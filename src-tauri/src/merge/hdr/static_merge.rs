@@ -18,6 +18,9 @@ pub(crate) struct StaticRadiancePreview {
     pub action_state: &'static str,
     pub color_state: &'static str,
     pub effective_sample_mean: f32,
+    pub headroom_max: f32,
+    pub headroom_p99: f32,
+    pub headroom_coverage: f32,
     pub invalid_or_clipped_coverage: f32,
     pub motion_coverage: f32,
     pub plan_hash: String,
@@ -48,6 +51,20 @@ fn hash_f32(values: impl IntoIterator<Item = f32>) -> String {
         .flat_map(f32::to_le_bytes)
         .collect::<Vec<_>>();
     format!("blake3:{}", blake3::hash(&bytes).to_hex())
+}
+
+fn summarize_headroom(radiance: &[[f32; 3]]) -> (f32, f32, f32) {
+    let mut luminance = radiance
+        .iter()
+        .map(|pixel| 0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2])
+        .collect::<Vec<_>>();
+    luminance.sort_by(f32::total_cmp);
+    let max = luminance.last().copied().unwrap_or(0.0).max(0.0);
+    let p99_index = ((luminance.len().saturating_sub(1)) as f32 * 0.99).round() as usize;
+    let p99 = luminance.get(p99_index).copied().unwrap_or(0.0).max(0.0);
+    let coverage = luminance.iter().filter(|value| **value > 1.0).count() as f32
+        / luminance.len().max(1) as f32;
+    (max, p99, coverage)
 }
 
 pub(crate) fn reconstruct_static_preview(
@@ -124,6 +141,7 @@ pub(crate) fn reconstruct_static_preview(
         return Err("hdr_plan_cancelled:radiance_artifact_encode".to_string());
     }
     let radiance_hash = hash_f32(radiance.iter().flat_map(|pixel| pixel.iter().copied()));
+    let (headroom_max, headroom_p99, headroom_coverage) = summarize_headroom(&radiance);
     let support_hash = hash_f32(support.iter().copied());
     let variance_hash = hash_f32(variance.iter().copied());
     let weight_hash = hash_f32(weight.iter().copied());
@@ -151,6 +169,9 @@ pub(crate) fn reconstruct_static_preview(
         },
         color_state: "scene_linear_camera_white_balanced_uncalibrated_display_fallback",
         effective_sample_mean: support.iter().sum::<f32>() / support.len() as f32,
+        headroom_max,
+        headroom_p99,
+        headroom_coverage,
         invalid_or_clipped_coverage: invalid_channels as f32 / (width * height * 3) as f32,
         motion_coverage,
         plan_hash: plan_hash.to_string(),
@@ -266,5 +287,14 @@ mod tests {
         let first = hash_f32([0.0, 0.5, 1.0]);
         assert_eq!(first, hash_f32([0.0, 0.5, 1.0]));
         assert_ne!(first, hash_f32([1.0, 0.5, 0.0]));
+    }
+
+    #[test]
+    fn headroom_summary_preserves_scene_values_above_sdr_white() {
+        let (max, p99, coverage) =
+            summarize_headroom(&[[0.2, 0.2, 0.2], [2.0, 1.5, 1.0], [4.0, 3.0, 2.0]]);
+        assert!(max > 3.0);
+        assert!(p99 > 3.0);
+        assert!((coverage - (2.0 / 3.0)).abs() < 0.0001);
     }
 }
