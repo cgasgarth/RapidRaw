@@ -90,7 +90,11 @@ export type CropStraightenSemanticCommand =
       readonly reason: CropStraightenCleanupReason | 'pointer-ended';
       readonly type: 'release-pointer';
     }
-  | { readonly correctionDegrees: number; readonly type: 'straighten-committed' };
+  | {
+      readonly correctionDegrees: number;
+      readonly identity: CropStraightenSessionIdentity;
+      readonly type: 'straighten-committed';
+    };
 
 export interface CropStraightenControllerTransition {
   readonly commands: readonly CropStraightenSemanticCommand[];
@@ -247,7 +251,8 @@ export const reduceCropStraightenController = (
   const commands: CropStraightenSemanticCommand[] = [
     { pointerId: event.pointerId, reason: 'pointer-ended', type: 'release-pointer' },
   ];
-  if (correction !== null) commands.push({ correctionDegrees: correction, type: 'straighten-committed' });
+  if (correction !== null)
+    commands.push({ correctionDegrees: correction, identity: state.session, type: 'straighten-committed' });
   return transition({ ...state, gesture: null }, commands);
 };
 

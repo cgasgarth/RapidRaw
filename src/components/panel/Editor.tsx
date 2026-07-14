@@ -38,7 +38,6 @@ import {
   isCropValidAfterRotation,
   percentCropFromPixelCrop,
   pixelCropFromPercentCrop,
-  resolveCropForGeometryTransaction,
   resolveNextCropForGeometryChange,
   updateCropDraft,
 } from '../../utils/cropUtils';
@@ -92,6 +91,7 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
 import { debounce } from '../../utils/timing';
 import {
   applyWhiteBalancePickerHoverPreview,
@@ -103,6 +103,7 @@ import {
 } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
+import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
@@ -424,33 +425,23 @@ export default function Editor({
   );
 
   const handleStraighten = useCallback(
-    (angleCorrection: number) => {
-      setAdjustments((prev: Adjustments) => {
-        const newRotation = (prev.rotation || 0) + angleCorrection;
-        if (!selectedImage?.width || !selectedImage.height) return { ...prev, rotation: newRotation };
-        return {
-          ...prev,
-          crop: resolveCropForGeometryTransaction(
-            prev.crop,
-            selectedImage.width,
-            selectedImage.height,
-            {
-              aspectRatio: prev.aspectRatio,
-              orientationSteps: prev.orientationSteps || 0,
-              rotation: prev.rotation || 0,
-            },
-            {
-              aspectRatio: prev.aspectRatio,
-              orientationSteps: prev.orientationSteps || 0,
-              rotation: newRotation,
-            },
-          ),
-          rotation: newRotation,
-        };
-      });
+    (angleCorrection: number, identity: CropStraightenSessionIdentity) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildStraightenEditTransaction(
+          {
+            ...state,
+            operationGeneration: adjustmentGeometryRevision,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          identity,
+          angleCorrection,
+          crypto.randomUUID(),
+        ),
+      );
       setEditor({ isStraightenActive: false });
     },
-    [selectedImage, setAdjustments, setEditor],
+    [adjustmentGeometryRevision, applyEditTransaction, setEditor, viewerSampleGraphRevision],
   );
 
   const updateSubMaskLocal = useCallback(

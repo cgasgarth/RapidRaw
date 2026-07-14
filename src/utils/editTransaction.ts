@@ -4,6 +4,7 @@ import type { Adjustments } from './adjustments';
 export type EditMutationSource =
   | 'manual-control'
   | 'picker'
+  | 'geometry-tool'
   | 'auto-edit'
   | 'preset'
   | 'copy-paste'

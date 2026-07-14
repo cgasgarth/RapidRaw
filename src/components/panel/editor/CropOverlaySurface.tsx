@@ -33,7 +33,7 @@ interface CropOverlaySurfaceProps {
   isCropViewVisible: boolean;
   onCropPreviewError: () => void;
   onCropPreviewLoad: () => void;
-  onStraighten: (correctionDegrees: number) => void;
+  onStraighten: (correctionDegrees: number, identity: CropStraightenSessionIdentity) => void;
   isMaxZoom: boolean | undefined;
   isRotationActive: boolean | undefined;
   isStraightenActive: boolean;
@@ -95,7 +95,7 @@ export function CropOverlaySurface({
       } else if (command.type === 'crop-completed') {
         handlersRef.current.handleCropComplete(command.crop, command.percentCrop);
       } else {
-        handlersRef.current.onStraighten(command.correctionDegrees);
+        handlersRef.current.onStraighten(command.correctionDegrees, command.identity);
       }
     }
   }, []);

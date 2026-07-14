@@ -77,6 +77,7 @@ describe('crop straighten controller', () => {
     expect(ended.commands[0]).toEqual({ pointerId: 4, reason: 'pointer-ended', type: 'release-pointer' });
     expect(ended.commands[1]).toEqual({
       correctionDegrees: expect.closeTo(-5.710593, 5),
+      identity: session,
       type: 'straighten-committed',
     });
   });
