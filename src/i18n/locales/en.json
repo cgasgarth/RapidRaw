@@ -63,6 +63,15 @@
         "contribution": "{{name}} contribution",
         "disabled": "Off",
         "enabled": "On",
+        "filterPreset": "Filter preset",
+        "filterPresetAria": "Black and White filter preset",
+        "manualResponse": "Manual response",
+        "sourceClass": "Source class",
+        "sourceClassAria": "Black and White source class",
+        "sourceColor": "Color source",
+        "sourceEncodedGrayscale": "Encoded grayscale",
+        "sourceMonochromeSensor": "Monochrome sensor",
+        "sourceWorkingMonochrome": "Working monochrome",
         "title": "Black & White Mixer"
       },
       "calibration": {

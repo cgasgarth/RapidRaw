@@ -30,10 +30,29 @@ export const monochromeProcessSchema = z.enum([
   'continuous_sensitivity_v1',
 ]);
 
+export const monochromeSourceClassSchema = z.enum([
+  'color_source',
+  'monochrome_sensor',
+  'encoded_grayscale',
+  'already_monochrome_working',
+]);
+
+export const monochromePresetIdSchema = z.enum([
+  'manual',
+  'neutral_panchromatic',
+  'yellow_filter',
+  'orange_filter',
+  'red_filter',
+  'green_filter',
+  'blue_filter',
+]);
+
 export const blackWhiteMixerSettingsSchema = z
   .object({
     enabled: z.boolean(),
     process: monochromeProcessSchema.default('legacy_fixed_band_v1'),
+    presetId: monochromePresetIdSchema.default('manual'),
+    sourceClass: monochromeSourceClassSchema.default('color_source'),
     weights: blackWhiteMixerWeightsSchema,
   })
   .strict()

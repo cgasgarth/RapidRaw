@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { parseBlackWhiteMixerSettings } from '../../../src/schemas/color/blackWhiteMixerSchemas';
+import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../src/utils/color/monochromePresets';
 import {
   applyBlackWhiteMixerToRgbPixel,
   applyTargetedMonochromeMix,
@@ -22,6 +23,8 @@ describe('versioned monochrome runtime', () => {
   test('keeps missing process values on the pixel-stable legacy process', () => {
     const parsed = parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights });
     expect(parsed.process).toBe('legacy_fixed_band_v1');
+    expect(parsed.sourceClass).toBe('color_source');
+    expect(parsed.presetId).toBe('manual');
   });
 
   test('neutral panchromatic v1 uses AP1 energy without an SDR clamp', () => {
@@ -70,5 +73,30 @@ describe('versioned monochrome runtime', () => {
     expect(targeted.process).toBe('continuous_sensitivity_v1');
     expect(changed.length).toBeGreaterThanOrEqual(1);
     expect(changed.length).toBeLessThanOrEqual(2);
+  });
+
+  test('source-class policy abstains from invented hue sensitivity', () => {
+    const settings = {
+      enabled: true,
+      process: 'continuous_sensitivity_v1' as const,
+      sourceClass: 'monochrome_sensor' as const,
+      weights: { ...zeroWeights, reds: 100, blues: -100 },
+    };
+    const result = applyBlackWhiteMixerToRgbPixel({ blue: 0.2, green: 0.4, red: 8 }, settings);
+    expect(result.outputRgb.red).toBeCloseTo(result.outputRgb.green, 10);
+    expect(result.outputRgb.green).toBeCloseTo(result.outputRgb.blue, 10);
+    expect(result.receipt.sourceClass).toBe('monochrome_sensor');
+    expect(result.receipt.equalChannelOutput).toBe(true);
+    expect(result.receipt.inputHeadroomPreserved).toBe(true);
+  });
+
+  test('project-owned filter presets compile to editable continuous responses', () => {
+    expect(MONOCHROME_PRESETS).toHaveLength(6);
+    const settings = parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights });
+    const selected = applyMonochromePreset(settings, 'orange_filter');
+    expect(selected.enabled).toBe(true);
+    expect(selected.process).toBe('continuous_sensitivity_v1');
+    expect(selected.presetId).toBe('orange_filter');
+    expect(selected.weights.blues).toBeLessThan(0);
   });
 });

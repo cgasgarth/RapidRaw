@@ -62,6 +62,15 @@
         "contribution": "Wkład {{name}}",
         "disabled": "Wył.",
         "enabled": "Wł.",
+        "filterPreset": "",
+        "filterPresetAria": "",
+        "manualResponse": "",
+        "sourceClass": "",
+        "sourceClassAria": "",
+        "sourceColor": "",
+        "sourceEncodedGrayscale": "",
+        "sourceMonochromeSensor": "",
+        "sourceWorkingMonochrome": "",
         "title": "Mikser czarno-biały"
       },
       "calibration": {

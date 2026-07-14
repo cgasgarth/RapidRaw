@@ -62,6 +62,15 @@
         "contribution": "",
         "disabled": "",
         "enabled": "",
+        "filterPreset": "",
+        "filterPresetAria": "",
+        "manualResponse": "",
+        "sourceClass": "",
+        "sourceClassAria": "",
+        "sourceColor": "",
+        "sourceEncodedGrayscale": "",
+        "sourceMonochromeSensor": "",
+        "sourceWorkingMonochrome": "",
         "title": ""
       },
       "calibration": {
