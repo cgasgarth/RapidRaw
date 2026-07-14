@@ -3,12 +3,19 @@ import { useCallback } from 'react';
 
 import { hdrRuntimePlanSchema } from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import { panoramaRuntimePlanSchema } from '../../schemas/computational-merge/panoramaUiSchemas';
+import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
+import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import {
   buildHdrDryRunActionState,
   buildPanoramaDryRunCommandState,
 } from '../../utils/computational-merge/computationalMergeModalState';
+import type { OperationEvent } from '../../workflows/operationLifecycle';
+
+type HdrLifecycleInput = {
+  [Type in OperationEvent['type']]: Omit<Extract<OperationEvent, { type: Type }>, 'launchId'>;
+}[OperationEvent['type']];
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
@@ -119,9 +126,18 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     (paths: string[], operationId: string) => {
       const { hdrModalState } = useUIStore.getState();
       if (hdrModalState.isProcessing) return;
+      const hdrLaunchId = useOperationLaunchStore.getState().launches.hdr?.launchId;
+      const dispatchHdrLifecycle = (event: HdrLifecycleInput) => {
+        if (hdrLaunchId === undefined) return;
+        useHdrWorkflowStore.getState().dispatch({
+          event: { ...event, launchId: hdrLaunchId } as OperationEvent,
+          type: 'lifecycle',
+        });
+      };
       const { settings } = hdrModalState;
       const { lastDryRunCommand, selectedPaths } = buildHdrDryRunActionState(paths, settings);
       if (hdrModalState.runtimePlan?.accepted === true && hdrModalState.runtimePlan.blockCodes.length === 0) {
+        dispatchHdrLifecycle({ type: 'start' });
         setUI((state) => ({
           hdrModalState: {
             ...state.hdrModalState,
@@ -136,6 +152,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           acceptedDryRunPlanId: hdrModalState.runtimePlan.acceptedDryRunPlanId,
           paths: selectedPaths,
         }).catch((err: unknown) => {
+          dispatchHdrLifecycle({ type: 'fail', error: String(err) });
           setUI((state) =>
             state.hdrModalState.activeOperationId !== operationId
               ? {}
@@ -159,9 +176,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           },
         };
       });
+      dispatchHdrLifecycle({ type: 'prepare' });
       void (async () => {
         try {
           const runtimePlan = hdrRuntimePlanSchema.parse(await invoke(Invokes.PlanHdr, { paths: selectedPaths }));
+          dispatchHdrLifecycle({ type: 'ready' });
           setUI((state) =>
             state.hdrModalState.activeOperationId !== operationId
               ? {}
@@ -179,6 +198,10 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
                 },
           );
           if (runtimePlan.blockCodes.length > 0 || !runtimePlan.accepted) {
+            dispatchHdrLifecycle({
+              type: 'fail',
+              error: runtimePlan.blockCodes.join('\n') || 'HDR dry-run blocked this merge.',
+            });
             setUI((state) => ({
               hdrModalState: {
                 ...state.hdrModalState,
@@ -189,6 +212,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             return;
           }
         } catch (err: unknown) {
+          dispatchHdrLifecycle({ type: 'fail', error: String(err) });
           setUI((state) =>
             state.hdrModalState.activeOperationId !== operationId
               ? {}

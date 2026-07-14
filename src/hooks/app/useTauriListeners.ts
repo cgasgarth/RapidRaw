@@ -26,7 +26,9 @@ import {
   persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useUIStore } from '../../store/useUIStore';
 import type { ThumbnailCacheMutation, ThumbnailSmartPreviewState } from '../../thumbnails/ThumbnailCache';
@@ -677,6 +679,24 @@ export function useTauriListeners({
       listen<unknown>(HDR_COMPLETE_EVENT, (event) => {
         const payload = parseHdrCompletePayload(event.payload);
         if (isEffectActive) {
+          const workflowSession = useHdrWorkflowStore.getState().session;
+          const currentLaunch = useOperationLaunchStore.getState().launches.hdr;
+          const currentUi = useUIStore.getState().hdrModalState;
+          const selectedIndexes = currentUi.lastDryRunCommand?.selectedSourceIndexes ?? [];
+          const activeSources = selectedIndexes
+            .map((index) => currentUi.stitchingSourcePaths[index])
+            .filter((path): path is string => path !== undefined);
+          if (
+            workflowSession !== null &&
+            currentLaunch?.launchId === workflowSession.launch.launchId &&
+            isMergeOperationActive(currentUi) &&
+            orderedMergeSourcesMatch(activeSources, payload.receipt.sourcePaths)
+          ) {
+            useHdrWorkflowStore.getState().dispatch({
+              event: { type: 'complete', launchId: workflowSession.launch.launchId },
+              type: 'lifecycle',
+            });
+          }
           useUIStore.getState().setUI((state) => {
             const selectedIndexes = state.hdrModalState.lastDryRunCommand?.selectedSourceIndexes ?? [];
             const activeSources = selectedIndexes
@@ -714,6 +734,13 @@ export function useTauriListeners({
       }),
       listen<unknown>(HDR_ERROR_EVENT, (event) => {
         if (isEffectActive) {
+          const launchId = useOperationLaunchStore.getState().launches.hdr?.launchId;
+          if (launchId !== undefined && isMergeOperationActive(useUIStore.getState().hdrModalState)) {
+            useHdrWorkflowStore.getState().dispatch({
+              event: { type: 'fail', error: parseStringPayload(event.payload), launchId },
+              type: 'lifecycle',
+            });
+          }
           useUIStore.getState().setUI((state) =>
             !isMergeOperationActive(state.hdrModalState)
               ? {}
