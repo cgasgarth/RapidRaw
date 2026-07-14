@@ -31,6 +31,9 @@ use super::negative_lab_optical_finish::{
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
+use crate::raw::negative_lab_auto_meter::{
+    NegativeLabAutoMeterControls, NegativeLabAutoMeterReceipt, measure_auto_meter,
+};
 use crate::raw::negative_lab_cmy_timing::{
     NegativeLabCmyTimingMetrics, NegativeLabCmyTimingParams, apply_cmy_timing_pixel,
 };
@@ -108,6 +111,8 @@ pub struct NegativeConversionParams {
     pub print_curve_v2: Option<NegativeLabHdPaperCurveParams>,
     #[serde(default)]
     pub paper_profile: Option<NegativeLabPaperProfileSnapshot>,
+    #[serde(default)]
+    pub auto_meter: NegativeLabAutoMeterControls,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -263,6 +268,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     pub cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     pub neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
+    pub auto_meter: NegativeLabAutoMeterReceipt,
     #[serde(default)]
     pub paper_profile: Option<NegativeLabPaperProfileSnapshot>,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
@@ -1155,6 +1161,7 @@ impl Default for NegativeConversionParams {
             print_curve_algorithm: NegativeLabDensityPrintAlgorithm::DensityRgbV1,
             print_curve_v2: None,
             paper_profile: None,
+            auto_meter: NegativeLabAutoMeterControls::default(),
         }
     }
 }
@@ -1805,6 +1812,7 @@ fn negative_lab_file_state(path: &Path, label: &str) -> Result<serde_json::Value
 #[derive(Debug, Clone)]
 struct NegativeLabConversionBundleOutputRef {
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    auto_meter: NegativeLabAutoMeterReceipt,
     #[allow(dead_code)]
     color_finish_metrics: Option<NegativeLabColorFinishMetrics>,
     flat_log_master: NegativeLabFlatLogMasterParams,
@@ -1863,6 +1871,7 @@ struct NegativeLabOutputSidecarReceipt {
 
 struct NegativeLabOutputRenderReceipt<'a> {
     density_normalization_metrics: &'a NegativeLabDensityNormalizationMetrics,
+    auto_meter: Option<&'a NegativeLabAutoMeterReceipt>,
     color_finish_metrics: Option<&'a NegativeLabColorFinishMetrics>,
     neutral_axis_analysis: Option<&'a NegativeLabNeutralAxisAnalysis>,
     dimensions: NegativeLabSavedPositiveDimensions,
@@ -1923,6 +1932,7 @@ fn write_negative_lab_conversion_bundle(
             Ok(serde_json::json!({
                 "contentHash": hash_negative_lab_output_file(&output.output_path)?,
                 "densityNormalizationMetrics": output.density_normalization_metrics,
+                "autoMeter": output.auto_meter,
                 "colorFinishMetrics": output.color_finish_metrics,
                 "flatLogMaster": output.flat_log_master,
                 "dimensions": {
@@ -2107,6 +2117,7 @@ fn write_negative_lab_output_sidecar(
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "densityNormalizationMetrics": render_receipt.density_normalization_metrics,
+            "autoMeter": render_receipt.auto_meter,
             "colorFinishMetrics": render_receipt.color_finish_metrics,
             "neutralAxisAnalysis": render_receipt.neutral_axis_analysis,
             "flatLogMaster": render_receipt.flat_log_master,
@@ -2461,6 +2472,7 @@ impl NegativeConversionParams {
             paper_profile: self
                 .paper_profile
                 .map(NegativeLabPaperProfileSnapshot::sanitized),
+            auto_meter: self.auto_meter.sanitized(),
         }
         .with_sanitized_endpoints()
     }
@@ -2588,6 +2600,7 @@ struct NegativeLabPipelineRender {
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
+    auto_meter: NegativeLabAutoMeterReceipt,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3371,6 +3384,7 @@ fn run_e6_positive_pipeline(
         optical_finish_metrics: optical_finish.metrics,
         cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
         neutral_axis_analysis: NegativeLabNeutralAxisAnalysis::default(),
+        auto_meter: measure_auto_meter(&[], &params.auto_meter, 0, params.render_intent),
     }
 }
 
@@ -3395,6 +3409,9 @@ fn run_bw_silver_pipeline(
     bw_params.green_weight = 1.0;
     bw_params.blue_weight = 1.0;
     bw_params.color_finish = NegativeLabScannerColorFinishParams::default();
+    // Auto-density/ISO-R is a color-negative meter. Keep the BW path fail-safe
+    // rather than applying a color-negative grade to a monochrome signal.
+    bw_params.auto_meter = NegativeLabAutoMeterControls::default();
     let mut render = run_pipeline_with_metrics(
         &DynamicImage::ImageRgb32F(monochrome),
         &bw_params,
@@ -3529,6 +3546,26 @@ fn run_pipeline_with_metrics(
     );
     let effective_cmy_timing =
         compile_neutral_axis_cmy_timing(&params.cmy_timing, &neutral_axis_analysis);
+    let auto_meter = measure_auto_meter(
+        &model_density_buffer,
+        &params.auto_meter,
+        clipped_pixel_count,
+        params.render_intent,
+    );
+    // Legacy density_rgb_v1 callers may not provide a paper profile. When an
+    // auto meter is explicitly enabled and confidence permits application,
+    // materialize the native default H&D curve so the receipt corresponds to
+    // an actual render change instead of a no-op.
+    let mut hd_curve = hd_curve;
+    if hd_curve.is_none() && (auto_meter.density_applied || auto_meter.grade_applied) {
+        hd_curve = Some(NegativeLabHdPaperCurveParams::default());
+    }
+    if let Some(curve) = hd_curve.as_mut() {
+        curve.density_offset =
+            (curve.density_offset + auto_meter.applied_density_offset).clamp(-0.5, 0.5);
+        curve.iso_r_grade = (curve.iso_r_grade * auto_meter.effective_iso_r_grade).clamp(0.5, 3.0);
+        *curve = curve.clone().sanitized();
+    }
 
     let mut density_metrics = out_buffer
         .par_chunks_mut(3)
@@ -3672,6 +3709,7 @@ fn run_pipeline_with_metrics(
         optical_finish_metrics: optical_finish.metrics,
         cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
         neutral_axis_analysis: NegativeLabNeutralAxisAnalysis::default(),
+        auto_meter: measure_auto_meter(&[], &params.auto_meter, 0, params.render_intent),
     }
 }
 
@@ -4359,6 +4397,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
+    auto_meter: NegativeLabAutoMeterReceipt,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -4415,6 +4454,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         optical_finish_metrics,
         cmy_timing_metrics,
         neutral_axis_analysis,
+        auto_meter,
         paper_profile: params.paper_profile.clone(),
         dimensions,
         flat_log_master: params.flat_log_master,
@@ -4567,6 +4607,7 @@ pub async fn preview_negative_conversion(
         rendered_preview.optical_finish_metrics,
         rendered_preview.cmy_timing_metrics,
         rendered_preview.neutral_axis_analysis,
+        rendered_preview.auto_meter,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -4609,6 +4650,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         rendered_preview.optical_finish_metrics,
         rendered_preview.cmy_timing_metrics,
         rendered_preview.neutral_axis_analysis,
+        rendered_preview.auto_meter,
         &params,
         rendered_preview.density_scopes,
     )
@@ -4915,6 +4957,7 @@ pub async fn convert_negatives(
                 &replay_plan_hash,
                 NegativeLabOutputRenderReceipt {
                     density_normalization_metrics: &density_normalization_metrics,
+                    auto_meter: Some(&pipeline_render.auto_meter),
                     color_finish_metrics: Some(&color_finish_metrics),
                     neutral_axis_analysis: Some(&pipeline_render.neutral_axis_analysis),
                     dimensions: NegativeLabSavedPositiveDimensions {
@@ -4927,6 +4970,7 @@ pub async fn convert_negatives(
             )?;
             bundle_outputs.push(NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: density_normalization_metrics.clone(),
+                auto_meter: pipeline_render.auto_meter.clone(),
                 color_finish_metrics: Some(color_finish_metrics.clone()),
                 flat_log_master: effective_params.flat_log_master,
                 render_intent: effective_params.render_intent,
@@ -6261,6 +6305,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                auto_meter: None,
                 color_finish_metrics: None,
                 neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
@@ -6388,6 +6433,12 @@ mod tests {
             &bundle_path,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                auto_meter: measure_auto_meter(
+                    &[],
+                    &NegativeLabAutoMeterControls::default(),
+                    0,
+                    NegativeLabRenderIntent::Print,
+                ),
                 color_finish_metrics: None,
                 flat_log_master: NegativeLabFlatLogMasterParams::default(),
                 render_intent: NegativeLabRenderIntent::Print,
@@ -6463,6 +6514,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                auto_meter: None,
                 color_finish_metrics: None,
                 neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
@@ -6579,6 +6631,12 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                auto_meter: measure_auto_meter(
+                    &[],
+                    &NegativeLabAutoMeterControls::default(),
+                    0,
+                    NegativeLabRenderIntent::Print,
+                ),
                 color_finish_metrics: None,
                 flat_log_master: NegativeLabFlatLogMasterParams::default(),
                 render_intent: NegativeLabRenderIntent::Print,
@@ -7346,6 +7404,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                auto_meter: None,
                 color_finish_metrics: None,
                 neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
@@ -7398,6 +7457,12 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                auto_meter: measure_auto_meter(
+                    &[],
+                    &NegativeLabAutoMeterControls::default(),
+                    0,
+                    NegativeLabRenderIntent::Print,
+                ),
                 color_finish_metrics: None,
                 flat_log_master: NegativeLabFlatLogMasterParams::default(),
                 render_intent: NegativeLabRenderIntent::Print,
@@ -7705,6 +7770,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                auto_meter: None,
                 color_finish_metrics: None,
                 neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
@@ -7725,6 +7791,12 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                auto_meter: measure_auto_meter(
+                    &[],
+                    &NegativeLabAutoMeterControls::default(),
+                    0,
+                    NegativeLabRenderIntent::Print,
+                ),
                 color_finish_metrics: None,
                 flat_log_master: NegativeLabFlatLogMasterParams::default(),
                 render_intent: NegativeLabRenderIntent::Print,
@@ -7998,6 +8070,12 @@ mod tests {
             NegativeLabOpticalFinishMetrics::default(),
             NegativeLabCmyTimingMetrics::default(),
             NegativeLabNeutralAxisAnalysis::default(),
+            measure_auto_meter(
+                &[],
+                &NegativeLabAutoMeterControls::default(),
+                0,
+                NegativeLabRenderIntent::Print,
+            ),
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -8084,6 +8162,7 @@ mod tests {
             pipeline.optical_finish_metrics,
             pipeline.cmy_timing_metrics,
             pipeline.neutral_axis_analysis,
+            pipeline.auto_meter,
             &params,
             pipeline.density_scopes,
         )

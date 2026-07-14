@@ -9076,6 +9076,24 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
         allowGlobalFallback: false,
         source: 'manual_only_v1',
       }),
+    autoMeter: z
+      .object({
+        autoDensityEnabled: z.boolean().default(false),
+        autoDensityStrength: z.number().min(0).max(1).default(1),
+        autoDensityAnchor: z.number().min(0.2).max(0.8).default(0.5),
+        autoGradeEnabled: z.boolean().default(false),
+        autoGradeStrength: z.number().min(0).max(1).default(1),
+        confidenceThreshold: z.number().min(0.3).max(0.95).default(0.58),
+      })
+      .strict()
+      .default({
+        autoDensityEnabled: false,
+        autoDensityStrength: 1,
+        autoDensityAnchor: 0.5,
+        autoGradeEnabled: false,
+        autoGradeStrength: 1,
+        confidenceThreshold: 0.58,
+      }),
     opticalFinish: negativeLabOpticalFinishV1Schema.default({
       algorithmVersion: 1,
       enabled: false,
@@ -9772,6 +9790,30 @@ export const negativeLabRuntimeProofV1Schema = z
           .strict()
           .optional(),
         paperProfile: negativeLabSetConversionRecipeParametersV1Schema.shape.paperProfile.optional(),
+        autoMeter: z
+          .object({
+            algorithmId: z.literal('native_negative_lab_auto_meter_v1'),
+            algorithmVersion: z.literal(1),
+            sampleCount: z.number().int().nonnegative(),
+            lumaDensityP10: z.number(),
+            lumaDensityP50: z.number(),
+            lumaDensityP90: z.number(),
+            texturalDensityRangeP10P90: z.number().nonnegative(),
+            boundedDensityRange: z.number().nonnegative(),
+            confidence: z.number().min(0).max(1),
+            confidenceThreshold: z.number().min(0).max(1),
+            requestedAutoDensityEnabled: z.boolean(),
+            requestedAutoDensityStrength: z.number().min(0).max(1),
+            requestedAutoGradeEnabled: z.boolean(),
+            requestedAutoGradeStrength: z.number().min(0).max(1),
+            appliedDensityOffset: z.number(),
+            effectiveIsoRGrade: z.number().positive(),
+            densityApplied: z.boolean(),
+            gradeApplied: z.boolean(),
+            warningCodes: z.array(z.string().trim().min(1)),
+          })
+          .strict()
+          .optional(),
         dryRunMode: z.literal('runtime_preview_non_mutating'),
         planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
         beforeAfterPreviewProof: z

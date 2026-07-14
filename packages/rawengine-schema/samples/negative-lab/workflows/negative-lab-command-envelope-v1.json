@@ -65,6 +65,14 @@
       "allowGlobalFallback": false,
       "source": "manual_only_v1"
     },
+    "autoMeter": {
+      "autoDensityEnabled": false,
+      "autoDensityStrength": 1,
+      "autoDensityAnchor": 0.5,
+      "autoGradeEnabled": false,
+      "autoGradeStrength": 1,
+      "confidenceThreshold": 0.58
+    },
     "opticalFinish": {
       "algorithmVersion": 1,
       "enabled": false,
