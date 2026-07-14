@@ -210,6 +210,47 @@ test('viewport changes cancel active work and retain one canonical ROI snapshot'
   expect(unchanged.effects).toEqual([]);
 });
 
+test('viewport transitions retain the last canonical pixels and reject the cancelled completion', () => {
+  let state = createPreviewCoordinatorState();
+  state = transition(state, { session: session(), type: 'image-session-installed' }).state;
+
+  const base = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  state = transition(base.state, { identity: base.state.settled.identity!, type: 'operation-started' }).state;
+  state = transition(state, {
+    artifact: artifact(base.state.settled.identity!, 'blob:canonical-base'),
+    identity: base.state.settled.identity!,
+    type: 'operation-completed',
+  }).state;
+
+  const successor = transition(state, {
+    identity: session({ targetHeight: 1400, targetWidth: 2200, viewportRevision: 2 }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  state = transition(successor.state, {
+    identity: successor.state.settled.identity!,
+    type: 'operation-started',
+  }).state;
+  const viewport = transition(state, {
+    type: 'viewport-changed',
+    viewport: { revision: 3, roiFingerprint: '[0.2,0.1,0.5,0.5]', targetHeight: 1600, targetWidth: 2400 },
+  });
+
+  expect(viewport.state.visibleArtifact?.url).toBe('blob:canonical-base');
+  expect(viewport.effects).toEqual([
+    { type: 'cancel', identity: successor.state.settled.identity, reason: 'viewport-changed' },
+  ]);
+
+  const late = transition(viewport.state, {
+    artifact: artifact(successor.state.settled.identity!, 'blob:cancelled-successor'),
+    identity: successor.state.settled.identity!,
+    type: 'operation-completed',
+  });
+  expect(late.state.visibleArtifact?.url).toBe('blob:canonical-base');
+  expect(late.state.staleCompletionCount).toBe(1);
+  expect(late.effects).toEqual([]);
+});
+
 test('display generation invalidates visible artifacts before a replacement render', () => {
   let state = createPreviewCoordinatorState();
   const started = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });

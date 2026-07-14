@@ -40,6 +40,7 @@ import {
   type InteractivePreviewScope,
   LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
+  usesPositionedPreviewPatch,
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import {
@@ -384,11 +385,10 @@ export function useImageProcessing(
       });
       if (synchronized.invalidated) {
         interactiveSchedulerRef.current?.clear();
-        clearInteractivePatch();
       }
       return { identity: synchronized.identity, roi: snapshot.roi, scope: snapshot.scope };
     },
-    [clearInteractivePatch, dispatchPreviewCoordinator],
+    [dispatchPreviewCoordinator],
   );
 
   const isPreviewRequestCurrent = useCallback(
@@ -626,14 +626,12 @@ export function useImageProcessing(
             tier: request.quality.tier,
           });
           if (operation) logAppOperationSuccess(operation, { backend: 'wgpu', byteLength: buffer.byteLength, jobId });
-          completeCoordinatorOperation();
           return;
         }
 
-        const patch = request.dragging ? parseInteractivePreviewPatchPayload(buffer) : null;
+        const patch = usesPositionedPreviewPatch(request) ? parseInteractivePreviewPatchPayload(buffer) : null;
         if (patch && !patch.ok) {
           completeCoordinatorOperation();
-          clearInteractivePatch();
           publishQualityStatus('degraded_limited', {
             ...request.quality,
             limitedBy: 'backend',
@@ -686,7 +684,7 @@ export function useImageProcessing(
             URL.revokeObjectURL(url);
             return;
           }
-          if (!completeCoordinatorOperation(url)) {
+          if (!completeCoordinatorOperation()) {
             URL.revokeObjectURL(url);
             return;
           }
@@ -712,6 +710,7 @@ export function useImageProcessing(
               phase: getPreviewReadyPhase(request.quality),
               requestId: request.requestId,
             },
+            ...(!request.dragging ? { renderedPreviewResolution: request.targetRes } : {}),
           });
           previewQualityControllerRef.current.record({
             commitMs: Math.max(0, previewNow() - commitStartedAt),
@@ -798,7 +797,6 @@ export function useImageProcessing(
         }
         if (!expectedSupersession && isPreviewRequestCurrent(request)) {
           failCoordinatorOperation(err);
-          clearInteractivePatch();
           publishQualityStatus('degraded_limited', {
             ...request.quality,
             limitedBy: 'error',
@@ -915,7 +913,6 @@ export function useImageProcessing(
         if (coordinatorIdentity !== undefined)
           previewCoordinatorOperationsRef.current.set(requestId, coordinatorIdentity);
         interactiveSchedulerRef.current?.clear();
-        clearInteractivePatch();
         void executeApplyAdjustments({
           snapshot: useEditorStore.getState().adjustmentSnapshot,
           createdAt,

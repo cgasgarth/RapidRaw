@@ -9,6 +9,7 @@ import {
   isInteractivePreviewPatchCoherent,
   LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
+  usesPositionedPreviewPatch,
 } from '../../../src/utils/interactivePreviewPatch.ts';
 
 const flushMicrotasks = async () => {
@@ -103,6 +104,12 @@ test('interactive preview patch parser returns normalized bounds for valid backe
     pixelHeight: 50,
     pixelWidth: 100,
   });
+});
+
+test('positioned patch transport covers active gestures and settled viewport ROI renders', () => {
+  expect(usesPositionedPreviewPatch({ dragging: true, roi: null })).toBe(true);
+  expect(usesPositionedPreviewPatch({ dragging: false, roi: [0.1, 0.2, 0.4, 0.5] })).toBe(true);
+  expect(usesPositionedPreviewPatch({ dragging: false, roi: null })).toBe(false);
 });
 
 test('interactive preview patch parser rejects full-frame JPEG content labeled as an offset ROI', () => {

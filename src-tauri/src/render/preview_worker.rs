@@ -372,16 +372,12 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     };
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
-    let pixel_roi = if is_interactive {
-        roi.map(|(nx, ny, nw, nh)| crate::gpu_processing::Roi {
-            x: (nx * preview_width as f32).round() as u32,
-            y: (ny * preview_height as f32).round() as u32,
-            width: (nw * preview_width as f32).round() as u32,
-            height: (nh * preview_height as f32).round() as u32,
-        })
-    } else {
-        None
-    };
+    let pixel_roi = roi.map(|(nx, ny, nw, nh)| crate::gpu_processing::Roi {
+        x: (nx * preview_width as f32).round() as u32,
+        y: (ny * preview_height as f32).round() as u32,
+        width: (nw * preview_width as f32).round() as u32,
+        height: (nh * preview_height as f32).round() as u32,
+    });
 
     let scaled_crop_offset = (
         unscaled_crop_offset.0 * effective_scale,
@@ -428,7 +424,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         retouched_processing_image.as_ref(),
         final_revision,
     );
-    let wants_analytics = !(is_interactive && pixel_roi.is_some());
+    let wants_analytics = pixel_roi.is_none();
     let channel_filter = if is_interactive {
         active_waveform_channel.map(str::to_string)
     } else {
@@ -554,7 +550,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let bytes = encode_preview_response(
         Some(app_handle),
         final_processed_image.as_ref(),
-        is_interactive,
+        should_encode_positioned_preview_patch(is_interactive, pixel_roi.is_some()),
         pixel_roi,
         preview_width,
         preview_height,
@@ -577,7 +573,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         preview_dim,
         interactive_divisor,
     });
-    if !is_interactive && let Some(graph_revision) = viewer_sample_graph_revision {
+    if !is_interactive
+        && pixel_roi.is_none()
+        && let Some(graph_revision) = viewer_sample_graph_revision
+    {
         let mut viewer_identity = preview_identity;
         viewer_identity.color_domain =
             crate::render::artifact_identity::ArtifactColorDomain::ViewEncoded;
@@ -620,7 +619,7 @@ fn settled_viewer_sample_frame(
 fn encode_preview_response(
     app_handle: Option<&tauri::AppHandle>,
     final_processed_image: &DynamicImage,
-    is_interactive: bool,
+    encode_as_patch: bool,
     pixel_roi: Option<crate::gpu_processing::Roi>,
     preview_width: u32,
     preview_height: u32,
@@ -665,7 +664,7 @@ fn encode_preview_response(
         Some(app) => Cow::Owned(to_display_preview_rgba8(app, final_processed_image)),
         None => to_preview_rgba8(final_processed_image),
     };
-    let interactive_geometry = if is_interactive {
+    let patch_geometry = if encode_as_patch {
         Some(validate_interactive_patch_geometry(
             final_rgba_image.width(),
             final_rgba_image.height(),
@@ -692,9 +691,9 @@ fn encode_preview_response(
         jpeg_bytes
     };
 
-    if is_interactive {
-        let (rx, ry, roi_w, roi_h) = interactive_geometry
-            .ok_or_else(|| "Interactive patch geometry was not validated".to_string())?;
+    if encode_as_patch {
+        let (rx, ry, roi_w, roi_h) = patch_geometry
+            .ok_or_else(|| "Positioned preview patch geometry was not validated".to_string())?;
         let mut response = Vec::with_capacity(24 + jpeg_bytes.len());
         response.extend_from_slice(&rx.to_le_bytes());
         response.extend_from_slice(&ry.to_le_bytes());
@@ -705,7 +704,7 @@ fn encode_preview_response(
         response.extend_from_slice(&jpeg_bytes);
 
         log::info!(
-            "[process_preview_job] interactive ROI {}x{} encode in {:.2?}, total {:.2?}",
+            "[process_preview_job] positioned ROI {}x{} encode in {:.2?}, total {:.2?}",
             roi_w,
             roi_h,
             step_start.elapsed(),
@@ -724,6 +723,10 @@ fn encode_preview_response(
         );
         Ok(jpeg_bytes)
     }
+}
+
+fn should_encode_positioned_preview_patch(is_interactive: bool, has_pixel_roi: bool) -> bool {
+    is_interactive || has_pixel_roi
 }
 
 #[cfg(target_os = "macos")]
@@ -935,6 +938,13 @@ mod tests {
         assert_ne!(&response[..2], &[0xff, 0xd8]);
     }
 
+    #[test]
+    fn positioned_preview_policy_covers_interactive_and_settled_roi_requests() {
+        assert!(should_encode_positioned_preview_patch(true, false));
+        assert!(should_encode_positioned_preview_patch(false, true));
+        assert!(!should_encode_positioned_preview_patch(false, false));
+    }
+
     fn encode_with_owned_source_baseline(
         image: DynamicImage,
         is_interactive: bool,
@@ -1117,6 +1127,37 @@ mod tests {
             u32::from_le_bytes(full_frame_encoded[12..16].try_into().unwrap()),
             2
         );
+    }
+
+    #[test]
+    fn settled_roi_encoder_preserves_positioned_geometry_contract() {
+        let image =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([80, 100, 120, 255])));
+        let roi = crate::gpu_processing::Roi {
+            x: 4,
+            y: 3,
+            width: 3,
+            height: 2,
+        };
+        let encoded = encode_preview_response(
+            None,
+            &image,
+            should_encode_positioned_preview_patch(false, true),
+            Some(roi),
+            10,
+            8,
+            94,
+            std::time::Instant::now(),
+        )
+        .expect("settled ROI preview should retain its positioned transport header");
+
+        assert_eq!(u32::from_le_bytes(encoded[0..4].try_into().unwrap()), 4);
+        assert_eq!(u32::from_le_bytes(encoded[4..8].try_into().unwrap()), 3);
+        assert_eq!(u32::from_le_bytes(encoded[8..12].try_into().unwrap()), 3);
+        assert_eq!(u32::from_le_bytes(encoded[12..16].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(encoded[16..20].try_into().unwrap()), 10);
+        assert_eq!(u32::from_le_bytes(encoded[20..24].try_into().unwrap()), 8);
+        assert!(encoded[24..].starts_with(&[0xff, 0xd8]));
     }
 
     #[test]
