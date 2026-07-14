@@ -65,6 +65,28 @@ const invokeMock = mock((command: string) => {
       width: 720,
     },
     previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
+    stageArtifacts: [
+      {
+        colorDomain: 'normalized_density',
+        contentHash: 'sha256:5b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
+        dimensions: { height: 480, width: 720 },
+        displayTransform: 'normalized_density_clamp_v1',
+        previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
+        recipeHash: 'sha256:6b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
+        stageId: 'normalized_density',
+        stageVersion: 1,
+      },
+      {
+        colorDomain: 'scene_linear_print',
+        contentHash: 'sha256:7b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
+        dimensions: { height: 480, width: 720 },
+        displayTransform: 'scene_linear_to_srgb_gamma_v1',
+        previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
+        recipeHash: 'sha256:6b05ce465b138a4232a9cf196884b41c6dd3b9a1a3f2f2916e4e3e78328701dd',
+        stageId: 'scene_linear_print',
+        stageVersion: 1,
+      },
+    ],
     renderer: 'rawengine_negative_lab_runtime_preview_v1',
     storage: 'temp_cache',
   });
@@ -189,6 +211,13 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
     });
     expect(result.displayPreviewUrl).toBe('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==');
     expect(result.nativeArtifact.renderer).toBe('rawengine_negative_lab_runtime_preview_v1');
+    expect(result.nativeArtifact.stageArtifacts?.map((stage) => stage.stageId)).toEqual([
+      'normalized_density',
+      'scene_linear_print',
+    ]);
+    expect(result.nativeArtifact.stageArtifacts?.[0]?.recipeHash).toBe(
+      result.nativeArtifact.stageArtifacts?.[1]?.recipeHash,
+    );
     expect(result.runtimeDryRun.toolName).toBe(NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME);
     expect(result.runtimeDryRun.dryRun.previewArtifacts[0]).toMatchObject({
       artifactId: 'artifact_negative_lab_runtime_preview_adapter',

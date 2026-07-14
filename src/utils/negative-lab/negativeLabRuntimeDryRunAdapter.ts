@@ -7,6 +7,7 @@ import {
   type NegativeLabRuntimePreviewRenderResultV1,
 } from '../../../packages/rawengine-schema/src';
 import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
+import { negativeLabStagePreviewArtifactFieldsSchema } from '../../schemas/negative-lab/negativeLabStagePreviewSchemas';
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
 import {
@@ -158,12 +159,16 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     previewDataUrl: z.string().startsWith('data:image/jpeg;base64,'),
+    stageArtifacts: z
+      .array(negativeLabStagePreviewArtifactFieldsSchema.extend({ boundsReceipt: nativeDensityBoundsReceiptSchema }))
+      .optional(),
     renderer: z.literal('rawengine_negative_lab_runtime_preview_v1'),
     storage: z.literal('temp_cache'),
   })
   .strict();
 
 export type NegativeLabDryRunPreviewArtifact = z.infer<typeof negativeLabDryRunPreviewArtifactSchema>;
+export type NegativeLabStagePreviewArtifact = NonNullable<NegativeLabDryRunPreviewArtifact['stageArtifacts']>[number];
 
 export interface NegativeLabRuntimeDryRunAdapterResult {
   displayPreviewUrl: string;
@@ -173,48 +178,61 @@ export interface NegativeLabRuntimeDryRunAdapterResult {
 
 const toRuntimePreviewRenderResult = (
   artifact: NegativeLabDryRunPreviewArtifact,
-): NegativeLabRuntimePreviewRenderResultV1 => ({
-  artifactId: artifact.artifactId,
-  baseFogSampleSummary: artifact.baseFogSampleSummary,
-  contentHash: artifact.contentHash,
-  densityNormalizationMetrics: {
-    axisBounds: {
-      color: artifact.densityNormalizationMetrics.axisBounds.color,
-      luma: artifact.densityNormalizationMetrics.axisBounds.luma,
-    },
-    channelBounds: {
-      blue: artifact.densityNormalizationMetrics.channelBounds.b,
-      green: artifact.densityNormalizationMetrics.channelBounds.g,
-      red: artifact.densityNormalizationMetrics.channelBounds.r,
-    },
-    boundsReceipt: {
-      ...artifact.densityNormalizationMetrics.boundsReceipt,
-      baseBounds: {
-        axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds,
-        channelBounds: {
-          blue: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.b,
-          green: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.g,
-          red: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.r,
+): NegativeLabRuntimePreviewRenderResultV1 => {
+  const stageArtifacts = artifact.stageArtifacts?.map((stage) => ({
+    colorDomain: stage.colorDomain,
+    contentHash: stage.contentHash,
+    dimensions: stage.dimensions,
+    displayTransform: stage.displayTransform,
+    previewDataUrl: stage.previewDataUrl,
+    recipeHash: stage.recipeHash,
+    stageId: stage.stageId,
+    stageVersion: stage.stageVersion,
+  }));
+  return {
+    artifactId: artifact.artifactId,
+    baseFogSampleSummary: artifact.baseFogSampleSummary,
+    contentHash: artifact.contentHash,
+    densityNormalizationMetrics: {
+      axisBounds: {
+        color: artifact.densityNormalizationMetrics.axisBounds.color,
+        luma: artifact.densityNormalizationMetrics.axisBounds.luma,
+      },
+      channelBounds: {
+        blue: artifact.densityNormalizationMetrics.channelBounds.b,
+        green: artifact.densityNormalizationMetrics.channelBounds.g,
+        red: artifact.densityNormalizationMetrics.channelBounds.r,
+      },
+      boundsReceipt: {
+        ...artifact.densityNormalizationMetrics.boundsReceipt,
+        baseBounds: {
+          axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.axisBounds,
+          channelBounds: {
+            blue: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.b,
+            green: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.g,
+            red: artifact.densityNormalizationMetrics.boundsReceipt.baseBounds.channelBounds.r,
+          },
+        },
+        finalBounds: {
+          axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds,
+          channelBounds: {
+            blue: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.b,
+            green: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.g,
+            red: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.r,
+          },
         },
       },
-      finalBounds: {
-        axisBounds: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.axisBounds,
-        channelBounds: {
-          blue: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.b,
-          green: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.g,
-          red: artifact.densityNormalizationMetrics.boundsReceipt.finalBounds.channelBounds.r,
-        },
-      },
+      clippedPixelCount: artifact.densityNormalizationMetrics.clippedPixelCount,
+      densityRangeUnclamped: artifact.densityNormalizationMetrics.densityRangeUnclamped,
+      epsilonClampedPixelCount: artifact.densityNormalizationMetrics.epsilonClampedPixelCount,
+      rendererVersion: artifact.densityNormalizationMetrics.rendererVersion,
     },
-    clippedPixelCount: artifact.densityNormalizationMetrics.clippedPixelCount,
-    densityRangeUnclamped: artifact.densityNormalizationMetrics.densityRangeUnclamped,
-    epsilonClampedPixelCount: artifact.densityNormalizationMetrics.epsilonClampedPixelCount,
-    rendererVersion: artifact.densityNormalizationMetrics.rendererVersion,
-  },
-  dimensions: artifact.dimensions,
-  renderer: artifact.renderer,
-  storage: artifact.storage,
-});
+    dimensions: artifact.dimensions,
+    renderer: artifact.renderer,
+    ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
+    storage: artifact.storage,
+  };
+};
 
 export async function renderNegativeLabRuntimeDryRunPreview(params: {
   command: Extract<NegativeLabCommandEnvelopeV1, { commandType: 'negativeLab.setConversionRecipe' }>;
