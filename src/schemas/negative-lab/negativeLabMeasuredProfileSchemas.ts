@@ -29,6 +29,33 @@ export const negativeLabMeasuredProfileRuntimeLimitationSchema = z.enum([
 ]);
 
 export const negativeLabMeasuredProfileRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+
+export const negativeLabProfileFitReceiptSchema = z
+  .object({
+    algorithmId: z.literal('native_negative_lab_profile_fit_v1'),
+    claimStatus: z.enum(['runtime_parameter_applied', 'blocked_or_unsupported']),
+    confidence: z.number().min(0).max(1),
+    crosstalkStatus: z.enum(['identity_crosstalk_pending_conditioning', 'identity_not_measured']),
+    fittedParams: z
+      .object({
+        baseFogStrength: z.number().min(0).max(1.25),
+        blueWeight: z.number().min(0.5).max(2),
+        contrast: z.number().min(0.5).max(2),
+        greenWeight: z.number().min(0.5).max(2),
+        redWeight: z.number().min(0.5).max(2),
+      })
+      .strict(),
+    maxResidual: z.number().min(0),
+    reportHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    rejectedPatchCount: z.number().int().nonnegative(),
+    residualMean: z.number().min(0),
+    schemaVersion: z.literal(1),
+    sourceInterpretationHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    targetLayoutId: z.literal('rawengine_negative_lab_target_v1'),
+    usedPatchCount: z.number().int().positive(),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
 export const negativeLabMeasuredProfileCalibrationMethodSchema = z.enum([
   'density_curve_process_family_v1',
   'density_matrix_process_family_v1',

@@ -77,6 +77,54 @@ pub struct NegativeConversionParams {
     pub flat_log_master: NegativeLabFlatLogMasterParams,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabCalibrationPatchV1 {
+    pub expected_rgb: [f32; 3],
+    pub independent_color_patch: bool,
+    pub observed_rgb: [f32; 3],
+    #[serde(default)]
+    pub clipped: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabProfileFitRequestV1 {
+    pub patches: Vec<NegativeLabCalibrationPatchV1>,
+    pub schema_version: u8,
+    pub source_interpretation_hash: String,
+    pub target_layout_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFittedParametersV1 {
+    pub base_fog_strength: f32,
+    pub blue_weight: f32,
+    pub contrast: f32,
+    pub green_weight: f32,
+    pub red_weight: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabProfileFitReceiptV1 {
+    pub algorithm_id: String,
+    pub claim_status: String,
+    pub confidence: f32,
+    pub crosstalk_status: String,
+    pub fitted_params: NegativeLabFittedParametersV1,
+    pub max_residual: f32,
+    pub report_hash: String,
+    pub rejected_patch_count: u32,
+    pub residual_mean: f32,
+    pub schema_version: u8,
+    pub source_interpretation_hash: String,
+    pub target_layout_id: String,
+    pub used_patch_count: u32,
+    pub warning_codes: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum NegativeConversionModel {
@@ -3557,6 +3605,152 @@ fn validate_negative_lab_source_interpretation(
     Ok(())
 }
 
+fn fit_negative_lab_profile(
+    request: NegativeLabProfileFitRequestV1,
+) -> Result<NegativeLabProfileFitReceiptV1, String> {
+    if request.schema_version != 1 {
+        return Err("Negative Lab calibration target schema version is unsupported.".to_string());
+    }
+    if request.target_layout_id != "rawengine_negative_lab_target_v1" {
+        return Err("Negative Lab calibration target layout is unsupported.".to_string());
+    }
+    if !request.source_interpretation_hash.starts_with("sha256:") {
+        return Err(
+            "Negative Lab profile fitting requires a loader interpretation hash.".to_string(),
+        );
+    }
+    if request.patches.len() < 12 {
+        return Err(
+            "Negative Lab profile fitting requires at least 12 target patches.".to_string(),
+        );
+    }
+    let mut rejected_patch_count = 0_u32;
+    let mut usable = Vec::new();
+    for patch in request.patches {
+        let valid = !patch.clipped
+            && patch
+                .expected_rgb
+                .iter()
+                .chain(patch.observed_rgb.iter())
+                .all(|value| value.is_finite() && (0.0..=1.0).contains(value));
+        if !valid {
+            rejected_patch_count += 1;
+        } else {
+            usable.push(patch);
+        }
+    }
+    if usable.len() < 12 {
+        return Err(
+            "Negative Lab profile fitting failed closed: fewer than 12 usable patches.".to_string(),
+        );
+    }
+    let mut ordered = usable.clone();
+    ordered.sort_by(|left, right| {
+        let left_luma = left.expected_rgb.iter().sum::<f32>();
+        let right_luma = right.expected_rgb.iter().sum::<f32>();
+        left_luma
+            .partial_cmp(&right_luma)
+            .unwrap_or(Ordering::Equal)
+    });
+    let mut monotonic_violation = false;
+    for pair in ordered.windows(2) {
+        let left = pair[0].observed_rgb.iter().sum::<f32>();
+        let right = pair[1].observed_rgb.iter().sum::<f32>();
+        if right + 0.02 < left {
+            monotonic_violation = true;
+            break;
+        }
+    }
+    if monotonic_violation {
+        return Err(
+            "Negative Lab profile fitting failed closed: target response is non-monotonic."
+                .to_string(),
+        );
+    }
+    let mut ratios = [Vec::new(), Vec::new(), Vec::new()];
+    let mut residuals = Vec::with_capacity(usable.len());
+    let mut independent_color_count = 0_u32;
+    for patch in &usable {
+        for (channel, channel_ratios) in ratios.iter_mut().enumerate() {
+            if patch.observed_rgb[channel] > 0.001 {
+                channel_ratios.push(
+                    (patch.expected_rgb[channel] / patch.observed_rgb[channel]).clamp(0.5, 2.0),
+                );
+            }
+        }
+        if patch.independent_color_patch {
+            independent_color_count += 1;
+        }
+        let residual = (0..3)
+            .map(|channel| (patch.expected_rgb[channel] - patch.observed_rgb[channel]).abs())
+            .sum::<f32>()
+            / 3.0;
+        residuals.push(residual);
+    }
+    let mean_ratio = |values: &[f32]| values.iter().sum::<f32>() / values.len().max(1) as f32;
+    let fitted_params = NegativeLabFittedParametersV1 {
+        base_fog_strength: 1.0,
+        blue_weight: mean_ratio(&ratios[2]),
+        contrast: (1.0
+            + (mean_ratio(&ratios[0]) + mean_ratio(&ratios[1]) + mean_ratio(&ratios[2]) - 3.0)
+                * 0.5)
+            .clamp(0.5, 2.0),
+        green_weight: mean_ratio(&ratios[1]),
+        red_weight: mean_ratio(&ratios[0]),
+    };
+    let residual_mean = residuals.iter().sum::<f32>() / residuals.len().max(1) as f32;
+    let max_residual = residuals.iter().copied().fold(0.0_f32, f32::max);
+    // Twelve usable patches is the minimum accepted calibration target. Treat
+    // that complete minimum target as sufficient sample coverage, then let
+    // residual quality determine whether runtime application is allowed.
+    let confidence =
+        ((usable.len() as f32 / 12.0).min(1.0) * (1.0 - residual_mean).max(0.0)).clamp(0.0, 1.0);
+    let claim_status = if confidence >= 0.65 && max_residual <= 0.2 {
+        "runtime_parameter_applied"
+    } else {
+        "blocked_or_unsupported"
+    };
+    let crosstalk_status = if independent_color_count >= 3 {
+        "identity_crosstalk_pending_conditioning"
+    } else {
+        "identity_not_measured"
+    };
+    let warning_codes = if claim_status == "runtime_parameter_applied" {
+        vec![
+            "no_stock_emulation_claim".to_string(),
+            "no_colorimetric_match_claim".to_string(),
+        ]
+    } else {
+        vec!["fit_confidence_below_runtime_threshold".to_string()]
+    };
+    let mut receipt = NegativeLabProfileFitReceiptV1 {
+        algorithm_id: "native_negative_lab_profile_fit_v1".to_string(),
+        claim_status: claim_status.to_string(),
+        confidence,
+        crosstalk_status: crosstalk_status.to_string(),
+        fitted_params,
+        max_residual,
+        report_hash: String::new(),
+        rejected_patch_count,
+        residual_mean,
+        schema_version: 1,
+        source_interpretation_hash: request.source_interpretation_hash,
+        target_layout_id: request.target_layout_id,
+        used_patch_count: usable.len() as u32,
+        warning_codes,
+    };
+    let canonical = serde_json::to_vec(&receipt).map_err(|error| error.to_string())?;
+    receipt.report_hash = format!("sha256:{}", hex::encode(Sha256::digest(canonical)));
+    Ok(receipt)
+}
+
+#[tauri::command]
+pub async fn fit_negative_lab_measured_profile(
+    request: NegativeLabProfileFitRequestV1,
+) -> Result<NegativeLabProfileFitReceiptV1, String> {
+    fit_negative_lab_profile(request)
+}
+
 #[tauri::command]
 pub async fn preflight_negative_lab_source(
     path: String,
@@ -4422,6 +4616,74 @@ mod tests {
             ..NegativeConversionParams::default()
         };
         assert!(validate_negative_lab_source_interpretation(&params, &interpretation).is_err());
+    }
+
+    fn calibration_fixture_patches() -> Vec<NegativeLabCalibrationPatchV1> {
+        (0..12)
+            .map(|index| {
+                let level = 0.08 + index as f32 * 0.07;
+                NegativeLabCalibrationPatchV1 {
+                    expected_rgb: [level, level * 0.95, level * 0.9],
+                    independent_color_patch: index >= 9,
+                    observed_rgb: [level / 1.1, level * 0.95 / 0.9, level * 0.9 / 1.2],
+                    clipped: false,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn measured_profile_fit_recovers_channel_weights_and_claims_runtime() {
+        let receipt = fit_negative_lab_profile(NegativeLabProfileFitRequestV1 {
+            patches: calibration_fixture_patches(),
+            schema_version: 1,
+            source_interpretation_hash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_string(),
+            target_layout_id: "rawengine_negative_lab_target_v1".to_string(),
+        })
+        .expect("synthetic calibration target should fit");
+        assert_eq!(receipt.claim_status, "runtime_parameter_applied");
+        assert!((receipt.fitted_params.red_weight - 1.1).abs() < 0.02);
+        assert!((receipt.fitted_params.green_weight - 0.9).abs() < 0.02);
+        assert!((receipt.fitted_params.blue_weight - 1.2).abs() < 0.02);
+        assert_eq!(
+            receipt.crosstalk_status,
+            "identity_crosstalk_pending_conditioning"
+        );
+        assert!(receipt.report_hash.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn measured_profile_fit_rejects_clipped_or_non_monotonic_targets() {
+        let mut clipped = calibration_fixture_patches();
+        clipped[0].clipped = true;
+        clipped[1].clipped = true;
+        assert!(
+            fit_negative_lab_profile(NegativeLabProfileFitRequestV1 {
+                patches: clipped,
+                schema_version: 1,
+                source_interpretation_hash:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .to_string(),
+                target_layout_id: "rawengine_negative_lab_target_v1".to_string(),
+            })
+            .is_err()
+        );
+
+        let mut non_monotonic = calibration_fixture_patches();
+        non_monotonic[11].observed_rgb = [0.01, 0.01, 0.01];
+        assert!(
+            fit_negative_lab_profile(NegativeLabProfileFitRequestV1 {
+                patches: non_monotonic,
+                schema_version: 1,
+                source_interpretation_hash:
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .to_string(),
+                target_layout_id: "rawengine_negative_lab_target_v1".to_string(),
+            })
+            .is_err()
+        );
     }
 
     #[test]
