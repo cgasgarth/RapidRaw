@@ -99,6 +99,7 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
+import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   createViewerInputRouter,
