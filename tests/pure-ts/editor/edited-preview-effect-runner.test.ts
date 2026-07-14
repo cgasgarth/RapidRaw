@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
+import { filmEmulationNodeV1Schema } from '../../../packages/rawengine-schema/src/index';
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -7,8 +8,10 @@ import {
   EditedPreviewEffectRunner,
   type EditedPreviewRequest,
   type ExecutedEditedPreview,
+  type ScheduledEditedPreviewRequest,
 } from '../../../src/utils/editedPreviewEffectRunner';
 import { EditorPersistenceEffectRunner } from '../../../src/utils/editorPersistenceEffectRunner';
+import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 import type { InteractivePreviewScope } from '../../../src/utils/interactivePreviewPatch';
 import { fingerprintPreviewGraphRevision, PreviewCoordinator } from '../../../src/utils/previewCoordinator';
 
@@ -120,7 +123,7 @@ function harness<T>({
   onFailure = () => {},
   onPresented,
 }: {
-  execute: (request: EditedPreviewRequest) => Promise<ExecutedEditedPreview>;
+  execute: (request: ScheduledEditedPreviewRequest) => Promise<ExecutedEditedPreview>;
   onFailure?: (error: unknown) => void;
   onPresented: (value: T) => void;
 }) {
@@ -347,6 +350,48 @@ describe('edited preview effect runner', () => {
 
     expect(calls).toEqual([1, 3]);
     expect(presented).toEqual([3]);
+  });
+
+  test('Film pointer release aborts interactive identity and only presents exact settled quality', async () => {
+    const interactive = deferred<ExecutedEditedPreview>();
+    const settled = deferred<ExecutedEditedPreview>();
+    const executions = [interactive.promise, settled.promise];
+    const scheduled: ScheduledEditedPreviewRequest[] = [];
+    const presented: number[] = [];
+    const { runner } = harness<number>({
+      execute: async (request) => {
+        scheduled.push(request);
+        return executions.shift() ?? Promise.reject(new Error('unexpected execution'));
+      },
+      onPresented: (value) => presented.push(value),
+    });
+    const filmEmulation = filmEmulationNodeV1Schema.parse({
+      contractVersion: 1,
+      enabled: true,
+      mix: 1,
+      nodeType: 'film_emulation',
+      profileRef: REFERENCE_FILM_PROFILE_REF,
+      seedPolicy: 'source_stable_v1',
+      workingSpace: 'acescg_linear_v1',
+    });
+    const snapshot = publishAdjustmentSnapshot(null, { ...structuredClone(INITIAL_ADJUSTMENTS), filmEmulation });
+
+    runner.request(buildRequest({ kind: 'interactive', snapshot }));
+    await tick();
+    runner.request(buildRequest({ kind: 'settled', snapshot }));
+    await tick();
+
+    expect(scheduled.map((request) => request.filmRenderIdentity?.quality)).toEqual([
+      'interactive_drag_v1',
+      'settled_preview_v1',
+    ]);
+    expect(scheduled[0]?.filmRenderCancellationSignal?.aborted).toBeTrue();
+    expect(scheduled[1]?.filmRenderCancellationSignal?.aborted).toBeFalse();
+
+    settled.resolve(execution(2));
+    interactive.resolve(execution(1));
+    await tick();
+    expect(presented).toEqual([2]);
   });
 
   test('preview presentation remains independent from a concurrent persistence failure', async () => {

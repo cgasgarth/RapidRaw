@@ -9,6 +9,11 @@ import type { AdjustmentSnapshot, PatchResidencySnapshot } from './adjustmentSna
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from './appEventLogger';
 import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 import {
+  buildFilmPreviewRenderIdentity,
+  type FilmRenderLease,
+  FilmRenderScheduler,
+} from './film-look/filmRenderScheduler';
+import {
   InteractivePreviewGenerationController,
   type InteractivePreviewIdentity,
   type InteractivePreviewScope,
@@ -90,6 +95,8 @@ export interface EditedPreviewRequest {
 }
 
 export interface ScheduledEditedPreviewRequest extends EditedPreviewRequest {
+  filmRenderCancellationSignal: AbortSignal | null;
+  filmRenderIdentity: FilmRenderLease['identity'] | null;
   interactiveIdentity: InteractivePreviewIdentity;
 }
 
@@ -136,6 +143,7 @@ export interface EditedPreviewEffectRunnerOptions<T> {
 }
 
 interface ScheduledEditedPreview {
+  filmRenderLease: FilmRenderLease | null;
   identity: PreviewOperationIdentity;
   request: ScheduledEditedPreviewRequest;
   timer: ReturnType<typeof setTimeout> | null;
@@ -269,6 +277,7 @@ export class EditedPreviewEffectRunner<T> {
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly dispatch: PreviewCoordinatorDispatch;
   private readonly execute: EditedPreviewExecutor;
+  private readonly filmRenderScheduler = new FilmRenderScheduler();
   private readonly getPatchResidency: () => PatchResidencySnapshot;
   private readonly interactiveGeneration = new InteractivePreviewGenerationController();
   private interactivePending: ScheduledEditedPreview | null = null;
@@ -304,6 +313,8 @@ export class EditedPreviewEffectRunner<T> {
         : { identity: this.interactiveGeneration.supersede(request.viewerScope), invalidated: true };
     const scheduledRequest: ScheduledEditedPreviewRequest = {
       ...request,
+      filmRenderCancellationSignal: null,
+      filmRenderIdentity: null,
       interactiveIdentity: synchronized.identity,
     };
     const viewportTransition = this.dispatch({
@@ -326,7 +337,24 @@ export class EditedPreviewEffectRunner<T> {
     const identity = transition.state[request.kind].identity;
     if (identity === undefined) throw new Error('PreviewCoordinator did not create an edited preview operation.');
 
-    const scheduled: ScheduledEditedPreview = { identity, request: scheduledRequest, timer: null };
+    const filmRenderIdentity = buildFilmPreviewRenderIdentity({
+      adjustmentRevision: request.snapshot.adjustmentRevision,
+      adjustments: request.snapshot.value,
+      backend: request.viewerScope.backend,
+      displayGeneration: request.session.displayGeneration,
+      imageSessionId: request.session.imageSessionId,
+      proofIdentity: request.proof,
+      quality: request.kind === 'interactive' ? 'interactive_drag_v1' : 'settled_preview_v1',
+      roi: request.roi,
+      sourceImagePath: request.session.sourceImagePath,
+      sourceRevision: request.session.sourceRevision,
+      targetResolution: request.targetResolution,
+      viewportRevision: request.session.viewportRevision,
+    });
+    const filmRenderLease = filmRenderIdentity === null ? null : this.filmRenderScheduler.begin(filmRenderIdentity);
+    scheduledRequest.filmRenderCancellationSignal = filmRenderLease?.signal ?? null;
+    scheduledRequest.filmRenderIdentity = filmRenderLease?.identity ?? null;
+    const scheduled: ScheduledEditedPreview = { filmRenderLease, identity, request: scheduledRequest, timer: null };
     this.active.set(identity.operationId, scheduled);
     if (request.kind === 'interactive') {
       this.interactivePending = scheduled;
@@ -356,6 +384,7 @@ export class EditedPreviewEffectRunner<T> {
     this.clearInteractivePending();
     for (const scheduled of this.active.values()) {
       if (scheduled.timer !== null) this.clearTimer(scheduled.timer);
+      if (scheduled.filmRenderLease !== null) this.filmRenderScheduler.cancel(scheduled.filmRenderLease);
     }
     this.active.clear();
     this.payloadCache.reset();
@@ -370,6 +399,7 @@ export class EditedPreviewEffectRunner<T> {
     const scheduled = this.active.get(identity.operationId);
     if (scheduled === undefined) return;
     if (scheduled.timer !== null) this.clearTimer(scheduled.timer);
+    if (scheduled.filmRenderLease !== null) this.filmRenderScheduler.cancel(scheduled.filmRenderLease);
     if (this.interactivePending?.identity.operationId === identity.operationId) this.interactivePending = null;
     this.active.delete(identity.operationId);
   }
@@ -377,6 +407,9 @@ export class EditedPreviewEffectRunner<T> {
   private clearInteractivePending(): void {
     if (this.interactivePending?.timer !== null && this.interactivePending?.timer !== undefined) {
       this.clearTimer(this.interactivePending.timer);
+    }
+    if (this.interactivePending?.filmRenderLease !== null && this.interactivePending?.filmRenderLease !== undefined) {
+      this.filmRenderScheduler.cancel(this.interactivePending.filmRenderLease);
     }
     if (this.interactivePending !== null && !this.interactiveRunning) {
       this.active.delete(this.interactivePending.identity.operationId);
@@ -397,6 +430,10 @@ export class EditedPreviewEffectRunner<T> {
 
   private async executeScheduled(scheduled: ScheduledEditedPreview): Promise<void> {
     if (this.disposed || !this.active.has(scheduled.identity.operationId)) return;
+    if (scheduled.filmRenderLease !== null && !this.filmRenderScheduler.canCommit(scheduled.filmRenderLease)) {
+      this.active.delete(scheduled.identity.operationId);
+      return;
+    }
     const dispatchedAt = previewNow();
     const context: EditedPreviewExecutionContext = {
       identity: scheduled.identity,
@@ -406,6 +443,7 @@ export class EditedPreviewEffectRunner<T> {
     };
     const started = this.dispatch({ identity: scheduled.identity, type: 'operation-started' });
     if (started.state.lastTransition?.staleCompletion === true) {
+      if (scheduled.filmRenderLease !== null) this.filmRenderScheduler.finish(scheduled.filmRenderLease);
       this.active.delete(scheduled.identity.operationId);
       return;
     }
@@ -415,6 +453,7 @@ export class EditedPreviewEffectRunner<T> {
       const executed = await this.execute(scheduled.request, this.getPatchResidency(), scheduled.identity);
       context.renderMs = Math.max(0, previewNow() - renderStartedAt);
       if (!this.active.has(scheduled.identity.operationId)) return;
+      if (scheduled.filmRenderLease !== null && !this.filmRenderScheduler.canCommit(scheduled.filmRenderLease)) return;
       const materialized = await this.materialize(executed, context);
       const artifact =
         materialized.artifactUrl === undefined
@@ -435,6 +474,7 @@ export class EditedPreviewEffectRunner<T> {
       const failed = this.dispatch({ error: String(error), identity: scheduled.identity, type: 'operation-failed' });
       if (failed.state.lastTransition?.staleCompletion !== true) this.onCurrentFailure(error, context);
     } finally {
+      if (scheduled.filmRenderLease !== null) this.filmRenderScheduler.finish(scheduled.filmRenderLease);
       const current = this.active.get(scheduled.identity.operationId);
       if (
         current !== undefined &&
