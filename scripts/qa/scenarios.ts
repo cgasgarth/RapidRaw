@@ -319,6 +319,130 @@ export const qaScenarios: readonly QaScenario[] = [
   },
   {
     ...browserDefaults,
+    id: 'browser.editor.original-compare-lifecycle',
+    tags: ['browser', 'editor', 'compare', 'preview'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      const canvas = page.getByTestId('image-canvas');
+      const toggleSplitCompare = async () => {
+        await page.getByTestId('editor-command-overflow-trigger').click();
+        await page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u }).click();
+      };
+      const originalCallCount = () =>
+        page.evaluate(
+          () =>
+            (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+              ({ command }) => command === 'generate_original_transformed_preview',
+            ).length,
+        );
+
+      const [completedUrl, staleUrl, freshUrl] = await page.evaluate(async () => {
+        const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+        if (harness === undefined) throw new Error('Browser Tauri harness is unavailable.');
+        const createPreviewUrl = async (color: string) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 8;
+          canvas.height = 8;
+          const context = canvas.getContext('2d');
+          if (context === null) throw new Error('Browser canvas context is unavailable.');
+          context.fillStyle = color;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          const blob = await new Promise<Blob>((resolve, reject) =>
+            canvas.toBlob((value) =>
+              value === null ? reject(new Error('Preview blob creation failed.')) : resolve(value),
+            ),
+          );
+          return URL.createObjectURL(blob);
+        };
+        const urls = await Promise.all(['#17364d', '#7d2648', '#355b32'].map(createPreviewUrl));
+        const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
+        URL.revokeObjectURL = (url) => {
+          harness.revokedObjectUrls.push(url);
+          revokeObjectUrl(url);
+        };
+        harness.originalPreviewResponses.push(
+          { delayMs: 0, url: urls[0] },
+          { delayMs: 250, url: urls[1] },
+          { delayMs: 0, url: urls[2] },
+        );
+        return urls;
+      });
+
+      const before = await originalCallCount();
+      await toggleSplitCompare();
+      await page.waitForFunction(
+        (prior) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'generate_original_transformed_preview',
+          ).length > prior,
+        before,
+      );
+      await page.waitForFunction(() => !document.querySelector('[data-testid="editor-compare-loading-reason"]'));
+      if ((await canvas.getAttribute('data-editor-compare-mode')) !== 'split-wipe')
+        throw new Error('Original compare did not become active after its preview completed.');
+
+      await toggleSplitCompare();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-editor-compare-mode') === 'off',
+      );
+      await page.waitForFunction(
+        (url) =>
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.revokedObjectUrls.filter((value) => value === url).length === 1,
+        completedUrl,
+      );
+      const beforeStale = await originalCallCount();
+
+      await toggleSplitCompare();
+      await page.waitForFunction(
+        (prior) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'generate_original_transformed_preview',
+          ).length > prior,
+        beforeStale,
+      );
+      await toggleSplitCompare();
+      await page.waitForFunction(
+        (url) =>
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.revokedObjectUrls.filter((value) => value === url).length === 1,
+        staleUrl,
+      );
+      if ((await canvas.getAttribute('data-editor-compare-mode')) !== 'off')
+        throw new Error('A delayed stale original completion reactivated compare.');
+
+      const beforeFresh = await originalCallCount();
+      await toggleSplitCompare();
+      await page.waitForFunction(
+        (prior) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'generate_original_transformed_preview',
+          ).length > prior,
+        beforeFresh,
+      );
+      await page.waitForFunction(() => !document.querySelector('[data-testid="editor-compare-loading-reason"]'));
+      if ((await canvas.getAttribute('data-editor-compare-mode')) !== 'split-wipe')
+        throw new Error('Original compare did not reactivate from a newly generated artifact.');
+      const revocations = await page.evaluate(
+        ({ completedUrl, freshUrl, staleUrl }) => {
+          const revoked = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.revokedObjectUrls ?? [];
+          return {
+            completed: revoked.filter((url) => url === completedUrl).length,
+            fresh: revoked.filter((url) => url === freshUrl).length,
+            stale: revoked.filter((url) => url === staleUrl).length,
+          };
+        },
+        { completedUrl, freshUrl, staleUrl },
+      );
+      if (revocations.completed !== 1 || revocations.stale !== 1 || revocations.fresh !== 0)
+        throw new Error(`Original compare URL ownership was not exact: ${JSON.stringify(revocations)}`);
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.editor.local-mask',
     tags: ['browser', 'editor', 'mask', 'local-adjustment'],
     dependencies: [],

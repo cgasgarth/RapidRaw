@@ -249,7 +249,91 @@ test('session cancellation releases the visible URL and prevents further publica
   const cancelled = transition(done.state, { reason: 'editor-unmounted', type: 'cancel-session' });
   expect(cancelled.effects).toEqual([{ type: 'release-url', url: 'blob:original', reason: 'editor-unmounted' }]);
   expect(cancelled.state.session).toBeNull();
+  expect(cancelled.state.originalArtifact).toBeNull();
   expect(cancelled.state.visibleArtifact).toBeNull();
+});
+
+test('original compare publishes independently without replacing the edited artifact', () => {
+  const coordinator = new PreviewCoordinator();
+  const edited = coordinator.dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  const editedIdentity = required(edited.state.settled.identity);
+  coordinator.dispatch({ identity: editedIdentity, type: 'operation-started' });
+  coordinator.dispatch({
+    artifact: artifact(editedIdentity, 'blob:edited'),
+    identity: editedIdentity,
+    type: 'operation-completed',
+  });
+
+  const original = coordinator.dispatch({ identity: session(), kind: 'original', type: 'render-inputs-changed' });
+  const originalIdentity = required(original.state.original.identity);
+  coordinator.dispatch({ identity: originalIdentity, type: 'operation-started' });
+  const completed = coordinator.dispatch({
+    artifact: artifact(originalIdentity, 'blob:original'),
+    identity: originalIdentity,
+    type: 'operation-completed',
+  });
+
+  expect(completed.effects).toEqual([
+    {
+      artifact: artifact(originalIdentity, 'blob:original'),
+      identity: originalIdentity,
+      reason: 'operation-presented',
+      type: 'publish',
+    },
+  ]);
+  expect(completed.state.visibleArtifact?.url).toBe('blob:edited');
+  expect(completed.state.originalArtifact?.url).toBe('blob:original');
+
+  const cancelled = coordinator.dispatch({ reason: 'editor-unmounted', type: 'cancel-session' });
+  expect(cancelled.effects).toEqual([
+    { reason: 'editor-unmounted', type: 'release-url', url: 'blob:edited' },
+    { reason: 'editor-unmounted', type: 'release-url', url: 'blob:original' },
+  ]);
+});
+
+test('newest original replaces and clear cancels only the compare channel with exact URL release', () => {
+  const coordinator = new PreviewCoordinator();
+  const first = coordinator.dispatch({ identity: session(), kind: 'original', type: 'render-inputs-changed' });
+  const firstIdentity = required(first.state.original.identity);
+  coordinator.dispatch({ identity: firstIdentity, type: 'operation-started' });
+  coordinator.dispatch({
+    artifact: artifact(firstIdentity, 'blob:original-1'),
+    identity: firstIdentity,
+    type: 'operation-completed',
+  });
+
+  const second = coordinator.dispatch({
+    identity: session({ targetHeight: 1400, targetWidth: 2200, viewportRevision: 2 }),
+    kind: 'original',
+    type: 'render-inputs-changed',
+  });
+  const secondIdentity = required(second.state.original.identity);
+  coordinator.dispatch({ identity: secondIdentity, type: 'operation-started' });
+  const completed = coordinator.dispatch({
+    artifact: artifact(secondIdentity, 'blob:original-2'),
+    identity: secondIdentity,
+    type: 'operation-completed',
+  });
+  expect(completed.effects).toContainEqual({
+    reason: 'original-artifact-replaced',
+    type: 'release-url',
+    url: 'blob:original-1',
+  });
+  expect(completed.state.originalArtifact?.url).toBe('blob:original-2');
+
+  const third = coordinator.dispatch({
+    identity: session({ targetHeight: 1600, targetWidth: 2400, viewportRevision: 3 }),
+    kind: 'original',
+    type: 'render-inputs-changed',
+  });
+  const thirdIdentity = required(third.state.original.identity);
+  const cleared = coordinator.dispatch({ reason: 'compare-disabled', type: 'original-preview-cleared' });
+  expect(cleared.effects).toEqual([
+    { identity: thirdIdentity, reason: 'compare-disabled', type: 'cancel' },
+    { reason: 'compare-disabled', type: 'release-url', url: 'blob:original-2' },
+  ]);
+  expect(cleared.state.original).toEqual({ status: 'idle' });
+  expect(cleared.state.originalArtifact).toBeNull();
 });
 
 test('original compare completion is rejected when a newer viewport request supersedes it', () => {
@@ -272,7 +356,10 @@ test('original compare completion is rejected when a newer viewport request supe
   });
   expect(late.state.staleCompletionCount).toBe(1);
   expect(late.state.visibleArtifact).toBeNull();
-  expect(late.effects).toEqual([]);
+  expect(late.state.originalArtifact).toBeNull();
+  expect(late.effects).toEqual([
+    { reason: 'stale-original-artifact', type: 'release-url', url: 'blob:stale-original' },
+  ]);
 });
 
 test('viewport changes cancel active work and retain one canonical ROI snapshot', () => {

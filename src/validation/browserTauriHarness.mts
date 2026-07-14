@@ -30,6 +30,11 @@ interface BrowserHarnessImage {
   tags: null;
 }
 
+interface BrowserHarnessOriginalPreviewResponse {
+  delayMs: number;
+  url: string;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -46,6 +51,8 @@ declare global {
       enabled: boolean;
       emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
+      originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
+      revokedObjectUrls: Array<string>;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
       callIndex: number;
@@ -259,7 +266,14 @@ export const installBrowserTauriHarness = (): void => {
     for (const callbackId of eventListeners.get(event) ?? [])
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
-  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = { calls, emitEvent, enabled: true, failNextSettingsSave: false };
+  window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    calls,
+    emitEvent,
+    enabled: true,
+    failNextSettingsSave: false,
+    originalPreviewResponses: [],
+    revokedObjectUrls: [],
+  };
   window.isTauri = true;
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: () => {},
@@ -605,7 +619,11 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     }
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
-    case commandNames.generateOriginalTransformedPreview:
+    case commandNames.generateOriginalTransformedPreview: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.originalPreviewResponses.shift();
+      if (response === undefined) return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
+      return new Promise((resolve) => window.setTimeout(() => resolve(response.url), response.delayMs));
+    }
     case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:

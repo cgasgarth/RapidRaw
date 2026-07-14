@@ -260,6 +260,9 @@ export function useImageProcessing(
           setEditor({ transformedOriginalUrl: effect.artifact.url });
         }
       }
+      for (const effect of transition.effects) {
+        if (effect.type === 'release-url' && effect.url.startsWith('blob:')) URL.revokeObjectURL(effect.url);
+      }
       return transition;
     },
     [previewCoordinator, setEditor],
@@ -1141,6 +1144,14 @@ export function useImageProcessing(
     [dispatchPreviewCoordinator],
   );
 
+  const failOriginalPreviewOperation = useCallback(
+    (identity: PreviewOperationIdentity, error: unknown): boolean => {
+      const transition = dispatchPreviewCoordinator({ error: String(error), identity, type: 'operation-failed' });
+      return transition.state.lastTransition?.staleCompletion !== true;
+    },
+    [dispatchPreviewCoordinator],
+  );
+
   const requestHiFiOriginalZoom = useMemo(
     () =>
       debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
@@ -1159,19 +1170,17 @@ export function useImageProcessing(
             );
             if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
               currentOriginalResRef.current = targetRes;
-            } else if (base64Data.startsWith('blob:')) {
-              URL.revokeObjectURL(base64Data);
             }
           } catch (e) {
-            dispatchPreviewCoordinator({ error: String(e), identity: operationIdentity, type: 'operation-failed' });
-            console.error('Failed to generate hi-fi original preview:', e);
+            if (failOriginalPreviewOperation(operationIdentity, e)) {
+              console.error('Failed to generate hi-fi original preview:', e);
+            }
           }
         }
       }, 200),
     [
       completeOriginalPreviewOperation,
-      dispatchPreviewCoordinator,
-      setEditor,
+      failOriginalPreviewOperation,
       startOriginalPreviewOperation,
       viewerSampleGraphRevision,
     ],
@@ -1334,9 +1343,17 @@ export function useImageProcessing(
   ]);
 
   useEffect(() => {
+    dispatchPreviewCoordinator({ reason: 'original-identity-changed', type: 'original-preview-cleared' });
     setEditor({ transformedOriginalUrl: null });
     currentOriginalResRef.current = 0;
-  }, [adjustmentSnapshot.geometryRevision, selectedImage?.path, setEditor]);
+  }, [adjustmentSnapshot.geometryRevision, dispatchPreviewCoordinator, selectedImage?.path, setEditor]);
+
+  useEffect(() => {
+    if (isCompareActive) return;
+    dispatchPreviewCoordinator({ reason: 'compare-disabled', type: 'original-preview-cleared' });
+    setEditor({ transformedOriginalUrl: null });
+    currentOriginalResRef.current = 0;
+  }, [dispatchPreviewCoordinator, isCompareActive, setEditor]);
 
   useEffect(() => {
     if (isCompareActive && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
@@ -1361,8 +1378,6 @@ export function useImageProcessing(
   ]);
 
   useEffect(() => {
-    let isEffectActive = true;
-    const requestImageSessionId = imageSessionId;
     const generate = async () => {
       if (isCompareActive && selectedImage?.path && !transformedOriginalUrl) {
         let operationIdentity: PreviewOperationIdentity | null = null;
@@ -1379,20 +1394,11 @@ export function useImageProcessing(
             },
             previewDataUrlResponseSchema,
           );
-          if (
-            isEffectActive &&
-            useEditorStore.getState().imageSessionId === requestImageSessionId &&
-            completeOriginalPreviewOperation(operationIdentity, base64Data)
-          ) {
+          if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
             currentOriginalResRef.current = targetRes;
-          } else if (base64Data.startsWith('blob:')) {
-            URL.revokeObjectURL(base64Data);
           }
         } catch (e) {
-          if (operationIdentity !== null) {
-            dispatchPreviewCoordinator({ error: String(e), identity: operationIdentity, type: 'operation-failed' });
-          }
-          if (isEffectActive && useEditorStore.getState().imageSessionId === requestImageSessionId) {
+          if (operationIdentity !== null && failOriginalPreviewOperation(operationIdentity, e)) {
             console.error('Failed to generate original preview:', e);
             dispatchCompare({ type: 'exit' });
           }
@@ -1400,9 +1406,6 @@ export function useImageProcessing(
       }
     };
     void generate();
-    return () => {
-      isEffectActive = false;
-    };
   }, [
     isCompareActive,
     selectedImage?.path,
@@ -1410,12 +1413,10 @@ export function useImageProcessing(
     transformedOriginalUrl,
     calculateTargetRes,
     dispatchCompare,
-    dispatchPreviewCoordinator,
     completeOriginalPreviewOperation,
-    setEditor,
+    failOriginalPreviewOperation,
     startOriginalPreviewOperation,
     viewerSampleGraphRevision,
-    imageSessionId,
   ]);
 
   return {
