@@ -44,14 +44,22 @@ const MIN_DENSITY_RANGE = 0.0001;
 const DISPLAY_GAMMA_INV = 1 / 2.2;
 const MIN_ENDPOINT_SEPARATION = 0.05;
 const DEFAULT_DENSITY_PRINT_V2_PARAMS: NonNullable<NegativeLabPresetParams['print_curve_v2']> = {
+  algorithm_version: 1,
+  anchor_density: 0.5,
   contrast_grade: 1,
   density_offset: 0,
+  d_max: 1.65,
+  d_min: 0.04,
+  iso_r_grade: 1,
   midtone_shape: 0,
-  schema_version: 1,
+  schema_version: 2,
   shoulder_strength: 0.25,
+  shoulder_width: 0.25,
   target_black_density: 1.65,
   target_white_density: 0.04,
   toe_strength: 0.25,
+  toe_width: 0.25,
+  output_domain: 'scene_linear_print',
 };
 
 export const clampNegativeLabUnitValue = (value: number): number => Math.min(1, Math.max(0, value));
@@ -180,35 +188,53 @@ const shapeDensityForPrint = ({
   params: NegativeLabPresetParams;
   scanMetrics?: NegativeLabScanMetricsV1 | undefined;
 }): number => {
-  const v2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
+  const rawV2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
+  const v2Params =
+    rawV2Params.schema_version === 1
+      ? {
+          ...rawV2Params,
+          d_max: rawV2Params.target_black_density,
+          d_min: rawV2Params.target_white_density,
+          iso_r_grade: rawV2Params.contrast_grade,
+        }
+      : rawV2Params;
   const metricsCompression =
     scanMetrics === undefined
       ? 1
       : clampNegativeLabUnitValue(
           scanMetrics.texturalDensityRangeP10P90 / Math.max(MIN_DENSITY_RANGE, scanMetrics.densityRangeUnclamped),
         );
-  const scanAwareContrast = v2Params.contrast_grade * (0.8 + metricsCompression * 0.4);
-  const exposed = clampNegativeLabUnitValue((densitySignal - 0.5 + v2Params.density_offset) * scanAwareContrast + 0.5);
+  const scanAwareContrast = v2Params.iso_r_grade * (0.8 + metricsCompression * 0.4);
+  const exposed = clampNegativeLabUnitValue(
+    (densitySignal - v2Params.anchor_density + v2Params.density_offset) * scanAwareContrast + v2Params.anchor_density,
+  );
   const midpointBias = v2Params.midtone_shape * exposed * (1 - exposed) * 0.45;
   const midpointShaped = clampNegativeLabUnitValue(exposed + midpointBias);
   const toePower = 1 + v2Params.toe_strength * 1.5;
   const shoulderPower = 1 + v2Params.shoulder_strength * 1.5;
-  const toe = midpointShaped ** toePower;
-  const shoulder = 1 - (1 - midpointShaped) ** shoulderPower;
+  const toe = midpointShaped / v2Params.toe_width;
+  const toeShaped =
+    midpointShaped + (clampNegativeLabUnitValue(toe) ** toePower - clampNegativeLabUnitValue(toe)) * v2Params.toe_width;
+  const shoulder = (1 - midpointShaped) / v2Params.shoulder_width;
+  const shoulderShaped = 1 - clampNegativeLabUnitValue(shoulder) ** shoulderPower * v2Params.shoulder_width;
   const blend = midpointShaped;
 
-  return clampNegativeLabUnitValue(toe * (1 - blend) + shoulder * blend);
+  return clampNegativeLabUnitValue(toeShaped * (1 - blend) + shoulderShaped * blend);
 };
 
 const renderPrintDensity = (tone: number, params: NegativeLabPresetParams): number => {
-  const v2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
-  const densitySpan = v2Params.target_black_density - v2Params.target_white_density;
-  const targetDensity = v2Params.target_black_density - tone * densitySpan;
-  const whiteTransmittance = 10 ** -v2Params.target_white_density;
-  const blackTransmittance = 10 ** -v2Params.target_black_density;
-  const linearPositive = clampNegativeLabUnitValue(
-    (10 ** -targetDensity - blackTransmittance) / (whiteTransmittance - blackTransmittance),
-  );
+  const rawV2Params = params.print_curve_v2 ?? DEFAULT_DENSITY_PRINT_V2_PARAMS;
+  const v2Params =
+    rawV2Params.schema_version === 1
+      ? {
+          ...rawV2Params,
+          d_max: rawV2Params.target_black_density,
+          d_min: rawV2Params.target_white_density,
+        }
+      : rawV2Params;
+  const densitySpan = v2Params.d_max - v2Params.d_min;
+  const targetDensity = v2Params.d_max - tone * densitySpan;
+  const linearPositive = clampNegativeLabUnitValue(10 ** -targetDensity);
 
   return params.print_curve_output_tag === 'export_linear' ? linearPositive : linearPositive ** DISPLAY_GAMMA_INV;
 };
