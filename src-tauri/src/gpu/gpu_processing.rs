@@ -332,9 +332,10 @@ const BLUR_FLAG_SHARPNESS: u32 = 1 << 0;
 const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
 const BLUR_FLAG_STRUCTURE: u32 = 1 << 3;
+const BLUR_FLAG_DEHAZE: u32 = 1 << 4;
 const BLUR_ABI_VERSION: u32 = 1;
 const GPU_RENDER_GRAPH_VERSION: u32 = 2;
-const GPU_SHADER_LAYOUT_VERSION: u32 = 2;
+const GPU_SHADER_LAYOUT_VERSION: u32 = 3;
 static NEXT_PROCESSOR_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 bitflags::bitflags! {
@@ -344,10 +345,11 @@ bitflags::bitflags! {
         const BLUR_TONAL = 1 << 1;
         const BLUR_CLARITY = 1 << 2;
         const BLUR_STRUCTURE = 1 << 3;
-        const FLARE = 1 << 4;
-        const MAIN_ADJUST = 1 << 5;
-        const LUT = 1 << 6;
-        const MASKS = 1 << 7;
+        const BLUR_DEHAZE = 1 << 4;
+        const FLARE = 1 << 5;
+        const MAIN_ADJUST = 1 << 6;
+        const LUT = 1 << 7;
+        const MASKS = 1 << 8;
     }
 }
 
@@ -357,6 +359,7 @@ pub enum BlurSemantic {
     Tonal,
     Clarity,
     Structure,
+    DehazeTransmission,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -406,7 +409,7 @@ pub struct GpuExecutionReceipt {
 
 const MASK_TEXTURE_ABI_VERSION: u32 = 1;
 const LUT_TEXTURE_ABI_VERSION: u32 = 1;
-const MAIN_BIND_GROUP_ABI_VERSION: u32 = 1;
+const MAIN_BIND_GROUP_ABI_VERSION: u32 = 2;
 const MAX_RESIDENT_MASKS: usize = 8;
 const MAX_RESIDENT_LUTS: usize = 4;
 
@@ -637,6 +640,7 @@ struct BlurPassNeeds {
     tonal: bool,
     clarity: bool,
     structure: bool,
+    dehaze: bool,
 }
 
 #[cfg(test)]
@@ -650,6 +654,7 @@ impl BlurPassNeeds {
             | (u32::from(self.tonal) * BLUR_FLAG_TONAL)
             | (u32::from(self.clarity) * BLUR_FLAG_CLARITY)
             | (u32::from(self.structure) * BLUR_FLAG_STRUCTURE)
+            | (u32::from(self.dehaze) * BLUR_FLAG_DEHAZE)
     }
 }
 
@@ -659,14 +664,16 @@ fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
         sharpness: global.sharpness != 0.0,
         tonal: tonal_blur_base_radius(adjustments).is_some(),
         clarity: global.clarity != 0.0 || global.centré != 0.0 || global.halation_amount > 0.0,
-        structure: global.structure != 0.0 || global.dehaze != 0.0 || global.glow_amount > 0.0,
+        structure: global.structure != 0.0 || global.glow_amount > 0.0,
+        dehaze: global.dehaze != 0.0,
     };
 
     let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
     for mask in &adjustments.mask_adjustments[..mask_count] {
         needs.sharpness |= mask.sharpness.abs() > 0.001;
         needs.clarity |= mask.clarity != 0.0 || mask.halation_amount > 0.0;
-        needs.structure |= mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0;
+        needs.structure |= mask.structure != 0.0 || mask.glow_amount > 0.0;
+        needs.dehaze |= mask.dehaze != 0.0;
     }
     needs
 }
@@ -745,9 +752,15 @@ pub fn compile_gpu_render_graph(
             40.0,
             GpuStageFlags::BLUR_STRUCTURE,
         ),
+        (
+            needs.dehaze,
+            BlurSemantic::DehazeTransmission,
+            crate::color::dehaze::DEHAZE_GUIDANCE_RADIUS,
+            GpuStageFlags::BLUR_DEHAZE,
+        ),
     ];
     let mut flags = GpuStageFlags::MAIN_ADJUST;
-    let mut blur_products = Vec::with_capacity(4);
+    let mut blur_products = Vec::with_capacity(5);
     for (active, semantic, radius, flag) in definitions {
         if active {
             flags |= flag;
@@ -821,9 +834,10 @@ fn graph_reasons(
             needs.clarity,
             "BLUR_CLARITY required by clarity/centre/halation",
         ),
+        (needs.structure, "BLUR_STRUCTURE required by structure/glow"),
         (
-            needs.structure,
-            "BLUR_STRUCTURE required by structure/dehaze/glow",
+            needs.dehaze,
+            "BLUR_DEHAZE required by transmission guidance",
         ),
         (
             adjustments.global.flare_amount > 0.0,
@@ -879,11 +893,12 @@ enum BlurFamily {
     Tonal = 1,
     Clarity = 2,
     Structure = 3,
+    Dehaze = 4,
 }
 
 #[derive(Debug, Default)]
 struct BlurSurfaceCache {
-    keys: [Option<BlurSurfaceKey>; 4],
+    keys: [Option<BlurSurfaceKey>; 5],
     totals: BlurPassCounters,
 }
 
@@ -932,7 +947,8 @@ const MAIN_BINDING_SHARPNESS_BLUR: u32 = MAIN_BINDING_LUT_SAMPLER + 1;
 const MAIN_BINDING_TONAL_BLUR: u32 = MAIN_BINDING_SHARPNESS_BLUR + 1;
 const MAIN_BINDING_CLARITY_BLUR: u32 = MAIN_BINDING_TONAL_BLUR + 1;
 const MAIN_BINDING_STRUCTURE_BLUR: u32 = MAIN_BINDING_CLARITY_BLUR + 1;
-const MAIN_BINDING_FLARE_TEXTURE: u32 = MAIN_BINDING_STRUCTURE_BLUR + 1;
+const MAIN_BINDING_DEHAZE_BLUR: u32 = MAIN_BINDING_STRUCTURE_BLUR + 1;
+const MAIN_BINDING_FLARE_TEXTURE: u32 = MAIN_BINDING_DEHAZE_BLUR + 1;
 const MAIN_BINDING_FLARE_SAMPLER: u32 = MAIN_BINDING_FLARE_TEXTURE + 1;
 
 // Keep these Rust bindings in sync with blur.wgsl and flare.wgsl.
@@ -1201,7 +1217,7 @@ pub struct GpuProcessor {
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
     v_blur_pipeline: wgpu::ComputePipeline,
-    blur_params_buffers: [wgpu::Buffer; 4],
+    blur_params_buffers: [wgpu::Buffer; 5],
 
     flare_resources: OnceLock<FlareResources>,
 
@@ -1219,6 +1235,7 @@ pub struct GpuProcessor {
     tonal_blur_view: wgpu::TextureView,
     clarity_blur_view: wgpu::TextureView,
     structure_blur_view: wgpu::TextureView,
+    dehaze_blur_view: wgpu::TextureView,
 
     pub tile_output_texture: wgpu::Texture,
     pub tile_output_texture_view: wgpu::TextureView,
@@ -1444,6 +1461,16 @@ impl GpuProcessor {
             },
             count: None,
         });
+        bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+            binding: MAIN_BINDING_DEHAZE_BLUR,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        });
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_FLARE_TEXTURE,
@@ -1552,6 +1579,12 @@ impl GpuProcessor {
             max_tile_size,
             blur_texture_usage,
         );
+        let (_, dehaze_blur_view) = create_rgba16f_texture_with_view(
+            device,
+            "Dehaze Transmission Guidance Texture",
+            max_tile_size,
+            blur_texture_usage,
+        );
 
         let (tile_output_texture, tile_output_texture_view) = create_rgba16f_texture_with_view(
             device,
@@ -1610,6 +1643,7 @@ impl GpuProcessor {
             tonal_blur_view,
             clarity_blur_view,
             structure_blur_view,
+            dehaze_blur_view,
             tile_output_texture,
             tile_output_texture_view,
             working_texture,
@@ -1897,6 +1931,7 @@ impl GpuProcessor {
                 tonal: true,
                 clarity: true,
                 structure: true,
+                dehaze: true,
             }
         } else {
             blur_pass_needs
@@ -2208,6 +2243,12 @@ impl GpuProcessor {
                     && run_blur(BlurFamily::Clarity, 8.0, &self.clarity_blur_view);
                 let did_create_structure_blur = blur_pass_needs.structure
                     && run_blur(BlurFamily::Structure, 40.0, &self.structure_blur_view);
+                let did_create_dehaze_blur = blur_pass_needs.dehaze
+                    && run_blur(
+                        BlurFamily::Dehaze,
+                        crate::color::dehaze::DEHAZE_GUIDANCE_RADIUS,
+                        &self.dehaze_blur_view,
+                    );
 
                 let mut tile_adjustments = adjustments;
                 tile_adjustments.tile_offset_x = input_x_start;
@@ -2285,6 +2326,14 @@ impl GpuProcessor {
                         &self.dummy_blur_view
                     }),
                 });
+                bind_group_entries.push(wgpu::BindGroupEntry {
+                    binding: MAIN_BINDING_DEHAZE_BLUR,
+                    resource: wgpu::BindingResource::TextureView(if did_create_dehaze_blur {
+                        &self.dehaze_blur_view
+                    } else {
+                        &self.dummy_blur_view
+                    }),
+                });
 
                 let use_flare = adjustments.global.flare_amount > 0.0;
                 bind_group_entries.push(wgpu::BindGroupEntry {
@@ -2309,7 +2358,8 @@ impl GpuProcessor {
                     blur_flags: (u32::from(did_create_sharpness_blur) * BLUR_FLAG_SHARPNESS)
                         | (u32::from(did_create_tonal_blur) * BLUR_FLAG_TONAL)
                         | (u32::from(did_create_clarity_blur) * BLUR_FLAG_CLARITY)
-                        | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE),
+                        | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE)
+                        | (u32::from(did_create_dehaze_blur) * BLUR_FLAG_DEHAZE),
                     flare_enabled: use_flare,
                     abi_version: MAIN_BIND_GROUP_ABI_VERSION + u32::from(split_scene_view_display),
                 };
@@ -2884,15 +2934,26 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn graph_compiler_deduplicates_consumers_and_scales_largest_radius() {
+    fn graph_compiler_keeps_dehaze_guidance_independent_from_detail_consumers() {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.structure = 0.2;
         adjustments.global.dehaze = 0.3;
         adjustments.global.glow_amount = 0.4;
         let graph = compile_gpu_render_graph(&adjustments, false, 0, 1920, 1080);
-        assert_eq!(graph.blur_products.len(), 1);
+        assert_eq!(graph.blur_products.len(), 2);
         assert_eq!(graph.blur_products[0].semantic, BlurSemantic::Structure);
+        assert_eq!(
+            graph.blur_products[1].semantic,
+            BlurSemantic::DehazeTransmission
+        );
         assert_eq!(graph.tile_halo, 40);
+
+        adjustments.global.dehaze = 0.8;
+        let amount_only = compile_gpu_render_graph(&adjustments, false, 0, 1920, 1080);
+        assert_eq!(
+            graph.fingerprint, amount_only.fingerprint,
+            "amount-only edits must reuse transmission guidance"
+        );
     }
 
     #[test]
@@ -3171,13 +3232,17 @@ mod blur_pass_tests {
 
         for structure in [
             |a: &mut AllAdjustments| a.global.structure = -0.1,
-            |a: &mut AllAdjustments| a.global.dehaze = 0.1,
             |a: &mut AllAdjustments| a.global.glow_amount = 0.1,
         ] {
             let mut adjustments = AllAdjustments::default();
             structure(&mut adjustments);
             assert!(needs(adjustments).structure);
         }
+
+        let mut dehaze = AllAdjustments::default();
+        dehaze.global.dehaze = 0.1;
+        assert!(needs(dehaze).dehaze);
+        assert!(!needs(dehaze).structure);
     }
 
     #[test]
@@ -3235,7 +3300,8 @@ mod blur_pass_tests {
                 sharpness: true,
                 tonal: true,
                 clarity: true,
-                structure: true,
+                structure: false,
+                dehaze: true,
             }
         );
 
@@ -4330,6 +4396,12 @@ mod blur_pass_tests {
                 .any(|(before, after)| (before - after).abs() > 0.001)
         }));
 
+        let preview = render(0.12).into_raw();
+        let export = render(0.12).into_raw();
+        let batch = render(0.12).into_raw();
+        assert_eq!(preview, export, "preview and export Dehaze must be exact");
+        assert_eq!(export, batch, "export and batch Dehaze must be exact");
+
         let clear = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
             let checker = if (x + y) % 2 == 0 { 0.0 } else { 1.0 };
             Rgba([0.02 + checker * 0.7, 0.03 + checker * 0.15, 0.04, 1.0])
@@ -4363,7 +4435,7 @@ mod blur_pass_tests {
         let processor = &processor_guard.as_ref().unwrap().processor;
         assert_eq!(
             processor.dehaze_analysis_cache.lock().unwrap().counters(),
-            (1, 2)
+            (4, 2)
         );
     }
 

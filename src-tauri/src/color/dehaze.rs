@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::adjustments::abi::{AllAdjustments, MAX_MASKS};
 
 pub const DEHAZE_ANALYSIS_IMPLEMENTATION_VERSION: u32 = 2;
-pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 2;
+pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 3;
+pub const DEHAZE_TRANSMISSION_IMPLEMENTATION_VERSION: u32 = 1;
+pub const DEHAZE_GUIDANCE_RADIUS: f32 = 40.0;
 
 const MAX_ANALYSIS_SAMPLES: usize = 512 * 512;
 const TRANSMISSION_FLOOR: f32 = 0.08;
@@ -71,6 +73,38 @@ pub enum AtmosphericLightMode {
     Manual,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DehazeGuidanceMode {
+    ImageDerivedEdgeAware,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmissionResourceIdentityV1 {
+    pub source_revision: u64,
+    pub decode_fingerprint: u64,
+    pub geometry_fingerprint: u64,
+    pub width: u32,
+    pub height: u32,
+    pub radius_bits: u32,
+    pub implementation_version: u32,
+}
+
+impl TransmissionResourceIdentityV1 {
+    fn from_analysis(identity: HazeAnalysisIdentityV1) -> Self {
+        Self {
+            source_revision: identity.source_revision,
+            decode_fingerprint: identity.decode_fingerprint,
+            geometry_fingerprint: identity.geometry_fingerprint,
+            width: identity.width,
+            height: identity.height,
+            radius_bits: DEHAZE_GUIDANCE_RADIUS.to_bits(),
+            implementation_version: DEHAZE_TRANSMISSION_IMPLEMENTATION_VERSION,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DehazeSettingsV1 {
@@ -101,6 +135,8 @@ pub struct CompiledDehazePlanV1 {
     pub analysis_identity: HazeAnalysisIdentityV1,
     pub atmospheric_light: [f32; 3],
     pub confidence: f32,
+    pub guidance_mode: DehazeGuidanceMode,
+    pub transmission_resource: TransmissionResourceIdentityV1,
     pub settings: DehazeSettingsV1,
     pub fingerprint: u64,
     pub implementation_version: u32,
@@ -122,6 +158,8 @@ pub fn compile_dehaze_plan(
     hasher.update(&analysis.identity.decode_fingerprint.to_le_bytes());
     hasher.update(&analysis.identity.geometry_fingerprint.to_le_bytes());
     hasher.update(&analysis.identity.implementation_version.to_le_bytes());
+    hasher.update(&DEHAZE_TRANSMISSION_IMPLEMENTATION_VERSION.to_le_bytes());
+    hasher.update(&DEHAZE_GUIDANCE_RADIUS.to_bits().to_le_bytes());
     for value in analysis
         .atmospheric_light
         .into_iter()
@@ -153,6 +191,8 @@ pub fn compile_dehaze_plan(
         analysis_identity: analysis.identity,
         atmospheric_light,
         confidence: analysis.atmospheric_light_confidence,
+        guidance_mode: DehazeGuidanceMode::ImageDerivedEdgeAware,
+        transmission_resource: TransmissionResourceIdentityV1::from_analysis(analysis.identity),
         settings,
         fingerprint,
         implementation_version: DEHAZE_RENDER_IMPLEMENTATION_VERSION,
@@ -502,10 +542,16 @@ mod tests {
             },
         );
         assert_eq!(low.analysis_identity, high.analysis_identity);
+        assert_eq!(low.transmission_resource, high.transmission_resource);
+        assert_eq!(low.guidance_mode, DehazeGuidanceMode::ImageDerivedEdgeAware);
         assert_ne!(low.fingerprint, high.fingerprint);
 
-        let (_, changed_source_hit) = cache.get_or_analyze(&image, identity(2));
+        let (changed_source, changed_source_hit) = cache.get_or_analyze(&image, identity(2));
         assert!(!changed_source_hit);
+        assert_ne!(
+            low.transmission_resource,
+            compile_dehaze_plan(&changed_source, DehazeSettingsV1::default()).transmission_resource
+        );
         assert_eq!(cache.counters(), (1, 2));
     }
 

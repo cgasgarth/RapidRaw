@@ -10,7 +10,7 @@ use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
     PointColorGpuSettings, ToneEqualizerGpuSettings,
 };
-use crate::color::dehaze::prepare_cpu_dehaze;
+use crate::color::dehaze::{DEHAZE_GUIDANCE_RADIUS, prepare_cpu_dehaze};
 use crate::color::point_color::apply_gpu_plan_ap1;
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
@@ -134,12 +134,15 @@ pub(crate) fn execute_cpu_edit_graph(
     );
     let structure_blur = blur(
         global.structure != 0.0
-            || global.dehaze != 0.0
             || global.glow_amount > 0.0
             || active_masks
                 .iter()
-                .any(|mask| mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0),
+                .any(|mask| mask.structure != 0.0 || mask.glow_amount > 0.0),
         40.0,
+    );
+    let dehaze_blur = blur(
+        global.dehaze != 0.0 || active_masks.iter().any(|mask| mask.dehaze != 0.0),
+        DEHAZE_GUIDANCE_RADIUS,
     );
     let flare_map =
         (global.flare_amount > 0.0).then(|| build_flare_map(&input, width, height, adjustments));
@@ -213,6 +216,9 @@ pub(crate) fn execute_cpu_edit_graph(
         let structure_surface = structure_blur
             .as_ref()
             .map_or(input[index], |blur| blur[index]);
+        let dehaze_guidance = dehaze_blur
+            .as_ref()
+            .map_or(input[index], |blur| blur[index]);
         color = apply_local_contrast(
             color,
             clarity_surface,
@@ -270,7 +276,7 @@ pub(crate) fn execute_cpu_edit_graph(
         color = if graph.pipeline_version >= 2 {
             apply_scene_dehaze_v1(
                 color,
-                structure_surface,
+                dehaze_guidance,
                 adjustments.global.is_raw_image == 1,
                 effective.dehaze,
                 Vec3::new(
@@ -283,7 +289,7 @@ pub(crate) fn execute_cpu_edit_graph(
         } else {
             legacy_fixed_atmosphere_dehaze_v1(
                 color,
-                structure_surface,
+                dehaze_guidance,
                 adjustments.global.is_raw_image == 1,
                 effective.dehaze,
             )
@@ -943,13 +949,7 @@ fn apply_scene_dehaze_v1(
     }
     let blurred = blur_to_linear(blurred, is_raw);
     let atmosphere = atmospheric_light.max(Vec3::splat(0.01));
-    let pixel_dark = (color / atmosphere).min_element();
-    let regional_dark = (blurred / atmosphere).min_element();
-    let pixel_luma = scene_luminance(color.max(Vec3::ZERO));
-    let blurred_luma = scene_luminance(blurred.max(Vec3::ZERO));
-    let edge = (pixel_luma.sqrt() - blurred_luma.sqrt()).abs();
-    let guided_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
-    let transmission = (1.0 - 0.95 * guided_dark).clamp(0.08, 1.0);
+    let transmission = edge_refined_image_transmission_v1(color, blurred, atmosphere);
     let confidence_weight = atmosphere_confidence.clamp(0.0, 1.0);
     let strength = (amount.abs() * 7.5).clamp(0.0, 1.0) * confidence_weight;
     let effective_transmission = 1.0 + (transmission - 1.0) * strength;
@@ -957,10 +957,32 @@ fn apply_scene_dehaze_v1(
         return color * effective_transmission + atmosphere * (1.0 - effective_transmission);
     }
     let recovered = (color - atmosphere) / effective_transmission + atmosphere;
+    let pixel_luma = scene_luminance(color.max(Vec3::ZERO));
     let atmosphere_luma = scene_luminance(atmosphere);
     let highlight_protection =
         smoothstep(atmosphere_luma * 0.75, atmosphere_luma * 1.25, pixel_luma);
     recovered.lerp(color, highlight_protection * 0.65)
+}
+
+fn edge_refined_image_transmission_v1(
+    color: Vec3,
+    regional_guidance: Vec3,
+    atmosphere: Vec3,
+) -> f32 {
+    let pixel_dark = (color / atmosphere).min_element();
+    let regional_dark = (regional_guidance / atmosphere).min_element();
+    let pixel_transmission = (1.0 - 0.95 * pixel_dark).clamp(0.08, 1.0);
+    let regional_transmission = (1.0 - 0.95 * regional_dark).clamp(0.08, 1.0);
+    let pixel_luma = scene_luminance(color.max(Vec3::ZERO));
+    let regional_luma = scene_luminance(regional_guidance.max(Vec3::ZERO));
+    let luma_edge = (pixel_luma.sqrt() - regional_luma.sqrt()).abs();
+    let pixel_chroma = color - Vec3::splat(pixel_luma);
+    let regional_chroma = regional_guidance - Vec3::splat(regional_luma);
+    let chroma_edge = (pixel_chroma - regional_chroma).length()
+        / (pixel_luma.sqrt() + regional_luma.sqrt() + 0.05);
+    let discontinuity = luma_edge.max(chroma_edge * 0.3);
+    regional_transmission
+        + (pixel_transmission - regional_transmission) * smoothstep(0.015, 0.12, discontinuity)
 }
 
 fn prepared_effect_blur(
@@ -2405,5 +2427,43 @@ mod scene_dehaze_tests {
         assert_eq!(abstained, color);
         assert!(partial.distance(color) > 0.0);
         assert!(partial.distance(color) < full.distance(color));
+    }
+
+    #[test]
+    fn image_transmission_follows_the_near_side_of_a_depth_discontinuity() {
+        let atmosphere = Vec3::new(0.9, 1.0, 1.1);
+        let radiance = Vec3::new(0.03, 0.07, 0.12);
+        let near_transmission = 0.24;
+        let far_transmission = 0.82;
+        let observed_near = radiance * near_transmission + atmosphere * (1.0 - near_transmission);
+        let observed_far = radiance * far_transmission + atmosphere * (1.0 - far_transmission);
+        let cross_edge_blur = observed_near.lerp(observed_far, 0.5);
+
+        let refined =
+            edge_refined_image_transmission_v1(observed_near, cross_edge_blur, atmosphere);
+        let coarse = (1.0 - 0.95 * (cross_edge_blur / atmosphere).min_element()).clamp(0.08, 1.0);
+        assert!((refined - near_transmission).abs() < (coarse - near_transmission).abs());
+    }
+
+    #[test]
+    fn smooth_regions_use_regional_guidance_to_reject_pixel_noise() {
+        let atmosphere = Vec3::splat(1.0);
+        let regional = Vec3::splat(0.55);
+        let noisy_pixel = Vec3::new(0.545, 0.552, 0.548);
+        let refined = edge_refined_image_transmission_v1(noisy_pixel, regional, atmosphere);
+        let regional_transmission = 1.0 - 0.95 * 0.55;
+        assert!((refined - regional_transmission).abs() < 0.01);
+    }
+
+    #[test]
+    fn edge_refined_haze_addition_and_removal_stay_finite_with_scene_headroom() {
+        let color = Vec3::new(-0.02, 0.4, 1.7);
+        let regional = Vec3::new(0.2, 0.45, 1.2);
+        let atmosphere = Vec3::new(0.8, 0.9, 1.1);
+        for amount in [-0.12, 0.12] {
+            let output = apply_scene_dehaze_v1(color, regional, true, amount, atmosphere, 1.0);
+            assert!(output.is_finite());
+            assert!(output.max_element() > 1.0);
+        }
     }
 }

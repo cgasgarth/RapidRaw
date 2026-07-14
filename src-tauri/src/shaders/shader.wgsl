@@ -364,9 +364,10 @@ const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
 @group(0) @binding(7) var tonal_blur_texture: texture_2d<f32>;
 @group(0) @binding(8) var clarity_blur_texture: texture_2d<f32>;
 @group(0) @binding(9) var structure_blur_texture: texture_2d<f32>;
+@group(0) @binding(10) var dehaze_blur_texture: texture_2d<f32>;
 
-@group(0) @binding(10) var flare_texture: texture_2d<f32>;
-@group(0) @binding(11) var flare_sampler: sampler;
+@group(0) @binding(11) var flare_texture: texture_2d<f32>;
+@group(0) @binding(12) var flare_sampler: sampler;
 
 const ACESCG_LUMINANCE_COEFF = vec3<f32>(0.27222872, 0.67408174, 0.05368952);
 const VIEW_ENCODED_LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
@@ -1645,16 +1646,18 @@ fn apply_scene_dehaze_v1(
 
     let safe_atmosphere = max(atmospheric_light, vec3<f32>(0.01));
     let pixel_dark = min(color.r / safe_atmosphere.r, min(color.g / safe_atmosphere.g, color.b / safe_atmosphere.b));
-    let regional_dark = min(
-        blurred_linear.r / safe_atmosphere.r,
-        min(blurred_linear.g / safe_atmosphere.g, blurred_linear.b / safe_atmosphere.b),
-    );
+    let regional_dark = min(blurred_linear.r / safe_atmosphere.r, min(blurred_linear.g / safe_atmosphere.g, blurred_linear.b / safe_atmosphere.b));
+    let pixel_transmission = clamp(1.0 - 0.95 * pixel_dark, 0.08, 1.0);
+    let regional_transmission = clamp(1.0 - 0.95 * regional_dark, 0.08, 1.0);
     let pixel_luma = scene_luminance(max(color, vec3<f32>(0.0)));
     let blurred_luma = scene_luminance(max(blurred_linear, vec3<f32>(0.0)));
-    let edge_diff = abs(sqrt(pixel_luma) - sqrt(blurred_luma));
-    let edge_weight = smoothstep(0.02, 0.15, edge_diff);
-    let guided_dark = mix(regional_dark, pixel_dark, edge_weight);
-    let transmission = clamp(1.0 - 0.95 * guided_dark, 0.08, 1.0);
+    let luma_edge = abs(sqrt(pixel_luma) - sqrt(blurred_luma));
+    let pixel_chroma = color - vec3<f32>(pixel_luma);
+    let regional_chroma = blurred_linear - vec3<f32>(blurred_luma);
+    let chroma_edge = length(pixel_chroma - regional_chroma) / (sqrt(pixel_luma) + sqrt(blurred_luma) + 0.05);
+    let discontinuity = max(luma_edge, chroma_edge * 0.3);
+    let edge_weight = smoothstep(0.015, 0.12, discontinuity);
+    let transmission = mix(regional_transmission, pixel_transmission, edge_weight);
     let confidence_weight = clamp(atmosphere_confidence, 0.0, 1.0);
     let strength = clamp(abs(amount) * 7.5, 0.0, 1.0) * confidence_weight;
     let effective_transmission = mix(1.0, transmission, strength);
@@ -2437,6 +2440,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var tonal_blurred = initial_linear_rgb;
     var clarity_blurred = initial_linear_rgb;
     var structure_blurred = initial_linear_rgb;
+    var dehaze_guidance = initial_linear_rgb;
     if ((adjustments.blur_pass_flags & 1u) != 0u) {
         sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
     }
@@ -2448,6 +2452,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     if ((adjustments.blur_pass_flags & 8u) != 0u) {
         structure_blurred = textureLoad(structure_blur_texture, id.xy, 0).rgb;
+    }
+    if ((adjustments.blur_pass_flags & 16u) != 0u) {
+        dehaze_guidance = textureLoad(dehaze_blur_texture, id.xy, 0).rgb;
     }
 
     var locally_contrasted_rgb = initial_linear_rgb;
@@ -2515,7 +2522,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (adjustments.global.edit_graph_version >= 2.0) {
         composite_rgb_linear = apply_scene_dehaze_v1(
             processed_rgb,
-            structure_blurred,
+            dehaze_guidance,
             is_raw,
             t_dehaze,
             dehaze_atmosphere,
@@ -2524,7 +2531,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         composite_rgb_linear = legacy_fixed_atmosphere_dehaze_v1(
             processed_rgb,
-            structure_blurred,
+            dehaze_guidance,
             is_raw,
             t_dehaze,
         );
