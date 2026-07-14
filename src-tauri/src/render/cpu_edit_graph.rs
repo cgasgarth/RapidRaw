@@ -347,21 +347,34 @@ pub(crate) fn execute_cpu_edit_graph(
             preserve_extended,
         ));
         color = apply_luma_levels(color, adjustments.global.levels, preserve_extended);
-        color = apply_color_grading(
-            color,
-            adjustments.global.color_grading_shadows,
-            adjustments.global.color_grading_midtones,
-            adjustments.global.color_grading_highlights,
-            adjustments.global.color_grading_global,
-            adjustments.global.color_grading_blending,
-            adjustments.global.color_grading_balance,
-        );
-        color = apply_local_color_grading(color, adjustments, mask_bitmaps, x, y);
+        let scene_monochrome_toning = adjustments.global.black_white_mixer.enabled != 0
+            && adjustments.global.black_white_mixer.process
+                != crate::monochrome::LEGACY_FIXED_BAND_V1
+            && adjustments.global.black_white_mixer.implementation_version
+                == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION;
+        let apply_grading = |input| {
+            let graded = apply_color_grading(
+                input,
+                adjustments.global.color_grading_shadows,
+                adjustments.global.color_grading_midtones,
+                adjustments.global.color_grading_highlights,
+                adjustments.global.color_grading_global,
+                adjustments.global.color_grading_blending,
+                adjustments.global.color_grading_balance,
+            );
+            apply_local_color_grading(graded, adjustments, mask_bitmaps, x, y)
+        };
+        if !scene_monochrome_toning {
+            color = apply_grading(color);
+        }
         color = Vec3::from_array(apply_black_white_mixer(
             color.to_array(),
             adjustments.global.black_white_mixer,
             preserve_extended,
         ));
+        if scene_monochrome_toning {
+            color = apply_grading(color);
+        }
         color = apply_vignette(color, x, y, width, height, adjustments);
         if let Some(curve) = graph.scene_curve() {
             color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));

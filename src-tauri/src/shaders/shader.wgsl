@@ -1006,11 +1006,11 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, 
         return color;
     }
 
-    if (settings.process == 1u && settings.implementation_version == 1u) {
+    if (settings.process == 1u && settings.implementation_version == 2u) {
         let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
         return vec3<f32>(dot(storage_safe, ACESCG_LUMINANCE_COEFF));
     }
-    if (settings.process == 2u && settings.implementation_version == 1u) {
+    if (settings.process == 2u && settings.implementation_version == 2u) {
         let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
         let lab = monochrome_oklab_from_ap1(storage_safe);
         let chroma = length(lab.yz);
@@ -2476,29 +2476,59 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer, preserve_scene_extended);
     composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels, preserve_scene_extended);
 
-    composite_rgb_linear = apply_color_grading(
-        composite_rgb_linear,
-        adjustments.global.color_grading_shadows,
-        adjustments.global.color_grading_midtones,
-        adjustments.global.color_grading_highlights,
-        adjustments.global.color_grading_global,
-        adjustments.global.color_grading_blending,
-        adjustments.global.color_grading_balance
-    );
+    let scene_monochrome_toning = adjustments.global.black_white_mixer.enabled != 0u
+        && adjustments.global.black_white_mixer.process != 0u
+        && adjustments.global.black_white_mixer.implementation_version == 2u;
 
-    for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
-        let influence = get_mask_influence(i, absolute_coord);
-        if (influence > 0.001) {
-            let m = adjustments.mask_adjustments[i];
-            let mask_graded = apply_color_grading(
-                composite_rgb_linear,
-                m.color_grading_shadows, m.color_grading_midtones, m.color_grading_highlights, m.color_grading_global, m.color_grading_blending, m.color_grading_balance
-            );
-            composite_rgb_linear = blend_mask_layer(composite_rgb_linear, mask_graded, influence, m.blend_mode);
+    if (!scene_monochrome_toning) {
+        composite_rgb_linear = apply_color_grading(
+            composite_rgb_linear,
+            adjustments.global.color_grading_shadows,
+            adjustments.global.color_grading_midtones,
+            adjustments.global.color_grading_highlights,
+            adjustments.global.color_grading_global,
+            adjustments.global.color_grading_blending,
+            adjustments.global.color_grading_balance
+        );
+
+        for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+            let influence = get_mask_influence(i, absolute_coord);
+            if (influence > 0.001) {
+                let m = adjustments.mask_adjustments[i];
+                let mask_graded = apply_color_grading(
+                    composite_rgb_linear,
+                    m.color_grading_shadows, m.color_grading_midtones, m.color_grading_highlights, m.color_grading_global, m.color_grading_blending, m.color_grading_balance
+                );
+                composite_rgb_linear = blend_mask_layer(composite_rgb_linear, mask_graded, influence, m.blend_mode);
+            }
         }
     }
 
     composite_rgb_linear = apply_black_white_mixer(composite_rgb_linear, adjustments.global.black_white_mixer, preserve_scene_extended);
+
+    if (scene_monochrome_toning) {
+        composite_rgb_linear = apply_color_grading(
+            composite_rgb_linear,
+            adjustments.global.color_grading_shadows,
+            adjustments.global.color_grading_midtones,
+            adjustments.global.color_grading_highlights,
+            adjustments.global.color_grading_global,
+            adjustments.global.color_grading_blending,
+            adjustments.global.color_grading_balance
+        );
+
+        for (var i = 0u; i < adjustments.mask_count; i = i + 1u) {
+            let influence = get_mask_influence(i, absolute_coord);
+            if (influence > 0.001) {
+                let m = adjustments.mask_adjustments[i];
+                let mask_graded = apply_color_grading(
+                    composite_rgb_linear,
+                    m.color_grading_shadows, m.color_grading_midtones, m.color_grading_highlights, m.color_grading_global, m.color_grading_blending, m.color_grading_balance
+                );
+                composite_rgb_linear = blend_mask_layer(composite_rgb_linear, mask_graded, influence, m.blend_mode);
+            }
+        }
+    }
 
     if (adjustments.global.vignette_amount != 0.0) {
         let full_dims_f = vec2<f32>(textureDimensions(input_texture));

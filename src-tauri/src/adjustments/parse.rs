@@ -176,7 +176,7 @@ fn parse_black_white_mixer_settings(js_black_white_mixer: &JsonValue) -> BlackWh
             / 100.0,
         enabled: u32::from(js_black_white_mixer["enabled"].as_bool().unwrap_or(false)),
         process,
-        implementation_version: crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1,
+        implementation_version: crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION,
         _pad3: 0,
     }
 }
