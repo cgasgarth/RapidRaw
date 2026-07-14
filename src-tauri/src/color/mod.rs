@@ -22,6 +22,7 @@ pub(crate) mod hdr_editing;
 pub(crate) mod hdr_scopes;
 pub(crate) mod icc_profiles;
 pub(crate) mod lens_correction;
+pub(crate) mod lens_database_service;
 pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
