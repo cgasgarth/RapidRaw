@@ -2496,7 +2496,17 @@ function BrushMaskCanvasVisualSmoke() {
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
                 selectedImage={brushMaskCanvasImage}
-                setAdjustments={() => {}}
+                setAdjustments={(updater) => {
+                  setSubMask((current) => {
+                    const previous: Adjustments = {
+                      ...INITIAL_ADJUSTMENTS,
+                      aiPatches: [],
+                      masks: [createBrushMaskCanvasContainer(current)],
+                    };
+                    const next = updater(previous);
+                    return next.masks[0]?.subMasks[0] ?? current;
+                  });
+                }}
                 setCrop={() => {}}
                 setIsMaskHovered={() => {}}
                 setIsMaskTouchInteracting={() => {}}

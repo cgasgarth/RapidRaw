@@ -69,4 +69,47 @@ describe('brush mask command receipt', () => {
       strokeCount: 1,
     });
   });
+
+  test('accepts a second Alt-inverted stroke after the first receipt is attached', () => {
+    const context = {
+      expectedGraphRevision: 'graph:brush-2',
+      imagePath: '/raws/alaska/_DSC7509.ARW',
+      imageSize: { height: 360, width: 640 },
+      maskId: 'mask-1',
+      maskName: 'Brush mask',
+      operationId: 'mask-1-2',
+      sessionId: 'test-session',
+    };
+    const paint = {
+      brushSize: 96,
+      feather: 0.64,
+      points: [
+        { x: 130, y: 170 },
+        { x: 430, y: 170 },
+      ],
+      tool: 'brush' as const,
+    };
+    const firstReceipt = buildBrushMaskCommandReceiptFromParameters({ lines: [paint] }, context, { dryRun: true });
+    const erase = {
+      ...paint,
+      points: [
+        { pressure: 0.4, x: 300, y: 95 },
+        { pressure: 0.8, x: 300, y: 250 },
+      ],
+      tool: 'eraser' as const,
+    };
+    const secondReceipt = buildBrushMaskCommandReceiptFromParameters(
+      {
+        lines: [paint, erase],
+        rawEngine: { brushMaskCommandReceipt: firstReceipt },
+      },
+      context,
+      { dryRun: true },
+    );
+
+    expect(secondReceipt.strokeCount).toBe(2);
+    expect(secondReceipt.lastStrokeMode).toBe('erase');
+    expect(secondReceipt.pressurePointCount).toBe(2);
+    expect(secondReceipt.command.parameters.strokes.map((stroke) => stroke.mode)).toEqual(['paint', 'erase']);
+  });
 });

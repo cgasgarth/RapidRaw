@@ -92,10 +92,15 @@ import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
+import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
+import {
+  createViewerInteractionCoordinator,
+  type ViewerInteractionContext,
+  type ViewerInteractionTransition,
+  viewerInteractionToolId,
+} from './viewerInteractionCoordinator';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
-import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 import {
   isViewerWhiteBalanceSampleCurrent,
   resolveViewerWhiteBalanceInteraction,
@@ -395,24 +400,17 @@ const ImageCanvas = memo(
     const currentLine = useRef<DrawnLine | null>(null);
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
-    const viewerInputRouter = useMemo(() => createViewerInputRouter(), []);
-    const viewerToolSessions = useMemo(() => createViewerToolSessionRegistry(), []);
-    const viewerInputTransitionRef = useRef<ReturnType<typeof viewerInputRouter.dispatch> | null>(null);
+    const viewerInteractionCoordinator = useMemo(() => createViewerInteractionCoordinator(), []);
+    const viewerInteractionTransitionRef = useRef<ViewerInteractionTransition | null>(null);
     const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
       null,
     );
     useEffect(
       () => () => {
-        viewerInputRouter.dispatch({ type: 'session-invalidated' });
-        viewerToolSessions.invalidate();
+        viewerInteractionCoordinator.dispose();
       },
-      [viewerInputRouter, viewerToolSessions],
+      [viewerInteractionCoordinator],
     );
-    useEffect(() => {
-      const transition = viewerInputRouter.dispatch({ type: 'session-invalidated' });
-      viewerToolSessions.invalidate();
-      setViewerInputOwnerState(transition.state.owner);
-    }, [adjustmentGeometryRevision, selectedImage.path, viewerInputRouter, viewerToolSessions]);
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
@@ -2208,6 +2206,28 @@ const ImageCanvas = memo(
                       : showGamutWarningOverlay
                         ? 'soft-proof'
                         : 'pan-zoom';
+    const viewerInteractionContext: ViewerInteractionContext = {
+      activeTool: pickerControllers.activeTool ?? viewerInputState?.activeTool ?? 'none',
+      focusContext: isSliderDragging ? 'editable' : 'viewer',
+      geometryEpoch: overlayGeometry.geometryEpoch,
+      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+      isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
+      pointerCount: 1,
+      sourceRevision: presentationDescriptor.graphRevision,
+      toolId: viewerInteractionToolId(activeCanvasOverlayTool),
+      zoomed: isMaxZoom ?? false,
+    };
+    useEffect(() => {
+      viewerInteractionCoordinator.synchronize(viewerInteractionContext);
+      setViewerInputOwnerState(viewerInteractionCoordinator.snapshot().owner);
+    }, [
+      viewerInteractionContext.activeTool,
+      viewerInteractionContext.geometryEpoch,
+      viewerInteractionContext.imageSessionId,
+      viewerInteractionContext.sourceRevision,
+      viewerInteractionContext.toolId,
+      viewerInteractionCoordinator,
+    ]);
     const activeCanvasOverlayStatus: CanvasOverlayStatus =
       isShowingOriginal || compareOverlayDisabled
         ? 'disabled'
@@ -2229,7 +2249,8 @@ const ImageCanvas = memo(
       isMaskInteractionActive: effectiveMaskInteractionActive,
       isToolActive,
     });
-    const viewerInputOwner = viewerInputOwnerState ?? viewerInputRouter.getState().owner ?? canvasPointerOwner;
+    const viewerInputOwner =
+      viewerInputOwnerState ?? viewerInteractionCoordinator.snapshot().owner ?? canvasPointerOwner;
 
     return (
       <ViewerSurface
@@ -2283,94 +2304,15 @@ const ImageCanvas = memo(
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
-          if (event.type === 'blur' || event.type === 'escape') {
-            pickerControllers.handleInputEvent(event);
-            const transition = viewerInputRouter.dispatch({ type: event.type });
-            viewerInputTransitionRef.current = transition;
-            setViewerInputOwnerState(transition.state.owner);
-            viewerToolSessions.invalidate();
-            return;
-          }
-          if (!('pointerId' in event)) return;
-          const transition =
-            event.type === 'pointerdown'
-              ? viewerInputRouter.dispatch({
-                  type: 'pointerdown',
-                  pointerId: event.pointerId,
-                  sample: {
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                    pointerType: normalizeViewerPointerType(event.pointerType),
-                    pressure: event.pressure,
-                  },
-                  input: {
-                    activeTool: pickerControllers.activeTool ?? viewerInputState?.activeTool ?? 'none',
-                    button: event.button,
-                    focusContext: isSliderDragging ? 'editable' : 'viewer',
-                    isDragging: false,
-                    isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
-                    pointerCount: 1,
-                    pointerType: normalizeViewerPointerType(event.pointerType),
-                    zoomed: isMaxZoom ?? false,
-                  },
-                })
-              : viewerInputRouter.dispatch({
-                  type: event.type,
-                  pointerId: event.pointerId,
-                  sample: {
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                    pointerType: normalizeViewerPointerType(event.pointerType),
-                    pressure: event.pressure,
-                  },
-                });
-          viewerInputTransitionRef.current = transition;
-          setViewerInputOwnerState(transition.state.owner);
-          if (!transition.ignored) pickerControllers.handleInputEvent(event);
-          if (
-            event.type === 'pointerdown' &&
-            transition.resolution &&
-            transition.state.owner !== null &&
-            transition.state.owner !== 'blocked'
-          ) {
-            viewerToolSessions.begin(
-              {
-                geometryEpoch: overlayGeometry.geometryEpoch,
-                imageSessionId: selectedImage.path,
-                operationGeneration: viewerInputRouter.getState().sessionGeneration,
-                sourceRevision: presentationDescriptor.graphRevision,
-                toolId: resolveViewerToolId(activeCanvasOverlayTool),
-              },
-              event.pointerId,
-              transition.state.owner,
-              {
-                clientX: event.clientX,
-                clientY: event.clientY,
-                pointerType: normalizeViewerPointerType(event.pointerType),
-                pressure: event.pressure,
-              },
-            );
-          } else if (event.type === 'pointermove') {
-            viewerToolSessions.reduce({
-              kind: 'update',
-              pointerId: event.pointerId,
-              sample: {
-                clientX: event.clientX,
-                clientY: event.clientY,
-                pointerType: normalizeViewerPointerType(event.pointerType),
-                pressure: event.pressure,
-              },
-            });
-          } else if (event.type === 'pointerup') {
-            viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
-          } else if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {
-            viewerToolSessions.reduce({ kind: 'cancel', pointerId: event.pointerId });
-          }
+          const transition = viewerInteractionCoordinator.dispatch(event, viewerInteractionContext);
+          viewerInteractionTransitionRef.current = transition;
+          setViewerInputOwnerState(transition.owner);
+          if (transition.forwardToTool) pickerControllers.handleInputEvent(event);
         }}
         onPointerLeave={handleViewerSamplerPointerLeave}
         onPointerDown={(event) => {
-          const transition = viewerInputTransitionRef.current;
-          if (transition?.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
+          const transition = viewerInteractionTransitionRef.current;
+          if (transition?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
           if (pickerControllers.activeTool !== null) {
             event.preventDefault();
             return;

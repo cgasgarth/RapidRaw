@@ -13,10 +13,14 @@ export type ViewerInputEvent =
   | { type: 'blur' | 'escape' | 'session-invalidated' };
 
 export interface ViewerPointerSample {
+  readonly altKey?: boolean;
   readonly clientX: number;
   readonly clientY: number;
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
   readonly pointerType: ViewerPointerType;
   readonly pressure: number;
+  readonly shiftKey?: boolean;
 }
 
 export interface ViewerSurfacePointerEvent {
