@@ -9011,6 +9011,42 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       vibrance: 0,
       workingSpace: 'linear_srgb_d65',
     }),
+    cmyTiming: z
+      .object({
+        algorithmVersion: z.literal(1).default(1),
+        enabled: z.boolean().default(false),
+        globalC: z.number().min(-1).max(1).default(0),
+        globalM: z.number().min(-1).max(1).default(0),
+        globalY: z.number().min(-1).max(1).default(0),
+        shadowC: z.number().min(-1).max(1).default(0),
+        shadowM: z.number().min(-1).max(1).default(0),
+        shadowY: z.number().min(-1).max(1).default(0),
+        highlightC: z.number().min(-1).max(1).default(0),
+        highlightM: z.number().min(-1).max(1).default(0),
+        highlightY: z.number().min(-1).max(1).default(0),
+        transitionWidth: z.number().min(0.02).max(0.5).default(0.15),
+        source: z.string().trim().min(1).default('manual_global_v1'),
+        signConvention: z
+          .literal('positive_density_reduces_channel_exposure_v1')
+          .default('positive_density_reduces_channel_exposure_v1'),
+      })
+      .strict()
+      .default({
+        algorithmVersion: 1,
+        enabled: false,
+        globalC: 0,
+        globalM: 0,
+        globalY: 0,
+        shadowC: 0,
+        shadowM: 0,
+        shadowY: 0,
+        highlightC: 0,
+        highlightM: 0,
+        highlightY: 0,
+        transitionWidth: 0.15,
+        source: 'manual_global_v1',
+        signConvention: 'positive_density_reduces_channel_exposure_v1',
+      }),
     opticalFinish: negativeLabOpticalFinishV1Schema.default({
       algorithmVersion: 1,
       enabled: false,
