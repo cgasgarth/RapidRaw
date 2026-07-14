@@ -8,6 +8,7 @@ import EditorNavigator, {
   createNavigatorPreviewState,
   type EditorTransformController,
   navigatorPreviewReducer,
+  resolveNavigatorTransformUpdate,
 } from '../../../src/components/panel/editor/EditorNavigator';
 import { type NavigatorPreviewArtifact, useEditorStore } from '../../../src/store/useEditorStore';
 import type { EditorZoomCommand } from '../../../src/utils/editorZoom';
@@ -118,6 +119,33 @@ test('keys interaction ownership by rapid A → B → A artifacts but not transf
     await flushPromises();
   });
   expect(required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]')).toBe(thirdOverview);
+});
+
+test('converges repeated pan, zoom, resize, and image snapshots without duplicate transform publication', () => {
+  let current = { positionX: 0, positionY: 0, scale: 1 };
+  let publications = 0;
+  const synchronize = (candidate: typeof current) => {
+    const next = resolveNavigatorTransformUpdate(current, candidate);
+    if (next !== current) publications += 1;
+    current = next;
+  };
+
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+  synchronize({ positionX: -400, positionY: -300, scale: 2 });
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+  synchronize({ positionX: -440, positionY: -300, scale: 2 });
+  synchronize({ positionX: -220, positionY: -150, scale: 1.5 });
+  synchronize({ positionX: 0, positionY: 0, scale: 1 });
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+
+  const converged = current;
+  synchronize({ positionX: Number.NaN, positionY: 0, scale: 1 });
+  synchronize({ positionX: 0, positionY: Number.POSITIVE_INFINITY, scale: 1 });
+  synchronize({ positionX: 0, positionY: 0, scale: 0 });
+
+  expect(publications).toBe(4);
+  expect(current).toBe(converged);
+  expect(current).toEqual({ positionX: 0, positionY: 0, scale: 1 });
 });
 
 describe('Navigator preview artifact reducer', () => {

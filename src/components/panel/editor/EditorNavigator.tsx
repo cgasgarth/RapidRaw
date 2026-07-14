@@ -50,6 +50,22 @@ export function navigatorPreviewReducer(
 const sameTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
   left.scale === right.scale && left.positionX === right.positionX && left.positionY === right.positionY;
 
+export function resolveNavigatorTransformUpdate(
+  current: ViewportTransform,
+  candidate: ViewportTransform,
+): ViewportTransform {
+  if (
+    !Number.isFinite(candidate.scale) ||
+    candidate.scale <= 0 ||
+    !Number.isFinite(candidate.positionX) ||
+    !Number.isFinite(candidate.positionY) ||
+    sameTransform(current, candidate)
+  ) {
+    return current;
+  }
+  return { ...candidate };
+}
+
 export default function EditorNavigator(props: EditorNavigatorProps) {
   const identity = useEditorStore(
     useShallow((state) => ({ artifact: state.navigatorPreviewArtifact, imageSessionId: state.imageSessionId })),
@@ -77,6 +93,7 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   const [transform, setTransform] = useState<ViewportTransform>(
     () => transformControllerRef.current?.instance?.transformState ?? { positionX: 0, positionY: 0, scale: 1 },
   );
+  const publishedTransformRef = useRef(transform);
   const [preview, dispatchPreview] = useReducer(navigatorPreviewReducer, artifact, createNavigatorPreviewState);
   const [imageBox, setImageBox] = useState({ height: 0, left: 0, top: 0, width: 0 });
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -99,7 +116,13 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
     let frame = 0;
     const synchronize = () => {
       const next = transformControllerRef.current?.instance?.transformState;
-      if (next) setTransform((current) => (sameTransform(current, next) ? current : { ...next }));
+      if (next) {
+        const resolved = resolveNavigatorTransformUpdate(publishedTransformRef.current, next);
+        if (resolved !== publishedTransformRef.current) {
+          publishedTransformRef.current = resolved;
+          setTransform(resolved);
+        }
+      }
       frame = requestAnimationFrame(synchronize);
     };
     frame = requestAnimationFrame(synchronize);

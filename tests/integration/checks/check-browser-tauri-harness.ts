@@ -684,31 +684,85 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const invokeFromContextMenu = async () => {
     await page.waitForFunction(
       () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
+      undefined,
       { timeout: 10_000 },
     );
     const selectedPath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
     if (!selectedPath) throw new Error('Selected editor path was unavailable for Batch Auto Adjust proof.');
     const targetThumbnail = page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${selectedPath}"]`);
     await targetThumbnail.click({ button: 'right' });
-    const productivity = page.getByRole('menuitem', { exact: true, name: 'Productivity' });
-    await productivity.waitFor({ timeout: 10_000 });
-    await productivity.press('ArrowRight');
-    await page.waitForFunction(
-      () =>
-        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
-          (item) => item.textContent?.trim() === 'Productivity' && item.getAttribute('aria-expanded') === 'true',
-        ),
-      { timeout: 10_000 },
-    );
-    const autoAdjust = page.getByRole('menuitem', { exact: true, name: 'Auto Adjust Image' });
-    await autoAdjust.waitFor({ timeout: 10_000 });
-    await page.waitForFunction(
-      () =>
-        document.activeElement?.getAttribute('role') === 'menuitem' &&
-        document.activeElement.textContent?.trim() === 'Auto Adjust Image',
-      { timeout: 10_000 },
-    );
-    await autoAdjust.press('Enter');
+    const menuDiagnostics = () =>
+      page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const visibleItems = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+          .filter((item) => item.getClientRects().length > 0)
+          .map((item) => ({
+            expanded: item.getAttribute('aria-expanded'),
+            path: item.dataset.menuItemPath ?? null,
+            text: item.textContent?.trim() ?? '',
+          }));
+        return {
+          active: active
+            ? {
+                disabled: 'disabled' in active && Boolean(active.disabled),
+                path: active.dataset.menuItemPath ?? null,
+                role: active.getAttribute('role'),
+                text: active.textContent?.trim() ?? '',
+                visible: active.getClientRects().length > 0,
+              }
+            : null,
+          visibleItems,
+        };
+      });
+    try {
+      await page.waitForFunction(
+        () => {
+          const active = document.activeElement as HTMLButtonElement | null;
+          return (
+            active?.getAttribute('role') === 'menuitem' &&
+            !active.disabled &&
+            active.getClientRects().length > 0 &&
+            active.closest('[role="menu"]')?.parentElement?.closest('[role="menu"]') === null
+          );
+        },
+        undefined,
+        { timeout: 10_000 },
+      );
+      let productivityFocused = false;
+      for (let step = 0; step < 32; step += 1) {
+        productivityFocused = await page.evaluate(
+          () =>
+            document.activeElement?.getAttribute('role') === 'menuitem' &&
+            document.activeElement.textContent?.trim() === 'Productivity',
+        );
+        if (productivityFocused) break;
+        await page.keyboard.press('ArrowDown');
+      }
+      if (!productivityFocused) {
+        throw new Error(`Productivity keyboard target not reached: ${JSON.stringify(await menuDiagnostics())}`);
+      }
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(
+        () => {
+          const active = document.activeElement as HTMLElement | null;
+          return (
+            active?.getAttribute('role') === 'menuitem' &&
+            active.textContent?.trim() === 'Auto Adjust Image' &&
+            active.getClientRects().length > 0 &&
+            [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
+              (item) => item.textContent?.trim() === 'Productivity' && item.getAttribute('aria-expanded') === 'true',
+            )
+          );
+        },
+        undefined,
+        { timeout: 10_000 },
+      );
+      await page.keyboard.press('Enter');
+    } catch (error) {
+      throw new Error(`Batch Auto Adjust keyboard menu activation failed: ${JSON.stringify(await menuDiagnostics())}`, {
+        cause: error,
+      });
+    }
   };
   const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
     const other = page.locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${activePath}"])`).first();
