@@ -14,6 +14,7 @@ import {
   negativeLabOutputTransformSchema,
   negativeLabSceneLinearStatsSchema,
 } from '../../schemas/negative-lab/negativeLabOutputTransformSchemas';
+import { negativeLabPaperProfileSchema } from '../../schemas/negative-lab/negativeLabPaperProfileSchemas';
 import { negativeLabStagePreviewArtifactFieldsSchema } from '../../schemas/negative-lab/negativeLabStagePreviewSchemas';
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
@@ -234,6 +235,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
     opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
     cmyTimingMetrics: negativeLabCmyTimingMetricsSchema.optional(),
     neutralAxisAnalysis: negativeLabNeutralAxisAnalysisSchema.optional(),
+    paperProfile: negativeLabPaperProfileSchema.nullable().optional(),
     flatLogMaster: z
       .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
       .strict()
@@ -326,6 +328,7 @@ const toRuntimePreviewRenderResult = (
     ...(artifact.opticalFinishMetrics === undefined ? {} : { opticalFinishMetrics: artifact.opticalFinishMetrics }),
     ...(artifact.cmyTimingMetrics === undefined ? {} : { cmyTimingMetrics: artifact.cmyTimingMetrics }),
     ...(artifact.neutralAxisAnalysis === undefined ? {} : { neutralAxisAnalysis: artifact.neutralAxisAnalysis }),
+    ...(artifact.paperProfile === undefined ? {} : { paperProfile: artifact.paperProfile }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
@@ -420,6 +423,21 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       allow_global_fallback?: boolean;
       source?: string;
     };
+    paper_profile?: {
+      profile_id: string;
+      profile_version: 1;
+      process_family: 'c41_color_negative' | 'black_and_white_silver_negative';
+      claim_class: 'generic_starting_point' | 'fixture_measured' | 'user_measured';
+      d_min: number;
+      d_max: number;
+      toe_knee: number;
+      shoulder_knee: number;
+      midtone_gamma: number;
+      channel_cmy: [number, number, number];
+      base_tint: [number, number, number];
+      source_references: string[];
+      content_hash: string;
+    } | null;
     color_finish?:
       | {
           algorithm_version: 1;
@@ -477,6 +495,25 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           scale_basis: params.command.parameters.opticalFinish.scaleBasis,
           working_space: params.command.parameters.opticalFinish.workingSpace,
         },
+        ...(params.command.parameters.paperProfile === null
+          ? {}
+          : {
+              paper_profile: {
+                profile_id: params.command.parameters.paperProfile.profileId,
+                profile_version: params.command.parameters.paperProfile.profileVersion,
+                process_family: params.command.parameters.paperProfile.processFamily,
+                claim_class: params.command.parameters.paperProfile.claimClass,
+                d_min: params.command.parameters.paperProfile.dMin,
+                d_max: params.command.parameters.paperProfile.dMax,
+                toe_knee: params.command.parameters.paperProfile.toeKnee,
+                shoulder_knee: params.command.parameters.paperProfile.shoulderKnee,
+                midtone_gamma: params.command.parameters.paperProfile.midtoneGamma,
+                channel_cmy: params.command.parameters.paperProfile.channelCmy,
+                base_tint: params.command.parameters.paperProfile.baseTint,
+                source_references: params.command.parameters.paperProfile.sourceReferences,
+                content_hash: params.command.parameters.paperProfile.contentHash,
+              },
+            }),
         ...(params.command.parameters.cmyTiming.enabled
           ? {
               cmy_timing: {

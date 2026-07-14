@@ -9090,6 +9090,25 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       scaleBasis: 'full_resolution_short_edge_v1',
       workingSpace: 'scene_linear_srgb_d65_v1',
     }),
+    paperProfile: z
+      .object({
+        profileId: z.string().regex(/^negative_lab\.paper\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u),
+        profileVersion: z.literal(1),
+        processFamily: z.enum(['c41_color_negative', 'black_and_white_silver_negative']),
+        claimClass: z.enum(['generic_starting_point', 'fixture_measured', 'user_measured']),
+        dMin: z.number().min(0).max(1),
+        dMax: z.number().min(0.8).max(3),
+        toeKnee: z.number().min(0.01).max(1),
+        shoulderKnee: z.number().min(0.01).max(1),
+        midtoneGamma: z.number().min(0.5).max(2),
+        channelCmy: z.tuple([z.number(), z.number(), z.number()]),
+        baseTint: z.tuple([z.number(), z.number(), z.number()]),
+        sourceReferences: z.array(z.string().trim().min(1)).min(1),
+        contentHash: z.string().regex(/^fnv1a32:[a-z0-9_]+$/u),
+      })
+      .strict()
+      .nullable()
+      .default(null),
     densityBounds: negativeLabDensityBoundsParamsV1Schema.default({
       analysisBuffer: 0.04,
       baseFogProvenance: 'automatic_analysis',
@@ -9752,6 +9771,7 @@ export const negativeLabRuntimeProofV1Schema = z
           })
           .strict()
           .optional(),
+        paperProfile: negativeLabSetConversionRecipeParametersV1Schema.shape.paperProfile.optional(),
         dryRunMode: z.literal('runtime_preview_non_mutating'),
         planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
         beforeAfterPreviewProof: z
