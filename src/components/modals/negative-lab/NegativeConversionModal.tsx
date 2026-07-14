@@ -642,6 +642,16 @@ function NegativeLabSession({
     [sessionSnapshot],
   );
   const params = sessionSnapshot.session.recipeState.params;
+  const colorFinish = params.color_finish ?? {
+    algorithm_version: 1 as const,
+    chroma_denoise_radius: 0,
+    chroma_denoise_strength: 0,
+    enabled: false,
+    saturation_trim: 0,
+    transform_id: 'linear_srgb_d65_cielab_v1' as const,
+    vibrance: 0,
+    working_space: 'linear_srgb_d65' as const,
+  };
   const setParams = useCallback(
     (nextState: SetStateAction<NegativeParams>) => {
       updateSessionSnapshot((currentSnapshot) =>
@@ -652,6 +662,15 @@ function NegativeLabSession({
       );
     },
     [updateSessionSnapshot],
+  );
+  const setColorFinish = useCallback(
+    (patch: Partial<NonNullable<NegativeParams['color_finish']>>) => {
+      setParams((current) => ({
+        ...current,
+        color_finish: { ...colorFinish, ...current.color_finish, ...patch },
+      }));
+    },
+    [colorFinish, setParams],
   );
   const selectedPresetId = sessionSnapshot.session.recipeState.selectedPresetId;
   const setSelectedPresetId = useCallback(
@@ -1917,6 +1936,16 @@ function NegativeLabSession({
             densityMax: 4,
             epsilonPolicyId: 'density_epsilon_v1',
             negativeDensityTolerance: 0.02,
+          },
+          colorFinish: {
+            algorithmVersion: currentParams.color_finish?.algorithm_version ?? 1,
+            chromaDenoiseRadius: currentParams.color_finish?.chroma_denoise_radius ?? 0,
+            chromaDenoiseStrength: currentParams.color_finish?.chroma_denoise_strength ?? 0,
+            enabled: currentParams.color_finish?.enabled ?? false,
+            saturationTrim: currentParams.color_finish?.saturation_trim ?? 0,
+            transformId: currentParams.color_finish?.transform_id ?? 'linear_srgb_d65_cielab_v1',
+            vibrance: currentParams.color_finish?.vibrance ?? 0,
+            workingSpace: currentParams.color_finish?.working_space ?? 'linear_srgb_d65',
           },
           densityBounds: {
             analysisBuffer: currentParams.analysis_buffer,
@@ -3777,6 +3806,75 @@ function NegativeLabSession({
             </span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2" data-testid="negative-lab-v2-print-curve-controls">
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-testid="negative-lab-color-finish"
+              data-enabled={String(colorFinish.enabled)}
+              data-algorithm="negative_lab_scanner_color_finish_v1"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="font-semibold text-text-secondary">
+                  {t('modals.negativeConversion.colorTiming')}
+                </UiText>
+                <label className="flex items-center gap-1 text-[11px] text-text-tertiary">
+                  <input
+                    checked={colorFinish.enabled}
+                    data-testid="negative-lab-color-finish-enabled"
+                    disabled={params.conversion_model === 'negative_log_density_v1' || isSaving}
+                    onChange={(event) => setColorFinish({ enabled: event.target.checked })}
+                    type="checkbox"
+                  />
+                  {colorFinish.enabled ? '1' : '0'}
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-text-tertiary">
+                <label
+                  aria-label={t('modals.negativeConversion.colorTiming')}
+                  className="col-span-2 flex flex-col gap-1"
+                >
+                  <input
+                    data-testid="negative-lab-color-finish-radius"
+                    disabled={!colorFinish.enabled || isSaving}
+                    max={0.1}
+                    min={0}
+                    onChange={(event) => setColorFinish({ chroma_denoise_radius: Number(event.target.value) })}
+                    step={0.005}
+                    type="range"
+                    value={colorFinish.chroma_denoise_radius}
+                  />
+                </label>
+                <label aria-label={t('modals.negativeConversion.colorTiming')} className="flex flex-col gap-1">
+                  <input
+                    data-testid="negative-lab-color-finish-strength"
+                    disabled={!colorFinish.enabled || isSaving}
+                    max={1}
+                    min={0}
+                    onChange={(event) => setColorFinish({ chroma_denoise_strength: Number(event.target.value) })}
+                    step={0.01}
+                    type="range"
+                    value={colorFinish.chroma_denoise_strength}
+                  />
+                </label>
+                <label aria-label={t('modals.negativeConversion.colorTiming')} className="flex flex-col gap-1">
+                  <input
+                    data-testid="negative-lab-color-finish-vibrance"
+                    disabled={!colorFinish.enabled || isSaving}
+                    max={0.25}
+                    min={-0.25}
+                    onChange={(event) => setColorFinish({ vibrance: Number(event.target.value) })}
+                    step={0.01}
+                    type="range"
+                    value={colorFinish.vibrance}
+                  />
+                </label>
+              </div>
+              <span
+                className="block text-[10px] text-text-tertiary"
+                data-testid="negative-lab-color-finish-transform"
+                data-transform-id={colorFinish.transform_id}
+                data-working-space={colorFinish.working_space}
+              />
+            </div>
             <Slider
               defaultValue={1}
               disabled={!isPrintCurveV2 || isSaving}

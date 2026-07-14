@@ -126,6 +126,23 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    colorFinishMetrics: z
+      .object({
+        afterHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        algorithmId: z.literal('negative_lab_scanner_color_finish_v1'),
+        algorithmVersion: z.literal(1),
+        beforeHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        changedPixelRatio: z.number().min(0).max(1),
+        effectiveRadiusPixels: z.number().int().nonnegative(),
+        gamutClippedPixelCount: z.number().int().nonnegative(),
+        luminancePreservationError: z.number().nonnegative(),
+        operationId: z.literal('negative_lab.scanner_color_finish'),
+        transformId: z.literal('linear_srgb_d65_cielab_v1'),
+        warningCodes: z.array(z.enum(['gamut_clipping_before_output_policy', 'inapplicable_mode_identity'])),
+        workingSpace: z.literal('linear_srgb_d65'),
+      })
+      .strict()
+      .optional(),
     densityNormalizationMetrics: z
       .object({
         axisBounds: z
@@ -304,6 +321,18 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           working_space?: 'scene_linear_luminance_v1';
         }
       | undefined;
+    color_finish?:
+      | {
+          algorithm_version: 1;
+          chroma_denoise_radius: number;
+          chroma_denoise_strength: number;
+          enabled: boolean;
+          saturation_trim: number;
+          transform_id: 'linear_srgb_d65_cielab_v1';
+          vibrance: number;
+          working_space: 'linear_srgb_d65';
+        }
+      | undefined;
   };
 }): Promise<NegativeLabRuntimeDryRunAdapterResult> {
   const conversionModel =
@@ -316,6 +345,16 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       params: {
         ...params.recipeParams,
         conversion_model: conversionModel,
+        color_finish: {
+          algorithm_version: params.command.parameters.colorFinish.algorithmVersion,
+          chroma_denoise_radius: params.command.parameters.colorFinish.chromaDenoiseRadius,
+          chroma_denoise_strength: params.command.parameters.colorFinish.chromaDenoiseStrength,
+          enabled: params.command.parameters.colorFinish.enabled,
+          saturation_trim: params.command.parameters.colorFinish.saturationTrim,
+          transform_id: params.command.parameters.colorFinish.transformId,
+          vibrance: params.command.parameters.colorFinish.vibrance,
+          working_space: params.command.parameters.colorFinish.workingSpace,
+        },
       },
       ...(params.crosstalkProfile == null ? {} : { crosstalkProfile: params.crosstalkProfile }),
       path: params.path,

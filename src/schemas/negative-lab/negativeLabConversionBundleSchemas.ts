@@ -9,7 +9,7 @@ import {
 } from './negativeLabFrameHealthSchemas';
 import { negativeLabFrameRgbBalanceOverridePayloadSchema } from './negativeLabFrameRgbBalanceOverrideSchemas';
 import { negativeLabPatchSamplerCorrectionPayloadSchema } from './negativeLabPatchSamplerCorrectionSchemas';
-import { negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
+import { negativeLabColorFinishMetricsSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 import { negativeLabSelectedProfileSnapshotSchema } from './negativeLabProfileComparisonSchemas';
 
 const fnv64HashSchema = z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u);
@@ -53,6 +53,7 @@ export const negativeLabConversionBundleSchema = z
           .string()
           .regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u)
           .nullable(),
+        colorFinishMetrics: negativeLabColorFinishMetricsSchema.optional(),
         frameExposureOverrides: negativeLabFrameExposureOverridePayloadSchema.default({
           overrides: [],
           schemaVersion: 1,
