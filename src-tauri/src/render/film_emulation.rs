@@ -13,6 +13,9 @@ use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
 use super::film_color_coupler::{
     apply as apply_color_coupler, reference as reference_color_coupler,
 };
+use super::film_density_grain::{
+    apply as apply_density_grain, reference as reference_density_grain,
+};
 use super::film_print_scan::{apply as apply_print_scan, reference as reference_print_scan};
 
 pub const FILM_NODE_TYPE: &str = "film_emulation";
@@ -141,6 +144,10 @@ pub fn parse_node(value: &serde_json::Value) -> Result<Option<FilmEmulationParam
 }
 
 pub fn apply_pixel(rgb: Vec3, params: FilmEmulationParams) -> Vec3 {
+    apply_pixel_at(rgb, params, 0, 0)
+}
+
+pub fn apply_pixel_at(rgb: Vec3, params: FilmEmulationParams, x: u32, y: u32) -> Vec3 {
     if !params.enabled || params.mix <= 0.0 {
         return rgb;
     }
@@ -158,7 +165,8 @@ pub fn apply_pixel(rgb: Vec3, params: FilmEmulationParams) -> Vec3 {
         0.0
     };
     let coupled = apply_color_coupler(shaped, exposure_ev, &reference_color_coupler());
-    let printed = apply_print_scan(coupled, &reference_print_scan());
+    let grained = apply_density_grain(coupled, x, y, &reference_density_grain());
+    let printed = apply_print_scan(grained, &reference_print_scan());
     rgb + params.mix * (printed - rgb)
 }
 
@@ -167,8 +175,8 @@ pub fn apply_image(image: &mut Rgb32FImage, params: FilmEmulationParams) {
     if !params.enabled || params.mix <= 0.0 {
         return;
     }
-    for pixel in image.pixels_mut() {
-        pixel.0 = apply_pixel(Vec3::from_array(pixel.0), params).to_array();
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        pixel.0 = apply_pixel_at(Vec3::from_array(pixel.0), params, x, y).to_array();
     }
 }
 

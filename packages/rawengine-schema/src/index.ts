@@ -21,6 +21,7 @@ export * from './exportColorCapabilities.js';
 export * from './exportRecipeSchemas.js';
 export * from './film/filmCharacteristicCurveSchemas.js';
 export * from './film/filmColorCouplerSchemas.js';
+export * from './film/filmDensityGrainSchemas.js';
 export * from './film/filmEmulationOperationSchemas.js';
 export * from './film/filmEmulationSchemas.js';
 export * from './film/filmMonochromeSchemas.js';
