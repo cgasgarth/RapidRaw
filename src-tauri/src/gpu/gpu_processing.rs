@@ -24,8 +24,8 @@ use crate::gpu_runtime::{
     GpuRuntimeIdentity,
 };
 use crate::gpu_textures::{
-    create_dummy_lut_texture_view, create_dummy_rgba16f_texture_view,
-    create_rgba16f_texture_with_view,
+    GpuIntermediateTexture, create_dummy_lut_texture_view, create_dummy_rgba16f_texture_view,
+    create_owned_rgba16f_texture_with_view, create_rgba16f_texture_with_view,
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
@@ -1623,26 +1623,22 @@ impl GpuProcessor {
             blur_texture_usage,
         );
 
-        let (tile_output_texture, tile_output_texture_view) = create_rgba16f_texture_with_view(
+        let (tile_output_texture, tile_output_texture_view) =
+            create_owned_rgba16f_texture_with_view(
+                device,
+                GpuIntermediateTexture::Tile,
+                max_tile_size,
+            )?;
+        let (working_texture, working_texture_view) = create_owned_rgba16f_texture_with_view(
             device,
-            "Tile Output Texture",
+            GpuIntermediateTexture::Working,
             max_tile_size,
-            blur_texture_usage | wgpu::TextureUsages::COPY_SRC,
-        );
-        let display_output_texture_usage =
-            blur_texture_usage | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
-        let (working_texture, working_texture_view) = create_rgba16f_texture_with_view(
+        )?;
+        let (output_texture, output_texture_view) = create_owned_rgba16f_texture_with_view(
             device,
-            "Working Output Texture",
+            GpuIntermediateTexture::Full,
             max_tile_size,
-            display_output_texture_usage,
-        );
-        let (output_texture, output_texture_view) = create_rgba16f_texture_with_view(
-            device,
-            "Full Output Texture",
-            max_tile_size,
-            display_output_texture_usage,
-        );
+        )?;
 
         let processor = Self {
             context,
