@@ -124,8 +124,23 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
+    pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
     pub renderer: String,
     pub storage: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabStagePreviewArtifact {
+    pub color_domain: String,
+    pub content_hash: String,
+    pub dimensions: NegativeLabPreviewArtifactDimensions,
+    pub display_transform: String,
+    pub preview_data_url: String,
+    pub recipe_hash: String,
+    pub stage_id: String,
+    pub stage_version: u8,
+    pub bounds_receipt: NegativeLabDensityBoundsReceipt,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -2192,7 +2207,9 @@ impl NegativeLabDensityMetricsAccumulator {
 
 #[derive(Debug, Clone)]
 struct NegativeLabPipelineRender {
+    normalized_density_preview: DynamicImage,
     rendered_preview: DynamicImage,
+    scene_linear_print_preview: DynamicImage,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
 }
 
@@ -2793,6 +2810,8 @@ fn run_pipeline_with_metrics(
         analyze_robust_density_bounds(&log_pixels, width as usize, height as usize, &params);
 
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
+    let mut normalized_density_buffer = vec![0.0f32; raw_pixels.len()];
+    let mut scene_linear_print_buffer = vec![0.0f32; raw_pixels.len()];
 
     let k = 4.0 * params.contrast;
     let x0 = 0.6 - (params.exposure * 0.25);
@@ -2810,9 +2829,11 @@ fn run_pipeline_with_metrics(
     let mut density_metrics = out_buffer
         .par_chunks_mut(3)
         .zip(log_pixels.par_chunks(3))
+        .zip(normalized_density_buffer.par_chunks_mut(3))
+        .zip(scene_linear_print_buffer.par_chunks_mut(3))
         .fold(
             NegativeLabDensityMetricsAccumulator::default,
-            |mut metrics, (out_pixel, log_pixel)| {
+            |mut metrics, (((out_pixel, log_pixel), normalized_density_pixel), scene_linear_print_pixel)| {
                 let normalized_density = normalize_density_with_robust_bounds(
                     [log_pixel[0], log_pixel[1], log_pixel[2]],
                     &robust_bounds,
@@ -2835,6 +2856,7 @@ fn run_pipeline_with_metrics(
                     },
                 ];
                 metrics.observe(model_density);
+                normalized_density_pixel.copy_from_slice(&model_density);
 
                 let weighted_density = [
                     model_density[0] * weights[0],
@@ -2864,9 +2886,11 @@ fn run_pipeline_with_metrics(
                     b = b + (luma - b) * sat_reduction;
                 }
 
-                out_pixel[0] = apply_endpoints(r).powf(gamma_inv);
-                out_pixel[1] = apply_endpoints(g).powf(gamma_inv);
-                out_pixel[2] = apply_endpoints(b).powf(gamma_inv);
+                let scene_linear = [apply_endpoints(r), apply_endpoints(g), apply_endpoints(b)];
+                scene_linear_print_pixel.copy_from_slice(&scene_linear);
+                out_pixel[0] = scene_linear[0].powf(gamma_inv);
+                out_pixel[1] = scene_linear[1].powf(gamma_inv);
+                out_pixel[2] = scene_linear[2].powf(gamma_inv);
 
                 metrics
             },
@@ -2883,9 +2907,15 @@ fn run_pipeline_with_metrics(
     density_metrics.crosstalk_receipt = crosstalk_receipt;
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
+    let normalized_density_img =
+        Rgb32FImage::from_vec(width, height, normalized_density_buffer).unwrap();
+    let scene_linear_print_img =
+        Rgb32FImage::from_vec(width, height, scene_linear_print_buffer).unwrap();
 
     NegativeLabPipelineRender {
+        normalized_density_preview: DynamicImage::ImageRgb32F(normalized_density_img),
         rendered_preview: DynamicImage::ImageRgb32F(out_img),
+        scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_linear_print_img),
         density_normalization_metrics: density_metrics,
     }
 }
@@ -3081,8 +3111,11 @@ fn build_negative_lab_runtime_base_fog_sample_summary(
 
 fn build_negative_lab_dry_run_preview_artifact(
     rendered_preview: &DynamicImage,
+    normalized_density_preview: &DynamicImage,
+    scene_linear_print_preview: &DynamicImage,
     base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    params: &NegativeConversionParams,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let rgb8 = rendered_preview.to_rgb8();
     let dimensions = NegativeLabPreviewArtifactDimensions {
@@ -3101,6 +3134,30 @@ fn build_negative_lab_dry_run_preview_artifact(
         .map_err(|error| error.to_string())?;
 
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
+    let normalized_density = normalized_density_preview.to_rgb32f();
+    let scene_linear_print = scene_linear_print_preview.to_rgb32f();
+    let recipe_hash = negative_lab_stage_recipe_hash(
+        params,
+        density_normalization_metrics.crosstalk_receipt.as_ref(),
+    )?;
+    let stage_artifacts = vec![
+        build_negative_lab_stage_preview_artifact(
+            "normalized_density",
+            "normalized_density",
+            "normalized_density_clamp_v1",
+            &normalized_density,
+            &density_normalization_metrics.bounds_receipt,
+            &recipe_hash,
+        )?,
+        build_negative_lab_stage_preview_artifact(
+            "scene_linear_print",
+            "scene_linear_print",
+            "scene_linear_to_srgb_gamma_v1",
+            &scene_linear_print,
+            &density_normalization_metrics.bounds_receipt,
+            &recipe_hash,
+        )?,
+    ];
     Ok(NegativeLabDryRunPreviewArtifact {
         artifact_id,
         base_fog_sample_summary,
@@ -3108,8 +3165,67 @@ fn build_negative_lab_dry_run_preview_artifact(
         density_normalization_metrics,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
+        stage_artifacts,
         renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
         storage: NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE.to_string(),
+    })
+}
+
+fn negative_lab_stage_recipe_hash(
+    params: &NegativeConversionParams,
+    crosstalk_receipt: Option<&NegativeLabCrosstalkReceipt>,
+) -> Result<String, String> {
+    let bytes = serde_json::to_vec(&(params.sanitized(), crosstalk_receipt))
+        .map_err(|error| format!("Failed to hash Negative Lab stage recipe: {error}"))?;
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
+}
+
+fn negative_lab_stage_pixels_hash(stage: &Rgb32FImage) -> String {
+    let mut hasher = Sha256::new();
+    for value in stage.as_raw() {
+        hasher.update(value.to_le_bytes());
+    }
+    format!("sha256:{}", hex::encode(hasher.finalize()))
+}
+
+fn build_negative_lab_stage_preview_artifact(
+    stage_id: &str,
+    color_domain: &str,
+    display_transform: &str,
+    stage: &Rgb32FImage,
+    bounds_receipt: &NegativeLabDensityBoundsReceipt,
+    recipe_hash: &str,
+) -> Result<NegativeLabStagePreviewArtifact, String> {
+    let rgb8 = image::RgbImage::from_fn(stage.width(), stage.height(), |x, y| {
+        let pixel = stage.get_pixel(x, y).0;
+        let transformed = if stage_id == "scene_linear_print" {
+            pixel.map(|value| value.clamp(0.0, 1.0).powf(1.0 / 2.2))
+        } else {
+            pixel.map(|value| (0.5 + value * 0.5).clamp(0.0, 1.0))
+        };
+        image::Rgb([
+            (transformed[0] * 255.0).round() as u8,
+            (transformed[1] * 255.0).round() as u8,
+            (transformed[2] * 255.0).round() as u8,
+        ])
+    });
+    let mut buf = Cursor::new(Vec::new());
+    DynamicImage::ImageRgb8(rgb8)
+        .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
+        .map_err(|error| error.to_string())?;
+    Ok(NegativeLabStagePreviewArtifact {
+        color_domain: color_domain.to_string(),
+        content_hash: negative_lab_stage_pixels_hash(stage),
+        dimensions: NegativeLabPreviewArtifactDimensions {
+            height: stage.height(),
+            width: stage.width(),
+        },
+        display_transform: display_transform.to_string(),
+        preview_data_url: jpeg_data_url(general_purpose::STANDARD.encode(buf.get_ref())),
+        recipe_hash: recipe_hash.to_string(),
+        stage_id: stage_id.to_string(),
+        stage_version: 1,
+        bounds_receipt: bounds_receipt.clone(),
     })
 }
 
@@ -3138,8 +3254,11 @@ pub async fn preview_negative_conversion(
     );
     Ok(build_negative_lab_dry_run_preview_artifact(
         &rendered_preview.rendered_preview,
+        &rendered_preview.normalized_density_preview,
+        &rendered_preview.scene_linear_print_preview,
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
+        &params,
     )?
     .preview_data_url)
 }
@@ -3169,8 +3288,11 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
     );
     build_negative_lab_dry_run_preview_artifact(
         &rendered_preview.rendered_preview,
+        &rendered_preview.normalized_density_preview,
+        &rendered_preview.scene_linear_print_preview,
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
+        &params,
     )
 }
 
@@ -6230,8 +6352,11 @@ mod tests {
 
         let artifact = build_negative_lab_dry_run_preview_artifact(
             &rendered_preview,
+            &rendered_preview,
+            &rendered_preview,
             summary.clone(),
             density_metrics,
+            &NegativeConversionParams::default(),
         )
         .expect("build preview artifact");
         let rgb8 = rendered_preview.to_rgb8();
@@ -6242,6 +6367,11 @@ mod tests {
         assert_eq!(artifact.dimensions.height, 1);
         assert_eq!(artifact.renderer, NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER);
         assert_eq!(artifact.storage, NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE);
+        assert_eq!(artifact.stage_artifacts.len(), 2);
+        assert_eq!(artifact.stage_artifacts[0].stage_id, "normalized_density");
+        assert_eq!(artifact.stage_artifacts[1].stage_id, "scene_linear_print");
+        assert_eq!(artifact.stage_artifacts[0].stage_version, 1);
+        assert_eq!(artifact.stage_artifacts[1].stage_version, 1);
         assert_eq!(
             artifact.density_normalization_metrics.renderer_version,
             NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION
@@ -6266,6 +6396,46 @@ mod tests {
         assert_eq!(
             artifact.base_fog_sample_summary.sample_rect.width,
             summary.sample_rect.width
+        );
+    }
+
+    #[test]
+    fn native_stage_artifacts_share_recipe_and_bounds_identity_but_hash_distinct_domains() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(2, 1, vec![0.12, 0.34, 0.56, 0.78, 0.52, 0.21]).unwrap(),
+        );
+        let params = NegativeConversionParams::default();
+        let pipeline = run_pipeline_with_metrics(&input, &params, None, None);
+        let summary = build_negative_lab_runtime_base_fog_sample_summary(&input, None);
+        let artifact = build_negative_lab_dry_run_preview_artifact(
+            &pipeline.rendered_preview,
+            &pipeline.normalized_density_preview,
+            &pipeline.scene_linear_print_preview,
+            summary,
+            pipeline.density_normalization_metrics,
+            &params,
+        )
+        .expect("build native stage artifacts");
+
+        let normalized = &artifact.stage_artifacts[0];
+        let scene_linear = &artifact.stage_artifacts[1];
+        assert_eq!(normalized.color_domain, "normalized_density");
+        assert_eq!(scene_linear.color_domain, "scene_linear_print");
+        assert_ne!(normalized.content_hash, scene_linear.content_hash);
+        assert_eq!(normalized.recipe_hash, scene_linear.recipe_hash);
+        assert_eq!(
+            normalized.bounds_receipt.schema_version,
+            scene_linear.bounds_receipt.schema_version
+        );
+        assert!(
+            normalized
+                .preview_data_url
+                .starts_with("data:image/jpeg;base64,")
+        );
+        assert!(
+            scene_linear
+                .preview_data_url
+                .starts_with("data:image/jpeg;base64,")
         );
     }
 
