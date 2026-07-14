@@ -1,9 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import type React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { z } from 'zod';
-import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Panel } from '../../components/ui/AppProperties';
+import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
 import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
@@ -23,33 +22,26 @@ import {
   decideAdjustmentPersistence,
   scheduleAdjustmentPersistenceAfterInteraction,
 } from '../../utils/adjustmentPersistence';
-import type { AdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
-import {
-  type AppOperationContext,
-  beginAppOperation,
-  logAppOperationFailure,
-  logAppOperationSuccess,
-} from '../../utils/appEventLogger';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
+import {
+  EditedPreviewEffectRunner,
+  type EditedPreviewExecutionContext,
+  type ExecutedEditedPreview,
+  type MaterializedEditedPreview,
+} from '../../utils/editedPreviewEffectRunner';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { buildEditTransactionPersistenceContext } from '../../utils/editTransaction';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   decodeInteractivePreviewUrl,
-  InteractivePreviewGenerationController,
-  type InteractivePreviewIdentity,
   type InteractivePreviewScope,
-  LatestOnlyInteractiveScheduler,
   parseInteractivePreviewPatchPayload,
-  usesPositionedPreviewPatch,
 } from '../../utils/interactivePreviewPatch';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
-import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import { presentedPreviewReleaseCoordinator } from '../../utils/presentedPreviewReleaseCoordinator';
 import {
   createPreviewQualityPolicy,
@@ -65,7 +57,6 @@ import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMat
 import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { debounce } from '../../utils/timing';
 import {
   debouncedSave,
   getEditorPersistenceAuthorityEpoch,
@@ -89,78 +80,26 @@ interface TransformWrapperRefValue {
   };
 }
 
-interface InteractivePreviewRequest {
-  snapshot: AdjustmentSnapshot;
-  createdAt: number;
-  identity: InteractivePreviewIdentity;
-  quality: PreviewQualityDecision;
-  roi: [number, number, number, number] | null;
-  requestId: number;
-  targetRes: number;
-}
-
-interface PreviewRenderRequest extends InteractivePreviewRequest {
-  dragging: boolean;
-  scopeRecovery: boolean;
-}
-
 interface InteractivePreviewScopeSnapshot {
   roi: [number, number, number, number] | null;
   scope: InteractivePreviewScope;
 }
 
-const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
-const applyAdjustmentsInvokeSchema = z
-  .object({
-    activeWaveformChannel: z.string().nullable().optional(),
-    computeWaveform: z.boolean(),
-    editDocumentV2: editDocumentV2Schema,
-    expectedImagePath: z.string().trim().min(1),
-    isInteractive: z.boolean(),
-    roi: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
-    targetResolution: z.number().int().positive(),
-    viewerSampleGraphRevision: z.string().nullable().optional(),
-  })
-  .strict();
-const exportSoftProofTransformResponseSchema = z
-  .object({
-    blackPointCompensation: z.string().trim().min(1),
-    colorManagedTransform: z.string().trim().min(1),
-    effectiveColorProfile: z.string().trim().min(1),
-    effectiveRenderingIntent: z.string().trim().min(1),
-    policyStatus: z.string().trim().min(1),
-    policyVersion: z.string().trim().min(1),
-    sourcePrecisionPath: z.string().trim().min(1),
-    transformApplied: z.boolean(),
-    transformPolicyFingerprint: z
-      .string()
-      .trim()
-      .regex(/^sha256:/),
-  })
-  .transform(
-    (metadata): ExportSoftProofTransformState => ({
-      blackPointCompensation: metadata.blackPointCompensation,
-      colorManagedTransform: metadata.colorManagedTransform,
-      effectiveColorProfile: metadata.effectiveColorProfile,
-      effectiveRenderingIntent: metadata.effectiveRenderingIntent,
-      policyStatus: metadata.policyStatus,
-      policyVersion: metadata.policyVersion,
-      sourcePrecisionPath: metadata.sourcePrecisionPath,
-      transformApplied: metadata.transformApplied,
-      transformPolicyFingerprint: metadata.transformPolicyFingerprint,
-    }),
-  );
+type ParsedInteractivePatch = ReturnType<typeof parseInteractivePreviewPatchPayload>;
+type ReadyInteractivePatch = Extract<ParsedInteractivePatch, { ok: true }>;
+type MaterializedEditedPreviewValue =
+  | { kind: 'empty' }
+  | { kind: 'wgpu' }
+  | { kind: 'limited'; reason: string }
+  | { kind: 'patch'; patch: ReadyInteractivePatch; url: string }
+  | { kind: 'full'; transform: ExportSoftProofTransformState | null; url: string };
+
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function useImageProcessing(
   transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
   prevAdjustmentsRef: React.RefObject<PreviousAdjustments | null>,
-  renderRefs: {
-    currentResRef: React.RefObject<number>;
-  },
 ) {
-  const { currentResRef } = renderRefs;
-
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const committedAdjustments = useEditorStore((state) => state.adjustments);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
@@ -171,7 +110,6 @@ export function useImageProcessing(
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const originalSize = useEditorStore((state) => state.originalSize);
   const zoomMode = useEditorStore((state) => state.zoomMode);
-  const historyIndex = useEditorStore((state) => state.historyIndex);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
   const canonicalAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const editorImageSession = useEditorStore((state) => state.imageSession);
@@ -192,7 +130,6 @@ export function useImageProcessing(
       : (renderAdjustmentSnapshot.value as Adjustments);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const proofRevision = useEditorStore((state) => state.proofRevision);
-  const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
@@ -211,20 +148,7 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const latestInteractiveRequestIdRef = useRef(0);
-  const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
-  const interactiveSchedulerRef = useRef<LatestOnlyInteractiveScheduler<InteractivePreviewRequest> | null>(null);
-  if (!interactiveSchedulerRef.current) {
-    interactiveSchedulerRef.current = new LatestOnlyInteractiveScheduler((request) =>
-      executeInteractiveRenderRef.current(request),
-    );
-  }
-  const previewIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeWaveformChannelRef = useRef(activeWaveformChannel);
-  activeWaveformChannelRef.current = activeWaveformChannel;
-  const interactiveGenerationRef = useRef(new InteractivePreviewGenerationController());
-  const preparedPayloadCacheRef = useRef(new PreparedAdjustmentPayloadCache());
   const viewportScopeRevisionRef = useRef<{ inputs: readonly unknown[]; revision: number }>({
     inputs: [],
     revision: 1,
@@ -236,6 +160,7 @@ export function useImageProcessing(
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
+  const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<MaterializedEditedPreviewValue> | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
   const displayResourceGenerationRef = useRef(1);
 
@@ -243,6 +168,7 @@ export function useImageProcessing(
     (event: PreviewCoordinatorEvent) => {
       const previous = previewCoordinator.snapshot();
       const transition = previewCoordinator.dispatch(event);
+      editedPreviewRunnerRef.current?.consume(transition.effects);
       originalPreviewRunnerRef.current?.consume(transition.effects);
       for (const effect of transition.effects) {
         if (effect.type !== 'publish') continue;
@@ -285,6 +211,187 @@ export function useImageProcessing(
     });
   originalPreviewRunnerRef.current = originalPreviewRunner;
 
+  const materializeEditedPreview = useCallback(
+    async (
+      result: ExecutedEditedPreview,
+      context: EditedPreviewExecutionContext,
+    ): Promise<MaterializedEditedPreview<MaterializedEditedPreviewValue>> => {
+      const { buffer, transform } = result;
+      if (buffer.byteLength === 0) return { value: { kind: 'empty' } };
+      const prefix = new TextDecoder().decode(buffer.slice(0, 11));
+      if (prefix === 'WGPU_RENDER') return { value: { kind: 'wgpu' } };
+
+      const positioned = context.request.kind === 'interactive' || context.request.roi !== null;
+      const patch = positioned ? parseInteractivePreviewPatchPayload(buffer) : null;
+      if (patch !== null && !patch.ok) return { value: { kind: 'limited', reason: patch.reason } };
+
+      const blob = new Blob([patch?.ok ? patch.imageBuffer : buffer], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      const decodeStartedAt = previewNow();
+      try {
+        await decodeInteractivePreviewUrl(url);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        throw error;
+      }
+      const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
+      return patch?.ok
+        ? { decodeMs, value: { kind: 'patch', patch, url } }
+        : { artifactUrl: url, decodeMs, value: { kind: 'full', transform, url } };
+    },
+    [],
+  );
+
+  const onEditedPreviewPresented = useCallback(
+    (
+      result: MaterializedEditedPreview<MaterializedEditedPreviewValue>,
+      context: EditedPreviewExecutionContext,
+    ): void => {
+      const { interactiveIdentity, quality, scopeRecovery, targetResolution } = context.request;
+      const requestId = context.identity.operationId;
+      const commitStartedAt = previewNow();
+      const recordTiming = (): void => {
+        previewQualityControllerRef.current.record({
+          commitMs: Math.max(0, previewNow() - commitStartedAt),
+          decodeMs: result.decodeMs ?? 0,
+          displayedAgeMs: Math.max(0, previewNow() - context.request.createdAt),
+          inputToDispatchMs: context.inputToDispatchMs,
+          renderMs: context.renderMs,
+          tier: quality.tier,
+        });
+      };
+      const readyStatus: PreviewQualityStatus = {
+        ...quality,
+        generation: interactiveIdentity.generation,
+        phase: getPreviewReadyPhase(quality),
+        requestId,
+      };
+      const value = result.value;
+      if (value.kind === 'empty' || value.kind === 'limited') {
+        setEditor({
+          previewQualityStatus: {
+            ...quality,
+            generation: interactiveIdentity.generation,
+            limitedBy: 'backend',
+            phase: 'degraded_limited',
+            reason: value.kind === 'empty' ? 'empty_render_buffer' : value.reason,
+            requestId,
+            sufficientForSemanticZoom: false,
+          },
+        });
+        recordTiming();
+        return;
+      }
+      if (value.kind === 'wgpu') {
+        setEditor({
+          interactivePatch: null,
+          previewQualityStatus: readyStatus,
+          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
+        });
+        recordTiming();
+        return;
+      }
+      if (value.kind === 'patch') {
+        setEditor({
+          interactivePatch: {
+            basePreviewUrl: interactiveIdentity.basePreviewUrl,
+            fullHeight: value.patch.fullHeight,
+            fullWidth: value.patch.fullWidth,
+            geometryIdentity: interactiveIdentity.geometryIdentity,
+            normH: value.patch.normH,
+            normW: value.patch.normW,
+            normX: value.patch.normX,
+            normY: value.patch.normY,
+            pixelHeight: value.patch.pixelHeight,
+            pixelWidth: value.patch.pixelWidth,
+            sourceImagePath: interactiveIdentity.sourceImagePath,
+            url: value.url,
+          },
+          previewQualityStatus: readyStatus,
+          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
+        });
+        recordTiming();
+        return;
+      }
+
+      const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
+      const transform = value.transform;
+      setEditor({
+        exportSoftProofTransform: transform,
+        interactivePatch: null,
+        navigatorPreviewArtifact: {
+          graphIdentity: interactiveIdentity.graphIdentity,
+          id: `${interactiveIdentity.graphIdentity}:${String(interactiveIdentity.generation)}:${String(requestId)}`,
+          imageSessionId: useEditorStore.getState().imageSession?.id ?? String(interactiveIdentity.imageSessionId),
+          url: value.url,
+        },
+        previewScopeStatus:
+          transform &&
+          completedScopeStatus?.path === interactiveIdentity.sourceImagePath &&
+          completedScopeStatus.histogramReady &&
+          completedScopeStatus.waveformReady
+            ? {
+                ...completedScopeStatus,
+                displayTransformLabel: transform.colorManagedTransform ?? 'Display preview transform',
+                exportProfileLabel: transform.effectiveColorProfile,
+                exportRenderingIntentLabel: transform.effectiveRenderingIntent,
+                renderBasis: 'export_preview',
+                softProofTransformApplied: transform.transformApplied === true,
+                sourceLabel: 'Export preview',
+                warningCodes: [
+                  transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
+                  'render_target_matches_export_recipe',
+                ],
+              }
+            : completedScopeStatus,
+        previewQualityStatus: readyStatus,
+        renderedPreviewResolution: targetResolution,
+      });
+      if (scopeRecovery) setEditor({ previewScopeRecoveryError: null });
+      recordTiming();
+    },
+    [setEditor],
+  );
+
+  const editedPreviewRunner =
+    editedPreviewRunnerRef.current ??
+    new EditedPreviewEffectRunner<MaterializedEditedPreviewValue>({
+      dispatch: dispatchPreviewCoordinator,
+      getPatchResidency: () => useEditorStore.getState().patchResidency.snapshot(),
+      markPatchesResident: (sessionId, patchIds) => {
+        useEditorStore.getState().patchResidency.markResident(sessionId, patchIds);
+      },
+      materialize: materializeEditedPreview,
+      onCurrentFailure: (error, context) => {
+        const expectedSupersession = String(error).includes('preview_superseded');
+        if (!expectedSupersession) console.error('Failed to apply adjustments:', error);
+        if (expectedSupersession) return;
+        const { interactiveIdentity, quality, scopeRecovery } = context.request;
+        setEditor({
+          previewQualityStatus: {
+            ...quality,
+            generation: interactiveIdentity.generation,
+            limitedBy: 'error',
+            phase: 'degraded_limited',
+            reason: 'render_error',
+            requestId: context.identity.operationId,
+            sufficientForSemanticZoom: false,
+          },
+          ...(scopeRecovery
+            ? {
+                previewScopeRecoveryError: error instanceof Error ? error.message : String(error),
+                previewScopeRecoveryState: 'error' as const,
+              }
+            : {}),
+        });
+      },
+      onPresented: onEditedPreviewPresented,
+      releaseMaterialized: (result) => {
+        if (result.value.kind === 'patch' || result.value.kind === 'full') URL.revokeObjectURL(result.value.url);
+      },
+    });
+  editedPreviewRunnerRef.current = editedPreviewRunner;
+
   const previewSessionIdentity = useCallback(
     (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
       const positive = (value: number): number => Math.max(1, Math.round(value));
@@ -308,10 +415,6 @@ export function useImageProcessing(
     },
     [],
   );
-
-  const clearInteractivePatch = useCallback(() => {
-    setEditor({ interactivePatch: null });
-  }, [setEditor]);
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
@@ -429,37 +532,6 @@ export function useImageProcessing(
     };
   };
 
-  const synchronizePreviewIdentity = useCallback(
-    (targetRes: number, roi: PreviewRoi | null) => {
-      const snapshot = interactiveScopeRef.current(targetRes, roi);
-      if (!snapshot) return null;
-
-      const synchronized = interactiveGenerationRef.current.synchronize(snapshot.scope);
-      dispatchPreviewCoordinator({
-        type: 'viewport-changed',
-        viewport: {
-          revision: snapshot.scope.viewportIdentity,
-          roiFingerprint: fingerprintPreviewRoi(snapshot.roi),
-          targetHeight: snapshot.scope.targetResolution,
-          targetWidth: snapshot.scope.targetResolution,
-        },
-      });
-      if (synchronized.invalidated) {
-        interactiveSchedulerRef.current?.clear();
-      }
-      return { identity: synchronized.identity, roi: snapshot.roi, scope: snapshot.scope };
-    },
-    [dispatchPreviewCoordinator],
-  );
-
-  const isPreviewRequestCurrent = useCallback(
-    (request: PreviewRenderRequest) => {
-      const current = synchronizePreviewIdentity(request.targetRes, request.roi);
-      return current !== null && interactiveGenerationRef.current.isCurrent(request.identity, current.identity);
-    },
-    [synchronizePreviewIdentity],
-  );
-
   const resolveQualityDecision = useCallback(
     (requestedTargetResolution: number, interacting: boolean) => {
       const editor = useEditorStore.getState();
@@ -498,401 +570,13 @@ export function useImageProcessing(
     [activeRightPanel, calculateROI],
   );
 
-  const executeApplyAdjustments = useCallback(
-    async (request: PreviewRenderRequest) => {
-      if (!isPreviewRequestCurrent(request)) return;
-      const coordinatorIdentity = previewCoordinator.operationForRequest(request.requestId);
-      if (coordinatorIdentity !== undefined) {
-        dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-started' });
-      }
-      const completeCoordinatorOperation = (url?: string): boolean => {
-        if (coordinatorIdentity === undefined) return true;
-        let transition: ReturnType<typeof dispatchPreviewCoordinator>;
-        if (url === undefined) {
-          transition = dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-completed' });
-        } else {
-          transition = dispatchPreviewCoordinator({
-            artifact: { identity: coordinatorIdentity, url },
-            identity: coordinatorIdentity,
-            type: 'operation-completed',
-          });
-        }
-        previewCoordinator.forgetRequest(request.requestId);
-        return transition.state.lastTransition?.staleCompletion !== true;
-      };
-      const failCoordinatorOperation = (error: unknown) => {
-        if (coordinatorIdentity === undefined) return;
-        dispatchPreviewCoordinator({ error: String(error), identity: coordinatorIdentity, type: 'operation-failed' });
-        previewCoordinator.forgetRequest(request.requestId);
-      };
-      const dispatchedAt = previewNow();
-      const inputToDispatchMs = Math.max(0, dispatchedAt - request.createdAt);
-      const publishQualityStatus = (phase: PreviewQualityStatus['phase'], quality = request.quality) => {
-        setEditor({
-          previewQualityStatus: {
-            ...quality,
-            generation: request.identity.generation,
-            phase,
-            requestId: request.requestId,
-          },
-        });
-      };
-      publishQualityStatus(request.dragging ? 'rendering_interaction' : 'refining_current_view');
-
-      const { patchResidency } = useEditorStore.getState();
-      const residency = patchResidency.snapshot();
-      const { newlySentPatchIds, payload } = preparedPayloadCacheRef.current.prepare(request.snapshot, residency);
-      const jobId = coordinatorIdentity?.operationId ?? request.requestId;
-      let operation: AppOperationContext | null = null;
-
-      try {
-        if (!request.dragging) {
-          setEditor({ requestedPreviewResolution: request.quality.requestedTargetResolution });
-        }
-        const proofRequest =
-          !request.dragging && selectedProofRecipe
-            ? {
-                blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
-                colorProfile: selectedProofRecipe.colorProfile ?? 'srgb',
-                expectedImagePath: request.identity.sourceImagePath,
-                exportSoftProofRecipeId: selectedProofRecipe.id,
-                computeWaveform: isWaveformVisible || request.scopeRecovery,
-                activeWaveformChannel: activeWaveformChannelRef.current,
-                jsAdjustments: payload,
-                renderingIntent: selectedProofRecipe.renderingIntent ?? 'relativeColorimetric',
-                targetResolution: request.targetRes,
-                viewerSampleGraphRevision: request.identity.graphIdentity,
-              }
-            : null;
-
-        if (!request.dragging) {
-          operation = beginAppOperation({
-            action: proofRequest ? 'render_soft_proof_preview' : 'render_editor_preview',
-            component: 'editor.preview',
-            details: {
-              computeWaveform: isWaveformVisible,
-              generation: request.identity.generation,
-              hasRoi: Boolean(request.roi),
-              jobId,
-              softProof: Boolean(proofRequest),
-              targetResolution: request.targetRes,
-              previewQualityTier: request.quality.tier,
-              previewQualityReason: request.quality.reason,
-              previewQualitySufficient: request.quality.sufficientForSemanticZoom,
-            },
-            domain: 'preview',
-            operationId: `preview_${String(jobId)}`,
-            traceId: proofRequest?.exportSoftProofRecipeId
-              ? `preview_soft_proof_${proofRequest.exportSoftProofRecipeId}`
-              : undefined,
-          });
-        }
-
-        if (!isPreviewRequestCurrent(request)) return;
-        const proofTransformRequest = proofRequest
-          ? {
-              blackPointCompensation: proofRequest.blackPointCompensation,
-              colorProfile: proofRequest.colorProfile,
-              jsAdjustments: proofRequest.jsAdjustments,
-              renderingIntent: proofRequest.renderingIntent,
-              targetResolution: proofRequest.targetResolution,
-            }
-          : null;
-        const renderStartedAt = previewNow();
-        const proofResult =
-          proofRequest && proofTransformRequest
-            ? await Promise.all([
-                invokeWithSchema(
-                  Invokes.GenerateExportSoftProofPreview,
-                  { request: proofRequest },
-                  previewBufferResponseSchema,
-                ),
-                invokeWithSchema(
-                  Invokes.ResolveExportSoftProofTransformMetadata,
-                  proofTransformRequest,
-                  exportSoftProofTransformResponseSchema,
-                ),
-              ]).then(([buffer, transform]) => ({ buffer, transform }))
-            : {
-                buffer: await invokeWithSchema(
-                  Invokes.ApplyAdjustments,
-                  {
-                    request: applyAdjustmentsInvokeSchema.parse({
-                      activeWaveformChannel: activeWaveformChannelRef.current,
-                      computeWaveform: isWaveformVisible || request.scopeRecovery,
-                      editDocumentV2: legacyAdjustmentsToEditDocumentV2(payload),
-                      expectedImagePath: request.identity.sourceImagePath,
-                      isInteractive: request.dragging,
-                      roi: request.roi,
-                      targetResolution: request.targetRes,
-                      viewerSampleGraphRevision: request.identity.graphIdentity,
-                    }),
-                  },
-                  previewBufferResponseSchema,
-                ),
-                transform: null,
-              };
-        const { buffer, transform } = proofResult;
-        const renderMs = Math.max(0, previewNow() - renderStartedAt);
-
-        if (!isPreviewRequestCurrent(request)) {
-          if (operation)
-            logAppOperationSuccess(operation, {
-              byteLength: buffer.byteLength,
-              droppedReason: 'stale_identity',
-              jobId,
-            });
-          return;
-        }
-        if (newlySentPatchIds.size > 0) {
-          patchResidency.markResident(request.identity.imageSessionId, newlySentPatchIds);
-        }
-
-        if (buffer.byteLength === 0) {
-          completeCoordinatorOperation();
-          if (operation) logAppOperationSuccess(operation, { byteLength: 0, droppedReason: 'empty_buffer', jobId });
-          publishQualityStatus('degraded_limited', {
-            ...request.quality,
-            limitedBy: 'backend',
-            reason: 'empty_render_buffer',
-            sufficientForSemanticZoom: false,
-          });
-          return;
-        }
-
-        const prefix = new TextDecoder().decode(buffer.slice(0, 11));
-        if (prefix === 'WGPU_RENDER') {
-          if (request.dragging) {
-            const current = synchronizePreviewIdentity(request.targetRes, request.roi);
-            if (
-              current === null ||
-              !interactiveGenerationRef.current.canCommit(request.identity, request.requestId, current.identity)
-            ) {
-              return;
-            }
-          }
-          if (!completeCoordinatorOperation()) return;
-          if (!request.dragging) {
-            setEditor({ renderedPreviewResolution: request.targetRes });
-          }
-          clearInteractivePatch();
-          publishQualityStatus(getPreviewReadyPhase(request.quality));
-          previewQualityControllerRef.current.record({
-            commitMs: 0,
-            decodeMs: 0,
-            displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
-            inputToDispatchMs,
-            renderMs,
-            tier: request.quality.tier,
-          });
-          if (operation) logAppOperationSuccess(operation, { backend: 'wgpu', byteLength: buffer.byteLength, jobId });
-          return;
-        }
-
-        const patch = usesPositionedPreviewPatch(request) ? parseInteractivePreviewPatchPayload(buffer) : null;
-        if (patch && !patch.ok) {
-          completeCoordinatorOperation();
-          publishQualityStatus('degraded_limited', {
-            ...request.quality,
-            limitedBy: 'backend',
-            reason: patch.reason,
-            sufficientForSemanticZoom: false,
-          });
-          if (operation)
-            logAppOperationSuccess(operation, { byteLength: buffer.byteLength, droppedReason: patch.reason, jobId });
-          return;
-        }
-
-        const blob = new Blob([patch?.ok ? patch.imageBuffer : buffer], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
-        const decodeStartedAt = previewNow();
-        try {
-          await decodeInteractivePreviewUrl(url);
-        } catch {
-          URL.revokeObjectURL(url);
-          if (operation && !request.dragging)
-            logAppOperationFailure(operation, new Error('final_preview_decode_failed'));
-          if (isPreviewRequestCurrent(request)) {
-            publishQualityStatus('degraded_limited', {
-              ...request.quality,
-              limitedBy: 'error',
-              reason: 'preview_decode_failed',
-              sufficientForSemanticZoom: false,
-            });
-          }
-          return;
-        }
-        const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
-
-        if (!isPreviewRequestCurrent(request)) {
-          URL.revokeObjectURL(url);
-          if (operation)
-            logAppOperationSuccess(operation, {
-              byteLength: buffer.byteLength,
-              droppedReason: 'stale_after_decode',
-              jobId,
-            });
-          return;
-        }
-
-        if (patch?.ok) {
-          const current = synchronizePreviewIdentity(request.targetRes, request.roi);
-          if (
-            current === null ||
-            !interactiveGenerationRef.current.canCommit(request.identity, request.requestId, current.identity)
-          ) {
-            URL.revokeObjectURL(url);
-            return;
-          }
-          if (!completeCoordinatorOperation()) {
-            URL.revokeObjectURL(url);
-            return;
-          }
-          const commitStartedAt = previewNow();
-          setEditor({
-            interactivePatch: {
-              basePreviewUrl: request.identity.basePreviewUrl,
-              fullHeight: patch.fullHeight,
-              fullWidth: patch.fullWidth,
-              geometryIdentity: request.identity.geometryIdentity,
-              normH: patch.normH,
-              normW: patch.normW,
-              normX: patch.normX,
-              normY: patch.normY,
-              pixelHeight: patch.pixelHeight,
-              pixelWidth: patch.pixelWidth,
-              sourceImagePath: request.identity.sourceImagePath,
-              url,
-            },
-            previewQualityStatus: {
-              ...request.quality,
-              generation: request.identity.generation,
-              phase: getPreviewReadyPhase(request.quality),
-              requestId: request.requestId,
-            },
-            ...(!request.dragging ? { renderedPreviewResolution: request.targetRes } : {}),
-          });
-          previewQualityControllerRef.current.record({
-            commitMs: Math.max(0, previewNow() - commitStartedAt),
-            decodeMs,
-            displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
-            inputToDispatchMs,
-            renderMs,
-            tier: request.quality.tier,
-          });
-          return;
-        }
-
-        if (!isPreviewRequestCurrent(request)) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        if (!completeCoordinatorOperation(url)) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        const commitStartedAt = previewNow();
-        const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
-        setEditor({
-          exportSoftProofTransform: transform,
-          navigatorPreviewArtifact: {
-            graphIdentity: request.identity.graphIdentity,
-            id: `${request.identity.graphIdentity}:${String(request.identity.generation)}:${String(request.requestId)}`,
-            imageSessionId: useEditorStore.getState().imageSession?.id ?? String(request.identity.imageSessionId),
-            url,
-          },
-          previewScopeStatus:
-            transform &&
-            completedScopeStatus?.path === request.identity.sourceImagePath &&
-            completedScopeStatus.histogramReady &&
-            completedScopeStatus.waveformReady
-              ? {
-                  ...completedScopeStatus,
-                  displayTransformLabel: transform.colorManagedTransform ?? 'Display preview transform',
-                  exportProfileLabel: transform.effectiveColorProfile,
-                  exportRenderingIntentLabel: transform.effectiveRenderingIntent,
-                  renderBasis: 'export_preview',
-                  softProofTransformApplied: transform.transformApplied === true,
-                  sourceLabel: 'Export preview',
-                  warningCodes: [
-                    transform.transformApplied
-                      ? 'export_profile_transform_applied'
-                      : 'export_profile_transform_missing',
-                    'render_target_matches_export_recipe',
-                  ],
-                }
-              : completedScopeStatus,
-          previewQualityStatus: {
-            ...request.quality,
-            generation: request.identity.generation,
-            phase: getPreviewReadyPhase(request.quality),
-            requestId: request.requestId,
-          },
-          renderedPreviewResolution: request.targetRes,
-        });
-        previewQualityControllerRef.current.record({
-          commitMs: Math.max(0, previewNow() - commitStartedAt),
-          decodeMs,
-          displayedAgeMs: Math.max(0, previewNow() - request.createdAt),
-          inputToDispatchMs,
-          renderMs,
-          tier: request.quality.tier,
-        });
-        clearInteractivePatch();
-        if (operation) {
-          logAppOperationSuccess(operation, {
-            byteLength: buffer.byteLength,
-            jobId,
-            softProofTransformApplied: transform?.transformApplied ?? false,
-          });
-        }
-        if (request.scopeRecovery) setEditor({ previewScopeRecoveryError: null });
-      } catch (err) {
-        const expectedSupersession = String(err).includes('preview_superseded');
-        if (!expectedSupersession) {
-          console.error('Failed to apply adjustments:', err);
-          if (operation) logAppOperationFailure(operation, err);
-        } else if (operation) {
-          logAppOperationSuccess(operation, { droppedReason: 'superseded', jobId });
-        }
-        if (!expectedSupersession && isPreviewRequestCurrent(request)) {
-          failCoordinatorOperation(err);
-          publishQualityStatus('degraded_limited', {
-            ...request.quality,
-            limitedBy: 'error',
-            reason: 'render_error',
-            sufficientForSemanticZoom: false,
-          });
-          if (request.scopeRecovery) {
-            setEditor({
-              previewScopeRecoveryError: err instanceof Error ? err.message : String(err),
-              previewScopeRecoveryState: 'error',
-            });
-          }
-        }
-      }
-    },
-    [
-      clearInteractivePatch,
-      isPreviewRequestCurrent,
-      isWaveformVisible,
-      previewCoordinator,
-      selectedProofRecipe,
-      setEditor,
-      synchronizePreviewIdentity,
-    ],
-  );
-
-  executeInteractiveRenderRef.current = (request) =>
-    executeApplyAdjustments({ ...request, dragging: true, scopeRecovery: false });
-
   useEffect(
     () => () => {
-      interactiveSchedulerRef.current?.dispose();
-      originalPreviewRunner.dispose();
       dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
+      editedPreviewRunner.cancel();
+      originalPreviewRunner.dispose();
     },
-    [dispatchPreviewCoordinator, originalPreviewRunner],
+    [dispatchPreviewCoordinator, editedPreviewRunner, originalPreviewRunner],
   );
 
   useEffect(() => {
@@ -920,7 +604,13 @@ export function useImageProcessing(
   }, [selectedImage?.path]);
 
   const applyAdjustments = useCallback(
-    (_currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number, scopeRecovery = false) => {
+    (
+      _currentAdjustments: Adjustments,
+      dragging: boolean = false,
+      targetRes?: number,
+      scopeRecovery = false,
+      delayMs = 0,
+    ) => {
       if (!selectedImage?.isReady) return;
 
       const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
@@ -936,67 +626,56 @@ export function useImageProcessing(
       };
       dispatchPreviewCoordinator({ quality: qualitySnapshot, type: 'quality-decision-changed' });
       const normalizedTargetRes = quality.effectiveTargetResolution;
-      const synchronized = synchronizePreviewIdentity(normalizedTargetRes, quality.effectiveRoi);
-      if (!synchronized) return;
-      const createdAt = previewNow();
-      const coordinatorSession = previewSessionIdentity(synchronized.scope, normalizedTargetRes, synchronized.roi);
-
-      if (dragging) {
-        const requestId = ++latestInteractiveRequestIdRef.current;
-        const transition = dispatchPreviewCoordinator({
-          identity: coordinatorSession,
-          kind: 'interactive',
-          reason: 'interactive-inputs-changed',
-          type: 'render-inputs-changed',
-        });
-        const coordinatorIdentity = transition.state.interactive.identity;
-        if (coordinatorIdentity === undefined || !previewCoordinator.bindRequest(requestId, coordinatorIdentity))
-          return;
-        interactiveSchedulerRef.current?.schedule({
-          snapshot: renderAdjustmentSnapshot,
-          createdAt,
-          identity: synchronized.identity,
+      const scopeSnapshot = interactiveScopeRef.current(normalizedTargetRes, quality.effectiveRoi);
+      if (scopeSnapshot === null) return;
+      const session = previewSessionIdentity(scopeSnapshot.scope, normalizedTargetRes, scopeSnapshot.roi);
+      const identity = editedPreviewRunner.request(
+        {
+          activeWaveformChannel,
+          computeWaveform: isWaveformVisible || scopeRecovery,
+          createdAt: previewNow(),
+          kind: dragging ? 'interactive' : 'settled',
+          proof:
+            !dragging && selectedProofRecipe
+              ? {
+                  blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
+                  colorProfile: selectedProofRecipe.colorProfile ?? ExportColorProfile.Srgb,
+                  exportSoftProofRecipeId: selectedProofRecipe.id,
+                  renderingIntent: selectedProofRecipe.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
+                }
+              : null,
           quality,
-          roi: synchronized.roi,
-          requestId,
-          targetRes: normalizedTargetRes,
-        });
-      } else {
-        const requestId = ++latestInteractiveRequestIdRef.current;
-        const transition = dispatchPreviewCoordinator({
-          identity: coordinatorSession,
-          kind: 'settled',
-          reason: scopeRecovery ? 'scope-recovery' : 'settled-inputs-changed',
-          type: 'render-inputs-changed',
-        });
-        const coordinatorIdentity = transition.state.settled.identity;
-        if (coordinatorIdentity === undefined || !previewCoordinator.bindRequest(requestId, coordinatorIdentity))
-          return;
-        interactiveSchedulerRef.current?.clear();
-        void executeApplyAdjustments({
-          snapshot: renderAdjustmentSnapshot,
-          createdAt,
-          dragging: false,
-          identity: interactiveGenerationRef.current.supersede(synchronized.scope),
-          quality,
-          roi: synchronized.roi,
-          requestId,
+          roi: scopeSnapshot.roi,
           scopeRecovery,
-          targetRes: normalizedTargetRes,
-        });
-      }
+          session,
+          snapshot: renderAdjustmentSnapshot,
+          targetResolution: normalizedTargetRes,
+          viewerScope: scopeSnapshot.scope,
+        },
+        delayMs,
+      );
+      setEditor({
+        ...(!dragging ? { requestedPreviewResolution: quality.requestedTargetResolution } : {}),
+        previewQualityStatus: {
+          ...quality,
+          generation: identity.generation,
+          phase: dragging ? 'rendering_interaction' : 'refining_current_view',
+          requestId: identity.operationId,
+        },
+      });
     },
     [
+      activeWaveformChannel,
       appSettings?.editorPreviewResolution,
-      clearInteractivePatch,
-      executeApplyAdjustments,
       dispatchPreviewCoordinator,
-      previewCoordinator,
+      editedPreviewRunner,
+      isWaveformVisible,
       resolveQualityDecision,
       renderAdjustmentSnapshot,
+      selectedProofRecipe,
       previewSessionIdentity,
       selectedImage?.isReady,
-      synchronizePreviewIdentity,
+      setEditor,
     ],
   );
 
@@ -1101,35 +780,6 @@ export function useImageProcessing(
     zoomMode,
   ]);
 
-  useLayoutEffect(() => {
-    if (!selectedImage?.isReady) return;
-    const quality = resolveQualityDecision(calculateTargetRes(), false);
-    synchronizePreviewIdentity(quality.effectiveTargetResolution, quality.effectiveRoi);
-  }, [
-    baseRenderSize,
-    calculateTargetRes,
-    renderAdjustmentSnapshot.geometryRevision,
-    hasRenderedFirstFrame,
-    historyIndex,
-    isExportSoftProofEnabled,
-    exportSoftProofRecipeId,
-    selectedImage?.isReady,
-    selectedImage?.path,
-    resolveQualityDecision,
-    synchronizePreviewIdentity,
-  ]);
-
-  const requestHiFiZoom = useMemo(
-    () =>
-      debounce((currentAdjustments: Adjustments, targetRes: number) => {
-        if (targetRes > currentResRef.current) {
-          currentResRef.current = targetRes;
-          applyAdjustments(currentAdjustments, false, targetRes);
-        }
-      }, 50),
-    [applyAdjustments, currentResRef],
-  );
-
   const requestOriginalPreview = useCallback(
     (targetRes: number, delayMs: number): void => {
       const scopeSnapshot = interactiveScopeRef.current(targetRes, null);
@@ -1157,57 +807,13 @@ export function useImageProcessing(
   }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
 
   useEffect(() => {
-    if (selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let baseRes = calculateTargetRes();
-      if (originalSize.width > 0 && originalSize.height > 0) {
-        const maxRes = Math.max(originalSize.width, originalSize.height);
-        if (baseRes > maxRes) baseRes = maxRes;
-      }
-      const finalRes = Math.round(baseRes);
-
-      if (finalRes > currentResRef.current) {
-        requestHiFiZoom(adjustments, finalRes);
-      }
-    }
-    return () => {
-      requestHiFiZoom.cancel();
-    };
-  }, [
-    adjustments,
-    displaySize.width,
-    displaySize.height,
-    calculateTargetRes,
-    currentResRef,
-    selectedImage?.isReady,
-    isSliderDragging,
-    requestHiFiZoom,
-    originalSize,
-  ]);
-
-  useEffect(() => {
     if (!selectedImage?.isReady) return;
-
-    if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
-
     const targetRes = calculateTargetRes();
-
     if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) {
-        applyAdjustments(adjustments, true, targetRes);
-      }
-      return () => {
-        if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
-      };
+      if (appSettings?.enableLivePreviews !== false) applyAdjustments(adjustments, true, targetRes);
+      return;
     }
-
-    previewIdleTimer.current = setTimeout(() => {
-      currentResRef.current = targetRes;
-      applyAdjustments(adjustments, false, targetRes);
-    }, 50);
-
-    return () => {
-      if (previewIdleTimer.current) clearTimeout(previewIdleTimer.current);
-    };
+    applyAdjustments(adjustments, false, targetRes, false, 50);
   }, [
     adjustments,
     selectedImage?.path,
@@ -1215,7 +821,6 @@ export function useImageProcessing(
     isSliderDragging,
     applyAdjustments,
     calculateTargetRes,
-    currentResRef,
     appSettings?.enableLivePreviews,
   ]);
 
@@ -1345,6 +950,5 @@ export function useImageProcessing(
 
   return {
     applyAdjustments,
-    executeApplyAdjustments,
   };
 }

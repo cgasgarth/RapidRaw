@@ -584,7 +584,6 @@ function App() {
         imageProcessing={{
           transformWrapperRef,
           prevAdjustmentsRef,
-          currentResRef,
         }}
       />
       <div
