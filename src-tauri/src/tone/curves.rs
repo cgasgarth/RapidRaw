@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
+use serde::{Deserialize, Serialize};
 
 pub const SCENE_CURVE_IMPLEMENTATION_VERSION: u32 = 1;
 pub const SCENE_CURVE_INPUT_DOMAIN: &str = "acescg_scene_linear_extended_v1";
@@ -366,7 +367,7 @@ fn fingerprint(
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Pod, Serialize, Zeroable)]
 pub struct GpuCurveKnot {
     pub x_ev: f32,
     pub y_ev: f32,
@@ -375,7 +376,7 @@ pub struct GpuCurveKnot {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Pod, Serialize, Zeroable)]
 pub struct GpuCurveParameters {
     pub point_count: u32,
     pub channel_mode: u32,

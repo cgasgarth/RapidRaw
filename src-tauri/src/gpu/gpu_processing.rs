@@ -968,16 +968,6 @@ pub enum EditGraphExecutionAuthority {
     TestOnlyLegacy,
 }
 
-impl EditGraphExecutionAuthority {
-    fn compiled(&self) -> Option<&Arc<crate::edit_graph::CompiledEditGraph>> {
-        match self {
-            Self::Compiled(graph) => Some(graph),
-            #[cfg(all(test, feature = "tauri-test"))]
-            Self::TestOnlyLegacy => None,
-        }
-    }
-}
-
 fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String> {
     match &request.edit_graph {
         EditGraphExecutionAuthority::Compiled(edit_graph) => {
@@ -3416,7 +3406,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn typed_curve_graph_routes_to_authoritative_cpu_until_dynamic_gpu_bindings_exist() {
+    fn typed_scene_and_output_curves_execute_on_gpu_with_cpu_parity() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -3440,6 +3430,17 @@ mod blur_pass_tests {
                     {"xEv": -16, "yEv": -16},
                     {"xEv": 0, "yEv": 1},
                     {"xEv": 16, "yEv": 16}
+                ]
+            },
+            "outputCurveV1": {
+                "domain": "view_encoded",
+                "targetIdentity": "rapid-view-test",
+                "sdrReferenceWhiteNits": 203,
+                "peakNits": 406,
+                "points": [
+                    {"input": 0, "output": 0},
+                    {"input": 1, "output": 0.8},
+                    {"input": 2, "output": 2}
                 ]
             }
         });
@@ -3467,7 +3468,7 @@ mod blur_pass_tests {
             &context,
             &state,
             &source,
-            PreGpuImageIdentity::for_source(&source, "typed_curve_cpu_route"),
+            PreGpuImageIdentity::for_source(&source, "typed_curve_gpu_route"),
             RenderRequest {
                 adjustments: plan.adjustments,
                 mask_bitmaps: &[],
@@ -3475,14 +3476,19 @@ mod blur_pass_tests {
                 roi: None,
                 edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
             },
-            "typed_curve_cpu_route",
+            "typed_curve_gpu_route",
         )
         .unwrap()
         .to_rgba32f()
         .into_raw();
 
-        assert_eq!(actual, expected);
-        assert!(state.gpu_processor.lock().unwrap().is_none());
+        for (gpu, cpu) in actual.iter().zip(expected) {
+            assert!(
+                (gpu - cpu).abs() <= cpu.abs().max(1.0) * 3.0e-3,
+                "gpu={gpu} cpu={cpu}"
+            );
+        }
+        assert!(state.gpu_processor.lock().unwrap().is_some());
     }
 
     #[cfg(feature = "tauri-test")]
@@ -5073,24 +5079,6 @@ fn process_and_get_dynamic_image_inner(
 
     let max_dim = context.limits.max_texture_dimension_2d;
     validate_edit_graph_request(&request)?;
-    if request
-        .edit_graph
-        .compiled()
-        .is_some_and(|graph| graph.has_typed_curves())
-    {
-        let graph = request
-            .edit_graph
-            .compiled()
-            .expect("typed curve authority is compiled");
-        return crate::cpu_edit_graph::execute_cpu_edit_graph(
-            base_image,
-            &request.adjustments,
-            request.mask_bitmaps,
-            request.lut.as_deref(),
-            graph,
-        )
-        .map_err(str::to_owned);
-    }
     if width > max_dim || height > max_dim {
         log::warn!(
             "Image dimensions ({}x{}) exceed GPU limits ({}); executing the compiled CPU reference graph",

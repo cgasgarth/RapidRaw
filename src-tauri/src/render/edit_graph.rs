@@ -693,7 +693,7 @@ impl CompiledEditGraph {
                         ..NodeDependencies::default()
                     },
                     Some("scene_curve_cpu_v1"),
-                    None,
+                    Some("scene_curve_wgsl_v1"),
                     scene_curve.fingerprint,
                 ));
             } else {
@@ -758,7 +758,7 @@ impl CompiledEditGraph {
                         ..NodeDependencies::default()
                     },
                     Some("output_curve_cpu_v1"),
-                    None,
+                    Some("output_curve_wgsl_v1"),
                     output_curve.fingerprint,
                 ));
             } else {
@@ -899,7 +899,30 @@ impl CompiledEditGraph {
     }
 
     pub fn shader_abi(&self) -> AllAdjustments {
-        self.compiled_shader_abi
+        let mut abi = self.compiled_shader_abi;
+        if let Some(curve) = self.scene_curve() {
+            for (destination, source) in abi
+                .global
+                .scene_curve_knots
+                .iter_mut()
+                .zip(curve.gpu_knots())
+            {
+                *destination = source;
+            }
+            abi.global.scene_curve_parameters = curve.gpu_parameters();
+        }
+        if let Some(curve) = self.output_curve() {
+            for (destination, source) in abi
+                .global
+                .output_curve_knots
+                .iter_mut()
+                .zip(curve.gpu_knots())
+            {
+                *destination = source;
+            }
+            abi.global.output_curve_parameters = curve.gpu_parameters();
+        }
+        abi
     }
 
     pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
@@ -916,6 +939,7 @@ impl CompiledEditGraph {
         })
     }
 
+    #[cfg(test)]
     pub fn has_typed_curves(&self) -> bool {
         self.scene_curve().is_some() || self.output_curve().is_some()
     }

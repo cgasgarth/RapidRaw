@@ -779,6 +779,10 @@ fn get_global_adjustments_from_json(
         ),
         tone_equalizer: parse_tone_equalizer(js_adjustments),
         point_color: parse_point_color(js_adjustments),
+        scene_curve_knots: [Default::default(); 32],
+        scene_curve_parameters: Default::default(),
+        output_curve_knots: [Default::default(); 32],
+        output_curve_parameters: Default::default(),
     }
 }
 

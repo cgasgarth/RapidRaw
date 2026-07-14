@@ -7,6 +7,7 @@
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
+use serde::{Deserialize, Serialize};
 
 use super::curves::{
     CurveDomain, MonotonePoint, OutputProfileId, ViewProcessId, evaluate_monotone,
@@ -236,7 +237,7 @@ fn fingerprint(target: OutputCurveTargetV1, points: &[OutputCurvePoint], tangent
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Pod, Serialize, Zeroable)]
 pub struct GpuOutputCurveKnot {
     pub input: f32,
     pub output: f32,
@@ -245,7 +246,7 @@ pub struct GpuOutputCurveKnot {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Pod, Serialize, Zeroable)]
 pub struct GpuOutputCurveParameters {
     pub point_count: u32,
     pub _padding: [u32; 3],
