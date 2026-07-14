@@ -373,9 +373,38 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
                 let neutral =
                     apply_pre_gpu_detail_stages(&source, 1, &serde_json::json!({}), false);
                 assert!(matches!(neutral.image, Cow::Borrowed(_)));
-                apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id), false)
-                    .image
-                    .into_owned()
+                let staged =
+                    apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id), false)
+                        .image
+                        .into_owned();
+                let render = |consumer: &str| {
+                    process_and_get_unclamped_dynamic_image(
+                        &context,
+                        &state,
+                        &staged,
+                        PreGpuImageIdentity::for_source(&staged, contract.id),
+                        RenderRequest {
+                            adjustments: AllAdjustments::default(),
+                            mask_bitmaps: &[],
+                            lut: None,
+                            roi: None,
+                            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                        },
+                        consumer,
+                    )
+                    .unwrap_or_else(|error| {
+                        panic!("{} CPU-to-WGPU handoff failed: {error}", contract.id)
+                    })
+                };
+                let preview = render("color_node_cpu_preview");
+                if contract.id == "scene_wavelet_detail" {
+                    let export = render("color_node_cpu_export");
+                    assert!(
+                        max_delta(&preview, &export) <= 1.0e-7,
+                        "multiscale detail preview/export WGPU handoff diverged"
+                    );
+                }
+                preview
             }
             ColorNodeBackend::CpuPostWgpu => apply_native_color_mixer_adjustments(
                 Cow::Borrowed(&identity),
