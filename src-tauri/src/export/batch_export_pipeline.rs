@@ -723,15 +723,10 @@ mod tests {
             assert!(report.diagnostics.gpu_credit_peak_bytes <= 256 * CREDIT_QUANTUM_BYTES);
             assert!(report.diagnostics.interactive_preemptions > 0);
         }
-        // Ten times the work must not produce linear retained-process growth.
-        // The allowance absorbs allocator/runtime noise on shared CI hosts.
-        assert!(
-            thousand.rss_growth_bytes()
-                <= hundred
-                    .rss_growth_bytes()
-                    .saturating_mul(2)
-                    .saturating_add(32 * CREDIT_QUANTUM_BYTES)
-        );
+        // Process RSS is shared by every concurrently executing Rust test, so it
+        // cannot prove this smoke test's memory bound in the parallel lib suite.
+        // The credit peaks above are pipeline-owned and deterministic; the ignored
+        // 10k benchmark retains the RSS assertion for isolated main-long runs.
         assert!(
             thousand.elapsed_per_item() <= hundred.elapsed_per_item().saturating_mul(2),
             "per-item throughput regressed: 100={:?}, 1000={:?}",

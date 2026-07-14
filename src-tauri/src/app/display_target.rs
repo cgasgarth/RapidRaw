@@ -6,9 +6,11 @@ use serde::Serialize;
 
 #[cfg(any(test, feature = "validation-harness"))]
 use super::hdr_display_capability::EdrHeadroomSample;
-use super::hdr_display_capability::{
-    HdrDisplayCapabilityV1, compile_hdr_display_capability, query_edr_headroom,
-};
+use super::hdr_display_capability::HdrDisplayCapabilityV1;
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
+use super::hdr_display_capability::compile_hdr_display_capability;
+#[cfg(target_os = "macos")]
+use super::hdr_display_capability::query_edr_headroom;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

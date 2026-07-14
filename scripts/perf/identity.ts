@@ -10,8 +10,15 @@ const command = (args: readonly string[]): string => {
 
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
 
-const optionalCommand = (args: readonly string[]): string => {
-  const result = Bun.spawnSync([...args], { stderr: 'pipe', stdout: 'pipe' });
+const optionalCommand = (args: readonly string[], timeout = 5_000): string => {
+  const result = Bun.spawnSync([...args], {
+    killSignal: 'SIGKILL',
+    maxBuffer: 64 * 1024,
+    stderr: 'pipe',
+    stdout: 'pipe',
+    timeout,
+  });
+  if (result.exitedDueToTimeout || result.exitedDueToMaxBuffer) return 'unreported';
   return result.exitCode === 0 ? result.stdout.toString().trim() : 'unreported';
 };
 
@@ -103,7 +110,7 @@ export function capturePerformanceIdentity(profile = 'development'): Performance
       node: process.versions.node ?? 'unreported',
       os: `${platform()}-${release()}`,
       powerSource: powerSource(),
-      rustc: optionalCommand(['rustc', '--version']),
+      rustc: optionalCommand(['rustc', '--version'], 250),
       thermalState: process.env.RAWENGINE_PERF_THERMAL_STATE ?? 'unreported',
     },
   };

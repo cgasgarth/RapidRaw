@@ -64,7 +64,7 @@ export async function executePerformanceBisect(options: {
   if (evaluated === undefined) throw new Error('git bisect run did not produce an evaluator result.');
   const firstBadCommit = evaluated.output.match(/([0-9a-f]{40}) is the first '?bad'? commit/u)?.[1];
   const ambiguousBlock = evaluated.output.match(
-    /The first 'bad' commit could be any of:\s*\n((?:[0-9a-f]{40}\s*\n?)+)/u,
+    /The first '?bad'? commit could be any of:\s*\n((?:[0-9a-f]{40}\s*\n?)+)/u,
   )?.[1];
   const candidateCommits =
     firstBadCommit === undefined ? (ambiguousBlock?.match(/[0-9a-f]{40}/gu) ?? []) : [firstBadCommit];
