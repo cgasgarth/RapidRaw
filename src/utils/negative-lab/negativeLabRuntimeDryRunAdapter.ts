@@ -7,6 +7,10 @@ import {
   type NegativeLabRuntimePreviewRenderResultV1,
 } from '../../../packages/rawengine-schema/src';
 import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
+import {
+  negativeLabOutputTransformSchema,
+  negativeLabSceneLinearStatsSchema,
+} from '../../schemas/negative-lab/negativeLabOutputTransformSchemas';
 import { negativeLabStagePreviewArtifactFieldsSchema } from '../../schemas/negative-lab/negativeLabStagePreviewSchemas';
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
@@ -235,6 +239,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     previewDataUrl: z.string().startsWith('data:image/jpeg;base64,'),
+    previewOutputTransform: negativeLabOutputTransformSchema.optional(),
     renderIntent: z.enum(['print', 'flat_log_master']).optional(),
     bypassedStageIds: z.array(z.string().trim().min(1)).optional(),
     stageArtifacts: z
@@ -245,6 +250,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       .string()
       .regex(/^sha256:[a-f0-9]{64}$/u)
       .optional(),
+    sceneLinearPrint: negativeLabSceneLinearStatsSchema.optional(),
     storage: z.literal('temp_cache'),
   })
   .strict();

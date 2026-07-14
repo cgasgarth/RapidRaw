@@ -184,6 +184,27 @@ pub struct NegativeLabRuntimeBaseFogSampleSummary {
     pub warning_codes: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabOutputTransformV1 {
+    pub bit_depth: u8,
+    pub implementation_version: u8,
+    pub input_color_domain: String,
+    pub intent: String,
+    pub output_color_domain: String,
+    pub transform_id: String,
+    pub transfer_function: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabSceneLinearStatsV1 {
+    pub content_hash: String,
+    pub max: f32,
+    pub min: f32,
+    pub non_finite_count: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDryRunPreviewArtifact {
@@ -197,6 +218,8 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub render_intent: NegativeLabRenderIntent,
+    pub preview_output_transform: NegativeLabOutputTransformV1,
+    pub scene_linear_print: NegativeLabSceneLinearStatsV1,
     pub bypassed_stage_ids: Vec<String>,
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
@@ -3258,7 +3281,7 @@ fn run_e6_positive_pipeline(
         finished_scene_linear
             .as_raw()
             .par_iter()
-            .map(|value| value.clamp(0.0, 1.0).powf(1.0 / 2.2))
+            .map(|value| negative_lab_scene_linear_to_srgb(*value))
             .collect(),
     )
     .unwrap();
@@ -3312,7 +3335,6 @@ fn run_pipeline_with_metrics(
 
     let k = 4.0 * params.contrast;
     let x0 = 0.6 - (params.exposure * 0.25);
-    let gamma_inv = 1.0 / 2.2;
 
     let y0 = 1.0 / (1.0 + (k * x0).exp());
     let y1 = 1.0 / (1.0 + (-k * (1.0 - x0)).exp());
@@ -3385,9 +3407,9 @@ fn run_pipeline_with_metrics(
 
                 let scene_linear = [apply_endpoints(r), apply_endpoints(g), apply_endpoints(b)];
                 scene_linear_print_pixel.copy_from_slice(&scene_linear);
-                out_pixel[0] = scene_linear[0].powf(gamma_inv);
-                out_pixel[1] = scene_linear[1].powf(gamma_inv);
-                out_pixel[2] = scene_linear[2].powf(gamma_inv);
+                out_pixel[0] = negative_lab_scene_linear_to_srgb(scene_linear[0]);
+                out_pixel[1] = negative_lab_scene_linear_to_srgb(scene_linear[1]);
+                out_pixel[2] = negative_lab_scene_linear_to_srgb(scene_linear[2]);
 
                 metrics
             },
@@ -3438,7 +3460,7 @@ fn run_pipeline_with_metrics(
     let finished_scene_linear = color_finish.image;
     let out_img = Rgb32FImage::from_fn(width, height, |x, y| {
         let pixel = finished_scene_linear.get_pixel(x, y).0;
-        image::Rgb(pixel.map(|value| value.clamp(0.0, 1.0).powf(gamma_inv)))
+        image::Rgb(pixel.map(negative_lab_scene_linear_to_srgb))
     });
 
     NegativeLabPipelineRender {
@@ -4155,6 +4177,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     let normalized_density = normalized_density_preview.to_rgb32f();
     let scene_linear_print = scene_linear_print_preview.to_rgb32f();
+    let scene_linear_stats = negative_lab_scene_linear_stats(&scene_linear_print);
     let recipe_hash = negative_lab_stage_recipe_hash(
         params,
         density_normalization_metrics.crosstalk_receipt.as_ref(),
@@ -4197,6 +4220,8 @@ fn build_negative_lab_dry_run_preview_artifact(
             Vec::new()
         },
         preview_data_url: jpeg_data_url(base64_str),
+        preview_output_transform: negative_lab_preview_output_transform(),
+        scene_linear_print: scene_linear_stats,
         stage_artifacts,
         renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
         source_interpretation_hash: params.source_interpretation_hash.clone(),
@@ -4221,6 +4246,42 @@ fn negative_lab_stage_pixels_hash(stage: &Rgb32FImage) -> String {
     format!("sha256:{}", hex::encode(hasher.finalize()))
 }
 
+fn negative_lab_scene_linear_to_srgb(value: f32) -> f32 {
+    value.clamp(0.0, 1.0).powf(1.0 / 2.2)
+}
+
+fn negative_lab_preview_output_transform() -> NegativeLabOutputTransformV1 {
+    NegativeLabOutputTransformV1 {
+        bit_depth: 8,
+        implementation_version: 1,
+        input_color_domain: "scene_linear_print_srgb_d65".to_string(),
+        intent: "display_preview".to_string(),
+        output_color_domain: "srgb_display".to_string(),
+        transform_id: "scene_linear_to_srgb_gamma_v1".to_string(),
+        transfer_function: "gamma_2_2_display_proof".to_string(),
+    }
+}
+
+fn negative_lab_scene_linear_stats(stage: &Rgb32FImage) -> NegativeLabSceneLinearStatsV1 {
+    let mut min = f32::INFINITY;
+    let mut max = f32::NEG_INFINITY;
+    let mut non_finite_count = 0_u32;
+    for value in stage.as_raw() {
+        if value.is_finite() {
+            min = min.min(*value);
+            max = max.max(*value);
+        } else {
+            non_finite_count += 1;
+        }
+    }
+    NegativeLabSceneLinearStatsV1 {
+        content_hash: negative_lab_stage_pixels_hash(stage),
+        max: if max.is_finite() { max } else { 0.0 },
+        min: if min.is_finite() { min } else { 0.0 },
+        non_finite_count,
+    }
+}
+
 fn build_negative_lab_stage_preview_artifact(
     stage_id: &str,
     color_domain: &str,
@@ -4232,7 +4293,7 @@ fn build_negative_lab_stage_preview_artifact(
     let rgb8 = image::RgbImage::from_fn(stage.width(), stage.height(), |x, y| {
         let pixel = stage.get_pixel(x, y).0;
         let transformed = if stage_id == "scene_linear_print" {
-            pixel.map(|value| value.clamp(0.0, 1.0).powf(1.0 / 2.2))
+            pixel.map(negative_lab_scene_linear_to_srgb)
         } else {
             pixel.map(|value| (0.5 + value * 0.5).clamp(0.0, 1.0))
         };
@@ -7727,6 +7788,19 @@ mod tests {
         assert_eq!(artifact.dimensions.height, 1);
         assert_eq!(artifact.renderer, NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER);
         assert_eq!(artifact.storage, NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE);
+        assert_eq!(
+            artifact.preview_output_transform.transform_id,
+            "scene_linear_to_srgb_gamma_v1"
+        );
+        assert_eq!(
+            artifact.preview_output_transform.input_color_domain,
+            "scene_linear_print_srgb_d65"
+        );
+        assert_eq!(
+            artifact.scene_linear_print.content_hash,
+            negative_lab_stage_pixels_hash(&rendered_preview.to_rgb32f())
+        );
+        assert_eq!(artifact.scene_linear_print.non_finite_count, 0);
         assert_eq!(artifact.stage_artifacts.len(), 2);
         assert_eq!(artifact.stage_artifacts[0].stage_id, "normalized_density");
         assert_eq!(artifact.stage_artifacts[1].stage_id, "scene_linear_print");
@@ -7757,6 +7831,16 @@ mod tests {
             artifact.base_fog_sample_summary.sample_rect.width,
             summary.sample_rect.width
         );
+    }
+
+    #[test]
+    fn scene_linear_output_transform_is_named_and_deterministic() {
+        let transform = negative_lab_preview_output_transform();
+        assert_eq!(transform.transform_id, "scene_linear_to_srgb_gamma_v1");
+        assert_eq!(negative_lab_scene_linear_to_srgb(0.0), 0.0);
+        assert_eq!(negative_lab_scene_linear_to_srgb(1.0), 1.0);
+        let midpoint = negative_lab_scene_linear_to_srgb(0.25);
+        assert!((midpoint - 0.5325).abs() < 0.001);
     }
 
     #[test]
