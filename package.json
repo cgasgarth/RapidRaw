@@ -26,6 +26,7 @@
     "check:types": "bun run typecheck",
     "typecheck": "bun scripts/ci/run-compact-command.ts --label typecheck -- bun node_modules/typescript/bin/tsc --noEmit --pretty false --checkers 4",
     "check:rust": "bun run check:rust:fmt && bun run check:rust:clippy",
+    "generate:render-abi": "bun scripts/render-abi/generate.ts --write",
     "check:render-abi": "bun scripts/checks/ci/check-render-abi.ts",
     "check:native-profiles": "bun scripts/checks/ci/check-native-profiles.ts",
     "check:rust:fmt": "bun scripts/ci/run-compact-command.ts --label rust:fmt --cwd src-tauri -- cargo fmt --all -- --check",
