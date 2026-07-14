@@ -17,6 +17,7 @@ import { useContextMenu } from '../../context/ContextMenuContext';
 import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
 import AdjustmentSlider from './AdjustmentSlider';
+import TypedCurveEditor from './TypedCurveEditor';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;
@@ -392,13 +393,48 @@ export function constrainParametricSplit(
   return Math.max(settings.split2 + 10, Math.min(nextValue, 90));
 }
 
-export default function CurveGraph({
-  adjustments,
-  setAdjustments,
-  histogram,
-  theme,
-  onDragStateChange,
-}: CurveGraphProps) {
+export default function CurveGraph(props: CurveGraphProps) {
+  const { t } = useTranslation();
+  const [domain, setDomain] = useState<'legacy' | 'scene' | 'output'>(() => {
+    if (props.adjustments.sceneCurveV1) return 'scene';
+    if (props.adjustments.outputCurveV1) return 'output';
+    return 'legacy';
+  });
+  const domainOptions = [
+    { label: t('adjustments.curves.typed.legacyTab', { defaultValue: 'Legacy' }), value: 'legacy' },
+    { label: t('adjustments.curves.typed.sceneTab', { defaultValue: 'Scene' }), value: 'scene' },
+    { label: t('adjustments.curves.typed.outputTab', { defaultValue: 'Output' }), value: 'output' },
+  ] as const;
+  if (props.isForMask) return <LegacyCurveGraph {...props} />;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-1 rounded bg-surface p-1" data-testid="curve-domain-switcher">
+        {domainOptions.map((option) => (
+          <button
+            aria-pressed={domain === option.value}
+            className={`rounded px-2 py-1 text-xs font-medium capitalize ${
+              domain === option.value
+                ? 'bg-surface-light text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+            key={option.value}
+            onClick={() => setDomain(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {domain === 'legacy' ? (
+        <LegacyCurveGraph {...props} />
+      ) : (
+        <TypedCurveEditor adjustments={props.adjustments} domain={domain} setAdjustments={props.setAdjustments} />
+      )}
+    </div>
+  );
+}
+
+function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDragStateChange }: CurveGraphProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);

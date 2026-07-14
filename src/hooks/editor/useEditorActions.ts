@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
 import {
   type Adjustments,
+  bindTypedCurveGraphVersion,
   COPYABLE_ADJUSTMENT_KEYS,
   INITIAL_ADJUSTMENTS,
   LensAdjustment,
@@ -272,10 +273,12 @@ export function useEditorActions() {
         requireExistingKey: true,
         skipDefaultValues: mode === PasteMode.Merge,
       });
-      const adjustmentsToApply = acceptReferenceMatchAdjustmentTransfer({
-        adjustments: selectedAdjustmentsToApply,
-        transferMode: 'copy-paste',
-      }).adjustments;
+      const adjustmentsToApply = bindTypedCurveGraphVersion(
+        acceptReferenceMatchAdjustmentTransfer({
+          adjustments: selectedAdjustmentsToApply,
+          transferMode: 'copy-paste',
+        }).adjustments,
+      );
 
       if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
         if (!adjustmentsToApply[LensAdjustment.LensMaker]) {

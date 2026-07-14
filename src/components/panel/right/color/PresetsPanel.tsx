@@ -63,7 +63,7 @@ import type { ColorStylePreset } from '../../../../schemas/color/colorStylePrese
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { Invokes } from '../../../../tauri/commands';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../../utils/blobUtils';
 import {
   BUILT_IN_COLOR_STYLE_PRESETS,
@@ -568,7 +568,10 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
 
       try {
         const imageData = await invoke<Uint8Array>(Invokes.GeneratePresetPreview, {
-          jsAdjustments: { ...INITIAL_ADJUSTMENTS, ...item.preset.adjustments },
+          jsAdjustments: {
+            ...INITIAL_ADJUSTMENTS,
+            ...bindTypedCurveGraphVersion(item.preset.adjustments),
+          },
         });
         if (imagePathAtStart !== currentImagePathRef.current) break;
         const previewUrl = URL.createObjectURL(createBlobFromUint8Array(imageData, 'image/jpeg'));
@@ -657,7 +660,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       }
       try {
         const before = structuredClone(adjustments);
-        const expected = buildReceiptSafePresetApplication(adjustments, preset.adjustments);
+        const expected = buildReceiptSafePresetApplication(adjustments, bindTypedCurveGraphVersion(preset.adjustments));
         setAdjustments(() => expected);
         setActionError(null);
         setSelectedPresetId(preset.id);
