@@ -2507,6 +2507,14 @@ const ImageCanvas = memo(
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
+          if (event.type === 'blur' || event.type === 'escape') {
+            const transition = viewerInputRouter.dispatch({ type: event.type });
+            viewerInputTransitionRef.current = transition;
+            setViewerInputOwnerState(transition.state.owner);
+            viewerToolSessions.invalidate();
+            return;
+          }
+          if (!('pointerId' in event)) return;
           const transition =
             event.type === 'pointerdown'
               ? viewerInputRouter.dispatch({
@@ -2529,24 +2537,18 @@ const ImageCanvas = memo(
                     zoomed: isMaxZoom ?? false,
                   },
                 })
-              : event.type === 'blur' || event.type === 'escape'
-                ? viewerInputRouter.dispatch({ type: event.type })
-                : viewerInputRouter.dispatch({
-                    type: event.type,
-                    pointerId: event.pointerId,
-                    sample: {
-                      clientX: event.clientX,
-                      clientY: event.clientY,
-                      pointerType: normalizeViewerPointerType(event.pointerType),
-                      pressure: event.pressure,
-                    },
-                  });
+              : viewerInputRouter.dispatch({
+                  type: event.type,
+                  pointerId: event.pointerId,
+                  sample: {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    pointerType: normalizeViewerPointerType(event.pointerType),
+                    pressure: event.pressure,
+                  },
+                });
           viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
-          if (event.type === 'blur' || event.type === 'escape') {
-            viewerToolSessions.invalidate();
-            return;
-          }
           if (
             event.type === 'pointerdown' &&
             transition.resolution &&
