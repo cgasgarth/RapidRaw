@@ -18,6 +18,7 @@ mod color;
 mod community_presets;
 mod computational;
 mod detail;
+mod editor;
 mod events;
 mod export;
 mod geometry;
@@ -104,6 +105,9 @@ use crate::app::startup::{
 };
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
+};
+use crate::editor::preview_geometry::{
+    PreviewGeometryQuality, PreviewGeometryTarget, preview_geometry_transform,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
@@ -208,48 +212,6 @@ pub struct WgpuTransformPayload {
     pub bg_primary: [f32; 4],
     pub bg_secondary: [f32; 4],
     pub pixelated: bool,
-}
-
-#[derive(Clone, Copy, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-enum PreviewGeometryQuality {
-    Interactive,
-    Settled,
-}
-
-#[derive(Clone, Copy, serde::Deserialize)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
-enum PreviewGeometryTarget {
-    EditorSetting {
-        quality: PreviewGeometryQuality,
-    },
-    LongEdge {
-        #[serde(rename = "longEdgePx")]
-        long_edge_px: u32,
-        quality: PreviewGeometryQuality,
-    },
-}
-
-impl PreviewGeometryTarget {
-    fn resolve_long_edge(self, editor_preview_resolution: u32) -> u32 {
-        match self {
-            Self::EditorSetting { quality } => match quality {
-                PreviewGeometryQuality::Interactive => {
-                    (editor_preview_resolution as f32 / 1.5).round() as u32
-                }
-                PreviewGeometryQuality::Settled => editor_preview_resolution,
-            },
-            Self::LongEdge {
-                long_edge_px,
-                quality,
-            } => match quality {
-                PreviewGeometryQuality::Interactive | PreviewGeometryQuality::Settled => {
-                    long_edge_px
-                }
-            },
-        }
-        .clamp(64, 8192)
-    }
 }
 
 pub fn generate_transformed_preview(
@@ -2377,8 +2339,10 @@ mod viewer_sampler_tests {
     }
 }
 
-#[tauri::command]
-async fn preview_geometry_transform(
+// Transitional helper retained for existing native tests while the command now
+// lives in `editor::preview_geometry`; follow-up cleanup removes this duplicate.
+#[allow(dead_code)]
+async fn legacy_preview_geometry_transform(
     params: GeometryParams,
     js_adjustments: serde_json::Value,
     show_lines: bool,
