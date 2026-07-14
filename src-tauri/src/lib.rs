@@ -92,14 +92,7 @@ use crate::merge::focus_stack::{
 };
 use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
 
-use crate::app::startup::{
-    FrontendStartupPhase, NativeStartupPhase, frontend_ready_manages_native_window,
-    record_frontend_phase_with_followup,
-};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use crate::app::startup::{
-    InitializationPriority, request_gpu_initialization, request_lens_initialization,
-};
+use crate::app::startup::NativeStartupPhase;
 use crate::cache_utils::{
     calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
 };
@@ -3597,14 +3590,6 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
     );
 }
 
-fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
-    if let Some(path_str) = path.to_str()
-        && let Err(e) = app_handle.emit(crate::events::OPEN_WITH_FILE, path_str)
-    {
-        log::error!("Failed to emit open-with-file event: {}", e);
-    }
-}
-
 #[cfg(not(target_os = "android"))]
 fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
     const MIN_WINDOW_WIDTH: u32 = 800;
@@ -3665,165 +3650,6 @@ fn restore_window_state(window: &tauri::WebviewWindow, state: &WindowState) {
     let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
         x, y,
     )));
-}
-
-#[cfg(all(feature = "validation-harness", unix))]
-#[tauri::command]
-fn frontend_ready(
-    app_handle: tauri::AppHandle,
-    window: tauri::Window,
-    state: tauri::State<AppState>,
-    qa_control_state: tauri::State<qa_control::QaControlState>,
-) -> Result<(), String> {
-    qa_control_state.mark_ready();
-    frontend_ready_impl(app_handle, window, state)
-}
-
-#[cfg(not(all(feature = "validation-harness", unix)))]
-#[tauri::command]
-fn frontend_ready(
-    app_handle: tauri::AppHandle,
-    window: tauri::Window,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    frontend_ready_impl(app_handle, window, state)
-}
-
-fn frontend_ready_impl(
-    app_handle: tauri::AppHandle,
-    window: tauri::Window,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let is_first_run = !state
-        .window_setup_complete
-        .swap(true, std::sync::atomic::Ordering::Relaxed);
-    #[cfg(target_os = "android")]
-    let _ = (is_first_run, &window);
-
-    #[cfg(not(target_os = "android"))]
-    {
-        #[cfg(not(any(windows, target_os = "linux")))]
-        let _ = is_first_run;
-
-        #[cfg(any(windows, target_os = "linux"))]
-        let mut should_maximize = false;
-        #[cfg(any(windows, target_os = "linux"))]
-        let mut should_fullscreen = false;
-
-        #[cfg(any(windows, target_os = "linux"))]
-        if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
-            let path = config_dir.join("window_state.json");
-
-            if let Ok(contents) = std::fs::read_to_string(&path)
-                && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
-            {
-                should_maximize = saved_state.maximized;
-                should_fullscreen = saved_state.fullscreen;
-
-                if (should_maximize || should_fullscreen)
-                    && let Some(monitor) = window
-                        .current_monitor()
-                        .ok()
-                        .flatten()
-                        .or_else(|| window.primary_monitor().ok().flatten())
-                        .or_else(|| {
-                            window
-                                .available_monitors()
-                                .ok()
-                                .and_then(|m| m.into_iter().next())
-                        })
-                {
-                    let monitor_size = monitor.size();
-                    let monitor_pos = monitor.position();
-                    let default_width = 1280i32;
-                    let default_height = 720i32;
-                    let center_x = monitor_pos.x + (monitor_size.width as i32 - default_width) / 2;
-                    let center_y =
-                        monitor_pos.y + (monitor_size.height as i32 - default_height) / 2;
-
-                    let _ = window.set_size(tauri::PhysicalSize::new(
-                        default_width as u32,
-                        default_height as u32,
-                    ));
-                    let _ = window.set_position(tauri::PhysicalPosition::new(center_x, center_y));
-                }
-            }
-        }
-
-        if frontend_ready_manages_native_window(std::env::consts::OS) {
-            if let Err(e) = window.show() {
-                log::error!("Failed to show window: {}", e);
-            }
-            if let Err(e) = window.set_focus() {
-                log::error!("Failed to focus window: {}", e);
-            }
-        }
-        #[cfg(any(windows, target_os = "linux"))]
-        if is_first_run {
-            if should_maximize {
-                let _ = window.maximize();
-            }
-            if should_fullscreen {
-                let _ = window.set_fullscreen(true);
-            }
-        }
-    }
-
-    if let Some(path) = state.initial_file_path.lock().unwrap().take() {
-        log::info!(
-            "Frontend is ready, emitting open-with-file for initial path: {}",
-            &path
-        );
-        handle_file_open(&app_handle, PathBuf::from(path));
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn get_startup_trace(
-    state: tauri::State<'_, AppState>,
-) -> crate::app::startup::StartupTraceSnapshot {
-    state.startup_trace.snapshot()
-}
-
-#[tauri::command]
-fn record_frontend_startup_phase(
-    trace_id: String,
-    phase: FrontendStartupPhase,
-    status: String,
-    detail: Option<String>,
-    state: tauri::State<'_, AppState>,
-    _app: tauri::AppHandle,
-) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
-    record_frontend_phase_with_followup(
-        &state.startup_trace,
-        &trace_id,
-        phase,
-        &status,
-        detail,
-        |_snapshot| {
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if state.startup_trace.arm_idle_warm_after(phase) {
-                let idle_services = _app.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(1_500)).await;
-                    request_lens_initialization(
-                        idle_services.clone(),
-                        InitializationPriority::IdleWarm,
-                    );
-                    request_gpu_initialization(idle_services, InitializationPriority::IdleWarm);
-                });
-            }
-            #[cfg(feature = "validation-harness")]
-            if phase == FrontendStartupPhase::Interactive
-                && std::env::var("RAWENGINE_STARTUP_BENCHMARK_EDITOR_DEMAND").as_deref() == Ok("1")
-            {
-                image_open_session::promote_editor_initialization(&_app);
-                request_lens_initialization(_app.clone(), InitializationPriority::IdleWarm);
-                request_gpu_initialization(_app, InitializationPriority::IdleWarm);
-            }
-        },
-    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -4221,9 +4047,9 @@ pub fn run() {
             analyze_perspective_correction,
             app::commands::source::is_original_file_available,
             app::commands::source::resolve_original_source_identity,
-            frontend_ready,
-            get_startup_trace,
-            record_frontend_startup_phase,
+            app::commands::startup::frontend_ready,
+            app::commands::startup::get_startup_trace,
+            app::commands::startup::record_frontend_startup_phase,
             library::changefeed::configure_library_changefeed,
             library::changefeed::get_library_changefeed_report,
             library::file_management::get_library_change_rows,
