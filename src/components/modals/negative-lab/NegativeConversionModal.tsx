@@ -110,6 +110,7 @@ import { buildNegativeBaseFogDensitometerReadout } from '../../../utils/negative
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
+  type NegativeLabNativeDustCandidate,
 } from '../../../utils/negative-lab/negativeLabDustScratchReview';
 import type { NegativeConversionEditorHandoff } from '../../../utils/negative-lab/negativeLabEditorHandoff';
 import {
@@ -939,6 +940,9 @@ function NegativeLabSession({
     Record<string, NegativeLabDustCandidateDecision>
   >({});
   const [dustCandidateFilter, setDustCandidateFilter] = useState<NegativeLabDustCandidateFilter>('all');
+  const [nativeDustCandidatesByFrameId, setNativeDustCandidatesByFrameId] = useState<
+    Record<string, NegativeLabNativeDustCandidate[]>
+  >({});
   const [dustHealLayerByCandidateId, setDustHealLayerByCandidateId] = useState<
     Record<string, ReturnType<typeof buildDustCandidateHealLayer>>
   >({});
@@ -1334,9 +1338,52 @@ function NegativeLabSession({
   const batchApplyFrameCount = batchDryRunSummary.dispositionCounts.apply;
   const batchReviewFrameCount = batchDryRunSummary.dispositionCounts.review;
   const batchSkippedFrameCount = batchDryRunSummary.dispositionCounts.skip;
+  useEffect(() => {
+    if (!previewReadyForWorkspace || selectedImagePath === null) {
+      setNativeDustCandidatesByFrameId({});
+      return;
+    }
+    const frame = frameHealthReport.frames[effectiveActivePathIndex];
+    if (frame === undefined) return;
+    let cancelled = false;
+    void invoke<
+      Array<{
+        candidateId: string;
+        confidence: number;
+        detectorVersion: string;
+        geometry: { coordinateSpace: 'normalized_frame'; height: number; width: number; x: number; y: number };
+        polarity: 'dark' | 'light' | 'mixed';
+        supportCount: number;
+      }>
+    >(Invokes.AnalyzeNegativeLabDustSpots, { path: selectedImagePath })
+      .then((candidates) => {
+        if (cancelled) return;
+        setNativeDustCandidatesByFrameId((current) => ({
+          ...current,
+          [frame.frameId]: candidates.map((candidate) => ({
+            ...candidate,
+            geometry: { ...candidate.geometry, kind: 'rect' as const },
+            status: 'pending' as const,
+            warningCodes: [],
+          })),
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setNativeDustCandidatesByFrameId((current) => ({ ...current, [frame.frameId]: [] }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveActivePathIndex, frameHealthReport.frames, previewReadyForWorkspace, selectedImagePath]);
   const dustScratchReviewReport = useMemo(
-    () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewReadyForWorkspace),
-    [frameHealthReport, previewReadyForWorkspace],
+    () =>
+      buildNegativeLabDustScratchReviewReport(
+        frameHealthReport,
+        previewReadyForWorkspace,
+        {},
+        nativeDustCandidatesByFrameId,
+      ),
+    [frameHealthReport, nativeDustCandidatesByFrameId, previewReadyForWorkspace],
   );
   const dustCandidateFilterCounts = useMemo(() => {
     const counts: Record<NegativeLabDustCandidateFilter, number> = { accepted: 0, all: 0, pending: 0, rejected: 0 };

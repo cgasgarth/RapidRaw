@@ -10,33 +10,27 @@ import { detectNegativeLabLongScratches, type NegativeLabScratchAnalysisInput } 
 
 type NegativeLabDustScratchCandidate = NegativeLabDustScratchReviewReport['frames'][number]['candidates'][number];
 
-const buildCandidateId = (frameId: string, kind: NegativeLabDustScratchCandidate['kind'], index: number): string =>
-  `negative_lab_${kind}_${frameId}_${index}`;
+export type NegativeLabNativeDustCandidate = Pick<
+  NegativeLabDustScratchCandidate,
+  'candidateId' | 'confidence' | 'geometry' | 'polarity' | 'status' | 'supportCount' | 'warningCodes'
+> & {
+  detectorVersion: string;
+};
 
 const buildReviewCandidates = (
-  frameId: string,
+  _frameId: string,
   reviewNeeded: boolean,
   scratchAnalysis: NegativeLabScratchAnalysisInput | undefined,
+  nativeDustCandidates: NegativeLabNativeDustCandidate[] | undefined,
   status: NegativeLabDustScratchCandidate['status'] = 'pending',
 ): NegativeLabDustScratchCandidate[] => {
   if (!reviewNeeded) return [];
 
-  const candidates: NegativeLabDustScratchCandidate[] = [
-    {
-      candidateId: buildCandidateId(frameId, 'dust_spot', 1),
-      confidence: 0.68,
-      geometry: {
-        coordinateSpace: 'normalized_frame',
-        height: 0.055,
-        kind: 'rect',
-        width: 0.055,
-        x: 0.18,
-        y: 0.22,
-      },
-      kind: 'dust_spot',
-      status,
-    },
-  ];
+  const candidates: NegativeLabDustScratchCandidate[] = (nativeDustCandidates ?? []).map((candidate) => ({
+    ...candidate,
+    kind: 'dust_spot',
+    status,
+  }));
   if (scratchAnalysis !== undefined) {
     candidates.push(...detectNegativeLabLongScratches(scratchAnalysis).map((candidate) => ({ ...candidate, status })));
   }
@@ -47,6 +41,7 @@ export const buildNegativeLabDustScratchReviewReport = (
   frameHealthReport: NegativeLabFrameHealthReport,
   previewReady: boolean,
   scratchAnalysisByFrameId: Readonly<Record<string, NegativeLabScratchAnalysisInput | undefined>> = {},
+  nativeDustCandidatesByFrameId: Readonly<Record<string, NegativeLabNativeDustCandidate[] | undefined>> = {},
 ): NegativeLabDustScratchReviewReport => {
   const frames = frameHealthReport.frames.map((frame) => {
     if (!frame.included) {
@@ -75,7 +70,12 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.batchDisposition === 'review' && frame.batchDispositionReason === 'acquisition_review_required') {
       return {
-        candidates: buildReviewCandidates(frame.frameId, true, scratchAnalysisByFrameId[frame.frameId]),
+        candidates: buildReviewCandidates(
+          frame.frameId,
+          true,
+          scratchAnalysisByFrameId[frame.frameId],
+          nativeDustCandidatesByFrameId[frame.frameId],
+        ),
         findingCodes: [
           'acquisition_review_required',
           'candidate_dust_spot',
@@ -105,7 +105,13 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.warningCodes.includes('base_estimate_active_frame_only')) {
       return {
-        candidates: buildReviewCandidates(frame.frameId, true, scratchAnalysisByFrameId[frame.frameId], 'acknowledged'),
+        candidates: buildReviewCandidates(
+          frame.frameId,
+          true,
+          scratchAnalysisByFrameId[frame.frameId],
+          nativeDustCandidatesByFrameId[frame.frameId],
+          'acknowledged',
+        ),
         findingCodes: [
           'base_fog_only_review',
           'candidate_dust_spot',
