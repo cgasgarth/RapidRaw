@@ -274,22 +274,34 @@ static TRANSPORT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     false
 );
 
+/// Single ownership table for executable graph nodes.
+///
+/// The graph compiler and backend runtimes resolve descriptors through this
+/// table instead of maintaining separate CPU/WGPU ordering lists.  Fused
+/// implementations may share an implementation id, but each graph kind has
+/// exactly one descriptor and therefore one inspectable owner.
+pub const EDIT_NODE_RUNTIME_REGISTRY: &[&EditNodeRuntimeDescriptor] = &[
+    &CAMERA_INPUT_RUNTIME,
+    &GEOMETRY_RUNTIME,
+    &PRE_GPU_DETAIL_RUNTIME,
+    &SCENE_GLOBAL_RUNTIME,
+    &SCENE_CURVE_RUNTIME,
+    &FILM_EMULATION_RUNTIME,
+    &LOCAL_SCENE_RUNTIME,
+    &VIEW_RUNTIME,
+    &DISPLAY_RUNTIME,
+    &OUTPUT_CURVE_RUNTIME,
+    &LEGACY_RUNTIME,
+    &CLIPPING_RUNTIME,
+    &TRANSPORT_RUNTIME,
+];
+
 pub fn runtime_descriptor(kind: EditNodeKind) -> &'static EditNodeRuntimeDescriptor {
-    match kind {
-        EditNodeKind::CameraInputBoundary => &CAMERA_INPUT_RUNTIME,
-        EditNodeKind::GeometryRetouch => &GEOMETRY_RUNTIME,
-        EditNodeKind::PreGpuSpatialDetail => &PRE_GPU_DETAIL_RUNTIME,
-        EditNodeKind::SceneGlobalColorTone => &SCENE_GLOBAL_RUNTIME,
-        EditNodeKind::SceneCurve => &SCENE_CURVE_RUNTIME,
-        EditNodeKind::FilmEmulation => &FILM_EMULATION_RUNTIME,
-        EditNodeKind::LocalSceneComposition => &LOCAL_SCENE_RUNTIME,
-        EditNodeKind::SceneToViewTransform => &VIEW_RUNTIME,
-        EditNodeKind::DisplayCreative => &DISPLAY_RUNTIME,
-        EditNodeKind::OutputCurve => &OUTPUT_CURVE_RUNTIME,
-        EditNodeKind::LegacyGpuSceneViewPass => &LEGACY_RUNTIME,
-        EditNodeKind::ClippingOverlay => &CLIPPING_RUNTIME,
-        EditNodeKind::RenderTransport => &TRANSPORT_RUNTIME,
-    }
+    EDIT_NODE_RUNTIME_REGISTRY
+        .iter()
+        .copied()
+        .find(|descriptor| descriptor.kind == kind)
+        .expect("every EditNodeKind must have one runtime descriptor")
 }
 
 pub const ALL_EDIT_NODE_KINDS: &[EditNodeKind] = &[
@@ -307,6 +319,27 @@ pub const ALL_EDIT_NODE_KINDS: &[EditNodeKind] = &[
     EditNodeKind::ClippingOverlay,
     EditNodeKind::RenderTransport,
 ];
+
+fn validate_runtime_registry(registry: &[&EditNodeRuntimeDescriptor]) -> Result<(), &'static str> {
+    if registry.is_empty() {
+        return Err("edit_graph.empty_runtime_registry");
+    }
+    for (index, descriptor) in registry.iter().enumerate() {
+        if descriptor.schema_version == 0 || descriptor.implementation_version == 0 {
+            return Err("edit_graph.invalid_runtime_descriptor_version");
+        }
+        if descriptor.cpu_implementation.is_none() && descriptor.wgpu_implementation.is_none() {
+            return Err("edit_graph.missing_runtime_backend_owner");
+        }
+        if registry[..index]
+            .iter()
+            .any(|previous| previous.kind == descriptor.kind)
+        {
+            return Err("edit_graph.duplicate_runtime_descriptor");
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NodeDependencies {
@@ -1219,6 +1252,8 @@ impl CompiledEditGraph {
     }
 
     pub fn validate_contract(&self) -> Result<(), &'static str> {
+        debug_assert!(validate_runtime_registry(EDIT_NODE_RUNTIME_REGISTRY).is_ok());
+        debug_assert_eq!(EDIT_NODE_RUNTIME_REGISTRY.len(), ALL_EDIT_NODE_KINDS.len());
         debug_assert!(
             ALL_EDIT_NODE_KINDS
                 .iter()
@@ -1589,6 +1624,8 @@ mod runtime_registry_tests {
 
     #[test]
     fn every_edit_node_kind_has_one_stable_runtime_descriptor_and_backend_owner() {
+        validate_runtime_registry(EDIT_NODE_RUNTIME_REGISTRY).expect("runtime registry is valid");
+        assert_eq!(EDIT_NODE_RUNTIME_REGISTRY.len(), ALL_EDIT_NODE_KINDS.len());
         let mut stable_ids = std::collections::HashSet::new();
         for kind in ALL_EDIT_NODE_KINDS {
             let descriptor = runtime_descriptor(*kind);
@@ -1607,6 +1644,24 @@ mod runtime_registry_tests {
             );
         }
         assert_eq!(stable_ids.len(), ALL_EDIT_NODE_KINDS.len());
+    }
+
+    #[test]
+    fn registry_validation_allows_a_test_node_without_backend_ordering_changes() {
+        static TEST_NODE: EditNodeRuntimeDescriptor = EditNodeRuntimeDescriptor {
+            kind: EditNodeKind::RenderTransport,
+            schema_version: 99,
+            implementation_version: 1,
+            cpu_implementation: Some("test_only_cpu_node_v1"),
+            wgpu_implementation: None,
+            fused_phase: None,
+            resource_requirements: &[],
+            supports_local: false,
+            legacy_compatibility: false,
+        };
+        let test_registry = [&TEST_NODE];
+        validate_runtime_registry(&test_registry)
+            .expect("test node can be registered in isolation");
     }
 
     #[test]
