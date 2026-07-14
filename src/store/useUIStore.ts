@@ -30,6 +30,7 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../schemas/computational-merge/superResolutionUiSchemas';
+import type { DenoiseOperationHandle } from '../schemas/denoiseWorkflowSchemas';
 import type {
   CompactEditorDrawerState,
   EditorWorkspaceCompareMode,
@@ -318,6 +319,7 @@ export interface FocusRetouchToolState {
 }
 
 export interface DenoiseModalState {
+  activeOperation: DenoiseOperationHandle | null;
   isOpen: boolean;
   isProcessing: boolean;
   previewBase64: string | null;
@@ -625,6 +627,7 @@ export const useUIStore = create<UIState>((set, get) => {
     negativeModalState: { isOpen: false, operationEpoch: 0, session: null, targetPaths: [] },
     negativeLabWorkspaceLayout: readNegativeLabWorkspaceLayout(),
     denoiseModalState: {
+      activeOperation: null,
       isOpen: false,
       isProcessing: false,
       previewBase64: null,

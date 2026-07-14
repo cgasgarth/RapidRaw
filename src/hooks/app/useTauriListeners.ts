@@ -4,7 +4,9 @@ import { toast } from 'react-toastify';
 import type { ChannelConfig } from '../../components/adjustments/Curves';
 import type { AnalyticsResourceDescriptor, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
+import { isCurrentDenoiseEvent } from '../../schemas/denoiseWorkflowSchemas';
 import {
+  denoiseErrorPayloadSchema,
   gamutWarningOverlayPayloadSchema,
   nativeQaOpenFixturePayloadSchema,
   nativeQaResetPayloadSchema,
@@ -12,6 +14,7 @@ import {
   parseCullingProgressPayload,
   parseCullingSuggestionsPayload,
   parseDenoiseCompletePayload,
+  parseDenoiseProgressPayload,
   parseExportReceiptPayload,
   parseHdrCompletePayload,
   parseImportProgressPayload,
@@ -559,37 +562,61 @@ export function useTauriListeners({
           });
       }),
       listen<unknown>(DENOISE_PROGRESS_EVENT, (event) => {
-        const payload = parseStringPayload(event.payload);
-        if (isEffectActive)
-          useUIStore.getState().setUI((state) => ({
-            denoiseModalState: { ...state.denoiseModalState, progressMessage: payload },
-          }));
+        if (!isEffectActive) return;
+        const current = useUIStore.getState().denoiseModalState;
+        if (!current.isOpen || !current.isProcessing || current.activeOperation === null) return;
+        const payload = parseDenoiseProgressPayload(event.payload);
+        useUIStore.getState().setUI((state) =>
+          isCurrentDenoiseEvent(state.denoiseModalState, payload.operation)
+            ? {
+                denoiseModalState: {
+                  ...state.denoiseModalState,
+                  progressMessage: payload.message,
+                },
+              }
+            : {},
+        );
       }),
       listen<unknown>(DENOISE_COMPLETE_EVENT, (event) => {
-        if (isEffectActive) {
-          const payload = parseDenoiseCompletePayload(event.payload);
-          useUIStore.getState().setUI((state) => ({
-            denoiseModalState: {
-              ...state.denoiseModalState,
-              isProcessing: false,
-              previewBase64: typeof payload === 'string' ? payload : payload.denoised,
-              originalBase64: typeof payload === 'string' ? null : (payload.original ?? null),
-              progressMessage: null,
-            },
-          }));
-        }
+        if (!isEffectActive) return;
+        const current = useUIStore.getState().denoiseModalState;
+        if (!current.isOpen || !current.isProcessing || current.activeOperation === null) return;
+        const payload = parseDenoiseCompletePayload(event.payload);
+        useUIStore.getState().setUI((state) =>
+          isCurrentDenoiseEvent(state.denoiseModalState, payload.operation)
+            ? {
+                denoiseModalState: {
+                  ...state.denoiseModalState,
+                  activeOperation: null,
+                  isProcessing: false,
+                  previewBase64: payload.denoised,
+                  originalBase64: payload.original ?? null,
+                  progressMessage: null,
+                },
+              }
+            : {},
+        );
       }),
       listen<unknown>(DENOISE_ERROR_EVENT, (event) => {
-        if (isEffectActive) {
-          useUIStore.getState().setUI((state) => ({
-            denoiseModalState: {
-              ...state.denoiseModalState,
-              isProcessing: false,
-              error: parseStringPayload(event.payload),
-              progressMessage: null,
-            },
-          }));
-        }
+        if (!isEffectActive) return;
+        const current = useUIStore.getState().denoiseModalState;
+        if (!current.isOpen || !current.isProcessing || current.activeOperation === null) return;
+        const parsed = denoiseErrorPayloadSchema.safeParse(event.payload);
+        if (!parsed.success) return;
+        const payload = parsed.data;
+        useUIStore.getState().setUI((state) =>
+          isCurrentDenoiseEvent(state.denoiseModalState, payload.operation)
+            ? {
+                denoiseModalState: {
+                  ...state.denoiseModalState,
+                  activeOperation: null,
+                  isProcessing: false,
+                  error: payload.error,
+                  progressMessage: null,
+                },
+              }
+            : {},
+        );
       }),
       listen<unknown>(WGPU_FRAME_READY_EVENT, (event) => {
         const payload = parseRenderPathPayload(event.payload);

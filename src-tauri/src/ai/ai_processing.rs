@@ -682,15 +682,13 @@ fn restore_scene_range(
     }
 }
 
-pub fn run_ai_denoise(
+pub(crate) fn run_ai_denoise_with_progress(
     rgb_img: &Rgb32FImage,
     intensity: f32,
     session: &Mutex<Session>,
-    app_handle: &tauri::AppHandle,
+    progress: &dyn Fn(String),
 ) -> Result<DynamicImage> {
-    run_ai_denoise_with_progress(rgb_img, intensity, session, &|message| {
-        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, message);
-    })
+    run_ai_denoise_impl(rgb_img, intensity, session, progress)
 }
 
 #[cfg(test)]
@@ -699,10 +697,10 @@ pub fn run_ai_denoise_headless(
     intensity: f32,
     session: &Mutex<Session>,
 ) -> Result<DynamicImage> {
-    run_ai_denoise_with_progress(rgb_img, intensity, session, &|_| {})
+    run_ai_denoise_impl(rgb_img, intensity, session, &|_| {})
 }
 
-fn run_ai_denoise_with_progress(
+fn run_ai_denoise_impl(
     rgb_img: &Rgb32FImage,
     intensity: f32,
     session: &Mutex<Session>,

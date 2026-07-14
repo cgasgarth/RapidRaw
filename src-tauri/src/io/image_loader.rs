@@ -1098,7 +1098,7 @@ pub(crate) async fn load_image_prepared(
     if install_active {
         RenderCaches::new(state).clear_active_image_render_state();
 
-        *state.active_denoise_artifact.lock().unwrap() = None;
+        state.services.denoise.activate_image(&path);
         state.services.hdr.cancel();
         state.services.panorama.reset();
     }

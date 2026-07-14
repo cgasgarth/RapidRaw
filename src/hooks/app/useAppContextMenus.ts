@@ -336,6 +336,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   denoiseModalState: {
+                    activeOperation: null,
                     isOpen: true,
                     isProcessing: false,
                     previewBase64: null,
@@ -792,6 +793,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 setUI({
                   denoiseModalState: {
+                    activeOperation: null,
                     isOpen: true,
                     isProcessing: false,
                     previewBase64: null,

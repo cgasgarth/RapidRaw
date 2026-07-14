@@ -5,6 +5,7 @@ pub(crate) mod denoise_api;
 pub(crate) mod denoise_artifact;
 pub mod denoise_cpu_reference;
 pub(crate) mod denoise_render;
+pub(crate) mod denoise_service;
 pub(crate) mod denoising;
 #[cfg(test)]
 pub(crate) mod grading_render;
