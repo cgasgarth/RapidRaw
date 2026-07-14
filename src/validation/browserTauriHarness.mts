@@ -1,3 +1,4 @@
+import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
 
@@ -926,6 +927,8 @@ interface HarnessApplyPreviewRequest {
 const normalizeHarnessApplyPreviewRequest = (args: Record<string, unknown> | undefined): HarnessApplyPreviewRequest => {
   const candidate = args?.['request'];
   const request = typeof candidate === 'object' && candidate !== null ? (candidate as Record<string, unknown>) : {};
+  editDocumentV2Schema.parse(request['editDocumentV2']);
+  if ('jsAdjustments' in request) throw new Error('Preview request used the retired flat adjustments payload.');
   const roiCandidate = request['roi'];
   const roi =
     Array.isArray(roiCandidate) &&

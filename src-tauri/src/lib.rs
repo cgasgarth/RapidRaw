@@ -615,9 +615,9 @@ pub(crate) fn validate_expected_preview_image(
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ApplyAdjustmentsRequest {
-    js_adjustments: serde_json::Value,
+    edit_document_v2: adjustments::edit_document_v2::EditDocumentV2,
     expected_image_path: String,
     is_interactive: bool,
     target_resolution: Option<u32>,
@@ -643,12 +643,13 @@ async fn apply_adjustments(
         .path
         .clone();
     validate_expected_preview_image(&loaded_image_path, &request.expected_image_path)?;
+    let render_adjustments = request.edit_document_v2.into_render_adjustments()?;
 
     {
         let scheduler_guard = state.preview_scheduler.lock().unwrap();
         if let Some(scheduler) = &*scheduler_guard {
             let job = PreviewJob {
-                adjustments: Arc::new(request.js_adjustments),
+                adjustments: Arc::new(render_adjustments),
                 expected_image_path: request.expected_image_path,
                 is_interactive: request.is_interactive,
                 target_resolution: request.target_resolution,
