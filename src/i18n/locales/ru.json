@@ -180,6 +180,14 @@
         "reds": "Красные",
         "yellows": "Желтые"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "pickFromImage": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "Внешний вид",
       "preset": "Предустановка",
       "previewMode": "",

@@ -622,6 +622,158 @@ fn is_valid_tone_equalizer(value: &JsonValue) -> bool {
         && number_in_range(object.get("smoothingRadius"), 4.0, 64.0)
 }
 
+fn non_empty_string(value: Option<&JsonValue>) -> bool {
+    value
+        .and_then(JsonValue::as_str)
+        .is_some_and(|value| !value.is_empty())
+}
+
+fn has_only_fields(object: &Map<String, JsonValue>, fields: &[&str]) -> bool {
+    object.len() == fields.len() && object.keys().all(|key| fields.contains(&key.as_str()))
+}
+
+fn is_valid_perceptual_color(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    has_only_fields(object, &["chroma", "hueDegrees", "lightness"])
+        && number_in_range(object.get("chroma"), 0.0, 2.0)
+        && number_in_range(object.get("hueDegrees"), 0.0, 360.0)
+        && number_in_range(object.get("lightness"), -1.0, 4.0)
+}
+
+fn is_valid_point_color_sample(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    has_only_fields(
+        object,
+        &[
+            "confidence",
+            "graphRevision",
+            "id",
+            "sampleRadiusPx",
+            "sourceColor",
+            "sourceSceneRevision",
+        ],
+    ) && number_in_range(object.get("confidence"), 0.0, 1.0)
+        && non_empty_string(object.get("graphRevision"))
+        && non_empty_string(object.get("id"))
+        && number_in_range(object.get("sampleRadiusPx"), 1.0, 128.0)
+        && object
+            .get("sourceColor")
+            .is_some_and(is_valid_perceptual_color)
+        && non_empty_string(object.get("sourceSceneRevision"))
+}
+
+fn is_valid_point_color_adjustment(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    let valid_samples = object
+        .get("samples")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|samples| {
+            (1..=8).contains(&samples.len()) && samples.iter().all(is_valid_point_color_sample)
+        });
+    has_only_fields(
+        object,
+        &[
+            "chromaRadius",
+            "chromaShift",
+            "enabled",
+            "feather",
+            "hueRadiusDegrees",
+            "hueShiftDegrees",
+            "id",
+            "lightnessRadius",
+            "lightnessShift",
+            "name",
+            "opacity",
+            "samples",
+            "saturationShift",
+            "variance",
+        ],
+    ) && number_in_range(object.get("chromaRadius"), 0.001, 1.0)
+        && number_in_range(object.get("chromaShift"), -1.0, 1.0)
+        && object.get("enabled").is_some_and(JsonValue::is_boolean)
+        && number_in_range(object.get("feather"), 0.0, 1.0)
+        && number_in_range(object.get("hueRadiusDegrees"), 0.1, 180.0)
+        && number_in_range(object.get("hueShiftDegrees"), -180.0, 180.0)
+        && non_empty_string(object.get("id"))
+        && number_in_range(object.get("lightnessRadius"), 0.001, 2.0)
+        && number_in_range(object.get("lightnessShift"), -1.0, 1.0)
+        && object
+            .get("name")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|name| !name.is_empty() && name.len() <= 80)
+        && number_in_range(object.get("opacity"), 0.0, 1.0)
+        && valid_samples
+        && number_in_range(object.get("saturationShift"), -1.0, 4.0)
+        && number_in_range(object.get("variance"), 0.25, 4.0)
+}
+
+fn is_valid_point_color(value: &JsonValue) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    let valid_points = object
+        .get("points")
+        .and_then(JsonValue::as_array)
+        .is_some_and(|points| {
+            points.len() <= 16 && points.iter().all(is_valid_point_color_adjustment)
+        });
+    let valid_skin = object
+        .get("skinUniformity")
+        .and_then(JsonValue::as_object)
+        .is_some_and(|skin| {
+            has_only_fields(
+                skin,
+                &[
+                    "chromaUniformity",
+                    "enabled",
+                    "hueUniformity",
+                    "lightnessUniformity",
+                    "preserveExtremes",
+                    "range",
+                    "target",
+                ],
+            ) && number_in_range(skin.get("chromaUniformity"), 0.0, 1.0)
+                && skin.get("enabled").is_some_and(JsonValue::is_boolean)
+                && number_in_range(skin.get("hueUniformity"), 0.0, 1.0)
+                && number_in_range(skin.get("lightnessUniformity"), 0.0, 1.0)
+                && number_in_range(skin.get("preserveExtremes"), 0.0, 1.0)
+                && skin
+                    .get("range")
+                    .is_some_and(|range| range.is_null() || is_valid_point_color_adjustment(range))
+                && skin
+                    .get("target")
+                    .is_some_and(|target| target.is_null() || is_valid_perceptual_color(target))
+        });
+    has_only_fields(
+        object,
+        &[
+            "enabled",
+            "points",
+            "process",
+            "selectedPointId",
+            "skinUniformity",
+            "visualizeMode",
+        ],
+    ) && object.get("enabled").is_some_and(JsonValue::is_boolean)
+        && valid_points
+        && object.get("process").and_then(JsonValue::as_str)
+            == Some("rawengine.point-color.oklab-ap1.v1")
+        && object
+            .get("selectedPointId")
+            .is_some_and(|selected| selected.is_null() || non_empty_string(Some(selected)))
+        && valid_skin
+        && object
+            .get("visualizeMode")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|mode| matches!(mode, "image" | "range" | "solo"))
+}
+
 fn validate_adjustments(
     adjustments: &mut JsonValue,
     extensions: &mut Map<String, JsonValue>,
@@ -682,6 +834,7 @@ fn validate_adjustments(
         "crop",
         "curves",
         "pointCurves",
+        "pointColor",
         "parametricCurve",
         "curveMode",
         "rawProcessingModeOverride",
@@ -844,6 +997,10 @@ fn validate_adjustments(
             object
                 .get("toneEqualizer")
                 .is_none_or(is_valid_tone_equalizer),
+        ),
+        (
+            "pointColor",
+            object.get("pointColor").is_none_or(is_valid_point_color),
         ),
         (
             "viewTransform",
@@ -2583,6 +2740,63 @@ mod tests {
         bytes
     }
 
+    fn point_color_fixture() -> JsonValue {
+        let sample = serde_json::json!({
+            "confidence": 0.95,
+            "graphRevision": "graph:1",
+            "id": "sample-1",
+            "sampleRadiusPx": 2,
+            "sourceColor": { "chroma": 0.12, "hueDegrees": 114, "lightness": 0.64 },
+            "sourceSceneRevision": "source:1"
+        });
+        let point = serde_json::json!({
+            "chromaRadius": 0.08,
+            "chromaShift": 0,
+            "enabled": true,
+            "feather": 0.4,
+            "hueRadiusDegrees": 25,
+            "hueShiftDegrees": 0,
+            "id": "point-1",
+            "lightnessRadius": 0.2,
+            "lightnessShift": 0,
+            "name": "Point 1",
+            "opacity": 1,
+            "samples": [sample],
+            "saturationShift": 0,
+            "variance": 1
+        });
+        serde_json::json!({
+            "enabled": true,
+            "points": [point],
+            "process": "rawengine.point-color.oklab-ap1.v1",
+            "selectedPointId": "point-1",
+            "skinUniformity": {
+                "chromaUniformity": 0,
+                "enabled": false,
+                "hueUniformity": 0,
+                "lightnessUniformity": 0,
+                "preserveExtremes": 0.5,
+                "range": point,
+                "target": { "chroma": 0.12, "hueDegrees": 114, "lightness": 0.64 }
+            },
+            "visualizeMode": "image"
+        })
+    }
+
+    #[test]
+    fn point_color_persistence_contract_accepts_current_plan_and_rejects_drift() {
+        let valid = point_color_fixture();
+        assert!(is_valid_point_color(&valid));
+
+        let mut invalid = valid.clone();
+        invalid["points"][0]["samples"][0]["confidence"] = JsonValue::from(2);
+        assert!(!is_valid_point_color(&invalid));
+
+        let mut unknown = valid;
+        unknown["unversionedField"] = JsonValue::Bool(true);
+        assert!(!is_valid_point_color(&unknown));
+    }
+
     #[test]
     fn legacy_recovery_is_byte_preserving_and_idempotent() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
@@ -2834,8 +3048,14 @@ mod tests {
                 "rawEngineEditGraphVersion": 1,
                 "toneMapper": "rapidView",
                 "viewTransform": {
+                    "chromaCompression": 0.25,
                     "contrast": 1.15,
-                    "middleGrey": 0.18
+                    "latitude": 0.55,
+                    "middleGrey": 0.18,
+                    "shoulder": 0.5,
+                    "sourceBlackEv": -10.0,
+                    "sourceWhiteEv": 6.5,
+                    "toe": 0.35
                 },
                 "whiteBalanceMigration": "native_v1",
                 "whiteBalanceTechnical": { "mode": "as_shot" }

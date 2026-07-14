@@ -33,6 +33,7 @@ import { ColorMixerControls } from './color/ColorMixerControls';
 import { ColorProfileToneControls } from './color/ColorProfileToneControls';
 import { ColorProofingDiagnostics } from './color/ColorProofingDiagnostics';
 import { ColorQuickControls } from './color/ColorQuickControls';
+import { PointColorControls } from './color/PointColorControls';
 import type { AdjustmentUpdate } from './color/types';
 
 interface ColorPanelProps {
@@ -99,19 +100,6 @@ const rememberSessionColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
       // Local state still carries the selection when browser storage is unavailable.
     }
   }
-};
-
-const skinTonePreviewHsl = (settings: Adjustments['skinToneUniformity']) => {
-  const hueDelta = Math.min(
-    settings.maxHueShiftDegrees,
-    Math.max(-settings.maxHueShiftDegrees, settings.targetHueDegrees - 18),
-  );
-
-  return {
-    hue: (hueDelta * settings.hueUniformity).toFixed(1),
-    luminance: ((settings.targetLuminance - 0.5) * 100 * settings.luminanceUniformity).toFixed(1),
-    saturation: ((settings.targetSaturation - 0.45) * 100 * settings.saturationUniformity).toFixed(1),
-  };
 };
 
 export default function ColorPanel({
@@ -249,18 +237,8 @@ export default function ColorPanel({
   };
 
   const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
-    const nextPreview = skinTonePreviewHsl(nextSettings);
     setAdjustments((prev) => ({
       ...prev,
-      hsl: {
-        ...prev.hsl,
-        oranges: {
-          ...prev.hsl.oranges,
-          hue: nextSettings.enabled ? Number(nextPreview.hue) : 0,
-          luminance: nextSettings.enabled ? Number(nextPreview.luminance) : 0,
-          saturation: nextSettings.enabled ? Number(nextPreview.saturation) : 0,
-        },
-      },
       skinToneUniformity: nextSettings,
     }));
   };
@@ -318,6 +296,12 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.mixer'),
         panel: (
           <div className="space-y-1">
+            <PointColorControls
+              adjustments={adjustments}
+              appSettings={appSettings}
+              onDragStateChange={onDragStateChange}
+              setAdjustments={setAdjustments}
+            />
             <ColorMixerControls
               activeChannelMixerOutput={activeChannelMixerOutput}
               activeColor={activeColor}

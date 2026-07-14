@@ -65,6 +65,7 @@ export enum Invokes {
   GenerateOriginalTransformedPreview = 'generate_original_transformed_preview',
   SampleViewerPixel = 'sample_viewer_pixel',
   SampleToneEqualizerPicker = 'sample_tone_equalizer_picker',
+  SamplePointColorPicker = 'sample_point_color_picker',
   GenerateExportSoftProofPreview = 'generate_export_soft_proof_preview',
   ResolveExportSoftProofTransformMetadata = 'resolve_export_soft_proof_transform_metadata',
   GeneratePreviewForPath = 'generate_preview_for_path',

@@ -1100,6 +1100,12 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         js_adjustments,
         mask_bitmaps,
     );
+    let mut gpu_adjustments = render_inputs.adjustments;
+    crate::render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
+    crate::render_pipeline::suppress_legacy_global_detail(
+        &mut gpu_adjustments,
+        detail_stage.owns_legacy_global_detail,
+    );
 
     process_and_get_unclamped_dynamic_image(
         context,
@@ -1112,7 +1118,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
             render_inputs.pre_gpu_revision,
         ),
         RenderRequest {
-            adjustments: render_inputs.adjustments,
+            adjustments: gpu_adjustments,
             mask_bitmaps,
             lut: render_inputs.lut,
             roi: None,

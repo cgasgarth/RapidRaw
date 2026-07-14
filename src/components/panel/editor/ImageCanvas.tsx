@@ -21,6 +21,7 @@ import type {
   RetouchCloneSource,
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
+import { isPointColorPickerResultCurrent, pointColorPickerResponseSchema } from '../../../utils/color/pointColorPicker';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -378,6 +379,7 @@ const ImageCanvas = memo(
     const focusRetouchToolState = useUIStore((state) => state.focusRetouchToolState);
     const setUI = useUIStore((state) => state.setUI);
     const toneEqualizerPickerActive = useUIStore((state) => state.toneEqualizerPickerActive);
+    const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
     const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
@@ -857,6 +859,7 @@ const ImageCanvas = memo(
       Boolean(isRotationActive) ||
       isWbPickerActive ||
       toneEqualizerPickerActive ||
+      pointColorPickerActive ||
       effectiveMaskInteractionActive ||
       isToolActive ||
       (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
@@ -1146,6 +1149,96 @@ const ImageCanvas = memo(
         setUI,
         viewerSampleGraphRevision,
       ],
+    );
+
+    const handlePointColorPickerPointerDown = useCallback(
+      async (event: React.PointerEvent<HTMLDivElement>) => {
+        const surface = event.currentTarget;
+        const rect = surface.getBoundingClientRect();
+        const mapped = mapViewerPointToImage({
+          clientPoint: { x: event.clientX, y: event.clientY },
+          displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
+          surfaceRect: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            layoutWidth: surface.offsetWidth,
+            layoutHeight: surface.offsetHeight,
+          },
+        });
+        if (!mapped) return;
+        const graphRevision = viewerSampleGraphRevision;
+        try {
+          const result = await invokeWithSchema(
+            Invokes.SamplePointColorPicker,
+            {
+              request: {
+                graphRevision,
+                jsAdjustments: adjustments,
+                normalizedImagePoint: mapped.normalizedImagePoint,
+                sourceIdentity: selectedImage.path,
+              },
+            },
+            pointColorPickerResponseSchema,
+          );
+          if (
+            !isPointColorPickerResultCurrent(result, {
+              active: useUIStore.getState().pointColorPickerActive,
+              graphRevision: viewerSampleGraphRevision,
+              sourceIdentity: selectedImage.path,
+            })
+          )
+            return;
+          const pointId = crypto.randomUUID();
+          const point = {
+            chromaRadius: 0.08,
+            chromaShift: 0,
+            enabled: true,
+            feather: 0.4,
+            hueRadiusDegrees: 25,
+            hueShiftDegrees: 0,
+            id: pointId,
+            lightnessRadius: 0.2,
+            lightnessShift: 0,
+            name: `Point ${adjustments.pointColor.points.length + 1}`,
+            opacity: 1,
+            samples: [
+              {
+                confidence: result.confidence,
+                graphRevision: result.graphFingerprint,
+                id: crypto.randomUUID(),
+                sampleRadiusPx: result.sampleRadiusPx,
+                sourceColor: { chroma: result.chroma, hueDegrees: result.hueDegrees, lightness: result.lightness },
+                sourceSceneRevision: result.sourceFingerprint,
+              },
+            ],
+            saturationShift: 0,
+            variance: 1,
+          } satisfies Adjustments['pointColor']['points'][number];
+          setAdjustments((previous) => ({
+            ...previous,
+            pointColor: {
+              ...previous.pointColor,
+              enabled: true,
+              points: [...previous.pointColor.points, point],
+              selectedPointId: pointId,
+            },
+          }));
+          setUI({
+            pointColorPickerActive: false,
+            pointColorPickerReceipt: {
+              confidence: result.confidence,
+              graphRevision: result.graphRevision,
+              sourceIdentity: result.sourceIdentity,
+              sourceFingerprint: result.sourceFingerprint,
+            },
+          });
+        } catch {
+          setUI({ pointColorPickerReceipt: null });
+        }
+      },
+      [adjustments, overlayGeometry, selectedImage.path, setAdjustments, setUI, viewerSampleGraphRevision],
     );
 
     const finishCanvasToolInteraction = useCallback((_reason: string) => {
@@ -2453,6 +2546,11 @@ const ImageCanvas = memo(
         data-testid="image-canvas"
         onPointerLeave={handleViewerSamplerPointerLeave}
         onPointerDown={(event) => {
+          if (pointColorPickerActive) {
+            event.preventDefault();
+            void handlePointColorPickerPointerDown(event);
+            return;
+          }
           if (toneEqualizerPickerActive) {
             event.preventDefault();
             void handleToneEqualizerPickerPointerDown(event);
@@ -2495,7 +2593,7 @@ const ImageCanvas = memo(
         style={{
           width: '100%',
           height: '100%',
-          cursor: toneEqualizerPickerActive ? 'crosshair' : effectiveCursor,
+          cursor: toneEqualizerPickerActive || pointColorPickerActive ? 'crosshair' : effectiveCursor,
           pointerEvents: 'auto',
         }}
       >

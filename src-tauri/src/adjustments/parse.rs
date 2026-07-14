@@ -1,7 +1,8 @@
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
-    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point, ToneEqualizerGpuSettings,
+    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MAX_POINT_COLOR_POINTS, MaskAdjustments, Point,
+    PointColorGpuPoint, PointColorGpuSettings, ToneEqualizerGpuSettings,
 };
 use crate::adjustments::scales::SCALES;
 use crate::color::view_transform::{
@@ -293,6 +294,104 @@ fn parse_tone_equalizer(value: &JsonValue) -> ToneEqualizerGpuSettings {
                 .min(4) as f32,
         ],
     }
+}
+
+fn parse_point_color(value: &JsonValue) -> PointColorGpuSettings {
+    if !section_is_visible(value, "color") {
+        return PointColorGpuSettings::default();
+    }
+    let Some(plan) = value
+        .get("pointColor")
+        .filter(|plan| plan["enabled"].as_bool() == Some(true))
+    else {
+        return PointColorGpuSettings::default();
+    };
+    let mut output = PointColorGpuSettings::default();
+    let Some(points) = plan["points"].as_array() else {
+        return output;
+    };
+    for (index, point) in points.iter().take(MAX_POINT_COLOR_POINTS).enumerate() {
+        let mut packed = PointColorGpuPoint::default();
+        if let Some(samples) = point["samples"].as_array() {
+            for (sample_index, sample) in samples.iter().take(4).enumerate() {
+                let color = &sample["sourceColor"];
+                packed.samples[sample_index] = [
+                    color["lightness"].as_f64().unwrap_or(0.0) as f32,
+                    color["chroma"].as_f64().unwrap_or(0.0) as f32,
+                    color["hueDegrees"].as_f64().unwrap_or(0.0) as f32,
+                    sample["confidence"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0) as f32,
+                ];
+            }
+            packed.control[2] = samples.len().min(4) as f32;
+        }
+        packed.range = [
+            point["hueRadiusDegrees"].as_f64().unwrap_or(25.0) as f32,
+            point["chromaRadius"].as_f64().unwrap_or(0.08) as f32,
+            point["lightnessRadius"].as_f64().unwrap_or(0.2) as f32,
+            point["variance"].as_f64().unwrap_or(1.0) as f32,
+        ];
+        packed.edit = [
+            point["feather"].as_f64().unwrap_or(0.4) as f32,
+            point["hueShiftDegrees"].as_f64().unwrap_or(0.0) as f32,
+            point["chromaShift"].as_f64().unwrap_or(0.0) as f32,
+            point["lightnessShift"].as_f64().unwrap_or(0.0) as f32,
+        ];
+        packed.control[0] = point["saturationShift"].as_f64().unwrap_or(0.0) as f32;
+        packed.control[1] = point["opacity"].as_f64().unwrap_or(1.0).clamp(0.0, 1.0) as f32;
+        packed.control[3] = point["enabled"].as_bool().unwrap_or(false) as u8 as f32;
+        output.points[index] = packed;
+    }
+    output.control = [
+        points.len().min(MAX_POINT_COLOR_POINTS) as u32,
+        match plan["visualizeMode"].as_str() {
+            Some("range") => 1,
+            Some("solo") => 2,
+            _ => 0,
+        },
+        1,
+        0,
+    ];
+    let skin = &plan["skinUniformity"];
+    if skin["enabled"].as_bool() == Some(true)
+        && let (Some(range), Some(target)) = (skin.get("range"), skin.get("target"))
+    {
+        let mut packed = PointColorGpuPoint::default();
+        if let Some(samples) = range["samples"].as_array() {
+            for (sample_index, sample) in samples.iter().take(4).enumerate() {
+                let color = &sample["sourceColor"];
+                packed.samples[sample_index] = [
+                    color["lightness"].as_f64().unwrap_or(0.0) as f32,
+                    color["chroma"].as_f64().unwrap_or(0.0) as f32,
+                    color["hueDegrees"].as_f64().unwrap_or(0.0) as f32,
+                    sample["confidence"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0) as f32,
+                ];
+            }
+            packed.control[2] = samples.len().min(4) as f32;
+        }
+        packed.range = [
+            range["hueRadiusDegrees"].as_f64().unwrap_or(25.0) as f32,
+            range["chromaRadius"].as_f64().unwrap_or(0.08) as f32,
+            range["lightnessRadius"].as_f64().unwrap_or(0.2) as f32,
+            range["variance"].as_f64().unwrap_or(1.0) as f32,
+        ];
+        packed.edit[0] = range["feather"].as_f64().unwrap_or(0.4) as f32;
+        packed.control[1] = range["opacity"].as_f64().unwrap_or(1.0) as f32;
+        packed.control[3] = 1.0;
+        output.skin_range = packed;
+        output.skin_target = [
+            target["lightness"].as_f64().unwrap_or(0.0) as f32,
+            target["chroma"].as_f64().unwrap_or(0.0) as f32,
+            target["hueDegrees"].as_f64().unwrap_or(0.0) as f32,
+            1.0,
+        ];
+        output.skin_control = [
+            skin["hueUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["chromaUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["lightnessUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["preserveExtremes"].as_f64().unwrap_or(0.5) as f32,
+        ];
+    }
+    output
 }
 
 fn curve_points(
@@ -679,6 +778,7 @@ fn get_global_adjustments_from_json(
             Some(15.0),
         ),
         tone_equalizer: parse_tone_equalizer(js_adjustments),
+        point_color: parse_point_color(js_adjustments),
         scene_curve_knots: [Default::default(); 32],
         scene_curve_parameters: Default::default(),
         output_curve_knots: [Default::default(); 32],
@@ -800,6 +900,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         _pad_end6: 0.0,
         _pad_end7: 0.0,
         tone_equalizer: parse_tone_equalizer(adj),
+        point_color: parse_point_color(adj),
     }
 }
 
@@ -1086,5 +1187,52 @@ mod tests {
         assert_eq!(parsed.bands2, [0.0, 8.0, 0.0, 0.0]);
         assert_eq!(parsed.params0, [1.0, -8.0, 24.0, 1.0]);
         assert_eq!(parsed.params1, [0.0, 64.0, -4.0, 4.0]);
+    }
+
+    #[test]
+    fn point_color_packs_identically_for_global_and_local_execution() {
+        let plan = json!({
+            "enabled": true,
+            "process": "rawengine.point-color.oklab-ap1.v1",
+            "selectedPointId": "skin",
+            "visualizeMode": "range",
+            "skinUniformity": { "enabled": false },
+            "points": [{
+                "id": "skin", "name": "Skin", "enabled": true, "opacity": 0.8,
+                "hueRadiusDegrees": 28, "chromaRadius": 0.09, "lightnessRadius": 0.22,
+                "variance": 1.1, "feather": 0.45, "hueShiftDegrees": 5,
+                "chromaShift": 0.02, "saturationShift": -0.1, "lightnessShift": 0.03,
+                "samples": [{
+                    "id": "sample", "confidence": 0.9, "sampleRadiusPx": 5,
+                    "sourceSceneRevision": "scene", "graphRevision": "graph",
+                    "sourceColor": { "lightness": 0.61, "chroma": 0.13, "hueDegrees": 32 }
+                }]
+            }]
+        });
+        let parsed = get_all_adjustments_from_json(
+            &json!({
+                "pointColor": plan,
+                "masks": [{
+                    "id": "local", "name": "Local", "visible": true, "invert": false,
+                    "blendMode": "normal", "opacity": 100, "adjustments": { "pointColor": plan },
+                    "subMasks": []
+                }]
+            }),
+            true,
+            None,
+        );
+        assert_eq!(parsed.global.point_color.control, [1, 1, 1, 0]);
+        assert_eq!(
+            parsed.global.point_color.points[0].samples[0],
+            [0.61, 0.13, 32.0, 0.9]
+        );
+        assert_eq!(
+            parsed.mask_adjustments[0].point_color.control,
+            parsed.global.point_color.control
+        );
+        assert_eq!(
+            parsed.mask_adjustments[0].point_color.points[0].edit,
+            parsed.global.point_color.points[0].edit
+        );
     }
 }

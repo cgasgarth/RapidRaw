@@ -8,9 +8,10 @@ use image::{DynamicImage, ImageBuffer, Luma, Rgba};
 
 use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
-    ToneEqualizerGpuSettings,
+    PointColorGpuSettings, ToneEqualizerGpuSettings,
 };
 use crate::color::dehaze::prepare_cpu_dehaze;
+use crate::color::point_color::apply_gpu_plan_ap1;
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
 };
@@ -57,6 +58,7 @@ struct EffectiveAdjustments {
     halation: f32,
     flare: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
+    point_color: PointColorGpuSettings,
     hsl: [HslColor; 8],
 }
 
@@ -323,6 +325,15 @@ pub(crate) fn execute_cpu_edit_graph(
         }
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
+        color = Vec3::from_array(apply_gpu_plan_ap1(color.to_array(), &effective.point_color));
+        for (mask_index, mask) in mask_bitmaps.iter().take(active_masks.len()).enumerate() {
+            let influence = f32::from(mask.get_pixel(x, y).0[0]) / 255.0;
+            if influence <= 0.001 {
+                continue;
+            }
+            let local = apply_gpu_plan_ap1(color.to_array(), &active_masks[mask_index].point_color);
+            color = color.lerp(Vec3::from_array(local), influence);
+        }
         color = apply_hue_shift(color, effective.hue);
         color = apply_creative_color(color, effective.saturation, effective.vibrance);
         color = Vec3::from_array(apply_color_balance_rgb(
@@ -517,6 +528,7 @@ fn effective_adjustments(
         halation: global.halation_amount,
         flare: global.flare_amount,
         tone_equalizer: global.tone_equalizer,
+        point_color: global.point_color,
         hsl: global.hsl,
     };
     let count = (adjustments.mask_count as usize)
@@ -925,7 +937,7 @@ fn apply_scene_dehaze_v1(
     let edge = (pixel_luma.sqrt() - blurred_luma.sqrt()).abs();
     let guided_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
     let transmission = (1.0 - 0.95 * guided_dark).clamp(0.08, 1.0);
-    let confidence_weight = 0.35 + 0.65 * atmosphere_confidence.clamp(0.0, 1.0);
+    let confidence_weight = atmosphere_confidence.clamp(0.0, 1.0);
     let strength = (amount.abs() * 7.5).clamp(0.0, 1.0) * confidence_weight;
     let effective_transmission = 1.0 + (transmission - 1.0) * strength;
     if amount < 0.0 {
@@ -2362,5 +2374,23 @@ mod tone_equalizer_picker_tests {
                 full[(y * width + x) as usize]
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod scene_dehaze_tests {
+    use super::*;
+
+    #[test]
+    fn zero_confidence_is_exact_identity_and_confidence_scales_recovery() {
+        let color = Vec3::new(0.35, 0.42, 0.51);
+        let blurred = Vec3::splat(0.62);
+        let atmosphere = Vec3::new(0.82, 0.9, 1.04);
+        let abstained = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 0.0);
+        let partial = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 0.5);
+        let full = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 1.0);
+        assert_eq!(abstained, color);
+        assert!(partial.distance(color) > 0.0);
+        assert!(partial.distance(color) < full.distance(color));
     }
 }

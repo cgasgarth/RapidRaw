@@ -460,6 +460,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         adjustments: {
             let mut adjustments = render_plan.adjustments;
             render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
+            render_pipeline::suppress_legacy_global_detail(
+                &mut adjustments,
+                pre_gpu_detail_stage.owns_legacy_global_detail,
+            );
             adjustments
         },
         mask_bitmaps: &mask_bitmaps,

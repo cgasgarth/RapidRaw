@@ -1,5 +1,10 @@
 import type { Crop } from 'react-image-crop';
 import {
+  POINT_COLOR_PROCESS_V1,
+  type PointColorPlanV1,
+  pointColorPlanV1Schema,
+} from '../../packages/rawengine-schema/src/color/pointColorSchemas';
+import {
   type MatchLookApplicationReceiptV1,
   matchLookApplicationReceiptV1Schema,
 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
@@ -367,6 +372,7 @@ export interface Adjustments {
   transformXOffset: number;
   transformYOffset: number;
   perspectiveCorrection: PerspectiveCorrectionSettings;
+  pointColor: PointColorPlanV1;
   vibrance: number;
   vignetteAmount: number;
   vignetteFeather: number;
@@ -410,6 +416,23 @@ export interface SkinToneUniformitySettings {
   targetLuminance: number;
   targetSaturation: number;
 }
+
+export const INITIAL_POINT_COLOR: PointColorPlanV1 = {
+  enabled: false,
+  points: [],
+  process: POINT_COLOR_PROCESS_V1,
+  selectedPointId: null,
+  skinUniformity: {
+    chromaUniformity: 0,
+    enabled: false,
+    hueUniformity: 0,
+    lightnessUniformity: 0,
+    preserveExtremes: 0.5,
+    range: null,
+    target: null,
+  },
+  visualizeMode: 'image',
+};
 
 export interface AiPatch {
   id: string;
@@ -1027,6 +1050,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     mode: 'off',
     resolvedPlan: null,
   },
+  pointColor: structuredClone(INITIAL_POINT_COLOR),
   vibrance: 0,
   vignetteAmount: 0,
   vignetteFeather: 50,
@@ -1240,6 +1264,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       ...INITIAL_ADJUSTMENTS.skinToneUniformity,
       ...(loadedAdjustments.skinToneUniformity || {}),
     },
+    pointColor: pointColorPlanV1Schema.safeParse(loadedAdjustments.pointColor).success
+      ? pointColorPlanV1Schema.parse(loadedAdjustments.pointColor)
+      : structuredClone(INITIAL_POINT_COLOR),
     levels: { ...INITIAL_ADJUSTMENTS.levels, ...(loadedAdjustments.levels || {}) },
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),

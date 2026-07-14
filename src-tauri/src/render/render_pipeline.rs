@@ -14,6 +14,7 @@ use crate::wavelet_render::{apply_wavelet_detail_stage, calculate_wavelet_detail
 
 pub(crate) struct PreGpuDetailStageResult<'a> {
     pub image: Cow<'a, DynamicImage>,
+    pub owns_legacy_global_detail: bool,
     pub render_hash: u64,
 }
 
@@ -23,6 +24,17 @@ pub(crate) struct PreGpuDetailStageResult<'a> {
 pub(crate) fn suppress_legacy_global_denoise(adjustments: &mut AllAdjustments) {
     adjustments.global.luma_noise_reduction = 0.0;
     adjustments.global.color_noise_reduction = 0.0;
+}
+
+pub(crate) fn suppress_legacy_global_detail(
+    adjustments: &mut AllAdjustments,
+    owns_legacy_global_detail: bool,
+) {
+    if owns_legacy_global_detail {
+        adjustments.global.sharpness = 0.0;
+        adjustments.global.clarity = 0.0;
+        adjustments.global.structure = 0.0;
+    }
 }
 
 pub(crate) fn apply_pre_gpu_detail_stages<'a>(
@@ -56,6 +68,9 @@ pub(crate) fn apply_pre_gpu_detail_stages<'a>(
         } else {
             Cow::Borrowed(image)
         },
+        owns_legacy_global_detail: crate::wavelet_render::multiscale_owns_legacy_global_detail(
+            adjustments,
+        ),
         render_hash,
     }
 }
@@ -131,6 +146,29 @@ mod tests {
             image.to_rgb32f().into_raw(),
             enabled.image.as_ref().to_rgb32f().into_raw()
         );
+    }
+
+    #[test]
+    fn graph_v2_detail_macros_execute_once_and_suppress_overlapping_gpu_controls() {
+        let image = test_image();
+        let adjustments_json = json!({
+            "rawEngineEditGraphVersion": 2,
+            "sharpness": 70,
+            "clarity": 45,
+            "structure": 30
+        });
+        let result = apply_pre_gpu_detail_stages(&image, 42, &adjustments_json, true);
+        assert!(matches!(result.image, Cow::Owned(_)));
+        assert!(result.owns_legacy_global_detail);
+
+        let mut gpu = AllAdjustments::default();
+        gpu.global.sharpness = 0.7;
+        gpu.global.clarity = 0.45;
+        gpu.global.structure = 0.3;
+        suppress_legacy_global_detail(&mut gpu, result.owns_legacy_global_detail);
+        assert_eq!(gpu.global.sharpness, 0.0);
+        assert_eq!(gpu.global.clarity, 0.0);
+        assert_eq!(gpu.global.structure, 0.0);
     }
 
     #[test]

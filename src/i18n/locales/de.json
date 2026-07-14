@@ -186,6 +186,14 @@
         "reds": "Rot",
         "yellows": "Gelb"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "pickFromImage": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "Präsenz",
       "preset": "Vorgabe",
       "previewMode": "",

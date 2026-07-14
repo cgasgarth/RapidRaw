@@ -180,6 +180,14 @@
         "reds": "紅色",
         "yellows": "黃色"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "pickFromImage": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "質感",
       "preset": "預設",
       "previewMode": "",

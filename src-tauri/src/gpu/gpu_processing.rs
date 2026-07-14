@@ -2824,9 +2824,16 @@ mod blur_pass_tests {
                     compile_gpu_render_graph(&legacy, *has_lut, *masks, width, height);
                 let v2_plan = compile_gpu_render_graph(&v2, *has_lut, *masks, width, height);
                 assert_eq!(
+                    legacy_plan.blur_products.len(),
+                    v2_plan.blur_products.len(),
+                    "v2 must not add transport surfaces for {class}/{workload}"
+                );
+                assert!(
+                    v2_plan.estimated_peak_resource_bytes
+                        <= legacy_plan.estimated_peak_resource_bytes.saturating_mul(2),
+                    "scale-aware v2 halo must remain within the 2x resource budget for {class}/{workload}: legacy={} v2={}",
                     legacy_plan.estimated_peak_resource_bytes,
-                    v2_plan.estimated_peak_resource_bytes,
-                    "v2 reuses existing transport surfaces for {class}/{workload}"
+                    v2_plan.estimated_peak_resource_bytes
                 );
                 assert_ne!(legacy_plan.fingerprint, v2_plan.fingerprint);
                 for _ in 0..1_000 {
@@ -4323,11 +4330,40 @@ mod blur_pass_tests {
                 .any(|(before, after)| (before - after).abs() > 0.001)
         }));
 
+        let clear = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 24, |x, y| {
+            let checker = if (x + y) % 2 == 0 { 0.0 } else { 1.0 };
+            Rgba([0.02 + checker * 0.7, 0.03 + checker * 0.15, 0.04, 1.0])
+        }));
+        let clear_identity = PreGpuImageIdentity::for_source(&clear, "dehaze_clear_air");
+        let render_clear = |amount| {
+            let mut adjustments = AllAdjustments::default();
+            adjustments.global.dehaze = amount;
+            adjustments.global.edit_graph_version = 2.0;
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &clear,
+                clear_identity,
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                },
+                "dehaze_clear_air",
+            )
+            .expect("GPU clear-air render succeeds")
+            .to_rgba16()
+            .into_raw()
+        };
+        assert_eq!(render_clear(0.0), render_clear(0.12));
+
         let processor_guard = state.gpu_processor.lock().unwrap();
         let processor = &processor_guard.as_ref().unwrap().processor;
         assert_eq!(
             processor.dehaze_analysis_cache.lock().unwrap().counters(),
-            (1, 1)
+            (1, 2)
         );
     }
 
