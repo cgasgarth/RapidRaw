@@ -15,6 +15,7 @@ export * from './computational-merge/computationalMergeRuntimeResultBuilders.js'
 export * from './computational-merge/computationalMergeWarningCodes.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';
+export * from './editDocumentV2.js';
 export * from './editGraphMigrations.js';
 export * from './exportColorCapabilities.js';
 export * from './exportRecipeSchemas.js';
