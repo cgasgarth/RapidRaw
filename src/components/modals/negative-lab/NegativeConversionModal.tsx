@@ -142,6 +142,7 @@ import {
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   NegativeLabOutputFormatId,
 } from '../../../utils/negative-lab/negativeLabOutputFormatIds';
+import { neutralNegativeLabPaperProfile } from '../../../utils/negative-lab/negativeLabPaperProfileRuntime';
 import {
   buildNegativeLabPickedPatchRect,
   type NegativeLabPatchPickerPoint,
@@ -2049,6 +2050,8 @@ function NegativeLabSession({
             schemaVersion: currentParams.bounds_schema_version,
             whitePointOffset: currentParams.white_point_offset,
           },
+          paperProfile:
+            previewProfile?.filmClass === 'black_and_white_silver' ? null : neutralNegativeLabPaperProfile(),
           ...(usingPrintCurveV2 && currentParams.print_curve_v2 !== null
             ? {
                 densityPrintCurve: {

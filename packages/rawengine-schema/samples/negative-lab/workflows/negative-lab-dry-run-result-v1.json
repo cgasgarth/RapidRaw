@@ -200,6 +200,7 @@
         "epsilonClampedPixelCount": 0,
         "rendererVersion": 1
       },
+      "paperProfile": null,
       "dryRunMode": "runtime_preview_non_mutating",
       "planHash": "sha256:negative_lab_sample_runtime_preview_plan",
       "previewArtifactHandle": {

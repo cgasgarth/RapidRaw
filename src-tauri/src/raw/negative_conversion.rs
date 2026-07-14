@@ -40,11 +40,12 @@ use crate::raw::negative_lab_neutral_axis::{
     NegativeLabNeutralAxisAnalysis, NegativeLabNeutralAxisParams, analyze_neutral_axis,
     compile_neutral_axis_cmy_timing,
 };
+use crate::raw::negative_lab_paper_profile::NegativeLabPaperProfileSnapshot;
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
 #[path = "negative_lab_hd_paper_curve.rs"]
-mod negative_lab_hd_paper_curve;
+pub(crate) mod negative_lab_hd_paper_curve;
 use negative_lab_hd_paper_curve::{
     NegativeLabDensityPrintAlgorithm, NegativeLabHdPaperCurveParams, scene_linear_reflectance,
 };
@@ -104,6 +105,8 @@ pub struct NegativeConversionParams {
     pub print_curve_algorithm: NegativeLabDensityPrintAlgorithm,
     #[serde(default)]
     pub print_curve_v2: Option<NegativeLabHdPaperCurveParams>,
+    #[serde(default)]
+    pub paper_profile: Option<NegativeLabPaperProfileSnapshot>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -259,6 +262,8 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     pub cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     pub neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
+    #[serde(default)]
+    pub paper_profile: Option<NegativeLabPaperProfileSnapshot>,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub render_intent: NegativeLabRenderIntent,
@@ -1148,6 +1153,7 @@ impl Default for NegativeConversionParams {
             flat_log_master: NegativeLabFlatLogMasterParams::default(),
             print_curve_algorithm: NegativeLabDensityPrintAlgorithm::DensityRgbV1,
             print_curve_v2: None,
+            paper_profile: None,
         }
     }
 }
@@ -2451,6 +2457,9 @@ impl NegativeConversionParams {
             print_curve_v2: self
                 .print_curve_v2
                 .map(NegativeLabHdPaperCurveParams::sanitized),
+            paper_profile: self
+                .paper_profile
+                .map(NegativeLabPaperProfileSnapshot::sanitized),
         }
         .with_sanitized_endpoints()
     }
@@ -3455,9 +3464,34 @@ fn run_pipeline_with_metrics(
         |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
     let weights = [params.red_weight, params.green_weight, params.blue_weight];
     let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
-    let hd_curve = (params.print_curve_algorithm
-        == NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2)
-        .then(|| params.print_curve_v2.unwrap_or_default().sanitized());
+    let hd_curve = if let Some(profile) = params.paper_profile.as_ref() {
+        if profile.compatible_with(params.process_family, params.render_intent) {
+            let mut curve = profile.to_hd_curve();
+            if let Some(manual) = params.print_curve_v2.as_ref() {
+                let manual = manual.clone().sanitized();
+                curve.iso_r_grade = (curve.iso_r_grade * manual.iso_r_grade).clamp(0.5, 3.0);
+                curve.density_offset =
+                    (curve.density_offset + manual.density_offset).clamp(-0.5, 0.5);
+                curve.toe_strength =
+                    (curve.toe_strength + manual.toe_strength - 0.25).clamp(0.0, 1.0);
+                curve.shoulder_strength =
+                    (curve.shoulder_strength + manual.shoulder_strength - 0.25).clamp(0.0, 1.0);
+                curve.midtone_shape = (curve.midtone_shape + manual.midtone_shape).clamp(-1.0, 1.0);
+            }
+            Some(curve.sanitized())
+        } else {
+            None
+        }
+    } else {
+        (params.print_curve_algorithm == NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2)
+            .then(|| params.print_curve_v2.unwrap_or_default().sanitized())
+    };
+    let paper_profile_channel_cmy = params
+        .paper_profile
+        .as_ref()
+        .filter(|profile| profile.compatible_with(params.process_family, params.render_intent))
+        .map(|profile| profile.clone().sanitized().channel_cmy)
+        .unwrap_or([0.0; 3]);
 
     let mut model_density_buffer = vec![0.0f32; raw_pixels.len()];
     model_density_buffer
@@ -3517,9 +3551,9 @@ fn run_pipeline_with_metrics(
 
                 let weighted_density = apply_cmy_timing_pixel(
                     [
-                        model_density[0] * weights[0],
-                        model_density[1] * weights[1],
-                        model_density[2] * weights[2],
+                        (model_density[0] + paper_profile_channel_cmy[0]) * weights[0],
+                        (model_density[1] + paper_profile_channel_cmy[1]) * weights[1],
+                        (model_density[2] + paper_profile_channel_cmy[2]) * weights[2],
                     ],
                     &effective_cmy_timing,
                 );
@@ -4380,6 +4414,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         optical_finish_metrics,
         cmy_timing_metrics,
         neutral_axis_analysis,
+        paper_profile: params.paper_profile.clone(),
         dimensions,
         flat_log_master: params.flat_log_master,
         render_intent: params.render_intent,

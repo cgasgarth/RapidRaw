@@ -97,6 +97,7 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     source: string;
     warningCodes: string[];
   };
+  paperProfile?: NegativeLabSetConversionRecipeCommandV1['parameters']['paperProfile'];
   detailFinishMetrics?: {
     changedPixelRatio: number;
     chromaDriftMax: number;
@@ -746,6 +747,7 @@ function buildNegativeLabRuntimeProofV1({
       ...(renderedPreview.neutralAxisAnalysis === undefined
         ? {}
         : { neutralAxisAnalysis: renderedPreview.neutralAxisAnalysis }),
+      ...(renderedPreview.paperProfile === undefined ? {} : { paperProfile: renderedPreview.paperProfile }),
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,
       previewArtifactHandle: previewArtifact,
@@ -900,6 +902,7 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
       previewRequest: command.parameters.previewRequest,
       processFamily: command.parameters.processFamily,
       neutralAxis: command.parameters.neutralAxis,
+      paperProfile: command.parameters.paperProfile,
     }),
   );
   const p50AnchorDensity = Number((0.48 + frameCount * 0.01).toFixed(4));
@@ -916,6 +919,7 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
       command.parameters.baseStrategy.mode === 'profile_default_low_confidence' ? ['low_acquisition_confidence'] : [],
     ),
     contentHash: `sha256:negative_lab_runtime_preview:${renderToken}`,
+    paperProfile: command.parameters.paperProfile,
     densityNormalizationMetrics: {
       axisBounds: {
         color: { max: 0.12, min: -0.12 },

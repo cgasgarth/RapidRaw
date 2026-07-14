@@ -79,6 +79,7 @@
       "scaleBasis": "full_resolution_short_edge_v1",
       "workingSpace": "scene_linear_srgb_d65_v1"
     },
+    "paperProfile": null,
     "densityBounds": {
       "analysisBuffer": 0.04,
       "baseFogProvenance": "automatic_analysis",

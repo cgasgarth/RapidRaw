@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { negativeLabCrosstalkProfileSchema } from './negativeLabCrosstalkProfileSchemas';
 
 export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generic\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
