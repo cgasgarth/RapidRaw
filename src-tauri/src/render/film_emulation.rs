@@ -264,6 +264,75 @@ pub struct FilmStagePatchV1 {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmEmulationTransferV1 {
+    pub contract: String,
+    pub profile_ref: FilmEmulationProfileRef,
+    pub enabled: bool,
+    pub mix: f32,
+    pub stage_overrides: Option<FilmStagePatchV1>,
+    pub stack_position: String,
+    pub after_node_semantic_id: Option<String>,
+    pub seed_transfer_policy: String,
+}
+
+impl FilmEmulationTransferV1 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.contract != "rapidraw.film_transfer.v1"
+            || self.profile_ref.id != REFERENCE_PROFILE_ID
+            || self.profile_ref.version != REFERENCE_PROFILE_VERSION
+            || self.profile_ref.content_sha256 != REFERENCE_PROFILE_CONTENT_SHA256
+            || !self.mix.is_finite()
+            || !(0.0..=1.0).contains(&self.mix)
+            || !matches!(
+                self.stack_position.as_str(),
+                "scene_creative_end" | "scene_creative_custom"
+            )
+            || (self.stack_position == "scene_creative_custom"
+                && self.after_node_semantic_id.is_none())
+            || (self.stack_position == "scene_creative_end"
+                && self.after_node_semantic_id.is_some())
+            || !matches!(
+                self.seed_transfer_policy.as_str(),
+                "preserve_for_same_source_v1" | "rederive_for_target_source_v1"
+            )
+        {
+            return Err("film_transfer_invalid");
+        }
+        if let Some(patch) = &self.stage_overrides {
+            if !patch.p.is_finite() || !(0.0001..=4.0).contains(&patch.p) {
+                return Err("film_transfer_invalid_stage_override");
+            }
+        }
+        Ok(())
+    }
+
+    pub fn operations(&self) -> Result<Vec<FilmEmulationOperationV1>, &'static str> {
+        self.validate()?;
+        let mut operations = vec![
+            FilmEmulationOperationV1::SetProfile {
+                profile_ref: self.profile_ref.clone(),
+            },
+            FilmEmulationOperationV1::SetEnabled {
+                enabled: self.enabled,
+            },
+            FilmEmulationOperationV1::SetMix { mix: self.mix },
+        ];
+        if let Some(patch) = &self.stage_overrides {
+            operations.push(FilmEmulationOperationV1::SetStageParams {
+                stage: "reference_luminance_shaper_v1".to_string(),
+                patch: patch.clone(),
+            });
+        }
+        operations.push(FilmEmulationOperationV1::SetStackPosition {
+            position: self.stack_position.clone(),
+            after_node_id: self.after_node_semantic_id.clone(),
+        });
+        Ok(operations)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApplyFilmEmulationOperationV1 {
     pub actor: FilmOperationActorV1,
     pub approval: FilmOperationApprovalV1,
@@ -625,5 +694,60 @@ mod tests {
             runtime_receipt(params(1.0), "sha256:post").input_domain,
             "acescg_linear_v1"
         );
+    }
+
+    #[test]
+    fn transfer_round_trip_preserves_pinned_state_and_operation_order() {
+        let transfer = FilmEmulationTransferV1 {
+            contract: "rapidraw.film_transfer.v1".to_string(),
+            profile_ref: FilmEmulationProfileRef {
+                id: REFERENCE_PROFILE_ID.to_string(),
+                version: REFERENCE_PROFILE_VERSION.to_string(),
+                content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
+            },
+            enabled: true,
+            mix: 0.65,
+            stage_overrides: Some(FilmStagePatchV1 { p: 1.1 }),
+            stack_position: "scene_creative_end".to_string(),
+            after_node_semantic_id: None,
+            seed_transfer_policy: "preserve_for_same_source_v1".to_string(),
+        };
+        let encoded = serde_json::to_vec(&transfer).unwrap();
+        let decoded: FilmEmulationTransferV1 = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, transfer);
+        let operations = decoded.operations().unwrap();
+        assert!(matches!(
+            operations[0],
+            FilmEmulationOperationV1::SetProfile { .. }
+        ));
+        assert!(
+            matches!(operations[2], FilmEmulationOperationV1::SetMix { mix } if (mix - 0.65).abs() < 1e-6)
+        );
+        assert!(matches!(
+            operations[3],
+            FilmEmulationOperationV1::SetStageParams { .. }
+        ));
+    }
+
+    #[test]
+    fn transfer_rejects_hash_mismatch_and_illegal_placement() {
+        let mut transfer = FilmEmulationTransferV1 {
+            contract: "rapidraw.film_transfer.v1".to_string(),
+            profile_ref: FilmEmulationProfileRef {
+                id: REFERENCE_PROFILE_ID.to_string(),
+                version: REFERENCE_PROFILE_VERSION.to_string(),
+                content_sha256: "sha256:stale".to_string(),
+            },
+            enabled: true,
+            mix: 0.5,
+            stage_overrides: None,
+            stack_position: "scene_creative_end".to_string(),
+            after_node_semantic_id: None,
+            seed_transfer_policy: "rederive_for_target_source_v1".to_string(),
+        };
+        assert!(transfer.validate().is_err());
+        transfer.profile_ref.content_sha256 = REFERENCE_PROFILE_CONTENT_SHA256.to_string();
+        transfer.stack_position = "scene_creative_custom".to_string();
+        assert!(transfer.validate().is_err());
     }
 }

@@ -1,3 +1,4 @@
+import type { Adjustments } from '../adjustments';
 import type {
   FilmLookAdjustmentPatch,
   FilmLookBrowserGroup,
@@ -6,6 +7,7 @@ import type {
   FilmLookCategory,
   FilmLookRuntimeSupportState,
 } from './filmLookBrowser';
+import { buildFilmLookAppliedAdjustmentPatch, clampFilmLookStrength } from './filmLookBrowser';
 
 const FILM_LOOK_CATEGORY_ORDER: Array<FilmLookCategory> = [
   'color_clean',
@@ -210,3 +212,18 @@ export const getFilmLookBrowserGroups = (): Array<FilmLookBrowserGroup> =>
     displayName: FILM_LOOK_CATEGORY_LABELS[category],
     looks: FILM_LOOK_BROWSER_ITEMS.filter((look) => look.category === category),
   })).filter((group) => group.looks.length > 0);
+
+export type FilmLegacyMigrationResult =
+  | { status: 'migrated_to_film_node'; profileId: string; strength: number }
+  | { status: 'legacy_mapping_unavailable' | 'legacy_controlled_fields_modified' | 'legacy_profile_withdrawn' };
+
+export const migrateLegacyFilmLook = (adjustments: Adjustments): FilmLegacyMigrationResult => {
+  if (adjustments.filmLookId === null) return { status: 'legacy_mapping_unavailable' };
+  const look = FILM_LOOK_BROWSER_ITEMS.find((candidate) => candidate.id === adjustments.filmLookId);
+  if (look === undefined) return { status: 'legacy_mapping_unavailable' };
+  const strength = clampFilmLookStrength(adjustments.filmLookStrength);
+  const expected = buildFilmLookAppliedAdjustmentPatch(look, strength);
+  if (!Object.entries(expected).every(([key, value]) => adjustments[key as keyof Adjustments] === value))
+    return { status: 'legacy_controlled_fields_modified' };
+  return { status: 'migrated_to_film_node', profileId: look.id, strength };
+};
