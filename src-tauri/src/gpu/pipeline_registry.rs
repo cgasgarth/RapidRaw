@@ -612,6 +612,14 @@ mod tests {
     }
 
     #[test]
+    fn film_stage_keeps_luminance_and_color_bindings_distinct() {
+        let shader = include_str!("../shaders/shader.wgsl");
+        assert!(shader.contains("let shaped_luminance = luminance * (1.0 + shaper_p)"));
+        assert!(shader.contains("let shaped_color = color_in + (color_in * scale - color_in)"));
+        assert!(!shader.contains("let shaped = color_in + (color_in * scale - color_in)"));
+    }
+
+    #[test]
     fn cache_artifact_rewrite_is_atomic_and_latest_pair_is_valid() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("cache");
