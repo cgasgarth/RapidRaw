@@ -9467,6 +9467,26 @@ export const negativeLabRuntimeProofV1Schema = z
             rendererVersion: z.number().int().positive(),
           })
           .strict(),
+        densityScopes: z
+          .object({
+            algorithmId: z.literal('native_negative_lab_density_scopes_v1'),
+            clippedPixelCount: z.number().int().nonnegative(),
+            densityHistogram: z
+              .object({ bins: z.array(z.number().int().nonnegative()).length(32), max: z.number(), min: z.number() })
+              .strict(),
+            gamutOutOfRangePixelCount: z.number().int().nonnegative(),
+            hAndDCurve: z
+              .array(z.object({ inputDensity: z.number(), outputLuma: z.number() }).strict())
+              .min(1)
+              .max(17),
+            outputLumaHistogram: z
+              .object({ bins: z.array(z.number().int().nonnegative()).length(32), max: z.number(), min: z.number() })
+              .strict(),
+            sampleCount: z.number().int().nonnegative(),
+            schemaVersion: z.literal(1),
+          })
+          .strict()
+          .optional(),
         dryRunMode: z.literal('runtime_preview_non_mutating'),
         planHash: z.string().regex(/^sha256:[A-Za-z0-9:_-]+$/u),
         beforeAfterPreviewProof: z

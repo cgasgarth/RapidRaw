@@ -3511,6 +3511,15 @@
       "densitometerStatusBalanced": "Balanced",
       "densitometerStatusMinorCast": "Minor cast",
       "densitometerStatusStrongCast": "Strong cast",
+      "densityScopes": {
+        "clippedGamut": "",
+        "densityHistogram": "",
+        "densityInput": "",
+        "nativeVersion": "",
+        "outputLuma": "",
+        "outputLumaHistogram": "",
+        "title": ""
+      },
       "dustCandidate": {
         "dustSpot": "Staubkandidat",
         "emulsionScratch": "Kratzerkandidat"
