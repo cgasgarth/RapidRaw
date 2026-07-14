@@ -53,6 +53,8 @@ export enum Invokes {
   ResumeExport = 'resume_export',
   FrontendLog = 'frontend_log',
   FrontendReady = 'frontend_ready',
+  FitAndPublishChartCalibration = 'fit_and_publish_chart_calibration',
+  FitChartCalibrationReport = 'fit_chart_calibration_report',
   GetStartupTrace = 'get_startup_trace',
   RecordFrontendStartupPhase = 'record_frontend_startup_phase',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
