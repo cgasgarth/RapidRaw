@@ -10,6 +10,10 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::app_settings::AppSettings;
+use crate::computational::denoise_artifact::{
+    EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
+};
+use crate::computational::denoise_service::EnhancedDenoiseService;
 use crate::denoise_render::{apply_denoise_stage, calculate_denoise_render_hash};
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
@@ -109,8 +113,31 @@ fn run_private_denoise_real_raw_proof(
         "lumaNoiseReduction": 0
     });
 
-    let preview = apply_denoise_stage(&base_image, &enabled).into_owned();
-    let export = apply_denoise_stage(&base_image, &enabled).into_owned();
+    let rendered = apply_denoise_stage(&base_image, &enabled).into_owned();
+    let cache_root = private_root.join(ARTIFACT_DIR).join("enhanced-cache");
+    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, "bm3d", 0.38)?;
+    let service = EnhancedDenoiseService::default();
+    service.activate_image(&source_path_string);
+    let prepared = service.begin(&source_path_string, &plan)?;
+    let operation = service.resume(prepared.handle(), &source_path_string, &plan)?;
+    let artifact = service.build_current(&operation, &cache_root, plan.clone(), || {
+        Ok(EnhancedDenoiseBuildOutput {
+            input_range: SceneRangeCounts::measure(&base_image.to_rgb32f()),
+            image: rendered,
+        })
+    })?;
+    let preview = artifact.image.as_ref().clone();
+
+    let reopened_service = EnhancedDenoiseService::default();
+    reopened_service.activate_image(&source_path_string);
+    let reopened_prepared = reopened_service.begin(&source_path_string, &plan)?;
+    let reopened_operation =
+        reopened_service.resume(reopened_prepared.handle(), &source_path_string, &plan)?;
+    let reopened =
+        reopened_service.build_current(&reopened_operation, &cache_root, plan, || {
+            Err("denoise_private_proof_unexpected_rebuild".to_string())
+        })?;
+    let export = reopened.image.as_ref().clone();
     let disabled_preview = apply_denoise_stage(&base_image, &disabled);
     let input_to_preview_mean_abs_delta = mean_abs_delta(&base_image, &preview);
     let input_to_preview_max_delta = max_delta(&base_image, &preview);

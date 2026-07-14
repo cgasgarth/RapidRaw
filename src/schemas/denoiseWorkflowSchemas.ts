@@ -1,5 +1,30 @@
 import { z } from 'zod';
 
+export const denoiseOperationHandleSchema = z
+  .object({
+    imageGeneration: z.number().int().positive(),
+    operationGeneration: z.number().int().positive(),
+  })
+  .strict();
+
+export type DenoiseOperationHandle = z.infer<typeof denoiseOperationHandleSchema>;
+
+export const denoiseOperationsMatch = (active: DenoiseOperationHandle | null, incoming: DenoiseOperationHandle) =>
+  active?.imageGeneration === incoming.imageGeneration && active.operationGeneration === incoming.operationGeneration;
+
+export const isCurrentDenoiseEvent = (
+  state: { activeOperation: DenoiseOperationHandle | null; isOpen: boolean; isProcessing: boolean },
+  incoming: DenoiseOperationHandle,
+) => state.isOpen && state.isProcessing && denoiseOperationsMatch(state.activeOperation, incoming);
+
+export const denoiseCancelReceiptSchema = z
+  .object({
+    cancelled: z.boolean(),
+    imageGeneration: z.number().int().nonnegative(),
+    operationGeneration: z.number().int().positive().nullable(),
+  })
+  .strict();
+
 export const denoiseWorkflowReportSchema = z
   .object({
     artifactPath: z.string().min(1),

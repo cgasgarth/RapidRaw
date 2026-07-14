@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import type { DenoiseOperationHandle } from '../../../schemas/denoiseWorkflowSchemas';
 import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { getDisplayFileName } from '../../../utils/displayFilePath';
@@ -15,8 +16,10 @@ import Slider from '../../ui/primitives/Slider';
 import UiText from '../../ui/primitives/Text';
 
 interface DenoiseModalProps {
+  activeOperation: DenoiseOperationHandle | null;
   isOpen: boolean;
   onClose: () => void;
+  onCancel: (operation?: DenoiseOperationHandle) => Promise<void>;
   onDenoise: (intensity: number, method: 'ai' | 'bm3d') => void;
   onBatchDenoise: (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => Promise<string[]>;
   onSave: () => Promise<string>;
@@ -268,6 +271,8 @@ export default function DenoiseModal(props: DenoiseModalProps) {
 }
 
 export function DenoiseSession({
+  activeOperation,
+  onCancel,
   onClose,
   onDenoise,
   onBatchDenoise,
@@ -299,6 +304,20 @@ export function DenoiseSession({
   const denoiseSourceCount = targetPaths.length;
   const mouseDownTarget = useRef<EventTarget | null>(null);
   const operationIdRef = useRef(0);
+  const processingRef = useRef(isProcessing);
+  const cancellationRequestedRef = useRef(false);
+  const activeOperationRef = useRef(activeOperation);
+
+  processingRef.current = isProcessing;
+  activeOperationRef.current = activeOperation;
+  if (!isProcessing) cancellationRequestedRef.current = false;
+
+  const cancelPendingOperation = useCallback(() => {
+    if (!processingRef.current || cancellationRequestedRef.current) return;
+    cancellationRequestedRef.current = true;
+    processingRef.current = false;
+    void onCancel(activeOperationRef.current ?? undefined);
+  }, [onCancel]);
 
   const methodOptions = useMemo<Array<{ label: string; value: 'ai' | 'bm3d' }>>(
     () => [
@@ -332,8 +351,9 @@ export function DenoiseSession({
   useEffect(
     () => () => {
       operationIdRef.current += 1;
+      cancelPendingOperation();
     },
-    [],
+    [cancelPendingOperation],
   );
 
   const currentStatusText =
@@ -354,8 +374,9 @@ export function DenoiseSession({
   const handleClose = useCallback(() => {
     if (isSaving) return;
     operationIdRef.current += 1;
+    cancelPendingOperation();
     onClose();
-  }, [onClose, isSaving]);
+  }, [cancelPendingOperation, onClose, isSaving]);
 
   const handleBackdropMouseDown = (e: React.MouseEvent) => {
     mouseDownTarget.current = e.target;

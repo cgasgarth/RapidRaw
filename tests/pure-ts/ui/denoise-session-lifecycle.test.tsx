@@ -15,6 +15,7 @@ mock.module('@tauri-apps/api/event', () => ({ listen }));
 const { DenoiseSession, createDenoiseSessionIdentity, initialDenoiseDraft } = await import(
   '../../../src/components/modals/editing/DenoiseModal'
 );
+const { isCurrentDenoiseEvent } = await import('../../../src/schemas/denoiseWorkflowSchemas');
 
 let cleanup: (() => Promise<void>) | null = null;
 
@@ -78,8 +79,86 @@ test('superseded batch completion and progress cannot populate the successor ses
   expect(runtime.container.textContent).not.toContain('a.ARW');
 });
 
+test('closing a pending single-image run cancels once and a reopened session can start again', async () => {
+  const cancel = mock(async () => {});
+  const close = mock(() => {});
+  const denoise = mock(() => {});
+  const runtime = installRuntime();
+  cleanup = runtime.unmount;
+  await runtime.render('first', props({ onCancel: cancel, onClose: close, onDenoise: denoise }));
+  await runtime.click(runtime.button('modals.denoise.btnStart'));
+  expect(denoise).toHaveBeenCalledTimes(1);
+
+  await runtime.render('first', props({ isProcessing: true, onCancel: cancel, onClose: close, onDenoise: denoise }));
+  await runtime.click(runtime.button('modals.denoise.cancel'));
+  expect(cancel).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(1);
+
+  await runtime.render('second', props({ onCancel: cancel, onClose: close, onDenoise: denoise }));
+  await runtime.click(runtime.button('modals.denoise.btnStart'));
+  expect(denoise).toHaveBeenCalledTimes(2);
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+test('unmounting a pending single-image session cancels its native generation', async () => {
+  const cancel = mock(async () => {});
+  const runtime = installRuntime();
+  cleanup = runtime.unmount;
+  await runtime.render('pending', props({ isProcessing: true, onCancel: cancel }));
+  await runtime.unmount();
+  cleanup = null;
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+test('replacing a pending session cancels the captured old handle, never the successor handle', async () => {
+  const oldOperation = { imageGeneration: 9, operationGeneration: 2 };
+  const successor = { imageGeneration: 10, operationGeneration: 3 };
+  const cancel = mock(async () => {});
+  const runtime = installRuntime();
+  cleanup = runtime.unmount;
+  await runtime.render('old', props({ activeOperation: oldOperation, isProcessing: true, onCancel: cancel }));
+  await runtime.render('successor', props({ activeOperation: successor, isProcessing: true, onCancel: cancel }));
+  expect(cancel).toHaveBeenCalledTimes(1);
+  expect(cancel).toHaveBeenCalledWith(oldOperation);
+});
+
+test('old progress, complete, and error handles are ignored by successor and closed sessions', () => {
+  const oldOperation = { imageGeneration: 3, operationGeneration: 7 };
+  const successor = { imageGeneration: 3, operationGeneration: 8 };
+  const activeState = { activeOperation: successor, isOpen: true, isProcessing: true };
+  for (const _eventType of ['progress', 'complete', 'error']) {
+    expect(isCurrentDenoiseEvent(activeState, oldOperation)).toBe(false);
+    expect(isCurrentDenoiseEvent(activeState, successor)).toBe(true);
+    expect(isCurrentDenoiseEvent({ ...activeState, isOpen: false }, successor)).toBe(false);
+  }
+});
+
+test('two-phase start installs the handle before execution can emit a terminal event', async () => {
+  const operation = { imageGeneration: 5, operationGeneration: 11 };
+  const start = createDeferred<typeof operation>();
+  let state = { activeOperation: null as typeof operation | null, isOpen: true, isProcessing: true };
+  let executeCalls = 0;
+  const launch = (async () => {
+    const handle = await start.promise;
+    state = { ...state, activeOperation: handle };
+    executeCalls += 1;
+  })();
+
+  expect(isCurrentDenoiseEvent(state, operation)).toBe(false);
+  expect(executeCalls).toBe(0);
+  start.resolve(operation);
+  await launch;
+  expect(executeCalls).toBe(1);
+  expect(isCurrentDenoiseEvent(state, operation)).toBe(true);
+  if (isCurrentDenoiseEvent(state, operation)) {
+    state = { ...state, activeOperation: null, isProcessing: false };
+  }
+  expect(state.isProcessing).toBe(false);
+});
+
 function props(overrides: Partial<React.ComponentProps<typeof DenoiseSession>> = {}) {
   return {
+    activeOperation: null,
     aiModelDownloadStatus: null,
     error: null,
     isActive: true,
@@ -87,6 +166,7 @@ function props(overrides: Partial<React.ComponentProps<typeof DenoiseSession>> =
     isRaw: true,
     loadingImageUrl: null,
     onBatchDenoise: async () => [],
+    onCancel: async () => {},
     onClose: () => {},
     onDenoise: () => {},
     onOpenFile: () => {},

@@ -1,8 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { hdrRuntimePlanSchema } from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import { panoramaRuntimePlanSchema } from '../../schemas/computational-merge/panoramaUiSchemas';
+import {
+  type DenoiseOperationHandle,
+  denoiseCancelReceiptSchema,
+  denoiseOperationHandleSchema,
+} from '../../schemas/denoiseWorkflowSchemas';
 import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -19,6 +24,7 @@ type HdrLifecycleInput = {
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
+  const denoiseLaunchRef = useRef<Promise<DenoiseOperationHandle> | null>(null);
 
   const handleStartPanorama = useCallback(
     async (paths: string[], operationId: string) => {
@@ -249,22 +255,80 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       setUI((state) => ({
         denoiseModalState: {
           ...state.denoiseModalState,
+          activeOperation: null,
           isProcessing: true,
           error: null,
+          originalBase64: null,
+          previewBase64: null,
           progressMessage: 'Starting engine...',
         },
       }));
 
+      const launch = invoke(Invokes.ApplyDenoising, {
+        path: denoiseModalState.targetPaths[0],
+        intensity,
+        method,
+      }).then((value) => denoiseOperationHandleSchema.parse(value));
+      denoiseLaunchRef.current = launch;
       try {
-        await invoke(Invokes.ApplyDenoising, {
-          path: denoiseModalState.targetPaths[0],
-          intensity,
-          method,
-        });
+        const operation = await launch;
+        const isCurrentLaunch = denoiseLaunchRef.current === launch;
+        if (isCurrentLaunch && useUIStore.getState().denoiseModalState.isProcessing) {
+          setUI((state) => ({
+            denoiseModalState: { ...state.denoiseModalState, activeOperation: operation },
+          }));
+          await invoke(Invokes.ExecuteDenoising, {
+            operation,
+            path: denoiseModalState.targetPaths[0],
+            intensity,
+            method,
+          });
+        } else {
+          await invoke(Invokes.CancelDenoising, { operation });
+        }
       } catch (err) {
-        setUI((state) => ({
-          denoiseModalState: { ...state.denoiseModalState, isProcessing: false, error: String(err) },
-        }));
+        if (denoiseLaunchRef.current === launch) {
+          setUI((state) =>
+            state.denoiseModalState.isProcessing
+              ? {
+                  denoiseModalState: {
+                    ...state.denoiseModalState,
+                    activeOperation: null,
+                    isProcessing: false,
+                    error: String(err),
+                  },
+                }
+              : {},
+          );
+        }
+      } finally {
+        if (denoiseLaunchRef.current === launch) denoiseLaunchRef.current = null;
+      }
+    },
+    [setUI],
+  );
+
+  const handleCancelDenoise = useCallback(
+    async (expectedOperation?: DenoiseOperationHandle) => {
+      const stateBeforeCancel = useUIStore.getState().denoiseModalState;
+      const pendingLaunch = denoiseLaunchRef.current;
+      setUI((state) => ({
+        denoiseModalState: {
+          ...state.denoiseModalState,
+          activeOperation: null,
+          error: null,
+          isProcessing: false,
+          originalBase64: null,
+          previewBase64: null,
+          progressMessage: null,
+        },
+      }));
+      try {
+        const operation = expectedOperation ?? stateBeforeCancel.activeOperation ?? (await pendingLaunch);
+        if (!operation) return;
+        denoiseCancelReceiptSchema.parse(await invoke(Invokes.CancelDenoising, { operation }));
+      } catch (error) {
+        console.error('Failed to cancel Enhanced Denoise:', error);
       }
     },
     [setUI],
@@ -314,6 +378,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     handleStartHdr,
     handleSaveHdr,
     handleApplyDenoise,
+    handleCancelDenoise,
     handleBatchDenoise,
     handleSaveDenoisedImage,
     handleSaveCollage,

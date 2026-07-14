@@ -195,10 +195,6 @@ pub struct AppState {
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
-    pub denoise_artifacts:
-        Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore>,
-    pub active_denoise_artifact:
-        Arc<Mutex<Option<Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactV1>>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
@@ -275,10 +271,6 @@ impl AppState {
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
-            denoise_artifacts: Arc::new(
-                crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore::default(),
-            ),
-            active_denoise_artifact: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
             cache_budget: Arc::clone(&cache_budget),
             lut_cache: MemoryLruCache::new(

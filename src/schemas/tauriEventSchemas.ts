@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 import { panoramaRenderedReviewSchema } from './computational-merge/panoramaUiSchemas';
+import { denoiseOperationHandleSchema } from './denoiseWorkflowSchemas';
 import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
@@ -118,15 +119,27 @@ export const importProgressPayloadSchema = pathProgressPayloadSchema.extend({
   committedPath: z.string().nullable().optional(),
 });
 
-export const denoiseCompletePayloadSchema = z.union([
-  z.string(),
-  z
-    .object({
-      denoised: z.string(),
-      original: z.string().nullable().optional(),
-    })
-    .loose(),
-]);
+export const denoiseCompletePayloadSchema = z
+  .object({
+    denoised: z.string(),
+    operation: denoiseOperationHandleSchema,
+    original: z.string().nullable().optional(),
+  })
+  .loose();
+
+export const denoiseErrorPayloadSchema = z
+  .object({
+    error: z.string(),
+    operation: denoiseOperationHandleSchema,
+  })
+  .strict();
+
+export const denoiseProgressPayloadSchema = z
+  .object({
+    message: z.string(),
+    operation: denoiseOperationHandleSchema,
+  })
+  .strict();
 
 export const renderPathPayloadSchema = z
   .object({
@@ -383,6 +396,8 @@ export const parseImportStartPayload = (value: unknown) => importStartPayloadSch
 export const parseImportProgressPayload = (value: unknown) => importProgressPayloadSchema.parse(value);
 export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadSchema.parse(value);
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
+export const parseDenoiseErrorPayload = (value: unknown) => denoiseErrorPayloadSchema.parse(value);
+export const parseDenoiseProgressPayload = (value: unknown) => denoiseProgressPayloadSchema.parse(value);
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
 export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
 export const parseHdrCompletePayload = (value: unknown) => hdrCompletePayloadSchema.parse(value);

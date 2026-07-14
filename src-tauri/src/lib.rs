@@ -3519,6 +3519,8 @@ pub fn run() {
             build_ai_commands::invoke_generative_replace_with_mask_def,
             denoise_api::dry_run_denoise_controls,
             denoising::apply_denoising,
+            denoising::execute_denoising,
+            denoising::cancel_denoising,
             denoising::batch_denoise_images,
             denoising::save_denoised_image,
             display_profile::get_active_display_profile,

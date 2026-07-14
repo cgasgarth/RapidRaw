@@ -20,6 +20,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::denoise_artifact::{
     EnhancedDenoiseArtifactV1, EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
 };
+use super::denoise_service::{DenoiseOperation, DenoiseOperationHandle, STALE_DENOISE_OPERATION};
 
 #[cfg(feature = "ai")]
 type AiSession = Arc<Mutex<rapidraw_ai::ort::session::Session>>;
@@ -30,6 +31,7 @@ struct ProgressReporter<'a> {
     counter: &'a Arc<AtomicUsize>,
     total_work: usize,
     app_handle: &'a AppHandle,
+    operation: Option<DenoiseOperationHandle>,
 }
 
 const BLOCK_SIZE: usize = 8;
@@ -60,70 +62,149 @@ impl Bm3dParams {
 }
 
 #[tauri::command]
-pub async fn apply_denoising(
+pub fn apply_denoising(
+    path: String,
+    intensity: f32,
+    method: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<DenoiseOperationHandle, String> {
+    let (source_path, _) = parse_virtual_path(&path);
+    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
+
+    if method == "ai" {
+        #[cfg(not(feature = "ai"))]
+        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+    }
+
+    let denoise = Arc::clone(&state.services.denoise);
+    let operation = denoise.begin(&path, &plan)?;
+    Ok(operation.handle())
+}
+
+#[tauri::command]
+pub fn execute_denoising(
+    operation: DenoiseOperationHandle,
     path: String,
     intensity: f32,
     method: String,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    let path_str = source_path.to_string_lossy().to_string();
-    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
-    let cache_root = enhanced_cache_root(&app_handle)?;
-
-    #[cfg(feature = "ai")]
-    let mut ai_session: Option<AiSession> = None;
-    #[cfg(not(feature = "ai"))]
-    let ai_session: Option<AiSession> = None;
-    #[cfg(feature = "ai")]
-    let mut ai_lease = None;
-    #[cfg(not(feature = "ai"))]
-    let ai_lease: Option<()> = None;
-    if method == "ai" {
-        #[cfg(not(feature = "ai"))]
-        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
-        #[cfg(feature = "ai")]
-        {
-            let lease = crate::ai::ai_processing::acquire_ort_model(
-                &app_handle,
-                &state.ai_model_registry,
-                crate::ai::model_registry::AiModelId::Denoise,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-            ai_session = Some(lease.ort()?);
-            ai_lease = Some(lease);
+    let denoise = Arc::clone(&state.services.denoise);
+    let preparation = (|| {
+        let (source_path, _) = parse_virtual_path(&path);
+        let path_str = source_path.to_string_lossy().to_string();
+        let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
+        let cache_root = enhanced_cache_root(&app_handle)?;
+        if method == "ai" {
+            #[cfg(not(feature = "ai"))]
+            return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
         }
-    }
+        let claimed = denoise.resume(operation, &path, &plan)?;
+        Ok((path_str, plan, cache_root, claimed))
+    })();
+    let (path_str, plan, cache_root, operation) = match preparation {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            denoise.cancel(operation);
+            return Err(error);
+        }
+    };
+    let handle = operation.handle();
 
-    let artifact_store = Arc::clone(&state.denoise_artifacts);
-    let active_artifact = Arc::clone(&state.active_denoise_artifact);
+    tauri::async_runtime::spawn(async move {
+        #[cfg(feature = "ai")]
+        let mut ai_session: Option<AiSession> = None;
+        #[cfg(not(feature = "ai"))]
+        let ai_session: Option<AiSession> = None;
+        #[cfg(feature = "ai")]
+        let mut ai_lease = None;
+        #[cfg(not(feature = "ai"))]
+        let ai_lease: Option<()> = None;
 
-    tokio::task::spawn_blocking(move || {
-        let _ai_lease = ai_lease;
-        match artifact_store.get_or_build(&cache_root, plan, || {
-            denoise_image(
-                path_str.clone(),
-                intensity,
-                method,
-                app_handle.clone(),
-                ai_session,
-            )
-        }) {
-            Ok(artifact) => {
-                *active_artifact.lock().unwrap() = Some(Arc::clone(&artifact));
-                if let Err(error) = emit_denoise_complete(&artifact, &path_str, &app_handle) {
-                    let _ = app_handle.emit(crate::events::DENOISE_ERROR, error);
+        #[cfg(feature = "ai")]
+        if method == "ai" {
+            let lease_result = {
+                let managed_state = app_handle.state::<AppState>();
+                crate::ai::ai_processing::acquire_ort_model(
+                    &app_handle,
+                    &managed_state.ai_model_registry,
+                    crate::ai::model_registry::AiModelId::Denoise,
+                )
+                .await
+            };
+            let lease = match lease_result {
+                Ok(lease) => lease,
+                Err(error) => {
+                    emit_denoise_error_if_current(
+                        &denoise,
+                        &operation,
+                        &app_handle,
+                        error.to_string(),
+                    );
+                    return;
+                }
+            };
+            match lease.ort() {
+                Ok(session) => ai_session = Some(session),
+                Err(error) => {
+                    emit_denoise_error_if_current(&denoise, &operation, &app_handle, error);
+                    return;
                 }
             }
-            Err(e) => {
-                let _ = app_handle.emit(crate::events::DENOISE_ERROR, e);
-            }
+            ai_lease = Some(lease);
         }
-    })
-    .await
-    .map_err(|e| format!("Denoising task failed: {}", e))
+
+        let task_denoise = Arc::clone(&denoise);
+        let task_operation = operation.clone();
+        let task_app_handle = app_handle.clone();
+        let task_path = path_str.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let _ai_lease = ai_lease;
+            task_denoise.build_current(&task_operation, &cache_root, plan, || {
+                denoise_image(
+                    task_path.clone(),
+                    intensity,
+                    method,
+                    task_app_handle.clone(),
+                    ai_session,
+                    Some(handle),
+                )
+            })
+        })
+        .await;
+
+        match result {
+            Ok(Ok(artifact)) => {
+                if let Err(error) = emit_denoise_complete(&artifact, &path_str, handle, &app_handle)
+                {
+                    emit_denoise_error_if_current(&denoise, &operation, &app_handle, error);
+                    return;
+                }
+                denoise.finish(&operation);
+            }
+            Ok(Err(error)) if error == STALE_DENOISE_OPERATION => {}
+            Ok(Err(error)) => {
+                emit_denoise_error_if_current(&denoise, &operation, &app_handle, error);
+            }
+            Err(error) => emit_denoise_error_if_current(
+                &denoise,
+                &operation,
+                &app_handle,
+                format!("Denoising task failed: {error}"),
+            ),
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cancel_denoising(
+    operation: DenoiseOperationHandle,
+    state: tauri::State<'_, AppState>,
+) -> super::denoise_service::DenoiseCancelReceipt {
+    state.services.denoise.cancel(operation)
 }
 
 #[tauri::command]
@@ -159,7 +240,7 @@ pub async fn batch_denoise_images(
         }
     }
 
-    let artifact_store = Arc::clone(&state.denoise_artifacts);
+    let denoise = Arc::clone(&state.services.denoise);
     let cache_root = enhanced_cache_root(&app_handle)?;
     tokio::task::spawn_blocking(move || {
         let _ai_lease = ai_lease;
@@ -187,7 +268,7 @@ pub async fn batch_denoise_images(
                     continue;
                 }
             };
-            match artifact_store.get_or_build(&cache_root, plan, || {
+            match denoise.get_or_build_cached(&cache_root, plan, || {
                 crate::denoising::denoise_image(
                     real_path.clone(),
                     intensity,
@@ -197,6 +278,7 @@ pub async fn batch_denoise_images(
                     ai_session.clone(),
                     #[cfg(not(feature = "ai"))]
                     ai_session,
+                    None,
                 )
             }) {
                 Ok(artifact) => {
@@ -263,25 +345,19 @@ pub async fn save_denoised_image(
     original_path_str: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let artifact = state
-        .active_denoise_artifact
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| {
-            "No enhanced denoise artifact is active for the current source.".to_string()
-        })?;
-
     let is_raw = crate::formats::is_raw_file(&original_path_str);
 
     let (first_path, source_sidecar_path) =
         crate::file_management::parse_virtual_path(&original_path_str);
-    let requested_source = first_path
-        .canonicalize()
-        .map_err(|error| format!("Could not resolve denoise source: {error}"))?;
-    if requested_source.to_string_lossy() != artifact.manifest.plan.source_revision.canonical_path {
-        return Err("Active denoise artifact belongs to a different physical source".to_string());
-    }
+    let requested_source = super::denoise_artifact::PhysicalSourceRevision::from_path(&first_path)?;
+    let artifact = state
+        .services
+        .denoise
+        .current_artifact(&original_path_str, &requested_source)
+        .ok_or_else(|| {
+            "No enhanced denoise artifact is active for the current image and source revision."
+                .to_string()
+        })?;
     let denoised_image = &artifact.image;
     let parent_dir = first_path
         .parent()
@@ -328,6 +404,7 @@ fn run_bm3d(
     rgb_img: &Rgb32FImage,
     intensity: f32,
     app_handle: &AppHandle,
+    operation: Option<DenoiseOperationHandle>,
 ) -> Result<DynamicImage, String> {
     let (width, height) = rgb_img.dimensions();
     let params = Bm3dParams::from_intensity(intensity);
@@ -343,18 +420,19 @@ fn run_bm3d(
     let total_work_units = (patches_x * patches_y) * 2;
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
-    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Processing (Step 1/2)...");
+    emit_denoise_progress(app_handle, operation, "Processing (Step 1/2)...");
 
     let progress = ProgressReporter {
         counter: &progress_counter,
         total_work: total_work_units,
         app_handle,
+        operation,
     };
     let mut denoised_channels =
         bm3d_process_joint(&channels, width, height, &params, &dct_tables, &progress);
 
     {
-        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Blending detail...");
+        emit_denoise_progress(app_handle, operation, "Blending detail...");
         let blurred_y = gaussian_blur_1ch(&original_y, width as usize, height as usize, 3.0);
         let detail_strength = (intensity * 0.5_f32).clamp(0.0_f32, 0.5_f32);
         let y_ch = &mut denoised_channels[0];
@@ -380,6 +458,7 @@ fn denoise_image(
     method: String,
     app_handle: AppHandle,
     ai_session: Option<AiSession>,
+    operation: Option<DenoiseOperationHandle>,
 ) -> Result<EnhancedDenoiseBuildOutput, String> {
     #[cfg(not(feature = "ai"))]
     let _ = &ai_session;
@@ -391,7 +470,7 @@ fn denoise_image(
     let is_raw = is_raw_file(&path_str);
     let settings = load_settings_or_default(&app_handle);
 
-    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Loading image...");
+    emit_denoise_progress(&app_handle, operation, "Loading image...");
 
     let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut dynamic_img =
@@ -399,7 +478,7 @@ fn denoise_image(
             .map_err(|e| e.to_string())?;
 
     if is_raw {
-        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Preparing RAW data...");
+        emit_denoise_progress(&app_handle, operation, "Preparing RAW data...");
         apply_cpu_default_raw_processing(&mut dynamic_img);
     }
 
@@ -412,23 +491,38 @@ fn denoise_image(
         #[cfg(feature = "ai")]
         {
             let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
-            crate::ai::ai_processing::run_ai_denoise(
+            crate::ai::ai_processing::run_ai_denoise_with_progress(
                 &rgb_img_for_denoiser,
                 intensity,
                 &session_arc,
-                &app_handle,
+                &|message| emit_denoise_progress(&app_handle, operation, message),
             )
             .map_err(|e| e.to_string())?
         }
     } else {
-        run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle)?
+        run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle, operation)?
     };
 
-    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Finalizing data...");
+    emit_denoise_progress(&app_handle, operation, "Finalizing data...");
     Ok(EnhancedDenoiseBuildOutput {
         image: out_dynamic,
         input_range,
     })
+}
+
+fn emit_denoise_progress(
+    app_handle: &AppHandle,
+    operation: Option<DenoiseOperationHandle>,
+    message: impl Into<String>,
+) {
+    let Some(operation) = operation else {
+        return;
+    };
+    let payload = serde_json::json!({
+        "message": message.into(),
+        "operation": operation,
+    });
+    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, payload);
 }
 
 fn enhanced_cache_root(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -473,6 +567,7 @@ fn encode_denoise_preview(image: &DynamicImage) -> Result<String, String> {
 fn emit_denoise_complete(
     artifact: &EnhancedDenoiseArtifactV1,
     path_str: &str,
+    operation: DenoiseOperationHandle,
     app_handle: &AppHandle,
 ) -> Result<(), String> {
     let settings = load_settings_or_default(app_handle);
@@ -490,12 +585,30 @@ fn emit_denoise_complete(
         "original": data_url_orig,
         "artifactId": artifact.manifest.artifact_id,
         "cacheIdentity": artifact.manifest.plan_fingerprint,
+        "operation": operation,
         "qualityReceipt": artifact.manifest.quality_receipt,
     });
 
     app_handle
         .emit(crate::events::DENOISE_COMPLETE, &payload)
         .map_err(|error| format!("Failed to emit denoise completion: {error}"))
+}
+
+fn emit_denoise_error_if_current(
+    denoise: &super::denoise_service::EnhancedDenoiseService,
+    operation: &DenoiseOperation,
+    app_handle: &AppHandle,
+    error: String,
+) {
+    if !denoise.is_current(operation) {
+        return;
+    }
+    let payload = serde_json::json!({
+        "error": error,
+        "operation": operation.handle(),
+    });
+    let _ = app_handle.emit(crate::events::DENOISE_ERROR, payload);
+    denoise.finish(operation);
 }
 
 fn rgb_to_ycbcr(r: &[f32], g: &[f32], b: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
@@ -597,9 +710,7 @@ fn run_bm3d_step_joint(
             let pct = (c as f32 / progress.total_work as f32) * 100.0;
             let step_str = if is_step_1 { "Step 1/2" } else { "Step 2/2" };
             let msg = format!("{} - {:.0}%", step_str, pct);
-            let _ = progress
-                .app_handle
-                .emit(crate::events::DENOISE_PROGRESS, msg);
+            emit_denoise_progress(progress.app_handle, progress.operation, msg);
         }
 
         let mut group_locs_buf = [(0, 0); MAX_GROUP_SIZE];
