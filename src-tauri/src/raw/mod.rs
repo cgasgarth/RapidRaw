@@ -8,6 +8,7 @@ pub(crate) mod highlight_reconstruction;
 pub(crate) mod negative_conversion;
 pub(crate) mod negative_lab_color_finish;
 pub(crate) mod negative_lab_detail_finish;
+pub(crate) mod negative_lab_optical_finish;
 pub(crate) mod negative_lab_retouch;
 #[cfg(all(test, feature = "tauri-test"))]
 pub(crate) mod private_decode_raw_proof;

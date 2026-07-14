@@ -87,6 +87,20 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     effectiveLocalContrastRadius: number;
     effectiveSharpeningRadius: number;
   };
+  opticalFinishMetrics?: {
+    afterHash: string;
+    algorithmId: 'negative_lab_optical_finish_v1';
+    algorithmVersion: 1;
+    beforeHash: string;
+    changedPixelRatio: number;
+    effectiveGlowRadiusPixels: number;
+    effectiveHalationRadiusPixels: number;
+    gamutClippedPixelCount: number;
+    localizedMaskRatio: number;
+    operationId: 'negative_lab.optical_finish';
+    prePolicyOvershoot: number;
+    warningCodes: Array<'inapplicable_mode_identity'>;
+  };
   dimensions: { height: number; width: number };
   renderer:
     | 'rawengine_density_preview_runtime'

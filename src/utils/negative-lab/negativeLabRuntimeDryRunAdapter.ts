@@ -7,6 +7,7 @@ import {
   type NegativeLabRuntimePreviewRenderResultV1,
 } from '../../../packages/rawengine-schema/src';
 import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
+import { negativeLabOpticalFinishMetricsSchema } from '../../schemas/negative-lab/negativeLabOpticalFinishSchemas';
 import {
   negativeLabOutputTransformSchema,
   negativeLabSceneLinearStatsSchema,
@@ -228,6 +229,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict()
       .optional(),
+    opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
     flatLogMaster: z
       .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
       .strict()
@@ -317,6 +319,7 @@ const toRuntimePreviewRenderResult = (
     },
     ...(artifact.densityScopes === undefined ? {} : { densityScopes: artifact.densityScopes }),
     ...(artifact.detailFinishMetrics === undefined ? {} : { detailFinishMetrics: artifact.detailFinishMetrics }),
+    ...(artifact.opticalFinishMetrics === undefined ? {} : { opticalFinishMetrics: artifact.opticalFinishMetrics }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
@@ -366,6 +369,22 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           working_space?: 'scene_linear_luminance_v1';
         }
       | undefined;
+    optical_finish?:
+      | {
+          algorithm_version?: 1;
+          enabled?: boolean;
+          glow_amount?: number;
+          glow_radius?: number;
+          glow_threshold?: number;
+          halation_amount?: number;
+          halation_radius?: number;
+          halation_threshold?: number;
+          orange_weight?: number;
+          red_weight?: number;
+          scale_basis?: 'full_resolution_short_edge_v1';
+          working_space?: 'scene_linear_srgb_d65_v1';
+        }
+      | undefined;
     color_finish?:
       | {
           algorithm_version: 1;
@@ -408,6 +427,20 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           transform_id: params.command.parameters.colorFinish.transformId,
           vibrance: params.command.parameters.colorFinish.vibrance,
           working_space: params.command.parameters.colorFinish.workingSpace,
+        },
+        optical_finish: {
+          algorithm_version: params.command.parameters.opticalFinish.algorithmVersion,
+          enabled: params.command.parameters.opticalFinish.enabled,
+          glow_amount: params.command.parameters.opticalFinish.glowAmount,
+          glow_radius: params.command.parameters.opticalFinish.glowRadius,
+          glow_threshold: params.command.parameters.opticalFinish.glowThreshold,
+          halation_amount: params.command.parameters.opticalFinish.halationAmount,
+          halation_radius: params.command.parameters.opticalFinish.halationRadius,
+          halation_threshold: params.command.parameters.opticalFinish.halationThreshold,
+          orange_weight: params.command.parameters.opticalFinish.orangeWeight,
+          red_weight: params.command.parameters.opticalFinish.redWeight,
+          scale_basis: params.command.parameters.opticalFinish.scaleBasis,
+          working_space: params.command.parameters.opticalFinish.workingSpace,
         },
         render_intent: params.recipeParams.render_intent ?? 'print',
         flat_log_master: params.recipeParams.flat_log_master ?? { algorithm_version: 1, gain: 1, lift: 0.02 },

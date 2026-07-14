@@ -8954,6 +8954,23 @@ export const negativeLabScannerColorFinishV1Schema = z
   })
   .strict();
 
+export const negativeLabOpticalFinishV1Schema = z
+  .object({
+    algorithmVersion: z.literal(1).default(1),
+    enabled: z.boolean().default(false),
+    glowAmount: z.number().min(0).max(1).default(0),
+    glowRadius: z.number().min(0.0005).max(0.25).default(0.02),
+    glowThreshold: z.number().min(0).max(1).default(0.35),
+    halationAmount: z.number().min(0).max(1).default(0),
+    halationRadius: z.number().min(0.0005).max(0.25).default(0.02),
+    halationThreshold: z.number().min(0).max(1).default(0.35),
+    orangeWeight: z.number().min(0).max(1).default(0.35),
+    redWeight: z.number().min(0).max(1).default(0.75),
+    scaleBasis: z.literal('full_resolution_short_edge_v1').default('full_resolution_short_edge_v1'),
+    workingSpace: z.literal('scene_linear_srgb_d65_v1').default('scene_linear_srgb_d65_v1'),
+  })
+  .strict();
+
 export const negativeLabSetConversionRecipeParametersV1Schema = z
   .object({
     baseStrategy: z
@@ -8986,6 +9003,20 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       transformId: 'linear_srgb_d65_cielab_v1',
       vibrance: 0,
       workingSpace: 'linear_srgb_d65',
+    }),
+    opticalFinish: negativeLabOpticalFinishV1Schema.default({
+      algorithmVersion: 1,
+      enabled: false,
+      glowAmount: 0,
+      glowRadius: 0.02,
+      glowThreshold: 0.35,
+      halationAmount: 0,
+      halationRadius: 0.02,
+      halationThreshold: 0.35,
+      orangeWeight: 0.35,
+      redWeight: 0.75,
+      scaleBasis: 'full_resolution_short_edge_v1',
+      workingSpace: 'scene_linear_srgb_d65_v1',
     }),
     densityBounds: negativeLabDensityBoundsParamsV1Schema.default({
       analysisBuffer: 0.04,
