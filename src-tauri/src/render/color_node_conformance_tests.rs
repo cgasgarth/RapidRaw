@@ -620,6 +620,23 @@ fn every_registered_pixel_adapter_mutates_the_color_cache_fingerprint() {
     }
 }
 
+#[test]
+fn point_color_global_and_mask_abi_bindings_preserve_runtime_fields() {
+    let mut global = GlobalAdjustments::default();
+    global.point_color.control = [3, 2, 1, 0];
+    global.point_color.points[0].control = [0.25, 0.75, 2.0, 1.0];
+    global_abi_coverage_tripwire(global);
+    assert_eq!(global.point_color.control, [3, 2, 1, 0]);
+    assert_eq!(global.point_color.points[0].control, [0.25, 0.75, 2.0, 1.0]);
+
+    let mut mask = MaskAdjustments::default();
+    mask.point_color.control = [1, 0, 1, 0];
+    mask.point_color.skin_target = [0.62, 0.14, 28.0, 1.0];
+    mask_abi_coverage_tripwire(mask);
+    assert_eq!(mask.point_color.control, [1, 0, 1, 0]);
+    assert_eq!(mask.point_color.skin_target, [0.62, 0.14, 28.0, 1.0]);
+}
+
 // Exhaustive destructuring is a compile-time tripwire: adding an ABI field requires
 // explicitly assigning it to a registered node instead of silently escaping coverage.
 #[allow(dead_code, clippy::too_many_lines)]
@@ -680,6 +697,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         rapid_view_parameters1,
         rapid_view_parameters2,
         tone_equalizer,
+        point_color,
         _pad_cg1,
         _pad_cg2,
         _pad_cg3,
@@ -771,6 +789,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         rapid_view_parameters1,
         rapid_view_parameters2,
         tone_equalizer,
+        point_color,
         _pad_cg1,
         _pad_cg2,
         _pad_cg3,
@@ -835,6 +854,7 @@ fn mask_abi_coverage_tripwire(mask: MaskAdjustments) {
         hue,
         blend_mode,
         tone_equalizer,
+        point_color,
         _pad_cg2,
         color_grading_shadows,
         color_grading_midtones,
@@ -883,6 +903,7 @@ fn mask_abi_coverage_tripwire(mask: MaskAdjustments) {
         hue,
         blend_mode,
         tone_equalizer,
+        point_color,
         _pad_cg2,
         color_grading_shadows,
         color_grading_midtones,
