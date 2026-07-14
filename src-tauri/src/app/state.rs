@@ -215,6 +215,8 @@ pub struct WarpedImageCache {
 }
 
 pub struct AppState {
+    /// Narrow service handles are the preferred capability boundary for new commands.
+    pub services: Arc<crate::app::services::AppServices>,
     pub startup_trace: StartupTrace,
     pub gpu_initialization: InitializationService,
     pub lens_initialization: InitializationService,
@@ -293,6 +295,7 @@ impl AppState {
             max_entries,
         };
         Self {
+            services: Arc::new(crate::app::services::AppServices::default()),
             startup_trace: StartupTrace::new(),
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
