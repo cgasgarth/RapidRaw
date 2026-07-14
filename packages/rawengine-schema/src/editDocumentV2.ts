@@ -185,6 +185,43 @@ export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelope
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 
+export interface CompiledEditDocumentNodeV2 {
+  readonly enabled: boolean;
+  readonly implementationVersion: number;
+  readonly nodeType: EditDocumentNodeTypeV2;
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  readonly renderStage: string;
+}
+
+/** Compile one validated envelope with descriptor-owned process and render-stage metadata. */
+export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNodeV2 => {
+  const envelope = editDocumentNodeEnvelopeV2Schema.parse(node);
+  const descriptor = getEditDocumentNodeDescriptor(envelope.type);
+  if (descriptor === undefined) throw new Error(`Unknown edit document node type: ${envelope.type}`);
+  if (envelope.process !== descriptor.process) throw new Error(`Node '${envelope.type}' has an incompatible process.`);
+  if (envelope.implementationVersion !== descriptor.implementationVersion) {
+    throw new Error(`Node '${envelope.type}' has an unsupported version.`);
+  }
+  return {
+    enabled: envelope.enabled,
+    implementationVersion: envelope.implementationVersion,
+    nodeType: envelope.type,
+    params: envelope.params,
+    process: envelope.process,
+    renderStage: descriptor.renderStage,
+  };
+};
+
+/** Compile the complete graph in descriptor order so render stages have stable authority. */
+export const compileEditDocumentV2 = (document: EditDocumentV2): readonly CompiledEditDocumentNodeV2[] => {
+  const parsed = editDocumentV2Schema.parse(document);
+  return EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap(({ nodeType }) => {
+    const node = parsed.nodes[nodeType];
+    return node === undefined ? [] : [compileEditDocumentNodeV2(node)];
+  });
+};
+
 export const parseEditDocumentV2 = (value: unknown): EditDocumentV2 => editDocumentV2Schema.parse(value);
 
 const editDocumentV2QuarantineInputSchema = z
