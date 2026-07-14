@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { generateKeyPairSync } from 'node:crypto';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -50,6 +50,29 @@ const scenario = (latency: number): PerformanceScenario => ({
 });
 
 const clock = (iso: string) => () => new Date(iso);
+
+type PerformanceBisectOptions = Parameters<typeof executePerformanceBisect>[0];
+const activeBisects = new Map<AbortController, Promise<unknown>>();
+
+const beginOwnedPerformanceBisect = (options: Omit<PerformanceBisectOptions, 'signal'>) => {
+  const controller = new AbortController();
+  const result = executePerformanceBisect({ ...options, signal: controller.signal });
+  activeBisects.set(controller, result);
+  void result.then(
+    () => activeBisects.delete(controller),
+    () => activeBisects.delete(controller),
+  );
+  return { abort: () => controller.abort(), result };
+};
+
+const executeOwnedPerformanceBisect = (options: Omit<PerformanceBisectOptions, 'signal'>) =>
+  beginOwnedPerformanceBisect(options).result;
+
+afterEach(async () => {
+  const executions = [...activeBisects.entries()];
+  for (const [controller] of executions) controller.abort();
+  await Promise.allSettled(executions.map(([, result]) => result));
+});
 
 describe('performance baseline history', () => {
   test('appends only reviewed passing baselines and preserves prior entries', async () => {
@@ -225,9 +248,14 @@ describe('performance regression diagnosis and routing', () => {
     };
     try {
       git('init', '--quiet');
-      // Keep the cleanliness probe honest when Git's fsmonitor emits a benign
-      // diagnostic on stderr: porcelain stdout must remain the source of truth.
-      git('config', 'core.fsmonitor', 'true');
+      // Keep the cleanliness probe honest when an fsmonitor hook emits a benign
+      // diagnostic on stderr without starting Git's long-lived fsmonitor daemon.
+      await writeFile(
+        resolve(directory, 'fsmonitor-warning.sh'),
+        "#!/bin/sh\necho 'synthetic fsmonitor diagnostic' >&2\nexit 1\n",
+        { mode: 0o755 },
+      );
+      git('config', 'core.fsmonitor', './fsmonitor-warning.sh');
       await writeFile(
         resolve(directory, 'evaluate.sh'),
         `#!/bin/sh
@@ -259,14 +287,14 @@ exit 1
       const bad = commits[4];
       if (good === undefined || firstBad === undefined || bad === undefined)
         throw new Error('Synthetic commits missing.');
-      const report = await executePerformanceBisect({
+      const report = await executeOwnedPerformanceBisect({
         cwd: directory,
         good,
         bad,
         evaluator: { command: './evaluate.sh', args: [] },
       });
       expect(report).toMatchObject({ good, bad, firstBadCommit: firstBad, candidateCommits: [firstBad] });
-      const skipped = await executePerformanceBisect({
+      const skipped = await executeOwnedPerformanceBisect({
         cwd: directory,
         good,
         bad,
@@ -277,6 +305,71 @@ exit 1
       expect(git('rev-parse', 'HEAD')).toBe(bad);
       expect(git('status', '--porcelain=v1')).toBe('');
     } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  }, 10_000);
+
+  test('forced bisect cancellation terminates and reaps the evaluator process group', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-cancel-'));
+    const evaluatorPidPath = resolve(tmpdir(), `rapidraw-perf-bisect-evaluator-${randomUUID()}.pid`);
+    const environment = isolatedGitEnvironment();
+    const git = (...args: string[]) => {
+      const result = Bun.spawnSync(['git', ...args], {
+        cwd: directory,
+        env: environment,
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+      if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+      return result.stdout.toString().trim();
+    };
+    let execution: ReturnType<typeof beginOwnedPerformanceBisect> | undefined;
+    try {
+      git('init', '--quiet');
+      await writeFile(
+        resolve(directory, 'evaluate-blocking.sh'),
+        `#!/bin/sh\necho $$ > ${JSON.stringify(evaluatorPidPath)}\nwhile :; do sleep 1; done\n`,
+        { mode: 0o755 },
+      );
+      const commits: string[] = [];
+      for (let value = 0; value < 3; value += 1) {
+        await writeFile(resolve(directory, 'value'), `${value}\n`);
+        git('add', '.');
+        git(
+          '-c',
+          'user.email=performance-lab@example.invalid',
+          '-c',
+          'user.name=Performance Lab',
+          'commit',
+          '--quiet',
+          '-m',
+          `value ${value}`,
+        );
+        commits.push(git('rev-parse', 'HEAD'));
+      }
+      const good = commits[0];
+      const bad = commits[2];
+      if (good === undefined || bad === undefined) throw new Error('Synthetic commits missing.');
+      execution = beginOwnedPerformanceBisect({
+        cwd: directory,
+        good,
+        bad,
+        evaluator: { command: './evaluate-blocking.sh', args: [] },
+      });
+      for (let attempt = 0; attempt < 200 && !(await Bun.file(evaluatorPidPath).exists()); attempt += 1)
+        await Bun.sleep(10);
+      if (!(await Bun.file(evaluatorPidPath).exists())) throw new Error('Blocking evaluator did not start.');
+      const evaluatorPid = Number((await readFile(evaluatorPidPath, 'utf8')).trim());
+
+      execution.abort();
+      await expect(execution.result).rejects.toThrow('performance_bisect_cancelled');
+      expect(() => process.kill(evaluatorPid, 0)).toThrow();
+      expect(git('rev-parse', 'HEAD')).toBe(bad);
+      expect(git('status', '--porcelain=v1')).toBe('');
+    } finally {
+      execution?.abort();
+      await Promise.allSettled(execution === undefined ? [] : [execution.result]);
+      await rm(evaluatorPidPath, { force: true });
       await rm(directory, { force: true, recursive: true });
     }
   }, 10_000);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
@@ -47,52 +47,154 @@ describe('affected validation DAG', () => {
     });
   });
   test('concurrent fixture git children cannot rewrite parent config under hook-scoped variables or failure', async () => {
-    const repositoryRoot = join(import.meta.dir, '../..');
-    const commonDirectory = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd: repositoryRoot,
-      stdout: 'pipe',
-    })
-      .stdout.toString()
-      .trim();
-    const gitDirectory = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-dir'], {
-      cwd: repositoryRoot,
-      stdout: 'pipe',
-    })
-      .stdout.toString()
-      .trim();
+    const fixtureRoot = await mkdtemp(join(tmpdir(), 'rapidraw-parent-git-invariants-'));
+    const parentRepository = join(fixtureRoot, 'parent');
+    const repositoryRoot = join(fixtureRoot, 'linked-worktree');
+    const successFixture = join(fixtureRoot, 'isolated-success');
+    const independentFixture = join(fixtureRoot, 'isolated-concurrent');
+    const failedFixture = join(fixtureRoot, 'isolated-failure');
+    await Promise.all(
+      [parentRepository, successFixture, independentFixture, failedFixture].map((directory) =>
+        mkdir(directory, { recursive: true }),
+      ),
+    );
+
+    const fixtureGit = (cwd: string, arguments_: string[]) =>
+      Bun.spawnSync(['git', ...arguments_], {
+        cwd,
+        env: isolatedGitEnvironment(),
+        stderr: 'pipe',
+        stdout: 'pipe',
+      });
+    const gitText = (cwd: string, arguments_: string[]): string => {
+      const result = fixtureGit(cwd, arguments_);
+      if (result.exitCode !== 0)
+        throw new Error(`git ${arguments_.join(' ')} failed: ${result.stderr.toString().trim()}`);
+      return result.stdout.toString().trim();
+    };
+
+    expect(await initFixtureRepository(parentRepository)).toEqual({ exitCode: 0, stderr: '' });
+    expect(fixtureGit(parentRepository, ['config', '--local', 'core.hooksPath', '.githooks']).exitCode).toBe(0);
+    expect(fixtureGit(parentRepository, ['config', '--local', 'core.fsmonitor', 'false']).exitCode).toBe(0);
+    expect(
+      fixtureGit(parentRepository, [
+        '-c',
+        'user.name=Validation Fixture',
+        '-c',
+        'user.email=validation@example.test',
+        'commit',
+        '--allow-empty',
+        '-qm',
+        'fixture base',
+      ]).exitCode,
+    ).toBe(0);
+    expect(
+      fixtureGit(parentRepository, ['worktree', 'add', '-q', '-b', 'fixture-linked', repositoryRoot]).exitCode,
+    ).toBe(0);
+
+    const readOptionalConfig = (key: string): string | undefined => {
+      const result = fixtureGit(repositoryRoot, ['config', '--local', '--get', key]);
+      if (result.exitCode === 1) return undefined;
+      if (result.exitCode !== 0) throw new Error(`git config ${key} failed: ${result.stderr.toString().trim()}`);
+      return result.stdout.toString().trim();
+    };
     const readParentState = async () => ({
-      bare: Bun.spawnSync(['git', 'config', '--local', '--get', 'core.bare'], {
-        cwd: repositoryRoot,
-        stdout: 'pipe',
-      })
-        .stdout.toString()
-        .trim(),
-      config: await readFile(join(commonDirectory, 'config')),
-      gitDirectory: Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-dir'], {
-        cwd: repositoryRoot,
-        stdout: 'pipe',
-      })
-        .stdout.toString()
-        .trim(),
-      status: Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
-        cwd: repositoryRoot,
-        stdout: 'pipe',
-      }).stdout.toString(),
+      bare: readOptionalConfig('core.bare'),
+      commonDirectory: gitText(repositoryRoot, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+      fsmonitor: readOptionalConfig('core.fsmonitor'),
+      gitDirectory: gitText(repositoryRoot, ['rev-parse', '--path-format=absolute', '--git-dir']),
+      gitFile: await readFile(join(repositoryRoot, '.git'), 'utf8'),
+      hooksPath: readOptionalConfig('core.hooksPath'),
+      status: gitText(repositoryRoot, ['status', '--porcelain=v1', '--untracked-files=no']),
+      topLevel: gitText(repositoryRoot, ['rev-parse', '--path-format=absolute', '--show-toplevel']),
+      unrelatedBranchMerge: readOptionalConfig('branch.concurrent-worker.merge'),
+      unrelatedBranchRemote: readOptionalConfig('branch.concurrent-worker.remote'),
     });
     const before = await readParentState();
-    const successFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-success-'));
-    const independentFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-concurrent-'));
-    const failedFixture = await mkdtemp(join(tmpdir(), 'rapidraw-isolated-git-failure-'));
-    const hookEnvironment = { ...process.env, GIT_DIR: commonDirectory, GIT_WORK_TREE: repositoryRoot };
+    const commonConfigBefore = await readFile(join(before.commonDirectory, 'config'));
+    expect(before).toMatchObject({
+      bare: 'false',
+      fsmonitor: 'false',
+      hooksPath: '.githooks',
+      status: '',
+      topLevel: await realpath(repositoryRoot),
+      unrelatedBranchMerge: undefined,
+      unrelatedBranchRemote: undefined,
+    });
+    expect(before.gitDirectory.startsWith(`${before.commonDirectory}/worktrees/`)).toBeTrue();
+    expect(before.gitFile.trim()).toBe(`gitdir: ${before.gitDirectory}`);
+    const hookEnvironment = {
+      ...process.env,
+      GIT_DIR: before.gitDirectory,
+      GIT_INDEX_FILE: join(before.gitDirectory, 'index'),
+      GIT_PREFIX: '',
+      GIT_WORK_TREE: repositoryRoot,
+    };
+
+    const spawnGatedFixtureRepository = (
+      root: string,
+      environment: NodeJS.ProcessEnv = process.env,
+      injectedExitCode = 0,
+    ) => {
+      const child = Bun.spawn(
+        ['/bin/sh', '-c', `printf 'ready\\n'; IFS= read -r _; git init -q; exit ${injectedExitCode}`],
+        {
+          cwd: root,
+          env: isolatedGitEnvironment(environment),
+          stderr: 'pipe',
+          stdin: 'pipe',
+          stdout: 'pipe',
+        },
+      );
+      const stdoutReader = child.stdout.getReader();
+      const ready = (async () => {
+        const chunk = await stdoutReader.read();
+        stdoutReader.releaseLock();
+        if (chunk.done || new TextDecoder().decode(chunk.value).trim() !== 'ready')
+          throw new Error('fixture git child did not reach its deterministic release barrier');
+      })();
+      const result = Promise.all([child.exited, new Response(child.stderr).text()]).then(([exitCode, stderr]) => ({
+        exitCode,
+        stderr,
+      }));
+      return {
+        child,
+        ready,
+        release: () => {
+          child.stdin.write('run\n');
+          child.stdin.end();
+        },
+        result,
+      };
+    };
+
+    const success = spawnGatedFixtureRepository(successFixture, hookEnvironment);
+    const independent = spawnGatedFixtureRepository(independentFixture);
+    const failed = spawnGatedFixtureRepository(failedFixture, hookEnvironment, 23);
+    const children = [success, independent, failed];
     try {
-      const [success, independent, failed] = await Promise.all([
-        initFixtureRepository(successFixture, hookEnvironment),
-        initFixtureRepository(independentFixture),
-        initFixtureRepository(failedFixture, hookEnvironment, 23),
-      ]);
-      expect(success).toEqual({ exitCode: 0, stderr: '' });
-      expect(independent).toEqual({ exitCode: 0, stderr: '' });
-      expect(failed).toEqual({ exitCode: 23, stderr: '' });
+      await Promise.all(children.map((child) => child.ready));
+      success.release();
+      expect(await success.result).toEqual({ exitCode: 0, stderr: '' });
+
+      // Exact interleaving: one synthetic child has completed, two remain at
+      // the release barrier, and an unrelated coordinator-style common-config
+      // update lands between them. A whole-file snapshot must differ here.
+      expect(independent.child.exitCode).toBeNull();
+      expect(failed.child.exitCode).toBeNull();
+      expect(
+        fixtureGit(repositoryRoot, ['config', '--local', 'branch.concurrent-worker.remote', 'origin']).exitCode,
+      ).toBe(0);
+      expect(
+        fixtureGit(repositoryRoot, ['config', '--local', 'branch.concurrent-worker.merge', 'refs/heads/main']).exitCode,
+      ).toBe(0);
+      expect(readOptionalConfig('branch.concurrent-worker.remote')).toBe('origin');
+      expect((await readFile(join(before.commonDirectory, 'config'))).equals(commonConfigBefore)).toBeFalse();
+
+      independent.release();
+      failed.release();
+      expect(await independent.result).toEqual({ exitCode: 0, stderr: '' });
+      expect(await failed.result).toEqual({ exitCode: 23, stderr: '' });
       for (const fixture of [successFixture, independentFixture, failedFixture]) {
         expect(
           Bun.spawnSync(['git', 'config', '--get', 'core.bare'], {
@@ -104,18 +206,19 @@ describe('affected validation DAG', () => {
             .trim(),
         ).toBe('false');
       }
+      const after = await readParentState();
+      expect(after).toEqual({
+        ...before,
+        unrelatedBranchMerge: 'refs/heads/main',
+        unrelatedBranchRemote: 'origin',
+      });
     } finally {
-      await Promise.all(
-        [successFixture, independentFixture, failedFixture].map((fixture) => rm(fixture, { recursive: true })),
-      );
+      for (const { child } of children) {
+        if (child.exitCode === null) child.kill('SIGTERM');
+        await child.exited;
+      }
+      await rm(fixtureRoot, { force: true, recursive: true });
     }
-    const after = await readParentState();
-    expect(after.bare).toBe('false');
-    expect(after.bare).toBe(before.bare);
-    expect(after.config.equals(before.config)).toBeTrue();
-    expect(after.gitDirectory).toBe(gitDirectory);
-    expect(after.gitDirectory).toBe(before.gitDirectory);
-    expect(after.status).toBe(before.status);
   });
 
   test.each([
