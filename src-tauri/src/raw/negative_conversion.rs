@@ -1,3 +1,4 @@
+use crate::color::density::negative_log_density_channel;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::jpeg_data_url;
 use crate::image_loader::{load_base_image_from_bytes, load_base_image_from_bytes_with_report};
@@ -2590,7 +2591,7 @@ struct NegativeLabPipelineRender {
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
-    -value.clamp(NEGATIVE_LAB_DENSITY_EPSILON, 1.0).log10()
+    negative_log_density_channel(value)
 }
 
 fn negative_lab_count_density_input_guards(raw_pixels: &[f32]) -> (u32, u32) {
