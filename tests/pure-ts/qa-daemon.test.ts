@@ -341,8 +341,13 @@ describe('QA daemon lifecycle', () => {
     if (state === undefined)
       throw new Error(`Daemon failed to publish state: ${await new Response(child.stderr).text()}`);
     child.kill('SIGTERM');
-    await child.exited;
+    await Promise.race([
+      child.exited,
+      Bun.sleep(5_000).then(() => {
+        throw new Error('QA daemon did not exit within the SIGTERM cleanup deadline.');
+      }),
+    ]);
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
     expect(await stat(state.socketPath).catch(() => undefined)).toBeUndefined();
-  }, 30_000);
+  }, 10_000);
 });
