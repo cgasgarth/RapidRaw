@@ -17,7 +17,6 @@ use crate::lens_correction::LensDatabase;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
-use crate::tethering::TetherSessionSnapshot;
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowState {
@@ -167,7 +166,6 @@ pub struct AppState {
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub smart_preview_scheduler:
         Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
-    pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
 }
 
 impl AppState {
@@ -254,7 +252,6 @@ impl AppState {
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             smart_preview_scheduler:
                 crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
-            tether_session: Mutex::new(None),
         }
     }
 }
