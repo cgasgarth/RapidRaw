@@ -7,10 +7,17 @@ import {
 } from './viewerInputResolver';
 
 export type ViewerInputEvent =
-  | { type: 'pointerdown'; pointerId: number; input: ResolveViewerInputInput }
-  | { type: 'pointermove'; pointerId: number }
-  | { type: 'pointerup' | 'pointercancel' | 'lostpointercapture'; pointerId: number }
+  | { type: 'pointerdown'; pointerId: number; input: ResolveViewerInputInput; sample?: ViewerPointerSample }
+  | { type: 'pointermove'; pointerId: number; sample?: ViewerPointerSample }
+  | { type: 'pointerup' | 'pointercancel' | 'lostpointercapture'; pointerId: number; sample?: ViewerPointerSample }
   | { type: 'blur' | 'escape' | 'session-invalidated' };
+
+export interface ViewerPointerSample {
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly pointerType: ViewerPointerType;
+  readonly pressure: number;
+}
 
 export interface ViewerSurfacePointerEvent {
   readonly altKey: boolean;
@@ -54,6 +61,7 @@ export const normalizeViewerSurfacePointerEvent = (event: {
 
 export interface ViewerInputRouterState {
   activePointerId: number | null;
+  lastPointerSample: ViewerPointerSample | null;
   owner: ViewerGestureOwner | null;
   sessionGeneration: number;
 }
@@ -66,6 +74,7 @@ export interface ViewerInputRouterTransition {
 
 export const initialViewerInputRouterState = (): ViewerInputRouterState => ({
   activePointerId: null,
+  lastPointerSample: null,
   owner: null,
   sessionGeneration: 0,
 });
@@ -73,6 +82,7 @@ export const initialViewerInputRouterState = (): ViewerInputRouterState => ({
 const clearGesture = (state: ViewerInputRouterState): ViewerInputRouterState => ({
   ...state,
   activePointerId: null,
+  lastPointerSample: null,
   owner: null,
 });
 
@@ -85,14 +95,24 @@ export const reduceViewerInputRouter = (
     const resolution = resolveViewerInput(event.input);
     if (resolution.owner === 'blocked') return { state, resolution, ignored: false };
     return {
-      state: { ...state, activePointerId: event.pointerId, owner: resolution.owner },
+      state: {
+        ...state,
+        activePointerId: event.pointerId,
+        lastPointerSample: event.sample ?? null,
+        owner: resolution.owner,
+      },
       resolution,
       ignored: false,
     };
   }
 
   if (event.type === 'pointermove') {
-    return { state, resolution: null, ignored: state.activePointerId !== event.pointerId };
+    const ignored = state.activePointerId !== event.pointerId;
+    return {
+      state: ignored || event.sample === undefined ? state : { ...state, lastPointerSample: event.sample },
+      resolution: null,
+      ignored,
+    };
   }
 
   if (

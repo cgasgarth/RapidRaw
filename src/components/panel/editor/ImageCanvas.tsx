@@ -2516,6 +2516,12 @@ const ImageCanvas = memo(
               ? viewerInputRouter.dispatch({
                   type: 'pointerdown',
                   pointerId: event.pointerId,
+                  sample: {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    pointerType: normalizeViewerPointerType(event.pointerType),
+                    pressure: event.pressure,
+                  },
                   input: {
                     activeTool: viewerInputState?.activeTool ?? 'none',
                     button: event.button,
@@ -2527,7 +2533,16 @@ const ImageCanvas = memo(
                     zoomed: isMaxZoom ?? false,
                   },
                 })
-              : viewerInputRouter.dispatch({ type: event.type, pointerId: event.pointerId });
+              : viewerInputRouter.dispatch({
+                  type: event.type,
+                  pointerId: event.pointerId,
+                  sample: {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    pointerType: normalizeViewerPointerType(event.pointerType),
+                    pressure: event.pressure,
+                  },
+                });
           viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
           if (

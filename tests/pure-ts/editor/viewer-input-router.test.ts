@@ -66,4 +66,28 @@ describe('viewer input router', () => {
     state = transition.state;
     expect(reduceViewerInputRouter(state, { type: 'pointerup', pointerId: 9 }).ignored).toBe(true);
   });
+
+  test('retains normalized pointer samples for pressure-aware controllers', () => {
+    const router = createViewerInputRouter();
+    router.dispatch({
+      type: 'pointerdown',
+      pointerId: 11,
+      input: input({ pointerType: 'pen' }),
+      sample: { clientX: 12, clientY: 24, pointerType: 'pen', pressure: 0.35 },
+    });
+    expect(router.getState().lastPointerSample).toEqual({
+      clientX: 12,
+      clientY: 24,
+      pointerType: 'pen',
+      pressure: 0.35,
+    });
+    router.dispatch({
+      type: 'pointermove',
+      pointerId: 11,
+      sample: { clientX: 18, clientY: 30, pointerType: 'pen', pressure: 0.8 },
+    });
+    expect(router.getState().lastPointerSample?.pressure).toBe(0.8);
+    router.dispatch({ type: 'pointerup', pointerId: 11 });
+    expect(router.getState().lastPointerSample).toBeNull();
+  });
 });
