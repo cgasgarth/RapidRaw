@@ -69,6 +69,7 @@ import {
   BUILT_IN_COLOR_STYLE_PRESETS,
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../../utils/color/style/colorStylePresetCatalog';
+import { buildReceiptSafePresetApplication } from '../../../../utils/referenceMatchTransfer';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
@@ -659,7 +660,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       }
       try {
         const before = structuredClone(adjustments);
-        const expected = { ...adjustments, ...bindTypedCurveGraphVersion(preset.adjustments) };
+        const expected = buildReceiptSafePresetApplication(adjustments, bindTypedCurveGraphVersion(preset.adjustments));
         setAdjustments(() => expected);
         setActionError(null);
         setSelectedPresetId(preset.id);
@@ -682,7 +683,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     (preset: ColorStylePreset) => {
       try {
         const before = structuredClone(adjustments);
-        const expected = { ...adjustments, ...preset.adjustmentPatch };
+        const expected = buildReceiptSafePresetApplication(adjustments, preset.adjustmentPatch);
         setAdjustments(() => expected);
         setActionError(null);
         setAppliedPreset({

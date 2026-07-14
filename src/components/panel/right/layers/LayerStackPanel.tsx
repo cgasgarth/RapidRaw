@@ -62,6 +62,7 @@ import {
   type LayerStackCommandBridgeOperation,
 } from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layers/layerStackSidecarAdjustments';
+import { reconcileReferenceMatchReceiptsAfterEdit } from '../../../../utils/referenceMatchTransfer';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
@@ -634,9 +635,9 @@ export function LayerStackPanel({
               : 'source_state_changed',
     });
     const nextMasks = materializeMasks(result.masks);
-    const nextAdjustments = persistLayerStackSidecarInAdjustments(
-      { ...currentState.adjustments, masks: nextMasks },
-      result.sidecar,
+    const nextAdjustments = reconcileReferenceMatchReceiptsAfterEdit(
+      currentState.adjustments,
+      persistLayerStackSidecarInAdjustments({ ...currentState.adjustments, masks: nextMasks }, result.sidecar),
     );
     setLayerGraphRevision(result.graphRevision);
     setLastCommandType(result.command.commandType);

@@ -115,6 +115,14 @@ const bridgeContextSchema = z
   })
   .strict();
 
+const parseBridgeContext = (context: LayerStackCommandBridgeContext) =>
+  bridgeContextSchema.parse({
+    graphRevision: context.graphRevision,
+    imagePath: context.imagePath,
+    operationId: context.operationId,
+    sessionId: context.sessionId,
+  });
+
 const clampOpacityFraction = (opacity: number): number => {
   if (!Number.isFinite(opacity)) return 1;
   return Math.max(0, Math.min(1, opacity / 100));
@@ -202,7 +210,7 @@ export function buildLayerStackSidecarFromMasks(
   masks: ReadonlyArray<MaskContainer>,
   context: LayerStackCommandBridgeContext,
 ): LayerStackSidecarV1 {
-  const parsedContext = bridgeContextSchema.parse(context);
+  const parsedContext = parseBridgeContext(context);
   return {
     graphRevision: parsedContext.graphRevision,
     layers: masks.map(toSidecarLayer),
@@ -323,7 +331,7 @@ function buildLayerStackCommand(
   sidecar: LayerStackSidecarV1,
   context: LayerStackCommandBridgeContext,
 ): LayerMaskCommandEnvelopeV1 {
-  const parsedContext = bridgeContextSchema.parse(context);
+  const parsedContext = parseBridgeContext(context);
   const commandId = `layer_stack_${parsedContext.operationId}`;
   const base = {
     actor: {
