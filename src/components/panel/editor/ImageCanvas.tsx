@@ -99,6 +99,7 @@ import {
 import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
+import { ViewerSurface } from './ViewerSurface';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { createViewerInputRouter, normalizeViewerPointerType } from './viewerInputRouter';
 
@@ -2515,7 +2516,9 @@ const ImageCanvas = memo(
     const viewerInputOwner = viewerInputOwnerState ?? viewerInputRouter.getState().owner ?? canvasPointerOwner;
 
     return (
-      <div
+      <ViewerSurface
+        geometry={overlayGeometry}
+        presentation={presentationDescriptor}
         className="canvas-overlay relative"
         data-canvas-overlay-status={activeCanvasOverlayStatus}
         data-canvas-overlay-tool={activeCanvasOverlayTool}
@@ -3445,7 +3448,7 @@ const ImageCanvas = memo(
             )
           }
         />
-      </div>
+      </ViewerSurface>
     );
   },
 );
