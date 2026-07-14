@@ -45,10 +45,13 @@ import {
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import {
   createPreviewCoordinatorState,
+  fingerprintPreviewRoi,
   type PreviewCoordinatorEvent,
   type PreviewCoordinatorState,
   type PreviewOperationIdentity,
+  type PreviewQualitySnapshot,
   type PreviewSessionIdentity,
+  quantizePreviewRoi,
   reducePreviewCoordinator,
 } from '../../utils/previewCoordinator';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
@@ -238,7 +241,7 @@ export function useImageProcessing(
         maskRevision: positive(scope.maskRevision),
         patchRevision: positive(scope.patchRevision),
         proofRevision: positive(scope.proofRevision),
-        roiFingerprint: JSON.stringify(roi ?? [0, 0, 1, 1]),
+        roiFingerprint: fingerprintPreviewRoi(roi),
         sourceImagePath: scope.sourceImagePath,
         sourceRevision: positive(scope.imageSessionId),
         targetHeight: positive(targetRes),
@@ -324,8 +327,7 @@ export function useImageProcessing(
         revision: viewportScopeRevisionRef.current.revision + 1,
       };
     }
-    const quantizeRoi = (value: number | undefined): number | null =>
-      value === undefined ? null : Math.round(value * normalizedTargetRes) / normalizedTargetRes;
+    const quantizedRoi = quantizePreviewRoi(roi, normalizedTargetRes);
     return {
       roi,
       scope: {
@@ -343,10 +345,10 @@ export function useImageProcessing(
         maskRevision: editor.adjustmentSnapshot.maskRevision,
         patchRevision: editor.adjustmentSnapshot.patchRevision,
         proofRevision: editor.proofRevision,
-        roiX: quantizeRoi(roi?.[0]),
-        roiY: quantizeRoi(roi?.[1]),
-        roiW: quantizeRoi(roi?.[2]),
-        roiH: quantizeRoi(roi?.[3]),
+        roiX: quantizedRoi?.[0] ?? null,
+        roiY: quantizedRoi?.[1] ?? null,
+        roiW: quantizedRoi?.[2] ?? null,
+        roiH: quantizedRoi?.[3] ?? null,
         sourceImagePath,
         targetResolution: normalizedTargetRes,
         viewportIdentity: viewportScopeRevisionRef.current.revision,
@@ -364,7 +366,7 @@ export function useImageProcessing(
         type: 'viewport-changed',
         viewport: {
           revision: snapshot.scope.viewportIdentity,
-          roiFingerprint: JSON.stringify(snapshot.roi ?? [0, 0, 1, 1]),
+          roiFingerprint: fingerprintPreviewRoi(snapshot.roi),
           targetHeight: snapshot.scope.targetResolution,
           targetWidth: snapshot.scope.targetResolution,
         },
@@ -855,6 +857,16 @@ export function useImageProcessing(
 
       const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
       const quality = resolveQualityDecision(requestedTargetRes, dragging);
+      const qualitySnapshot: PreviewQualitySnapshot = {
+        effectiveTargetResolution: quality.effectiveTargetResolution,
+        interacting: dragging,
+        reason: quality.reason,
+        requestedTargetResolution: quality.requestedTargetResolution,
+        roiFingerprint: fingerprintPreviewRoi(quality.effectiveRoi),
+        sufficientForSemanticZoom: quality.sufficientForSemanticZoom,
+        tier: quality.tier,
+      };
+      dispatchPreviewCoordinator({ quality: qualitySnapshot, type: 'quality-decision-changed' });
       const normalizedTargetRes = quality.effectiveTargetResolution;
       const synchronized = synchronizePreviewIdentity(normalizedTargetRes, quality.effectiveRoi);
       if (!synchronized) return;

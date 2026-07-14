@@ -1,9 +1,11 @@
 import {
   createPreviewCoordinatorState,
   fingerprintPreviewOperationIdentity,
+  fingerprintPreviewRoi,
   fingerprintPreviewSessionIdentity,
   type PreviewArtifact,
   type PreviewSessionIdentity,
+  quantizePreviewRoi,
   reducePreviewCoordinator,
 } from '../../../src/utils/previewCoordinator';
 
@@ -216,4 +218,24 @@ test('display generation invalidates visible artifacts before a replacement rend
   });
   expect(invalidated.state.visibleArtifact).toBeNull();
   expect(invalidated.state.displayGeneration).toBe(2);
+});
+
+test('quality decisions are translated once and ROI fingerprints are resolution-stable', () => {
+  expect(quantizePreviewRoi([0.1234, 0.5678, 0.25, 0.125], 100)).toEqual([0.12, 0.57, 0.25, 0.13]);
+  expect(fingerprintPreviewRoi(null)).toBe('[0,0,1,1]');
+  const quality = {
+    effectiveTargetResolution: 1600,
+    interacting: false,
+    reason: 'settled viewport',
+    requestedTargetResolution: 1800,
+    roiFingerprint: fingerprintPreviewRoi([0.1, 0.1, 0.8, 0.8]),
+    sufficientForSemanticZoom: true,
+    tier: 'settled_full',
+  } as const;
+  const transition = reducePreviewCoordinator(createPreviewCoordinatorState(), {
+    quality,
+    type: 'quality-decision-changed',
+  });
+  expect(transition.state.quality).toEqual(quality);
+  expect(transition.state.lastTransition?.reason).toBe('quality-decision-changed');
 });
