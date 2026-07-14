@@ -112,16 +112,29 @@ export interface ValidationSnapshot {
   toolchainIdentity: string;
 }
 
+export const boundedToolIdentity = (label: string, command: readonly string[], timeoutMs = 250): string => {
+  const result = Bun.spawnSync([...command], {
+    killSignal: 'SIGKILL',
+    maxBuffer: 4096,
+    stderr: 'pipe',
+    stdout: 'pipe',
+    timeout: timeoutMs,
+  });
+  const disposition = result.exitedDueToTimeout
+    ? 'timeout'
+    : result.exitedDueToMaxBuffer
+      ? 'max-buffer'
+      : (result.signalCode ?? String(result.exitCode));
+  return `${label}:${disposition}:${result.stdout.toString().trim()}`;
+};
+
 export const freezeValidationSnapshot = async (root: string): Promise<ValidationSnapshot> => {
   const files = (await walkFiles(root)).sort();
   const digests = new Map<string, string>();
   for (const path of files) digests.set(path, digest([await readFile(join(root, path))]));
   const identity = digest(files.flatMap((path) => [path, digests.get(path) ?? 'missing']));
   const toolchainIdentity = ['bun', 'cargo', 'rustc']
-    .map((tool) => {
-      const result = Bun.spawnSync([tool, '--version'], { stdout: 'pipe', stderr: 'pipe' });
-      return `${tool}:${result.exitCode}:${result.stdout.toString().trim()}`;
-    })
+    .map((tool) => boundedToolIdentity(tool, [tool, '--version']))
     .join('|');
   return { files, digests, identity, toolchainIdentity };
 };

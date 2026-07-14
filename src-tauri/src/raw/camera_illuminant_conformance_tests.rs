@@ -101,11 +101,56 @@ fn illuminant_reference(illuminant: Illuminant) -> Option<(f32, [f64; 2])> {
     }
 }
 
+fn independent_cct_to_xy(cct: f32) -> [f64; 2] {
+    let temperature = f64::from(cct);
+    assert!((1_667.0..=25_000.0).contains(&temperature));
+    let x = if temperature <= 4_000.0 {
+        -0.266_123_9e9 / temperature.powi(3) - 0.234_358_0e6 / temperature.powi(2)
+            + 0.877_695_6e3 / temperature
+            + 0.179_910
+    } else {
+        -3.025_846_9e9 / temperature.powi(3)
+            + 2.107_037_9e6 / temperature.powi(2)
+            + 0.222_634_7e3 / temperature
+            + 0.240_390
+    };
+    let y = if temperature <= 2_222.0 {
+        -1.106_381_4 * x.powi(3) - 1.348_110_20 * x.powi(2) + 2.185_558_32 * x - 0.202_196_83
+    } else if temperature <= 4_000.0 {
+        -0.954_947_6 * x.powi(3) - 1.374_185_93 * x.powi(2) + 2.091_370_15 * x - 0.167_488_67
+    } else {
+        3.081_758_0 * x.powi(3) - 5.873_386_70 * x.powi(2) + 3.751_129_97 * x - 0.370_014_83
+    };
+    [x, y]
+}
+
+fn independent_camera_white_chroma(matrix: &[f32], white: [f64; 2]) -> [f64; 2] {
+    let xyz = [
+        white[0] / white[1],
+        1.0,
+        (1.0 - white[0] - white[1]) / white[1],
+    ];
+    let response = [
+        f64::from(matrix[0]) * xyz[0]
+            + f64::from(matrix[1]) * xyz[1]
+            + f64::from(matrix[2]) * xyz[2],
+        f64::from(matrix[3]) * xyz[0]
+            + f64::from(matrix[4]) * xyz[1]
+            + f64::from(matrix[5]) * xyz[2],
+        f64::from(matrix[6]) * xyz[0]
+            + f64::from(matrix[7]) * xyz[1]
+            + f64::from(matrix[8]) * xyz[2],
+    ];
+    [
+        (response[0] / response[1]).abs().ln(),
+        (response[2] / response[1]).abs().ln(),
+    ]
+}
+
 fn expected_profile(
     color_matrices: &std::collections::HashMap<Illuminant, Vec<f32>>,
     wb: [f32; 4],
 ) -> ExpectedProfile {
-    let target_cct = (6_504.0 / (wb[2] / wb[0]).clamp(0.44, 2.28)).clamp(2_856.0, 8_000.0);
     let mut candidates = color_matrices
         .iter()
         .filter(|(_, matrix)| matrix.len() == 9 && matrix.iter().all(|value| value.is_finite()))
@@ -116,6 +161,23 @@ fn expected_profile(
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| left.1.total_cmp(&right.1));
     assert!(!candidates.is_empty(), "metadata color profile candidates");
+    let warm_endpoint = candidates[0];
+    let cool_endpoint = *candidates.last().expect("nonempty candidates");
+    let observed = [f64::from(wb[1] / wb[0]).ln(), f64::from(wb[1] / wb[2]).ln()];
+    let warm_chroma = independent_camera_white_chroma(warm_endpoint.3, warm_endpoint.2);
+    let cool_chroma = independent_camera_white_chroma(cool_endpoint.3, cool_endpoint.2);
+    let axis = [
+        cool_chroma[0] - warm_chroma[0],
+        cool_chroma[1] - warm_chroma[1],
+    ];
+    let denominator = axis[0].mul_add(axis[0], axis[1] * axis[1]);
+    let cool_endpoint_weight = (((observed[0] - warm_chroma[0]) * axis[0]
+        + (observed[1] - warm_chroma[1]) * axis[1])
+        / denominator)
+        .clamp(0.0, 1.0);
+    let target_cct = (1.0
+        / ((1.0 - cool_endpoint_weight) / f64::from(warm_endpoint.1)
+            + cool_endpoint_weight / f64::from(cool_endpoint.1))) as f32;
     let warm = candidates
         .iter()
         .rev()
@@ -144,11 +206,7 @@ fn expected_profile(
             .map(|(warm, cool)| warm.mul_add(1.0 - weight, cool * weight))
             .collect()
     };
-    let weight = f64::from(weight);
-    let white_xy = [
-        warm.2[0] * (1.0 - weight) + cool.2[0] * weight,
-        warm.2[1] * (1.0 - weight) + cool.2[1] * weight,
-    ];
+    let white_xy = independent_cct_to_xy(target_cct);
     let mut hasher = blake3::Hasher::new();
     for value in &matrix {
         hasher.update(&value.to_le_bytes());

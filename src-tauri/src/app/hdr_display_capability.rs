@@ -1,6 +1,8 @@
 use serde::Serialize;
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 pub const HDR_DISPLAY_CAPABILITY_VERSION: u32 = 1;
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 const SDR_REFERENCE_WHITE_NITS: f64 = 203.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -18,6 +20,7 @@ pub enum HdrPresentationAuthority {
     ToneMappedSdrFallback,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct EdrHeadroomSample {
     pub current: Option<f64>,
@@ -45,10 +48,12 @@ pub struct HdrDisplayCapabilityV1 {
     pub fingerprint: u64,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 fn valid_headroom(value: Option<f64>) -> Option<f64> {
     value.filter(|value| value.is_finite() && *value >= 1.0)
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 pub fn compile_hdr_display_capability(
     display_profile_sha256: String,
     sample: EdrHeadroomSample,
@@ -101,6 +106,7 @@ pub fn compile_hdr_display_capability(
     capability
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 fn capability_fingerprint(capability: &HdrDisplayCapabilityV1) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     let mut update = |bytes: &[u8]| {
@@ -185,11 +191,6 @@ pub fn query_edr_headroom(display_id: Option<u32>) -> EdrHeadroomSample {
             }),
         }
     }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn query_edr_headroom(_display_id: Option<u32>) -> EdrHeadroomSample {
-    EdrHeadroomSample::default()
 }
 
 #[cfg(test)]

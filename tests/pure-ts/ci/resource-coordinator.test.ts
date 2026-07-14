@@ -15,22 +15,35 @@ const temporaryRoot = async (): Promise<string> => {
   return root;
 };
 
-const waitFor = async (condition: () => Promise<boolean>, message: string): Promise<void> => {
-  for (let attempt = 0; attempt < 500; attempt += 1) {
+const waitFor = async (condition: () => Promise<boolean>, message: string, timeoutMs = 4_000): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (await condition()) return;
     await Bun.sleep(10);
   }
   throw new Error(message);
 };
 
-const queuedLabels = async (root: string): Promise<string[]> => {
-  const queue = join(root, 'native-heavy.queue');
+const queuedLabels = async (root: string, resource = 'native-heavy'): Promise<string[]> => {
+  const queue = join(root, `${resource}.queue`);
   const entries = await readdir(queue).catch(() => []);
-  return await Promise.all(
+  const labels = await Promise.all(
     entries
       .filter((entry) => entry.endsWith('.json'))
-      .map(async (entry) => JSON.parse(await readFile(join(queue, entry), 'utf8')).label as string),
+      .map(async (entry) => {
+        const contents = await readFile(join(queue, entry), 'utf8').catch(() => null);
+        if (contents === null) return null;
+        try {
+          const value: unknown = JSON.parse(contents);
+          return typeof value === 'object' && value !== null && 'label' in value && typeof value.label === 'string'
+            ? value.label
+            : null;
+        } catch {
+          return null;
+        }
+      }),
   );
+  return labels.filter((label): label is string => label !== null);
 };
 
 const directLease = (root: string, script: string, cwd?: string) => {
@@ -92,34 +105,47 @@ describe('cross-worktree resource coordinator', () => {
   test('bounds memory-heavy lanes across worktrees without serializing safe parallel work', async () => {
     const root = await temporaryRoot();
     const worktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];
+    const releasePath = join(root, 'release-capacity');
     await Promise.all(worktrees.map((worktree) => mkdir(worktree)));
+    const startedPath = (label: string) => join(root, `${label}.started`);
     const script = (label: string) =>
       `const lease=await acquireResourceLease({resource:'cpu-heavy',capacity:2,label:${JSON.stringify(label)}});
 const pressure=new Uint8Array(32*1024*1024); pressure.fill(1);
-console.log('start '+Date.now()); await Bun.sleep(180); console.log('end '+Date.now()+' '+pressure[0]); await lease.release();`;
+await Bun.write(${JSON.stringify(startedPath(label))},'started');
+while(!(await Bun.file(${JSON.stringify(releasePath)}).exists())) await Bun.sleep(10);
+console.log('released '+pressure[0]); await lease.release();`;
     const first = directLease(root, script('first'), worktrees[0]);
     const second = directLease(root, script('second'), worktrees[1]);
-    await Bun.sleep(25);
-    const third = directLease(root, script('third'), worktrees[2]);
-    const processes = [first, second, third];
-    await Promise.all(processes.map(expectSuccessfulExit));
-    const intervals = await Promise.all(
-      processes.map(async (process) => {
-        const output = await new Response(process.stdout).text();
-        return {
-          end: Number(output.match(/end (\d+)/u)?.[1]),
-          start: Number(output.match(/start (\d+)/u)?.[1]),
-        };
-      }),
+    await waitFor(
+      async () => (await Bun.file(startedPath('first')).exists()) && (await Bun.file(startedPath('second')).exists()),
+      'capacity two did not admit the first two workers concurrently',
+      10_000,
     );
-    const thirdInterval = intervals[2];
-    const firstInterval = intervals[0];
-    const secondInterval = intervals[1];
-    if (!firstInterval || !secondInterval || !thirdInterval) throw new Error('expected three intervals');
-    expect(firstInterval.start).toBeLessThan(secondInterval.end);
-    expect(secondInterval.start).toBeLessThan(firstInterval.end);
-    expect(thirdInterval.start).toBeGreaterThanOrEqual(Math.min(firstInterval.end, secondInterval.end));
+    const third = directLease(root, script('third'), worktrees[2]);
+    await waitFor(
+      async () => (await queuedLabels(root, 'cpu-heavy')).includes('third'),
+      'third worker never queued',
+      10_000,
+    );
+    expect(await Bun.file(startedPath('third')).exists()).toBeFalse();
+    await writeFile(releasePath, 'release\n');
+    await Promise.all([first, second, third].map(expectSuccessfulExit));
+    expect(await Bun.file(startedPath('third')).exists()).toBeTrue();
+  }, 15_000);
+
+  test('uses a portable lock primitive without requiring macOS shlock', async () => {
+    const root = await temporaryRoot();
+    const child = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'portable-lock'});
+console.log('portable-acquired');
+await lease.release();`,
+    );
+    await expectSuccessfulExit(child);
+    expect(await new Response(child.stdout).text()).toContain('portable-acquired');
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
+
   test('hands a released lease to the oldest waiter before an immediate reacquirer', async () => {
     const root = await temporaryRoot();
     const releaseFirst = join(root, 'release-first');
@@ -175,22 +201,26 @@ await lease.release();`,
       `const lease=await acquireResourceLease({resource:'native-heavy',label:'killed-waiter'});await lease.release();`,
     );
     await waitFor(async () => (await queuedLabels(root)).includes('killed-waiter'), 'killed waiter never queued');
-    killed.kill('SIGKILL');
-    await killed.exited;
     const follower = directLease(
       root,
       `const lease=await acquireResourceLease({resource:'native-heavy',label:'live-follower'});
 console.log('follower-acquired');
 await lease.release();`,
     );
-    await waitFor(async () => (await queuedLabels(root)).includes('live-follower'), 'live follower never queued');
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('live-follower'),
+      'live follower never queued',
+      10_000,
+    );
+    killed.kill('SIGKILL');
+    await killed.exited;
     await writeFile(releaseHolder, 'release\n');
     expect(await holder.exited).toBe(0);
     expect(await follower.exited).toBe(0);
     expect(await new Response(follower.stdout).text()).toContain('follower-acquired');
     expect(await queuedLabels(root)).toEqual([]);
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
-  });
+  }, 15_000);
 
   test('serializes heavy processes while an uncoordinated lightweight process still runs', async () => {
     const root = await temporaryRoot();

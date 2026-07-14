@@ -60,24 +60,28 @@ export const requiredExecutionElapsedSeconds = (
   selected: Readonly<Record<PrFastLane, boolean>>,
 ): number => {
   const plan = jobs.find((job) => job.name === 'validation: affected fast-lane plan');
-  if (!plan) throw new Error('required validation plan timing is missing');
-  const planStartedAt = Date.parse(plan.startedAt);
+  if (!plan || plan.completedAt === null) throw new Error('required validation plan timing is missing or incomplete');
   const selectedJobNames = Object.entries(PR_REQUIRED_JOBS).flatMap(([lane, jobIds]) =>
     selected[lane as PrFastLane] ? jobIds.map((jobId) => PR_REQUIRED_JOB_NAMES[jobId]) : [],
   );
   if (selectedJobNames.some((name) => name === undefined)) throw new Error('required job name mapping is incomplete');
   const selectedJobs = selectedJobNames.map((name) => jobs.find((job) => job.name === name));
-  if (selectedJobs.some((job) => job === undefined || job.completedAt === null)) {
+  const completedSelectedJobs = selectedJobs.filter(
+    (job): job is WorkflowJobTiming => job !== undefined && job.completedAt !== null,
+  );
+  if (completedSelectedJobs.length !== selectedJobs.length) {
     throw new Error('selected required job timing is missing or incomplete');
   }
-  const completedAt = Math.max(
-    ...selectedJobs.map((job) => Date.parse(job?.completedAt ?? '')),
-    Date.parse(plan.completedAt ?? plan.startedAt),
-  );
-  if (!Number.isFinite(planStartedAt) || !Number.isFinite(completedAt) || completedAt < planStartedAt) {
-    throw new Error('required validation timing is invalid');
-  }
-  return Math.ceil((completedAt - planStartedAt) / 1000);
+  const durationMs = (job: WorkflowJobTiming): number => {
+    const startedAt = Date.parse(job.startedAt);
+    const completedAt = Date.parse(job.completedAt ?? '');
+    if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) {
+      throw new Error(`required validation timing is invalid for ${job.name}`);
+    }
+    return completedAt - startedAt;
+  };
+  const slowestSelectedMs = Math.max(0, ...completedSelectedJobs.map(durationMs));
+  return Math.ceil((durationMs(plan) + slowestSelectedMs) / 1000);
 };
 
 export interface PrValidationPlan {

@@ -24,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
+      - name: Install browser contract runtime
+        run: bunx playwright install chromium
       - name: Run complete frontend, schema, bundle, and browser contracts
         run: |
           bun run lint
@@ -43,9 +45,7 @@ jobs:
           bun run check:browser-harness
 
       - name: Run browser visual smoke
-        run: |
-          bunx playwright install chromium
-          bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
+        run: bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
 
       - name: Generate bundle analysis report
         if: ${{ always() }}

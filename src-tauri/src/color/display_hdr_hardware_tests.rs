@@ -1,16 +1,23 @@
+#[cfg(target_os = "macos")]
 use std::{path::Path, time::Instant};
 
+#[cfg(target_os = "macos")]
 use image::{ImageBuffer, Rgba};
 use rapidraw_color_reference::{
     transfer::{hlg_inverse_oetf, hlg_oetf, pq_eotf, pq_inverse_eotf},
     types::{AbsoluteLuminanceNits, HlgSignal, PqSignal, SceneLinearHlg},
 };
 use serde::Serialize;
+#[cfg(target_os = "macos")]
 use sha2::{Digest, Sha256};
 
+#[cfg(target_os = "macos")]
 const REPORT_ENV: &str = "RAWENGINE_DISPLAY_HDR_PROOF_REPORT";
+#[cfg(target_os = "macos")]
 const GRAPH_REPORT_ENV: &str = "RAWENGINE_COLOR_GRAPH_TRACE_REPORT";
+#[cfg(target_os = "macos")]
 const COMMIT_ENV: &str = "RAWENGINE_COLOR_PROOF_COMMIT";
+#[cfg(target_os = "macos")]
 const CONTRACT: &str = "rapidraw.native-display-hdr-proof.v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -61,6 +68,7 @@ struct EdrCapability {
     disposition: String,
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct GraphBinding {
@@ -71,6 +79,7 @@ struct GraphBinding {
     graph_report_path: String,
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NativeDisplayHdrProof {
@@ -102,6 +111,7 @@ struct NativeDisplayHdrProof {
     timings_ms: ProofTimings,
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProofTimings {
@@ -279,6 +289,7 @@ fn query_edr_capability() -> EdrCapability {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn graph_binding() -> Result<GraphBinding, String> {
     let Ok(path) = std::env::var(GRAPH_REPORT_ENV) else {
         return Ok(GraphBinding {
@@ -309,6 +320,7 @@ fn graph_binding() -> Result<GraphBinding, String> {
     })
 }
 
+#[cfg(target_os = "macos")]
 fn write_visual_artifact(
     path: &Path,
     pq: &[TransferPair],
@@ -352,6 +364,7 @@ fn write_visual_artifact(
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn native_colorsync_edr_hdr_contract_and_visual_artifact_are_bound_and_numeric() {
     let display_started = Instant::now();
@@ -503,8 +516,54 @@ fn native_colorsync_edr_hdr_contract_and_visual_artifact_are_bound_and_numeric()
     std::fs::write(&report_path, report_bytes).expect("display HDR report writes outside repo");
 }
 
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn non_macos_hdr_contract_uses_explicit_deterministic_capability_fallback() {
+    let profile = crate::display_profile::active_display_profile()
+        .expect("unsupported platforms must return a typed display-profile fallback");
+    assert!(profile.display_id.is_none());
+    assert!(profile.icc_sha256.is_none());
+    assert!(profile.profile_byte_count.is_none());
+
+    let fallback = query_edr_capability();
+    assert!(fallback.current_headroom.is_none());
+    assert!(fallback.potential_headroom.is_none());
+    assert!(fallback.reference_headroom.is_none());
+    assert_eq!(
+        fallback.disposition,
+        "explicit_capability_fallback_non_macos"
+    );
+
+    validate_display_contract(&DisplayContract {
+        mode: DisplayMode::Sdr,
+        display_profile_sha256: "unsupported_platform".to_string(),
+        snapshot_profile_sha256: "unsupported_platform".to_string(),
+        output_transfer_count: 1,
+        metadata: None,
+    })
+    .expect("non-macOS fallback still enforces the single-transfer SDR contract");
+    assert!(!pq_pairs().expect("PQ fallback vectors").is_empty());
+    assert!(!hlg_pairs().expect("HLG fallback vectors").is_empty());
+}
+
 #[test]
 fn stale_profile_double_transfer_wrong_metadata_and_cross_use_fail_closed() {
+    validate_display_contract(&DisplayContract {
+        mode: DisplayMode::HdrPq,
+        display_profile_sha256: "profile-a".to_string(),
+        snapshot_profile_sha256: "profile-a".to_string(),
+        output_transfer_count: 1,
+        metadata: Some(HdrMetadata {
+            mode: DisplayMode::HdrPq,
+            transfer: "smpte_st_2084",
+            primaries: "bt2020",
+            reference_white_nits: 203.0,
+            peak_nits: 1_000.0,
+            full_range: true,
+        }),
+    })
+    .expect("valid PQ contract");
+
     let valid = DisplayContract {
         mode: DisplayMode::HdrHlg,
         display_profile_sha256: "profile-a".to_string(),
