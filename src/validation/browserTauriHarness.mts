@@ -40,6 +40,12 @@ interface BrowserHarnessApplyPreviewResponse {
   delayMs: number;
 }
 
+interface BrowserHarnessMetadataSaveResponse {
+  delayMs: number;
+  failure?: string;
+  sidecarRevision?: string;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -62,6 +68,7 @@ declare global {
       batchAutoAdjustCommitDelayMs: number;
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
+      metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
       callIndex: number;
@@ -296,6 +303,7 @@ export const installBrowserTauriHarness = (): void => {
     enabled: true,
     failNextSettingsSave: false,
     imageOpenDelayMs: 250,
+    metadataSaveResponses: [],
     originalPreviewResponses: [],
     revokedObjectUrls: [],
   };
@@ -495,7 +503,6 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(null);
     case commandNames.frontendReady:
     case commandNames.clearSessionCaches:
-    case commandNames.applyAdjustmentsToPaths:
       return Promise.resolve(null);
     case commandNames.startBackgroundIndexing:
       catalogIndexingOperationId += 1;
@@ -510,12 +517,50 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.cancelThumbnailGeneration:
       return Promise.resolve(true);
+    case commandNames.applyAdjustmentsToPaths: {
+      const adjustments = args?.['adjustments'] ?? null;
+      const paths = getStringArrayArg(args, 'paths');
+      for (const path of paths) harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
+      return Promise.resolve(
+        paths.map((path) => ({
+          adjustments,
+          adjustmentRevision: null,
+          catalogRevision: null,
+          imageId: `path:${path}`,
+          imageSessionId: null,
+          path,
+          renderFingerprint: 1,
+          sidecarRevision: `sha256:${'e'.repeat(64)}`,
+          thumbnailRevision: `sha256:${'f'.repeat(64)}`,
+          transactionId: null,
+        })),
+      );
+    }
     case commandNames.saveMetadataAndUpdateThumbnail: {
       const path = getStringArg(args, 'path') ?? `${browserHarnessRoot}/browser-harness.ARW`;
-      if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
-      return Promise.resolve({
-        path,
-        sidecarRevision: `sha256:${'a'.repeat(64)}`,
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.metadataSaveResponses.shift();
+      return new Promise((resolve, reject) => {
+        window.setTimeout(() => {
+          if (response?.failure !== undefined) {
+            reject(new Error(response.failure));
+            return;
+          }
+          if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
+          resolve({
+            adjustments: args?.['adjustments'] ?? null,
+            adjustmentRevision:
+              (args?.['transaction'] as { nextAdjustmentRevision?: unknown } | undefined)?.nextAdjustmentRevision ??
+              null,
+            catalogRevision: null,
+            imageId: `path:${path}`,
+            imageSessionId: (args?.['transaction'] as { imageSessionId?: unknown } | undefined)?.imageSessionId ?? null,
+            path,
+            renderFingerprint: 1,
+            sidecarRevision: response?.sidecarRevision ?? `sha256:${'a'.repeat(64)}`,
+            thumbnailRevision: `sha256:${'d'.repeat(64)}`,
+            transactionId: (args?.['transaction'] as { transactionId?: unknown } | undefined)?.transactionId ?? null,
+          });
+        }, response?.delayMs ?? 0);
       });
     }
     case commandNames.exportImages:

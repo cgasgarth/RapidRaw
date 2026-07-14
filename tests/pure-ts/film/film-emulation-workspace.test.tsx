@@ -8,7 +8,6 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { FilmEmulationWorkspace } from '../../../src/components/film/FilmEmulationWorkspace';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { scheduleAdjustmentPersistenceAfterInteraction } from '../../../src/utils/adjustmentPersistence';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 
@@ -58,32 +57,9 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   await invokeRangeInteraction(mix, 'onLostPointerCapture');
   expect(useEditorStore.getState().isSliderDragging).toBe(false);
 
-  jest.useFakeTimers();
-  const persistedStrengths: number[] = [];
-  let persistenceTimer: ReturnType<typeof setTimeout> | null = null;
-  const observePersistence = () => {
-    const state = useEditorStore.getState();
-    const strength = state.adjustments.filmLookStrength;
-    persistenceTimer = scheduleAdjustmentPersistenceAfterInteraction(persistenceTimer, state.isSliderDragging, () =>
-      persistedStrengths.push(strength),
-    );
-    if (state.isSliderDragging) {
-      jest.runAllTimers();
-      expect(persistedStrengths).toEqual([]);
-    }
-  };
-  const gestureTransactionIds = await dragRange(
-    container,
-    'input[aria-label="Film mix"]',
-    [90, 70, 50],
-    observePersistence,
-  );
+  const gestureTransactionIds = await dragRange(container, 'input[aria-label="Film mix"]', [90, 70, 50]);
   expect(new Set(gestureTransactionIds).size).toBe(1);
   expect(useEditorStore.getState().isSliderDragging).toBe(false);
-  expect(persistedStrengths).toEqual([]);
-  jest.advanceTimersByTime(50);
-  expect(persistedStrengths).toEqual([50]);
-  jest.useRealTimers();
   expect(useEditorStore.getState()).toMatchObject({
     adjustmentRevision: 4,
     adjustments: { filmLookStrength: 50 },

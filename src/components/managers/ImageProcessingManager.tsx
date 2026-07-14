@@ -1,10 +1,8 @@
 import type { RefObject } from 'react';
 import { useImageProcessing } from '../../hooks/editor/useImageProcessing';
-import type { Adjustments } from '../../utils/adjustments';
 
 interface Props {
   transformWrapperRef: RefObject<TransformController | null>;
-  prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
 }
 
 interface TransformController {
@@ -21,13 +19,8 @@ interface TransformController {
   zoomOut(factor: number, time?: number): void;
 }
 
-interface PreviousAdjustments {
-  adjustments: Adjustments;
-  path: string;
-}
-
 export default function ImageProcessingManager(props: Props) {
-  useImageProcessing(props.transformWrapperRef, props.prevAdjustmentsRef);
+  useImageProcessing(props.transformWrapperRef);
 
   return null;
 }

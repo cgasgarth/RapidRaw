@@ -855,6 +855,7 @@ fn validate_adjustments(
         "flipHorizontal",
         "flipVertical",
         "flareAmount",
+        "filmEmulation",
         "filmLookId",
         "filmLookStrength",
         "glowAmount",
@@ -1052,6 +1053,14 @@ fn validate_adjustments(
         extensions.insert("referenceMatchApplicationReceipt".to_string(), value);
         disabled.push("adjustments.referenceMatchApplicationReceipt".to_string());
         reasons.push("reference_match_application_receipt_invalid".to_string());
+    }
+    let invalid_film_emulation = object.get("filmEmulation").is_some_and(|value| {
+        crate::film_emulation::parse_node(&serde_json::json!({ "filmEmulation": value })).is_err()
+    });
+    if invalid_film_emulation && let Some(value) = object.remove("filmEmulation") {
+        extensions.insert("filmEmulation".to_string(), value);
+        disabled.push("adjustments.filmEmulation".to_string());
+        reasons.push("film_emulation_contract_invalid".to_string());
     }
     let invalid_numeric: Vec<String> = object
         .iter()
@@ -3073,6 +3082,41 @@ mod tests {
         );
         assert_eq!(reloaded.adjustments["toneMapper"], "rapidView");
         assert_eq!(reloaded.adjustments["viewTransform"]["contrast"], 1.15);
+    }
+
+    #[test]
+    fn save_sidecar_roundtrips_disabled_film_emulation_contract() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "exposure": 0.6,
+                "filmEmulation": null
+            }),
+            ..Default::default()
+        };
+
+        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect("disabled Film node should remain valid persisted render state");
+
+        let reloaded = load_sidecar(&sidecar_path);
+        assert_eq!(reloaded.adjustments["exposure"], 0.6);
+        assert!(reloaded.adjustments["filmEmulation"].is_null());
+    }
+
+    #[test]
+    fn save_sidecar_rejects_invalid_film_emulation_contract() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({ "filmEmulation": { "mix": 1 } }),
+            ..Default::default()
+        };
+
+        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect_err("invalid Film node must fail closed");
+        assert!(error.contains("adjustments.filmEmulation"));
+        assert!(!sidecar_path.exists());
     }
 
     #[test]

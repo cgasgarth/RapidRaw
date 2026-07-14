@@ -31,7 +31,7 @@ export class EditorPersistenceAuthorityLedger {
     return `${path}\0${canonicalJson(document)}`;
   }
 
-  track(path: string, document: unknown, persistence: Promise<unknown>): Promise<unknown> {
+  track<T>(path: string, document: unknown, persistence: Promise<T>): Promise<T> {
     const pending = this.pendingByPath.get(path) ?? new Set<Promise<unknown>>();
     this.pendingByPath.set(path, pending);
     const tracked = persistence

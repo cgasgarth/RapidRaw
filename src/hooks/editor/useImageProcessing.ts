@@ -6,24 +6,16 @@ import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/E
 import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import {
   getPreviewReadyPhase,
   type PreviewOperationClass,
-  type PreviewQualityDecision,
   type PreviewQualityStatus,
   type PreviewRoi,
 } from '../../utils/adaptivePreviewQuality';
-import {
-  decideAdjustmentPersistence,
-  scheduleAdjustmentPersistenceAfterInteraction,
-} from '../../utils/adjustmentPersistence';
-import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
-import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
+import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
 import {
@@ -34,8 +26,6 @@ import {
 } from '../../utils/editedPreviewEffectRunner';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
-import { buildEditTransactionPersistenceContext } from '../../utils/editTransaction';
-import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   decodeInteractivePreviewUrl,
   type InteractivePreviewScope,
@@ -54,19 +44,8 @@ import {
   quantizePreviewRoi,
 } from '../../utils/previewCoordinator';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
-import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import {
-  debouncedSave,
-  getEditorPersistenceAuthorityEpoch,
-  isEditorPersistenceAuthorityCurrent,
-} from './useEditorActions';
-
-interface PreviousAdjustments {
-  adjustments: Adjustments;
-  path: string;
-}
 
 interface TransformState {
   positionX: number;
@@ -96,10 +75,7 @@ type MaterializedEditedPreviewValue =
 
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
-export function useImageProcessing(
-  transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
-  prevAdjustmentsRef: React.RefObject<PreviousAdjustments | null>,
-) {
+export function useImageProcessing(transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>) {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const committedAdjustments = useEditorStore((state) => state.adjustments);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
@@ -111,9 +87,7 @@ export function useImageProcessing(
   const originalSize = useEditorStore((state) => state.originalSize);
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
-  const canonicalAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const editorImageSession = useEditorStore((state) => state.imageSession);
-  const lastEditApplicationReceipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
     imageSessionId: editorImageSession?.id ?? null,
     path: selectedImage?.path ?? null,
@@ -129,7 +103,6 @@ export function useImageProcessing(
       ? referenceMatchAdjustments
       : (renderAdjustmentSnapshot.value as Adjustments);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
-  const proofRevision = useEditorStore((state) => state.proofRevision);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
@@ -140,7 +113,6 @@ export function useImageProcessing(
 
   const activeRightPanel = useUIStore((state) => state.activeRightPanel);
   const appSettings = useSettingsStore((state) => state.appSettings);
-  const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const selectedProofRecipe = useMemo(
     () =>
       isExportSoftProofEnabled
@@ -148,7 +120,6 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const persistIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportScopeRevisionRef = useRef<{ inputs: readonly unknown[]; revision: number }>({
     inputs: [],
     revision: 1,
@@ -822,102 +793,6 @@ export function useImageProcessing(
     applyAdjustments,
     calculateTargetRes,
     appSettings?.enableLivePreviews,
-  ]);
-
-  useEffect(() => {
-    if (!selectedImage?.isReady) return;
-    const previous = prevAdjustmentsRef.current;
-    const persistence = decideAdjustmentPersistence(
-      previous,
-      selectedImage.path,
-      committedAdjustments,
-      areAdjustmentsEqual,
-    );
-    if (persistence.action === 'prime') {
-      // A newly selected image can become preview-ready before its metadata phase
-      // hydrates the editor store. Prime the comparison snapshot without writing so
-      // INITIAL_ADJUSTMENTS cannot race and replace the image's persisted edits.
-      prevAdjustmentsRef.current = persistence.snapshot;
-      return;
-    }
-    if (persistence.action === 'unchanged') return;
-
-    const persistenceAuthorityEpoch = getEditorPersistenceAuthorityEpoch();
-    persistIdleTimer.current = scheduleAdjustmentPersistenceAfterInteraction(
-      persistIdleTimer.current,
-      isSliderDragging,
-      () => {
-        if (!isEditorPersistenceAuthorityCurrent(persistenceAuthorityEpoch)) return;
-        if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
-        const currentReceipt =
-          lastEditApplicationReceipt &&
-          lastEditApplicationReceipt.imageSessionId ===
-            (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
-          lastEditApplicationReceipt.adjustmentRevision === canonicalAdjustmentRevision
-            ? lastEditApplicationReceipt
-            : null;
-        if (currentReceipt?.persistence === 'native-committed') {
-          prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: committedAdjustments };
-          return;
-        }
-        const transaction = currentReceipt
-          ? buildEditTransactionPersistenceContext(currentReceipt, currentReceipt)
-          : undefined;
-        debouncedSave(selectedImage.path, committedAdjustments, transaction);
-        useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
-
-        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
-        if (otherPaths.length > 0) {
-          const prev = prevAdjustmentsRef.current;
-          if (prev && prev.path === selectedImage.path) {
-            const delta: Record<string, unknown> = {};
-            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            for (const key of Object.keys(committedAdjustments) as Array<keyof Adjustments>) {
-              if (includedKeys.includes(key as string)) {
-                const adjustmentValue: unknown = committedAdjustments[key];
-                const previousAdjustmentValue: unknown = prev.adjustments[key];
-                if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
-                  delta[key] = adjustmentValue;
-                }
-              }
-            }
-            if (Object.keys(delta).length > 0) {
-              const acceptedDelta = acceptReferenceMatchAdjustmentTransfer({
-                adjustments: delta,
-                transferMode: 'batch-sync',
-              }).adjustments;
-              otherPaths.forEach((p) => {
-                globalImageCache.delete(p);
-              });
-              useProcessStore.getState().invalidateThumbnails(otherPaths);
-              invokeWithSchema(
-                Invokes.ApplyAdjustmentsToPaths,
-                { paths: otherPaths, adjustments: acceptedDelta },
-                emptyTauriResponseSchema,
-              ).catch((err: unknown) => {
-                console.error('Failed to apply adjustments to multi-selection:', err);
-              });
-            }
-          }
-        }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: committedAdjustments };
-      },
-    );
-
-    return () => {
-      if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
-    };
-  }, [
-    committedAdjustments,
-    selectedImage?.path,
-    selectedImage?.isReady,
-    isSliderDragging,
-    multiSelectedPaths,
-    prevAdjustmentsRef,
-    appSettings?.copyPasteSettings?.includedAdjustments,
-    imageSessionId,
-    canonicalAdjustmentRevision,
-    lastEditApplicationReceipt,
   ]);
 
   useEffect(() => {

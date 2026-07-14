@@ -25,7 +25,11 @@ import {
   hasBasicToneAdjustmentChange,
 } from '../../utils/basicToneCommandBridge';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
-import { EditorPersistenceAuthorityLedger } from '../../utils/editorPersistenceAuthority';
+import {
+  awaitMatchingEditorPersistence,
+  beginEditorPersistenceBarrier,
+  trackEditorPersistence,
+} from '../../utils/editorPersistenceService';
 import {
   type EditorZoomCommand,
   getEditorZoomDpr,
@@ -47,44 +51,33 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);
 }, 500);
 
-const editorPersistenceLedger = new EditorPersistenceAuthorityLedger();
-let editorPersistenceAuthorityEpoch = 0;
-
 export const debouncedSave = debounce(
   (path: string, adjustmentsToSave: Adjustments, transaction?: EditTransactionPersistenceContext) => {
-    void editorPersistenceLedger
-      .track(
+    void trackEditorPersistence(
+      path,
+      adjustmentsToSave,
+      invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
         path,
-        adjustmentsToSave,
-        invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
-          path,
-          adjustments: adjustmentsToSave,
-          transaction,
-        }),
-      )
-      .catch((err: unknown) => {
-        console.error('Auto-save failed:', err);
-        toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
-      });
+        adjustments: adjustmentsToSave,
+        transaction,
+      }),
+    ).catch((err: unknown) => {
+      console.error('Auto-save failed:', err);
+      toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
+    });
   },
   300,
 );
 
-export const beginEditorPersistenceAuthorityBarrier = (): number => {
-  editorPersistenceAuthorityEpoch += 1;
+export const beginEditorPersistenceAuthorityBarrier = (): void => {
   debouncedSave.cancel();
-  return editorPersistenceAuthorityEpoch;
+  beginEditorPersistenceBarrier();
 };
-
-export const isEditorPersistenceAuthorityCurrent = (epoch: number): boolean =>
-  epoch === editorPersistenceAuthorityEpoch;
-
-export const getEditorPersistenceAuthorityEpoch = (): number => editorPersistenceAuthorityEpoch;
 
 export const awaitMatchingEditorSave = async (
   path: string,
   adjustments: Adjustments,
-): Promise<{ path: string; sidecarRevision: string } | null> => editorPersistenceLedger.receiptFor(path, adjustments);
+): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, adjustments);
 
 type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
 
