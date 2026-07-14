@@ -3,6 +3,7 @@ import type { Adjustments } from './adjustments';
 /** The caller's intent, kept explicit so new mutation paths can be audited. */
 export type EditMutationSource =
   | 'manual-control'
+  | 'picker'
   | 'auto-edit'
   | 'preset'
   | 'copy-paste'
