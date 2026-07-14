@@ -179,4 +179,50 @@ describe('reduceEditTransaction', () => {
       'edit_transaction.stale_session:session-layer:session-other',
     );
   });
+
+  test('reset transactions replace history atomically instead of appending a duplicate boundary', () => {
+    const store = useEditorStore.getState();
+    store.applyEditTransaction(request({ baseAdjustmentRevision: 0, imageSessionId: 'editor-image-session:1' }));
+
+    const reset = store.applyEditTransaction(
+      request({
+        baseAdjustmentRevision: 1,
+        imageSessionId: 'editor-image-session:1',
+        source: 'reset',
+        history: 'reset',
+        operations: [{ type: 'replace-adjustments', adjustments: INITIAL_ADJUSTMENTS }],
+      }),
+    );
+    const state = useEditorStore.getState();
+
+    expect(reset.source).toBe('reset');
+    expect(reset.changedKeys).toEqual(['exposure']);
+    expect(state.adjustments).toEqual(INITIAL_ADJUSTMENTS);
+    expect(state.adjustmentRevision).toBe(2);
+    expect(state.history).toEqual([INITIAL_ADJUSTMENTS]);
+    expect(state.historyIndex).toBe(0);
+    expect(state.historyCheckpoints).toEqual([]);
+    expect(() =>
+      useEditorStore.getState().applyEditTransaction(
+        request({
+          baseAdjustmentRevision: 1,
+          imageSessionId: 'editor-image-session:1',
+          source: 'reset',
+          history: 'reset',
+          operations: [{ type: 'replace-adjustments', adjustments: INITIAL_ADJUSTMENTS }],
+        }),
+      ),
+    ).toThrow('edit_transaction.stale_base:1:2');
+    expect(() =>
+      useEditorStore.getState().applyEditTransaction(
+        request({
+          baseAdjustmentRevision: 2,
+          imageSessionId: 'editor-image-session:other',
+          source: 'reset',
+          history: 'reset',
+          operations: [{ type: 'replace-adjustments', adjustments: INITIAL_ADJUSTMENTS }],
+        }),
+      ),
+    ).toThrow('edit_transaction.stale_session:editor-image-session:other:editor-image-session:1');
+  });
 });
