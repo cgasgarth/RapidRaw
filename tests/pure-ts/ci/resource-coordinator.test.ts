@@ -4,10 +4,27 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const temporaryRoots: string[] = [];
+const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
 
 afterEach(async () => {
+  const children = spawnedChildren.splice(0);
+  for (const child of children) {
+    if (child.exitCode === null) child.kill('SIGTERM');
+  }
+  await Promise.all(
+    children.map(async (child) => {
+      const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(1_000).then(() => false)]);
+      if (!exited) child.kill('SIGKILL');
+      await child.exited;
+    }),
+  );
   await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
+
+const trackChild = <Child extends ReturnType<typeof Bun.spawn>>(child: Child): Child => {
+  spawnedChildren.push(child);
+  return child;
+};
 
 const temporaryRoot = async (): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'rapidraw-resource-coordinator-'));
@@ -48,12 +65,25 @@ const queuedLabels = async (root: string, resource = 'native-heavy'): Promise<st
 
 const directLease = (root: string, script: string, cwd?: string) => {
   const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
-  return Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${script}`], {
-    env: { ...Bun.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: root, RAWENGINE_RESOURCE_WAIT_POLL_MS: '10' },
-    cwd,
-    stderr: 'pipe',
-    stdout: 'pipe',
-  });
+  const lifecycle = `const {existsSync}=await import('node:fs');
+const lifecycleParent=Number(Bun.env.RAWENGINE_TEST_PARENT_PID);
+const lifecycleRoot=${JSON.stringify(root)};
+const lifecycle=setInterval(()=>{try{process.kill(lifecycleParent,0)}catch{process.exit(143)}if(!existsSync(lifecycleRoot))process.exit(143)},25);
+lifecycle.unref();
+try{${script}}finally{clearInterval(lifecycle)}`;
+  return trackChild(
+    Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${lifecycle}`], {
+      env: {
+        ...Bun.env,
+        RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
+        RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
+        RAWENGINE_TEST_PARENT_PID: String(process.pid),
+      },
+      cwd,
+      stderr: 'pipe',
+      stdout: 'pipe',
+    }),
+  );
 };
 
 const expectSuccessfulExit = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
@@ -62,29 +92,40 @@ const expectSuccessfulExit = async (child: ReturnType<typeof Bun.spawn>): Promis
 };
 
 const coordinated = (root: string, label: string, script: string) =>
-  Bun.spawn(
-    [
-      'bun',
-      'scripts/ci/run-resource-coordinated.ts',
-      '--resource',
-      'native-heavy',
-      '--label',
-      label,
-      '--',
-      'bun',
-      '-e',
-      script,
-    ],
-    {
-      env: {
-        ...Bun.env,
-        RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
-        RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
+  trackChild(
+    Bun.spawn(
+      [
+        'bun',
+        'scripts/ci/run-resource-coordinated.ts',
+        '--resource',
+        'native-heavy',
+        '--label',
+        label,
+        '--',
+        'bun',
+        '-e',
+        script,
+      ],
+      {
+        env: {
+          ...Bun.env,
+          RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
+          RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
+        },
+        stderr: 'pipe',
+        stdout: 'pipe',
       },
-      stderr: 'pipe',
-      stdout: 'pipe',
-    },
+    ),
   );
+
+const processIsAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const seedStaleLock = async (root: string, label: string): Promise<void> => {
   await mkdir(root, { recursive: true });
@@ -232,7 +273,7 @@ await lease.release();`,
     await Bun.sleep(60);
     const second = coordinated(root, 'second-heavy', `console.log('second-start '+Date.now())`);
     const lightweightStartedAt = Date.now();
-    const lightweight = Bun.spawn(['bun', '-e', `await Bun.sleep(20)`]);
+    const lightweight = trackChild(Bun.spawn(['bun', '-e', `await Bun.sleep(20)`]));
     expect(await lightweight.exited).toBe(0);
     expect(Date.now() - lightweightStartedAt).toBeLessThan(250);
 
@@ -284,36 +325,58 @@ await lease.release();`,
     expect(firstInterval.end <= secondInterval.start || secondInterval.end <= firstInterval.start).toBe(true);
   });
 
-  test('a killed wrapper leaves its child process group as owner until the child exits', async () => {
+  test('a killed wrapper reaps its command before releasing the live lease', async () => {
     const root = await temporaryRoot();
     const orphanStartedPath = join(root, 'orphan-started');
-    const orphanEndPath = join(root, 'orphan-end');
+    const commandPidPath = join(root, 'command-pid');
     await seedStaleLock(root, 'killed-recoverer');
     const interrupted = coordinated(
       root,
       'interrupted-successor',
-      `await Bun.write(${JSON.stringify(orphanStartedPath)},'started'); await Bun.sleep(220); await Bun.write(${JSON.stringify(orphanEndPath)},String(Date.now()))`,
+      `await Bun.write(${JSON.stringify(commandPidPath)},String(process.pid));
+await Bun.write(${JSON.stringify(orphanStartedPath)},'started');
+while(true) await Bun.sleep(10);`,
     );
-    let acquired = false;
-    for (let attempt = 0; attempt < 300; attempt += 1) {
-      const owner = await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '');
-      if (owner.includes('interrupted-successor') && (await Bun.file(orphanStartedPath).exists())) {
-        acquired = true;
-        break;
-      }
-      await Bun.sleep(10);
-    }
-    expect(acquired).toBe(true);
+    await waitFor(
+      async () =>
+        (await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '')).includes(
+          'interrupted-successor',
+        ) && (await Bun.file(orphanStartedPath).exists()),
+      'interrupted wrapper never acquired its lease',
+      10_000,
+    );
+    const ownerPid = Number(JSON.parse(await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).pid);
+    const commandPid = Number(await readFile(commandPidPath, 'utf8'));
     interrupted.kill('SIGKILL');
     await interrupted.exited;
     const follower = coordinated(root, 'post-kill-follower', `console.log('follower-start '+Date.now())`);
     expect(await follower.exited).toBe(0);
     const followerOutput = await new Response(follower.stdout).text();
-    const orphanEnd = Number(await readFile(orphanEndPath, 'utf8'));
-    const followerStart = Number(followerOutput.match(/follower-start (\d+)/)?.[1]);
     expect(followerOutput).toMatch(
       /post-kill-follower (?:waiting for native-heavy:|recovered stale native-heavy:) interrupted-successor pid=/u,
     );
-    expect(followerStart).toBeGreaterThanOrEqual(orphanEnd);
+    await waitFor(
+      async () => !processIsAlive(ownerPid) && !processIsAlive(commandPid),
+      'supervisor did not reap its command after wrapper interruption',
+    );
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  }, 15_000);
+
+  test('a sentinel holder exits when its coordinator root disappears', async () => {
+    const root = await temporaryRoot();
+    const started = join(root, 'holder-started');
+    const missingSentinel = join(root, 'never-created');
+    const holder = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'root-guarded-holder'});
+await Bun.write(${JSON.stringify(started)},'started');
+while(!(await Bun.file(${JSON.stringify(missingSentinel)}).exists())) await Bun.sleep(10);
+await lease.release();`,
+    );
+    await waitFor(async () => await Bun.file(started).exists(), 'root-guarded holder did not start');
+
+    await rm(root, { recursive: true, force: true });
+
+    expect(await holder.exited).toBe(143);
   });
 });
