@@ -97,6 +97,9 @@ use crate::cache_utils::{
 use crate::editor::preview_geometry::{
     PreviewGeometryQuality, PreviewGeometryTarget, preview_geometry_transform,
 };
+use crate::editor::viewer_sampling_service::{
+    CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
+};
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
@@ -387,6 +390,13 @@ fn analyze_tone_equalizer_placement(
         confidence: placement.confidence,
         histogram,
     })
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSamplePoint {
+    x: f64,
+    y: f64,
 }
 
 #[derive(Deserialize)]
@@ -785,16 +795,14 @@ fn generate_export_soft_proof_preview(
         let frame = CachedViewerSampleFrame {
             artifact_identity,
             graph_revision: graph_revision.to_string(),
-            pixels: crate::app_state::SampleablePixels::native(Arc::new(DynamicImage::ImageRgb8(
-                proof_image,
-            ))),
+            pixels: SampleablePixels::native(Arc::new(DynamicImage::ImageRgb8(proof_image))),
             image_identity: loaded_image.path.clone(),
             space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
         };
-        let weight = frame.pixels.retained_bytes();
         state
-            .viewer_sample_frames
-            .insert("softProof".to_string(), Arc::new(frame), weight);
+            .services
+            .viewer_sampling
+            .publish(ViewerSampleCacheSlot::SoftProof, frame);
     }
 
     let proof_image =
@@ -1281,531 +1289,17 @@ fn generate_original_transformed_preview(
         let frame = CachedViewerSampleFrame {
             artifact_identity,
             graph_revision,
-            pixels: crate::app_state::SampleablePixels::native(Arc::new(transformed_image.clone())),
+            pixels: SampleablePixels::native(Arc::new(transformed_image.clone())),
             image_identity: loaded_image.path,
             space_label: "Original · Display encoded sRGB".to_string(),
         };
-        let weight = frame.pixels.retained_bytes();
         state
-            .viewer_sample_frames
-            .insert("original".to_string(), Arc::new(frame), weight);
+            .services
+            .viewer_sampling
+            .publish(ViewerSampleCacheSlot::Original, frame);
     }
 
     encode_jpeg_data_url(&transformed_image, 80)
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct ViewerSamplePoint {
-    x: f64,
-    y: f64,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct ViewerSampleImageSize {
-    width: u32,
-    height: u32,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-enum ViewerSampleTarget {
-    Edited,
-    Original,
-    SoftProof,
-}
-
-impl ViewerSampleTarget {
-    fn cache_key(self) -> &'static String {
-        static EDITED: std::sync::LazyLock<String> =
-            std::sync::LazyLock::new(|| "edited".to_string());
-        static ORIGINAL: std::sync::LazyLock<String> =
-            std::sync::LazyLock::new(|| "original".to_string());
-        static SOFT_PROOF: std::sync::LazyLock<String> =
-            std::sync::LazyLock::new(|| "softProof".to_string());
-        match self {
-            Self::Edited => &EDITED,
-            Self::Original => &ORIGINAL,
-            Self::SoftProof => &SOFT_PROOF,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-enum ViewerSampleSpace {
-    DisplayEncoded,
-    WorkingLinear,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ViewerSampleRequest {
-    request_identity: String,
-    image_identity: String,
-    graph_revision: String,
-    geometry_epoch: u64,
-    normalized_image_point: ViewerSamplePoint,
-    source_image_size: ViewerSampleImageSize,
-    target: ViewerSampleTarget,
-    sample_radius_image_px: u32,
-    requested_space: ViewerSampleSpace,
-}
-
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-enum ViewerSampleUnavailableReason {
-    FrameUnavailable,
-    StaleFrame,
-    UnsupportedSpace,
-    InvalidPoint,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct ViewerClippedChannels(u8);
-
-impl Serialize for ViewerClippedChannels {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeSeq;
-        let mut sequence = serializer.serialize_seq(Some(self.0.count_ones() as usize))?;
-        for (bit, label) in [(1, "r"), (2, "g"), (4, "b")] {
-            if self.0 & bit != 0 {
-                sequence.serialize_element(label)?;
-            }
-        }
-        sequence.end()
-    }
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "camelCase")]
-enum ViewerSampleResponse {
-    Available {
-        #[serde(rename = "requestIdentity")]
-        request_identity: String,
-        #[serde(rename = "imagePointPx")]
-        image_point_px: ViewerSamplePointPx,
-        rgb: [f64; 3],
-        luma: f64,
-        #[serde(rename = "clippedChannels")]
-        clipped_channels: ViewerClippedChannels,
-        #[serde(rename = "spaceLabel")]
-        space_label: String,
-    },
-    Unavailable {
-        #[serde(rename = "requestIdentity")]
-        request_identity: String,
-        reason: ViewerSampleUnavailableReason,
-        #[serde(rename = "spaceLabel")]
-        space_label: String,
-    },
-}
-
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
-struct ViewerSamplePointPx {
-    x: u32,
-    y: u32,
-}
-
-fn unavailable_viewer_sample(
-    request: &ViewerSampleRequest,
-    reason: ViewerSampleUnavailableReason,
-    space_label: &str,
-) -> ViewerSampleResponse {
-    ViewerSampleResponse::Unavailable {
-        request_identity: request.request_identity.clone(),
-        reason,
-        space_label: space_label.to_string(),
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ViewerSampleRect {
-    min_x: u32,
-    max_x: u32,
-    min_y: u32,
-    max_y: u32,
-    image_point_px: ViewerSamplePointPx,
-}
-
-fn resolve_sample_rect(
-    request: &ViewerSampleRequest,
-    width: u32,
-    height: u32,
-) -> Option<ViewerSampleRect> {
-    let point = request.normalized_image_point;
-    if width == 0
-        || height == 0
-        || request.source_image_size.width == 0
-        || request.source_image_size.height == 0
-        || !point.x.is_finite()
-        || !point.y.is_finite()
-        || !(0.0..=1.0).contains(&point.x)
-        || !(0.0..=1.0).contains(&point.y)
-    {
-        return None;
-    }
-    let center_x = (point.x * f64::from(width - 1)).round() as u32;
-    let center_y = (point.y * f64::from(height - 1)).round() as u32;
-    let source_max = request
-        .source_image_size
-        .width
-        .max(request.source_image_size.height);
-    let frame_max = width.max(height);
-    let radius = ((request.sample_radius_image_px as f64 * f64::from(frame_max)
-        / f64::from(source_max))
-    .ceil() as u32)
-        .min(16);
-    Some(ViewerSampleRect {
-        min_x: center_x.saturating_sub(radius),
-        max_x: center_x.saturating_add(radius).min(width - 1),
-        min_y: center_y.saturating_sub(radius),
-        max_y: center_y.saturating_add(radius).min(height - 1),
-        image_point_px: ViewerSamplePointPx {
-            x: (point.x * f64::from(request.source_image_size.width - 1)).round() as u32,
-            y: (point.y * f64::from(request.source_image_size.height - 1)).round() as u32,
-        },
-    })
-}
-
-static VIEWER_SAMPLE_PIXELS_VISITED: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(0);
-
-fn sum_native_pixels(image: &DynamicImage, rect: ViewerSampleRect) -> Option<([f64; 3], u64)> {
-    macro_rules! sum_rows {
-        ($buffer:expr, $channels:expr, $scale:expr) => {{
-            let raw = $buffer.as_raw();
-            let width = $buffer.width() as usize;
-            let channels = $channels;
-            let mut totals = [0.0_f64; 3];
-            let mut count = 0_u64;
-            for y in rect.min_y as usize..=rect.max_y as usize {
-                let start = (y * width + rect.min_x as usize) * channels;
-                let end = (y * width + rect.max_x as usize + 1) * channels;
-                for pixel in raw.get(start..end)?.chunks_exact(channels) {
-                    totals[0] += pixel[0] as f64 * $scale;
-                    totals[1] += pixel[1] as f64 * $scale;
-                    totals[2] += pixel[2] as f64 * $scale;
-                    count += 1;
-                }
-            }
-            Some((totals, count))
-        }};
-    }
-    match image {
-        DynamicImage::ImageRgb8(buffer) => sum_rows!(buffer, 3, 1.0 / 255.0),
-        DynamicImage::ImageRgba8(buffer) => sum_rows!(buffer, 4, 1.0 / 255.0),
-        DynamicImage::ImageRgb16(buffer) => sum_rows!(buffer, 3, 1.0 / 65535.0),
-        DynamicImage::ImageRgba16(buffer) => sum_rows!(buffer, 4, 1.0 / 65535.0),
-        DynamicImage::ImageRgb32F(buffer) => sum_rows!(buffer, 3, 1.0),
-        DynamicImage::ImageRgba32F(buffer) => sum_rows!(buffer, 4, 1.0),
-        _ => None,
-    }
-}
-
-fn sample_viewer_frame(
-    request: &ViewerSampleRequest,
-    frame: &CachedViewerSampleFrame,
-) -> ViewerSampleResponse {
-    if request.requested_space != ViewerSampleSpace::DisplayEncoded {
-        return unavailable_viewer_sample(
-            request,
-            ViewerSampleUnavailableReason::UnsupportedSpace,
-            &frame.space_label,
-        );
-    }
-    if !request.normalized_image_point.x.is_finite()
-        || !request.normalized_image_point.y.is_finite()
-        || !(0.0..=1.0).contains(&request.normalized_image_point.x)
-        || !(0.0..=1.0).contains(&request.normalized_image_point.y)
-        || request.source_image_size.width == 0
-        || request.source_image_size.height == 0
-    {
-        return unavailable_viewer_sample(
-            request,
-            ViewerSampleUnavailableReason::InvalidPoint,
-            &frame.space_label,
-        );
-    }
-    let (width, height) = frame.pixels.dimensions();
-    let Some(rect) = resolve_sample_rect(request, width, height) else {
-        return unavailable_viewer_sample(
-            request,
-            if width == 0 || height == 0 {
-                ViewerSampleUnavailableReason::FrameUnavailable
-            } else {
-                ViewerSampleUnavailableReason::InvalidPoint
-            },
-            &frame.space_label,
-        );
-    };
-    let Some((totals, count)) = sum_native_pixels(frame.pixels.image(), rect) else {
-        return unavailable_viewer_sample(
-            request,
-            ViewerSampleUnavailableReason::FrameUnavailable,
-            &frame.space_label,
-        );
-    };
-    VIEWER_SAMPLE_PIXELS_VISITED.fetch_add(count, std::sync::atomic::Ordering::Relaxed);
-    let channels = totals.map(|value| (value / count as f64).clamp(0.0, 1.0));
-    let clipped_channels =
-        ViewerClippedChannels(channels.iter().enumerate().fold(0, |bits, (index, value)| {
-            bits | (u8::from(*value >= 1.0 - f64::EPSILON) << index)
-        }));
-    ViewerSampleResponse::Available {
-        request_identity: request.request_identity.clone(),
-        image_point_px: rect.image_point_px,
-        rgb: channels,
-        luma: channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722,
-        clipped_channels,
-        space_label: frame.space_label.clone(),
-    }
-}
-
-#[tauri::command]
-fn sample_viewer_pixel(
-    request: ViewerSampleRequest,
-    state: tauri::State<AppState>,
-) -> ViewerSampleResponse {
-    let _geometry_epoch = request.geometry_epoch;
-    let Some(frame) = state.viewer_sample_frames.get(request.target.cache_key()) else {
-        return unavailable_viewer_sample(
-            &request,
-            ViewerSampleUnavailableReason::FrameUnavailable,
-            "Unavailable",
-        );
-    };
-    if frame.image_identity != request.image_identity
-        || frame.graph_revision != request.graph_revision
-    {
-        return unavailable_viewer_sample(
-            &request,
-            ViewerSampleUnavailableReason::StaleFrame,
-            &frame.space_label,
-        );
-    }
-    sample_viewer_frame(&request, frame.as_ref())
-}
-
-#[cfg(test)]
-mod viewer_sampler_tests {
-    use super::*;
-    use std::time::Instant;
-
-    fn fixture_request(radius: u32) -> ViewerSampleRequest {
-        ViewerSampleRequest {
-            request_identity: "fixture-request".to_string(),
-            image_identity: "/fixture/color-patches.tif".to_string(),
-            graph_revision: "history_3".to_string(),
-            geometry_epoch: 9,
-            normalized_image_point: ViewerSamplePoint { x: 0.5, y: 0.5 },
-            source_image_size: ViewerSampleImageSize {
-                width: 3,
-                height: 1,
-            },
-            target: ViewerSampleTarget::Edited,
-            sample_radius_image_px: radius,
-            requested_space: ViewerSampleSpace::DisplayEncoded,
-        }
-    }
-
-    fn frame(image: DynamicImage) -> CachedViewerSampleFrame {
-        let (width, height) = image.dimensions();
-        CachedViewerSampleFrame {
-            artifact_identity:
-                crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
-                    &crate::render::artifact_identity::tests_support::source(
-                        "/fixture/color-patches.tif",
-                    ),
-                    1,
-                    1,
-                    1,
-                    1,
-                    width,
-                    height,
-                ),
-            graph_revision: "history_3".to_string(),
-            pixels: crate::app_state::SampleablePixels::native(Arc::new(image)),
-            image_identity: "/fixture/color-patches.tif".to_string(),
-            space_label: "Display encoded sRGB".to_string(),
-        }
-    }
-
-    fn available(response: ViewerSampleResponse) -> ([f64; 3], f64, ViewerSamplePointPx) {
-        match response {
-            ViewerSampleResponse::Available {
-                rgb,
-                luma,
-                image_point_px,
-                ..
-            } => (rgb, luma, image_point_px),
-            response => panic!("expected available response, got {response:?}"),
-        }
-    }
-
-    #[test]
-    fn samples_known_display_encoded_patch_and_luma() {
-        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(3, 1, |x, _| match x {
-            0 => image::Rgb([255, 0, 0]),
-            1 => image::Rgb([0, 128, 0]),
-            _ => image::Rgb([0, 0, 255]),
-        }));
-        let frame = frame(image);
-
-        let (rgb, luma, point) = available(sample_viewer_frame(&fixture_request(0), &frame));
-        assert!((rgb[1] - 128.0 / 255.0).abs() < 1e-6);
-        assert!((luma - 0.7152 * 128.0 / 255.0).abs() < 1e-6);
-        assert_eq!(point, ViewerSamplePointPx { x: 1, y: 0 });
-    }
-
-    #[test]
-    fn radius_average_and_unsupported_domain_are_explicit() {
-        let frame = frame(DynamicImage::ImageRgb8(ImageBuffer::from_fn(
-            3,
-            1,
-            |x, _| image::Rgb(if x == 1 { [255, 255, 255] } else { [0, 0, 0] }),
-        )));
-        let (rgb, _, _) = available(sample_viewer_frame(&fixture_request(1), &frame));
-        assert!((rgb[0] - 1.0 / 3.0).abs() < 1e-6);
-
-        let mut linear_request = fixture_request(0);
-        linear_request.requested_space = ViewerSampleSpace::WorkingLinear;
-        let unavailable = sample_viewer_frame(&linear_request, &frame);
-        assert!(matches!(
-            unavailable,
-            ViewerSampleResponse::Unavailable {
-                reason: ViewerSampleUnavailableReason::UnsupportedSpace,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn typed_response_preserves_frontend_wire_schema() {
-        let response = sample_viewer_frame(
-            &fixture_request(0),
-            &frame(DynamicImage::ImageRgb8(ImageBuffer::from_pixel(
-                1,
-                1,
-                image::Rgb([255, 0, 255]),
-            ))),
-        );
-        assert_eq!(
-            serde_json::to_value(response).unwrap(),
-            serde_json::json!({
-                "status": "available",
-                "requestIdentity": "fixture-request",
-                "imagePointPx": { "x": 1, "y": 0 },
-                "rgb": [1.0, 0.0, 1.0],
-                "luma": 0.2848,
-                "clippedChannels": ["r", "b"],
-                "spaceLabel": "Display encoded sRGB",
-            })
-        );
-    }
-
-    #[test]
-    fn direct_native_formats_match_rgb32f_reference() {
-        let images = [
-            DynamicImage::ImageRgb8(ImageBuffer::from_pixel(3, 1, image::Rgb([64, 128, 255]))),
-            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(
-                3,
-                1,
-                image::Rgba([64, 128, 255, 7]),
-            )),
-            DynamicImage::ImageRgb16(ImageBuffer::from_pixel(
-                3,
-                1,
-                image::Rgb([16448, 32896, 65535]),
-            )),
-            DynamicImage::ImageRgba16(ImageBuffer::from_pixel(
-                3,
-                1,
-                image::Rgba([16448, 32896, 65535, 12]),
-            )),
-            DynamicImage::ImageRgb32F(ImageBuffer::from_pixel(3, 1, image::Rgb([0.25, 0.5, 1.25]))),
-            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
-                3,
-                1,
-                image::Rgba([0.25, 0.5, 1.25, -4.0]),
-            )),
-        ];
-        for image in images {
-            let reference = image.to_rgb32f().get_pixel(1, 0).0.map(f64::from);
-            let (actual, _, _) = available(sample_viewer_frame(&fixture_request(0), &frame(image)));
-            for channel in 0..3 {
-                assert!((actual[channel] - reference[channel].clamp(0.0, 1.0)).abs() < 1e-5);
-            }
-        }
-    }
-
-    #[test]
-    fn resolves_edges_radius_cap_and_invalid_dimensions() {
-        let mut request = fixture_request(u32::MAX);
-        request.normalized_image_point = ViewerSamplePoint { x: 0.0, y: 1.0 };
-        request.source_image_size = ViewerSampleImageSize {
-            width: 10,
-            height: 10,
-        };
-        assert_eq!(
-            resolve_sample_rect(&request, 100, 50),
-            Some(ViewerSampleRect {
-                min_x: 0,
-                max_x: 16,
-                min_y: 33,
-                max_y: 49,
-                image_point_px: ViewerSamplePointPx { x: 0, y: 9 },
-            })
-        );
-        assert!(resolve_sample_rect(&request, 0, 50).is_none());
-        request.normalized_image_point.x = f64::NAN;
-        assert!(resolve_sample_rect(&request, 100, 50).is_none());
-    }
-
-    #[test]
-    #[ignore = "manual 8K sampling benchmark"]
-    fn benchmark_8k_10k_samples_are_radius_bounded() {
-        let frame = frame(DynamicImage::ImageRgb8(ImageBuffer::from_pixel(
-            7680,
-            4320,
-            image::Rgb([64, 128, 255]),
-        )));
-        let legacy_iterations = 3_u32;
-        let legacy_started = Instant::now();
-        for _ in 0..legacy_iterations {
-            std::hint::black_box(frame.pixels.image().to_rgb32f());
-        }
-        let legacy_elapsed = legacy_started.elapsed();
-        eprintln!(
-            "8K legacy full-frame conversion: iterations={legacy_iterations} elapsed={legacy_elapsed:?} avg={:?} temporary_bytes_per_request={}",
-            legacy_elapsed / legacy_iterations,
-            7680_u64 * 4320 * 12,
-        );
-        for radius in [0, 4, 16] {
-            let mut request = fixture_request(radius);
-            request.source_image_size = ViewerSampleImageSize {
-                width: 7680,
-                height: 4320,
-            };
-            let before = VIEWER_SAMPLE_PIXELS_VISITED.load(std::sync::atomic::Ordering::Relaxed);
-            let started = Instant::now();
-            for _ in 0..10_000 {
-                std::hint::black_box(sample_viewer_frame(&request, &frame));
-            }
-            let elapsed = started.elapsed();
-            let visited =
-                VIEWER_SAMPLE_PIXELS_VISITED.load(std::sync::atomic::Ordering::Relaxed) - before;
-            eprintln!(
-                "8K radius={radius}: elapsed={elapsed:?} visited={visited} old_rgb32f_temp_bytes_per_request={}",
-                7680_u64 * 4320 * 12
-            );
-            assert!(visited <= 10_000 * u64::from((2 * radius.min(16) + 1).pow(2)));
-        }
-    }
 }
 
 // Transitional helper retained for existing native tests while the command now
@@ -3463,7 +2957,7 @@ pub fn run() {
             generate_preview_for_path,
             analyze_negative_lab_dust_spots,
             generate_original_transformed_preview,
-            sample_viewer_pixel,
+            app::commands::viewer_sampling::sample_viewer_pixel,
             generate_preset_preview,
             generate_uncropped_preview,
             preview_geometry_transform,

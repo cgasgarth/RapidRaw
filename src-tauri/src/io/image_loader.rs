@@ -1385,7 +1385,10 @@ pub(crate) async fn load_image_prepared(
     let (orig_width, orig_height) = pristine_arc.dimensions();
 
     if install_active {
-        state.viewer_sample_frames.clear();
+        state
+            .services
+            .viewer_sampling
+            .install_session(my_generation as u64, &path);
         *state.original_image.lock().unwrap() = Some(LoadedImage {
             path,
             image: pristine_arc,

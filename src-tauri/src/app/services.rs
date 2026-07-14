@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::render::native_cache::CacheBudgetCoordinator;
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct OperationId(u64);
 
@@ -96,7 +98,7 @@ impl JobCoordinator {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
@@ -111,7 +113,28 @@ pub struct AppServices {
         Arc<crate::library::catalog_indexing_service::CatalogIndexingService>,
     pub(crate) thumbnails:
         Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
+    pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub jobs: Arc<JobCoordinator>,
+}
+
+impl AppServices {
+    pub(crate) fn new(cache_budget: Arc<CacheBudgetCoordinator>) -> Self {
+        Self {
+            editor: Arc::default(),
+            denoise: Arc::default(),
+            focus_stack: Arc::default(),
+            hdr: Arc::default(),
+            burst_sr: Arc::default(),
+            panorama: Arc::default(),
+            import_jobs: Arc::default(),
+            catalog_indexing: Arc::default(),
+            thumbnails: Arc::default(),
+            viewer_sampling: Arc::new(
+                crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
+            ),
+            jobs: Arc::default(),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -9,7 +9,9 @@ use crate::adjustment_utils::hydrate_adjustments;
 use crate::app_settings::load_preview_runtime_settings_or_default;
 use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
-    CachedViewerSampleFrame,
+};
+use crate::editor::viewer_sampling_service::{
+    CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
 use crate::generate_transformed_preview_cancellable;
 use crate::image_processing::{
@@ -592,10 +594,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             &loaded_image.path,
             viewer_identity,
         );
-        let weight = frame.pixels.retained_bytes();
         state
-            .viewer_sample_frames
-            .insert("edited".to_string(), Arc::new(frame), weight);
+            .services
+            .viewer_sampling
+            .publish(ViewerSampleCacheSlot::Edited, frame);
     }
     Ok(bytes)
 }
@@ -609,7 +611,7 @@ fn settled_viewer_sample_frame(
     CachedViewerSampleFrame {
         artifact_identity,
         graph_revision: graph_revision.to_string(),
-        pixels: crate::app_state::SampleablePixels::native(Arc::clone(image)),
+        pixels: SampleablePixels::native(Arc::clone(image)),
         image_identity: image_identity.to_string(),
         space_label: "Display encoded sRGB".to_string(),
     }
