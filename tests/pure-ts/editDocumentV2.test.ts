@@ -10,6 +10,7 @@ import {
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
+  resetEditDocumentV2Node,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
@@ -121,5 +122,32 @@ describe('EditDocumentV2 legacy adapter', () => {
         },
       }),
     ).toThrow('non-finite');
+  });
+
+  test('reset uses descriptor defaults and preserves unrelated domains', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      exposure: 1.5,
+      contrast: 0.25,
+    });
+    const reset = resetEditDocumentV2Node(document, 'scene_global_color_tone');
+
+    expect(reset.nodes.scene_global_color_tone?.params).toEqual({
+      blacks: 0,
+      brightness: 0,
+      contrast: 0,
+      exposure: 0,
+      highlights: 0,
+      saturation: 0,
+      shadows: 0,
+      whites: 0,
+    });
+    expect(reset.nodes.geometry).toEqual(document.nodes.geometry);
+    expect(reset.provenance).toEqual(document.provenance);
+  });
+
+  test('non-resettable source artifacts remain unchanged', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    expect(resetEditDocumentV2Node(document, 'source_artifacts')).toEqual(document);
   });
 });

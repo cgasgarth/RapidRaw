@@ -5,7 +5,16 @@ export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
+    defaultParams: {
+      blacks: 0,
+      brightness: 0,
+      contrast: 0,
+      exposure: 0,
+      highlights: 0,
+      saturation: 0,
+      shadows: 0,
+      whites: 0,
+    },
     legacyFields: ['blacks', 'brightness', 'contrast', 'exposure', 'highlights', 'saturation', 'shadows', 'whites'],
     nodeType: 'scene_global_color_tone',
     process: 'scene_referred_v2',
@@ -60,7 +69,14 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
+    defaultParams: {
+      aspectRatio: null,
+      crop: null,
+      flipHorizontal: false,
+      flipVertical: false,
+      orientationSteps: 0,
+      rotation: 0,
+    },
     legacyFields: ['aspectRatio', 'crop', 'flipHorizontal', 'flipVertical', 'orientationSteps', 'rotation'],
     nodeType: 'geometry',
     process: 'legacy_pipeline_v1',
