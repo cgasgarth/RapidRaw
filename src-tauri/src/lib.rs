@@ -26,6 +26,7 @@ mod io;
 mod layers;
 mod library;
 mod merge;
+mod negative_lab_profiles;
 mod preset_converter;
 mod presets;
 mod proofs;
@@ -4537,6 +4538,8 @@ pub fn run() {
             negative_conversion::suggest_negative_lab_highlight_patch_exposure,
             negative_conversion::suggest_negative_lab_shadow_patch_black_point,
             negative_conversion::convert_negatives,
+            negative_lab_profiles::read_negative_lab_measured_profile_library,
+            negative_lab_profiles::write_negative_lab_measured_profile_library,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
