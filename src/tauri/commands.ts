@@ -76,6 +76,7 @@ export enum Invokes {
   ResolveExportSoftProofTransformMetadata = 'resolve_export_soft_proof_transform_metadata',
   GeneratePreviewForPath = 'generate_preview_for_path',
   RenderNegativeLabDryRunPreviewArtifact = 'render_negative_lab_dry_run_preview_artifact',
+  PreflightNegativeLabSource = 'preflight_negative_lab_source',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   PreviewAutoEditProposal = 'preview_auto_edit_proposal',
