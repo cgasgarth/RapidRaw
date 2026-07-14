@@ -231,7 +231,7 @@ import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computational-merge/com
 import { DETAIL_APP_SERVER_ROUTES } from './detail/detailAppServerRoutes';
 import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './film-look/filmLookAppServerRoutes';
 import {
-  dispatchNegativeLabAgentAppServerTool,
+  dispatchNegativeLabAgentAppServerToolAsync,
   NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME,
   NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME,
 } from './negative-lab/app-server/negativeLabAgentAppServerToolDispatch';
@@ -1407,7 +1407,7 @@ const dispatchAgentAppServerTool = async (
       break;
     case NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME:
     case NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME:
-      result = dispatchNegativeLabAgentAppServerTool(request);
+      result = await dispatchNegativeLabAgentAppServerToolAsync(request);
       break;
     case NEGATIVE_LAB_AGENT_INSPECT_TOOL_NAME:
       result = inspectNegativeLabAgentReadOnly(negativeLabAgentInspectRequestSchema.parse(request.arguments));
