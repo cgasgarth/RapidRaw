@@ -2158,13 +2158,11 @@ const ImageCanvas = memo(
             event.type === 'pointercancel';
           if (isCancellation) {
             executeBrushCommands(viewerBrushController.cancel(event.type));
-            pickerControllers.handleInputEvent(event);
-            focusRetouchController.handleInputEvent(event);
           }
           const transition = viewerInteractionCoordinator.dispatch(event, viewerInteractionContext);
           viewerInteractionTransitionRef.current = transition;
           setViewerInputOwnerState(transition.owner);
-          if (transition.forwardToTool && !isCancellation) {
+          if (transition.forwardToTool) {
             pickerControllers.handleInputEvent(event);
             focusRetouchController.handleInputEvent(event);
           }
