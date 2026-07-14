@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { PointColorAdjustmentV1 } from '../../../packages/rawengine-schema/src/color/pointColorSchemas';
+import { isPointColorPickerResultCurrent } from '../../../src/utils/color/pointColorPicker';
 import {
   applyPointColorCoordinate,
   applySkinUniformityCoordinate,
@@ -77,5 +78,47 @@ describe('Point Color perceptual runtime', () => {
     expect(output.hueDegrees).toBeCloseTo(50, 8);
     expect(output.chroma).toBe(color.chroma);
     expect(output.lightness).toBe(color.lightness);
+  });
+
+  test('rejects picker receipts after source, graph, or tool currentness changes', () => {
+    const result = {
+      chroma: 0.1,
+      confidence: 0.9,
+      graphFingerprint: 'fingerprint',
+      graphRevision: 'graph-1',
+      hueDegrees: 20,
+      lightness: 0.5,
+      sampleRadiusPx: 2,
+      sourceFingerprint: 'source-fingerprint',
+      sourceIdentity: '/raw/source.arw',
+    };
+    expect(
+      isPointColorPickerResultCurrent(result, {
+        active: true,
+        graphRevision: 'graph-1',
+        sourceIdentity: '/raw/source.arw',
+      }),
+    ).toBe(true);
+    expect(
+      isPointColorPickerResultCurrent(result, {
+        active: false,
+        graphRevision: 'graph-1',
+        sourceIdentity: '/raw/source.arw',
+      }),
+    ).toBe(false);
+    expect(
+      isPointColorPickerResultCurrent(result, {
+        active: true,
+        graphRevision: 'graph-2',
+        sourceIdentity: '/raw/source.arw',
+      }),
+    ).toBe(false);
+    expect(
+      isPointColorPickerResultCurrent(result, {
+        active: true,
+        graphRevision: 'graph-1',
+        sourceIdentity: '/raw/other.arw',
+      }),
+    ).toBe(false);
   });
 });

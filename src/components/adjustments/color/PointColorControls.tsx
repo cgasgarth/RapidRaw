@@ -2,6 +2,7 @@ import { Crosshair, Plus, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { POINT_COLOR_MAX_POINTS_V1 } from '../../../../packages/rawengine-schema/src/color/pointColorSchemas';
+import { useUIStore } from '../../../store/useUIStore';
 import type { Adjustments } from '../../../utils/adjustments';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -38,6 +39,8 @@ const createPoint = (index: number): Adjustments['pointColor']['points'][number]
 
 export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustments }: ColorPanelGroupProps) => {
   const { t } = useTranslation();
+  const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
+  const setUI = useUIStore((state) => state.setUI);
   const plan = adjustments.pointColor;
   const selected = useMemo(
     () => plan.points.find((point) => point.id === plan.selectedPointId) ?? plan.points[0] ?? null,
@@ -94,6 +97,14 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
             type="button"
           >
             <Plus size={12} /> {t('adjustments.color.pointColor.addPoint')}
+          </button>
+          <button
+            aria-pressed={pointColorPickerActive}
+            className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
+            onClick={() => setUI({ pointColorPickerActive: !pointColorPickerActive, pointColorPickerReceipt: null })}
+            type="button"
+          >
+            <Crosshair size={12} /> {t('adjustments.color.pointColor.pickFromImage')}
           </button>
           <button
             aria-pressed={plan.visualizeMode !== 'image'}

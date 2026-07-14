@@ -191,6 +191,7 @@
         "addPoint": "Add point",
         "deletePoint": "Delete point",
         "empty": "Add a perceptual color point, then refine its H/C/L range.",
+        "pickFromImage": "Pick from image",
         "samples": "Point Color samples",
         "visualize": "Visualize"
       },

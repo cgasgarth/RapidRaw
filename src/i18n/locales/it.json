@@ -184,6 +184,7 @@
         "addPoint": "",
         "deletePoint": "",
         "empty": "",
+        "pickFromImage": "",
         "samples": "",
         "visualize": ""
       },
