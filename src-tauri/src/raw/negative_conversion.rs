@@ -26,6 +26,9 @@ use super::negative_lab_detail_finish::{
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
+use crate::raw::negative_lab_color_finish::{
+    NegativeLabColorFinishMetrics, NegativeLabScannerColorFinishParams, apply_color_finish,
+};
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
@@ -61,6 +64,8 @@ pub struct NegativeConversionParams {
     pub white_point: f32,
     #[serde(default)]
     pub conversion_model: NegativeConversionModel,
+    #[serde(default)]
+    pub color_finish: NegativeLabScannerColorFinishParams,
     #[serde(default)]
     pub detail_finish: NegativeLabDetailFinishParams,
 }
@@ -129,6 +134,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     pub density_scopes: NegativeLabDensityScopes,
     pub detail_finish_metrics: NegativeLabDetailFinishMetrics,
+    pub color_finish_metrics: NegativeLabColorFinishMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
@@ -871,6 +877,7 @@ impl Default for NegativeConversionParams {
             white_point_offset: default_white_point_offset(),
             white_point: default_white_point(),
             conversion_model: NegativeConversionModel::DensityRgbV1,
+            color_finish: NegativeLabScannerColorFinishParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
         }
     }
@@ -1510,6 +1517,8 @@ fn negative_lab_file_state(path: &Path, label: &str) -> Result<serde_json::Value
 #[derive(Debug, Clone)]
 struct NegativeLabConversionBundleOutputRef {
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    #[allow(dead_code)]
+    color_finish_metrics: Option<NegativeLabColorFinishMetrics>,
     source_path: PathBuf,
     output_path: PathBuf,
     sidecar_path: PathBuf,
@@ -1530,6 +1539,8 @@ pub struct NegativeLabSavedPositiveHandoff {
     pub artifact_id: String,
     pub conversion_bundle_path: Option<String>,
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_finish_metrics: Option<NegativeLabColorFinishMetrics>,
     pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
     pub output_artifact_id: String,
@@ -1560,6 +1571,7 @@ struct NegativeLabOutputSidecarReceipt {
 
 struct NegativeLabOutputRenderReceipt<'a> {
     density_normalization_metrics: &'a NegativeLabDensityNormalizationMetrics,
+    color_finish_metrics: Option<&'a NegativeLabColorFinishMetrics>,
     dimensions: NegativeLabSavedPositiveDimensions,
 }
 
@@ -1616,6 +1628,7 @@ fn write_negative_lab_conversion_bundle(
             Ok(serde_json::json!({
                 "contentHash": hash_negative_lab_output_file(&output.output_path)?,
                 "densityNormalizationMetrics": output.density_normalization_metrics,
+                "colorFinishMetrics": output.color_finish_metrics,
                 "dimensions": {
                     "height": output.output_height,
                     "width": output.output_width,
@@ -1795,6 +1808,7 @@ fn write_negative_lab_output_sidecar(
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "densityNormalizationMetrics": render_receipt.density_normalization_metrics,
+            "colorFinishMetrics": render_receipt.color_finish_metrics,
             "noOverwritePolicy": "never_overwrite_original",
             "outputFormat": output_format,
             "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
@@ -2129,6 +2143,7 @@ impl NegativeConversionParams {
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
             conversion_model: self.conversion_model,
+            color_finish: self.color_finish.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
         }
         .with_sanitized_endpoints()
@@ -2253,6 +2268,7 @@ struct NegativeLabPipelineRender {
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     density_scopes: NegativeLabDensityScopes,
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
+    color_finish_metrics: NegativeLabColorFinishMetrics,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3044,24 +3060,25 @@ fn run_pipeline_with_metrics(
         Rgb32FImage::from_vec(width, height, scene_linear_print_buffer).unwrap();
     let detail_finish_metrics =
         apply_negative_lab_detail_finish(&mut scene_linear_print_img, &params.detail_finish);
-    let out_img = Rgb32FImage::from_vec(
-        width,
-        height,
-        scene_linear_print_img
-            .as_raw()
-            .par_iter()
-            .map(|value| value.clamp(0.0, 1.0).powf(gamma_inv))
-            .collect(),
-    )
-    .unwrap();
+    let color_finish = apply_color_finish(
+        &scene_linear_print_img,
+        &params.color_finish,
+        params.conversion_model != NegativeConversionModel::NegativeLogDensityV1,
+    );
+    let finished_scene_linear = color_finish.image;
+    let out_img = Rgb32FImage::from_fn(width, height, |x, y| {
+        let pixel = finished_scene_linear.get_pixel(x, y).0;
+        image::Rgb(pixel.map(|value| value.clamp(0.0, 1.0).powf(gamma_inv)))
+    });
 
     NegativeLabPipelineRender {
         normalized_density_preview: DynamicImage::ImageRgb32F(normalized_density_img),
         rendered_preview: DynamicImage::ImageRgb32F(out_img),
-        scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_linear_print_img),
+        scene_linear_print_preview: DynamicImage::ImageRgb32F(finished_scene_linear),
         density_normalization_metrics: density_metrics,
         density_scopes,
         detail_finish_metrics,
+        color_finish_metrics: color_finish.metrics,
     }
 }
 
@@ -3262,6 +3279,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
+    color_finish_metrics: NegativeLabColorFinishMetrics,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -3313,6 +3331,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         density_normalization_metrics,
         density_scopes,
         detail_finish_metrics,
+        color_finish_metrics,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
         stage_artifacts,
@@ -3409,6 +3428,7 @@ pub async fn preview_negative_conversion(
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
         rendered_preview.detail_finish_metrics,
+        rendered_preview.color_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -3445,6 +3465,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
         rendered_preview.detail_finish_metrics,
+        rendered_preview.color_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )
@@ -3698,6 +3719,7 @@ pub async fn convert_negatives(
                 run_pipeline_with_metrics(&img, &effective_params, None, crosstalk_profile);
             let processed = pipeline_render.rendered_preview;
             let density_normalization_metrics = pipeline_render.density_normalization_metrics;
+            let color_finish_metrics = pipeline_render.color_finish_metrics;
 
             let out_path = build_negative_output_path(&real_path, &save_options);
             let filename = out_path
@@ -3737,6 +3759,7 @@ pub async fn convert_negatives(
                 &replay_plan_hash,
                 NegativeLabOutputRenderReceipt {
                     density_normalization_metrics: &density_normalization_metrics,
+                    color_finish_metrics: Some(&color_finish_metrics),
                     dimensions: NegativeLabSavedPositiveDimensions {
                         height: processed.height(),
                         width: processed.width(),
@@ -3745,6 +3768,7 @@ pub async fn convert_negatives(
             )?;
             bundle_outputs.push(NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: density_normalization_metrics.clone(),
+                color_finish_metrics: Some(color_finish_metrics.clone()),
                 output_height: processed.height(),
                 output_path: out_path.clone(),
                 output_width: processed.width(),
@@ -3756,6 +3780,7 @@ pub async fn convert_negatives(
                 artifact_id: sidecar_receipt.artifact_id,
                 conversion_bundle_path: None,
                 density_normalization_metrics,
+                color_finish_metrics: Some(color_finish_metrics),
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: processed.height(),
                     width: processed.width(),
@@ -4811,6 +4836,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                color_finish_metrics: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: 8,
                     width: 12,
@@ -4934,6 +4960,7 @@ mod tests {
             &bundle_path,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                color_finish_metrics: None,
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -5006,6 +5033,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                color_finish_metrics: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: 8,
                     width: 12,
@@ -5118,6 +5146,7 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                color_finish_metrics: None,
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -5882,6 +5911,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                color_finish_metrics: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: rendered.height(),
                     width: rendered.width(),
@@ -5930,6 +5960,7 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                color_finish_metrics: None,
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -6234,6 +6265,7 @@ mod tests {
             "fnv1a32:2f4a91bc",
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
+                color_finish_metrics: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: rendered.height(),
                     width: rendered.width(),
@@ -6250,6 +6282,7 @@ mod tests {
             &save_options,
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
+                color_finish_metrics: None,
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -6511,6 +6544,12 @@ mod tests {
             summary.clone(),
             density_metrics,
             NegativeLabDetailFinishMetrics::default(),
+            apply_color_finish(
+                &rendered_preview.to_rgb32f(),
+                &NegativeLabScannerColorFinishParams::default(),
+                true,
+            )
+            .metrics,
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -6570,6 +6609,7 @@ mod tests {
             summary,
             pipeline.density_normalization_metrics,
             pipeline.detail_finish_metrics,
+            pipeline.color_finish_metrics,
             &params,
             pipeline.density_scopes,
         )
