@@ -9,6 +9,7 @@ use crate::adjustments::abi::{AllAdjustments, MAX_MASKS};
 pub const DEHAZE_ANALYSIS_IMPLEMENTATION_VERSION: u32 = 2;
 pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 3;
 pub const DEHAZE_TRANSMISSION_IMPLEMENTATION_VERSION: u32 = 1;
+pub const DEHAZE_RECEIPT_IMPLEMENTATION_VERSION: u32 = 1;
 pub const DEHAZE_GUIDANCE_RADIUS: f32 = 40.0;
 
 const MAX_ANALYSIS_SAMPLES: usize = 512 * 512;
@@ -53,6 +54,56 @@ pub enum HazeWarningCode {
     NonFiniteInput,
 }
 
+/// A source-bound optional depth artifact.  Dehaze never assumes that a depth
+/// model is available; when present, its confidence is blended with image
+/// evidence and the identity is carried into the render fingerprint.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepthGuidanceIdentityV1 {
+    pub source_revision: u64,
+    pub geometry_fingerprint: u64,
+    pub artifact_fingerprint: u64,
+    pub width: u32,
+    pub height: u32,
+    pub confidence: f32,
+    pub implementation_version: u32,
+}
+
+/// Optional normalized transmission guidance supplied by a depth service.
+/// Values are one (near/no haze) to zero (far/high haze), never display data.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DepthGuidanceV1 {
+    pub identity: DepthGuidanceIdentityV1,
+    pub transmission: Vec<f32>,
+}
+
+impl DepthGuidanceV1 {
+    #[allow(dead_code)] // The AI depth registry supplies this at capability integration time.
+    pub fn new(
+        identity: DepthGuidanceIdentityV1,
+        transmission: Vec<f32>,
+    ) -> Result<Self, &'static str> {
+        let expected = identity.width as usize * identity.height as usize;
+        if transmission.len() != expected {
+            return Err("depth guidance dimensions do not match identity");
+        }
+        if !transmission.iter().all(|value| value.is_finite()) {
+            return Err("depth guidance contains non-finite values");
+        }
+        Ok(Self {
+            identity,
+            transmission: transmission
+                .into_iter()
+                .map(|value| value.clamp(0.0, 1.0))
+                .collect(),
+        })
+    }
+
+    fn at(&self, x: u32, y: u32) -> f32 {
+        self.transmission[(y * self.identity.width + x) as usize]
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HazeAnalysisPlanV1 {
@@ -62,6 +113,10 @@ pub struct HazeAnalysisPlanV1 {
     pub haze_fraction: f32,
     pub transmission_percentiles: [f32; 5],
     pub sampled_pixels: u32,
+    pub depth_guidance: Option<DepthGuidanceIdentityV1>,
+    pub depth_confidence: f32,
+    pub protected_sample_fraction: f32,
+    pub minimum_transmission_fraction: f32,
     pub warning_codes: Vec<HazeWarningCode>,
 }
 
@@ -77,6 +132,16 @@ pub enum AtmosphericLightMode {
 #[serde(rename_all = "snake_case")]
 pub enum DehazeGuidanceMode {
     ImageDerivedEdgeAware,
+    HybridDepthImage,
+    DepthGuided,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DehazeQuality {
+    Interactive,
+    Refined,
+    Export,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -114,6 +179,10 @@ pub struct DehazeSettingsV1 {
     pub highlight_protection: f32,
     pub color_preservation: f32,
     pub minimum_transmission: f32,
+    pub depth_influence: f32,
+    pub edge_refinement: f32,
+    pub sky_protection: f32,
+    pub quality: DehazeQuality,
 }
 
 impl Default for DehazeSettingsV1 {
@@ -125,6 +194,10 @@ impl Default for DehazeSettingsV1 {
             highlight_protection: 0.5,
             color_preservation: 0.75,
             minimum_transmission: TRANSMISSION_FLOOR,
+            depth_influence: 0.0,
+            edge_refinement: 0.75,
+            sky_protection: 0.5,
+            quality: DehazeQuality::Interactive,
         }
     }
 }
@@ -139,6 +212,32 @@ pub struct CompiledDehazePlanV1 {
     pub transmission_resource: TransmissionResourceIdentityV1,
     pub settings: DehazeSettingsV1,
     pub fingerprint: u64,
+    pub implementation_version: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DehazeExecutionStatsV1 {
+    pub analysis_cache_hit: bool,
+    pub quality: DehazeQuality,
+    pub output_finite: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DehazeReceiptV1 {
+    pub analysis_fingerprint: u64,
+    pub render_fingerprint: u64,
+    pub guidance_mode: DehazeGuidanceMode,
+    pub depth_guidance: Option<DepthGuidanceIdentityV1>,
+    pub atmospheric_light: [f32; 3],
+    pub atmospheric_light_confidence: f32,
+    pub haze_fraction: f32,
+    pub transmission_percentiles: [f32; 5],
+    pub minimum_transmission_fraction: f32,
+    pub protected_sample_fraction: f32,
+    pub analysis_cache_hit: bool,
+    pub quality: DehazeQuality,
+    pub output_finite: bool,
     pub implementation_version: u32,
 }
 
@@ -160,6 +259,13 @@ pub fn compile_dehaze_plan(
     hasher.update(&analysis.identity.implementation_version.to_le_bytes());
     hasher.update(&DEHAZE_TRANSMISSION_IMPLEMENTATION_VERSION.to_le_bytes());
     hasher.update(&DEHAZE_GUIDANCE_RADIUS.to_bits().to_le_bytes());
+    if let Some(depth) = analysis.depth_guidance {
+        hasher.update(&depth.source_revision.to_le_bytes());
+        hasher.update(&depth.geometry_fingerprint.to_le_bytes());
+        hasher.update(&depth.artifact_fingerprint.to_le_bytes());
+        hasher.update(&depth.confidence.to_bits().to_le_bytes());
+        hasher.update(&depth.implementation_version.to_le_bytes());
+    }
     for value in analysis
         .atmospheric_light
         .into_iter()
@@ -179,6 +285,9 @@ pub fn compile_dehaze_plan(
         settings.highlight_protection,
         settings.color_preservation,
         settings.minimum_transmission,
+        settings.depth_influence,
+        settings.edge_refinement,
+        settings.sky_protection,
         atmospheric_light[0],
         atmospheric_light[1],
         atmospheric_light[2],
@@ -186,16 +295,67 @@ pub fn compile_dehaze_plan(
         hasher.update(&value.to_bits().to_le_bytes());
     }
     hasher.update(&[settings.atmospheric_light_mode as u8]);
+    hasher.update(&[settings.quality as u8]);
     let fingerprint = u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap());
+    let guidance_mode = match (analysis.depth_guidance, settings.depth_influence) {
+        (Some(_), influence) if influence >= 0.75 => DehazeGuidanceMode::DepthGuided,
+        (Some(_), influence) if influence > 0.0 => DehazeGuidanceMode::HybridDepthImage,
+        _ => DehazeGuidanceMode::ImageDerivedEdgeAware,
+    };
     CompiledDehazePlanV1 {
         analysis_identity: analysis.identity,
         atmospheric_light,
         confidence: analysis.atmospheric_light_confidence,
-        guidance_mode: DehazeGuidanceMode::ImageDerivedEdgeAware,
+        guidance_mode,
         transmission_resource: TransmissionResourceIdentityV1::from_analysis(analysis.identity),
         settings,
         fingerprint,
         implementation_version: DEHAZE_RENDER_IMPLEMENTATION_VERSION,
+    }
+}
+
+pub fn dehaze_receipt(
+    analysis: &HazeAnalysisPlanV1,
+    plan: &CompiledDehazePlanV1,
+    stats: DehazeExecutionStatsV1,
+) -> DehazeReceiptV1 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"dehaze-analysis-v1");
+    hasher.update(&analysis.identity.source_revision.to_le_bytes());
+    hasher.update(&analysis.identity.decode_fingerprint.to_le_bytes());
+    hasher.update(&analysis.identity.geometry_fingerprint.to_le_bytes());
+    hasher.update(&analysis.identity.implementation_version.to_le_bytes());
+    for value in analysis
+        .atmospheric_light
+        .into_iter()
+        .chain([
+            analysis.atmospheric_light_confidence,
+            analysis.haze_fraction,
+            analysis.depth_confidence,
+            analysis.protected_sample_fraction,
+            analysis.minimum_transmission_fraction,
+        ])
+        .chain(analysis.transmission_percentiles)
+    {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+    let analysis_fingerprint =
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap());
+    DehazeReceiptV1 {
+        analysis_fingerprint,
+        render_fingerprint: plan.fingerprint,
+        guidance_mode: plan.guidance_mode,
+        depth_guidance: analysis.depth_guidance,
+        atmospheric_light: plan.atmospheric_light,
+        atmospheric_light_confidence: analysis.atmospheric_light_confidence,
+        haze_fraction: analysis.haze_fraction,
+        transmission_percentiles: analysis.transmission_percentiles,
+        minimum_transmission_fraction: analysis.minimum_transmission_fraction,
+        protected_sample_fraction: analysis.protected_sample_fraction,
+        analysis_cache_hit: stats.analysis_cache_hit,
+        quality: stats.quality,
+        output_finite: stats.output_finite,
+        implementation_version: DEHAZE_RECEIPT_IMPLEMENTATION_VERSION,
     }
 }
 
@@ -248,6 +408,14 @@ pub fn prepare_cpu_dehaze(image: &DynamicImage, adjustments: &mut AllAdjustments
 }
 
 pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> HazeAnalysisPlanV1 {
+    analyze_haze_with_depth(image, identity, None)
+}
+
+pub fn analyze_haze_with_depth(
+    image: &DynamicImage,
+    identity: HazeAnalysisIdentityV1,
+    depth: Option<&DepthGuidanceV1>,
+) -> HazeAnalysisPlanV1 {
     let rgba = image.to_rgba32f();
     let (width, height) = rgba.dimensions();
     let stride = (((u64::from(width) * u64::from(height)) as f64 / MAX_ANALYSIS_SAMPLES as f64)
@@ -258,6 +426,7 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
         ((width / stride + 1) as usize * (height / stride + 1) as usize).min(MAX_ANALYSIS_SAMPLES),
     );
     let mut saw_non_finite = false;
+    let mut protected_samples = 0usize;
     for y in (0..height).step_by(stride as usize) {
         for x in (0..width).step_by(stride as usize) {
             let pixel = rgba.get_pixel(x, y).0;
@@ -280,10 +449,13 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
                 .abs()
                 .max((scene_luma([below[0], below[1], below[2]]) - luma).abs());
             let unclipped = 1.0 - smoothstep(1.0, 2.0, max_channel);
+            if unclipped < 0.05 || max_channel <= 0.0 {
+                protected_samples += 1;
+            }
             let low_texture = 1.0 - smoothstep(0.01, 0.12, texture);
             let score =
                 luma.max(0.0) * (1.0 - chroma.clamp(0.0, 1.0)).powi(2) * unclipped * low_texture;
-            samples.push((rgb, score));
+            samples.push((rgb, score, x, y));
         }
     }
 
@@ -319,10 +491,28 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
     let candidate_confidence =
         (evidence * (1.0 - dispersion / (atmosphere_luma + 0.05))).clamp(0.0, 1.0);
 
-    let mut transmissions: Vec<f32> = samples
-        .iter()
-        .map(|sample| estimate_transmission(sample.0, atmospheric_light, TRANSMISSION_FLOOR))
-        .collect();
+    let depth_matches = depth.is_some_and(|guidance| {
+        guidance.identity.source_revision == identity.source_revision
+            && guidance.identity.geometry_fingerprint == identity.geometry_fingerprint
+            && guidance.identity.width == width
+            && guidance.identity.height == height
+    });
+    let mut transmissions = Vec::with_capacity(samples.len());
+    for sample in &samples {
+        let image_transmission =
+            estimate_transmission(sample.0, atmospheric_light, TRANSMISSION_FLOOR);
+        let transmission = if depth_matches {
+            let depth = depth.expect("depth_matches implies depth guidance");
+            let x = sample.2.min(depth.identity.width.saturating_sub(1));
+            let y = sample.3.min(depth.identity.height.saturating_sub(1));
+            let depth_transmission = depth.at(x, y);
+            let depth_weight = (depth.identity.confidence.clamp(0.0, 1.0) * 0.8).clamp(0.0, 0.8);
+            image_transmission + (depth_transmission - image_transmission) * depth_weight
+        } else {
+            image_transmission
+        };
+        transmissions.push(transmission.clamp(TRANSMISSION_FLOOR, 1.0));
+    }
     transmissions.sort_by(f32::total_cmp);
     let transmission_percentiles =
         [0.05, 0.25, 0.5, 0.75, 0.95].map(|quantile| percentile(&transmissions, quantile));
@@ -350,6 +540,14 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
     if saw_non_finite {
         warning_codes.push(HazeWarningCode::NonFiniteInput);
     }
+    if let Some(depth) = depth
+        && (depth.identity.source_revision != identity.source_revision
+            || depth.identity.geometry_fingerprint != identity.geometry_fingerprint
+            || depth.identity.width != width
+            || depth.identity.height != height)
+    {
+        warning_codes.push(HazeWarningCode::InsufficientEvidence);
+    }
     HazeAnalysisPlanV1 {
         identity,
         atmospheric_light,
@@ -357,6 +555,33 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
         haze_fraction,
         transmission_percentiles,
         sampled_pixels: samples.len().try_into().unwrap_or(u32::MAX),
+        depth_guidance: depth_matches.then(|| {
+            depth
+                .expect("depth_matches implies depth guidance")
+                .identity
+        }),
+        depth_confidence: if depth_matches {
+            depth
+                .expect("depth_matches implies depth guidance")
+                .identity
+                .confidence
+        } else {
+            0.0
+        },
+        protected_sample_fraction: if samples.is_empty() {
+            0.0
+        } else {
+            protected_samples as f32 / samples.len() as f32
+        },
+        minimum_transmission_fraction: if transmissions.is_empty() {
+            0.0
+        } else {
+            transmissions
+                .iter()
+                .filter(|value| **value <= TRANSMISSION_FLOOR + f32::EPSILON)
+                .count() as f32
+                / transmissions.len() as f32
+        },
         warning_codes,
     }
 }
@@ -595,5 +820,95 @@ mod tests {
         assert!(!scene_dehaze_is_active(&adjustments));
         adjustments.global.edit_graph_version = 2.0;
         assert!(scene_dehaze_is_active(&adjustments));
+    }
+
+    #[test]
+    fn depth_guidance_is_source_bound_and_blended_only_when_identity_matches() {
+        let atmosphere = [0.8, 0.9, 1.05];
+        let image = ImageBuffer::from_fn(32, 16, |x, _| {
+            let radiance = [0.08 + x as f32 / 200.0, 0.12, 0.2];
+            let transmission = 0.25 + x as f32 / 64.0;
+            let observed = apply_atmosphere_model(radiance, atmosphere, transmission, -1.0);
+            Rgba([observed[0], observed[1], observed[2], 1.0])
+        });
+        let matching_identity = DepthGuidanceIdentityV1 {
+            source_revision: 11,
+            geometry_fingerprint: 3,
+            artifact_fingerprint: 77,
+            width: 32,
+            height: 16,
+            confidence: 0.9,
+            implementation_version: 1,
+        };
+        let depth = DepthGuidanceV1::new(matching_identity, vec![0.9; 32 * 16]).unwrap();
+        let image_only = analyze_haze(&DynamicImage::ImageRgba32F(image.clone()), identity(11));
+        let guided = analyze_haze_with_depth(
+            &DynamicImage::ImageRgba32F(image.clone()),
+            identity(11),
+            Some(&depth),
+        );
+        assert_eq!(guided.depth_guidance, Some(matching_identity));
+        assert_eq!(guided.depth_confidence, 0.9);
+        assert!(guided.transmission_percentiles[2] > image_only.transmission_percentiles[2]);
+
+        let wrong_source = DepthGuidanceV1::new(
+            DepthGuidanceIdentityV1 {
+                source_revision: 12,
+                ..matching_identity
+            },
+            vec![0.9; 32 * 16],
+        )
+        .unwrap();
+        let rejected = analyze_haze_with_depth(
+            &DynamicImage::ImageRgba32F(image),
+            identity(11),
+            Some(&wrong_source),
+        );
+        assert_eq!(
+            rejected.transmission_percentiles,
+            image_only.transmission_percentiles
+        );
+        assert!(
+            rejected
+                .warning_codes
+                .contains(&HazeWarningCode::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn compiled_plan_and_receipt_report_depth_mode_and_analysis_reuse() {
+        let image = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            32,
+            16,
+            Rgba([0.42, 0.5, 0.64, 1.0]),
+        ));
+        let analysis = analyze_haze(&image, identity(21));
+        let mut settings = DehazeSettingsV1 {
+            amount: 0.5,
+            depth_influence: 0.8,
+            quality: DehazeQuality::Refined,
+            ..Default::default()
+        };
+        let no_depth = compile_dehaze_plan(&analysis, settings);
+        assert_eq!(
+            no_depth.guidance_mode,
+            DehazeGuidanceMode::ImageDerivedEdgeAware
+        );
+        settings.depth_influence = 0.0;
+        let plan = compile_dehaze_plan(&analysis, settings);
+        let receipt = dehaze_receipt(
+            &analysis,
+            &plan,
+            DehazeExecutionStatsV1 {
+                analysis_cache_hit: true,
+                quality: DehazeQuality::Refined,
+                output_finite: true,
+            },
+        );
+        assert!(receipt.analysis_fingerprint != 0);
+        assert_eq!(receipt.render_fingerprint, plan.fingerprint);
+        assert!(receipt.analysis_cache_hit);
+        assert!(receipt.output_finite);
+        assert_eq!(receipt.quality, DehazeQuality::Refined);
     }
 }

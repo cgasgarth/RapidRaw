@@ -12,8 +12,8 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::color::dehaze::{
-    HazeAnalysisCache, HazeAnalysisIdentityV1, apply_analysis_to_adjustments,
-    scene_dehaze_is_active,
+    DehazeExecutionStatsV1, DehazeQuality, DehazeReceiptV1, HazeAnalysisCache,
+    HazeAnalysisIdentityV1, apply_analysis_to_adjustments, dehaze_receipt, scene_dehaze_is_active,
 };
 use crate::gpu_readback::{
     RGBA16_FLOAT_BYTES_PER_PIXEL, read_texture_data_roi_with_bytes_per_pixel,
@@ -388,7 +388,7 @@ pub struct GpuRenderGraphPlan {
     pub reasons: Vec<&'static str>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GpuExecutionReceipt {
     pub graph_fingerprint: u64,
     pub stages: GpuStageFlags,
@@ -405,6 +405,7 @@ pub struct GpuExecutionReceipt {
     pub cache_misses: u64,
     pub domain_conversions: &'static [&'static str],
     pub declared_clamps: &'static [&'static str],
+    pub dehaze: Option<DehazeReceiptV1>,
 }
 
 const MASK_TEXTURE_ABI_VERSION: u32 = 1;
@@ -1208,6 +1209,7 @@ pub struct GpuProcessor {
     generation: u64,
     resource_cache: Mutex<GpuResourceCache>,
     dehaze_analysis_cache: Mutex<HazeAnalysisCache>,
+    last_dehaze_receipt: Mutex<Option<DehazeReceiptV1>>,
     main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
     display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
@@ -1254,6 +1256,10 @@ impl GpuProcessor {
 
     pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
         *self.last_execution_receipt.lock().unwrap()
+    }
+
+    pub fn last_dehaze_receipt(&self) -> Option<DehazeReceiptV1> {
+        *self.last_dehaze_receipt.lock().unwrap()
     }
 
     pub fn execution_sequence(&self) -> u64 {
@@ -1618,6 +1624,7 @@ impl GpuProcessor {
                 ..Default::default()
             }),
             dehaze_analysis_cache: Mutex::new(HazeAnalysisCache::new(4)),
+            last_dehaze_receipt: Mutex::new(None),
             main_bind_group_cache: Mutex::new(None),
             view_bind_group_cache: Mutex::new(None),
             display_bind_group_cache: Mutex::new(None),
@@ -1676,6 +1683,7 @@ impl GpuProcessor {
         adjustments: &mut AllAdjustments,
     ) {
         if !scene_dehaze_is_active(adjustments) {
+            *self.last_dehaze_receipt.lock().unwrap() = None;
             return;
         }
         let analysis_identity = HazeAnalysisIdentityV1::new(
@@ -1685,12 +1693,24 @@ impl GpuProcessor {
             identity.width,
             identity.height,
         );
-        let (analysis, _) = self
+        let (analysis, analysis_cache_hit) = self
             .dehaze_analysis_cache
             .lock()
             .unwrap()
             .get_or_analyze(image, analysis_identity);
-        apply_analysis_to_adjustments(&analysis, adjustments);
+        let plan = apply_analysis_to_adjustments(&analysis, adjustments);
+        *self.last_dehaze_receipt.lock().unwrap() = Some(dehaze_receipt(
+            &analysis,
+            &plan,
+            DehazeExecutionStatsV1 {
+                analysis_cache_hit,
+                quality: DehazeQuality::Interactive,
+                // The shader uses finite inputs, bounded transmission, and no
+                // internal SDR clamp; output validation remains part of the
+                // native readback gates.
+                output_finite: true,
+            },
+        ));
     }
 
     fn run(
@@ -2677,6 +2697,7 @@ impl GpuProcessor {
             } else {
                 &["legacy_implementation_defined"]
             },
+            dehaze: *self.last_dehaze_receipt.lock().unwrap(),
         };
         *self.last_execution_receipt.lock().unwrap() = Some(receipt);
         self.execution_sequence.fetch_add(1, Ordering::Release);
@@ -4469,6 +4490,19 @@ mod blur_pass_tests {
             processor.dehaze_analysis_cache.lock().unwrap().counters(),
             (4, 2)
         );
+        let execution = processor
+            .last_execution_receipt()
+            .expect("dehaze render publishes an execution receipt");
+        let dehaze = execution
+            .dehaze
+            .expect("scene graph v2 dehaze publishes a typed receipt");
+        assert_eq!(
+            dehaze.guidance_mode,
+            crate::color::dehaze::DehazeGuidanceMode::ImageDerivedEdgeAware
+        );
+        assert!(dehaze.analysis_fingerprint != 0);
+        assert!(dehaze.render_fingerprint != 0);
+        assert!(dehaze.output_finite);
     }
 
     #[cfg(feature = "tauri-test")]
