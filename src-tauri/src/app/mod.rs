@@ -1,4 +1,5 @@
 pub(crate) mod capabilities;
+pub(crate) mod commands;
 #[cfg(not(feature = "ai"))]
 pub(crate) mod disabled_commands;
 pub(crate) mod display_target;
