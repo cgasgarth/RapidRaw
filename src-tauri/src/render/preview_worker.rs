@@ -434,22 +434,17 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     };
 
     let analytics_config = if wants_analytics {
-        state
-            .analytics_scheduler
-            .lock()
-            .unwrap()
-            .clone()
-            .map(|scheduler| AnalyticsConfig {
-                path: loaded_image.path.clone(),
-                frame_id: AnalyticsFrameId {
-                    image_session: preview_id.image_session,
-                    preview_generation: preview_id.generation,
-                    graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
-                },
-                products: requested_products(compute_waveform, active_waveform_channel),
-                active_waveform_channel: channel_filter,
-                scheduler,
-            })
+        Some(AnalyticsConfig {
+            path: loaded_image.path.clone(),
+            frame_id: AnalyticsFrameId {
+                image_session: preview_id.image_session,
+                preview_generation: preview_id.generation,
+                graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
+            },
+            products: requested_products(compute_waveform, active_waveform_channel),
+            active_waveform_channel: channel_filter,
+            service: Arc::clone(&state.services.analytics),
+        })
     } else {
         None
     };

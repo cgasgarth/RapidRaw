@@ -94,11 +94,11 @@ mod tests {
     use crate::app_state::{AnalyticsProducts, AnalyticsSamplingPolicy};
     use image::DynamicImage;
 
-    fn job(generation: u64) -> AnalyticsJob {
+    fn job_for(image_session: u64, generation: u64) -> AnalyticsJob {
         AnalyticsJob {
             path: "fixture".into(),
             frame_id: AnalyticsFrameId {
-                image_session: 1,
+                image_session,
                 preview_generation: generation,
                 graph_revision: 1,
             },
@@ -107,6 +107,10 @@ mod tests {
             active_waveform_channel: None,
             policy: AnalyticsSamplingPolicy::default(),
         }
+    }
+
+    fn job(generation: u64) -> AnalyticsJob {
+        job_for(1, generation)
     }
 
     #[test]
@@ -139,5 +143,20 @@ mod tests {
         scheduler.shutdown();
         scheduler.finish(false);
         assert!(scheduler.next().is_none());
+    }
+
+    #[test]
+    fn a_b_a_successor_rejects_old_a_and_publishes_only_the_latest_identity() {
+        let scheduler = AnalyticsScheduler::new();
+        scheduler.submit(job_for(10, 1)).unwrap();
+        let old_a = scheduler.next().unwrap();
+        scheduler.submit(job_for(11, 1)).unwrap();
+        scheduler.submit(job_for(12, 1)).unwrap();
+
+        assert!(!scheduler.is_current(old_a.frame_id));
+        let successor_a = scheduler.next().unwrap();
+        assert_eq!(successor_a.frame_id.image_session, 12);
+        assert!(scheduler.is_current(successor_a.frame_id));
+        assert_eq!(scheduler.metrics.superseded.load(Ordering::Relaxed), 1);
     }
 }

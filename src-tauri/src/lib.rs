@@ -595,26 +595,6 @@ fn sample_point_color_picker(
     })
 }
 
-fn start_analytics_worker(app_handle: tauri::AppHandle) {
-    let state = app_handle.state::<AppState>();
-    let scheduler = analytics_scheduler::AnalyticsScheduler::new();
-    *state.analytics_scheduler.lock().unwrap() = Some(Arc::clone(&scheduler));
-
-    std::thread::spawn(move || {
-        while let Some(job) = scheduler.next() {
-            let id = job.frame_id;
-            let result = image_analytics::calculate(&job, || scheduler.is_current(id));
-            let current = scheduler.is_current(id);
-            if current && let Ok(result) = result {
-                let _ = app_handle.emit(crate::events::ANALYTICS_RESULT, result);
-                scheduler.finish(true);
-            } else {
-                scheduler.finish(false);
-            }
-        }
-    });
-}
-
 pub(crate) fn validate_expected_preview_image(
     actual_path: &str,
     expected_path: &str,
@@ -890,10 +870,8 @@ fn generate_export_soft_proof_preview(
         );
     }
 
-    if let Some(proof_image) = proof_image
-        && let Some(scheduler) = state.analytics_scheduler.lock().unwrap().clone()
-    {
-        let _ = scheduler.submit(AnalyticsJob {
+    if let Some(proof_image) = proof_image {
+        let _ = state.services.analytics.submit(AnalyticsJob {
             path: loaded_image.path,
             frame_id: AnalyticsFrameId::default(),
             image: Arc::new(proof_image),
@@ -2847,7 +2825,8 @@ pub fn run() {
                 );
 
                 preview_worker::start_preview_worker(app.handle().clone());
-                start_analytics_worker(app.handle().clone());
+                let state = app.state::<AppState>();
+                state.services.analytics.start_worker(app.handle().clone());
                 file_management::start_thumbnail_workers(app.handle().clone());
                 app.state::<AppState>().startup_trace.mark(
                     NativeStartupPhase::CoreCommandsReady,

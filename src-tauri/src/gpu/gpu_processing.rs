@@ -5734,7 +5734,7 @@ fn process_and_get_dynamic_image_inner(
                     if let Ok(dynamic_img) =
                         rgba16float_readback_to_dynamic_image(out_w, out_h, unpadded_data)
                     {
-                        let _ = analytics.scheduler.submit(crate::AnalyticsJob {
+                        let _ = analytics.service.submit(crate::AnalyticsJob {
                             path: analytics.path,
                             frame_id: analytics.frame_id,
                             image: std::sync::Arc::new(dynamic_img),
@@ -5751,7 +5751,7 @@ fn process_and_get_dynamic_image_inner(
                 if let Ok(dynamic_img) =
                     rgba16float_readback_to_dynamic_image(out_w, out_h, pixels_clone)
                 {
-                    let _ = analytics.scheduler.submit(crate::AnalyticsJob {
+                    let _ = analytics.service.submit(crate::AnalyticsJob {
                         path: analytics.path,
                         frame_id: analytics.frame_id,
                         image: std::sync::Arc::new(dynamic_img),
