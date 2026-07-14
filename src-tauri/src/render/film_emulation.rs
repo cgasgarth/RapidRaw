@@ -298,10 +298,10 @@ impl FilmEmulationTransferV1 {
         {
             return Err("film_transfer_invalid");
         }
-        if let Some(patch) = &self.stage_overrides {
-            if !patch.p.is_finite() || !(0.0001..=4.0).contains(&patch.p) {
-                return Err("film_transfer_invalid_stage_override");
-            }
+        if let Some(patch) = &self.stage_overrides
+            && (!patch.p.is_finite() || !(0.0001..=4.0).contains(&patch.p))
+        {
+            return Err("film_transfer_invalid_stage_override");
         }
         Ok(())
     }
