@@ -4394,6 +4394,8 @@ pub fn run() {
             color::camera_profile::registry::import_camera_profile,
             color::camera_profile::registry::remove_camera_profile,
             color::camera_profile::registry::reveal_camera_profile,
+            color::calibration::fit_and_publish_chart_calibration,
+            color::calibration::fit_chart_calibration_report,
             image_loader::compare_raw_reconstruction_modes,
             image_loader::load_image,
             image_open_session::begin_image_open,
