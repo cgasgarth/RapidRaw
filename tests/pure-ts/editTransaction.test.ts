@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../src/store/useEditorStore';
+import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2';
 import {
+  buildAdjustmentMutationOperations,
   buildEditTransactionPersistenceContext,
   type EditTransactionRequest,
   reduceEditTransaction,
@@ -22,8 +25,11 @@ const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransacti
 
 afterEach(() => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
   useEditorStore.setState({
     adjustments: initial,
+    editDocumentV2,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, initial, editDocumentV2),
     adjustmentRevision: 0,
     history: [initial],
     historyCheckpoints: [],
@@ -32,6 +38,32 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
+  test('routes focused scene-tone UI changes to a node operation and mixed changes to legacy replacement', () => {
+    const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      exposure: 0.5,
+    });
+    expect(focused).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'scene_global_color_tone',
+        patch: { exposure: 0.5 },
+      },
+    ]);
+
+    const mixed = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      exposure: 0.5,
+      temperature: 10,
+    });
+    expect(mixed).toEqual([
+      {
+        type: 'replace-adjustments',
+        adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.5, temperature: 10 },
+      },
+    ]);
+  });
+
   test('applies semantic patch operations and advances the revision once', () => {
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request());
 
@@ -52,6 +84,60 @@ describe('reduceEditTransaction', () => {
       baseAdjustmentRevision: 4,
       nextAdjustmentRevision: 5,
     });
+  });
+
+  test('patches a node-keyed scene-tone document without recreating unrelated nodes', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const result = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({
+        operations: [
+          {
+            type: 'patch-edit-document-node',
+            nodeType: 'scene_global_color_tone',
+            patch: { exposure: 0.75, highlights: -20 },
+          },
+        ],
+      }),
+      undefined,
+      document,
+    );
+
+    expect(result.after).toMatchObject({ exposure: 0.75, highlights: -20 });
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+      exposure: 0.75,
+      highlights: -20,
+    });
+    expect(result.afterEditDocumentV2.nodes.geometry).toBe(document.nodes.geometry);
+    expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(document.nodes.scene_curve);
+    expect(result.changedKeys).toEqual(['exposure', 'highlights']);
+  });
+
+  test('rejects fields and values outside scene-tone node ownership', () => {
+    const wrongField = request({
+      operations: [
+        {
+          type: 'patch-edit-document-node',
+          nodeType: 'scene_global_color_tone',
+          patch: { temperature: 20 },
+        },
+      ],
+    });
+    expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, wrongField)).toThrow(
+      'edit_transaction.field_not_owned:scene_global_color_tone:temperature',
+    );
+
+    const outOfRange = request({
+      operations: [
+        {
+          type: 'patch-edit-document-node',
+          nodeType: 'scene_global_color_tone',
+          patch: { exposure: 6 },
+        },
+      ],
+    });
+    expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, outOfRange)).toThrow();
   });
 
   test('exact no-ops do not advance revision or create a changed-key set', () => {
@@ -99,6 +185,28 @@ describe('reduceEditTransaction', () => {
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
+  });
+
+  test('store publishes the node document in the same immutable render snapshot', () => {
+    const result = useEditorStore.getState().applyEditTransaction(
+      request({
+        baseAdjustmentRevision: 0,
+        imageSessionId: 'editor-image-session:1',
+        operations: [
+          {
+            type: 'patch-edit-document-node',
+            nodeType: 'scene_global_color_tone',
+            patch: { exposure: 1.25 },
+          },
+        ],
+      }),
+    );
+    const state = useEditorStore.getState();
+
+    expect(result.afterEditDocumentV2).toBe(state.editDocumentV2);
+    expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
+    expect(state.adjustmentSnapshot.editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(1.25);
   });
 
   test('layer commands publish canonical state and history through the authority', () => {

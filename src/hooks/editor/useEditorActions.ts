@@ -37,7 +37,11 @@ import {
   getEditorZoomSourceSize,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
-import type { EditTransactionPersistenceContext, EditTransactionRequest } from '../../utils/editTransaction';
+import {
+  buildAdjustmentMutationOperations,
+  type EditTransactionPersistenceContext,
+  type EditTransactionRequest,
+} from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
@@ -146,7 +150,7 @@ export function useEditorActions() {
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'manual-control',
-        operations: [{ type: 'replace-adjustments', adjustments: newAdjustments }],
+        operations: buildAdjustmentMutationOperations(prev, newAdjustments),
         history: 'single-entry',
         persistence: 'commit',
       };

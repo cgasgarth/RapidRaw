@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { OverlayMode } from '../components/panel/right/color/CropPanel';
@@ -23,6 +24,7 @@ import {
   type BasicToneCommandEnvelope,
 } from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
+import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -155,6 +157,8 @@ interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
+  /** Versioned render authority; flat adjustments are the compatibility projection. */
+  editDocumentV2: EditDocumentV2;
   /** Monotonic revision used to reject stale preview/commit proposals. */
   adjustmentRevision: number;
   /** Once published, this adjustment object graph is immutable for the lifetime of the snapshot. */
@@ -309,9 +313,14 @@ const historyNavigationPreviewInvalidation = {
   uncroppedAdjustedPreviewUrl: null,
 } satisfies Partial<EditorState>;
 
-const publishAdjustmentState = (state: EditorState, adjustments: Adjustments) => ({
+const publishAdjustmentState = (
+  state: EditorState,
+  adjustments: Adjustments,
+  editDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments),
+) => ({
   adjustments,
-  adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments),
+  editDocumentV2,
+  adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments, editDocumentV2),
   autoEditPreviewSession: null,
 });
 
@@ -352,7 +361,8 @@ const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state
 };
 
 const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
-const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialAdjustments);
+const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(initialAdjustments);
+const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialAdjustments, initialEditDocumentV2);
 
 const viewportRevisionKeys: Array<keyof EditorState> = [
   'baseRenderSize',
@@ -365,6 +375,7 @@ const viewportRevisionKeys: Array<keyof EditorState> = [
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: initialAdjustments,
+  editDocumentV2: initialEditDocumentV2,
   adjustmentRevision: 0,
   adjustmentSnapshot: initialAdjustmentSnapshot,
   lastEditApplicationReceipt: null,
@@ -455,7 +466,12 @@ export const useEditorStore = create<EditorState>((set) => ({
         if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
         update.referenceMatchPreview = null;
         update.autoEditPreviewSession = null;
-        update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
+        update.editDocumentV2 = legacyAdjustmentsToEditDocumentV2(update.adjustments);
+        update.adjustmentSnapshot = publishAdjustmentSnapshot(
+          state.adjustmentSnapshot,
+          update.adjustments,
+          update.editDocumentV2,
+        );
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
         update.lastEditApplicationReceipt = null;
         Object.assign(
@@ -555,6 +571,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         state.adjustmentRevision,
         request,
         currentImageSessionId,
+        state.editDocumentV2,
       );
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
@@ -598,7 +615,7 @@ export const useEditorStore = create<EditorState>((set) => ({
                 );
       return {
         ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, nextResult.after),
+        ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
