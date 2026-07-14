@@ -182,6 +182,9 @@ describe('crop straighten controller', () => {
     expect(controller.dispatch({ crop, identity: session, percentCrop, type: 'crop-changed' }).commands).toEqual([
       { crop, percentCrop, type: 'crop-changed' },
     ]);
+    expect(controller.dispatch({ crop, identity: session, percentCrop, type: 'crop-completed' }).commands).toEqual([
+      { crop, identity: session, percentCrop, type: 'crop-completed' },
+    ]);
     const stale = controller.dispatch({
       crop,
       identity: { ...session, geometryEpoch: 8 },

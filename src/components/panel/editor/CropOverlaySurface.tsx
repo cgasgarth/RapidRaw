@@ -27,7 +27,7 @@ interface CropOverlaySurfaceProps {
   cropPreviewUrl: string | null;
   cropRenderSize: { height?: number; width?: number } | null;
   geometry: EditorOverlayGeometry;
-  handleCropComplete: (crop: Crop, percentCrop: PercentCrop) => void;
+  handleCropComplete: (crop: Crop, percentCrop: PercentCrop, identity: CropStraightenSessionIdentity) => void;
   handleCropStart: () => void;
   isCropping: boolean;
   isCropViewVisible: boolean;
@@ -45,6 +45,7 @@ interface CropOverlaySurfaceProps {
 }
 
 const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
+const emptyCrop: PercentCrop = { height: 0, unit: '%', width: 0, x: 0, y: 0 };
 
 export function CropOverlaySurface({
   aspectRatio,
@@ -93,7 +94,7 @@ export function CropOverlaySurface({
       } else if (command.type === 'crop-changed') {
         handlersRef.current.setCrop(command.crop, command.percentCrop);
       } else if (command.type === 'crop-completed') {
-        handlersRef.current.handleCropComplete(command.crop, command.percentCrop);
+        handlersRef.current.handleCropComplete(command.crop, command.percentCrop, command.identity);
       } else {
         handlersRef.current.onStraighten(command.correctionDegrees, command.identity);
       }
@@ -183,9 +184,16 @@ export function CropOverlaySurface({
   return (
     <div
       className="absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200"
+      data-controller-image-session={session?.imageSessionId}
+      data-controller-installed-tool={controller.getState().session?.tool}
+      data-controller-operation-generation={session?.operationGeneration}
+      data-controller-source-identity={session?.sourceIdentity}
+      data-controller-source-revision={session?.sourceRevision}
+      data-controller-tool={session?.tool}
       data-crop-view-visible={String(isCropViewVisible)}
       data-overlay-geometry-epoch={geometry.geometryEpoch}
       data-overlay-geometry-space="oriented-pixels"
+      data-testid="crop-overlay-surface"
       style={{ opacity: isCropViewVisible ? 1 : 0, pointerEvents: isCropViewVisible ? 'auto' : 'none' }}
     >
       {isCropping && (
@@ -208,7 +216,7 @@ export function CropOverlaySurface({
         <div onPointerDown={dispatchCropStarted} style={{ height: cropHeight, position: 'relative', width: cropWidth }}>
           <CropOverlay
             aspect={aspectRatio}
-            crop={crop}
+            crop={crop ?? emptyCrop}
             onChange={dispatchCropChanged}
             onComplete={dispatchCropCompleted}
             ruleOfThirds={false}
