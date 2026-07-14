@@ -28,6 +28,7 @@ export * from './film/filmMonochromeSchemas.js';
 export * from './film/filmOpticalScatterSchemas.js';
 export * from './film/filmPrintScanSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
+export * from './film/filmResourceCacheSchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';
 export * from './filmHalationRuntime.js';
