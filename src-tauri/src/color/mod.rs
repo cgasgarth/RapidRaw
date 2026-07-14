@@ -13,11 +13,14 @@ pub(crate) mod dehaze;
 mod display_hdr_hardware_tests;
 pub(crate) mod display_profile;
 pub(crate) mod gamut_mapping;
+#[cfg_attr(not(any(test, feature = "validation-harness")), allow(dead_code))]
+pub(crate) mod hdr_editing;
 pub(crate) mod icc_profiles;
 pub(crate) mod lens_correction;
 pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
+pub(crate) mod perceptual_grading;
 pub(crate) mod point_color;
 pub(crate) mod view_transform;
 #[cfg(test)]

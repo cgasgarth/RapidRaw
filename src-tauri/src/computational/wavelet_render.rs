@@ -2,11 +2,14 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-const WAVELET_RENDER_REVISION_ABI: u32 = 1;
+const WAVELET_RENDER_REVISION_ABI: u32 = 2;
 
 use image::DynamicImage;
 use serde_json::Value;
 
+use crate::detail::multiscale::{
+    MultiscaleDetailPlanV1, MultiscaleDetailSettingsV1, apply_multiscale_detail,
+};
 use crate::image_processing::{WaveletDetailSettings, apply_wavelet_detail_by_scale};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -62,10 +65,21 @@ pub fn parse_wavelet_detail_render_controls(adjustments: &Value) -> WaveletDetai
 }
 
 pub fn calculate_wavelet_detail_render_hash(base_hash: u64, adjustments: &Value) -> u64 {
-    let controls = parse_wavelet_detail_render_controls(adjustments);
     let mut hasher = DefaultHasher::new();
     WAVELET_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
+    if let Some(settings) = typed_multiscale_settings(adjustments) {
+        "multiscale_detail_v1".hash(&mut hasher);
+        match serde_json::from_value::<MultiscaleDetailSettingsV1>(settings.clone()) {
+            Ok(settings) => serde_json::to_string(&settings)
+                .expect("multiscale detail settings serialize")
+                .hash(&mut hasher),
+            Err(_) => settings.to_string().hash(&mut hasher),
+        }
+        return hasher.finish();
+    }
+    let controls = parse_wavelet_detail_render_controls(adjustments);
+    "legacy_wavelet_detail_v1".hash(&mut hasher);
     controls.enabled.hash(&mut hasher);
     controls.fine_amount.to_bits().hash(&mut hasher);
     controls.medium_amount.to_bits().hash(&mut hasher);
@@ -79,6 +93,22 @@ pub fn apply_wavelet_detail_stage<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
 ) -> Cow<'a, DynamicImage> {
+    if let Some(settings) = typed_multiscale_settings(adjustments) {
+        let parsed = serde_json::from_value::<MultiscaleDetailSettingsV1>(settings.clone());
+        let Ok(settings) = parsed else {
+            return Cow::Borrowed(image);
+        };
+        let Ok(plan) = MultiscaleDetailPlanV1::compile(settings, image.width(), image.height())
+        else {
+            return Cow::Borrowed(image);
+        };
+        if plan.is_identity() {
+            return Cow::Borrowed(image);
+        }
+        let mut output = image.clone();
+        apply_multiscale_detail(&mut output, &plan);
+        return Cow::Owned(output);
+    }
     let controls = parse_wavelet_detail_render_controls(adjustments);
     if !controls.enabled
         || (controls.fine_amount.abs() <= f32::EPSILON
@@ -100,6 +130,16 @@ pub fn apply_wavelet_detail_stage<'a>(
         },
     );
     Cow::Owned(output)
+}
+
+fn typed_multiscale_settings(adjustments: &Value) -> Option<&Value> {
+    let graph_version = adjustments
+        .get("rawEngineEditGraphVersion")
+        .and_then(Value::as_u64)
+        .unwrap_or(1);
+    (graph_version >= 2)
+        .then(|| adjustments.get("multiscaleDetailV1"))
+        .flatten()
 }
 
 #[cfg(test)]
@@ -141,6 +181,31 @@ mod tests {
             "waveletDetailFine": 55,
             "waveletDetailHaloSuppression": 0.8,
             "waveletDetailMedium": 35
+        })
+    }
+
+    fn multiscale_adjustments(gain: f32) -> Value {
+        json!({
+            "rawEngineEditGraphVersion": 2,
+            "multiscaleDetailV1": {
+                "bands": [
+                    {"gain": gain, "threshold": 0.01, "edgeProtection": 0.7, "noiseProtection": 0.9},
+                    {"gain": gain * 0.8, "threshold": 0.01, "edgeProtection": 0.7, "noiseProtection": 0.8},
+                    {"gain": gain * 0.6, "threshold": 0.01, "edgeProtection": 0.6, "noiseProtection": 0.6},
+                    {"gain": gain * 0.4, "threshold": 0.01, "edgeProtection": 0.5, "noiseProtection": 0.4},
+                    {"gain": gain * 0.2, "threshold": 0.01, "edgeProtection": 0.4, "noiseProtection": 0.2}
+                ],
+                "overallAmount": 1.0,
+                "haloSuppression": 0.75,
+                "ringingSuppression": 0.8,
+                "shadowNoiseProtection": 0.85,
+                "highlightProtection": 0.8,
+                "chromaDetail": 0.0,
+                "referenceScalePx": 1024.0,
+                "process": "atrous_luma_v1"
+            },
+            "waveletDetailEnabled": true,
+            "waveletDetailFine": 100
         })
     }
 
@@ -190,6 +255,56 @@ mod tests {
             calculate_wavelet_detail_render_hash(42, &disabled_adjustments()),
             calculate_wavelet_detail_render_hash(42, &enabled_adjustments())
         );
+    }
+
+    #[test]
+    fn typed_multiscale_process_owns_output_without_double_applying_legacy_controls() {
+        let image = synthetic_texture_image();
+        let typed = multiscale_adjustments(0.75);
+        let mut without_legacy = typed.clone();
+        without_legacy["waveletDetailEnabled"] = json!(false);
+        let output = apply_wavelet_detail_stage(&image, &typed);
+        let output_without_legacy = apply_wavelet_detail_stage(&image, &without_legacy);
+
+        assert!(max_delta(&image, output.as_ref()) > 0.0001);
+        assert_eq!(
+            max_delta(output.as_ref(), output_without_legacy.as_ref()),
+            0.0
+        );
+        assert_eq!(
+            calculate_wavelet_detail_render_hash(42, &typed),
+            calculate_wavelet_detail_render_hash(42, &without_legacy)
+        );
+    }
+
+    #[test]
+    fn typed_multiscale_hash_is_canonical_across_json_field_order() {
+        let original = multiscale_adjustments(0.75);
+        let mut reordered = original.clone();
+        let settings = original["multiscaleDetailV1"].as_object().unwrap();
+        reordered["multiscaleDetailV1"] = Value::Object(
+            settings
+                .iter()
+                .rev()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+        );
+
+        assert_eq!(
+            calculate_wavelet_detail_render_hash(42, &original),
+            calculate_wavelet_detail_render_hash(42, &reordered)
+        );
+    }
+
+    #[test]
+    fn malformed_typed_settings_fail_safe_without_falling_through_to_legacy() {
+        let image = synthetic_texture_image();
+        let mut adjustments = multiscale_adjustments(0.75);
+        adjustments["multiscaleDetailV1"]["bands"] = json!([]);
+        let output = apply_wavelet_detail_stage(&image, &adjustments);
+
+        assert!(matches!(output, Cow::Borrowed(_)));
+        assert_eq!(max_delta(&image, output.as_ref()), 0.0);
     }
 
     #[test]
