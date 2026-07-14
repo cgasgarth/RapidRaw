@@ -3634,6 +3634,31 @@ fn generate_preview_for_path(
 }
 
 #[tauri::command]
+fn analyze_negative_lab_dust_spots(
+    path: String,
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<raw::negative_lab_retouch::NegativeLabDustSpotCandidate>, String> {
+    let _ = get_or_init_gpu_context(&state, &app_handle)?;
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+    let settings = load_settings_or_default(&app_handle);
+    let bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
+    let image = load_and_composite(
+        &bytes,
+        &source_path_str,
+        &serde_json::json!({}),
+        false,
+        &settings,
+        None,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(raw::negative_lab_retouch::detect_negative_lab_dust_spots(
+        &image.to_rgb32f(),
+    ))
+}
+
+#[tauri::command]
 async fn load_and_parse_lut(
     path: String,
     state: tauri::State<'_, AppState>,
@@ -4345,6 +4370,7 @@ pub fn run() {
             generate_export_soft_proof_preview,
             resolve_export_soft_proof_transform_metadata,
             generate_preview_for_path,
+            analyze_negative_lab_dust_spots,
             generate_original_transformed_preview,
             sample_viewer_pixel,
             generate_preset_preview,

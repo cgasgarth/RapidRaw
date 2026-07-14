@@ -46,6 +46,7 @@ export enum Invokes {
   DryRunDeblurControls = 'dry_run_deblur_controls',
   DryRunDenoiseControls = 'dry_run_denoise_controls',
   EstimateNegativeBaseFog = 'estimate_negative_base_fog',
+  AnalyzeNegativeLabDustSpots = 'analyze_negative_lab_dust_spots',
   SuggestNegativeLabHighlightPatchExposure = 'suggest_negative_lab_highlight_patch_exposure',
   SuggestNegativeLabNeutralPatchRgbBalance = 'suggest_negative_lab_neutral_patch_rgb_balance',
   SuggestNegativeLabShadowPatchBlackPoint = 'suggest_negative_lab_shadow_patch_black_point',
