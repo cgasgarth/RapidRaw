@@ -23,6 +23,7 @@ export * from './film/filmCharacteristicCurveSchemas.js';
 export * from './film/filmColorCouplerSchemas.js';
 export * from './film/filmEmulationOperationSchemas.js';
 export * from './film/filmEmulationSchemas.js';
+export * from './film/filmMonochromeSchemas.js';
 export * from './film/filmPrintScanSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
 export * from './filmGrainProvenance.js';
