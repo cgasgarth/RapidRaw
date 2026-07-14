@@ -218,6 +218,7 @@ const callbacks = new Map<number, (event: unknown) => void>();
 const eventListeners = new Map<string, Set<number>>();
 let folderRevision = 1;
 let catalogCursor = 0;
+let thumbnailOperationId = 0;
 let catalogPageSize = 256;
 let batchAutoAdjustInvocation = 0;
 const harnessAdjustmentsByPath = new Map<string, unknown>();
@@ -484,11 +485,17 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(null);
     case commandNames.frontendReady:
     case commandNames.startBackgroundIndexing:
-    case commandNames.updateThumbnailQueue:
-    case commandNames.cancelThumbnailGeneration:
     case commandNames.clearSessionCaches:
     case commandNames.applyAdjustmentsToPaths:
       return Promise.resolve(null);
+    case commandNames.updateThumbnailQueue:
+      thumbnailOperationId += 1;
+      return Promise.resolve({
+        generation: Number((args?.['request'] as { generation?: unknown } | undefined)?.generation ?? 0),
+        operationId: thumbnailOperationId,
+      });
+    case commandNames.cancelThumbnailGeneration:
+      return Promise.resolve(true);
     case commandNames.saveMetadataAndUpdateThumbnail: {
       const path = getStringArg(args, 'path') ?? `${browserHarnessRoot}/browser-harness.ARW`;
       if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));

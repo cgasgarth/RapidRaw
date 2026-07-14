@@ -153,11 +153,6 @@ pub struct AnalyticsConfig {
     pub scheduler: Arc<crate::analytics_scheduler::AnalyticsScheduler>,
 }
 
-pub struct ThumbnailProgressTracker {
-    pub total: usize,
-    pub completed: usize,
-}
-
 pub struct WarpedImageCache {
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub image: Arc<DynamicImage>,
@@ -193,8 +188,6 @@ pub struct AppState {
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
     pub initial_file_path: Mutex<Option<String>>,
-    pub thumbnail_cancellation_token: Arc<AtomicBool>,
-    pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
     pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
@@ -209,7 +202,6 @@ pub struct AppState {
     pub full_warped_cache: Mutex<Option<WarpedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
-    pub thumbnail_scheduler: Arc<crate::library::thumbnail_scheduler::ThumbnailScheduler>,
     pub smart_preview_scheduler:
         Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
     pub tether_session: Mutex<Option<TetherSessionSnapshot>>,
@@ -274,11 +266,6 @@ impl AppState {
                 Arc::clone(&cache_budget),
             ),
             initial_file_path: Mutex::new(None),
-            thumbnail_cancellation_token: Arc::new(AtomicBool::new(false)),
-            thumbnail_progress: Mutex::new(ThumbnailProgressTracker {
-                total: 0,
-                completed: 0,
-            }),
             preview_scheduler: Mutex::new(None),
             export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
             viewer_sample_frames: MemoryLruCache::new(
@@ -305,9 +292,6 @@ impl AppState {
             full_warped_cache: Mutex::new(None),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
-            thumbnail_scheduler: crate::library::thumbnail_scheduler::ThumbnailScheduler::new(
-                Default::default(),
-            ),
             smart_preview_scheduler:
                 crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
             tether_session: Mutex::new(None),

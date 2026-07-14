@@ -4,6 +4,11 @@ import { panoramaRenderedReviewSchema } from './computational-merge/panoramaUiSc
 import { denoiseOperationHandleSchema } from './denoiseWorkflowSchemas';
 import { importJobAuthoritySchema } from './fileOperationSchemas';
 import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
+import {
+  thumbnailErrorPayloadSchema,
+  thumbnailOperationAuthoritySchema,
+  thumbnailProgressPayloadSchema,
+} from './thumbnailOperationSchemas';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;
@@ -66,6 +71,7 @@ export const thumbnailGeneratedPayloadSchema = z
     cacheRevision: z.string().optional(),
     fromCache: z.boolean().optional(),
     generation: nonnegativeNumberSchema.optional(),
+    operationId: nonnegativeNumberSchema.optional(),
     is_edited: z.boolean().optional(),
     path: z.string(),
     rating: z.number().optional(),
@@ -397,6 +403,9 @@ const toProgress = (payload: ProgressPayload): Progress => {
 
 export const parseProgressPayload = (value: unknown): Progress => toProgress(progressPayloadSchema.parse(value));
 export const parseThumbnailGeneratedPayload = (value: unknown) => thumbnailGeneratedPayloadSchema.parse(value);
+export const parseThumbnailProgressPayload = (value: unknown) => thumbnailProgressPayloadSchema.parse(value);
+export const parseThumbnailTerminalPayload = (value: unknown) => thumbnailOperationAuthoritySchema.parse(value);
+export const parseThumbnailErrorPayload = (value: unknown) => thumbnailErrorPayloadSchema.parse(value);
 export const parseThumbnailInvalidatedPayload = (value: unknown) => thumbnailInvalidatedPayloadSchema.parse(value);
 export const parseSmartPreviewGeneratedPayload = (value: unknown) => smartPreviewGeneratedPayloadSchema.parse(value);
 export const parseImportStartPayload = (value: unknown) => importStartPayloadSchema.parse(value);

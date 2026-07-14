@@ -26,10 +26,14 @@ import {
   parseRenderPathPayload,
   parseSmartPreviewGeneratedPayload,
   parseStringPayload,
+  parseThumbnailErrorPayload,
   parseThumbnailGeneratedPayload,
   parseThumbnailInvalidatedPayload,
+  parseThumbnailProgressPayload,
+  parseThumbnailTerminalPayload,
   persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
+import { isCurrentThumbnailAuthority, shouldAcceptThumbnailAuthority } from '../../schemas/thumbnailOperationSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -92,6 +96,7 @@ import {
   SMART_PREVIEW_GENERATED_EVENT,
   THUMBNAIL_GENERATED_EVENT,
   THUMBNAIL_GENERATION_COMPLETE_EVENT,
+  THUMBNAIL_GENERATION_ERROR_EVENT,
   THUMBNAIL_INVALIDATED_EVENT,
   THUMBNAIL_PROGRESS_EVENT,
   WAVEFORM_UPDATE_EVENT,
@@ -394,20 +399,41 @@ export function useTauriListeners({
         }
       }),
       listen<unknown>(THUMBNAIL_PROGRESS_EVENT, (event) => {
-        const payload = parseProgressPayload(event.payload);
-        if (isEffectActive)
-          useProcessStore
-            .getState()
-            .setProcess({ thumbnailProgress: { current: payload.current, total: payload.total } });
+        const payload = parseThumbnailProgressPayload(event.payload);
+        if (!isEffectActive) return;
+        const process = useProcessStore.getState();
+        if (!shouldAcceptThumbnailAuthority(payload, process.thumbnailAuthority)) return;
+        process.setProcess({
+          thumbnailAuthority: { generation: payload.generation, operationId: payload.operationId },
+          thumbnailProgress: { current: payload.current, total: payload.total },
+        });
       }),
-      listen(THUMBNAIL_GENERATION_COMPLETE_EVENT, () => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ thumbnailProgress: { current: 0, total: 0 } });
+      listen<unknown>(THUMBNAIL_GENERATION_COMPLETE_EVENT, (event) => {
+        const authority = parseThumbnailTerminalPayload(event.payload);
+        if (!isEffectActive) return;
+        const process = useProcessStore.getState();
+        if (!isCurrentThumbnailAuthority(authority, process.thumbnailAuthority)) return;
+        process.setProcess({ thumbnailProgress: { current: 0, total: 0 } });
+      }),
+      listen<unknown>(THUMBNAIL_GENERATION_ERROR_EVENT, (event) => {
+        const payload = parseThumbnailErrorPayload(event.payload);
+        if (!isEffectActive) return;
+        const process = useProcessStore.getState();
+        if (!isCurrentThumbnailAuthority(payload, process.thumbnailAuthority)) return;
+        process.setProcess({ thumbnailProgress: { current: 0, total: 0 } });
+        console.error(`Thumbnail generation failed for ${payload.path}: ${payload.message}`);
       }),
       listen<unknown>(THUMBNAIL_GENERATED_EVENT, (event) => {
         if (!isEffectActive) return;
-        const { path, generation, resource, rating, is_edited, smartPreview } = parseThumbnailGeneratedPayload(
-          event.payload,
-        );
+        const { path, generation, operationId, resource, rating, is_edited, smartPreview } =
+          parseThumbnailGeneratedPayload(event.payload);
+
+        if (
+          generation !== undefined &&
+          operationId !== undefined &&
+          !isCurrentThumbnailAuthority({ generation, operationId }, useProcessStore.getState().thumbnailAuthority)
+        )
+          return;
 
         if (!refs.current.markGenerated(path, generation)) return;
 
