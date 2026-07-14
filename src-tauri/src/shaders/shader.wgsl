@@ -2136,6 +2136,23 @@ fn apply_film_color_coupler(color_in: vec3<f32>, exposure_ev: f32) -> vec3<f32> 
     return vec3<f32>(luminance) + abs(luminance) * vec3<f32>(q_y + output_o1, q_y, q_y + output_o2);
 }
 
+fn apply_film_print_scan(color_in: vec3<f32>) -> vec3<f32> {
+    let transmittance = max(abs(color_in), vec3<f32>(1.0e-6));
+    let printer_exposure = transmittance;
+    var output = vec3<f32>(0.0);
+    for (var channel: u32 = 0u; channel < 3u; channel += 1u) {
+        let log_exposure = log2(printer_exposure[channel]) * 0.3010299957;
+        var response: f32;
+        if (log_exposure <= -1.5) { response = 0.05 * clamp((log_exposure + 3.0) / 1.5, 0.0, 1.0); }
+        else if (log_exposure <= -0.5) { response = mix(0.05, 0.25, clamp(log_exposure + 1.5, 0.0, 1.0)); }
+        else if (log_exposure <= 0.0) { response = mix(0.25, 0.5, clamp((log_exposure + 0.5) / 0.5, 0.0, 1.0)); }
+        else if (log_exposure <= 0.8) { response = mix(0.5, 0.8, clamp(log_exposure / 0.8, 0.0, 1.0)); }
+        else { response = mix(0.8, 1.0, clamp((log_exposure - 0.8) / 0.7, 0.0, 1.0)); }
+        output[channel] = max((pow(10.0, -(0.04 + response * 1.96)) - 0.01) / 0.99, 0.0);
+    }
+    return output;
+}
+
 fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
     let mix_amount = clamp(adjustments.global._pad_cg1, 0.0, 1.0);
     let shaper_p = max(adjustments.global._pad_cg2, 1.0e-6);
@@ -2151,7 +2168,8 @@ fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
     let shaped = color_in + (color_in * scale - color_in);
     let exposure_ev = log2(abs(shaped.x * 0.27222872 + shaped.y * 0.67408177 + shaped.z * 0.05368952) / 0.18);
     let coupled = apply_film_color_coupler(shaped, exposure_ev);
-    return color_in + mix_amount * (coupled - color_in);
+    let printed = apply_film_print_scan(coupled);
+    return color_in + mix_amount * (printed - color_in);
 }
 
 fn rapid_view_softplus(value: f32, width: f32) -> f32 {
