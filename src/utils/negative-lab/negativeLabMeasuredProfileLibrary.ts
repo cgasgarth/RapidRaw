@@ -6,8 +6,10 @@ import {
 } from '../../schemas/negative-lab/negativeLabMeasuredProfileLibrarySchemas';
 import type {
   NegativeLabMeasuredProfile,
+  NegativeLabMeasuredProfileCatalog,
   NegativeLabMeasurementReport,
 } from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+import { parseNegativeLabMeasuredProfileCatalog } from '../../schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 
 const stableJson = (value: unknown): string => {
@@ -79,6 +81,19 @@ export const mergeNegativeLabMeasuredProfileLibrary = ({
   }
   return [...builtIns, ...local.entries.map((entry) => entry.profile)];
 };
+
+/** Preserve catalog identity/version while adding validated local snapshots. */
+export const mergeNegativeLabMeasuredProfileCatalog = ({
+  builtInCatalog,
+  local,
+}: {
+  builtInCatalog: NegativeLabMeasuredProfileCatalog;
+  local: NegativeLabMeasuredProfileLibrary;
+}): NegativeLabMeasuredProfileCatalog =>
+  parseNegativeLabMeasuredProfileCatalog({
+    ...builtInCatalog,
+    profiles: mergeNegativeLabMeasuredProfileLibrary({ builtIns: builtInCatalog.profiles, local }),
+  });
 
 export const importNegativeLabMeasuredProfileLibrary = (json: string): NegativeLabMeasuredProfileLibrary =>
   parseNegativeLabMeasuredProfileLibrary(JSON.parse(json));

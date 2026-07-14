@@ -11,6 +11,7 @@ import {
   createNegativeLabMeasuredProfileLibraryEntry,
   exportNegativeLabMeasuredProfileLibrary,
   importNegativeLabMeasuredProfileLibrary,
+  mergeNegativeLabMeasuredProfileCatalog,
   mergeNegativeLabMeasuredProfileLibrary,
   removeNegativeLabMeasuredProfileLibraryEntry,
 } from '../../../src/utils/negative-lab/negativeLabMeasuredProfileLibrary';
@@ -77,5 +78,30 @@ describe('Negative Lab measured profile library', () => {
       }),
     ).toThrow('shadows built-in');
     expect(removeNegativeLabMeasuredProfileLibraryEntry(library, localProfile.profileId).entries).toHaveLength(0);
+  });
+
+  test('merges local snapshots without changing catalog identity or version', () => {
+    const localProfile = {
+      ...profile,
+      profileId: 'negative_lab.measured.c41.local_snapshot.v1',
+      measurementProfileId: 'negative_lab.measured.c41.local_snapshot.v1',
+    };
+    const localReport = { ...report, profileId: localProfile.profileId };
+    const local = {
+      ...createEmptyNegativeLabMeasuredProfileLibrary(),
+      entries: [createNegativeLabMeasuredProfileLibraryEntry({ profile: localProfile, report: localReport })],
+    };
+    const merged = mergeNegativeLabMeasuredProfileCatalog({
+      builtInCatalog: {
+        catalogId: 'negative_lab_measured_profile_catalog',
+        catalogVersion: '2026-07-14',
+        profiles: [profile],
+        schemaVersion: 1,
+      },
+      local,
+    });
+    expect(merged.catalogId).toBe('negative_lab_measured_profile_catalog');
+    expect(merged.catalogVersion).toBe('2026-07-14');
+    expect(merged.profiles.map((item) => item.profileId)).toEqual([profile.profileId, localProfile.profileId]);
   });
 });
