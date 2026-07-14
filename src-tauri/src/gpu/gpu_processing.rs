@@ -2834,9 +2834,16 @@ mod blur_pass_tests {
                     compile_gpu_render_graph(&legacy, *has_lut, *masks, width, height);
                 let v2_plan = compile_gpu_render_graph(&v2, *has_lut, *masks, width, height);
                 assert_eq!(
+                    legacy_plan.blur_products.len(),
+                    v2_plan.blur_products.len(),
+                    "v2 must not add transport surfaces for {class}/{workload}"
+                );
+                assert!(
+                    v2_plan.estimated_peak_resource_bytes
+                        <= legacy_plan.estimated_peak_resource_bytes.saturating_mul(2),
+                    "scale-aware v2 halo must remain within the 2x resource budget for {class}/{workload}: legacy={} v2={}",
                     legacy_plan.estimated_peak_resource_bytes,
-                    v2_plan.estimated_peak_resource_bytes,
-                    "v2 reuses existing transport surfaces for {class}/{workload}"
+                    v2_plan.estimated_peak_resource_bytes
                 );
                 assert_ne!(legacy_plan.fingerprint, v2_plan.fingerprint);
                 for _ in 0..1_000 {

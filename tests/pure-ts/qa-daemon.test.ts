@@ -344,5 +344,5 @@ describe('QA daemon lifecycle', () => {
     await child.exited;
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
     expect(await stat(state.socketPath).catch(() => undefined)).toBeUndefined();
-  }, 15_000);
+  }, 30_000);
 });

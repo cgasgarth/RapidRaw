@@ -2834,8 +2834,14 @@ mod tests {
                 "rawEngineEditGraphVersion": 1,
                 "toneMapper": "rapidView",
                 "viewTransform": {
+                    "chromaCompression": 0.25,
                     "contrast": 1.15,
-                    "middleGrey": 0.18
+                    "latitude": 0.55,
+                    "middleGrey": 0.18,
+                    "shoulder": 0.5,
+                    "sourceBlackEv": -10.0,
+                    "sourceWhiteEv": 6.5,
+                    "toe": 0.35
                 },
                 "whiteBalanceMigration": "native_v1",
                 "whiteBalanceTechnical": { "mode": "as_shot" }

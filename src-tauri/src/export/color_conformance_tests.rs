@@ -25,11 +25,13 @@ use crate::{
     },
 };
 
+// Keep the independent matrix/ICC oracle inside each target gamut. Production
+// out-of-gamut compression is asserted separately through its mapping receipt.
 const AP1_FIXTURE: [[f32; 3]; 4] = [
     [0.18, 0.18, 0.18],
-    [0.40, 0.20, 0.10],
-    [0.10, 0.30, 0.50],
-    [0.60, 0.45, 0.20],
+    [0.32, 0.27, 0.24],
+    [0.22, 0.28, 0.32],
+    [0.48, 0.44, 0.36],
 ];
 const MATRIX_OUTPUT_RGB16_TOLERANCE: u16 = 4;
 // The synthetic narrow ICC crosses an additional quantized sRGB→PCS→RGB CMM boundary.
