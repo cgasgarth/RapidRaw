@@ -137,6 +137,29 @@ export const createFilmEmulationTargetState = (
     target,
   });
 
+/**
+ * Explicit hydration boundary from the persisted editor node into the command
+ * adapter. Editor history and adjustment revisions remain the canonical edit
+ * authority; the command graph identity is deterministically rebuilt here.
+ */
+export const hydrateFilmEmulationTargetState = (
+  target: FilmEmulationTargetStateV1['target'],
+  rawNode: FilmEmulationNodeV1 | null,
+): FilmEmulationTargetStateV1 => {
+  const node = rawNode === null ? null : filmEmulationNodeV1Schema.parse(rawNode);
+  const graphRevision =
+    node === null ? 'film.graph.v1:0' : revisionFor('editor-hydration', filmEmulationCanonicalHash({ node, target }));
+  return stateWithHashes({
+    commandReceipts: [],
+    graphRevision,
+    history: [],
+    node,
+    placement: DEFAULT_PLACEMENT,
+    redo: [],
+    target,
+  });
+};
+
 const resultFor = (
   command: ApplyFilmEmulationOperationV1,
   source: FilmEmulationTargetStateV1,

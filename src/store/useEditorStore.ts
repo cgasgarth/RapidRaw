@@ -550,24 +550,51 @@ export const useEditorStore = create<EditorState>((set) => ({
         request,
         currentImageSessionId,
       );
-      result = nextResult;
+      const activeInteractionReceipt = state.lastEditApplicationReceipt;
+      const coalescedReceipt =
+        request.history === 'coalesced-interaction' &&
+        state.historyIndex === state.history.length - 1 &&
+        state.history[state.historyIndex] === state.adjustments &&
+        activeInteractionReceipt?.transactionId === request.transactionId &&
+        activeInteractionReceipt.imageSessionId === request.imageSessionId &&
+        activeInteractionReceipt.source === request.source
+          ? activeInteractionReceipt
+          : null;
+      const publishedResult = coalescedReceipt
+        ? {
+            ...nextResult,
+            applicationReceipt: {
+              ...nextResult.applicationReceipt,
+              baseAdjustmentRevision: coalescedReceipt.baseAdjustmentRevision,
+            },
+          }
+        : nextResult;
+      result = publishedResult;
       if (nextResult.noOp) return {};
       const nextHistory =
         request.history === 'none'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
           : request.history === 'reset'
             ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
-            : pushEditHistoryEntryWithCheckpoints(
-                state.history,
-                state.historyIndex,
-                nextResult.after,
-                state.historyCheckpoints,
-              );
+            : coalescedReceipt
+              ? {
+                  history: state.history.map((entry, index) =>
+                    index === state.historyIndex ? nextResult.after : entry,
+                  ),
+                  checkpoints: state.historyCheckpoints,
+                  historyIndex: state.historyIndex,
+                }
+              : pushEditHistoryEntryWithCheckpoints(
+                  state.history,
+                  state.historyIndex,
+                  nextResult.after,
+                  state.historyCheckpoints,
+                );
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
-        lastEditApplicationReceipt: nextResult.applicationReceipt,
+        lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,

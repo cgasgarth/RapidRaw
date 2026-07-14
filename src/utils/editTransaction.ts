@@ -6,6 +6,7 @@ export type EditMutationSource =
   | 'auto-edit'
   | 'preset'
   | 'copy-paste'
+  | 'film-workspace'
   | 'layer-command'
   | 'reset'
   | 'history'

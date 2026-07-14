@@ -23,6 +23,7 @@ import ColorPanel from '../../components/adjustments/Color';
 import ColorWheel from '../../components/adjustments/ColorWheel';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
+import { FilmEmulationWorkspace } from '../../components/film/FilmEmulationWorkspace';
 import FocusStackModal from '../../components/modals/computational-merge/FocusStackModal';
 import HdrModal from '../../components/modals/computational-merge/HdrModal';
 import PanoramaModal from '../../components/modals/computational-merge/PanoramaModal';
@@ -104,6 +105,7 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
+import { publishAdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import {
   ActiveChannel,
   type Adjustments,
@@ -2110,6 +2112,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.EditorParityContract]: EditorParityContractVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace]: FilmEmulationWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview]: FocusPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
@@ -8097,6 +8100,100 @@ function FilmLookVisualSmoke() {
           />
         </aside>
       </div>
+    </main>
+  );
+}
+
+function FilmEmulationWorkspaceVisualSmoke() {
+  const [ready, setReady] = useState(false);
+  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const historyIndex = useEditorStore((state) => state.historyIndex);
+  const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
+
+  useEffect(() => {
+    const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
+    useEditorStore.setState({
+      adjustmentRevision: 0,
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
+      adjustments: initial,
+      exportSoftProofTransform: {
+        blackPointCompensation: 'enabled',
+        colorManagedTransform: 'display-p3-preview',
+        effectiveColorProfile: 'Display P3',
+        effectiveRenderingIntent: 'relative_colorimetric',
+        policyStatus: 'active',
+        policyVersion: 'film-workspace-smoke-v1',
+        sourcePrecisionPath: 'preview',
+        transformApplied: true,
+        transformPolicyFingerprint: 'film-workspace-before',
+      },
+      finalPreviewUrl: 'blob:film-workspace-before',
+      history: [initial],
+      historyCheckpoints: [],
+      historyIndex: 0,
+      imageSession: null,
+      imageSessionId: 21,
+      lastEditApplicationReceipt: null,
+      transformedOriginalUrl: 'blob:film-workspace-original-before',
+    });
+    setReady(true);
+  }, []);
+
+  return (
+    <main
+      className="grid h-screen grid-cols-[1fr_390px] overflow-hidden bg-[#111316] text-[#f3f4f1]"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace}
+      data-visual-smoke-ready={ready ? 'true' : 'false'}
+    >
+      <section
+        className="grid min-w-0 place-items-center bg-[radial-gradient(circle_at_45%_35%,#6f806c,#23363d_48%,#101317_78%)] p-8"
+        data-visual-smoke-section="film-emulation-preview"
+      >
+        <div className="w-full max-w-2xl rounded-lg border border-white/15 bg-black/45 p-5 shadow-2xl">
+          {/* i18next-instrument-ignore */}
+          <h1 className="text-xl font-semibold">Film Emulation transaction proof</h1>
+          {/* i18next-instrument-ignore */}
+          <p className="mt-1 text-sm text-[#b8c0c7]">
+            Current editor preview and export share the committed Film node.
+          </p>
+          <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
+            <div className="rounded border border-white/10 bg-black/30 p-3">
+              {/* i18next-instrument-ignore */}
+              <p className="text-[#8d97a3]">Revision</p>
+              <p className="text-lg font-semibold">{adjustmentRevision}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-black/30 p-3">
+              {/* i18next-instrument-ignore */}
+              <p className="text-[#8d97a3]">History</p>
+              <p className="text-lg font-semibold">{historyIndex}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-black/30 p-3">
+              {/* i18next-instrument-ignore */}
+              <p className="text-[#8d97a3]">Native node</p>
+              <p className="text-lg font-semibold">{adjustments.filmEmulation?.enabled ? 'Enabled' : 'Off'}</p>
+            </div>
+          </div>
+          <div
+            className="mt-4 rounded border border-white/10 bg-black/30 p-3 font-mono text-xs"
+            data-adjustment-revision={adjustmentRevision}
+            data-changed-keys={receipt?.changedKeys.join(',') ?? ''}
+            data-exposure={adjustments.exposure}
+            data-film-enabled={adjustments.filmEmulation?.enabled ? 'true' : 'false'}
+            data-history-index={historyIndex}
+            data-source={receipt?.source ?? 'none'}
+            data-testid="film-workspace-transaction-proof"
+          >
+            {receipt?.transactionId ?? 'Awaiting Film edit'}
+          </div>
+        </div>
+      </section>
+      <aside
+        className="min-h-0 border-l border-white/10 bg-[#15181c]"
+        data-visual-smoke-section="film-emulation-workspace"
+      >
+        {ready ? <FilmEmulationWorkspace /> : null}
+      </aside>
     </main>
   );
 }

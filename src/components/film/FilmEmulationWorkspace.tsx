@@ -1,21 +1,26 @@
 import { RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FilmEmulationOperationV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import {
   applyFilmEmulationOperation,
-  createFilmEmulationTargetState,
+  hydrateFilmEmulationTargetState,
   REFERENCE_FILM_PROFILE_REF,
 } from '../../utils/film-look/filmEmulationOperation';
-import { buildFilmLookAppliedAdjustmentPatch, type FilmLookBrowserItem } from '../../utils/film-look/filmLookBrowser';
+import {
+  buildFilmLookAppliedAdjustmentPatch,
+  type FilmLookBrowserItem,
+  resetFilmLookControlledAdjustments,
+} from '../../utils/film-look/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
 import {
   buildFilmStageOperation,
   FILM_REFERENCE_STAGE_DEFAULT_P,
   getFilmStageControlDescriptors,
 } from '../../utils/film-look/filmStageControls';
+import { buildFilmWorkspaceEditTransactionRequest } from '../../utils/film-look/filmWorkspaceEditTransaction';
 import { FilmProfileBrowser } from './FilmProfileBrowser';
 import { FilmStageControls } from './FilmStageControls';
 
@@ -31,15 +36,14 @@ const readFavorites = (): Set<string> => {
 
 export function FilmEmulationWorkspace() {
   const { t } = useTranslation();
-  const { adjustments, setEditor } = useEditorStore((state) => ({
-    adjustments: state.adjustments,
-    setEditor: state.setEditor,
-  }));
+  const adjustments = useEditorStore((state) => state.adjustments);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const [favorites, setFavorites] = useState(readFavorites);
   const [compare, setCompare] = useState(false);
   const [printVariant, setPrintVariant] = useState('None');
-  const filmStateRef = useRef(createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' }));
   const operationCounterRef = useRef(0);
+  const mixInteractionIdRef = useRef<string | null>(null);
+  const ownsSliderDragRef = useRef(false);
   const activeProfile = useMemo(
     () =>
       getFilmLookBrowserGroups()
@@ -47,11 +51,46 @@ export function FilmEmulationWorkspace() {
         .find((look) => look.id === adjustments.filmLookId) ?? null,
     [adjustments.filmLookId],
   );
-  const updateAdjustments = (update: (previous: Adjustments) => Adjustments) =>
-    setEditor((state) => ({ adjustments: update(state.adjustments) }));
+  const commitFilmPatch = (
+    patch: Parameters<typeof buildFilmWorkspaceEditTransactionRequest>[1],
+    history: Parameters<typeof buildFilmWorkspaceEditTransactionRequest>[3] = 'single-entry',
+    transactionId: string = crypto.randomUUID(),
+  ) => {
+    const state = useEditorStore.getState();
+    const request = buildFilmWorkspaceEditTransactionRequest(state, patch, transactionId, history);
+    return applyEditTransaction(request);
+  };
+  const beginMixInteraction = () => {
+    if (mixInteractionIdRef.current) return;
+    mixInteractionIdRef.current = crypto.randomUUID();
+    const state = useEditorStore.getState();
+    ownsSliderDragRef.current = !state.isSliderDragging;
+    if (ownsSliderDragRef.current) state.setEditor({ isSliderDragging: true });
+  };
+  const endMixInteraction = () => {
+    mixInteractionIdRef.current = null;
+    if (ownsSliderDragRef.current) useEditorStore.getState().setEditor({ isSliderDragging: false });
+    ownsSliderDragRef.current = false;
+  };
+  useEffect(
+    () => () => {
+      mixInteractionIdRef.current = null;
+      if (ownsSliderDragRef.current) useEditorStore.getState().setEditor({ isSliderDragging: false });
+      ownsSliderDragRef.current = false;
+    },
+    [],
+  );
+  const commitFilmMix = (filmLookStrength: number) => {
+    const activeTransactionId = mixInteractionIdRef.current;
+    commitFilmPatch({ filmLookStrength }, 'coalesced-interaction', activeTransactionId ?? crypto.randomUUID());
+  };
   const applyFilmOperation = (operation: FilmEmulationOperationV1) => {
     operationCounterRef.current += 1;
-    const source = filmStateRef.current;
+    const state = useEditorStore.getState();
+    const source = hydrateFilmEmulationTargetState(
+      { kind: 'image', variantId: 'editor' },
+      state.adjustments.filmEmulation,
+    );
     const command = {
       actor: { id: 'film-workspace', kind: 'ui' as const, sessionId: 'film-workspace' },
       approval: { approvalClass: 'edit_apply' as const, reason: 'Film workspace control', state: 'approved' as const },
@@ -66,8 +105,7 @@ export function FilmEmulationWorkspace() {
       target: source.target,
     };
     const applied = applyFilmEmulationOperation(command, source);
-    filmStateRef.current = applied.state;
-    updateAdjustments((previous) => ({ ...previous, filmEmulation: applied.state.node }));
+    commitFilmPatch({ filmEmulation: applied.state.node });
   };
   const nativeFilmEnabled = adjustments.filmEmulation !== null;
   const stageDescriptors = nativeFilmEnabled
@@ -76,28 +114,24 @@ export function FilmEmulationWorkspace() {
       )
     : [];
   const applyProfile = (look: FilmLookBrowserItem) => {
-    filmStateRef.current = createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' });
-    updateAdjustments((previous) => ({
-      ...previous,
+    const current = useEditorStore.getState().adjustments;
+    commitFilmPatch({
       ...buildFilmLookAppliedAdjustmentPatch(
         look,
-        previous.filmLookId === look.id ? previous.filmLookStrength : look.strengthDefault,
+        current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
       ),
       filmEmulation: null,
       filmLookId: look.id,
-      filmLookStrength: previous.filmLookId === look.id ? previous.filmLookStrength : look.strengthDefault,
-    }));
+      filmLookStrength: current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
+    });
   };
   const resetFilm = () => {
-    applyFilmOperation({ kind: 'remove_node' });
-    filmStateRef.current = createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' });
-    updateAdjustments((previous) => ({
-      ...previous,
-      ...INITIAL_ADJUSTMENTS,
+    commitFilmPatch({
+      ...resetFilmLookControlledAdjustments(),
       filmEmulation: null,
       filmLookId: null,
-      filmLookStrength: 100,
-    }));
+      filmLookStrength: INITIAL_ADJUSTMENTS.filmLookStrength,
+    });
   };
   const toggleFavorite = (id: string) =>
     setFavorites((previous) => {
@@ -165,13 +199,18 @@ export function FilmEmulationWorkspace() {
             </output>
           </div>
           <input
-            aria-label={t('film.workspace.mix', { defaultValue: 'Film mix' })}
+            aria-label={t('film.workspace.mixLabel', { defaultValue: 'Film mix' })}
             className="w-full accent-editor-focus-ring"
             max={100}
             min={0}
-            onChange={(event) =>
-              updateAdjustments((previous) => ({ ...previous, filmLookStrength: Number(event.target.value) }))
-            }
+            onBlur={endMixInteraction}
+            onChange={(event) => commitFilmMix(Number(event.target.value))}
+            onKeyDown={beginMixInteraction}
+            onKeyUp={endMixInteraction}
+            onLostPointerCapture={endMixInteraction}
+            onPointerCancel={endMixInteraction}
+            onPointerDown={beginMixInteraction}
+            onPointerUp={endMixInteraction}
             step={1}
             type="range"
             value={adjustments.filmLookStrength}
