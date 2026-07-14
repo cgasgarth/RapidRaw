@@ -187,6 +187,13 @@
         "reds": "Reds",
         "yellows": "Yellows"
       },
+      "pointColor": {
+        "addPoint": "Add point",
+        "deletePoint": "Delete point",
+        "empty": "Add a perceptual color point, then refine its H/C/L range.",
+        "samples": "Point Color samples",
+        "visualize": "Visualize"
+      },
       "presence": "Presence",
       "preset": "Preset",
       "previewMode": "Preview",

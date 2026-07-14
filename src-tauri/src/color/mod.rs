@@ -18,6 +18,8 @@ pub(crate) mod lens_correction;
 pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
+#[allow(dead_code)]
+pub(crate) mod point_color;
 pub(crate) mod view_transform;
 #[cfg(test)]
 mod visual_approval_artifacts;

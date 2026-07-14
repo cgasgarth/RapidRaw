@@ -4,6 +4,7 @@ export * from './appServerCommandSchemas.js';
 export * from './auto-edit/autoEditSchemas.js';
 export * from './brushMaskCommandRuntime.js';
 export * from './brushMaskV1.js';
+export * from './color/pointColorSchemas.js';
 export * from './color/rawInputTransformSchemas.js';
 export * from './color/whiteBalanceSchemas.js';
 export * from './computational-merge/computationalMergeDerivedSourceRuntime.js';

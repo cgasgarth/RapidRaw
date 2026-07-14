@@ -186,6 +186,13 @@
         "reds": "Czerwone",
         "yellows": "Żółte"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "Prezencja",
       "preset": "Ustawienie",
       "previewMode": "",

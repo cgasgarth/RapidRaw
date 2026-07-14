@@ -186,6 +186,13 @@
         "reds": "红色",
         "yellows": "黄色"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "质感",
       "preset": "预设",
       "previewMode": "",

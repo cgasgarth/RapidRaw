@@ -33,6 +33,7 @@ import { ColorMixerControls } from './color/ColorMixerControls';
 import { ColorProfileToneControls } from './color/ColorProfileToneControls';
 import { ColorProofingDiagnostics } from './color/ColorProofingDiagnostics';
 import { ColorQuickControls } from './color/ColorQuickControls';
+import { PointColorControls } from './color/PointColorControls';
 import type { AdjustmentUpdate } from './color/types';
 
 interface ColorPanelProps {
@@ -318,6 +319,12 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.mixer'),
         panel: (
           <div className="space-y-1">
+            <PointColorControls
+              adjustments={adjustments}
+              appSettings={appSettings}
+              onDragStateChange={onDragStateChange}
+              setAdjustments={setAdjustments}
+            />
             <ColorMixerControls
               activeChannelMixerOutput={activeChannelMixerOutput}
               activeColor={activeColor}

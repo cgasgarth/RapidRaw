@@ -180,6 +180,13 @@
         "reds": "レッド",
         "yellows": "イエロー"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "外観",
       "preset": "プリセット",
       "previewMode": "",
