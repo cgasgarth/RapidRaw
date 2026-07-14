@@ -70,7 +70,6 @@ import {
   type ViewerSampleRequest,
   type ViewerSampleResult,
   type ViewerSampleTarget,
-  viewerSampleResultSchema,
 } from '../../../utils/viewerSampler';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import {
@@ -100,6 +99,7 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
+import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   createViewerInputRouter,
@@ -943,6 +943,7 @@ const ImageCanvas = memo(
     });
 
     const latestViewerSampleRequestRef = useRef<ViewerSampleRequest | null>(null);
+    const viewerSamplerCommandService = useMemo(() => createViewerSamplerCommandService(), []);
     const executeViewerSampleRef = useRef<(request: ViewerSampleRequest) => Promise<void>>(async () => {});
     const viewerSampleSchedulerRef = useRef<LatestViewerSampleScheduler | null>(null);
     if (!viewerSampleSchedulerRef.current) {
@@ -952,7 +953,7 @@ const ImageCanvas = memo(
     }
     executeViewerSampleRef.current = async (request) => {
       try {
-        const result = await invokeWithSchema(Invokes.SampleViewerPixel, { request }, viewerSampleResultSchema);
+        const result = await viewerSamplerCommandService.sample(request);
         if (isViewerSampleResultCurrent(result, latestViewerSampleRequestRef.current)) {
           transitionViewerSampler((current) => ({ ...current, result }));
         }
