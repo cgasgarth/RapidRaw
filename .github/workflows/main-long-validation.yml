@@ -303,8 +303,11 @@ jobs:
 
       - name: Upload optimized validation app
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ github.run_attempt == 1 }}
         with:
-          name: main-native-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          # Immutable per-workflow identity: a job-only rerun reuses the
+          # producer artifact from attempt one instead of looking for a new name.
+          name: main-native-startup-${{ github.run_id }}
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/RapidRAW.app.tar.gz
           if-no-files-found: error
           retention-days: 1
@@ -372,8 +375,17 @@ jobs:
       - name: Download optimized validation binary on a clean runtime runner
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.0
         with:
-          name: main-native-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          name: main-native-startup-${{ github.run_id }}
           path: native-startup
+
+      - name: Diagnose missing immutable startup artifact
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "startup artifact unavailable: producer job=main-macos-app-build run_id=$GITHUB_RUN_ID producer_attempt=1 expected_name=main-native-startup-$GITHUB_RUN_ID" >&2
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | [.name, .expired, .workflow_run.run_attempt] | @tsv' || true
 
       - name: Run bounded native startup benchmark
         env:
