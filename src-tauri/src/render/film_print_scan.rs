@@ -145,10 +145,18 @@ fn curve_sample(exposure: f32, x: &[f32], y: &[f32]) -> f32 {
 }
 
 pub fn apply(capture_rgb: Vec3, curve: &FilmPrintScanV1) -> Vec3 {
-    if !curve.enabled_by_profile || curve.validate().is_err() || !capture_rgb.is_finite() {
+    // The print/scan approximation is defined for normalized positive input. Preserve
+    // signed and extended-range scene values so this optional stage cannot clip or
+    // reverse the shared scene-referred contract.
+    if !curve.enabled_by_profile
+        || curve.validate().is_err()
+        || !capture_rgb.is_finite()
+        || capture_rgb.min_element() < 0.0
+        || capture_rgb.max_element() > 1.0
+    {
         return capture_rgb;
     }
-    let transmittance = capture_rgb.abs().max(Vec3::splat(EPSILON));
+    let transmittance = capture_rgb.max(Vec3::splat(EPSILON));
     let printer_input = Vec3::new(
         curve.printer_cross_talk[0][0] * transmittance.x
             + curve.printer_cross_talk[0][1] * transmittance.y
@@ -174,8 +182,8 @@ pub fn apply(capture_rgb: Vec3, curve: &FilmPrintScanV1) -> Vec3 {
             &curve.paper.exposure_knots_log10[channel],
             &curve.paper.response_knots[channel],
         );
-        let density = curve.paper.d_min[channel]
-            + response.clamp(0.0, 1.0) * (curve.paper.d_max[channel] - curve.paper.d_min[channel]);
+        let density = curve.paper.d_max[channel]
+            - response.clamp(0.0, 1.0) * (curve.paper.d_max[channel] - curve.paper.d_min[channel]);
         scan_transmittance[channel] = ((10.0_f32.powf(-density) - curve.paper.flare_floor)
             / (1.0 - curve.paper.flare_floor))
             .max(0.0)
@@ -261,5 +269,26 @@ mod tests {
             invalid.validate(),
             Err("film_print_scan_invalid_paper_curve")
         );
+    }
+
+    #[test]
+    fn extended_scene_values_fail_through_without_abs_or_clipping() {
+        let curve = reference();
+        assert_eq!(
+            apply(Vec3::new(-0.25, 2.5, 0.5), &curve),
+            Vec3::new(-0.25, 2.5, 0.5)
+        );
+    }
+
+    #[test]
+    fn direct_positive_reference_is_monotone_in_normalized_domain() {
+        let curve = reference();
+        let mut previous = -f32::EPSILON;
+        for step in 0..=100 {
+            let value = step as f32 / 100.0;
+            let output = apply(Vec3::splat(value), &curve).x;
+            assert!(output >= previous);
+            previous = output;
+        }
     }
 }
