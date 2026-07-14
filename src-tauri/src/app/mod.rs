@@ -4,6 +4,7 @@ pub(crate) mod disabled_commands;
 pub(crate) mod display_target;
 pub(crate) mod events;
 pub(crate) mod hdr_display_capability;
+pub(crate) mod services;
 pub(crate) mod settings;
 pub(crate) mod startup;
 pub(crate) mod state;
