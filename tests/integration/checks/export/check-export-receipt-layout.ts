@@ -1,141 +1,52 @@
 #!/usr/bin/env bun
 
-import { spawn } from 'node:child_process';
-import { chromium } from '@playwright/test';
+import { exportHarnessRootPath, runExportUiCheck } from '../../../../scripts/lib/proofs/export-ui-check.ts';
 
-const host = 'localhost';
-const port = 1420;
-const baseUrl = `http://${host}:${port}`;
-const harnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
-const rootPath = '/tmp/rawengine-browser-harness';
+await runExportUiCheck({
+  label: 'export receipt layout',
+  run: async (page) => {
+    await page.getByText('File Settings').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'TIFF' }).click({ force: true });
+    await page.getByRole('button', { name: /Export Image/u }).click();
 
-async function waitForDevServer(): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < 45_000) {
-    try {
-      const response = await fetch(baseUrl);
-      if (response.ok) return;
-    } catch {
-      // Vite is still starting.
+    const receipt = page.getByTestId('export-success-receipt');
+    await receipt.waitFor({ timeout: 10_000 });
+    await page
+      .locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${exportHarnessRootPath}/export.tif"]`)
+      .waitFor({ timeout: 10_000 });
+    await receipt.locator('summary').click();
+
+    const detailsBox = await page.getByTestId('export-success-receipt-details').boundingBox();
+    const actionsBox = await page.getByTestId('export-success-receipt-actions').boundingBox();
+    const policyBox = await page.getByTestId('export-success-color-policy').boundingBox();
+    const transformBox = await page.getByTestId('export-success-color-managed-transform').boundingBox();
+
+    if (!detailsBox || detailsBox.width < 240) {
+      throw new Error(`Receipt details column collapsed: ${detailsBox?.width ?? 'missing'}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error(`Timed out waiting for Vite at ${baseUrl}`);
-}
+    if (!actionsBox || actionsBox.width < 240) {
+      throw new Error(`Receipt actions row collapsed: ${actionsBox?.width ?? 'missing'}`);
+    }
+    if (!policyBox || policyBox.height > 36) {
+      throw new Error(`Receipt policy text wrapped too tall: ${policyBox?.height ?? 'missing'}`);
+    }
+    if (!transformBox || transformBox.height > 36) {
+      throw new Error(`Receipt transform text wrapped too tall: ${transformBox?.height ?? 'missing'}`);
+    }
 
-async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
-  if (server.exitCode !== null || server.signalCode !== null) return;
-  server.kill('SIGTERM');
-  await Promise.race([
-    new Promise((resolve) => {
-      server.once('exit', resolve);
-    }),
-    new Promise((resolve) =>
-      setTimeout(() => {
-        server.kill('SIGKILL');
-        resolve(undefined);
-      }, 5_000),
-    ),
-  ]);
-}
-
-const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
-  env: { ...process.env },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-let serverOutput = '';
-const captureServerOutput = (chunk: Buffer) => {
-  serverOutput = `${serverOutput}${chunk.toString()}`.slice(-4_000);
-};
-server.stdout.on('data', captureServerOutput);
-server.stderr.on('data', captureServerOutput);
-
-let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
-
-try {
-  await waitForDevServer();
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
-  await page.addInitScript(
-    ({ key, root }) => {
-      window.localStorage.setItem(
-        key,
-        JSON.stringify({
-          editorPreviewResolution: 1024,
-          lastFolderState: {
-            currentFolderPath: root,
-            expandedFolders: [root],
-          },
-          lastRootPath: root,
-          libraryViewMode: 'flat',
-          rootFolders: [root],
-          theme: 'dark',
-          thumbnailSize: 'medium',
-          useWgpuRenderer: false,
-        }),
+    const collectionRefreshPaths = await page.evaluate(() => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return calls.filter((call) => call.command === 'open_library_collection').map((call) => call.args?.path);
+    });
+    if (collectionRefreshPaths.length < 2 || collectionRefreshPaths.at(-1) !== exportHarnessRootPath) {
+      throw new Error(
+        `Expected export completion to reopen ${exportHarnessRootPath}; saw ${JSON.stringify(collectionRefreshPaths)}.`,
       );
-    },
-    { key: harnessSettingsStorageKey, root: rootPath },
-  );
+    }
 
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /Continue Session/u }).click();
-  await page
-    .getByRole('button', { name: /browser-harness\.ARW/u })
-    .first()
-    .dblclick();
-  await page.getByRole('button', { exact: true, name: 'Export' }).click();
-  await page.getByText('File Settings').waitFor({ timeout: 10_000 });
-  await page.getByRole('button', { name: 'TIFF' }).click({ force: true });
-  await page.getByRole('button', { name: /Export Image/u }).click();
-
-  const receipt = page.getByTestId('export-success-receipt');
-  await receipt.waitFor({ timeout: 10_000 });
-  await page
-    .locator('[data-testid="filmstrip-thumbnail"][data-image-path="/tmp/rawengine-browser-harness/export.tif"]')
-    .waitFor({ timeout: 10_000 });
-  await receipt.locator('summary').click();
-
-  const detailsBox = await page.getByTestId('export-success-receipt-details').boundingBox();
-  const actionsBox = await page.getByTestId('export-success-receipt-actions').boundingBox();
-  const policyBox = await page.getByTestId('export-success-color-policy').boundingBox();
-  const transformBox = await page.getByTestId('export-success-color-managed-transform').boundingBox();
-
-  if (!detailsBox || detailsBox.width < 240) {
-    throw new Error(`Receipt details column collapsed: ${detailsBox?.width ?? 'missing'}`);
-  }
-  if (!actionsBox || actionsBox.width < 240) {
-    throw new Error(`Receipt actions row collapsed: ${actionsBox?.width ?? 'missing'}`);
-  }
-  if (!policyBox || policyBox.height > 36) {
-    throw new Error(`Receipt policy text wrapped too tall: ${policyBox?.height ?? 'missing'}`);
-  }
-  if (!transformBox || transformBox.height > 36) {
-    throw new Error(`Receipt transform text wrapped too tall: ${transformBox?.height ?? 'missing'}`);
-  }
-
-  const harnessProof = await page.evaluate(() => {
-    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
-    return {
-      listRefreshCount: calls.filter((call) => call.command === 'list_images_in_dir').length,
-      snapshotCount: calls.filter((call) => call.command === 'get_folder_refresh_snapshot').length,
-    };
-  });
-  if (harnessProof.listRefreshCount < 2) {
-    throw new Error(`Expected export completion to refresh the selected folder, saw ${harnessProof.listRefreshCount}.`);
-  }
-
-  await page.getByRole('button', { name: /Back to Library/u }).click();
-  await page
-    .locator('[data-testid="library-thumbnail"][data-image-path="/tmp/rawengine-browser-harness/export.tif"]')
-    .waitFor({ timeout: 10_000 });
-
-  console.log('export receipt layout ok');
-} catch (error) {
-  console.error('export receipt layout failed');
-  if (serverOutput.trim()) console.error(serverOutput.trim());
-  throw error;
-} finally {
-  if (browser !== undefined) await browser.close();
-  await stopServer(server);
-}
+    await page.getByRole('button', { name: /Back to Library/u }).click();
+    await page
+      .locator(`[data-testid="library-thumbnail"][data-image-path="${exportHarnessRootPath}/export.tif"]`)
+      .waitFor({ timeout: 10_000 });
+  },
+});
