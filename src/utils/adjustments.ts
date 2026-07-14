@@ -493,7 +493,7 @@ interface Hsl {
 
 export interface BlackWhiteMixerSettings {
   enabled: boolean;
-  process: 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
+  process: 'continuous_sensitivity_v1' | 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
   weights: {
     aquas: number;
     blues: number;

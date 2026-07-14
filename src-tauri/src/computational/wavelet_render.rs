@@ -102,6 +102,11 @@ pub fn apply_wavelet_detail_stage<'a>(
         else {
             return Cow::Borrowed(image);
         };
+        if log::log_enabled!(log::Level::Trace) {
+            let receipt = serde_json::to_string(&plan.receipt())
+                .unwrap_or_else(|error| format!("receipt_encode_error:{error}"));
+            log::trace!("multiscale_detail_plan={receipt}");
+        }
         if plan.is_identity() {
             return Cow::Borrowed(image);
         }

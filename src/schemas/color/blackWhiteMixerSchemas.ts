@@ -24,7 +24,11 @@ export const blackWhiteMixerWeightsSchema = z
   })
   .strict();
 
-export const monochromeProcessSchema = z.enum(['legacy_fixed_band_v1', 'neutral_panchromatic_v1']);
+export const monochromeProcessSchema = z.enum([
+  'legacy_fixed_band_v1',
+  'neutral_panchromatic_v1',
+  'continuous_sensitivity_v1',
+]);
 
 export const blackWhiteMixerSettingsSchema = z
   .object({
