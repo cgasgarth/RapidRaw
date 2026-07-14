@@ -19,6 +19,7 @@ use crate::color::view_transform::{
 use crate::edit_graph::CompiledEditGraph;
 use crate::lut_processing::Lut;
 use crate::mixer_render::{apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb};
+use crate::render::cpu_nodes::CpuNodeRuntime;
 use crate::tone::tone_equalizer::{
     BasicToneMacros, ToneEqualizerPickerSampleV1, ToneEqualizerPlanV1, ToneEqualizerSettingsV1,
     band_weights, edge_aware_exposure_ev, scene_luminance as tone_scene_luminance,
@@ -72,6 +73,7 @@ pub(crate) fn execute_cpu_edit_graph(
 ) -> Result<DynamicImage, &'static str> {
     graph.validate_contract()?;
     graph.validate_gpu_execution(adjustments, lut.is_some(), mask_bitmaps.len())?;
+    let node_runtime = CpuNodeRuntime::from_graph(graph)?;
     let mut authoritative_adjustments = graph.shader_abi();
     prepare_cpu_dehaze(base_image, &mut authoritative_adjustments);
     let adjustments = &authoritative_adjustments;
@@ -400,8 +402,8 @@ pub(crate) fn execute_cpu_edit_graph(
             color = apply_grading(color);
         }
         color = apply_vignette(color, x, y, width, height, adjustments);
-        if let Some(curve) = graph.scene_curve() {
-            color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
+        if let Some(curve) = node_runtime.scene_curve() {
+            color = curve.apply(color);
         }
         if let Some(film) = graph.film_emulation() {
             color = crate::render::film_optical_scatter::apply(
@@ -452,8 +454,8 @@ pub(crate) fn execute_cpu_edit_graph(
         if graph.film_emulation().is_none() {
             color = apply_grain(color, x, y, width, height, adjustments);
         }
-        if let Some(curve) = graph.output_curve() {
-            color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
+        if let Some(curve) = node_runtime.output_curve() {
+            color = curve.apply(color);
         }
 
         if adjustments.global.show_clipping == 1 {
