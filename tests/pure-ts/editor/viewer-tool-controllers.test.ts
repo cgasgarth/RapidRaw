@@ -52,4 +52,21 @@ describe('viewer tool controllers', () => {
     expect(resolveViewerToolId('viewer-sampler')).toBe('viewer-sampler');
     expect(resolveViewerToolId('pan-zoom')).toBe('pan');
   });
+
+  test('keeps the latest pressure-aware pointer sample inside the owned session', () => {
+    const registry = createViewerToolSessionRegistry();
+    registry.begin(key(), 3, 'active-tool', { clientX: 10, clientY: 20, pointerType: 'pen', pressure: 0.25 });
+    const update = registry.reduce({
+      kind: 'update',
+      pointerId: 3,
+      sample: { clientX: 15, clientY: 30, pointerType: 'pen', pressure: 0.75 },
+    });
+    expect(update?.session.lastPointerSample).toEqual({
+      clientX: 15,
+      clientY: 30,
+      pointerType: 'pen',
+      pressure: 0.75,
+    });
+    expect(registry.active()?.lastPointerSample?.pressure).toBe(0.75);
+  });
 });

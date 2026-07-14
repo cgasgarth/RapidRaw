@@ -2565,9 +2565,24 @@ const ImageCanvas = memo(
               },
               event.pointerId,
               transition.state.owner,
+              {
+                clientX: event.clientX,
+                clientY: event.clientY,
+                pointerType: normalizeViewerPointerType(event.pointerType),
+                pressure: event.pressure,
+              },
             );
           } else if (event.type === 'pointermove') {
-            viewerToolSessions.reduce({ kind: 'update', pointerId: event.pointerId });
+            viewerToolSessions.reduce({
+              kind: 'update',
+              pointerId: event.pointerId,
+              sample: {
+                clientX: event.clientX,
+                clientY: event.clientY,
+                pointerType: normalizeViewerPointerType(event.pointerType),
+                pressure: event.pressure,
+              },
+            });
           } else if (event.type === 'pointerup') {
             viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
           } else if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {

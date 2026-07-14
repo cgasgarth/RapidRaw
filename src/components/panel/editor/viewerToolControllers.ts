@@ -1,5 +1,12 @@
 import type { ViewerGestureOwner } from './viewerInputResolver';
 
+export interface ViewerToolPointerSample {
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly pointerType: 'mouse' | 'pen' | 'touch';
+  readonly pressure: number;
+}
+
 export type ViewerToolId =
   | 'brush'
   | 'crop'
@@ -28,6 +35,7 @@ export interface ViewerOverlayDescriptor {
 
 export interface ViewerToolSession {
   readonly key: ViewerToolSessionKey;
+  readonly lastPointerSample: ViewerToolPointerSample | null;
   readonly startedAtPointerId: number;
 }
 
@@ -38,11 +46,20 @@ export type ViewerToolCommand =
 
 export interface ViewerToolController {
   readonly id: ViewerToolId;
-  begin(key: ViewerToolSessionKey, pointerId: number, owner: ViewerGestureOwner): ViewerToolCommand;
+  begin(
+    key: ViewerToolSessionKey,
+    pointerId: number,
+    owner: ViewerGestureOwner,
+    sample?: ViewerToolPointerSample,
+  ): ViewerToolCommand;
   overlays(session: ViewerToolSession): readonly ViewerOverlayDescriptor[];
   reduce(
     session: ViewerToolSession,
-    event: { readonly kind: 'update' | 'end' | 'cancel'; readonly pointerId: number },
+    event: {
+      readonly kind: 'update' | 'end' | 'cancel';
+      readonly pointerId: number;
+      readonly sample?: ViewerToolPointerSample;
+    },
   ): ViewerToolCommand | null;
 }
 
@@ -51,7 +68,11 @@ const overlayZOrder = (id: ViewerToolId): ViewerOverlayDescriptor['zOrder'] =>
 
 const createController = (id: ViewerToolId): ViewerToolController => ({
   id,
-  begin: (key, pointerId, owner) => ({ kind: 'begin', owner, session: { key, startedAtPointerId: pointerId } }),
+  begin: (key, pointerId, owner, sample) => ({
+    kind: 'begin',
+    owner,
+    session: { key, lastPointerSample: sample ?? null, startedAtPointerId: pointerId },
+  }),
   overlays: (session) => [
     {
       ariaLabel: `${session.key.toolId} interaction`,
@@ -61,8 +82,12 @@ const createController = (id: ViewerToolId): ViewerToolController => ({
       zOrder: overlayZOrder(session.key.toolId),
     },
   ],
-  reduce: (session, event) =>
-    event.pointerId === session.startedAtPointerId ? { kind: event.kind, pointerId: event.pointerId, session } : null,
+  reduce: (session, event) => {
+    if (event.pointerId !== session.startedAtPointerId) return null;
+    const nextSession =
+      event.kind === 'update' && event.sample !== undefined ? { ...session, lastPointerSample: event.sample } : session;
+    return { kind: event.kind, pointerId: event.pointerId, session: nextSession };
+  },
 });
 
 export const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
@@ -87,9 +112,18 @@ export const resolveViewerToolId = (tool: string): ViewerToolId => {
 
 export interface ViewerToolSessionRegistry {
   active(): ViewerToolSession | null;
-  begin(key: ViewerToolSessionKey, pointerId: number, owner: ViewerGestureOwner): ViewerToolCommand | null;
+  begin(
+    key: ViewerToolSessionKey,
+    pointerId: number,
+    owner: ViewerGestureOwner,
+    sample?: ViewerToolPointerSample,
+  ): ViewerToolCommand | null;
   invalidate(): ViewerToolCommand | null;
-  reduce(event: { readonly kind: 'update' | 'end' | 'cancel'; readonly pointerId: number }): ViewerToolCommand | null;
+  reduce(event: {
+    readonly kind: 'update' | 'end' | 'cancel';
+    readonly pointerId: number;
+    readonly sample?: ViewerToolPointerSample;
+  }): ViewerToolCommand | null;
 }
 
 /** One owner and one cleanup path for every viewer gesture. */
@@ -97,9 +131,9 @@ export const createViewerToolSessionRegistry = (): ViewerToolSessionRegistry => 
   let session: ViewerToolSession | null = null;
   return {
     active: () => session,
-    begin: (key, pointerId, owner) => {
+    begin: (key, pointerId, owner, sample) => {
       if (session !== null) return null;
-      const command = viewerToolControllers[key.toolId].begin(key, pointerId, owner);
+      const command = viewerToolControllers[key.toolId].begin(key, pointerId, owner, sample);
       session = command.session;
       return command;
     },
@@ -112,6 +146,7 @@ export const createViewerToolSessionRegistry = (): ViewerToolSessionRegistry => 
     reduce: (event) => {
       if (session === null) return null;
       const command = viewerToolControllers[session.key.toolId].reduce(session, event);
+      if (command?.kind === 'update') session = command.session;
       if (command !== null && (event.kind === 'end' || event.kind === 'cancel')) session = null;
       return command;
     },
