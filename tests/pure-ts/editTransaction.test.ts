@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../src/store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   buildEditTransactionPersistenceContext,
   type EditTransactionRequest,
   reduceEditTransaction,
 } from '../../src/utils/editTransaction';
+import { buildLayerEditTransactionRequest } from '../../src/utils/layers/layerEditTransaction';
 
 const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransactionRequest => ({
   transactionId: 'tx-1',
@@ -98,5 +99,84 @@ describe('reduceEditTransaction', () => {
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
+  });
+
+  test('layer commands publish canonical state and history through the authority', () => {
+    const next = {
+      ...INITIAL_ADJUSTMENTS,
+      masks: [
+        {
+          adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+          id: 'layer-1',
+          invert: false,
+          name: 'Layer 1',
+          opacity: 100,
+          subMasks: [],
+          visible: false,
+        },
+      ],
+    };
+    const result = useEditorStore.getState().applyEditTransaction(
+      request({
+        transactionId: 'layer-1',
+        baseAdjustmentRevision: 0,
+        imageSessionId: 'editor-image-session:1',
+        source: 'layer-command',
+        operations: [{ type: 'replace-adjustments', adjustments: next }],
+      }),
+    );
+    const state = useEditorStore.getState();
+
+    expect(result.applicationReceipt.source).toBe('layer-command');
+    expect(state.adjustments.masks).toEqual(next.masks);
+    expect(state.history).toHaveLength(2);
+  });
+
+  test('layer command boundary carries session/revision identity into persistence', () => {
+    const next = {
+      ...INITIAL_ADJUSTMENTS,
+      masks: [
+        {
+          adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+          id: 'layer-persisted',
+          invert: false,
+          name: 'Layer persisted',
+          opacity: 100,
+          subMasks: [],
+          visible: true,
+        },
+      ],
+    };
+    const request = buildLayerEditTransactionRequest(
+      {
+        adjustmentRevision: 7,
+        adjustments: INITIAL_ADJUSTMENTS,
+        imageSessionId: 4,
+        imageSession: { id: 'session-layer' },
+      },
+      next,
+      'layer-persist-1',
+    );
+    const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 7, request, 'session-layer');
+    const persistence = buildEditTransactionPersistenceContext(request, result);
+
+    expect(result.applicationReceipt).toMatchObject({
+      transactionId: 'layer-persist-1',
+      imageSessionId: 'session-layer',
+      baseAdjustmentRevision: 7,
+      adjustmentRevision: 8,
+    });
+    expect(persistence).toEqual({
+      transactionId: 'layer-persist-1',
+      imageSessionId: 'session-layer',
+      baseAdjustmentRevision: 7,
+      nextAdjustmentRevision: 8,
+    });
+    expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 8, request, 'session-layer')).toThrow(
+      'edit_transaction.stale_base:7:8',
+    );
+    expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 7, request, 'session-other')).toThrow(
+      'edit_transaction.stale_session:session-layer:session-other',
+    );
   });
 });
