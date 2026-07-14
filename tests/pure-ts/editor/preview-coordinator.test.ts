@@ -111,6 +111,12 @@ test('settled completion wins over a late interactive result and releases replac
     identity: settled.state.settled.identity!,
     type: 'operation-completed',
   });
+  expect(settledDone.effects).toContainEqual({
+    type: 'publish',
+    artifact: { identity: settled.state.settled.identity, url: 'blob:settled' },
+    identity: settled.state.settled.identity,
+    reason: 'operation-presented',
+  });
   state = settledDone.state;
   const interactiveDone = transition(state, {
     artifact: artifact(interactive.state.interactive.identity!, 'blob:interactive'),
