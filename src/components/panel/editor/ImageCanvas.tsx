@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
@@ -8,11 +7,9 @@ import type { Stage as KonvaStage } from 'konva/lib/Stage';
 import type { Vector2d } from 'konva/lib/types';
 import { Circle, Group, Text as KonvaText, Label, Layer, Line, Rect, Stage, Tag } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
-import { focusRetouchSessionSchema } from '../../../schemas/focus-stack/focusStackRetouchSchemas';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
-import { Invokes } from '../../../tauri/commands';
 import type {
   Adjustments,
   AiPatch,
@@ -21,7 +18,7 @@ import type {
   RetouchCloneSource,
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
-import { isPointColorPickerResultCurrent, pointColorPickerResponseSchema } from '../../../utils/color/pointColorPicker';
+import { isPointColorPickerResultCurrent } from '../../../utils/color/pointColorPicker';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -52,13 +49,11 @@ import {
   type BrushMaskCommandReceipt,
   buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
-import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import {
   applyToneEqualizerPickerSelection,
   applyToneEqualizerTargetedDelta,
   isToneEqualizerPickerResultCurrent,
   type ToneEqualizerPickerResponse,
-  toneEqualizerPickerResponseSchema,
 } from '../../../utils/toneEqualizerPicker';
 import {
   buildViewerSamplerIdentity,
@@ -82,6 +77,7 @@ import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, ToolType } from '../right/layers/Masks';
 import { CompareOverlay } from './CompareOverlay';
 import { CropOverlaySurface } from './CropOverlaySurface';
+import { createFocusRetouchCommandService } from './focusRetouchCommandService';
 import {
   imageCanvasLayerZIndex,
   resolveCropPreviewVisibility,
@@ -105,6 +101,7 @@ import {
   normalizeViewerPointerType,
   type ViewerSurfacePointerEvent,
 } from './viewerInputRouter';
+import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
@@ -388,6 +385,7 @@ const ImageCanvas = memo(
     const toneEqualizerPickerActive = useUIStore((state) => state.toneEqualizerPickerActive);
     const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
     const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
+    const focusRetouchCommandService = useMemo(() => createFocusRetouchCommandService(), []);
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
@@ -725,26 +723,23 @@ const ImageCanvas = memo(
       focusRetouchPoints.current = [];
       if (!focusRetouchToolState.active || points.length === 0) return;
       try {
-        const value = await invoke(Invokes.ApplyFocusStackRetouch, {
-          request: {
-            packagePath: focusRetouchToolState.packagePath,
-            expectedRevisionId: focusRetouchToolState.session?.revision?.revisionId ?? null,
-            stroke: {
-              strokeId: crypto.randomUUID(),
-              sourceIndex: focusRetouchToolState.erase ? null : focusRetouchToolState.selectedSource,
-              pointsFixed1256Px: points,
-              radiusFixed1256Px: Math.round(focusRetouchToolState.radiusPx * 256),
-              hardnessU16: Math.round((focusRetouchToolState.hardnessPercent * 65535) / 100),
-            },
+        const session = await focusRetouchCommandService.applyStroke({
+          packagePath: focusRetouchToolState.packagePath,
+          expectedRevisionId: focusRetouchToolState.session?.revision?.revisionId ?? null,
+          stroke: {
+            strokeId: crypto.randomUUID(),
+            sourceIndex: focusRetouchToolState.erase ? null : focusRetouchToolState.selectedSource,
+            pointsFixed1256Px: points,
+            radiusFixed1256Px: Math.round(focusRetouchToolState.radiusPx * 256),
+            hardnessU16: Math.round((focusRetouchToolState.hardnessPercent * 65535) / 100),
           },
         });
-        const session = focusRetouchSessionSchema.parse(value);
         setUI((state) => ({ focusRetouchToolState: { ...state.focusRetouchToolState, session } }));
       } catch (cause) {
         setUI((state) => ({ focusRetouchToolState: { ...state.focusRetouchToolState, active: false } }));
         console.error('focus retouch stroke failed', cause);
       }
-    }, [focusRetouchToolState, setUI]);
+    }, [focusRetouchCommandService, focusRetouchToolState, setUI]);
     const recordBrushMaskCommandCapture = useCallback(
       (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
         if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return null;
@@ -1070,6 +1065,7 @@ const ImageCanvas = memo(
     const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
 
     const tonePickerGraphRevisionRef = useRef(viewerSampleGraphRevision);
+    const viewerPickerCommandServices = useMemo(() => createViewerPickerCommandServices(), []);
     tonePickerGraphRevisionRef.current = viewerSampleGraphRevision;
     const tonePickerSourceIdentityRef = useRef(selectedImage.path);
     tonePickerSourceIdentityRef.current = selectedImage.path;
@@ -1128,18 +1124,12 @@ const ImageCanvas = memo(
         }
         const graphRevision = viewerSampleGraphRevision;
         try {
-          const result = await invokeWithSchema(
-            Invokes.SampleToneEqualizerPicker,
-            {
-              request: {
-                graphRevision,
-                jsAdjustments: adjustments,
-                normalizedImagePoint: mapped.normalizedImagePoint,
-                sourceIdentity: selectedImage.path,
-              },
-            },
-            toneEqualizerPickerResponseSchema,
-          );
+          const result = await viewerPickerCommandServices.sampleToneEqualizer({
+            graphRevision,
+            jsAdjustments: adjustments,
+            normalizedImagePoint: mapped.normalizedImagePoint,
+            sourceIdentity: selectedImage.path,
+          });
           if (
             !isToneEqualizerPickerResultCurrent(result, {
               active: useUIStore.getState().toneEqualizerPickerActive,
@@ -1174,6 +1164,7 @@ const ImageCanvas = memo(
         selectedImage.path,
         setUI,
         viewerSampleGraphRevision,
+        viewerPickerCommandServices,
       ],
     );
 
@@ -1196,18 +1187,12 @@ const ImageCanvas = memo(
         if (!mapped) return;
         const graphRevision = viewerSampleGraphRevision;
         try {
-          const result = await invokeWithSchema(
-            Invokes.SamplePointColorPicker,
-            {
-              request: {
-                graphRevision,
-                jsAdjustments: adjustments,
-                normalizedImagePoint: mapped.normalizedImagePoint,
-                sourceIdentity: selectedImage.path,
-              },
-            },
-            pointColorPickerResponseSchema,
-          );
+          const result = await viewerPickerCommandServices.samplePointColor({
+            graphRevision,
+            jsAdjustments: adjustments,
+            normalizedImagePoint: mapped.normalizedImagePoint,
+            sourceIdentity: selectedImage.path,
+          });
           if (
             !isPointColorPickerResultCurrent(result, {
               active: useUIStore.getState().pointColorPickerActive,
@@ -1264,7 +1249,15 @@ const ImageCanvas = memo(
           setUI({ pointColorPickerReceipt: null });
         }
       },
-      [adjustments, overlayGeometry, selectedImage.path, setAdjustments, setUI, viewerSampleGraphRevision],
+      [
+        adjustments,
+        overlayGeometry,
+        selectedImage.path,
+        setAdjustments,
+        setUI,
+        viewerPickerCommandServices,
+        viewerSampleGraphRevision,
+      ],
     );
 
     const finishCanvasToolInteraction = useCallback((_reason: string) => {
