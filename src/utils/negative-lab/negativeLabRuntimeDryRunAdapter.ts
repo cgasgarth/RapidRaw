@@ -6,6 +6,7 @@ import {
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabRuntimePreviewRenderResultV1,
 } from '../../../packages/rawengine-schema/src';
+import { negativeLabCmyTimingMetricsSchema } from '../../schemas/negative-lab/negativeLabCmyTimingSchemas';
 import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
 import { negativeLabOpticalFinishMetricsSchema } from '../../schemas/negative-lab/negativeLabOpticalFinishSchemas';
 import {
@@ -230,6 +231,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       .strict()
       .optional(),
     opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
+    cmyTimingMetrics: negativeLabCmyTimingMetricsSchema.optional(),
     flatLogMaster: z
       .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
       .strict()
@@ -320,6 +322,7 @@ const toRuntimePreviewRenderResult = (
     ...(artifact.densityScopes === undefined ? {} : { densityScopes: artifact.densityScopes }),
     ...(artifact.detailFinishMetrics === undefined ? {} : { detailFinishMetrics: artifact.detailFinishMetrics }),
     ...(artifact.opticalFinishMetrics === undefined ? {} : { opticalFinishMetrics: artifact.opticalFinishMetrics }),
+    ...(artifact.cmyTimingMetrics === undefined ? {} : { cmyTimingMetrics: artifact.cmyTimingMetrics }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
@@ -385,6 +388,24 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           working_space?: 'scene_linear_srgb_d65_v1';
         }
       | undefined;
+    cmy_timing?:
+      | {
+          algorithm_version?: 1;
+          enabled?: boolean;
+          global_c?: number;
+          global_m?: number;
+          global_y?: number;
+          shadow_c?: number;
+          shadow_m?: number;
+          shadow_y?: number;
+          highlight_c?: number;
+          highlight_m?: number;
+          highlight_y?: number;
+          transition_width?: number;
+          source?: string;
+          sign_convention?: 'positive_density_reduces_channel_exposure_v1';
+        }
+      | undefined;
     color_finish?:
       | {
           algorithm_version: 1;
@@ -442,6 +463,26 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           scale_basis: params.command.parameters.opticalFinish.scaleBasis,
           working_space: params.command.parameters.opticalFinish.workingSpace,
         },
+        ...(params.command.parameters.cmyTiming.enabled
+          ? {
+              cmy_timing: {
+                algorithm_version: params.command.parameters.cmyTiming.algorithmVersion,
+                enabled: params.command.parameters.cmyTiming.enabled,
+                global_c: params.command.parameters.cmyTiming.globalC,
+                global_m: params.command.parameters.cmyTiming.globalM,
+                global_y: params.command.parameters.cmyTiming.globalY,
+                shadow_c: params.command.parameters.cmyTiming.shadowC,
+                shadow_m: params.command.parameters.cmyTiming.shadowM,
+                shadow_y: params.command.parameters.cmyTiming.shadowY,
+                highlight_c: params.command.parameters.cmyTiming.highlightC,
+                highlight_m: params.command.parameters.cmyTiming.highlightM,
+                highlight_y: params.command.parameters.cmyTiming.highlightY,
+                transition_width: params.command.parameters.cmyTiming.transitionWidth,
+                source: params.command.parameters.cmyTiming.source,
+                sign_convention: params.command.parameters.cmyTiming.signConvention,
+              },
+            }
+          : {}),
         render_intent: params.recipeParams.render_intent ?? 'print',
         flat_log_master: params.recipeParams.flat_log_master ?? { algorithm_version: 1, gain: 1, lift: 0.02 },
       },
