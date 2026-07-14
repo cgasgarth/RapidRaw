@@ -248,6 +248,7 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
@@ -542,6 +543,12 @@ export const useEditorStore = create<EditorState>((set) => ({
       return { ...update, gamutWarningOverlay: null };
     });
   },
+
+  publishWhiteBalancePickerPreview: (adjustments) =>
+    set((state) => ({
+      ...historyNavigationPreviewInvalidation,
+      ...publishAdjustmentState(state, adjustments),
+    })),
 
   applyEditTransaction: (request) => {
     let result: EditTransactionResult | null = null;
