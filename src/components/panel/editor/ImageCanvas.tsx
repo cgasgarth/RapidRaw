@@ -18,7 +18,6 @@ import type {
   RetouchCloneSource,
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
-import { isPointColorPickerResultCurrent } from '../../../utils/color/pointColorPicker';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -49,10 +48,6 @@ import {
   type BrushMaskCommandReceipt,
   buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
-import {
-  isToneEqualizerPickerResultCurrent,
-  type ToneEqualizerPickerResponse,
-} from '../../../utils/toneEqualizerPicker';
 import {
   buildViewerSamplerIdentity,
   isViewerSampleResultCurrent,
@@ -91,13 +86,14 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
+import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
-import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
+import { useViewerPickerControllers } from './useViewerPickerControllers';
 import {
   isViewerWhiteBalanceSampleCurrent,
   resolveViewerWhiteBalanceInteraction,
@@ -380,8 +376,6 @@ const ImageCanvas = memo(
     const { t } = useTranslation();
     const focusRetouchToolState = useUIStore((state) => state.focusRetouchToolState);
     const setUI = useUIStore((state) => state.setUI);
-    const toneEqualizerPickerActive = useUIStore((state) => state.toneEqualizerPickerActive);
-    const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
     const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
     const focusRetouchCommandService = useMemo(() => createFocusRetouchCommandService(), []);
     const viewerAdjustmentCommandServices = useMemo(
@@ -506,6 +500,12 @@ const ImageCanvas = memo(
         viewerSampleGraphRevision,
       ],
     );
+    const pickerControllers = useViewerPickerControllers({
+      adjustments,
+      geometry: overlayGeometry,
+      presentation: presentationDescriptor,
+      setAdjustments,
+    });
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
 
@@ -880,8 +880,7 @@ const ImageCanvas = memo(
       isStraightenActive ||
       Boolean(isRotationActive) ||
       isWbPickerActive ||
-      toneEqualizerPickerActive ||
-      pointColorPickerActive ||
+      pickerControllers.activeTool !== null ||
       effectiveMaskInteractionActive ||
       isToolActive ||
       (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
@@ -1052,190 +1051,6 @@ const ImageCanvas = memo(
     }, [viewerSampleLocked]);
 
     const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
-
-    const tonePickerGraphRevisionRef = useRef(viewerSampleGraphRevision);
-    const viewerPickerCommandServices = useMemo(() => createViewerPickerCommandServices(), []);
-    tonePickerGraphRevisionRef.current = viewerSampleGraphRevision;
-    const tonePickerSourceIdentityRef = useRef(selectedImage.path);
-    tonePickerSourceIdentityRef.current = selectedImage.path;
-    const tonePickerDragRef = useRef<{
-      baseline: Adjustments;
-      currentClientY: number;
-      pointerId: number;
-      released: boolean;
-      result: ToneEqualizerPickerResponse | null;
-      startClientY: number;
-    } | null>(null);
-    const commitToneEqualizerPickerDrag = useCallback(
-      (interaction: NonNullable<typeof tonePickerDragRef.current>) => {
-        const result = interaction.result;
-        if (!result) return;
-        const deltaEv = Math.max(-4, Math.min(4, (interaction.startClientY - interaction.currentClientY) / 80));
-        viewerAdjustmentCommandServices.commitToneEqualizerPicker(interaction.baseline, result, deltaEv);
-        tonePickerDragRef.current = null;
-      },
-      [viewerAdjustmentCommandServices],
-    );
-    const handleToneEqualizerPickerPointerDown = useCallback(
-      async (event: React.PointerEvent<HTMLDivElement>) => {
-        const surface = event.currentTarget;
-        surface.setPointerCapture(event.pointerId);
-        const interaction = {
-          baseline: adjustments,
-          currentClientY: event.clientY,
-          pointerId: event.pointerId,
-          released: false,
-          result: null,
-          startClientY: event.clientY,
-        } satisfies NonNullable<typeof tonePickerDragRef.current>;
-        tonePickerDragRef.current = interaction;
-        const rect = surface.getBoundingClientRect();
-        const mapped = mapViewerPointToImage({
-          clientPoint: { x: event.clientX, y: event.clientY },
-          displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
-          surfaceRect: {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            layoutWidth: surface.offsetWidth,
-            layoutHeight: surface.offsetHeight,
-          },
-        });
-        if (!mapped) {
-          tonePickerDragRef.current = null;
-          surface.releasePointerCapture(event.pointerId);
-          return;
-        }
-        const graphRevision = viewerSampleGraphRevision;
-        try {
-          const result = await viewerPickerCommandServices.sampleToneEqualizer({
-            graphRevision,
-            jsAdjustments: adjustments,
-            normalizedImagePoint: mapped.normalizedImagePoint,
-            sourceIdentity: selectedImage.path,
-          });
-          if (
-            !isToneEqualizerPickerResultCurrent(result, {
-              active: useUIStore.getState().toneEqualizerPickerActive,
-              graphRevision: tonePickerGraphRevisionRef.current,
-              sourceIdentity: tonePickerSourceIdentityRef.current,
-            })
-          ) {
-            if (tonePickerDragRef.current?.pointerId === interaction.pointerId) tonePickerDragRef.current = null;
-            return;
-          }
-          if (tonePickerDragRef.current?.pointerId !== interaction.pointerId) return;
-          tonePickerDragRef.current.result = result;
-          setUI({
-            toneEqualizerPickerReceipt: {
-              exposureEv: result.exposureEv,
-              graphRevision: result.graphRevision,
-              primaryBand: result.primaryBand,
-              sourceIdentity: result.sourceIdentity,
-              sourceFingerprint: result.sourceFingerprint,
-            },
-          });
-          if (tonePickerDragRef.current.released) commitToneEqualizerPickerDrag(tonePickerDragRef.current);
-        } catch {
-          tonePickerDragRef.current = null;
-          if (useUIStore.getState().toneEqualizerPickerActive) setUI({ toneEqualizerPickerReceipt: null });
-        }
-      },
-      [
-        adjustments,
-        commitToneEqualizerPickerDrag,
-        overlayGeometry,
-        selectedImage.path,
-        setUI,
-        viewerSampleGraphRevision,
-        viewerPickerCommandServices,
-      ],
-    );
-
-    const handlePointColorPickerPointerDown = useCallback(
-      async (event: React.PointerEvent<HTMLDivElement>) => {
-        const surface = event.currentTarget;
-        const rect = surface.getBoundingClientRect();
-        const mapped = mapViewerPointToImage({
-          clientPoint: { x: event.clientX, y: event.clientY },
-          displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
-          surfaceRect: {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            layoutWidth: surface.offsetWidth,
-            layoutHeight: surface.offsetHeight,
-          },
-        });
-        if (!mapped) return;
-        const graphRevision = viewerSampleGraphRevision;
-        try {
-          const result = await viewerPickerCommandServices.samplePointColor({
-            graphRevision,
-            jsAdjustments: adjustments,
-            normalizedImagePoint: mapped.normalizedImagePoint,
-            sourceIdentity: selectedImage.path,
-          });
-          if (
-            !isPointColorPickerResultCurrent(result, {
-              active: useUIStore.getState().pointColorPickerActive,
-              graphRevision: viewerSampleGraphRevision,
-              sourceIdentity: selectedImage.path,
-            })
-          )
-            return;
-          const pointId = crypto.randomUUID();
-          const point = {
-            chromaRadius: 0.08,
-            chromaShift: 0,
-            enabled: true,
-            feather: 0.4,
-            hueRadiusDegrees: 25,
-            hueShiftDegrees: 0,
-            id: pointId,
-            lightnessRadius: 0.2,
-            lightnessShift: 0,
-            name: `Point ${adjustments.pointColor.points.length + 1}`,
-            opacity: 1,
-            samples: [
-              {
-                confidence: result.confidence,
-                graphRevision: result.graphFingerprint,
-                id: crypto.randomUUID(),
-                sampleRadiusPx: result.sampleRadiusPx,
-                sourceColor: { chroma: result.chroma, hueDegrees: result.hueDegrees, lightness: result.lightness },
-                sourceSceneRevision: result.sourceFingerprint,
-              },
-            ],
-            saturationShift: 0,
-            variance: 1,
-          } satisfies Adjustments['pointColor']['points'][number];
-          viewerAdjustmentCommandServices.appendPointColorSample(point);
-          setUI({
-            pointColorPickerActive: false,
-            pointColorPickerReceipt: {
-              confidence: result.confidence,
-              graphRevision: result.graphRevision,
-              sourceIdentity: result.sourceIdentity,
-              sourceFingerprint: result.sourceFingerprint,
-            },
-          });
-        } catch {
-          setUI({ pointColorPickerReceipt: null });
-        }
-      },
-      [
-        adjustments,
-        overlayGeometry,
-        selectedImage.path,
-        viewerAdjustmentCommandServices,
-        setUI,
-        viewerPickerCommandServices,
-        viewerSampleGraphRevision,
-      ],
-    );
 
     const finishCanvasToolInteraction = useCallback((_reason: string) => {
       isDrawing.current = false;
@@ -2421,8 +2236,8 @@ const ImageCanvas = memo(
 
     const activeCanvasOverlayTool = isCropping
       ? 'crop'
-      : toneEqualizerPickerActive
-        ? 'tone-equalizer'
+      : pickerControllers.activeTool
+        ? pickerControllers.activeTool
         : isWbPickerActive
           ? 'white-balance'
           : activeRetouchSource
@@ -2453,7 +2268,7 @@ const ImageCanvas = memo(
                 : activeRemoveSource.status === 'stale' || activeRemoveSource.status === 'fallback_unchanged'
                   ? 'stale'
                   : 'warning'
-              : toneEqualizerPickerActive || isToolActive || isCropping || showGamutWarningOverlay
+              : pickerControllers.activeTool !== null || isToolActive || isCropping || showGamutWarningOverlay
                 ? 'active'
                 : 'ready';
     const canvasPointerOwner = resolveImageCanvasPointerOwner({
@@ -2485,7 +2300,9 @@ const ImageCanvas = memo(
         data-presentation-fingerprint={presentationDescriptor.fingerprint}
         data-renderer-generation={String(rendererHandoff.generation)}
         data-renderer-handoff-status={rendererHandoff.status}
-        data-viewer-active-tool={viewerInputState?.activeTool ?? activeCanvasOverlayTool}
+        data-viewer-active-tool={
+          pickerControllers.activeTool ?? viewerInputState?.activeTool ?? activeCanvasOverlayTool
+        }
         data-viewer-temporary-hand={String(viewerInputState?.isTemporaryHand ?? false)}
         data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
         data-wb-picker-preview-identity={lastWhiteBalancePickerReceipt?.previewIdentity ?? undefined}
@@ -2514,6 +2331,7 @@ const ImageCanvas = memo(
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
           if (event.type === 'blur' || event.type === 'escape') {
+            pickerControllers.handleInputEvent(event);
             const transition = viewerInputRouter.dispatch({ type: event.type });
             viewerInputTransitionRef.current = transition;
             setViewerInputOwnerState(transition.state.owner);
@@ -2533,7 +2351,7 @@ const ImageCanvas = memo(
                     pressure: event.pressure,
                   },
                   input: {
-                    activeTool: viewerInputState?.activeTool ?? 'none',
+                    activeTool: pickerControllers.activeTool ?? viewerInputState?.activeTool ?? 'none',
                     button: event.button,
                     focusContext: isSliderDragging ? 'editable' : 'viewer',
                     isDragging: false,
@@ -2555,6 +2373,7 @@ const ImageCanvas = memo(
                 });
           viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
+          if (!transition.ignored) pickerControllers.handleInputEvent(event);
           if (
             event.type === 'pointerdown' &&
             transition.resolution &&
@@ -2599,14 +2418,8 @@ const ImageCanvas = memo(
         onPointerDown={(event) => {
           const transition = viewerInputTransitionRef.current;
           if (transition?.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
-          if (pointColorPickerActive) {
+          if (pickerControllers.activeTool !== null) {
             event.preventDefault();
-            void handlePointColorPickerPointerDown(event);
-            return;
-          }
-          if (toneEqualizerPickerActive) {
-            event.preventDefault();
-            void handleToneEqualizerPickerPointerDown(event);
             return;
           }
           if (focusRetouchToolState.active) {
@@ -2616,37 +2429,23 @@ const ImageCanvas = memo(
           }
         }}
         onPointerMove={(event) => {
-          const tonePickerDrag = tonePickerDragRef.current;
-          if (tonePickerDrag?.pointerId === event.pointerId) {
-            tonePickerDrag.currentClientY = event.clientY;
-            return;
-          }
           handleViewerSamplerPointerMove(event);
           if (focusRetouchToolState.active && event.currentTarget.hasPointerCapture(event.pointerId))
             captureFocusRetouchPoint(event);
         }}
         onPointerUp={(event) => {
-          const tonePickerDrag = tonePickerDragRef.current;
-          if (tonePickerDrag?.pointerId === event.pointerId) {
-            tonePickerDrag.currentClientY = event.clientY;
-            tonePickerDrag.released = true;
-            if (event.currentTarget.hasPointerCapture(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            if (tonePickerDrag.result) commitToneEqualizerPickerDrag(tonePickerDrag);
-            return;
-          }
           if (focusRetouchToolState.active && event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
             void finishFocusRetouchStroke();
+            return;
           }
-        }}
-        onPointerCancel={(event) => {
-          if (tonePickerDragRef.current?.pointerId === event.pointerId) tonePickerDragRef.current = null;
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
         }}
         style={{
           width: '100%',
           height: '100%',
-          cursor: toneEqualizerPickerActive || pointColorPickerActive ? 'crosshair' : effectiveCursor,
+          cursor: pickerControllers.activeTool !== null ? 'crosshair' : effectiveCursor,
           pointerEvents: 'auto',
         }}
       >
@@ -2694,6 +2493,7 @@ const ImageCanvas = memo(
               showSideBySideCompare={showSideBySideCompare}
               showSplitCompare={showSplitCompare}
             />
+            <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
             {displayedMaskUrl && (
               <img
                 alt={t('editor.canvas.maskOverlayAlt')}

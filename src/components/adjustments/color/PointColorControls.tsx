@@ -101,6 +101,7 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
           <button
             aria-pressed={pointColorPickerActive}
             className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
+            data-testid="point-color-picker"
             onClick={() => setUI({ pointColorPickerActive: !pointColorPickerActive, pointColorPickerReceipt: null })}
             type="button"
           >

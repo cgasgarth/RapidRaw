@@ -59,9 +59,27 @@ export function ViewerSurface({
   ...props
 }: ViewerSurfaceProps) {
   const dispatchPointerEvent = (event: PointerEvent<HTMLDivElement>, type: ViewerSurfacePointerEvent['type']): void => {
+    const rect = event.currentTarget.getBoundingClientRect();
     onInputEvent?.(
       normalizeViewerSurfacePointerEvent({
-        ...event,
+        altKey: event.altKey,
+        button: event.button,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        pressure: event.pressure,
+        shiftKey: event.shiftKey,
+        surfaceRect: {
+          height: rect.height,
+          layoutHeight: event.currentTarget.offsetHeight,
+          layoutWidth: event.currentTarget.offsetWidth,
+          width: rect.width,
+          x: rect.x,
+          y: rect.y,
+        },
         type,
       }),
     );

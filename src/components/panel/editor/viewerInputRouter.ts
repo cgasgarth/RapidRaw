@@ -30,6 +30,14 @@ export interface ViewerSurfacePointerEvent {
   readonly pointerType: ViewerPointerType;
   readonly pressure: number;
   readonly shiftKey: boolean;
+  readonly surfaceRect?: {
+    readonly height: number;
+    readonly layoutHeight: number;
+    readonly layoutWidth: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+  };
   readonly type: 'lostpointercapture' | 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
 }
 
@@ -46,6 +54,7 @@ export const normalizeViewerSurfacePointerEvent = (event: {
   pointerType?: string;
   pressure?: number;
   shiftKey?: boolean;
+  surfaceRect?: ViewerSurfacePointerEvent['surfaceRect'];
   type: ViewerSurfacePointerEvent['type'];
 }): ViewerSurfacePointerEvent => ({
   altKey: event.altKey ?? false,
@@ -58,6 +67,7 @@ export const normalizeViewerSurfacePointerEvent = (event: {
   pointerType: normalizeViewerPointerType(event.pointerType ?? 'mouse'),
   pressure: Math.min(1, Math.max(0, event.pressure ?? 0)),
   shiftKey: event.shiftKey ?? false,
+  ...(event.surfaceRect === undefined ? {} : { surfaceRect: event.surfaceRect }),
   type: event.type,
 });
 

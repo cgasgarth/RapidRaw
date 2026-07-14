@@ -64,6 +64,8 @@ describe('viewer tool controllers', () => {
     ).toMatchObject({ pointerType: 'mouse', pressure: 1 });
     expect(resolveViewerToolId('object-prompt')).toBe('mask');
     expect(resolveViewerToolId('viewer-sampler')).toBe('viewer-sampler');
+    expect(resolveViewerToolId('tone-equalizer')).toBe('tone-equalizer');
+    expect(resolveViewerToolId('point-color')).toBe('point-color');
     expect(resolveViewerToolId('pan-zoom')).toBe('pan');
   });
 

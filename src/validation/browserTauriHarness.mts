@@ -112,6 +112,8 @@ const commandNames: Record<
   | 'readExifForPaths'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
+  | 'samplePointColorPicker'
+  | 'sampleToneEqualizerPicker'
   | 'scheduleImagePrefetch'
   | 'startBackgroundIndexing'
   | 'testAiConnectorConnection'
@@ -161,6 +163,8 @@ const commandNames: Record<
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
+  samplePointColorPicker: Invokes.SamplePointColorPicker,
+  sampleToneEqualizerPicker: Invokes.SampleToneEqualizerPicker,
   scheduleImagePrefetch: Invokes.ScheduleImagePrefetch,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
   testAiConnectorConnection: Invokes.TestAIConnectorConnection,
@@ -466,6 +470,44 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       });
     case commandNames.applyAdjustments:
       return createHarnessApplyPreview(args);
+    case commandNames.samplePointColorPicker: {
+      const request = args?.['request'] as { graphRevision?: string; sourceIdentity?: string } | undefined;
+      return new Promise((resolve) => {
+        window.setTimeout(
+          () =>
+            resolve({
+              chroma: 0.22,
+              confidence: 0.94,
+              graphFingerprint: 'browser-harness-graph-fingerprint',
+              graphRevision: request?.graphRevision ?? 'browser-harness-graph',
+              hueDegrees: 205,
+              lightness: 0.43,
+              sampleRadiusPx: 8,
+              sourceFingerprint: 'browser-harness-source-fingerprint',
+              sourceIdentity: request?.sourceIdentity ?? `${browserHarnessRoot}/browser-harness.ARW`,
+            }),
+          80,
+        );
+      });
+    }
+    case commandNames.sampleToneEqualizerPicker: {
+      const request = args?.['request'] as { graphRevision?: string; sourceIdentity?: string } | undefined;
+      return new Promise((resolve) => {
+        window.setTimeout(
+          () =>
+            resolve({
+              contributingWeights: [0, 0, 0.1, 0.3, 1, 0.3, 0.1, 0, 0],
+              exposureEv: 0.25,
+              graphFingerprint: '1234567890abcdef',
+              graphRevision: request?.graphRevision ?? 'browser-harness-graph',
+              primaryBand: 4,
+              sourceFingerprint: 'abcdef1234567890',
+              sourceIdentity: request?.sourceIdentity ?? `${browserHarnessRoot}/browser-harness.ARW`,
+            }),
+          80,
+        );
+      });
+    }
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview:

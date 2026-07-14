@@ -83,7 +83,9 @@ const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint>
   crop: { cancelHint: 'Esc', label: 'Drag to crop; Enter applies', tool: 'crop' },
   mask: { cancelHint: 'Esc', label: 'Draw on the image to define the mask', tool: 'mask' },
   'object-prompt': { cancelHint: 'Esc', label: 'Click the subject or drag a prompt box', tool: 'object-prompt' },
+  'point-color': { cancelHint: 'Esc', label: 'Click a color to create a Point Color sample', tool: 'point-color' },
   retouch: { cancelHint: 'Esc', label: 'Click to place the retouch source and target', tool: 'retouch' },
+  'tone-equalizer': { cancelHint: 'Esc', label: 'Click or drag a tone to target its band', tool: 'tone-equalizer' },
   'white-balance': { cancelHint: 'Esc', label: 'Click a neutral area to set white balance', tool: 'white-balance' },
 };
 
