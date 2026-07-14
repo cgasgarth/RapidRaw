@@ -2247,11 +2247,11 @@ fn apply_film_emulation(color_in: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
     if (luminance != luminance || abs(luminance) > 3.4e38 || luminance <= 1.0e-8) {
         return color_in;
     }
-    let shaped = luminance * (1.0 + shaper_p) / (luminance + shaper_p);
-    let scale = shaped / luminance;
-    let shaped = color_in + (color_in * scale - color_in);
-    let exposure_ev = log2(abs(shaped.x * 0.27222872 + shaped.y * 0.67408177 + shaped.z * 0.05368952) / 0.18);
-    let coupled = apply_film_color_coupler(shaped, exposure_ev);
+    let shaped_luminance = luminance * (1.0 + shaper_p) / (luminance + shaper_p);
+    let scale = shaped_luminance / luminance;
+    let shaped_color = color_in + (color_in * scale - color_in);
+    let exposure_ev = log2(abs(shaped_color.x * 0.27222872 + shaped_color.y * 0.67408177 + shaped_color.z * 0.05368952) / 0.18);
+    let coupled = apply_film_color_coupler(shaped_color, exposure_ev);
     let grained = apply_film_density_grain(coupled, coord);
     let printed = apply_film_print_scan(grained);
     return color_in + mix_amount * (printed - color_in);
@@ -2728,6 +2728,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var composite_rgb_linear = initial_linear_rgb;
     var tone_preview_rgb = vec3<f32>(-1.0);
+    // Keep the blur guidance available to the later film-emulation stage. The
+    // scene-input work is conditional, but film optical scatter is applied
+    // after that block when the feature is enabled.
+    var clarity_blurred = initial_linear_rgb;
+    var structure_blurred = initial_linear_rgb;
     if (scene_input_phase) {
     initial_linear_rgb = apply_noise_reduction(
         initial_linear_rgb, absolute_coord_i,
@@ -2736,8 +2741,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var sharpness_blurred = initial_linear_rgb;
     var tonal_blurred = initial_linear_rgb;
-    var clarity_blurred = initial_linear_rgb;
-    var structure_blurred = initial_linear_rgb;
+    clarity_blurred = initial_linear_rgb;
+    structure_blurred = initial_linear_rgb;
     var dehaze_guidance = initial_linear_rgb;
     if ((adjustments.blur_pass_flags & 1u) != 0u) {
         sharpness_blurred = textureLoad(sharpness_blur_texture, id.xy, 0).rgb;
