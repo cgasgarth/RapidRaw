@@ -11,8 +11,10 @@ import {
   fileOperationPathSchema,
   fileOperationVoidResponseSchema,
   type ImportFilesRequest,
+  type ImportJobAuthority,
   type ImportResumeValidation,
   importFilesRequestSchema,
+  importJobAuthoritySchema,
   importJobIdSchema,
   importResumeValidationSchema,
   type RenameFilesRequest,
@@ -49,17 +51,22 @@ export function renameFilesWithSchema(request: RenameFilesRequest): Promise<File
   return invokeWithSchema(Invokes.RenameFiles, args, fileOperationPathListSchema, Invokes.RenameFiles);
 }
 
-export function importFilesWithSchema(request: ImportFilesRequest): Promise<string> {
+export function importFilesWithSchema(request: ImportFilesRequest): Promise<ImportJobAuthority> {
   return invokeWithSchema(
     Invokes.ImportFiles,
     importFilesRequestSchema.parse(request),
-    importJobIdSchema,
+    importJobAuthoritySchema,
     Invokes.ImportFiles,
   );
 }
 
-export function cancelImportWithSchema(): Promise<boolean> {
-  return invokeWithSchema(Invokes.CancelImport, {}, z.boolean(), Invokes.CancelImport);
+export function cancelImportWithSchema(authority: ImportJobAuthority): Promise<boolean> {
+  return invokeWithSchema(
+    Invokes.CancelImport,
+    importJobAuthoritySchema.parse(authority),
+    z.boolean(),
+    Invokes.CancelImport,
+  );
 }
 
 export function validateImportJobResumeWithSchema(jobId: string): Promise<ImportResumeValidation> {
@@ -72,9 +79,9 @@ export function validateImportJobResumeWithSchema(jobId: string): Promise<Import
   );
 }
 
-export function resumeImportJobWithSchema(jobId: string): Promise<string> {
+export function resumeImportJobWithSchema(jobId: string): Promise<ImportJobAuthority> {
   const args = { jobId: importJobIdSchema.parse(jobId) };
-  return invokeWithSchema(Invokes.ResumeImportJob, args, importJobIdSchema, Invokes.ResumeImportJob);
+  return invokeWithSchema(Invokes.ResumeImportJob, args, importJobAuthoritySchema, Invokes.ResumeImportJob);
 }
 
 export function copyFilesWithSchema(request: CopyMoveFilesRequest): Promise<void> {

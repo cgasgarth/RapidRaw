@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 import { panoramaRenderedReviewSchema } from './computational-merge/panoramaUiSchemas';
 import { denoiseOperationHandleSchema } from './denoiseWorkflowSchemas';
+import { importJobAuthoritySchema } from './fileOperationSchemas';
 import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
@@ -97,7 +98,8 @@ export const smartPreviewGeneratedPayloadSchema = z
 
 export const importStartPayloadSchema = z
   .object({
-    jobId: z.string().optional(),
+    generation: importJobAuthoritySchema.shape.generation,
+    jobId: importJobAuthoritySchema.shape.jobId,
     total: nonnegativeNumberSchema,
   })
   .loose();
@@ -109,7 +111,8 @@ export const pathProgressPayloadSchema = progressPayloadSchema
   .loose();
 
 export const importProgressPayloadSchema = pathProgressPayloadSchema.extend({
-  jobId: z.string().optional(),
+  generation: importJobAuthoritySchema.shape.generation,
+  jobId: importJobAuthoritySchema.shape.jobId,
   stage: z.string().optional(),
   committed: nonnegativeNumberSchema.optional(),
   failed: nonnegativeNumberSchema.optional(),
@@ -118,6 +121,10 @@ export const importProgressPayloadSchema = pathProgressPayloadSchema.extend({
   totalBytes: nonnegativeNumberSchema.optional(),
   committedPath: z.string().nullable().optional(),
 });
+
+export const importTerminalPayloadSchema = importJobAuthoritySchema.extend({ receipt: z.unknown() }).strict();
+
+export const importErrorPayloadSchema = importJobAuthoritySchema.extend({ message: z.string() }).strict();
 
 export const denoiseCompletePayloadSchema = z
   .object({
@@ -394,6 +401,8 @@ export const parseThumbnailInvalidatedPayload = (value: unknown) => thumbnailInv
 export const parseSmartPreviewGeneratedPayload = (value: unknown) => smartPreviewGeneratedPayloadSchema.parse(value);
 export const parseImportStartPayload = (value: unknown) => importStartPayloadSchema.parse(value);
 export const parseImportProgressPayload = (value: unknown) => importProgressPayloadSchema.parse(value);
+export const parseImportTerminalPayload = (value: unknown) => importTerminalPayloadSchema.parse(value);
+export const parseImportErrorPayload = (value: unknown) => importErrorPayloadSchema.parse(value);
 export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadSchema.parse(value);
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
 export const parseDenoiseErrorPayload = (value: unknown) => denoiseErrorPayloadSchema.parse(value);

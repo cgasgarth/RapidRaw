@@ -3619,6 +3619,7 @@ pub fn run() {
             file_management::resolve_xmp_metadata_conflicts,
             file_management::import_files,
             file_management::cancel_import,
+            file_management::get_active_import_job_status,
             file_management::get_import_job_receipt,
             file_management::validate_import_job_resume,
             file_management::resume_import_job,

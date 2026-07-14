@@ -3428,7 +3428,7 @@ pub async fn import_files(
     destination_folder: String,
     settings: ImportSettings,
     app_handle: AppHandle,
-) -> Result<String, String> {
+) -> Result<super::import_job_service::ImportJobAuthority, String> {
     import_files_for_runtime(source_paths, destination_folder, settings, app_handle).await
 }
 
@@ -3437,7 +3437,7 @@ pub(super) async fn import_files_for_runtime<R: Runtime>(
     destination_folder: String,
     settings: ImportSettings,
     app_handle: AppHandle<R>,
-) -> Result<String, String> {
+) -> Result<super::import_job_service::ImportJobAuthority, String> {
     let total_files = source_paths.len();
     if total_files == 0 {
         return Err("Import requires at least one source".to_string());
@@ -3451,96 +3451,68 @@ pub(super) async fn import_files_for_runtime<R: Runtime>(
         return Err("Import destination is not a directory".to_string());
     }
     let job_id = super::import_pipeline::new_job_id();
-    let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let _ = app_handle.emit(
-        crate::events::IMPORT_START,
-        serde_json::json!({ "jobId": job_id, "total": total_files }),
-    );
+    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let start = import_jobs.begin_new(job_id).map_err(str::to_string)?;
+    let cancellation = Arc::clone(&start.cancellation);
+    emit_import_start(&app_handle, &start.authority, total_files);
     let pipeline = super::import_pipeline::ImportPipeline::new(
-        app_handle.clone(),
-        job_id.clone(),
+        app_handle,
+        start.authority.clone(),
         destination,
         settings,
         Arc::clone(&cancellation),
     );
-    install_import_job(&app_handle, &job_id, Arc::clone(&cancellation))?;
-    let task_handle = spawn_import_task(app_handle.clone(), job_id.clone(), async move {
+    let authority = start.authority;
+    spawn_import_task(import_jobs, authority.clone(), async move {
         let _ = pipeline.run(source_paths).await;
     });
-    attach_import_task_handle(&app_handle, &job_id, task_handle)?;
-    Ok(job_id)
+    Ok(authority)
 }
 
-fn install_import_job<R: Runtime>(
-    app_handle: &AppHandle<R>,
-    job_id: &str,
-    cancellation: Arc<std::sync::atomic::AtomicBool>,
-) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    let mut active = state
-        .import_job
-        .lock()
-        .map_err(|_| "import job lock poisoned")?;
-    if let Some(previous) = active.as_mut() {
-        previous.cancellation_token.store(true, Ordering::Release);
-    }
-    *active = Some(crate::ImportJob {
-        job_id: job_id.to_string(),
-        cancellation_token: cancellation,
-        task_handle: None,
-    });
-    Ok(())
-}
-
-fn spawn_import_task<R: Runtime>(
-    app_handle: AppHandle<R>,
-    job_id: String,
+fn spawn_import_task(
+    import_jobs: Arc<super::import_job_service::ImportJobService>,
+    authority: super::import_job_service::ImportJobAuthority,
     task: impl std::future::Future<Output = ()> + Send + 'static,
-) -> tauri::async_runtime::JoinHandle<()> {
+) {
     tauri::async_runtime::spawn(async move {
         task.await;
-        if let Ok(mut active) = app_handle.state::<AppState>().import_job.lock()
-            && active.as_ref().is_some_and(|job| job.job_id == job_id)
-        {
-            *active = None;
-        }
-    })
+        let _ = import_jobs.complete(&authority);
+    });
 }
 
-fn attach_import_task_handle<R: Runtime>(
+fn emit_import_start<R: Runtime>(
     app_handle: &AppHandle<R>,
-    job_id: &str,
-    task_handle: tauri::async_runtime::JoinHandle<()>,
-) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    let mut active = state
-        .import_job
-        .lock()
-        .map_err(|_| "import job lock poisoned")?;
-    if let Some(job) = active.as_mut().filter(|job| job.job_id == job_id) {
-        job.task_handle = Some(task_handle);
-    }
-    Ok(())
+    authority: &super::import_job_service::ImportJobAuthority,
+    total: usize,
+) {
+    let _ = app_handle.emit(
+        crate::events::IMPORT_START,
+        serde_json::json!({
+            "generation": authority.generation,
+            "jobId": &authority.job_id,
+            "total": total,
+        }),
+    );
 }
 
 #[tauri::command]
-pub fn cancel_import(app_handle: AppHandle) -> Result<bool, String> {
-    cancel_import_for_runtime(app_handle)
+pub fn cancel_import(
+    job_id: String,
+    generation: u64,
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, String> {
+    state
+        .services
+        .import_jobs
+        .cancel(&super::import_job_service::ImportJobAuthority { generation, job_id })
+        .map_err(str::to_string)
 }
 
-pub(super) fn cancel_import_for_runtime<R: Runtime>(
-    app_handle: AppHandle<R>,
-) -> Result<bool, String> {
-    let state = app_handle.state::<AppState>();
-    let mut active = state
-        .import_job
-        .lock()
-        .map_err(|_| "import job lock poisoned")?;
-    let Some(job) = active.as_mut() else {
-        return Ok(false);
-    };
-    job.cancellation_token.store(true, Ordering::Release);
-    Ok(true)
+#[tauri::command]
+pub fn get_active_import_job_status(
+    state: tauri::State<'_, AppState>,
+) -> Option<super::import_job_service::ImportJobStatus> {
+    state.services.import_jobs.status()
 }
 
 #[tauri::command]
@@ -3556,35 +3528,43 @@ pub fn validate_import_job_resume(
     job_id: String,
     app_handle: AppHandle,
 ) -> Result<super::import_pipeline::ImportResumeValidation, String> {
+    app_handle
+        .state::<AppState>()
+        .services
+        .import_jobs
+        .ensure_resume_available()
+        .map_err(str::to_string)?;
     super::import_pipeline::validate_job_resume(&app_handle, &job_id)
 }
 
 #[tauri::command]
-pub async fn resume_import_job(job_id: String, app_handle: AppHandle) -> Result<String, String> {
+pub async fn resume_import_job(
+    job_id: String,
+    app_handle: AppHandle,
+) -> Result<super::import_job_service::ImportJobAuthority, String> {
     resume_import_job_for_runtime(job_id, app_handle).await
 }
 
 pub(super) async fn resume_import_job_for_runtime<R: Runtime>(
     job_id: String,
     app_handle: AppHandle<R>,
-) -> Result<String, String> {
-    let validation = super::import_pipeline::validate_job_resume(&app_handle, &job_id)?;
-    if !validation.invalid.is_empty() {
-        return Err(format!(
-            "Import resume rejected: {} source or destination revision(s) changed",
-            validation.invalid.len()
-        ));
-    }
-    let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    install_import_job(&app_handle, &job_id, Arc::clone(&cancellation))?;
-    let task_app = app_handle.clone();
-    let task_job_id = job_id.clone();
-    let task_handle = spawn_import_task(app_handle.clone(), job_id.clone(), async move {
-        let _ = super::import_pipeline::ImportPipeline::resume(task_app, task_job_id, cancellation)
-            .await;
+) -> Result<super::import_job_service::ImportJobAuthority, String> {
+    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let reservation = import_jobs
+        .reserve_resume(job_id.clone())
+        .map_err(str::to_string)?;
+    let prepared = super::import_pipeline::ImportPipeline::prepare_resume(&app_handle, &job_id)?;
+    let total_files = prepared.total_items();
+    let start = reservation.start().map_err(str::to_string)?;
+    emit_import_start(&app_handle, &start.authority, total_files);
+    let cancellation = Arc::clone(&start.cancellation);
+    let task_app = app_handle;
+    let task_authority = start.authority.clone();
+    let authority = start.authority;
+    spawn_import_task(import_jobs, authority.clone(), async move {
+        let _ = prepared.run(task_app, task_authority, cancellation).await;
     });
-    attach_import_task_handle(&app_handle, &job_id, task_handle)?;
-    Ok(job_id)
+    Ok(authority)
 }
 
 pub(crate) fn generate_filename_from_template(

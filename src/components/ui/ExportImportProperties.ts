@@ -179,6 +179,7 @@ export interface FileFormat {
 export interface ImportState {
   errorMessage: string;
   jobId?: string;
+  generation?: number;
   path?: string;
   progress?: Progress;
   stage?: string;
