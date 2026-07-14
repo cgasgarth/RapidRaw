@@ -36,6 +36,10 @@ use crate::raw::negative_lab_cmy_timing::{
 use crate::raw::negative_lab_color_finish::{
     NegativeLabColorFinishMetrics, NegativeLabScannerColorFinishParams, apply_color_finish,
 };
+use crate::raw::negative_lab_neutral_axis::{
+    NegativeLabNeutralAxisAnalysis, NegativeLabNeutralAxisParams, analyze_neutral_axis,
+    compile_neutral_axis_cmy_timing,
+};
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
@@ -86,6 +90,8 @@ pub struct NegativeConversionParams {
     pub color_finish: NegativeLabScannerColorFinishParams,
     #[serde(default)]
     pub cmy_timing: NegativeLabCmyTimingParams,
+    #[serde(default)]
+    pub neutral_axis: NegativeLabNeutralAxisParams,
     #[serde(default)]
     pub detail_finish: NegativeLabDetailFinishParams,
     #[serde(default)]
@@ -252,6 +258,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub color_finish_metrics: NegativeLabColorFinishMetrics,
     pub optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     pub cmy_timing_metrics: NegativeLabCmyTimingMetrics,
+    pub neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub render_intent: NegativeLabRenderIntent,
@@ -1134,6 +1141,7 @@ impl Default for NegativeConversionParams {
             source_interpretation_hash: None,
             color_finish: NegativeLabScannerColorFinishParams::default(),
             cmy_timing: NegativeLabCmyTimingParams::default(),
+            neutral_axis: NegativeLabNeutralAxisParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
             optical_finish: NegativeLabOpticalFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
@@ -1849,6 +1857,7 @@ struct NegativeLabOutputSidecarReceipt {
 struct NegativeLabOutputRenderReceipt<'a> {
     density_normalization_metrics: &'a NegativeLabDensityNormalizationMetrics,
     color_finish_metrics: Option<&'a NegativeLabColorFinishMetrics>,
+    neutral_axis_analysis: Option<&'a NegativeLabNeutralAxisAnalysis>,
     dimensions: NegativeLabSavedPositiveDimensions,
     flat_log_master: NegativeLabFlatLogMasterParams,
     render_intent: NegativeLabRenderIntent,
@@ -2092,6 +2101,7 @@ fn write_negative_lab_output_sidecar(
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "densityNormalizationMetrics": render_receipt.density_normalization_metrics,
             "colorFinishMetrics": render_receipt.color_finish_metrics,
+            "neutralAxisAnalysis": render_receipt.neutral_axis_analysis,
             "flatLogMaster": render_receipt.flat_log_master,
             "noOverwritePolicy": "never_overwrite_original",
             "outputFormat": output_format,
@@ -2432,6 +2442,7 @@ impl NegativeConversionParams {
             source_interpretation_hash: self.source_interpretation_hash.clone(),
             color_finish: self.color_finish.sanitized(),
             cmy_timing: self.cmy_timing.sanitized(),
+            neutral_axis: self.neutral_axis.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
             optical_finish: self.optical_finish.sanitized(),
             render_intent: self.render_intent,
@@ -2566,6 +2577,7 @@ struct NegativeLabPipelineRender {
     color_finish_metrics: NegativeLabColorFinishMetrics,
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     cmy_timing_metrics: NegativeLabCmyTimingMetrics,
+    neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3348,6 +3360,7 @@ fn run_e6_positive_pipeline(
         color_finish_metrics: color_finish.metrics,
         optical_finish_metrics: optical_finish.metrics,
         cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
+        neutral_axis_analysis: NegativeLabNeutralAxisAnalysis::default(),
     }
 }
 
@@ -3446,43 +3459,70 @@ fn run_pipeline_with_metrics(
         == NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2)
         .then(|| params.print_curve_v2.unwrap_or_default().sanitized());
 
-    let mut density_metrics = out_buffer
+    let mut model_density_buffer = vec![0.0f32; raw_pixels.len()];
+    model_density_buffer
         .par_chunks_mut(3)
         .zip(log_pixels.par_chunks(3))
+        .for_each(|(model_density_pixel, log_pixel)| {
+            let normalized_density = normalize_density_with_robust_bounds(
+                [log_pixel[0], log_pixel[1], log_pixel[2]],
+                &robust_bounds,
+            );
+            model_density_pixel.copy_from_slice(&[
+                if legacy_pre_curve_clamp {
+                    normalized_density[0].max(0.0)
+                } else {
+                    normalized_density[0]
+                },
+                if legacy_pre_curve_clamp {
+                    normalized_density[1].max(0.0)
+                } else {
+                    normalized_density[1]
+                },
+                if legacy_pre_curve_clamp {
+                    normalized_density[2].max(0.0)
+                } else {
+                    normalized_density[2]
+                },
+            ]);
+        });
+    let neutral_axis_analysis = analyze_neutral_axis(
+        model_density_buffer.as_chunks::<3>().0,
+        width as usize,
+        height as usize,
+        &params.neutral_axis,
+    );
+    let effective_cmy_timing =
+        compile_neutral_axis_cmy_timing(&params.cmy_timing, &neutral_axis_analysis);
+
+    let mut density_metrics = out_buffer
+        .par_chunks_mut(3)
+        .zip(model_density_buffer.par_chunks(3))
         .zip(normalized_density_buffer.par_chunks_mut(3))
         .zip(scene_linear_print_buffer.par_chunks_mut(3))
         .fold(
             NegativeLabDensityMetricsAccumulator::default,
-            |mut metrics, (((out_pixel, log_pixel), normalized_density_pixel), scene_linear_print_pixel)| {
-                let normalized_density = normalize_density_with_robust_bounds(
-                    [log_pixel[0], log_pixel[1], log_pixel[2]],
-                    &robust_bounds,
-                );
+            |mut metrics,
+             (
+                ((out_pixel, model_density_pixel), normalized_density_pixel),
+                scene_linear_print_pixel,
+            )| {
                 let model_density = [
-                    if legacy_pre_curve_clamp {
-                        normalized_density[0].max(0.0)
-                    } else {
-                        normalized_density[0]
-                    },
-                    if legacy_pre_curve_clamp {
-                        normalized_density[1].max(0.0)
-                    } else {
-                        normalized_density[1]
-                    },
-                    if legacy_pre_curve_clamp {
-                        normalized_density[2].max(0.0)
-                    } else {
-                        normalized_density[2]
-                    },
+                    model_density_pixel[0],
+                    model_density_pixel[1],
+                    model_density_pixel[2],
                 ];
                 metrics.observe(model_density);
                 normalized_density_pixel.copy_from_slice(&model_density);
 
-                let weighted_density = apply_cmy_timing_pixel([
-                    model_density[0] * weights[0],
-                    model_density[1] * weights[1],
-                    model_density[2] * weights[2],
-                ], &params.cmy_timing);
+                let weighted_density = apply_cmy_timing_pixel(
+                    [
+                        model_density[0] * weights[0],
+                        model_density[1] * weights[1],
+                        model_density[2] * weights[2],
+                    ],
+                    &effective_cmy_timing,
+                );
 
                 let apply_curve = |x: f32| -> f32 {
                     let sigmoid = 1.0 / (1.0 + (-k * (x - x0)).exp());
@@ -3596,6 +3636,7 @@ fn run_pipeline_with_metrics(
         color_finish_metrics: color_finish.metrics,
         optical_finish_metrics: optical_finish.metrics,
         cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
+        neutral_axis_analysis: NegativeLabNeutralAxisAnalysis::default(),
     }
 }
 
@@ -4282,6 +4323,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     color_finish_metrics: NegativeLabColorFinishMetrics,
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     cmy_timing_metrics: NegativeLabCmyTimingMetrics,
+    neutral_axis_analysis: NegativeLabNeutralAxisAnalysis,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -4337,6 +4379,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         color_finish_metrics,
         optical_finish_metrics,
         cmy_timing_metrics,
+        neutral_axis_analysis,
         dimensions,
         flat_log_master: params.flat_log_master,
         render_intent: params.render_intent,
@@ -4487,6 +4530,7 @@ pub async fn preview_negative_conversion(
         rendered_preview.color_finish_metrics,
         rendered_preview.optical_finish_metrics,
         rendered_preview.cmy_timing_metrics,
+        rendered_preview.neutral_axis_analysis,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -4528,6 +4572,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         rendered_preview.color_finish_metrics,
         rendered_preview.optical_finish_metrics,
         rendered_preview.cmy_timing_metrics,
+        rendered_preview.neutral_axis_analysis,
         &params,
         rendered_preview.density_scopes,
     )
@@ -4835,6 +4880,7 @@ pub async fn convert_negatives(
                 NegativeLabOutputRenderReceipt {
                     density_normalization_metrics: &density_normalization_metrics,
                     color_finish_metrics: Some(&color_finish_metrics),
+                    neutral_axis_analysis: Some(&pipeline_render.neutral_axis_analysis),
                     dimensions: NegativeLabSavedPositiveDimensions {
                         height: processed.height(),
                         width: processed.width(),
@@ -6180,6 +6226,7 @@ mod tests {
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
                 color_finish_metrics: None,
+                neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: 8,
                     width: 12,
@@ -6381,6 +6428,7 @@ mod tests {
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
                 color_finish_metrics: None,
+                neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: 8,
                     width: 12,
@@ -7263,6 +7311,7 @@ mod tests {
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
                 color_finish_metrics: None,
+                neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: rendered.height(),
                     width: rendered.width(),
@@ -7621,6 +7670,7 @@ mod tests {
             NegativeLabOutputRenderReceipt {
                 density_normalization_metrics: &fixture_density_metrics(),
                 color_finish_metrics: None,
+                neutral_axis_analysis: None,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: rendered.height(),
                     width: rendered.width(),
@@ -7911,6 +7961,7 @@ mod tests {
             .metrics,
             NegativeLabOpticalFinishMetrics::default(),
             NegativeLabCmyTimingMetrics::default(),
+            NegativeLabNeutralAxisAnalysis::default(),
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -7996,6 +8047,7 @@ mod tests {
             pipeline.color_finish_metrics,
             pipeline.optical_finish_metrics,
             pipeline.cmy_timing_metrics,
+            pipeline.neutral_axis_analysis,
             &params,
             pipeline.density_scopes,
         )

@@ -9,6 +9,7 @@ pub(crate) mod negative_conversion;
 pub(crate) mod negative_lab_cmy_timing;
 pub(crate) mod negative_lab_color_finish;
 pub(crate) mod negative_lab_detail_finish;
+pub(crate) mod negative_lab_neutral_axis;
 pub(crate) mod negative_lab_optical_finish;
 pub(crate) mod negative_lab_retouch;
 #[cfg(all(test, feature = "tauri-test"))]
