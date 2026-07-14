@@ -18,7 +18,7 @@ const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
   return descriptor?.nodeType ?? null;
 };
 
-export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Adjustments): EditDocumentV2 => {
+export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
   const mapped = entries
     .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
@@ -27,9 +27,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Adjustments): Edi
     EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
       const descriptor = descriptorFor(nodeType);
       const params = Object.fromEntries(
-        mapped
-          .filter((entry) => entry.nodeType === nodeType)
-          .map(({ key }) => [key, adjustments[key as keyof Adjustments]]),
+        mapped.filter((entry) => entry.nodeType === nodeType).map(({ key }) => [key, adjustments[key]]),
       );
       return [
         nodeType,

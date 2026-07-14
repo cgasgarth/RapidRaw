@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { z } from 'zod';
+import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Panel } from '../../components/ui/AppProperties';
 import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
@@ -32,6 +33,7 @@ import {
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
 import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { buildEditTransactionPersistenceContext } from '../../utils/editTransaction';
@@ -105,9 +107,16 @@ const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
 const previewDataUrlResponseSchema = z.string();
 const applyAdjustmentsInvokeSchema = z
   .object({
+    activeWaveformChannel: z.string().nullable().optional(),
+    computeWaveform: z.boolean(),
+    editDocumentV2: editDocumentV2Schema,
     expectedImagePath: z.string().trim().min(1),
+    isInteractive: z.boolean(),
+    roi: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
+    targetResolution: z.number().int().positive(),
+    viewerSampleGraphRevision: z.string().nullable().optional(),
   })
-  .passthrough();
+  .strict();
 const exportSoftProofTransformResponseSchema = z
   .object({
     blackPointCompensation: z.string().trim().min(1),
@@ -568,9 +577,9 @@ export function useImageProcessing(
                     request: applyAdjustmentsInvokeSchema.parse({
                       activeWaveformChannel: activeWaveformChannelRef.current,
                       computeWaveform: isWaveformVisible || request.scopeRecovery,
+                      editDocumentV2: legacyAdjustmentsToEditDocumentV2(payload),
                       expectedImagePath: request.identity.sourceImagePath,
                       isInteractive: request.dragging,
-                      jsAdjustments: payload,
                       roi: request.roi,
                       targetResolution: request.targetRes,
                       viewerSampleGraphRevision: request.identity.graphIdentity,

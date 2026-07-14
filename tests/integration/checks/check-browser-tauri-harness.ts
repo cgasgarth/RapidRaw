@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
+import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 
@@ -174,6 +175,44 @@ try {
     throw new Error('Compare mode did not return to off after toggling side-by-side.');
   }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
+  await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
+  const previewCallsBeforeExposureEdit = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter((call) => call.command === 'apply_adjustments').length ??
+      0,
+  );
+  const exposureRange = page.getByTestId('basic-control-exposure-range');
+  await exposureRange.waitFor({ timeout: 10_000 });
+  await exposureRange.evaluate((element) => {
+    const range = element as HTMLInputElement;
+    range.value = '0.75';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    range.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    (previousCallCount) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter((call) => call.command === 'apply_adjustments')
+        .length ?? 0) > previousCallCount,
+    previewCallsBeforeExposureEdit,
+    { timeout: 10_000 },
+  );
+  const editDocumentPreviewProof = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter((candidate) => candidate.command === 'apply_adjustments')
+      .at(-1);
+    const request = call?.args?.['request'];
+    return typeof request === 'object' && request !== null ? request : null;
+  });
+  if (editDocumentPreviewProof === null || 'jsAdjustments' in editDocumentPreviewProof) {
+    throw new Error('Editor preview did not retire the flat adjustments render payload.');
+  }
+  const previewEditDocument = editDocumentV2Schema.parse(editDocumentPreviewProof['editDocumentV2']);
+  if (previewEditDocument.nodes.scene_global_color_tone?.params.exposure !== 0.75) {
+    throw new Error('Exposure UI edit did not reach the scene_global_color_tone render node.');
+  }
+  await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await verifyViewerPickerControllers(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
