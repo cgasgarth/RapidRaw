@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, atomic::AtomicBool};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
@@ -588,10 +588,8 @@ pub async fn plan_super_resolution(
         paths.len() as u64,
         paths.len() as u64,
     )?;
-    *state
-        .burst_sr_accepted_runtime
-        .lock()
-        .map_err(|_| "sr_runtime_unavailable")? = None;
+    let service = Arc::clone(&state.services.burst_sr);
+    let plan_handle = service.begin_plan();
     let task_token = job.cancellation_token.clone();
     let runtime_paths = paths.clone();
     let runtime_settings = settings.clone();
@@ -613,8 +611,11 @@ pub async fn plan_super_resolution(
         .map_err(|error| format!("super_resolution_registration_task_failed:{error}"))
         .and_then(|result| result);
     if let Ok(plan) = &result {
-        state.computational_merge_jobs.finish(&job.job_id)?;
-        if plan.accepted {
+        if !service.is_current(plan_handle) {
+            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            return Err("super_resolution_registration_stale_completion".to_string());
+        }
+        let accepted = if plan.accepted {
             let registration = plan
                 .registration
                 .clone()
@@ -641,15 +642,19 @@ pub async fn plan_super_resolution(
                 width: reconstruction.width,
                 height: reconstruction.height,
             };
-            *state
-                .burst_sr_accepted_runtime
-                .lock()
-                .map_err(|_| "sr_runtime_unavailable")? =
-                Some(super::candidate::AcceptedBurstSrRuntime {
-                    identity,
-                    paths: runtime_paths,
-                });
+            Some(super::candidate::AcceptedBurstSrRuntime {
+                identity,
+                paths: runtime_paths,
+            })
+        } else {
+            None
+        };
+        if !state.computational_merge_jobs.finish(&job.job_id)? {
+            return Err("super_resolution_registration_cancelled".to_string());
         }
+        service
+            .complete_plan(plan_handle, accepted)
+            .map_err(str::to_string)?;
     } else {
         state.computational_merge_jobs.fail(&job.job_id)?;
     }
@@ -659,10 +664,7 @@ pub async fn plan_super_resolution(
 pub fn cancel_super_resolution_registration(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    *state
-        .burst_sr_accepted_runtime
-        .lock()
-        .map_err(|_| "sr_runtime_unavailable")? = None;
+    state.services.burst_sr.cancel();
     state
         .computational_merge_jobs
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)

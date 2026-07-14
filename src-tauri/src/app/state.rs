@@ -196,9 +196,6 @@ pub struct AppState {
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
-    pub burst_sr_accepted_runtime:
-        Arc<Mutex<Option<crate::merge::super_resolution::job::AcceptedBurstSrRuntime>>>,
-    pub burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_artifacts:
         Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore>,
@@ -280,8 +277,6 @@ impl AppState {
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
-            burst_sr_accepted_runtime: Arc::new(Mutex::new(None)),
-            burst_sr_job_results: crate::merge::super_resolution::job::BurstSrJobResults::default(),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_artifacts: Arc::new(
                 crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore::default(),

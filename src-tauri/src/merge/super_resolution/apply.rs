@@ -58,24 +58,29 @@ pub fn apply_burst_sr_candidate(
 ) -> Result<BurstSrApplyReceipt, String> {
     validate_request(&request)?;
     let accepted = state
-        .burst_sr_accepted_runtime
-        .lock()
-        .map_err(|_| "invalid_candidate_runtime_unavailable")?
-        .clone()
-        .ok_or("stale_candidate_runtime")?;
+        .services
+        .burst_sr
+        .accepted_for_apply()
+        .map_err(str::to_string)?;
     let cache_root = app_handle
         .path()
         .app_cache_dir()
         .map_err(|error| format!("invalid_candidate_cache_unavailable:{error}"))?
         .join("burst-sr-candidates");
-    apply(&request, &accepted, &cache_root)
+    apply(&request, &accepted.runtime, &cache_root, || {
+        state.services.burst_sr.authorize(&accepted)
+    })
 }
 
-fn apply(
+fn apply<A>(
     request: &BurstSrApplyRequest,
     accepted: &AcceptedBurstSrRuntime,
     cache_root: &Path,
-) -> Result<BurstSrApplyReceipt, String> {
+    authorize_publish: A,
+) -> Result<BurstSrApplyReceipt, String>
+where
+    A: FnOnce() -> Result<(), String>,
+{
     let _guard = APPLY_LOCK
         .get_or_init(|| Mutex::new(()))
         .lock()
@@ -196,7 +201,7 @@ fn apply(
     tx.stage_manifest(&manifest)?;
     validate(&candidate, &accepted.identity).map_err(normalize_candidate_error)?;
     validate_sources(accepted)?;
-    let package = tx.commit(&manifest, |_| Ok(()))?;
+    let package = tx.commit_guarded(&manifest, authorize_publish, |_| Ok(()))?;
     let payload_path = Path::new(&package.final_package_path)
         .join("payload.tiff")
         .to_string_lossy()

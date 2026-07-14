@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::Mutex};
-
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -43,8 +41,6 @@ pub(crate) fn stage_work_units(tiles: u64, sources: u64) -> Vec<StageWorkUnits> 
         .collect()
 }
 
-pub(crate) use super::candidate::AcceptedBurstSrRuntime;
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BurstSrCandidateJobResult {
@@ -53,19 +49,6 @@ pub struct BurstSrCandidateJobResult {
     pub error_code: Option<String>,
     pub candidate: Option<super::candidate::BurstSrCandidateHandle>,
     pub progress: ComputationalMergeProgress,
-}
-
-#[derive(Default)]
-pub struct BurstSrJobResults(Mutex<HashMap<String, BurstSrCandidateJobResult>>);
-impl BurstSrJobResults {
-    pub(crate) fn read(&self, id: &ComputationalMergeJobId) -> Option<BurstSrCandidateJobResult> {
-        self.0.lock().ok()?.get(&id.to_string()).cloned()
-    }
-    fn insert(&self, id: String, result: BurstSrCandidateJobResult) {
-        if let Ok(mut values) = self.0.lock() {
-            values.insert(id, result);
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -84,20 +67,14 @@ pub fn prepare_burst_sr_candidate(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<BurstSrCandidateJobHandle, String> {
     let accepted = state
-        .burst_sr_accepted_runtime
-        .lock()
-        .map_err(|_| "sr_runtime_unavailable")?
-        .clone()
-        .ok_or("sr_candidate_requires_accepted_review")?;
-    if accepted.identity.review_id != accepted_review_id
-        && accepted.identity.plan_id != accepted_review_id
-    {
-        return Err("sr_candidate_accepted_review_mismatch".into());
-    }
+        .services
+        .burst_sr
+        .accepted(&accepted_review_id)
+        .map_err(str::to_string)?;
     let plan = super::tiles::plan(
-        accepted.identity.width,
-        accepted.identity.height,
-        accepted.paths.len(),
+        accepted.runtime.identity.width,
+        accepted.runtime.identity.height,
+        accepted.runtime.paths.len(),
         memory_budget_bytes.unwrap_or(crate::merge::tile_runtime::DEFAULT_MEMORY_BUDGET_BYTES),
         requested_tile_size.unwrap_or(super::tiles::DEFAULT_CORE),
     )?;
@@ -110,6 +87,10 @@ pub fn prepare_burst_sr_candidate(
     )?;
     let id = job.job_id.to_string();
     let result_id = id.clone();
+    if let Err(error) = state.services.burst_sr.register_job(&accepted, id.clone()) {
+        let _ = state.computational_merge_jobs.cancel(&job.job_id);
+        return Err(error.to_string());
+    }
     std::thread::Builder::new()
         .name(format!("burst-sr-candidate-{id}"))
         .spawn(move || {
@@ -124,13 +105,14 @@ pub fn prepare_burst_sr_candidate(
                     .map_err(|e| format!("sr_candidate_cache_failed:{e}"))?;
                 super::candidate::prepare(
                     &root,
-                    &accepted,
+                    &accepted.runtime,
                     &plan,
                     &job.job_id,
                     &job.cancellation_token,
                     &state.computational_merge_jobs,
                 )
             })();
+            let mut candidate_path = None;
             let (status, error_code, candidate) = match outcome {
                 Ok(output)
                     if state
@@ -138,6 +120,7 @@ pub fn prepare_burst_sr_candidate(
                         .finish(&job.job_id)
                         .unwrap_or(false) =>
                 {
+                    candidate_path = Some(output.path);
                     ("succeeded", None, Some(output.handle))
                 }
                 Ok(output) => {
@@ -158,17 +141,25 @@ pub fn prepare_burst_sr_candidate(
                     (status, Some(error), None)
                 }
             };
-            if let Some(progress) = state.computational_merge_jobs.progress(&job.job_id) {
-                state.burst_sr_job_results.insert(
-                    result_id.clone(),
-                    BurstSrCandidateJobResult {
-                        job_id: result_id,
+            let published = state
+                .computational_merge_jobs
+                .progress(&job.job_id)
+                .is_some_and(|progress| {
+                    let result = BurstSrCandidateJobResult {
+                        job_id: result_id.clone(),
                         status: status.into(),
                         error_code,
                         candidate,
                         progress,
-                    },
-                );
+                    };
+                    state
+                        .services
+                        .burst_sr
+                        .publish_job_result(&accepted, result_id, result)
+                        .is_ok()
+                });
+            if !published && let Some(path) = candidate_path {
+                let _ = std::fs::remove_dir_all(path);
             }
         })
         .map_err(|e| format!("sr_candidate_job_spawn_failed:{e}"))?;
@@ -184,8 +175,11 @@ pub fn read_burst_sr_candidate_job(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<BurstSrCandidateJobResult, String> {
     let id = ComputationalMergeJobId::from_string(job_id.clone());
-    if let Some(result) = state.burst_sr_job_results.read(&id) {
+    if let Some(result) = state.services.burst_sr.read_job_result(&job_id) {
         return Ok(result);
+    }
+    if !state.services.burst_sr.job_current(&job_id) {
+        return Err("computational_merge_job_not_found".to_string());
     }
     let progress = state
         .computational_merge_jobs
