@@ -1319,6 +1319,9 @@ impl CompiledEditGraph {
             "omittedNoOpNodes": self.receipt.omitted_no_op_node_ids.as_ref(),
             "fusedGpuGroups": self.receipt.fused_gpu_groups.iter()
                 .map(|group| group.as_ref()).collect::<Vec<_>>(),
+            "wgpuRuntime": crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(self)
+                .ok()
+                .map(|runtime| runtime.diagnostic_receipt()),
         })
     }
 }

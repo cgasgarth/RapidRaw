@@ -995,6 +995,22 @@ fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String
                     request.mask_bitmaps.len(),
                 )
                 .map_err(str::to_owned)?;
+            let runtime = crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
+                .map_err(str::to_owned)?;
+            let grouped_modules = runtime
+                .fused_groups()
+                .iter()
+                .map(|group| group.len())
+                .sum::<usize>();
+            if grouped_modules != runtime.modules().len()
+                || runtime
+                    .active_resources()
+                    .iter()
+                    .any(|resource| resource.is_empty())
+                || runtime.max_halo_pixels() > 256
+            {
+                return Err("edit_graph.invalid_wgpu_runtime_receipt".to_string());
+            }
         }
         #[cfg(all(test, feature = "tauri-test"))]
         EditGraphExecutionAuthority::TestOnlyLegacy => {}
