@@ -11,6 +11,16 @@ const READY_MARKER: &str = "COMMIT_READY";
 const REGISTRATION_RECEIPT: &str = "REGISTRATION.json";
 static PUBLISH_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
+pub(crate) fn with_atomic_output_publish_lock<T>(
+    operation: impl FnOnce() -> T,
+) -> Result<T, String> {
+    let _guard = PUBLISH_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| "atomic_output_publish_lock_unavailable".to_string())?;
+    Ok(operation())
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AtomicOutputFault {
     Write,
@@ -156,11 +166,24 @@ impl AtomicDerivedOutputTransaction {
     }
 
     pub fn commit<F>(
-        mut self,
+        self,
         manifest: &DerivedOutputManifest,
         register: F,
     ) -> Result<AtomicDerivedOutputReceipt, String>
     where
+        F: FnOnce(&Path) -> Result<(), String>,
+    {
+        self.commit_guarded(manifest, || Ok(()), register)
+    }
+
+    pub(crate) fn commit_guarded<A, F>(
+        mut self,
+        manifest: &DerivedOutputManifest,
+        authorize_publish: A,
+        register: F,
+    ) -> Result<AtomicDerivedOutputReceipt, String>
+    where
+        A: FnOnce() -> Result<(), String>,
         F: FnOnce(&Path) -> Result<(), String>,
     {
         self.validate(manifest)?;
@@ -177,14 +200,14 @@ impl AtomicDerivedOutputTransaction {
             AtomicOutputFault::Rename,
             "atomic_output_injected_rename_failure",
         )?;
-        let _guard = PUBLISH_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .map_err(|_| "atomic_output_publish_lock_unavailable".to_string())?;
-        let final_path = collision_safe_path(&self.parent, &self.requested_stem);
-        fs::rename(&self.staging_path, &final_path)
-            .map_err(io_error("atomic_output_publish_failed"))?;
-        self.published = true;
+        let final_path = with_atomic_output_publish_lock(|| {
+            authorize_publish()?;
+            let final_path = collision_safe_path(&self.parent, &self.requested_stem);
+            fs::rename(&self.staging_path, &final_path)
+                .map_err(io_error("atomic_output_publish_failed"))?;
+            self.published = true;
+            Ok::<_, String>(final_path)
+        })??;
         sync_directory(&self.parent)?;
         let manifest_hash = self.inventory["manifest.json"].content_hash.clone();
         let payload_hash = self
@@ -422,6 +445,18 @@ mod atomic_derived_output_tests {
             assert!(tx.commit(&manifest(), |_| Ok(())).is_err());
             assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
         }
+    }
+    #[test]
+    fn denied_guarded_commit_cleans_staging_without_publishing() {
+        let root = tempfile::tempdir().unwrap();
+        let result = staged(root.path()).commit_guarded(
+            &manifest(),
+            || Err("stale_generation".to_string()),
+            |_| Ok(()),
+        );
+
+        assert!(matches!(result, Err(error) if error == "stale_generation"));
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
     }
     #[test]
     fn write_and_flush_faults_are_cleaned() {

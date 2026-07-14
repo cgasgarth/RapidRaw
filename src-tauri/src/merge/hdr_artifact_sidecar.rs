@@ -6,13 +6,13 @@ use std::path::PathBuf;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::app_state::{PendingHdrMergePlan, PendingHdrSourceRef};
 use crate::derived_output_provenance::{
     DerivedOutputProvenanceInput, DerivedOutputProvenanceSource,
     build_derived_output_provenance_sidecar, stable_hash,
 };
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
+use crate::merge::hdr::planning_service::{PendingHdrMergePlan, PendingHdrSourceRef};
 
 const HDR_ENGINE_ID: &str = crate::merge::hdr::runtime::ENGINE_ID;
 const HDR_ENGINE_BACKEND_TYPE: &str = crate::merge::hdr::runtime::BACKEND_ID;
@@ -162,8 +162,6 @@ pub fn build_hdr_runtime_plan(
         ownership_hash: None,
         feather_hash: None,
         unresolved_fraction: None,
-        output_width: u64::from(output_width),
-        output_height: u64::from(output_height),
         planned_sources: Vec::new(),
         motion_probability_bytes: Vec::new(),
         ownership_bytes: Vec::new(),

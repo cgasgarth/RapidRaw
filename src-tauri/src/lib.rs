@@ -87,7 +87,8 @@ use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 use crate::merge::atomic_derived_output::{AtomicDerivedOutputTransaction, DerivedOutputManifest};
-use crate::merge::hdr::{ALIGNMENT_POLICY_ID, HdrAlignmentPlanResponse, build_alignment_plan};
+use crate::merge::hdr::ALIGNMENT_POLICY_ID;
+use crate::merge::hdr::planning_service::{HdrSavePayload, PendingHdrSourceRef};
 
 use crate::app::startup::NativeStartupPhase;
 use crate::cache_utils::{
@@ -2428,14 +2429,12 @@ fn load_hdr_merge_items(
         .collect::<Result<Vec<_>, String>>()
 }
 
-fn build_hdr_source_refs(
-    loaded_items: &[LoadedHdrMergeItem],
-) -> Vec<app_state::PendingHdrSourceRef> {
+fn build_hdr_source_refs(loaded_items: &[LoadedHdrMergeItem]) -> Vec<PendingHdrSourceRef> {
     loaded_items
         .iter()
         .enumerate()
-        .map(|(source_index, (path, content_hash, img, exposure, iso))| {
-            app_state::PendingHdrSourceRef {
+        .map(
+            |(source_index, (path, content_hash, img, exposure, iso))| PendingHdrSourceRef {
                 content_hash: content_hash.clone(),
                 image_path: parse_virtual_path(path).0.to_string_lossy().into_owned(),
                 width: img.width(),
@@ -2443,73 +2442,9 @@ fn build_hdr_source_refs(
                 exposure_time_seconds: exposure.as_secs_f32(),
                 iso: *iso,
                 source_index,
-            }
-        })
+            },
+        )
         .collect::<Vec<_>>()
-}
-
-#[tauri::command]
-async fn plan_hdr(
-    paths: Vec<String>,
-    state: tauri::State<'_, AppState>,
-) -> Result<HdrAlignmentPlanResponse, String> {
-    if paths.len() < 2 {
-        return Err("Please select at least two images to merge.".to_string());
-    }
-
-    *state.hdr_runtime_plan.lock().unwrap() = None;
-    state.hdr_source_refs.lock().unwrap().clear();
-    let generation = state.hdr_plan_generation.fetch_add(1, Ordering::SeqCst) + 1;
-    let generation_handle = state.hdr_plan_generation.clone();
-    let response = build_alignment_plan(&paths, || {
-        generation_handle.load(Ordering::SeqCst) != generation
-    })?;
-    if state.hdr_plan_generation.load(Ordering::SeqCst) != generation {
-        return Err("hdr_plan_cancelled:artifact_publication".to_string());
-    }
-    *state.hdr_runtime_plan.lock().unwrap() = Some(app_state::PendingHdrMergePlan {
-        accepted_dry_run_plan_hash: response.accepted_dry_run_plan_hash.clone(),
-        accepted_dry_run_plan_id: response.accepted_dry_run_plan_id.clone(),
-        alignment_policy_id: ALIGNMENT_POLICY_ID.to_string(),
-        source_content_hashes: response
-            .sources
-            .iter()
-            .map(|source| source.frame.content_hash.clone())
-            .collect(),
-        source_paths: paths,
-        static_radiance_hash: Some(response.static_radiance_preview.radiance_hash.clone()),
-        deghost_radiance_hash: Some(response.deghost_preview.radiance_hash.clone()),
-        motion_probability_hash: Some(response.deghost_preview.motion_probability_hash.clone()),
-        ownership_hash: Some(response.deghost_preview.ownership_hash.clone()),
-        feather_hash: Some(response.deghost_preview.feather_hash.clone()),
-        unresolved_fraction: Some(response.deghost_preview.unresolved_fraction),
-        output_width: response.sources[response.reference_source_index]
-            .frame
-            .width as u64,
-        output_height: response.sources[response.reference_source_index]
-            .frame
-            .height as u64,
-        planned_sources: response.sources.clone(),
-        motion_probability_bytes: Vec::new(),
-        ownership_bytes: Vec::new(),
-        feather_bytes: Vec::new(),
-        scene_linear_artifact_hash: None,
-        tone_mapped_preview_hash: None,
-        motion_coverage: None,
-        confidence_mean: None,
-    });
-    Ok(response)
-}
-
-#[tauri::command]
-async fn cancel_hdr_plan(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.hdr_plan_generation.fetch_add(1, Ordering::SeqCst);
-    let _ = state
-        .computational_merge_jobs
-        .cancel_active_family(crate::merge::computational_job::ComputationalMergeFamily::Hdr);
-    *state.hdr_runtime_plan.lock().unwrap() = None;
-    state.hdr_source_refs.lock().unwrap().clear();
-    Ok(())
 }
 
 #[tauri::command]
@@ -2523,12 +2458,8 @@ async fn merge_hdr(
     if paths.len() < 2 {
         return Err("Please select at least two images to merge.".to_string());
     }
-    let mut accepted_plan = state
-        .hdr_runtime_plan
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "hdr_apply_requires_accepted_native_plan".to_string())?;
+    let accepted = state.services.hdr.accepted_plan().map_err(str::to_string)?;
+    let mut accepted_plan = accepted.plan.clone();
     if accepted_plan.alignment_policy_id != ALIGNMENT_POLICY_ID
         || accepted_dry_run_plan_hash.as_ref() != Some(&accepted_plan.accepted_dry_run_plan_hash)
         || accepted_dry_run_plan_id.as_ref() != Some(&accepted_plan.accepted_dry_run_plan_id)
@@ -2554,9 +2485,6 @@ async fn merge_hdr(
         "Decoding calibrated RAW sources...",
     );
 
-    let hdr_result_handle = state.hdr_result.clone();
-    let hdr_runtime_plan_handle = state.hdr_runtime_plan.clone();
-    let hdr_source_refs_handle = state.hdr_source_refs.clone();
     let loaded_items = load_hdr_merge_items(&paths, &app_handle, true)?;
     job.cancellation_token.checkpoint()?;
     state.computational_merge_jobs.publish_progress(
@@ -2652,9 +2580,11 @@ async fn merge_hdr(
 
     let _ = app_handle.emit(crate::events::HDR_PROGRESS, "Creating preview...");
 
-    *hdr_result_handle.lock().unwrap() = Some(hdr_merged);
-    *hdr_runtime_plan_handle.lock().unwrap() = Some(runtime_plan);
-    *hdr_source_refs_handle.lock().unwrap() = source_refs;
+    state
+        .services
+        .hdr
+        .publish_merge(&accepted, runtime_plan, source_refs, hdr_merged)
+        .map_err(str::to_string)?;
     state.computational_merge_jobs.publish_progress(
         &job.job_id,
         "ready_to_publish",
@@ -2675,9 +2605,7 @@ async fn merge_hdr(
     Ok(())
 }
 
-fn build_hdr_apply_source_roles(
-    source_refs: &[app_state::PendingHdrSourceRef],
-) -> Vec<HdrApplySourceRole> {
+fn build_hdr_apply_source_roles(source_refs: &[PendingHdrSourceRef]) -> Vec<HdrApplySourceRole> {
     let reference_index = source_refs.len() / 2;
     source_refs
         .iter()
@@ -2700,9 +2628,16 @@ async fn save_hdr(
     first_path_str: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let hdr_image = state.hdr_result.lock().unwrap().take().ok_or_else(|| {
-        "No hdr image found in memory to save. It might have already been saved.".to_string()
-    })?;
+    let HdrSavePayload {
+        lease,
+        image: hdr_image,
+        plan: mut runtime_plan,
+        source_refs,
+    } = state
+        .services
+        .hdr
+        .acquire_save_payload()
+        .map_err(str::to_string)?;
 
     let (first_path, _) = parse_virtual_path(&first_path_str);
     let parent_dir = first_path
@@ -2713,13 +2648,6 @@ async fn save_hdr(
         .and_then(|s| s.to_str())
         .unwrap_or("hdr");
 
-    let source_refs = state.hdr_source_refs.lock().unwrap().clone();
-    let mut runtime_plan = state
-        .hdr_runtime_plan
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "HDR merge plan missing; rerun HDR merge before saving.".to_string())?;
     if source_refs.len() < 2 || runtime_plan.alignment_policy_id != ALIGNMENT_POLICY_ID {
         return Err("hdr_apply_missing_calibrated_lineage".to_string());
     }
@@ -2811,13 +2739,17 @@ async fn save_hdr(
         .map_err(|error| format!("hdr_lineage_encode_failed:{error}"))?,
     )?;
     transaction.stage_manifest(&manifest)?;
-    let receipt = transaction.commit(&manifest, |package| {
-        if package.join(&payload_name).is_file() {
-            Ok(())
-        } else {
-            Err("hdr_registration_payload_missing".to_string())
-        }
-    })?;
+    let receipt = transaction.commit_guarded(
+        &manifest,
+        || lease.authorize_publication(),
+        |package| {
+            if package.join(&payload_name).is_file() {
+                Ok(())
+            } else {
+                Err("hdr_registration_payload_missing".to_string())
+            }
+        },
+    )?;
     let output_path = PathBuf::from(&receipt.final_package_path).join(&payload_name);
     write_hdr_output_sidecar(
         &output_path,
@@ -2826,8 +2758,7 @@ async fn save_hdr(
         hdr_image.width(),
         hdr_image.height(),
     )?;
-    state.hdr_source_refs.lock().unwrap().clear();
-    *state.hdr_runtime_plan.lock().unwrap() = None;
+    let _ = lease.complete();
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
     let _ =
@@ -3527,7 +3458,7 @@ pub fn run() {
             app::commands::logging::frontend_log,
             save_collage,
             merge_hdr,
-            cancel_hdr_plan,
+            merge::hdr::commands::cancel_hdr_plan,
             merge::focus_stack::commands::plan_focus_stack,
             merge::focus_stack::commands::cancel_focus_stack_plan,
             merge::focus_stack::job::prepare_focus_stack_candidate,
@@ -3606,7 +3537,7 @@ pub fn run() {
             image_open_session::schedule_image_prefetch,
             image_open_session::get_image_open_diagnostics,
             image_loader::is_image_cached,
-            plan_hdr,
+            merge::hdr::commands::plan_hdr,
             super_resolution::plan_super_resolution,
             super_resolution::cancel_super_resolution_registration,
             super_resolution::job::prepare_burst_sr_candidate,
