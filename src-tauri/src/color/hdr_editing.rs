@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageBuffer, Rgb};
+use image::{DynamicImage, ImageBuffer, Rgb, Rgba};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -11,6 +11,7 @@ use crate::export::export_color_policy::{ExportColorProfile, ExportRenderingInte
 use crate::export::export_encoders::encode_image_with_working_color_state;
 
 pub const HDR_EDITING_IMPLEMENTATION_VERSION: u32 = 1;
+pub const SDR_RENDITION_IMPLEMENTATION_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -99,15 +100,43 @@ pub struct HdrExportPreflightV1 {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HdrExportCapabilityCatalogV1 {
+    pub implementation_version: u32,
+    pub targets: Vec<HdrExportPreflightV1>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HdrExportReceiptV1 {
     pub bit_depth: u8,
     pub byte_size: usize,
     pub color_primaries: String,
+    pub color_policy_fingerprint: String,
+    pub file_format: String,
     pub implementation_version: u32,
     pub plan_fingerprint: String,
     pub rendition: String,
+    pub scene_edit_fingerprint: String,
+    pub target: HdrExportTargetV1,
     pub transfer: String,
     pub view_fingerprint: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HdrExportWorkflowSettingsV1 {
+    pub sdr_rendition: SdrRenditionSettingsV1,
+    pub target: HdrExportTargetV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SdrRenditionPlanV1 {
+    pub implementation_version: u32,
+    pub plan_fingerprint: u64,
+    pub scene_edit_fingerprint: u64,
+    pub settings: SdrRenditionSettingsV1,
+    pub view: ViewTransformPlanV1,
 }
 
 pub struct HdrExportArtifactV1 {
@@ -130,6 +159,90 @@ pub struct HdrEditingPlanV1 {
     pub sdr_view: ViewTransformPlanV1,
 }
 
+impl SdrRenditionPlanV1 {
+    pub fn compile(
+        settings: SdrRenditionSettingsV1,
+        scene_edit_fingerprint: u64,
+    ) -> Result<Self, String> {
+        validate_sdr_settings(settings)?;
+        let default_view = ViewTransformSettingsV1::default();
+        let view = ViewTransformPlanV1::compile(ViewTransformSettingsV1 {
+            contrast: f64::from(settings.contrast),
+            target_black_linear: f64::from(settings.shadow_lift) * 0.04,
+            source_white_ev: default_view.source_white_ev
+                - f64::from(settings.highlight_compression) * 2.5,
+            chroma_compression: (1.0 - f64::from(settings.saturation)).clamp(0.0, 1.0),
+            ..default_view
+        })?;
+        let canonical = serde_json::to_vec(&(
+            settings,
+            scene_edit_fingerprint,
+            view.fingerprint,
+            SDR_RENDITION_IMPLEMENTATION_VERSION,
+        ))
+        .map_err(|error| format!("sdr_rendition_plan_encode:{error}"))?;
+        let digest = Sha256::digest(canonical);
+        Ok(Self {
+            implementation_version: SDR_RENDITION_IMPLEMENTATION_VERSION,
+            plan_fingerprint: u64::from_le_bytes(
+                digest[..8].try_into().expect("sha256 prefix length"),
+            ),
+            scene_edit_fingerprint,
+            settings,
+            view,
+        })
+    }
+
+    pub fn apply_rgb(&self, scene_ap1: [f32; 3]) -> [f32; 3] {
+        self.view.apply_rgb(scene_ap1)
+    }
+
+    pub fn apply_image(&self, scene_ap1: &DynamicImage) -> DynamicImage {
+        let source = scene_ap1.to_rgba32f();
+        DynamicImage::ImageRgba32F(ImageBuffer::from_fn(
+            source.width(),
+            source.height(),
+            |x, y| {
+                let pixel = source.get_pixel(x, y).0;
+                let rendered = self.apply_rgb([pixel[0], pixel[1], pixel[2]]);
+                Rgba([rendered[0], rendered[1], rendered[2], pixel[3]])
+            },
+        ))
+    }
+
+    pub fn preflight(
+        &self,
+        target: HdrExportTargetV1,
+        output_format: &str,
+        color_profile: &ExportColorProfile,
+        scene_linear_source: bool,
+    ) -> HdrExportPreflightV1 {
+        preflight_hdr_export(target, output_format, color_profile, scene_linear_source)
+    }
+
+    pub fn receipt(
+        &self,
+        target: HdrExportTargetV1,
+        byte_size: usize,
+        color_policy_fingerprint: String,
+    ) -> HdrExportReceiptV1 {
+        HdrExportReceiptV1 {
+            bit_depth: 16,
+            byte_size,
+            color_primaries: "srgb_bt709".to_string(),
+            color_policy_fingerprint,
+            file_format: "tiff".to_string(),
+            implementation_version: self.implementation_version,
+            plan_fingerprint: format!("{:016x}", self.plan_fingerprint),
+            rendition: "sdr_companion".to_string(),
+            scene_edit_fingerprint: format!("{:016x}", self.scene_edit_fingerprint),
+            target,
+            transfer: "srgb".to_string(),
+            view_fingerprint: format!("{:016x}", self.view.fingerprint),
+        }
+    }
+}
+
 impl HdrEditingPlanV1 {
     pub fn compile(
         settings: HdrEditingSettingsV1,
@@ -149,16 +262,8 @@ impl HdrEditingPlanV1 {
         };
         let hdr_view = ViewTransformPlanV1::compile(hdr_settings)?;
 
-        let sdr_settings = ViewTransformSettingsV1 {
-            contrast: f64::from(settings.sdr_rendition.contrast),
-            target_black_linear: f64::from(settings.sdr_rendition.shadow_lift) * 0.04,
-            source_white_ev: default_view.source_white_ev
-                - f64::from(settings.sdr_rendition.highlight_compression) * 2.5,
-            chroma_compression: (1.0 - f64::from(settings.sdr_rendition.saturation))
-                .clamp(0.0, 1.0),
-            ..default_view
-        };
-        let sdr_view = ViewTransformPlanV1::compile(sdr_settings)?;
+        let sdr_plan = SdrRenditionPlanV1::compile(settings.sdr_rendition, scene_edit_fingerprint)?;
+        let sdr_view = sdr_plan.view;
 
         let native_hdr = settings.mode == EditingDynamicRangeMode::Hdr
             && capability.authoritative_hdr_preview
@@ -263,26 +368,7 @@ impl HdrEditingPlanV1 {
     }
 
     pub fn export_preflight(&self, target: HdrExportTargetV1) -> HdrExportPreflightV1 {
-        match target {
-            HdrExportTargetV1::SdrCompanionTiff16 => HdrExportPreflightV1 {
-                bit_depth: Some(16),
-                block_code: None,
-                color_primaries: Some("srgb_bt709".to_string()),
-                rendition: "sdr_companion".to_string(),
-                supported: true,
-                target,
-                transfer: Some("srgb".to_string()),
-            },
-            HdrExportTargetV1::HdrPq10 | HdrExportTargetV1::HdrHlg10 => HdrExportPreflightV1 {
-                bit_depth: None,
-                block_code: Some("hdr_export_metadata_encoder_unavailable".to_string()),
-                color_primaries: None,
-                rendition: "hdr_view".to_string(),
-                supported: false,
-                target,
-                transfer: None,
-            },
-        }
+        preflight_hdr_export(target, "tiff", &ExportColorProfile::Srgb, true)
     }
 
     pub fn export_sdr_companion_tiff16(
@@ -325,19 +411,16 @@ impl HdrEditingPlanV1 {
             false,
             None,
         )?;
-        let receipt = HdrExportReceiptV1 {
-            bit_depth: encoded
-                .color_policy
-                .as_ref()
-                .map_or(16, |policy| policy.bit_depth),
-            byte_size: encoded.bytes.len(),
-            color_primaries: "srgb_bt709".to_string(),
-            implementation_version: self.implementation_version,
-            plan_fingerprint: format!("{:016x}", self.plan_fingerprint),
-            rendition: "sdr_companion".to_string(),
-            transfer: "srgb".to_string(),
-            view_fingerprint: format!("{:016x}", self.sdr_view.fingerprint),
-        };
+        let sdr_plan =
+            SdrRenditionPlanV1::compile(self.sdr_rendition, self.scene_edit_fingerprint)?;
+        let receipt = sdr_plan.receipt(
+            HdrExportTargetV1::SdrCompanionTiff16,
+            encoded.bytes.len(),
+            encoded.color_policy.as_ref().map_or_else(
+                || "unavailable".to_string(),
+                |policy| policy.transform_policy_fingerprint.clone(),
+            ),
+        );
         Ok(HdrExportArtifactV1 {
             bytes: encoded.bytes,
             receipt,
@@ -345,10 +428,70 @@ impl HdrEditingPlanV1 {
     }
 }
 
+pub fn hdr_export_capabilities() -> HdrExportCapabilityCatalogV1 {
+    HdrExportCapabilityCatalogV1 {
+        implementation_version: HDR_EDITING_IMPLEMENTATION_VERSION,
+        targets: [
+            HdrExportTargetV1::SdrCompanionTiff16,
+            HdrExportTargetV1::HdrPq10,
+            HdrExportTargetV1::HdrHlg10,
+        ]
+        .map(|target| preflight_hdr_export(target, "tiff", &ExportColorProfile::Srgb, true))
+        .into(),
+    }
+}
+
+pub fn preflight_hdr_export(
+    target: HdrExportTargetV1,
+    output_format: &str,
+    color_profile: &ExportColorProfile,
+    scene_linear_source: bool,
+) -> HdrExportPreflightV1 {
+    if target != HdrExportTargetV1::SdrCompanionTiff16 {
+        return HdrExportPreflightV1 {
+            bit_depth: None,
+            block_code: Some("hdr_export_metadata_encoder_unavailable".to_string()),
+            color_primaries: None,
+            rendition: "hdr_view".to_string(),
+            supported: false,
+            target,
+            transfer: None,
+        };
+    }
+    let block_code = if !scene_linear_source {
+        Some("hdr_export_scene_linear_source_required")
+    } else if !matches!(output_format.to_ascii_lowercase().as_str(), "tif" | "tiff") {
+        Some("hdr_sdr_companion_requires_tiff")
+    } else if color_profile != &ExportColorProfile::Srgb {
+        Some("hdr_sdr_companion_requires_srgb")
+    } else {
+        None
+    };
+    HdrExportPreflightV1 {
+        bit_depth: block_code.is_none().then_some(16),
+        block_code: block_code.map(str::to_string),
+        color_primaries: block_code.is_none().then(|| "srgb_bt709".to_string()),
+        rendition: "sdr_companion".to_string(),
+        supported: block_code.is_none(),
+        target,
+        transfer: block_code.is_none().then(|| "srgb".to_string()),
+    }
+}
+
 fn validate_settings(settings: HdrEditingSettingsV1) -> Result<(), String> {
     let sdr = settings.sdr_rendition;
+    let values = [settings.hdr_limit_stops];
+    if values.into_iter().any(|value| !value.is_finite()) {
+        return Err("hdr_editing_non_finite_setting".to_string());
+    }
+    if !(1.0..=6.0).contains(&settings.hdr_limit_stops) {
+        return Err("hdr_editing_setting_out_of_range".to_string());
+    }
+    validate_sdr_settings(sdr)
+}
+
+fn validate_sdr_settings(sdr: SdrRenditionSettingsV1) -> Result<(), String> {
     let values = [
-        settings.hdr_limit_stops,
         sdr.highlight_compression,
         sdr.contrast,
         sdr.shadow_lift,
@@ -358,8 +501,7 @@ fn validate_settings(settings: HdrEditingSettingsV1) -> Result<(), String> {
     if values.into_iter().any(|value| !value.is_finite()) {
         return Err("hdr_editing_non_finite_setting".to_string());
     }
-    if !(1.0..=6.0).contains(&settings.hdr_limit_stops)
-        || !(0.0..=1.0).contains(&sdr.highlight_compression)
+    if !(0.0..=1.0).contains(&sdr.highlight_compression)
         || !(0.5..=1.5).contains(&sdr.contrast)
         || !(0.0..=1.0).contains(&sdr.shadow_lift)
         || !(0.0..=1.5).contains(&sdr.saturation)
@@ -492,5 +634,175 @@ mod tests {
         assert_ne!(first.plan_fingerprint, second.plan_fingerprint);
         assert_ne!(first.plan_fingerprint, third.plan_fingerprint);
         assert_eq!(first.scene_edit_fingerprint, second.scene_edit_fingerprint);
+    }
+
+    #[test]
+    fn sdr_export_preflight_is_format_profile_and_scene_domain_capability_gated() {
+        let plan = SdrRenditionPlanV1::compile(SdrRenditionSettingsV1::default(), 42).unwrap();
+        assert!(
+            plan.preflight(
+                HdrExportTargetV1::SdrCompanionTiff16,
+                "tiff",
+                &ExportColorProfile::Srgb,
+                true,
+            )
+            .supported
+        );
+        for (format, profile, scene_linear, block) in [
+            (
+                "jpeg",
+                ExportColorProfile::Srgb,
+                true,
+                "hdr_sdr_companion_requires_tiff",
+            ),
+            (
+                "tiff",
+                ExportColorProfile::DisplayP3,
+                true,
+                "hdr_sdr_companion_requires_srgb",
+            ),
+            (
+                "tiff",
+                ExportColorProfile::Srgb,
+                false,
+                "hdr_export_scene_linear_source_required",
+            ),
+        ] {
+            let preflight = plan.preflight(
+                HdrExportTargetV1::SdrCompanionTiff16,
+                format,
+                &profile,
+                scene_linear,
+            );
+            assert!(!preflight.supported);
+            assert_eq!(preflight.block_code.as_deref(), Some(block));
+        }
+        let catalog = hdr_export_capabilities();
+        assert_eq!(
+            catalog
+                .targets
+                .iter()
+                .filter(|target| target.supported)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn sdr_rendition_image_preserves_alpha_and_has_display_independent_identity() {
+        let settings = SdrRenditionSettingsV1::default();
+        let plan = SdrRenditionPlanV1::compile(settings, 77).unwrap();
+        let repeat = SdrRenditionPlanV1::compile(settings, 77).unwrap();
+        let changed_scene = SdrRenditionPlanV1::compile(settings, 78).unwrap();
+        assert_eq!(plan.plan_fingerprint, repeat.plan_fingerprint);
+        assert_ne!(plan.plan_fingerprint, changed_scene.plan_fingerprint);
+
+        let source =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(1, 1, Rgba([4.0, 2.0, 1.0, 0.35])));
+        let output = plan.apply_image(&source).to_rgba32f();
+        let pixel = output.get_pixel(0, 0).0;
+        assert_eq!(pixel[3], 0.35);
+        assert!(pixel[..3].iter().all(|channel| channel.is_finite()));
+        assert!(pixel[0] > 0.0 && pixel[0] < 4.0);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn sdr_rendition_cpu_wgpu_and_tiff_output_are_conformant() {
+        use tauri::Manager;
+
+        use crate::AppState;
+        use crate::adjustments::abi::AllAdjustments;
+        use crate::gpu_processing::{
+            EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, acquire_gpu_test_lock,
+            get_or_init_compute_gpu_context_for_tests, process_and_get_unclamped_dynamic_image,
+        };
+
+        let _gpu_guard = acquire_gpu_test_lock();
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(4, 1, |x, _| {
+            let value = [0.18, 1.0, 2.0, 4.0][x as usize];
+            Rgba([value, value * 0.8, value * 0.5, 1.0])
+        }));
+        let plan = SdrRenditionPlanV1::compile(SdrRenditionSettingsV1::default(), 0x5412)
+            .expect("SDR rendition compiles");
+        let cpu_linear = plan.apply_image(&source);
+        let cpu_linear_rgba = cpu_linear.to_rgba32f();
+        let cpu = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(4, 1, |x, y| {
+            let pixel = cpu_linear_rgba.get_pixel(x, y).0;
+            let encode = |value: f32| {
+                let magnitude = value.abs();
+                let encoded = if magnitude <= 0.003_130_8 {
+                    magnitude * 12.92
+                } else {
+                    1.055 * magnitude.powf(1.0 / 2.4) - 0.055
+                };
+                value.signum() * encoded
+            };
+            Rgba([
+                encode(pixel[0]),
+                encode(pixel[1]),
+                encode(pixel[2]),
+                pixel[3],
+            ])
+        }))
+        .to_rgba32f();
+        let parameters = plan.view.gpu_parameters();
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.is_raw_image = 1;
+        adjustments.global.tonemapper_mode = 2;
+        adjustments.global.rapid_view_parameters0 = parameters[0];
+        adjustments.global.rapid_view_parameters1 = parameters[1];
+        adjustments.global.rapid_view_parameters2 = parameters[2];
+
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let wgpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_test_source(&source, "hdr_sdr_rendition"),
+            RenderRequest {
+                adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+            },
+            "hdr_sdr_rendition",
+        )
+        .expect("SDR rendition WGPU render succeeds")
+        .to_rgba32f();
+        let max_delta = cpu
+            .pixels()
+            .zip(wgpu.pixels())
+            .flat_map(|(cpu, wgpu)| (0..3).map(move |channel| (cpu[channel] - wgpu[channel]).abs()))
+            .fold(0.0_f32, f32::max);
+        assert!(max_delta <= 0.008, "CPU/WGPU delta {max_delta}");
+
+        let encoded = encode_image_with_working_color_state(
+            &cpu_linear,
+            WorkingColorState::AcesCgLinearV1,
+            "tiff",
+            100,
+            &ExportColorProfile::Srgb,
+            &ExportRenderingIntent::RelativeColorimetric,
+            false,
+            None,
+        )
+        .expect("SDR companion encodes through production TIFF path");
+        let decoded = image::load_from_memory_with_format(&encoded.bytes, ImageFormat::Tiff)
+            .expect("production TIFF reads back")
+            .to_rgb16();
+        assert_eq!(decoded.dimensions(), (4, 1));
+        assert!(
+            decoded
+                .pixels()
+                .all(|pixel| pixel.0.iter().any(|value| *value > 0))
+        );
     }
 }

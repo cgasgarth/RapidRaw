@@ -22,6 +22,10 @@ use tauri::Emitter;
 use tauri::Manager;
 use tokio::sync::Notify;
 
+use crate::color::hdr_editing::{
+    HdrExportCapabilityCatalogV1, HdrExportReceiptV1, HdrExportWorkflowSettingsV1,
+    SdrRenditionPlanV1, hdr_export_capabilities,
+};
 use crate::color::working_to_output_transform::WorkingColorState;
 use crate::exif_processing;
 use crate::export::batch_export_pipeline::{
@@ -104,6 +108,7 @@ struct ExportReceiptOutput {
     color_profile: Option<String>,
     effective_color_profile: Option<String>,
     format: String,
+    hdr_output: Option<HdrExportReceiptV1>,
     icc_embedded: Option<bool>,
     output_path: String,
     output_digest: Option<ProvenanceDigest>,
@@ -488,6 +493,7 @@ struct EncodedExportItem {
     color_policy: Option<ExportReceiptMetadata>,
     source_digest: Option<VerifiedSourceDigestReceipt>,
     export_elapsed_ms: u128,
+    hdr_receipt: Option<HdrExportReceiptV1>,
 }
 
 fn estimate_export_work(
@@ -910,11 +916,18 @@ pub struct ExportSettings {
     pub output_sharpening: Option<OutputSharpeningSettings>,
     #[serde(default)]
     pub preserve_folders: bool,
+    #[serde(default)]
+    pub hdr_workflow: Option<HdrExportWorkflowSettingsV1>,
 }
 
 #[tauri::command]
 pub fn get_export_color_capabilities() -> ExportColorCapabilityCatalog {
     resolve_export_color_capabilities()
+}
+
+#[tauri::command]
+pub fn get_hdr_export_capabilities() -> HdrExportCapabilityCatalogV1 {
+    hdr_export_capabilities()
 }
 
 fn apply_export_resize_and_watermark(
@@ -1747,6 +1760,34 @@ async fn run_batch_export_pipeline(
             );
         }
         let extension = output_format.to_ascii_lowercase();
+        let is_raw = is_raw_file(&target.source_path_str);
+        if let Some(workflow) = export_settings.hdr_workflow {
+            let rendition = match SdrRenditionPlanV1::compile(workflow.sdr_rendition, 0) {
+                Ok(rendition) => rendition,
+                Err(error) => {
+                    return (
+                        vec![ExportItemResult::Failed(error)],
+                        diagnostics.snapshot(),
+                    );
+                }
+            };
+            let preflight = rendition.preflight(
+                workflow.target,
+                &extension,
+                &export_settings.color_profile,
+                is_raw,
+            );
+            if !preflight.supported {
+                return (
+                    vec![ExportItemResult::Failed(
+                        preflight
+                            .block_code
+                            .unwrap_or_else(|| "hdr_export_preflight_failed".to_string()),
+                    )],
+                    diagnostics.snapshot(),
+                );
+            }
+        }
         let source_revision = match SourceRevision::from_path(Path::new(&target.source_path_str)) {
             Ok(revision) => revision,
             Err(error) => {
@@ -1779,7 +1820,7 @@ async fn run_batch_export_pipeline(
             output_path: target.output_path,
             extension,
             is_current_edit: Some(&target.source_path_str) == current_edit_path.as_ref(),
-            is_raw: is_raw_file(&target.source_path_str),
+            is_raw,
             auxiliary_output_policy: if export_settings.export_masks {
                 AuxiliaryOutputPolicy::ReportPartialOnCancellation
             } else {
@@ -2067,19 +2108,49 @@ async fn run_batch_export_pipeline(
                     let started = Instant::now();
                     let state = app_handle.state::<AppState>();
                     let source_digest = verified_source_digest(&rendered.decoded, &state)?;
-                    let (encoded_bytes, color_policy) = match rendered.output {
-                        RenderedExportOutput::Image(image) => encode_image_with_metadata(
-                            &image,
-                            if rendered.decoded.plan.is_raw {
-                                WorkingColorState::AcesCgLinearV1
-                            } else {
-                                WorkingColorState::EncodedSrgbV1
-                            },
-                            &rendered.decoded.plan.output_path,
-                            &rendered.decoded.plan.source_path,
-                            &export_settings,
-                        )?,
-                        RenderedExportOutput::Lut(bytes) => (bytes, None),
+                    let (encoded_bytes, color_policy, hdr_receipt) = match rendered.output {
+                        RenderedExportOutput::Image(image) => {
+                            let hdr_plan = export_settings
+                                .hdr_workflow
+                                .map(|workflow| {
+                                    SdrRenditionPlanV1::compile(
+                                        workflow.sdr_rendition,
+                                        export_execution_fingerprint(
+                                            &rendered.decoded.plan.source_path,
+                                            &rendered.decoded.adjustments,
+                                        ),
+                                    )
+                                    .map(|plan| (plan, workflow.target))
+                                })
+                                .transpose()?;
+                            let rendition = match &hdr_plan {
+                                Some((plan, _)) => plan.apply_image(&image),
+                                None => image,
+                            };
+                            let (bytes, policy) = encode_image_with_metadata(
+                                &rendition,
+                                if rendered.decoded.plan.is_raw {
+                                    WorkingColorState::AcesCgLinearV1
+                                } else {
+                                    WorkingColorState::EncodedSrgbV1
+                                },
+                                &rendered.decoded.plan.output_path,
+                                &rendered.decoded.plan.source_path,
+                                &export_settings,
+                            )?;
+                            let receipt = hdr_plan.map(|(plan, target)| {
+                                plan.receipt(
+                                    target,
+                                    bytes.len(),
+                                    policy.as_ref().map_or_else(
+                                        || "unavailable".to_string(),
+                                        |policy| policy.transform_policy_fingerprint.clone(),
+                                    ),
+                                )
+                            });
+                            (bytes, policy, receipt)
+                        }
+                        RenderedExportOutput::Lut(bytes) => (bytes, None, None),
                     };
                     Ok::<_, String>(EncodedExportItem {
                         decoded: rendered.decoded,
@@ -2087,6 +2158,7 @@ async fn run_batch_export_pipeline(
                         color_policy,
                         source_digest,
                         export_elapsed_ms: started.elapsed().as_millis(),
+                        hdr_receipt,
                     })
                 })
                 .await;
@@ -2206,6 +2278,7 @@ async fn run_batch_export_pipeline(
                                 )
                             )),
                             export_elapsed_ms: Some(item.export_elapsed_ms),
+                            hdr_receipt: item.hdr_receipt.clone(),
                         },
                     )?;
                     if matches!(
@@ -2859,6 +2932,7 @@ async fn export_images_legacy(
                                 raw_development_report: None,
                                 edit_graph_revision: None,
                                 export_elapsed_ms: None,
+                                hdr_receipt: None,
                             },
                         )?));
                     }
@@ -3018,6 +3092,7 @@ async fn export_images_legacy(
                                 export_execution_fingerprint(&source_path_str, &js_adjustments)
                             )),
                             export_elapsed_ms: Some(export_started.elapsed().as_millis()),
+                            hdr_receipt: None,
                         },
                     )?;
                     committed_primary_output = Some(primary_output.clone());
@@ -3160,6 +3235,7 @@ struct ExportReceiptContext<'a> {
     raw_development_report: Option<RawDevelopmentReport>,
     edit_graph_revision: Option<String>,
     export_elapsed_ms: Option<u128>,
+    hdr_receipt: Option<HdrExportReceiptV1>,
 }
 
 fn export_receipt_output(
@@ -3175,6 +3251,7 @@ fn export_receipt_output(
         mut raw_development_report,
         edit_graph_revision,
         export_elapsed_ms,
+        hdr_receipt,
     } = context;
     let byte_size = match output_commit {
         Some(receipt) => receipt.digest.byte_len,
@@ -3225,6 +3302,7 @@ fn export_receipt_output(
             .as_ref()
             .map(|metadata| metadata.effective_color_profile.clone()),
         format: format.to_string(),
+        hdr_output: hdr_receipt,
         icc_embedded: metadata.as_ref().map(|metadata| metadata.icc_embedded),
         output_path: output_path.to_string_lossy().to_string(),
         output_digest: output_commit.map(|receipt| ProvenanceDigest {
@@ -4240,6 +4318,7 @@ mod tests {
             export_masks: false,
             output_sharpening,
             preserve_folders: false,
+            hdr_workflow: None,
         }
     }
 
@@ -4493,6 +4572,53 @@ mod tests {
     }
 
     #[test]
+    fn terminal_export_receipt_carries_authoritative_sdr_rendition_identity() {
+        let directory = tempfile::tempdir().unwrap();
+        let output_path = directory.path().join("hdr-sdr-companion.tiff");
+        fs::write(&output_path, [1_u8, 2, 3, 4]).unwrap();
+        let plan = crate::color::hdr_editing::SdrRenditionPlanV1::compile(
+            crate::color::hdr_editing::SdrRenditionSettingsV1::default(),
+            0x5412,
+        )
+        .unwrap();
+        let hdr_receipt = plan.receipt(
+            crate::color::hdr_editing::HdrExportTargetV1::SdrCompanionTiff16,
+            4,
+            "sha256:color-policy".to_string(),
+        );
+        let output = export_receipt_output(
+            &output_path,
+            "/fixtures/source.ARW",
+            "tiff",
+            ExportReceiptContext {
+                metadata: None,
+                output_commit: None,
+                source_digest: None,
+                raw_development_report: None,
+                edit_graph_revision: Some("scene-edit:5412".to_string()),
+                export_elapsed_ms: Some(7),
+                hdr_receipt: Some(hdr_receipt.clone()),
+            },
+        )
+        .unwrap();
+        assert_eq!(output.hdr_output, Some(hdr_receipt));
+        let terminal = serde_json::to_value(export_terminal_receipt(
+            ExportTerminalStatus::Completed,
+            vec![output],
+            1,
+        ))
+        .unwrap();
+        assert_eq!(
+            terminal["outputs"][0]["hdrOutput"]["sceneEditFingerprint"],
+            "0000000000005412"
+        );
+        assert_eq!(
+            terminal["outputs"][0]["hdrOutput"]["target"],
+            "sdr_companion_tiff16"
+        );
+    }
+
+    #[test]
     fn export_receipt_reports_semantic_applied_policy() {
         let settings = base_export_settings(None);
         let metadata = export_receipt_metadata(
@@ -4612,6 +4738,7 @@ mod tests {
                 raw_development_report: Some(raw_development_report),
                 edit_graph_revision: Some("export_job:test".to_string()),
                 export_elapsed_ms: Some(123),
+                hdr_receipt: None,
             },
         )
         .expect("receipt output should serialize RAW development report");
@@ -4659,6 +4786,7 @@ mod tests {
                 raw_development_report: Some(report_for_failure),
                 edit_graph_revision: Some("export_job:test-sidecar-failure".to_string()),
                 export_elapsed_ms: None,
+                hdr_receipt: None,
             },
         )
         .unwrap();
@@ -4678,6 +4806,7 @@ mod tests {
                 raw_development_report: receipt.raw_development_report.clone(),
                 edit_graph_revision: Some("export_job:test-source-changed".to_string()),
                 export_elapsed_ms: None,
+                hdr_receipt: None,
             },
         )
         .unwrap();
@@ -5571,6 +5700,7 @@ mod tests {
                 raw_development_report: None,
                 edit_graph_revision: Some("fixture-edit-v1".to_string()),
                 export_elapsed_ms: Some(1),
+                hdr_receipt: None,
             },
         )
         .expect("terminal receipt should bind the committed artifact");
@@ -6067,6 +6197,7 @@ mod tests {
                 raw_development_report: None,
                 edit_graph_revision: None,
                 export_elapsed_ms: None,
+                hdr_receipt: None,
             },
         )
         .expect("build real output receipt");
