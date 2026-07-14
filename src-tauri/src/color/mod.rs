@@ -10,6 +10,8 @@ pub(crate) mod camera_profile;
 #[cfg(test)]
 pub(crate) mod controlled_profiles;
 pub(crate) mod dehaze;
+#[cfg_attr(not(any(test, feature = "validation-harness")), allow(dead_code))]
+pub(crate) mod density;
 #[cfg(test)]
 mod display_hdr_hardware_tests;
 pub(crate) mod display_profile;
@@ -25,6 +27,10 @@ pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
 pub(crate) mod perceptual_grading;
 pub(crate) mod point_color;
+#[cfg_attr(not(any(test, feature = "validation-harness")), allow(dead_code))]
+pub(crate) mod provenance;
+#[cfg_attr(not(any(test, feature = "validation-harness")), allow(dead_code))]
+pub(crate) mod transform_descriptor;
 pub(crate) mod view_transform;
 #[cfg(test)]
 mod visual_approval_artifacts;
