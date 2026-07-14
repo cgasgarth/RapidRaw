@@ -42,10 +42,14 @@ impl WgpuNodeRuntime {
             if descriptor.wgpu_implementation != Some(implementation) {
                 return Err("edit_graph.wgpu_runtime_ownership_mismatch");
             }
-            let halo_pixels = match node.spatial_support {
+            let halo_pixels = descriptor.wgpu_halo_pixels();
+            let declared_halo = match node.spatial_support {
                 SpatialSupport::Pointwise => 0,
                 SpatialSupport::BoundedHalo { pixels } => pixels,
             };
+            if declared_halo != halo_pixels {
+                return Err("edit_graph.wgpu_halo_ownership_mismatch");
+            }
             let module = WgpuNodeModule {
                 kind: node.kind,
                 implementation,
@@ -236,10 +240,48 @@ mod tests {
     }
 
     #[test]
+    fn rejects_graph_halo_drift_from_registered_wgpu_owner() {
+        let mut graph = graph_with_curves_and_local_resources();
+        let mut nodes = graph.nodes.to_vec();
+        let curve = nodes
+            .iter_mut()
+            .find(|node| node.kind == EditNodeKind::SceneCurve)
+            .expect("scene curve node is present");
+        curve.spatial_support = SpatialSupport::BoundedHalo { pixels: 64 };
+        graph.nodes = nodes.into();
+        assert_eq!(
+            WgpuNodeRuntime::from_graph(&graph),
+            Err("edit_graph.wgpu_halo_ownership_mismatch")
+        );
+    }
+
+    #[test]
+    fn registered_halo_sizes_match_compiled_graph_spatial_support() {
+        let graph = graph_with_curves_and_local_resources();
+        let runtime = WgpuNodeRuntime::from_graph(&graph).unwrap();
+        for module in runtime.modules() {
+            let node = graph
+                .nodes
+                .iter()
+                .find(|node| node.kind == module.kind)
+                .expect("every WGPU module must have a graph owner");
+            let declared_halo = match node.spatial_support {
+                SpatialSupport::Pointwise => 0,
+                SpatialSupport::BoundedHalo { pixels } => pixels,
+            };
+            assert_eq!(module.halo_pixels, declared_halo);
+        }
+    }
+
+    #[test]
     fn curve_modules_expose_real_wgsl_entry_points_for_parity_vectors() {
         let graph = graph_with_curves_and_local_resources();
         let runtime = WgpuNodeRuntime::from_graph(&graph).unwrap();
         for module in runtime.modules() {
+            assert_eq!(
+                module.halo_pixels,
+                runtime_descriptor(module.kind).wgpu_halo_pixels()
+            );
             assert_eq!(
                 runtime_descriptor(module.kind).wgpu_entry_point(),
                 Some(module.entry_point)
