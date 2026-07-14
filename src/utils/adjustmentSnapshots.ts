@@ -1,7 +1,10 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 
 export interface AdjustmentSnapshot {
   readonly value: Readonly<Adjustments>;
+  readonly editDocumentV2: Readonly<EditDocumentV2>;
   readonly adjustmentRevision: number;
   readonly geometryRevision: number;
   readonly maskRevision: number;
@@ -24,14 +27,17 @@ export const deepFreezeAdjustmentSnapshot = <T>(value: T, seen = new WeakSet<obj
 export const publishAdjustmentSnapshot = (
   previous: AdjustmentSnapshot | null,
   value: Adjustments,
+  editDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(value),
 ): AdjustmentSnapshot => {
-  if (previous?.value === value) return previous;
+  if (previous?.value === value && previous.editDocumentV2 === editDocumentV2) return previous;
   const geometryChanged = previous === null || geometryKeys.some((key) => previous.value[key] !== value[key]);
   const maskChanged = previous === null || previous.value.masks !== value.masks;
   const patchChanged = previous === null || previous.value.aiPatches !== value.aiPatches;
   deepFreezeAdjustmentSnapshot(value);
+  deepFreezeAdjustmentSnapshot(editDocumentV2);
   return Object.freeze({
     value,
+    editDocumentV2,
     adjustmentRevision: (previous?.adjustmentRevision ?? 0) + 1,
     geometryRevision: (previous?.geometryRevision ?? 0) + Number(geometryChanged),
     maskRevision: (previous?.maskRevision ?? 0) + Number(maskChanged),

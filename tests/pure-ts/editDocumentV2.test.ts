@@ -9,13 +9,14 @@ import {
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   batchUpdateEditDocumentV2Nodes,
-  copyEditDocumentV2Node,
   buildEditDocumentV2Diagnostics,
+  copyEditDocumentV2Node,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
   pasteEditDocumentV2Node,
+  prepareEditDocumentV2ForRender,
   resetEditDocumentV2Node,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
@@ -63,6 +64,29 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(() => editDocumentV2Schema.parse({ ...document, unsupported: true })).toThrow();
   });
 
+  test('scene global tone params are strict, finite, and bounded', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const node = document.nodes.scene_global_color_tone;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_global_color_tone: { ...node, params: { ...node?.params, exposure: 6 } },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_global_color_tone: { ...node, params: { ...node?.params, futureTone: 1 } },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('node updates retain unrelated nodes and provenance domains', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     const next = editDocumentV2Schema.parse({
@@ -99,6 +123,23 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(next.nodes.geometry).toBe(document.nodes.geometry);
     expect(next.nodes.scene_global_color_tone?.params.exposure).toBe(0.25);
+  });
+
+  test('render preparation keeps payload residency while overlaying authoritative migrated nodes', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      exposure: 1.25,
+    });
+    const prepared = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aiPatches: [],
+      exposure: -2,
+    };
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['scene_global_color_tone']);
+
+    expect(renderDocument.nodes.scene_global_color_tone).toBe(authoritative.nodes.scene_global_color_tone);
+    expect(renderDocument.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
+    expect(renderDocument.nodes.source_artifacts?.params.aiPatches).toEqual([]);
   });
 
   test('future node types are quarantined and non-finite node values are rejected', () => {
@@ -244,5 +285,11 @@ describe('EditDocumentV2 legacy adapter', () => {
         implementationVersion: 2,
       }),
     ).toThrow('unsupported version');
+    expect(() =>
+      compileEditDocumentNodeV2({
+        ...document.nodes.scene_global_color_tone,
+        params: { ...document.nodes.scene_global_color_tone?.params, exposure: 6 },
+      }),
+    ).toThrow();
   });
 });

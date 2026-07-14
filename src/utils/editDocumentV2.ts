@@ -86,7 +86,29 @@ export const updateEditDocumentV2Node = (
   const node = document.nodes[nodeType];
   if (node === undefined) return document;
   const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: update(node.params) });
-  return { ...document, nodes: { ...document.nodes, [nodeType]: nextNode } };
+  const next = { ...document, nodes: { ...document.nodes, [nodeType]: nextNode } };
+  editDocumentV2Schema.parse(next);
+  return next;
+};
+
+/**
+ * Preserve prepared legacy payload behavior (including patch residency) while
+ * taking migrated node families from the authoritative editor document.
+ */
+export const prepareEditDocumentV2ForRender = (
+  preparedAdjustments: Readonly<Record<string, unknown>>,
+  authoritativeDocument: EditDocumentV2,
+  authoritativeNodeTypes: readonly EditDocumentNodeTypeV2[],
+): EditDocumentV2 => {
+  const prepared = legacyAdjustmentsToEditDocumentV2(preparedAdjustments);
+  const nodes = { ...prepared.nodes };
+  for (const nodeType of authoritativeNodeTypes) {
+    const authoritativeNode = authoritativeDocument.nodes[nodeType];
+    if (authoritativeNode !== undefined) nodes[nodeType] = authoritativeNode;
+  }
+  const next = { ...prepared, nodes };
+  editDocumentV2Schema.parse(next);
+  return next;
 };
 
 export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>

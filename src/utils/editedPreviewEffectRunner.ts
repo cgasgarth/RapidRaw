@@ -7,7 +7,7 @@ import { Invokes } from '../tauri/commands';
 import type { PreviewQualityDecision } from './adaptivePreviewQuality';
 import type { AdjustmentSnapshot, PatchResidencySnapshot } from './adjustmentSnapshots';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from './appEventLogger';
-import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
+import { prepareEditDocumentV2ForRender } from './editDocumentV2';
 import {
   buildFilmPreviewRenderIdentity,
   type FilmRenderLease,
@@ -211,7 +211,9 @@ const executeNativeEditedPreview = async (
       request: applyAdjustmentsInvokeSchema.parse({
         activeWaveformChannel: request.activeWaveformChannel,
         computeWaveform: request.computeWaveform,
-        editDocumentV2: legacyAdjustmentsToEditDocumentV2(payload),
+        editDocumentV2: prepareEditDocumentV2ForRender(payload, request.snapshot.editDocumentV2, [
+          'scene_global_color_tone',
+        ]),
         expectedImagePath: request.session.sourceImagePath,
         isInteractive: request.kind === 'interactive',
         roi: request.roi,

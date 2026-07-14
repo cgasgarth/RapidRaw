@@ -2,6 +2,19 @@ import { z } from 'zod';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 
+export const sceneGlobalColorToneParamsV2Schema = z
+  .object({
+    blacks: z.number().finite().min(-100).max(100),
+    brightness: z.number().finite().min(-5).max(5),
+    contrast: z.number().finite().min(-100).max(100),
+    exposure: z.number().finite().min(-5).max(5),
+    highlights: z.number().finite().min(-100).max(100),
+    saturation: z.number().finite().min(-100).max(100),
+    shadows: z.number().finite().min(-100).max(100),
+    whites: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
@@ -153,6 +166,14 @@ const editDocumentNodesV2Schema = z
       if (!hasFiniteJsonValues(node.params)) {
         context.addIssue({ code: z.ZodIssueCode.custom, message: `Node '${nodeType}' contains a non-finite value.` });
       }
+      if (nodeType === 'scene_global_color_tone') {
+        const parsed = sceneGlobalColorToneParamsV2Schema.safeParse(node.params);
+        if (!parsed.success) {
+          for (const issue of parsed.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
     }
   });
 
@@ -184,6 +205,7 @@ export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
+export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 
 export interface CompiledEditDocumentNodeV2 {
   readonly enabled: boolean;
@@ -203,6 +225,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.implementationVersion !== descriptor.implementationVersion) {
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
+  if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   return {
     enabled: envelope.enabled,
     implementationVersion: envelope.implementationVersion,

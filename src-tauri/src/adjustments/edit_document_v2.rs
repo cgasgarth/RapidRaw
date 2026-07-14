@@ -47,6 +47,47 @@ struct EditNodeEnvelopeV2 {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneGlobalColorToneParamsV2 {
+    blacks: f64,
+    brightness: f64,
+    contrast: f64,
+    exposure: f64,
+    highlights: f64,
+    saturation: f64,
+    shadows: f64,
+    whites: f64,
+}
+
+impl SceneGlobalColorToneParamsV2 {
+    fn compile(&self) -> Result<(), String> {
+        validate_scene_tone_parameter("blacks", self.blacks, -100.0, 100.0)?;
+        validate_scene_tone_parameter("brightness", self.brightness, -5.0, 5.0)?;
+        validate_scene_tone_parameter("contrast", self.contrast, -100.0, 100.0)?;
+        validate_scene_tone_parameter("exposure", self.exposure, -5.0, 5.0)?;
+        validate_scene_tone_parameter("highlights", self.highlights, -100.0, 100.0)?;
+        validate_scene_tone_parameter("saturation", self.saturation, -100.0, 100.0)?;
+        validate_scene_tone_parameter("shadows", self.shadows, -100.0, 100.0)?;
+        validate_scene_tone_parameter("whites", self.whites, -100.0, 100.0)?;
+        Ok(())
+    }
+}
+
+fn validate_scene_tone_parameter(
+    field: &str,
+    value: f64,
+    minimum: f64,
+    maximum: f64,
+) -> Result<(), String> {
+    if value.is_finite() && value >= minimum && value <= maximum {
+        return Ok(());
+    }
+    Err(format!(
+        "EditDocumentV2 node 'scene_global_color_tone' field '{field}' must be finite and within [{minimum}, {maximum}]"
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentMigrationReceiptV2 {
     defaulted: Vec<String>,
     disabled: Vec<String>,
@@ -97,8 +138,9 @@ impl EditDocumentV2 {
 
         for (node_key, node) in self.nodes {
             validate_node_contract(node_key, &node)?;
+            let compiled_params = compile_node_params(node_key, &node)?;
             if node.enabled {
-                adjustments.extend(node.params);
+                adjustments.extend(compiled_params);
             }
         }
         Ok(Value::Object(adjustments))
@@ -140,6 +182,25 @@ impl EditDocumentV2 {
         )?;
         let _ = &self.provenance;
         Ok(())
+    }
+}
+
+fn compile_node_params(
+    node_key: EditNodeTypeV2,
+    node: &EditNodeEnvelopeV2,
+) -> Result<Map<String, Value>, String> {
+    match node_key {
+        EditNodeTypeV2::SceneGlobalColorTone => {
+            let params = serde_json::from_value::<SceneGlobalColorToneParamsV2>(Value::Object(
+                node.params.clone(),
+            ))
+            .map_err(|error| {
+                format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
+            })?;
+            params.compile()?;
+            Ok(node.params.clone())
+        }
+        _ => Ok(node.params.clone()),
     }
 }
 
@@ -438,5 +499,25 @@ mod tests {
             .expect("compiled document");
         assert!(compiled.get("exposure").is_none());
         assert_eq!(compiled["vibrance"], json!(12));
+    }
+
+    #[test]
+    fn scene_global_color_tone_compiler_rejects_unowned_and_out_of_range_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["scene_global_color_tone"]["params"]["futureTone"] = json!(1);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned scene-tone field must fail");
+        assert!(error.contains("unknown field `futureTone`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["scene_global_color_tone"]["params"]["exposure"] = json!(6);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range exposure must fail");
+        assert!(error.contains("field 'exposure'"));
+        assert!(error.contains("[-5, 5]"));
     }
 }
