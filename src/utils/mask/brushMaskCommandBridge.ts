@@ -47,6 +47,7 @@ const capturedBrushParametersSchema = z
   .object({
     flow: z.number().min(0).max(100).optional(),
     lines: z.array(capturedBrushLineSchema).min(1).max(1024),
+    rawEngine: z.unknown().optional(),
   })
   .strict();
 
