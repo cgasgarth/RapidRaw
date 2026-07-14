@@ -963,6 +963,69 @@ async function assertEditorParityContractFixture(page) {
 }
 
 export async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays) {
+    const section = page.locator('[data-visual-smoke-section="professional-canvas-retouch-remove"]');
+    let handles = section.getByTestId('image-canvas-retouch-handles');
+    await handles.waitFor({ state: 'visible', timeout: 10_000 });
+    if ((page.viewportSize()?.width ?? 0) <= 700) return;
+    const image = await section.locator('[data-editor-image-frame="edited"]').first().boundingBox();
+    if (image === null) throw new Error('Professional retouch proof could not resolve the edited image frame.');
+    const waitForAttribute = async (testId, attribute, expected, tolerance = 0.000_001) => {
+      try {
+        await page.waitForFunction(
+          ({ attribute, expected, testId, tolerance }) => {
+            const value = Number(document.querySelector(`[data-testid="${testId}"]`)?.getAttribute(attribute));
+            return Number.isFinite(value) && Math.abs(value - expected) <= tolerance;
+          },
+          { attribute, expected, testId, tolerance },
+          { timeout: 10_000 },
+        );
+      } catch (error) {
+        const actual = await page.getByTestId(testId).getAttribute(attribute);
+        throw new Error(`${testId} ${attribute}: expected ${expected} +/- ${tolerance}, received ${actual}`, {
+          cause: error,
+        });
+      }
+    };
+    const drag = async (start, end) => {
+      await page.mouse.move(image.x + image.width * start.x, image.y + image.height * start.y);
+      await page.mouse.down();
+      await page.mouse.move(image.x + image.width * end.x, image.y + image.height * end.y, { steps: 8 });
+      await page.mouse.up();
+    };
+
+    await page.keyboard.down('Alt');
+    try {
+      await page.mouse.click(image.x + image.width * 0.2, image.y + image.height * 0.7);
+    } finally {
+      await page.keyboard.up('Alt');
+    }
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-source-x', 0.2);
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-source-y', 0.7);
+
+    await page.mouse.click(image.x + image.width * 0.75, image.y + image.height * 0.25);
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-target-x', 0.75);
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-target-y', 0.25);
+
+    await drag({ x: 0.2, y: 0.7 }, { x: 0.28, y: 0.62 });
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-source-x', 0.28, 0.01);
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-source-y', 0.62, 0.01);
+    await drag({ x: 0.75, y: 0.25 }, { x: 0.68, y: 0.36 });
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-target-x', 0.68, 0.01);
+    await waitForAttribute('image-canvas-retouch-handles', 'data-retouch-handle-target-y', 0.36, 0.01);
+
+    await page.getByTestId('professional-canvas-show-remove').dispatchEvent('click');
+    handles = section.getByTestId('image-canvas-remove-handles');
+    await handles.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.mouse.click(image.x + image.width * 0.42, image.y + image.height * 0.58);
+    await waitForAttribute('image-canvas-remove-handles', 'data-remove-handle-target-x', 0.42 * 640, 0.01);
+    await waitForAttribute('image-canvas-remove-handles', 'data-remove-handle-target-y', 0.58 * 360, 0.01);
+    await drag({ x: 0.42, y: 0.58 }, { x: 0.52, y: 0.44 });
+    await waitForAttribute('image-canvas-remove-handles', 'data-remove-handle-target-x', 0.52 * 640, 1);
+    await waitForAttribute('image-canvas-remove-handles', 'data-remove-handle-target-y', 0.44 * 360, 1);
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact) {
     let navigator = page.getByTestId('editor-navigator');
     await navigator.waitFor({ timeout: 10_000 });

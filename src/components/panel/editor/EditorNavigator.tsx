@@ -50,6 +50,27 @@ export function navigatorPreviewReducer(
 const sameTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
   left.scale === right.scale && left.positionX === right.positionX && left.positionY === right.positionY;
 
+const isSettledTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
+  Math.abs(left.scale - right.scale) <= 0.001 &&
+  Math.abs(left.positionX - right.positionX) <= 0.5 &&
+  Math.abs(left.positionY - right.positionY) <= 0.5;
+
+const isValidTransform = (transform: ViewportTransform): boolean =>
+  Number.isFinite(transform.scale) &&
+  transform.scale > 0 &&
+  Number.isFinite(transform.positionX) &&
+  Number.isFinite(transform.positionY);
+
+export function resolveNavigatorTransformUpdate(
+  current: ViewportTransform,
+  candidate: ViewportTransform,
+): ViewportTransform {
+  if (!isValidTransform(candidate) || sameTransform(current, candidate)) {
+    return current;
+  }
+  return { ...candidate };
+}
+
 export default function EditorNavigator(props: EditorNavigatorProps) {
   const identity = useEditorStore(
     useShallow((state) => ({ artifact: state.navigatorPreviewArtifact, imageSessionId: state.imageSessionId })),
@@ -77,6 +98,9 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   const [transform, setTransform] = useState<ViewportTransform>(
     () => transformControllerRef.current?.instance?.transformState ?? { positionX: 0, positionY: 0, scale: 1 },
   );
+  const publishedTransformRef = useRef(transform);
+  const observedTransformRef = useRef(transform);
+  const stableObservationCountRef = useRef(0);
   const [preview, dispatchPreview] = useReducer(navigatorPreviewReducer, artifact, createNavigatorPreviewState);
   const [imageBox, setImageBox] = useState({ height: 0, left: 0, top: 0, width: 0 });
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -96,14 +120,27 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   }, []);
 
   useEffect(() => {
-    let frame = 0;
     const synchronize = () => {
       const next = transformControllerRef.current?.instance?.transformState;
-      if (next) setTransform((current) => (sameTransform(current, next) ? current : { ...next }));
-      frame = requestAnimationFrame(synchronize);
+      if (next && isValidTransform(next)) {
+        if (isSettledTransform(observedTransformRef.current, next)) {
+          stableObservationCountRef.current += 1;
+        } else {
+          observedTransformRef.current = { ...next };
+          stableObservationCountRef.current = 1;
+        }
+        if (stableObservationCountRef.current >= 2) {
+          const resolved = resolveNavigatorTransformUpdate(publishedTransformRef.current, observedTransformRef.current);
+          if (resolved !== publishedTransformRef.current) {
+            publishedTransformRef.current = resolved;
+            setTransform(resolved);
+          }
+        }
+      }
     };
-    frame = requestAnimationFrame(synchronize);
-    return () => cancelAnimationFrame(frame);
+    synchronize();
+    const interval = window.setInterval(synchronize, 32);
+    return () => window.clearInterval(interval);
   }, [transformControllerRef]);
 
   const sourceSize = useMemo(
@@ -256,6 +293,9 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
       data-preview-graph={artifact?.graphIdentity ?? ''}
       data-preview-identity={identity}
       data-preview-session={artifact?.imageSessionId ?? ''}
+      data-transform-position-x={String(transform.positionX)}
+      data-transform-position-y={String(transform.positionY)}
+      data-transform-scale={String(transform.scale)}
       data-testid="editor-navigator"
     >
       {/* i18next-instrument-ignore */}

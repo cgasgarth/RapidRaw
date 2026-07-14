@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
+import { act, createElement, Profiler } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import EditorNavigator, {
   createNavigatorPreviewState,
   type EditorTransformController,
   navigatorPreviewReducer,
+  resolveNavigatorTransformUpdate,
 } from '../../../src/components/panel/editor/EditorNavigator';
 import { type NavigatorPreviewArtifact, useEditorStore } from '../../../src/store/useEditorStore';
 import type { EditorZoomCommand } from '../../../src/utils/editorZoom';
@@ -120,6 +121,83 @@ test('keys interaction ownership by rapid A → B → A artifacts but not transf
   expect(required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]')).toBe(thirdOverview);
 });
 
+test('converges repeated pan, zoom, resize, and image snapshots without duplicate transform publication', () => {
+  let current = { positionX: 0, positionY: 0, scale: 1 };
+  let publications = 0;
+  const synchronize = (candidate: typeof current) => {
+    const next = resolveNavigatorTransformUpdate(current, candidate);
+    if (next !== current) publications += 1;
+    current = next;
+  };
+
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+  synchronize({ positionX: -400, positionY: -300, scale: 2 });
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+  synchronize({ positionX: -440, positionY: -300, scale: 2 });
+  synchronize({ positionX: -220, positionY: -150, scale: 1.5 });
+  synchronize({ positionX: 0, positionY: 0, scale: 1 });
+  for (let iteration = 0; iteration < 100; iteration += 1) synchronize({ ...current });
+
+  const converged = current;
+  synchronize({ positionX: Number.NaN, positionY: 0, scale: 1 });
+  synchronize({ positionX: 0, positionY: Number.POSITIVE_INFINITY, scale: 1 });
+  synchronize({ positionX: 0, positionY: 0, scale: 0 });
+
+  expect(publications).toBe(4);
+  expect(current).toBe(converged);
+  expect(current).toEqual({ positionX: 0, positionY: 0, scale: 1 });
+});
+
+test('publishes one settled controller transform after continuous motion and cleans up its sampler', async () => {
+  const intervalDriver = new ControlledIntervalDriver();
+  let candidate = { positionX: 0, positionY: 0, scale: 1 };
+  let renderCount = 0;
+  const controller: EditorTransformController = {
+    instance: {
+      get transformState() {
+        return { ...candidate };
+      },
+    },
+    setTransform: () => undefined,
+  };
+  const rendered = await renderNavigator({
+    controller,
+    intervalDriver,
+    onRender: () => renderCount++,
+  });
+  const navigator = required<HTMLElement>(rendered.container, '[data-testid="editor-navigator"]');
+  const initialRenderCount = renderCount;
+
+  await act(async () => {
+    for (let step = 1; step <= 100; step += 1) {
+      candidate = { positionX: -step * 2, positionY: -step, scale: 1 + step / 100 };
+      intervalDriver.tick();
+    }
+    await flushPromises();
+  });
+  expect(renderCount).toBe(initialRenderCount);
+  expect(readNavigatorTransform(navigator)).toEqual({ positionX: 0, positionY: 0, scale: 1 });
+
+  candidate = { positionX: -240, positionY: -120, scale: 2.5 };
+  await act(async () => {
+    intervalDriver.tick();
+    await flushPromises();
+  });
+  expect(renderCount).toBe(initialRenderCount);
+  await act(async () => {
+    intervalDriver.tick();
+    await flushPromises();
+  });
+  expect(renderCount).toBe(initialRenderCount + 1);
+  expect(readNavigatorTransform(navigator)).toEqual(candidate);
+  expect(intervalDriver.activeCount).toBe(1);
+
+  act(() => rendered.root.unmount());
+  rendered.container.remove();
+  renderedRoot = null;
+  expect(intervalDriver.activeCount).toBe(0);
+});
+
 describe('Navigator preview artifact reducer', () => {
   test('owns empty, loading, ready, and error phases', () => {
     expect(createNavigatorPreviewState(null)).toEqual({ artifact: null, phase: 'empty' });
@@ -146,11 +224,15 @@ async function renderNavigator({
     setTransform: () => undefined,
   },
   onZoomChange = () => undefined,
+  intervalDriver,
+  onRender,
 }: {
   controller?: EditorTransformController;
+  intervalDriver?: ControlledIntervalDriver;
+  onRender?: () => void;
   onZoomChange?: (command: EditorZoomCommand) => void;
 } = {}) {
-  installDom();
+  installDom(intervalDriver);
   useEditorStore.setState({
     baseRenderSize: { containerHeight: 600, containerWidth: 800, height: 600, offsetX: 0, offsetY: 0, width: 800 },
     finalPreviewUrl: useEditorStore.getState().finalPreviewUrl,
@@ -164,11 +246,17 @@ async function renderNavigator({
   const root = createRoot(container);
 
   await act(async () => {
+    const navigator = createElement(EditorNavigator, {
+      onZoomChange,
+      transformControllerRef: { current: controller },
+    });
     root.render(
       createElement(
         I18nextProvider,
         { i18n },
-        createElement(EditorNavigator, { onZoomChange, transformControllerRef: { current: controller } }),
+        onRender
+          ? createElement(Profiler, { id: 'editor-navigator', onRender: () => onRender() }, navigator)
+          : navigator,
       ),
     );
     await flushPromises();
@@ -187,7 +275,7 @@ function required<T extends Element>(container: Element, selector: string): T {
   return element;
 }
 
-function installDom() {
+function installDom(intervalDriver?: ControlledIntervalDriver) {
   const window = new Window({ url: 'http://localhost/editor-navigator-test' });
   class TestResizeObserver {
     observe() {}
@@ -212,6 +300,50 @@ function installDom() {
     value: (handle: number) => window.clearTimeout(handle),
     writable: true,
   });
+  if (intervalDriver) {
+    Object.defineProperty(window, 'setInterval', {
+      configurable: true,
+      value: intervalDriver.setInterval,
+      writable: true,
+    });
+    Object.defineProperty(window, 'clearInterval', {
+      configurable: true,
+      value: intervalDriver.clearInterval,
+      writable: true,
+    });
+  }
+}
+
+class ControlledIntervalDriver {
+  private callbacks = new Map<number, () => void>();
+  private nextId = 1;
+
+  readonly setInterval = (callback: TimerHandler): number => {
+    if (typeof callback !== 'function') throw new Error('Controlled interval requires a callback.');
+    const id = this.nextId++;
+    this.callbacks.set(id, callback);
+    return id;
+  };
+
+  readonly clearInterval = (id: number): void => {
+    this.callbacks.delete(id);
+  };
+
+  get activeCount(): number {
+    return this.callbacks.size;
+  }
+
+  tick(): void {
+    for (const callback of [...this.callbacks.values()]) callback();
+  }
+}
+
+function readNavigatorTransform(element: HTMLElement): { positionX: number; positionY: number; scale: number } {
+  return {
+    positionX: Number(element.dataset.transformPositionX),
+    positionY: Number(element.dataset.transformPositionY),
+    scale: Number(element.dataset.transformScale),
+  };
 }
 
 async function flushPromises() {
