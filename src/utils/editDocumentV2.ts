@@ -1,5 +1,6 @@
 import {
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   editDocumentNodeEnvelopeV2Schema,
@@ -107,5 +108,44 @@ export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: Edit
   return editDocumentV2Schema.parse({
     ...parsed,
     nodes: { ...parsed.nodes, [nodeType]: nextNode },
+  });
+};
+
+/** Copy only descriptor-approved creative node state; provenance never travels in the payload. */
+export const copyEditDocumentV2Node = (
+  document: EditDocumentV2,
+  nodeType: EditDocumentNodeTypeV2,
+): EditDocumentNodeEnvelopeV2 | null => {
+  const parsed = editDocumentV2Schema.parse(document);
+  const descriptor = descriptorFor(nodeType);
+  const node = parsed.nodes[nodeType];
+  if (descriptor === undefined || node === undefined || !descriptor.capabilities.copy) return null;
+  return editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: structuredClone(node.params) });
+};
+
+/** Paste a validated node payload while keeping document provenance and unrelated nodes untouched. */
+export const pasteEditDocumentV2Node = (
+  document: EditDocumentV2,
+  nodeType: EditDocumentNodeTypeV2,
+  payload: unknown,
+): EditDocumentV2 => {
+  const parsed = editDocumentV2Schema.parse(document);
+  const descriptor = descriptorFor(nodeType);
+  const node = parsed.nodes[nodeType];
+  const candidate = editDocumentNodeEnvelopeV2Schema.safeParse(payload);
+  if (
+    descriptor === undefined ||
+    node === undefined ||
+    !descriptor.capabilities.paste ||
+    !candidate.success ||
+    candidate.data.type !== nodeType ||
+    candidate.data.process !== descriptor.process ||
+    candidate.data.implementationVersion !== descriptor.implementationVersion
+  ) {
+    return parsed;
+  }
+  return editDocumentV2Schema.parse({
+    ...parsed,
+    nodes: { ...parsed.nodes, [nodeType]: { ...candidate.data, params: structuredClone(candidate.data.params) } },
   });
 };

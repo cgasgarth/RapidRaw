@@ -6,11 +6,13 @@ import {
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
+  copyEditDocumentV2Node,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
   resetEditDocumentV2Node,
+  pasteEditDocumentV2Node,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
@@ -149,5 +151,33 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('non-resettable source artifacts remain unchanged', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     expect(resetEditDocumentV2Node(document, 'source_artifacts')).toEqual(document);
+  });
+
+  test('copy and paste derive eligibility from descriptors and isolate node state', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.5 });
+    const clipboard = copyEditDocumentV2Node(document, 'scene_global_color_tone');
+    expect(clipboard?.params.exposure).toBe(0.5);
+    if (clipboard) clipboard.params.exposure = 2;
+    expect(document.nodes.scene_global_color_tone?.params.exposure).toBe(0.5);
+
+    const pasted = pasteEditDocumentV2Node(document, 'scene_global_color_tone', clipboard);
+    expect(pasted.nodes.scene_global_color_tone?.params.exposure).toBe(2);
+    expect(pasted.nodes.geometry).toEqual(document.nodes.geometry);
+    expect(pasted.provenance).toEqual(document.provenance);
+    expect(copyEditDocumentV2Node(document, 'source_artifacts')).toBeNull();
+  });
+
+  test('rejects malformed or cross-node clipboard payloads without mutation', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    expect(
+      pasteEditDocumentV2Node(document, 'scene_global_color_tone', {
+        enabled: true,
+        implementationVersion: 1,
+        params: { exposure: 2 },
+        process: 'scene_referred_v2',
+        type: 'geometry',
+      }),
+    ).toEqual(document);
+    expect(pasteEditDocumentV2Node(document, 'scene_global_color_tone', { invalid: true })).toEqual(document);
   });
 });
