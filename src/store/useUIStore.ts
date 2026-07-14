@@ -90,6 +90,13 @@ export interface ToneEqualizerPickerUiReceipt {
   sourceFingerprint: string;
 }
 
+export interface PointColorPickerUiReceipt {
+  confidence: number;
+  graphRevision: string;
+  sourceIdentity: string;
+  sourceFingerprint: string;
+}
+
 export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY;
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
@@ -438,6 +445,8 @@ export interface UIState {
   developPanelPinnedControlIds: string[];
   toneEqualizerPickerActive: boolean;
   toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
+  pointColorPickerActive: boolean;
+  pointColorPickerReceipt: PointColorPickerUiReceipt | null;
 
   // Modals & Dialogs
   isCreateFolderModalOpen: boolean;
@@ -567,6 +576,8 @@ export const useUIStore = create<UIState>((set, get) => {
     developPanelPinnedControlIds: initialPreferences.rightInspector.pinnedControlIds,
     toneEqualizerPickerActive: false,
     toneEqualizerPickerReceipt: null,
+    pointColorPickerActive: false,
+    pointColorPickerReceipt: null,
 
     isCreateFolderModalOpen: false,
     isRenameFolderModalOpen: false,

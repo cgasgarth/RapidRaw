@@ -91,6 +91,21 @@ struct ToneEqualizerGpuSettings {
     params1: vec4<f32>,
 }
 
+struct PointColorGpuPoint {
+    samples: array<vec4<f32>, 4>,
+    range: vec4<f32>,
+    edit: vec4<f32>,
+    control: vec4<f32>,
+}
+
+struct PointColorGpuSettings {
+    points: array<PointColorGpuPoint, 8>,
+    control: vec4<u32>,
+    skin_range: PointColorGpuPoint,
+    skin_target: vec4<f32>,
+    skin_control: vec4<f32>,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -186,6 +201,7 @@ struct GlobalAdjustments {
     flare_amount: f32,
     sharpness_threshold: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
+    point_color: PointColorGpuSettings,
 }
 
 struct MaskAdjustments {
@@ -239,6 +255,7 @@ struct MaskAdjustments {
     _pad_end6: f32,
     _pad_end7: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
+    point_color: PointColorGpuSettings,
 }
 
 struct AllAdjustments {
@@ -1186,6 +1203,107 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     }
     let final_color = hs_shifted_rgb * (target_luma / new_luma);
     return final_color + negative_residual;
+}
+
+fn point_color_ap1_to_oklch(ap1: vec3<f32>) -> vec3<f32> {
+    let rgb = vec3<f32>(
+        dot(vec3<f32>(1.7050515, -0.6217907, -0.0832584), ap1),
+        dot(vec3<f32>(-0.1302571, 1.1408027, -0.0105485), ap1),
+        dot(vec3<f32>(-0.0240033, -0.1289688, 1.1529715), ap1),
+    );
+    let lms = vec3<f32>(
+        dot(vec3<f32>(0.41222146, 0.53633255, 0.051445995), rgb),
+        dot(vec3<f32>(0.2119035, 0.6806995, 0.10739696), rgb),
+        dot(vec3<f32>(0.08830246, 0.28171885, 0.6299787), rgb),
+    );
+    let root = sign(lms) * pow(abs(lms), vec3<f32>(1.0 / 3.0));
+    let lab = vec3<f32>(
+        dot(vec3<f32>(0.21045426, 0.7936178, -0.004072047), root),
+        dot(vec3<f32>(1.9779985, -2.4285922, 0.4505937), root),
+        dot(vec3<f32>(0.025904037, 0.78277177, -0.80867577), root),
+    );
+    return vec3<f32>(lab.x, length(lab.yz), select(degrees(atan2(lab.z, lab.y)) % 360.0, 0.0, length(lab.yz) < 0.0000001));
+}
+
+fn point_color_oklch_to_ap1(color: vec3<f32>) -> vec3<f32> {
+    let hue = radians(color.z);
+    let lab = vec3<f32>(color.x, color.y * cos(hue), color.y * sin(hue));
+    let root = vec3<f32>(
+        lab.x + 0.39633778 * lab.y + 0.21580376 * lab.z,
+        lab.x - 0.105561346 * lab.y - 0.06385417 * lab.z,
+        lab.x - 0.08948418 * lab.y - 1.2914855 * lab.z,
+    );
+    let lms = root * root * root;
+    let rgb = vec3<f32>(
+        dot(vec3<f32>(4.0767417, -3.3077116, 0.23096994), lms),
+        dot(vec3<f32>(-1.268438, 2.6097574, -0.34131938), lms),
+        dot(vec3<f32>(-0.004196086, -0.7034186, 1.7076147), lms),
+    );
+    return vec3<f32>(
+        dot(vec3<f32>(0.6130974, 0.3395231, 0.0473795), rgb),
+        dot(vec3<f32>(0.0701937, 0.9163539, 0.0134524), rgb),
+        dot(vec3<f32>(0.0206156, 0.1095698, 0.8698146), rgb),
+    );
+}
+
+fn point_color_hue_distance(left: f32, right: f32) -> f32 {
+    let distance = abs(left - right) % 360.0;
+    return min(distance, 360.0 - distance);
+}
+
+fn apply_point_color(color: vec3<f32>, settings: PointColorGpuSettings) -> vec3<f32> {
+    var oklch = point_color_ap1_to_oklch(color);
+    var visualization_weight = 0.0;
+    for (var point_index = 0u; point_index < min(settings.control.x, 8u); point_index += 1u) {
+        let point = settings.points[point_index];
+        if (point.control.w < 0.5) { continue; }
+        var membership = 0.0;
+        for (var sample_index = 0u; sample_index < min(u32(point.control.z), 4u); sample_index += 1u) {
+            let sample = point.samples[sample_index];
+            let distance = length(vec3<f32>(
+                point_color_hue_distance(oklch.z, sample.z) / max(point.range.x, 0.1),
+                abs(oklch.y - sample.y) / max(point.range.y, 0.001),
+                abs(oklch.x - sample.x) / max(point.range.z, 0.001),
+            )) / clamp(point.range.w, 0.25, 4.0);
+            let chroma_gate = smoothstep(0.003, 0.02, min(oklch.y, sample.y));
+            let weight = (1.0 - smoothstep(max(0.0, 1.0 - clamp(point.edit.x, 0.0, 1.0)), 1.0, distance)) * chroma_gate * clamp(sample.w, 0.0, 1.0);
+            membership = 1.0 - (1.0 - membership) * (1.0 - weight);
+        }
+        let weight = membership * clamp(point.control.y, 0.0, 1.0);
+        visualization_weight = max(visualization_weight, weight);
+        let saturation = oklch.y / max(oklch.x, 0.01);
+        oklch = vec3<f32>(
+            oklch.x + point.edit.w * weight,
+            max(oklch.y + point.edit.z * weight, max(0.0, saturation * (1.0 + point.control.x * weight)) * max(oklch.x, 0.01)),
+            (oklch.z + point.edit.y * weight + 360.0) % 360.0,
+        );
+    }
+    if (settings.skin_target.w > 0.5) {
+        let point = settings.skin_range;
+        var membership = 0.0;
+        for (var sample_index = 0u; sample_index < min(u32(point.control.z), 4u); sample_index += 1u) {
+            let sample = point.samples[sample_index];
+            let distance = length(vec3<f32>(point_color_hue_distance(oklch.z, sample.z) / max(point.range.x, 0.1), abs(oklch.y - sample.y) / max(point.range.y, 0.001), abs(oklch.x - sample.x) / max(point.range.z, 0.001))) / clamp(point.range.w, 0.25, 4.0);
+            let weight = (1.0 - smoothstep(max(0.0, 1.0 - clamp(point.edit.x, 0.0, 1.0)), 1.0, distance)) * smoothstep(0.003, 0.02, min(oklch.y, sample.y)) * clamp(sample.w, 0.0, 1.0);
+            membership = 1.0 - (1.0 - membership) * (1.0 - weight);
+        }
+        let extremes = clamp(1.0 - smoothstep(0.0, 0.12, oklch.x) + smoothstep(0.82, 1.0, oklch.x), 0.0, 1.0);
+        let influence = membership * (1.0 - clamp(settings.skin_control.w, 0.0, 1.0) * extremes);
+        let hue_delta = ((settings.skin_target.z - oklch.z + 540.0) % 360.0) - 180.0;
+        oklch = vec3<f32>(
+            oklch.x + (settings.skin_target.x - oklch.x) * clamp(settings.skin_control.z, 0.0, 1.0) * influence,
+            oklch.y + (settings.skin_target.y - oklch.y) * clamp(settings.skin_control.y, 0.0, 1.0) * influence,
+            (oklch.z + hue_delta * clamp(settings.skin_control.x, 0.0, 1.0) * influence + 360.0) % 360.0,
+        );
+        visualization_weight = max(visualization_weight, membership);
+    }
+    let edited = point_color_oklch_to_ap1(oklch);
+    if (settings.control.y == 1u) { return vec3<f32>(visualization_weight); }
+    if (settings.control.y == 2u) {
+        let grayscale = vec3<f32>(scene_luminance(max(edited, vec3<f32>(0.0))));
+        return mix(grayscale, edited, visualization_weight);
+    }
+    return edited;
 }
 
 fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, global: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {
@@ -2344,6 +2462,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
+    composite_rgb_linear = apply_point_color(composite_rgb_linear, adjustments.global.point_color);
+    for (var i = 0u; i < adjustments.mask_count; i += 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let local_point_color = apply_point_color(composite_rgb_linear, adjustments.mask_adjustments[i].point_color);
+            composite_rgb_linear = mix(composite_rgb_linear, local_point_color, influence);
+        }
+    }
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
     composite_rgb_linear = apply_color_balance_rgb(composite_rgb_linear, adjustments.global.color_balance_rgb, preserve_scene_extended);

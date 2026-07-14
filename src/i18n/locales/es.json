@@ -180,6 +180,14 @@
         "reds": "Rojos",
         "yellows": "Amarillos"
       },
+      "pointColor": {
+        "addPoint": "",
+        "deletePoint": "",
+        "empty": "",
+        "pickFromImage": "",
+        "samples": "",
+        "visualize": ""
+      },
       "presence": "Presencia",
       "preset": "Preajuste",
       "previewMode": "",

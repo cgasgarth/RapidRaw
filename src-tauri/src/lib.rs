@@ -1076,6 +1076,127 @@ fn sample_tone_equalizer_picker(
     })
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PointColorPickerRequest {
+    graph_revision: String,
+    source_identity: String,
+    normalized_image_point: ViewerSamplePoint,
+    js_adjustments: serde_json::Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PointColorPickerResponse {
+    source_identity: String,
+    source_fingerprint: String,
+    graph_fingerprint: String,
+    graph_revision: String,
+    lightness: f32,
+    chroma: f32,
+    hue_degrees: f32,
+    confidence: f32,
+    sample_radius_px: u32,
+}
+
+#[tauri::command]
+fn sample_point_color_picker(
+    request: PointColorPickerRequest,
+    state: tauri::State<'_, AppState>,
+) -> Result<PointColorPickerResponse, String> {
+    if request.graph_revision.trim().is_empty() {
+        return Err("point_color.picker_missing_graph_revision".to_string());
+    }
+    let loaded = state
+        .original_image
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("point_color.no_source")?;
+    if loaded.path != request.source_identity {
+        return Err("point_color.stale_source".to_string());
+    }
+    let source_fingerprint = loaded.artifact_source.source_fingerprint();
+    let mut adjustments = request.js_adjustments;
+    hydrate_adjustments(&state, &mut adjustments);
+    let render_plan =
+        compile_consumer_render_plan(&adjustments, &loaded.path, loaded.is_raw, None, None)?;
+    let source = loaded.image.to_rgba32f();
+    let width = source.width();
+    let height = source.height();
+    let center_x = (request.normalized_image_point.x.clamp(0.0, 1.0)
+        * f64::from(width.saturating_sub(1)))
+    .round() as i32;
+    let center_y = (request.normalized_image_point.y.clamp(0.0, 1.0)
+        * f64::from(height.saturating_sub(1)))
+    .round() as i32;
+    let sample_radius_px = 2_u32;
+    let mut samples = Vec::with_capacity(25);
+    for y in (center_y - 2)..=(center_y + 2) {
+        for x in (center_x - 2)..=(center_x + 2) {
+            if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+                continue;
+            }
+            let pixel = source.get_pixel(x as u32, y as u32).0;
+            let color = crate::color::point_color::ap1_to_oklch([pixel[0], pixel[1], pixel[2]]);
+            if color.lightness.is_finite() && color.chroma.is_finite() {
+                samples.push(color);
+            }
+        }
+    }
+    if samples.is_empty() {
+        return Err("point_color.invalid_sample".to_string());
+    }
+    samples.sort_by(|left, right| left.lightness.total_cmp(&right.lightness));
+    let lightness = samples[samples.len() / 2].lightness;
+    samples.sort_by(|left, right| left.chroma.total_cmp(&right.chroma));
+    let chroma = samples[samples.len() / 2].chroma;
+    let (hue_x, hue_y) = samples.iter().fold((0.0_f32, 0.0_f32), |(x, y), sample| {
+        let weight = sample.chroma.max(0.001);
+        (
+            x + sample.hue_degrees.to_radians().cos() * weight,
+            y + sample.hue_degrees.to_radians().sin() * weight,
+        )
+    });
+    let hue_degrees = hue_y.atan2(hue_x).to_degrees().rem_euclid(360.0);
+    let spread = samples
+        .iter()
+        .map(|sample| (sample.lightness - lightness).abs() + (sample.chroma - chroma).abs())
+        .sum::<f32>()
+        / samples.len() as f32;
+    let confidence = (1.0 - spread * 4.0).clamp(0.0, 1.0)
+        * if lightness < 0.01 || chroma < 0.003 {
+            0.25
+        } else {
+            1.0
+        };
+    let current_source = state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|current| {
+            (
+                current.path.clone(),
+                current.artifact_source.source_fingerprint(),
+            )
+        });
+    if current_source != Some((request.source_identity.clone(), source_fingerprint)) {
+        return Err("point_color.stale_source".to_string());
+    }
+    Ok(PointColorPickerResponse {
+        source_identity: request.source_identity,
+        source_fingerprint: format!("{source_fingerprint:016x}"),
+        graph_fingerprint: format!("{:016x}", render_plan.edit_graph.fingerprint),
+        graph_revision: request.graph_revision,
+        lightness,
+        chroma,
+        hue_degrees,
+        confidence,
+        sample_radius_px,
+    })
+}
+
 fn start_analytics_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let scheduler = analytics_scheduler::AnalyticsScheduler::new();
@@ -4224,6 +4345,7 @@ pub fn run() {
             get_wgpu_presentation_report,
             analyze_tone_equalizer_placement,
             sample_tone_equalizer_picker,
+            sample_point_color_picker,
             app::display_target::get_display_target_report,
             get_gpu_pipeline_report,
             android_integration::resolve_android_content_uri_name,

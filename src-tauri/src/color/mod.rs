@@ -23,6 +23,7 @@ pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
 pub(crate) mod perceptual_grading;
+pub(crate) mod point_color;
 pub(crate) mod view_transform;
 #[cfg(test)]
 mod visual_approval_artifacts;

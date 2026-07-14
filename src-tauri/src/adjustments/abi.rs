@@ -161,6 +161,34 @@ pub struct ToneEqualizerGpuSettings {
     pub params1: [f32; 4],
 }
 
+pub const MAX_POINT_COLOR_POINTS: usize = 8;
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct PointColorGpuPoint {
+    /// Up to four OKLCh samples: lightness, chroma, hue degrees, confidence.
+    pub samples: [[f32; 4]; 4],
+    /// hue radius, chroma radius, lightness radius, variance.
+    pub range: [f32; 4],
+    /// feather, hue shift, chroma shift, lightness shift.
+    pub edit: [f32; 4],
+    /// saturation shift, opacity, sample count, enabled.
+    pub control: [f32; 4],
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct PointColorGpuSettings {
+    pub points: [PointColorGpuPoint; MAX_POINT_COLOR_POINTS],
+    /// active point count, visualize mode, process version, reserved.
+    pub control: [u32; 4],
+    pub skin_range: PointColorGpuPoint,
+    /// target lightness, chroma, hue degrees, enabled.
+    pub skin_target: [f32; 4],
+    /// hue, chroma, lightness uniformity, preserve extremes.
+    pub skin_control: [f32; 4],
+}
+
 impl Default for ToneEqualizerGpuSettings {
     fn default() -> Self {
         Self {
@@ -266,6 +294,7 @@ pub struct GlobalAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
     pub tone_equalizer: ToneEqualizerGpuSettings,
+    pub point_color: PointColorGpuSettings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
@@ -317,6 +346,7 @@ pub struct MaskAdjustments {
     pub(crate) _pad_end6: f32,
     pub(crate) _pad_end7: f32,
     pub tone_equalizer: ToneEqualizerGpuSettings,
+    pub point_color: PointColorGpuSettings,
 }
 
 pub const MAX_MASKS: usize = 32;
