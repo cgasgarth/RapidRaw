@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjustments::abi::{AllAdjustments, MAX_MASKS};
 
-pub const DEHAZE_ANALYSIS_IMPLEMENTATION_VERSION: u32 = 1;
-pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 1;
+pub const DEHAZE_ANALYSIS_IMPLEMENTATION_VERSION: u32 = 2;
+pub const DEHAZE_RENDER_IMPLEMENTATION_VERSION: u32 = 2;
 
 const MAX_ANALYSIS_SAMPLES: usize = 512 * 512;
 const TRANSMISSION_FLOOR: f32 = 0.08;
@@ -121,6 +121,21 @@ pub fn compile_dehaze_plan(
     hasher.update(&analysis.identity.source_revision.to_le_bytes());
     hasher.update(&analysis.identity.decode_fingerprint.to_le_bytes());
     hasher.update(&analysis.identity.geometry_fingerprint.to_le_bytes());
+    hasher.update(&analysis.identity.implementation_version.to_le_bytes());
+    for value in analysis
+        .atmospheric_light
+        .into_iter()
+        .chain([
+            analysis.atmospheric_light_confidence,
+            analysis.haze_fraction,
+        ])
+        .chain(analysis.transmission_percentiles)
+    {
+        hasher.update(&value.to_bits().to_le_bytes());
+    }
+    for warning in &analysis.warning_codes {
+        hasher.update(&[*warning as u8]);
+    }
     for value in [
         settings.amount,
         settings.highlight_protection,
@@ -213,16 +228,29 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
             }
             let min_channel = rgb[0].min(rgb[1]).min(rgb[2]);
             let max_channel = rgb[0].max(rgb[1]).max(rgb[2]);
-            let luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+            let luma = scene_luma(rgb);
             let chroma = (max_channel - min_channel) / max_channel.abs().max(0.05);
-            let score = luma.max(0.0) * (1.0 - chroma.clamp(0.0, 1.0)).powi(2);
+            let right = rgba
+                .get_pixel((x + stride).min(width.saturating_sub(1)), y)
+                .0;
+            let below = rgba
+                .get_pixel(x, (y + stride).min(height.saturating_sub(1)))
+                .0;
+            let texture = (scene_luma([right[0], right[1], right[2]]) - luma)
+                .abs()
+                .max((scene_luma([below[0], below[1], below[2]]) - luma).abs());
+            let unclipped = 1.0 - smoothstep(1.0, 2.0, max_channel);
+            let low_texture = 1.0 - smoothstep(0.01, 0.12, texture);
+            let score =
+                luma.max(0.0) * (1.0 - chroma.clamp(0.0, 1.0)).powi(2) * unclipped * low_texture;
             samples.push((rgb, score));
         }
     }
 
     samples.sort_by(|left, right| right.1.total_cmp(&left.1));
-    let candidate_count = (samples.len() / 50).clamp(1, 512);
-    let candidates = &samples[..candidate_count.min(samples.len())];
+    let eligible_candidates = samples.iter().take_while(|sample| sample.1 > 0.0).count();
+    let candidate_count = (samples.len() / 50).clamp(1, 512).min(eligible_candidates);
+    let candidates = &samples[..candidate_count];
     let mut atmospheric_light = [1.0; 3];
     if !candidates.is_empty() {
         for (channel, atmosphere_channel) in atmospheric_light.iter_mut().enumerate() {
@@ -232,7 +260,7 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
         }
     }
 
-    let atmosphere_luma = luma(atmospheric_light).max(0.01);
+    let atmosphere_luma = scene_luma(atmospheric_light).max(0.01);
     let dispersion = if candidates.is_empty() {
         1.0
     } else {
@@ -248,7 +276,8 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
             / candidates.len() as f32
     };
     let evidence = (candidates.len() as f32 / 16.0).clamp(0.0, 1.0);
-    let confidence = (evidence * (1.0 - dispersion / (atmosphere_luma + 0.05))).clamp(0.0, 1.0);
+    let candidate_confidence =
+        (evidence * (1.0 - dispersion / (atmosphere_luma + 0.05))).clamp(0.0, 1.0);
 
     let mut transmissions: Vec<f32> = samples
         .iter()
@@ -262,6 +291,14 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
     } else {
         transmissions.iter().filter(|value| **value < 0.85).count() as f32
             / transmissions.len() as f32
+    };
+    // Clear-air and ambiguous scenes must abstain instead of applying a minimum-strength guess.
+    let haze_evidence = smoothstep(0.08, 0.35, haze_fraction);
+    let measured_confidence = candidate_confidence * haze_evidence;
+    let confidence = if measured_confidence < 0.35 {
+        0.0
+    } else {
+        measured_confidence
     };
     let mut warning_codes = Vec::new();
     if samples.len() < 16 {
@@ -285,10 +322,17 @@ pub fn analyze_haze(image: &DynamicImage, identity: HazeAnalysisIdentityV1) -> H
 }
 
 pub fn estimate_transmission(color: [f32; 3], atmospheric_light: [f32; 3], floor: f32) -> f32 {
+    if !color
+        .iter()
+        .chain(atmospheric_light.iter())
+        .all(|value| value.is_finite())
+    {
+        return 1.0;
+    }
     let normalized_dark = (color[0] / atmospheric_light[0].max(0.01))
         .min(color[1] / atmospheric_light[1].max(0.01))
         .min(color[2] / atmospheric_light[2].max(0.01));
-    (1.0 - HAZE_STRENGTH * normalized_dark).clamp(floor.clamp(0.01, 1.0), 1.0)
+    (1.0 - HAZE_STRENGTH * normalized_dark.max(0.0)).clamp(floor.clamp(0.01, 1.0), 1.0)
 }
 
 #[cfg(test)]
@@ -359,8 +403,14 @@ impl HazeAnalysisCache {
     }
 }
 
-fn luma(color: [f32; 3]) -> f32 {
-    0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]
+fn scene_luma(color: [f32; 3]) -> f32 {
+    // ACES AP1 luminance coefficients; haze analysis runs in the scene working domain.
+    0.272_228_72 * color[0] + 0.674_081_74 * color[1] + 0.053_689_52 * color[2]
+}
+
+fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
+    let t = ((value - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 fn percentile(values: &[f32], quantile: f32) -> f32 {
@@ -457,6 +507,38 @@ mod tests {
         let (_, changed_source_hit) = cache.get_or_analyze(&image, identity(2));
         assert!(!changed_source_hit);
         assert_eq!(cache.counters(), (1, 2));
+    }
+
+    #[test]
+    fn clear_air_and_invalid_samples_abstain_instead_of_forcing_a_dehaze_guess() {
+        let clear = ImageBuffer::from_fn(32, 16, |x, y| {
+            let checker = if (x + y) % 2 == 0 { 0.0 } else { 1.0 };
+            Rgba([0.02 + checker * 0.7, 0.03 + checker * 0.15, 0.04, 1.0])
+        });
+        let plan = analyze_haze(&DynamicImage::ImageRgba32F(clear), identity(4));
+        assert!(plan.atmospheric_light_confidence < 0.1, "{plan:?}");
+        assert!(plan.warning_codes.contains(&HazeWarningCode::LowConfidence));
+        assert_eq!(
+            estimate_transmission([f32::NAN, 0.2, 0.3], [1.0; 3], 0.08),
+            1.0
+        );
+        assert_eq!(
+            estimate_transmission([-0.5, -0.2, -0.1], [1.0; 3], 0.08),
+            1.0
+        );
+    }
+
+    #[test]
+    fn render_fingerprint_includes_analysis_evidence_not_only_source_identity() {
+        let image =
+            DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(32, 16, Rgba([0.5, 0.6, 0.7, 1.0])));
+        let analysis = analyze_haze(&image, identity(7));
+        let first = compile_dehaze_plan(&analysis, DehazeSettingsV1::default());
+        let mut changed = analysis;
+        changed.atmospheric_light_confidence =
+            (changed.atmospheric_light_confidence + 0.25).min(1.0);
+        let second = compile_dehaze_plan(&changed, DehazeSettingsV1::default());
+        assert_ne!(first.fingerprint, second.fingerprint);
     }
 
     #[test]

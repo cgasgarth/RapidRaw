@@ -937,7 +937,7 @@ fn apply_scene_dehaze_v1(
     let edge = (pixel_luma.sqrt() - blurred_luma.sqrt()).abs();
     let guided_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
     let transmission = (1.0 - 0.95 * guided_dark).clamp(0.08, 1.0);
-    let confidence_weight = 0.35 + 0.65 * atmosphere_confidence.clamp(0.0, 1.0);
+    let confidence_weight = atmosphere_confidence.clamp(0.0, 1.0);
     let strength = (amount.abs() * 7.5).clamp(0.0, 1.0) * confidence_weight;
     let effective_transmission = 1.0 + (transmission - 1.0) * strength;
     if amount < 0.0 {
@@ -2374,5 +2374,23 @@ mod tone_equalizer_picker_tests {
                 full[(y * width + x) as usize]
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod scene_dehaze_tests {
+    use super::*;
+
+    #[test]
+    fn zero_confidence_is_exact_identity_and_confidence_scales_recovery() {
+        let color = Vec3::new(0.35, 0.42, 0.51);
+        let blurred = Vec3::splat(0.62);
+        let atmosphere = Vec3::new(0.82, 0.9, 1.04);
+        let abstained = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 0.0);
+        let partial = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 0.5);
+        let full = apply_scene_dehaze_v1(color, blurred, true, 0.1, atmosphere, 1.0);
+        assert_eq!(abstained, color);
+        assert!(partial.distance(color) > 0.0);
+        assert!(partial.distance(color) < full.distance(color));
     }
 }
