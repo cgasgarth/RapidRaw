@@ -46,6 +46,13 @@ import {
   type LibraryWorkspacePreferences,
   libraryWorkspacePreferencesSchema,
 } from '../schemas/libraryWorkspacePreferencesSchemas';
+import {
+  DEFAULT_NEGATIVE_LAB_WORKSPACE_LAYOUT,
+  type NegativeLabWorkspaceLayout,
+  type NegativeLabWorkspacePanelId,
+  readNegativeLabWorkspaceLayout,
+  saveNegativeLabWorkspaceLayout,
+} from '../schemas/negative-lab/negativeLabWorkspaceLayout';
 import type { MaskContainer } from '../utils/adjustments';
 import {
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
@@ -477,6 +484,7 @@ export interface UIState {
   mountedLazyModalIds: ReadonlySet<LazyComputationalModalId>;
   focusRetouchToolState: FocusRetouchToolState;
   negativeModalState: NegativeConversionModalState;
+  negativeLabWorkspaceLayout: NegativeLabWorkspaceLayout;
   denoiseModalState: DenoiseModalState;
   cullingModalState: CullingModalState;
   collageModalState: CollageModalState;
@@ -496,6 +504,8 @@ export interface UIState {
   setDefaultEditorZoomMode: (mode: EditorWorkspaceZoomMode) => void;
   setEditorLightsOutLevel: (level: EditorWorkspaceLightsOutLevel) => void;
   setCompactEditorDrawerState: (state: CompactEditorDrawerState) => void;
+  setNegativeLabWorkspaceLayout: (layout: NegativeLabWorkspaceLayout) => void;
+  toggleNegativeLabWorkspacePanel: (panelId: NegativeLabWorkspacePanelId) => void;
   setEditorRegionSize: (
     region: 'compactTools' | 'filmstrip' | 'leftSidebar' | 'rightInspector',
     size: number | null,
@@ -613,6 +623,7 @@ export const useUIStore = create<UIState>((set, get) => {
       session: null,
     },
     negativeModalState: { isOpen: false, operationEpoch: 0, session: null, targetPaths: [] },
+    negativeLabWorkspaceLayout: readNegativeLabWorkspaceLayout(),
     denoiseModalState: {
       isOpen: false,
       isProcessing: false,
@@ -628,6 +639,26 @@ export const useUIStore = create<UIState>((set, get) => {
     layerMaskProvenanceReceipts: {},
     layerMaskSourceGraphRevision: DEFAULT_LAYER_MASK_SOURCE_GRAPH_REVISION,
     layerMaskSourceGraphRevisionCounter: 0,
+
+    setNegativeLabWorkspaceLayout: (layout) => {
+      const normalized = {
+        ...DEFAULT_NEGATIVE_LAB_WORKSPACE_LAYOUT,
+        ...layout,
+        collapsedPanelIds: [...new Set(layout.collapsedPanelIds)],
+      };
+      saveNegativeLabWorkspaceLayout(normalized);
+      set({ negativeLabWorkspaceLayout: normalized });
+    },
+
+    toggleNegativeLabWorkspacePanel: (panelId) => {
+      const current = get().negativeLabWorkspaceLayout;
+      const collapsedPanelIds = current.collapsedPanelIds.includes(panelId)
+        ? current.collapsedPanelIds.filter((id) => id !== panelId)
+        : [...current.collapsedPanelIds, panelId];
+      const next = { ...current, collapsedPanelIds };
+      saveNegativeLabWorkspaceLayout(next);
+      set({ negativeLabWorkspaceLayout: next });
+    },
 
     clearDerivedOutputReceipts: () => {
       set({ derivedOutputReceipts: {} });
