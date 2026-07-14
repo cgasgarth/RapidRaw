@@ -20,6 +20,7 @@ import {
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import {
@@ -267,6 +268,8 @@ export default function AppModals(props: AppModalsProps) {
                   cancellationId: panoramaModalState.alignmentCancellationId,
                 });
               }
+              const launchId = useOperationLaunchStore.getState().launches.panorama?.launchId;
+              if (launchId !== undefined) useOperationLaunchStore.getState().close('panorama', launchId);
               setUI({
                 panoramaModalState: createDefaultPanoramaModalState(panoramaModalState.settings),
               });
@@ -309,6 +312,8 @@ export default function AppModals(props: AppModalsProps) {
                 : null
             }
             onClose={() => {
+              const launchId = useOperationLaunchStore.getState().launches.hdr?.launchId;
+              if (launchId !== undefined) useOperationLaunchStore.getState().close('hdr', launchId);
               setUI({
                 hdrModalState: createDefaultHdrModalState(hdrModalState.settings),
               });

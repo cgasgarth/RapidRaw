@@ -62,6 +62,7 @@ import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focus-stack/focus
 import { libraryRelinkIdentitySchema } from '../../schemas/library/libraryRelinkSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -726,6 +727,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: SquaresUnite,
               label: stitchLabel,
               onClick: () => {
+                useOperationLaunchStore.getState().launch('panorama', finalSelection, Date.now());
                 setUI({
                   panoramaModalState: {
                     activeOperationId: null,
@@ -750,6 +752,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Images,
               label: mergeLabel,
               onClick: () => {
+                useOperationLaunchStore.getState().launch('hdr', hdrStackSelection, Date.now());
                 setUI({
                   hdrModalState: {
                     activeOperationId: null,
