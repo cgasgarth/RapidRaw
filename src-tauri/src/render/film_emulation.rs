@@ -9,6 +9,8 @@ use glam::Vec3;
 use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
 
+use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
+
 pub const FILM_NODE_TYPE: &str = "film_emulation";
 pub const FILM_CONTRACT_VERSION: u32 = 1;
 pub const REFERENCE_PROFILE_ID: &str = "rapidraw.reference_film.v1";
@@ -138,13 +140,14 @@ pub fn apply_pixel(rgb: Vec3, params: FilmEmulationParams) -> Vec3 {
     if !params.enabled || params.mix <= 0.0 {
         return rgb;
     }
-    let luminance = AP1_LUMINANCE.dot(rgb);
-    if !luminance.is_finite() || luminance <= 1.0e-8 {
-        return rgb;
-    }
-    let shaped = luminance * (1.0 + params.shaper_p) / (luminance + params.shaper_p);
-    let scale = shaped / luminance;
-    rgb + params.mix * (rgb * scale - rgb)
+    let mut curve = reference_curve();
+    let response_scale = REFERENCE_SHAPER_P / params.shaper_p;
+    curve
+        .response_knots
+        .iter_mut()
+        .for_each(|response| *response *= response_scale);
+    let shaped = apply_direct_positive(rgb, &curve);
+    rgb + params.mix * (shaped - rgb)
 }
 
 #[allow(dead_code)]
