@@ -117,11 +117,6 @@ pub struct AnalyticsConfig {
     pub(crate) service: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
 }
 
-pub struct WarpedImageCache {
-    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
-    pub image: Arc<DynamicImage>,
-}
-
 pub struct AppState {
     /// Narrow service handles are the preferred capability boundary for new commands.
     pub services: Arc<crate::app::services::AppServices>,
@@ -160,7 +155,6 @@ pub struct AppState {
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
-    pub full_warped_cache: Mutex<Option<WarpedImageCache>>,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub smart_preview_scheduler:
@@ -245,7 +239,6 @@ impl AppState {
             lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
-            full_warped_cache: Mutex::new(None),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             smart_preview_scheduler:

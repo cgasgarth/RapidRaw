@@ -268,54 +268,6 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
     Ok(arc_lut)
 }
 
-pub fn get_cached_full_warped_image(
-    state: &tauri::State<AppState>,
-    js_adjustments: &serde_json::Value,
-) -> Result<Arc<DynamicImage>, String> {
-    let geo_hash = calculate_geometry_hash(js_adjustments);
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded")?;
-    let identity = crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
-        &loaded_image.artifact_source,
-        state.load_image_generation.load(Ordering::SeqCst) as u64,
-        calculate_transform_hash(js_adjustments),
-        loaded_image.artifact_source.source_fingerprint(),
-        geo_hash,
-        loaded_image.image.width(),
-        loaded_image.image.height(),
-    );
-
-    {
-        let cache_lock = state.full_warped_cache.lock().unwrap();
-        if let Some(cached) = cache_lock.as_ref()
-            && cached.identity == identity
-        {
-            return Ok(Arc::clone(&cached.image));
-        }
-    }
-
-    let (mut full_image, is_raw) = get_full_image_for_processing(state)?;
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut full_image);
-    }
-    let warped_image = apply_geometry_warp(Cow::Borrowed(&full_image), js_adjustments).into_owned();
-    let warped_arc = Arc::new(warped_image);
-
-    {
-        let mut cache_lock = state.full_warped_cache.lock().unwrap();
-        *cache_lock = Some(WarpedImageCache {
-            identity,
-            image: Arc::clone(&warped_arc),
-        });
-    }
-
-    Ok(warped_arc)
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ToneEqualizerPlacementResponse {
