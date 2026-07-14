@@ -215,19 +215,30 @@ export function useImageProcessing(
   const previewCoordinatorOperationsRef = useRef(new Map<number, PreviewOperationIdentity>());
   const displayResourceGenerationRef = useRef(1);
 
-  const dispatchPreviewCoordinator = useCallback((event: PreviewCoordinatorEvent) => {
-    const transition = reducePreviewCoordinator(previewCoordinatorStateRef.current, event);
-    previewCoordinatorStateRef.current = transition.state;
-    const cancelledIds = new Set(
-      transition.effects.filter((effect) => effect.type === 'cancel').map((effect) => effect.identity.operationId),
-    );
-    if (cancelledIds.size > 0) {
-      for (const [requestId, identity] of previewCoordinatorOperationsRef.current) {
-        if (cancelledIds.has(identity.operationId)) previewCoordinatorOperationsRef.current.delete(requestId);
+  const dispatchPreviewCoordinator = useCallback(
+    (event: PreviewCoordinatorEvent) => {
+      const transition = reducePreviewCoordinator(previewCoordinatorStateRef.current, event);
+      previewCoordinatorStateRef.current = transition.state;
+      for (const effect of transition.effects) {
+        if (effect.type !== 'publish') continue;
+        if (effect.identity.kind === 'settled') {
+          setEditor({ finalPreviewUrl: effect.artifact.url });
+        } else if (effect.identity.kind === 'original') {
+          setEditor({ transformedOriginalUrl: effect.artifact.url });
+        }
       }
-    }
-    return transition;
-  }, []);
+      const cancelledIds = new Set(
+        transition.effects.filter((effect) => effect.type === 'cancel').map((effect) => effect.identity.operationId),
+      );
+      if (cancelledIds.size > 0) {
+        for (const [requestId, identity] of previewCoordinatorOperationsRef.current) {
+          if (cancelledIds.has(identity.operationId)) previewCoordinatorOperationsRef.current.delete(requestId);
+        }
+      }
+      return transition;
+    },
+    [setEditor],
+  );
 
   const previewSessionIdentity = useCallback(
     (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
@@ -725,7 +736,6 @@ export function useImageProcessing(
         const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
         setEditor({
           exportSoftProofTransform: transform,
-          finalPreviewUrl: url,
           navigatorPreviewArtifact: {
             graphIdentity: request.identity.graphIdentity,
             id: `${request.identity.graphIdentity}:${String(request.identity.generation)}:${String(request.requestId)}`,
@@ -1111,7 +1121,6 @@ export function useImageProcessing(
             );
             if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
               currentOriginalResRef.current = targetRes;
-              setEditor({ transformedOriginalUrl: base64Data });
             } else if (base64Data.startsWith('blob:')) {
               URL.revokeObjectURL(base64Data);
             }
@@ -1335,7 +1344,6 @@ export function useImageProcessing(
             completeOriginalPreviewOperation(operationIdentity, base64Data)
           ) {
             currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
           } else if (base64Data.startsWith('blob:')) {
             URL.revokeObjectURL(base64Data);
           }
