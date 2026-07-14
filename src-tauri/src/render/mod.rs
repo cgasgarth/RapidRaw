@@ -9,6 +9,7 @@ pub(crate) mod film_characteristic_curve;
 pub(crate) mod film_color_coupler;
 pub(crate) mod film_density_grain;
 pub(crate) mod film_emulation;
+pub(crate) mod film_execution_plan;
 pub(crate) mod film_look_render;
 pub(crate) mod film_monochrome;
 pub(crate) mod film_optical_scatter;
