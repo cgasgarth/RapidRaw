@@ -9083,6 +9083,19 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
     previewRequest: negativeLabPreviewRequestV1Schema,
     processFamily: negativeLabSupportedProcessFamilyV1Schema,
     sessionId: z.string().trim().min(1),
+    /**
+     * Optional native commit payload supplied by the local app-server bridge.
+     * Recipes remain portable; only a local apply may include source paths and
+     * the exact Rust command payload that will be executed after approval.
+     */
+    nativeCommit: z
+      .object({
+        options: z.record(z.string(), z.unknown()).optional(),
+        params: z.record(z.string(), z.unknown()),
+        paths: z.array(z.string().trim().min(1)).min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((recipe, context) => {

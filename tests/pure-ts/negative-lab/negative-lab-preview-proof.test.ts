@@ -8,6 +8,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/index.ts';
 import {
+  buildNegativeLabRuntimeApplyV1,
   NegativeLabAppServerRuntimeToolBusV1,
   negativeLabAcceptedDryRunPlanHashV1,
 } from '../../../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
@@ -16,6 +17,7 @@ import { NEGATIVE_LAB_AGENT_TOOL_MANIFEST } from '../../../src/utils/negative-la
 describe('Negative Lab before/after preview proof', () => {
   test('proves source-negative metadata beside generated-positive dry-run output and gates apply by accepted plan identity', () => {
     const bus = new NegativeLabAppServerRuntimeToolBusV1(NEGATIVE_LAB_AGENT_TOOL_MANIFEST, {
+      applyNative: buildNegativeLabRuntimeApplyV1,
       renderPreview: () => ({
         artifactId: 'artifact_negative_lab_generated_positive_preview',
         baseFogSampleSummary: {
@@ -151,6 +153,39 @@ describe('Negative Lab before/after preview proof', () => {
     expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.max).toBeGreaterThan(
       dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.min,
     );
+
+    const busWithoutNativeExecutor = new NegativeLabAppServerRuntimeToolBusV1(NEGATIVE_LAB_AGENT_TOOL_MANIFEST, {
+      renderPreview: () => ({
+        artifactId: 'artifact_negative_lab_generated_positive_preview_without_executor',
+        contentHash: 'sha256:positive_preview_pixels_without_executor',
+        dimensions: { height: 720, width: 1080 },
+        renderer: 'rawengine_negative_lab_runtime_preview_v1',
+        storage: 'temp_cache',
+      }),
+    });
+    const unboundDryRun = busWithoutNativeExecutor.execute({
+      request: command,
+      toolName: 'negativelab.preview_conversion',
+    });
+    expect(() =>
+      busWithoutNativeExecutor.execute({
+        request: {
+          acknowledgedWarningCodes:
+            unboundDryRun.kind === 'dry_run' ? unboundDryRun.dryRun.warnings.map((warning) => warning.code) : [],
+          acceptedDryRunPlanHash: unboundDryRun.kind === 'dry_run' ? unboundDryRun.acceptedDryRunPlanHash : '',
+          approval: {
+            approvalClass: ApprovalClass.EditApply,
+            reason: 'Synthetic output must never be accepted as a native save.',
+            state: 'approved',
+          },
+          commandId: command.commandId,
+          dryRunPlanId: unboundDryRun.kind === 'dry_run' ? unboundDryRun.dryRun.dryRunPlanId : '',
+          expectedSessionRevision: 'graph_rev_negative_lab_preview_proof',
+          sessionId: 'session_negative_lab_preview_proof',
+        },
+        toolName: 'negativelab.apply_planned_command',
+      }),
+    ).toThrow('synthetic output receipts are disabled');
 
     expect(() =>
       bus.execute({
