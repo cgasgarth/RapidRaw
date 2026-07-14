@@ -55,11 +55,9 @@ import {
 } from '../../../utils/toneEqualizerPicker';
 import {
   buildViewerSamplerIdentity,
-  createViewerSampleRequest,
   isViewerSampleResultCurrent,
   LatestViewerSampleScheduler,
   mapViewerPointToImage,
-  resolveViewerSampleTarget,
   type ViewerSampleRequest,
   type ViewerSampleResult,
   type ViewerSampleTarget,
@@ -98,6 +96,7 @@ import type { ViewerActiveTool } from './viewerInputResolver';
 import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
 import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
+import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
 declare global {
@@ -986,56 +985,39 @@ const ImageCanvas = memo(
         if (viewerSampleLocked || samplerSuppressed || event.pointerType === 'touch') return;
         const surface = event.currentTarget;
         const rect = surface.getBoundingClientRect();
-        const normalizedViewerX = (event.clientX - rect.x) / rect.width;
-        const normalizedViewerY = (event.clientY - rect.y) / rect.height;
-        const target = resolveViewerSampleTarget({
-          compareMode,
-          compareDividerPosition,
-          compareOrientation,
-          normalizedViewerX,
-          normalizedViewerY,
-          softProofEnabled: isExportSoftProofEnabled,
-        });
-        const sideBySideRenderSize =
-          compareMode === 'side-by-side' ? (target === 'original' ? originalImageRenderSize : imageRenderSize) : null;
-        const mapped = mapViewerPointToImage({
-          clientPoint: { x: event.clientX, y: event.clientY },
-          displayedImageRect: sideBySideRenderSize
-            ? {
-                x: sideBySideRenderSize.offsetX,
-                y: sideBySideRenderSize.offsetY,
-                width: sideBySideRenderSize.width,
-                height: sideBySideRenderSize.height,
-              }
-            : overlayGeometry.displayedImageRectInViewCssPixels,
-          surfaceRect: {
+        const resolved = resolveViewerSamplerInteraction(
+          {
+            compareDividerPosition,
+            compareMode,
+            compareOrientation,
+            displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
+            editedRenderSize: imageRenderSize,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            graphRevision: viewerSampleGraphRevision,
+            imageIdentity: selectedImage.path,
+            originalRenderSize: originalImageRenderSize,
+            proofEnabled: isExportSoftProofEnabled,
+            sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
+          },
+          { altKey: event.altKey, clientX: event.clientX, clientY: event.clientY },
+          {
+            height: rect.height,
+            layoutHeight: surface.offsetHeight,
+            layoutWidth: surface.offsetWidth,
+            width: rect.width,
             x: rect.x,
             y: rect.y,
-            width: rect.width,
-            height: rect.height,
-            layoutWidth: surface.offsetWidth,
-            layoutHeight: surface.offsetHeight,
           },
-        });
-        if (!mapped) {
+        );
+        if (resolved === null) {
           latestViewerSampleRequestRef.current = null;
           viewerSampleSchedulerRef.current?.clear();
           transitionViewerSampler((current) => ({ ...current, result: null }));
           return;
         }
-        const request = createViewerSampleRequest({
-          imageIdentity: selectedImage.path,
-          graphRevision: viewerSampleGraphRevision,
-          geometryEpoch: overlayGeometry.geometryEpoch,
-          normalizedImagePoint: mapped.normalizedImagePoint,
-          sourceImageSize: { width: selectedImage.width, height: selectedImage.height },
-          target,
-          sampleRadiusImagePx: event.altKey ? 4 : 0,
-          requestedSpace: 'displayEncoded',
-        });
-        transitionViewerSampler((current) => ({ ...current, target }));
-        latestViewerSampleRequestRef.current = request;
-        viewerSampleSchedulerRef.current?.schedule(request);
+        transitionViewerSampler((current) => ({ ...current, target: resolved.target }));
+        latestViewerSampleRequestRef.current = resolved.request;
+        viewerSampleSchedulerRef.current?.schedule(resolved.request);
       },
       [
         compareMode,
