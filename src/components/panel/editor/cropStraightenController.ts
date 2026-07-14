@@ -83,7 +83,12 @@ export type CropStraightenControllerEvent =
 export type CropStraightenSemanticCommand =
   | { readonly type: 'crop-started' }
   | { readonly crop: Crop; readonly percentCrop: PercentCrop; readonly type: 'crop-changed' }
-  | { readonly crop: Crop; readonly percentCrop: PercentCrop; readonly type: 'crop-completed' }
+  | {
+      readonly crop: Crop;
+      readonly identity: CropStraightenSessionIdentity;
+      readonly percentCrop: PercentCrop;
+      readonly type: 'crop-completed';
+    }
   | { readonly pointerId: number; readonly type: 'capture-pointer' }
   | {
       readonly pointerId: number;
@@ -222,7 +227,11 @@ export const reduceCropStraightenController = (
   }
   if (event.type === 'crop-changed' || event.type === 'crop-completed') {
     if (state.session.tool !== 'crop') return transition(state, [], true);
-    return transition(state, [{ crop: event.crop, percentCrop: event.percentCrop, type: event.type }]);
+    return transition(state, [
+      event.type === 'crop-completed'
+        ? { crop: event.crop, identity: state.session, percentCrop: event.percentCrop, type: event.type }
+        : { crop: event.crop, percentCrop: event.percentCrop, type: event.type },
+    ]);
   }
   if (event.type === 'pointer-started') {
     if (state.session.tool !== 'straighten' || state.gesture !== null) return transition(state, [], true);

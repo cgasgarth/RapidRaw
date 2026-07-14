@@ -30,6 +30,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
+import { buildCropEditTransaction } from '../../utils/cropEditTransaction';
 import {
   activeCropDraft,
   type CropInteraction,
@@ -1947,7 +1948,7 @@ export default function Editor({
   }, [canonicalPercentCrop, cropGeometryKey, cropSessionKey]);
 
   const handleCropComplete = useCallback(
-    (_crop: Crop, completedPercentCrop: PercentCrop) => {
+    (_crop: Crop, completedPercentCrop: PercentCrop, identity: CropStraightenSessionIdentity) => {
       const pc =
         cropInteraction.kind === 'dragging' &&
         cropInteraction.sessionKey === cropSessionKey &&
@@ -1955,6 +1956,7 @@ export default function Editor({
           ? cropInteraction.lastValidPercentCrop
           : completedPercentCrop;
       if (!pc.width || !pc.height || !selectedImage?.width) {
+        setCropInteraction({ kind: 'idle' });
         return;
       }
       if (liveRotation !== null) {
@@ -1967,13 +1969,19 @@ export default function Editor({
         adjustments.orientationSteps || 0,
       );
       const newPixelCrop = pixelCropFromPercentCrop(pc, dimensions.width, dimensions.height);
-
-      setAdjustments((prev: Adjustments) => {
-        if (JSON.stringify(newPixelCrop) !== JSON.stringify(prev.crop)) {
-          return { ...prev, crop: newPixelCrop };
-        }
-        return prev;
-      });
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildCropEditTransaction(
+          {
+            ...state,
+            operationGeneration: adjustmentGeometryRevision,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          identity,
+          newPixelCrop,
+          crypto.randomUUID(),
+        ),
+      );
       setCropInteraction({ kind: 'idle' });
     },
     [
@@ -1983,7 +1991,9 @@ export default function Editor({
       cropSessionKey,
       liveRotation,
       selectedImage,
-      setAdjustments,
+      adjustmentGeometryRevision,
+      applyEditTransaction,
+      viewerSampleGraphRevision,
     ],
   );
 

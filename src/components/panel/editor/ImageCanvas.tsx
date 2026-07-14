@@ -201,7 +201,7 @@ interface ImageCanvasProps {
   finalPreviewUrl: string | null;
   provisionalPreviewUrl?: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
-  handleCropComplete: (c: Crop, cp: PercentCrop) => void;
+  handleCropComplete: (c: Crop, cp: PercentCrop, identity: CropStraightenSessionIdentity) => void;
   handleCropStart?: () => void;
   imageSessionId: string | null;
   imageRenderSize: RenderSize;
