@@ -149,3 +149,26 @@ test('session cancellation releases the visible URL and prevents further publica
   expect(cancelled.state.session).toBeNull();
   expect(cancelled.state.visibleArtifact).toBeNull();
 });
+
+test('original compare completion is rejected when a newer viewport request supersedes it', () => {
+  let state = createPreviewCoordinatorState();
+  const first = transition(state, {
+    identity: session({ viewportRevision: 1 }),
+    kind: 'original',
+    type: 'render-inputs-changed',
+  });
+  state = transition(first.state, { identity: first.state.original.identity!, type: 'operation-started' }).state;
+  const newer = transition(state, {
+    identity: session({ targetWidth: 2200, targetHeight: 1400, viewportRevision: 2 }),
+    kind: 'original',
+    type: 'render-inputs-changed',
+  });
+  const late = transition(newer.state, {
+    artifact: artifact(first.state.original.identity!, 'blob:stale-original'),
+    identity: first.state.original.identity!,
+    type: 'operation-completed',
+  });
+  expect(late.state.staleCompletionCount).toBe(1);
+  expect(late.state.visibleArtifact).toBeNull();
+  expect(late.effects).toEqual([]);
+});
