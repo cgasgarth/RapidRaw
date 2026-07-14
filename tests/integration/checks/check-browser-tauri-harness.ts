@@ -745,23 +745,74 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       await page.waitForFunction(
         () => {
           const active = document.activeElement as HTMLElement | null;
-          return (
+          const ready =
             active?.getAttribute('role') === 'menuitem' &&
             active.textContent?.trim() === 'Auto Adjust Image' &&
             active.getClientRects().length > 0 &&
             [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
               (item) => item.textContent?.trim() === 'Productivity' && item.getAttribute('aria-expanded') === 'true',
-            )
+            );
+          if (!ready) return false;
+          active.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              bubbles: true,
+              cancelable: true,
+              code: 'Enter',
+              key: 'Enter',
+            }),
           );
+          return true;
         },
         undefined,
         { timeout: 10_000 },
       );
-      await page.keyboard.press('Enter');
     } catch (error) {
       throw new Error(`Batch Auto Adjust keyboard menu activation failed: ${JSON.stringify(await menuDiagnostics())}`, {
         cause: error,
       });
+    }
+  };
+  const waitForSingleAutoAdjustInvocation = async (baselineCount: number) => {
+    const expected = baselineCount + 1;
+    const diagnostics = () =>
+      page.evaluate(() => {
+        const calls =
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+            ({ command }) => command === 'apply_auto_adjustments_to_paths',
+          ) ?? [];
+        const active = document.activeElement as HTMLElement | null;
+        return {
+          active: active
+            ? {
+                path: active.dataset.menuItemPath ?? null,
+                role: active.getAttribute('role'),
+                text: active.textContent?.trim() ?? '',
+              }
+            : null,
+          count: calls.length,
+          lastArgs: calls.at(-1)?.args ?? null,
+          visibleMenuItems: [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => item.textContent?.trim() ?? ''),
+        };
+      });
+    try {
+      await page.waitForFunction(
+        (minimum) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+            ({ command }) => command === 'apply_auto_adjustments_to_paths',
+          ).length ?? 0) >= minimum,
+        expected,
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      throw new Error(`Batch Auto Adjust invocation did not arrive: ${JSON.stringify(await diagnostics())}`, {
+        cause: error,
+      });
+    }
+    const observed = await diagnostics();
+    if (observed.count !== expected) {
+      throw new Error(`Batch Auto Adjust invocation was not singular: ${JSON.stringify({ expected, ...observed })}`);
     }
   };
   const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
@@ -810,14 +861,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   });
   const baseline = await counts();
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    baseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(baseline.autoAdjust);
   await page.waitForTimeout(500);
   const afterPrepare = await counts();
   if (afterPrepare.commit !== baseline.commit + 1) {
@@ -897,14 +941,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const activePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
   if (!activePath) throw new Error('Batch Auto Adjust race proof requires an active path.');
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    raceBaseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(raceBaseline.autoAdjust);
   await switchAwayAndBack(activePath, false);
   await page.waitForFunction(
     (expected) =>
@@ -929,14 +966,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
 
   const editedRaceBaseline = await counts();
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    editedRaceBaseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(editedRaceBaseline.autoAdjust);
   await switchAwayAndBack(activePath, false);
   await exposure.click();
   await exposureInput.fill('0.8');
