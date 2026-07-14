@@ -15,7 +15,7 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime};
 use uuid::Uuid;
@@ -24,6 +24,8 @@ use crate::formats::is_raw_file;
 use crate::image_processing::apply_cpu_default_raw_processing;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use crate::panorama_utils::{alignment_plan, processing, projection, stitching};
+
+pub(crate) mod service;
 
 pub const BRIEF_DESCRIPTOR_SIZE: usize = 256;
 pub type Descriptor = [u8; BRIEF_DESCRIPTOR_SIZE / 8];
@@ -385,10 +387,6 @@ pub struct PanoramaPlanResult {
     pub warnings: Vec<String>,
 }
 
-static PANORAMA_ALIGNMENT_CANCELLATIONS: LazyLock<
-    Mutex<HashMap<String, Arc<alignment_plan::AlignmentCancellation>>>,
-> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
 pub trait PanoramaRenderEngine {
     fn render(
         &self,
@@ -453,6 +451,7 @@ pub async fn plan_panorama(
     max_preview_dimension_px: Option<u32>,
     cancellation_id: Option<String>,
     app_handle: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
 ) -> Result<PanoramaPlanResult, String> {
     if paths.len() < 2 {
         return Err("Please select at least two images to plan a panorama.".to_string());
@@ -475,10 +474,12 @@ pub async fn plan_panorama(
 
     let cancellation_id = cancellation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
     let cancellation = Arc::new(alignment_plan::AlignmentCancellation::default());
-    PANORAMA_ALIGNMENT_CANCELLATIONS
-        .lock()
-        .unwrap()
-        .insert(cancellation_id.clone(), cancellation.clone());
+    let service = Arc::clone(&state.services.panorama);
+    let handle = service.begin_plan(
+        source_paths.clone(),
+        cancellation_id.clone(),
+        Arc::clone(&cancellation),
+    );
     let task = tokio::task::spawn_blocking(move || {
         let (sources, images) = load_panorama_sources_for_plan(&source_paths, &app_handle)?;
         let alignment_plan = alignment_plan::build_calibrated_alignment_plan(
@@ -505,23 +506,26 @@ pub async fn plan_panorama(
         Ok(result) => result,
         Err(join_err) => Err(format!("Panorama plan task failed: {}", join_err)),
     };
-    PANORAMA_ALIGNMENT_CANCELLATIONS
-        .lock()
-        .unwrap()
-        .remove(&cancellation_id);
-    result
+    match result {
+        Ok(plan) => {
+            service
+                .complete_plan(handle, &cancellation_id, plan.clone())
+                .map_err(str::to_string)?;
+            Ok(plan)
+        }
+        Err(error) => {
+            service.fail_plan(handle, &cancellation_id);
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
-pub fn cancel_panorama_alignment(cancellation_id: String) -> bool {
-    PANORAMA_ALIGNMENT_CANCELLATIONS
-        .lock()
-        .unwrap()
-        .get(&cancellation_id)
-        .is_some_and(|token| {
-            token.cancel();
-            true
-        })
+pub fn cancel_panorama_alignment(
+    cancellation_id: String,
+    state: tauri::State<'_, AppState>,
+) -> bool {
+    state.services.panorama.cancel(&cancellation_id)
 }
 
 #[tauri::command]
@@ -541,16 +545,21 @@ pub async fn stitch_panorama(
         .iter()
         .map(|p| parse_virtual_path(p).0.to_string_lossy().into_owned())
         .collect();
+    let service = Arc::clone(&state.services.panorama);
+    let accepted = service.accepted(&source_paths).map_err(str::to_string)?;
     let stitch_options = options.unwrap_or_default();
     validate_panorama_stitch_options(&stitch_options)?;
     let cancellation_id = cancellation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
     let cancellation = Arc::new(alignment_plan::AlignmentCancellation::default());
-    PANORAMA_ALIGNMENT_CANCELLATIONS
-        .lock()
-        .unwrap()
-        .insert(cancellation_id.clone(), cancellation.clone());
-
-    let panorama_result_handle = state.panorama_result.clone();
+    service
+        .register_render(
+            &accepted,
+            cancellation_id.clone(),
+            Arc::clone(&cancellation),
+        )
+        .map_err(str::to_string)?;
+    let task_service = Arc::clone(&service);
+    let task_cancellation_id = cancellation_id.clone();
 
     let task = tokio::task::spawn_blocking(move || {
         let request = PanoramaRenderRequest {
@@ -605,11 +614,17 @@ pub async fn stitch_panorama(
                 let final_base64 = encode_png_data_url(&preview_image)?;
                 let render_review = build_panorama_render_review(&render_result.metadata);
 
-                *panorama_result_handle.lock().unwrap() = Some(PendingPanoramaResult {
-                    image: render_result.image,
-                    metadata: render_result.metadata,
-                    source_refs,
-                });
+                task_service
+                    .publish_render(
+                        &accepted,
+                        &task_cancellation_id,
+                        PendingPanoramaResult {
+                            image: render_result.image,
+                            metadata: render_result.metadata,
+                            source_refs,
+                        },
+                    )
+                    .map_err(str::to_string)?;
 
                 let _ = app_handle.emit(
                     "panorama-complete",
@@ -632,10 +647,7 @@ pub async fn stitch_panorama(
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
     };
-    PANORAMA_ALIGNMENT_CANCELLATIONS
-        .lock()
-        .unwrap()
-        .remove(&cancellation_id);
+    service.fail_render(&cancellation_id);
     result
 }
 
@@ -943,15 +955,9 @@ pub async fn save_panorama(
     source_paths: Option<Vec<String>>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let pending_panorama = state
-        .panorama_result
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| {
-            "No panorama image found in memory to save. It might have already been saved."
-                .to_string()
-        })?;
+    let service = Arc::clone(&state.services.panorama);
+    let payload = service.acquire_save().map_err(str::to_string)?;
+    let pending_panorama = &payload.pending;
 
     let (first_path, _) = parse_virtual_path(&first_path_str);
     let parent_dir = first_path
@@ -996,22 +1002,48 @@ pub async fn save_panorama(
     image_to_save
         .save(&temp_output_path)
         .map_err(|e| format!("Failed to save panorama image: {}", e))?;
-    if let Err(e) = fs::rename(&temp_output_path, &output_path) {
+    let publish = crate::merge::atomic_derived_output::with_atomic_output_publish_lock(|| {
+        service.authorize(&payload.lease)?;
+        fs::rename(&temp_output_path, &output_path).map_err(|error| {
+            format!(
+                "Failed to atomically publish panorama image {}: {error}",
+                output_path.display()
+            )
+        })
+    })?;
+    if let Err(e) = publish {
         let _ = fs::remove_file(&temp_output_path);
-        return Err(format!(
-            "Failed to atomically publish panorama image {}: {}",
-            output_path.display(),
-            e
-        ));
+        return Err(e);
     }
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
-    crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path)?;
-    write_panorama_output_sidecar(&output_path, &pending_panorama.metadata, &source_refs)?;
+    let metadata_result =
+        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path)
+            .and_then(|()| {
+                write_panorama_output_sidecar(
+                    &output_path,
+                    &pending_panorama.metadata,
+                    &source_refs,
+                )
+            });
+    if let Err(error) = metadata_result {
+        let (image_cleanup, sidecar_cleanup) = rollback_panorama_publication(&output_path);
+        return Err(format!(
+            "panorama_metadata_publication_failed:{error}; rollback_image={image_cleanup:?}; rollback_sidecar={sidecar_cleanup:?}"
+        ));
+    }
 
-    *state.panorama_result.lock().unwrap() = None;
+    let _ = service.complete_save(&payload.lease);
 
     Ok(output_path.to_string_lossy().to_string())
+}
+
+fn rollback_panorama_publication(
+    output_path: &Path,
+) -> (Option<std::io::Error>, Option<std::io::Error>) {
+    let image_cleanup = fs::remove_file(output_path).err();
+    let sidecar_cleanup = fs::remove_file(panorama_sidecar_path(output_path)).err();
+    (image_cleanup, sidecar_cleanup)
 }
 
 fn render_with_legacy_homography_engine(
@@ -2991,6 +3023,40 @@ mod tests {
                 .to_string_lossy()
                 .starts_with(".IMG_0001_Pano.")
         );
+    }
+
+    #[test]
+    fn panorama_output_atomically_publishes_and_reopens_exact_pixels() {
+        let root = tempfile::tempdir().unwrap();
+        let output = root.path().join("landscape_Pano.tiff");
+        let temporary = temporary_panorama_output_path(&output);
+        let image = DynamicImage::ImageRgb8(image::RgbImage::from_fn(37, 19, |x, y| {
+            Rgb([(x * 7) as u8, (y * 11) as u8, ((x + y) * 3) as u8])
+        }));
+
+        image.save(&temporary).unwrap();
+        fs::rename(&temporary, &output).unwrap();
+        let reopened = image::open(&output).unwrap();
+
+        assert_eq!(reopened.dimensions(), (37, 19));
+        assert_eq!(reopened.to_rgb8(), image.to_rgb8());
+        assert!(!temporary.exists());
+    }
+
+    #[test]
+    fn metadata_failure_rolls_back_output_and_partial_sidecar() {
+        let root = tempfile::tempdir().unwrap();
+        let output = root.path().join("landscape_Pano.tiff");
+        let sidecar = panorama_sidecar_path(&output);
+        fs::write(&output, b"published-image").unwrap();
+        fs::write(&sidecar, b"partial-sidecar").unwrap();
+
+        let (image_error, sidecar_error) = rollback_panorama_publication(&output);
+
+        assert!(image_error.is_none());
+        assert!(sidecar_error.is_none());
+        assert!(!output.exists());
+        assert!(!sidecar.exists());
     }
 
     #[test]
