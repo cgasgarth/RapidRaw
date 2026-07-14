@@ -32,6 +32,7 @@ import {
 import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
+import { buildEditTransactionPersistenceContext } from '../../utils/editTransaction';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   decodeInteractivePreviewUrl,
@@ -145,6 +146,7 @@ export function useImageProcessing(
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const lastEditApplicationReceipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const adjustments = resolveReferenceMatchRenderAdjustments({
     adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
     committed: committedAdjustments,
@@ -1022,7 +1024,14 @@ export function useImageProcessing(
 
     persistIdleTimer.current = setTimeout(() => {
       if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
-      debouncedSave(selectedImage.path, adjustments);
+      const transaction =
+        lastEditApplicationReceipt &&
+        lastEditApplicationReceipt.imageSessionId ===
+          (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
+        lastEditApplicationReceipt.adjustmentRevision === adjustmentSnapshot.adjustmentRevision
+          ? buildEditTransactionPersistenceContext(lastEditApplicationReceipt, lastEditApplicationReceipt)
+          : undefined;
+      debouncedSave(selectedImage.path, adjustments, transaction);
       useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 
       const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
@@ -1074,6 +1083,8 @@ export function useImageProcessing(
     prevAdjustmentsRef,
     appSettings?.copyPasteSettings?.includedAdjustments,
     imageSessionId,
+    adjustmentSnapshot.adjustmentRevision,
+    lastEditApplicationReceipt,
   ]);
 
   useEffect(() => {

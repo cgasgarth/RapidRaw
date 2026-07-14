@@ -32,7 +32,7 @@ import {
   getEditorZoomSourceSize,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
-import type { EditTransactionRequest } from '../../utils/editTransaction';
+import type { EditTransactionPersistenceContext, EditTransactionRequest } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
@@ -46,12 +46,19 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);
 }, 500);
 
-export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustments) => {
-  invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err: unknown) => {
-    console.error('Auto-save failed:', err);
-    toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
-  });
-}, 300);
+export const debouncedSave = debounce(
+  (path: string, adjustmentsToSave: Adjustments, transaction?: EditTransactionPersistenceContext) => {
+    invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
+      path,
+      adjustments: adjustmentsToSave,
+      transaction,
+    }).catch((err: unknown) => {
+      console.error('Auto-save failed:', err);
+      toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
+    });
+  },
+  300,
+);
 
 type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
 
