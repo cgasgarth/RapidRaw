@@ -2,12 +2,14 @@
 
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { findForbiddenStartupDependency } from '../../../scripts/ci/startupEntryDependencyGuard';
 
 interface ManifestChunk {
   dynamicImports?: string[];
   file: string;
   imports?: string[];
   isEntry?: boolean;
+  name?: string;
   src?: string;
 }
 
@@ -34,28 +36,30 @@ const manifest = JSON.parse(await readFile(join(root, '.vite/manifest.json'), 'u
 const entry = Object.values(manifest).find((chunk) => chunk.isEntry && chunk.src === 'index.html');
 if (!entry) throw new Error('startup entry missing from Vite manifest');
 
-const staticGraph = new Set<string>();
-const visit = (chunk: ManifestChunk): void => {
-  if (staticGraph.has(chunk.file)) return;
-  staticGraph.add(chunk.file);
+const staticGraph = new Map<string, ManifestChunk>();
+const visit = (key: string, chunk: ManifestChunk): void => {
+  if (staticGraph.has(key)) return;
+  staticGraph.set(key, chunk);
   for (const imported of chunk.imports ?? []) {
     const dependency = manifest[imported];
     if (!dependency) throw new Error(`startup static dependency missing from manifest: ${imported}`);
-    visit(dependency);
+    visit(imported, dependency);
   }
 };
-visit(entry);
+const entryKey = Object.entries(manifest).find(([, chunk]) => chunk === entry)?.[0];
+if (!entryKey) throw new Error('startup entry key missing from Vite manifest');
+visit(entryKey, entry);
 
 const totalBytes = (
-  await Promise.all([...staticGraph].map(async (file) => (await stat(join(root, file))).size))
+  await Promise.all([...staticGraph.values()].map(async ({ file }) => (await stat(join(root, file))).size))
 ).reduce((sum, size) => sum + size, 0);
 if (totalBytes >= 50_000) throw new Error(`startup entry static graph is ${totalBytes} bytes; budget is <50000`);
 
-const forbidden = ['react', 'react-dom', 'zod'];
-for (const file of staticGraph) {
-  const lowered = file.toLowerCase();
-  const match = forbidden.find((dependency) => lowered.includes(dependency));
-  if (match) throw new Error(`startup entry statically loads ${match}: ${file}`);
+for (const [key, chunk] of staticGraph) {
+  // Vite content hashes are opaque. A hash such as `ZoDX18UC` must not be
+  // mistaken for the Zod package; manifest identities retain dependency names.
+  const match = findForbiddenStartupDependency(key, chunk);
+  if (match) throw new Error(`startup entry statically loads ${match}: ${chunk.file}`);
 }
 if ((entry.dynamicImports ?? []).length === 0) throw new Error('startup entry does not defer the full application');
 

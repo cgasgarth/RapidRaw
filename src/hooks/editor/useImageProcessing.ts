@@ -48,6 +48,7 @@ import {
   parseInteractivePreviewPatchPayload,
   usesPositionedPreviewPatch,
 } from '../../utils/interactivePreviewPatch';
+import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import { presentedPreviewReleaseCoordinator } from '../../utils/presentedPreviewReleaseCoordinator';
 import {
@@ -56,7 +57,6 @@ import {
   fingerprintPreviewRoi,
   PreviewCoordinator,
   type PreviewCoordinatorEvent,
-  type PreviewOperationIdentity,
   type PreviewQualitySnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
@@ -110,7 +110,6 @@ interface InteractivePreviewScopeSnapshot {
 }
 
 const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
-const previewDataUrlResponseSchema = z.string();
 const applyAdjustmentsInvokeSchema = z
   .object({
     activeWaveformChannel: z.string().nullable().optional(),
@@ -200,7 +199,6 @@ export function useImageProcessing(
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
   const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
   const setEditor = useEditorStore((state) => state.setEditor);
-  const dispatchCompare = useEditorStore((state) => state.dispatchCompare);
   const isCompareActive = compare.mode !== 'off' || compare.isOriginalHeld;
 
   const activeRightPanel = useUIStore((state) => state.activeRightPanel);
@@ -213,19 +211,6 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewerSampleGraphRevision = fingerprintPreviewGraphRevision({
-    adjustmentRevision: renderAdjustmentSnapshot.adjustmentRevision,
-    geometryRevision: renderAdjustmentSnapshot.geometryRevision,
-    imageSessionId,
-    maskRevision: renderAdjustmentSnapshot.maskRevision,
-    patchRevision: renderAdjustmentSnapshot.patchRevision,
-    proofRevision,
-    proposalFingerprint:
-      renderAdjustmentSnapshot === adjustmentSnapshot
-        ? (referenceMatchPreview?.proposalFingerprint ?? 'committed')
-        : (autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview'),
-  });
-
   const latestInteractiveRequestIdRef = useRef(0);
   const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
   const interactiveSchedulerRef = useRef<LatestOnlyInteractiveScheduler<InteractivePreviewRequest> | null>(null);
@@ -234,7 +219,6 @@ export function useImageProcessing(
       executeInteractiveRenderRef.current(request),
     );
   }
-  const currentOriginalResRef = useRef<number>(0);
   const previewIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
@@ -252,12 +236,14 @@ export function useImageProcessing(
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
+  const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
   const displayResourceGenerationRef = useRef(1);
 
   const dispatchPreviewCoordinator = useCallback(
     (event: PreviewCoordinatorEvent) => {
       const previous = previewCoordinator.snapshot();
       const transition = previewCoordinator.dispatch(event);
+      originalPreviewRunnerRef.current?.consume(transition.effects);
       for (const effect of transition.effects) {
         if (effect.type !== 'publish') continue;
         if (effect.identity.kind === 'settled') {
@@ -287,6 +273,17 @@ export function useImageProcessing(
     },
     [previewCoordinator, setEditor],
   );
+
+  const originalPreviewRunner =
+    originalPreviewRunnerRef.current ??
+    new OriginalPreviewEffectRunner({
+      dispatch: dispatchPreviewCoordinator,
+      onCurrentFailure: (error) => {
+        console.error('Failed to generate original preview:', error);
+        useEditorStore.getState().dispatchCompare({ type: 'exit' });
+      },
+    });
+  originalPreviewRunnerRef.current = originalPreviewRunner;
 
   const previewSessionIdentity = useCallback(
     (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
@@ -892,9 +889,10 @@ export function useImageProcessing(
   useEffect(
     () => () => {
       interactiveSchedulerRef.current?.dispose();
+      originalPreviewRunner.dispose();
       dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
     },
-    [dispatchPreviewCoordinator],
+    [dispatchPreviewCoordinator, originalPreviewRunner],
   );
 
   useEffect(() => {
@@ -1132,78 +1130,24 @@ export function useImageProcessing(
     [applyAdjustments, currentResRef],
   );
 
-  const startOriginalPreviewOperation = useCallback(
-    (targetRes: number): PreviewOperationIdentity | null => {
+  const requestOriginalPreview = useCallback(
+    (targetRes: number, delayMs: number): void => {
       const scopeSnapshot = interactiveScopeRef.current(targetRes, null);
-      if (scopeSnapshot === null) return null;
+      if (scopeSnapshot === null) return;
       const session = previewSessionIdentity(scopeSnapshot.scope, targetRes, null);
-      const transition = dispatchPreviewCoordinator({
-        identity: session,
-        kind: 'original',
-        reason: 'original-preview-requested',
-        type: 'render-inputs-changed',
-      });
-      const identity = transition.state.original.identity;
-      if (identity !== undefined) {
-        dispatchPreviewCoordinator({ identity, type: 'operation-started' });
-      }
-      return identity ?? null;
+      if (!originalPreviewRunner.needsRequest(session, targetRes)) return;
+      originalPreviewRunner.request(
+        session,
+        {
+          expectedImagePath: session.sourceImagePath,
+          jsAdjustments: structuredClone(adjustments),
+          targetResolution: targetRes,
+          viewerSampleGraphRevision: session.graphRevision,
+        },
+        delayMs,
+      );
     },
-    [dispatchPreviewCoordinator, previewSessionIdentity],
-  );
-
-  const completeOriginalPreviewOperation = useCallback(
-    (identity: PreviewOperationIdentity, base64Data: string): boolean => {
-      const transition = dispatchPreviewCoordinator({
-        artifact: { identity, url: base64Data },
-        identity,
-        type: 'operation-completed',
-      });
-      return transition.state.lastTransition?.staleCompletion !== true;
-    },
-    [dispatchPreviewCoordinator],
-  );
-
-  const failOriginalPreviewOperation = useCallback(
-    (identity: PreviewOperationIdentity, error: unknown): boolean => {
-      const transition = dispatchPreviewCoordinator({ error: String(error), identity, type: 'operation-failed' });
-      return transition.state.lastTransition?.staleCompletion !== true;
-    },
-    [dispatchPreviewCoordinator],
-  );
-
-  const requestHiFiOriginalZoom = useMemo(
-    () =>
-      debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
-        if (targetRes > currentOriginalResRef.current) {
-          const operationIdentity = startOriginalPreviewOperation(targetRes);
-          if (operationIdentity === null) return;
-          try {
-            const base64Data = await invokeWithSchema(
-              Invokes.GenerateOriginalTransformedPreview,
-              {
-                jsAdjustments: currentAdjustments,
-                targetResolution: targetRes,
-                viewerSampleGraphRevision,
-              },
-              previewDataUrlResponseSchema,
-            );
-            if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
-              currentOriginalResRef.current = targetRes;
-            }
-          } catch (e) {
-            if (failOriginalPreviewOperation(operationIdentity, e)) {
-              console.error('Failed to generate hi-fi original preview:', e);
-            }
-          }
-        }
-      }, 200),
-    [
-      completeOriginalPreviewOperation,
-      failOriginalPreviewOperation,
-      startOriginalPreviewOperation,
-      viewerSampleGraphRevision,
-    ],
+    [adjustments, originalPreviewRunner, previewSessionIdentity],
   );
 
   useEffect(() => {
@@ -1372,80 +1316,31 @@ export function useImageProcessing(
   ]);
 
   useEffect(() => {
-    dispatchPreviewCoordinator({ reason: 'original-identity-changed', type: 'original-preview-cleared' });
+    originalPreviewRunner.cancel('original-identity-changed');
     setEditor({ transformedOriginalUrl: null });
-    currentOriginalResRef.current = 0;
-  }, [adjustmentSnapshot.geometryRevision, dispatchPreviewCoordinator, selectedImage?.path, setEditor]);
+  }, [adjustmentSnapshot.geometryRevision, originalPreviewRunner, selectedImage?.path, setEditor]);
 
   useEffect(() => {
     if (isCompareActive) return;
-    dispatchPreviewCoordinator({ reason: 'compare-disabled', type: 'original-preview-cleared' });
+    originalPreviewRunner.cancel('compare-disabled');
     setEditor({ transformedOriginalUrl: null });
-    currentOriginalResRef.current = 0;
-  }, [dispatchPreviewCoordinator, isCompareActive, setEditor]);
+  }, [isCompareActive, originalPreviewRunner, setEditor]);
 
   useEffect(() => {
     if (isCompareActive && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       const targetRes = calculateTargetRes();
-      if (targetRes > currentOriginalResRef.current) {
-        requestHiFiOriginalZoom(adjustments, targetRes);
-      }
+      requestOriginalPreview(targetRes, transformedOriginalUrl ? 200 : 0);
     }
-    return () => {
-      requestHiFiOriginalZoom.cancel();
-    };
   }, [
     isCompareActive,
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
-    adjustments,
     selectedImage?.isReady,
     isSliderDragging,
-    requestHiFiOriginalZoom,
-    originalSize,
-  ]);
-
-  useEffect(() => {
-    const generate = async () => {
-      if (isCompareActive && selectedImage?.path && !transformedOriginalUrl) {
-        let operationIdentity: PreviewOperationIdentity | null = null;
-        try {
-          const targetRes = calculateTargetRes();
-          operationIdentity = startOriginalPreviewOperation(targetRes);
-          if (operationIdentity === null) return;
-          const base64Data = await invokeWithSchema(
-            Invokes.GenerateOriginalTransformedPreview,
-            {
-              jsAdjustments: adjustments,
-              targetResolution: targetRes,
-              viewerSampleGraphRevision,
-            },
-            previewDataUrlResponseSchema,
-          );
-          if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
-            currentOriginalResRef.current = targetRes;
-          }
-        } catch (e) {
-          if (operationIdentity !== null && failOriginalPreviewOperation(operationIdentity, e)) {
-            console.error('Failed to generate original preview:', e);
-            dispatchCompare({ type: 'exit' });
-          }
-        }
-      }
-    };
-    void generate();
-  }, [
-    isCompareActive,
-    selectedImage?.path,
-    adjustments,
+    requestOriginalPreview,
     transformedOriginalUrl,
-    calculateTargetRes,
-    dispatchCompare,
-    completeOriginalPreviewOperation,
-    failOriginalPreviewOperation,
-    startOriginalPreviewOperation,
-    viewerSampleGraphRevision,
+    originalSize,
   ]);
 
   return {

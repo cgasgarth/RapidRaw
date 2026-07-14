@@ -1213,9 +1213,21 @@ fn generate_uncropped_preview(
     Ok(())
 }
 
+fn validate_original_preview_source(expected: &str, loaded: &str) -> Result<(), String> {
+    if loaded == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "stale_original_preview_source: expected {} but loaded {}",
+            expected, loaded
+        ))
+    }
+}
+
 #[tauri::command]
 fn generate_original_transformed_preview(
     js_adjustments: serde_json::Value,
+    expected_image_path: String,
     target_resolution: Option<u32>,
     viewer_sample_graph_revision: Option<String>,
     state: tauri::State<AppState>,
@@ -1227,6 +1239,7 @@ fn generate_original_transformed_preview(
         .unwrap()
         .clone()
         .ok_or("No original image loaded")?;
+    validate_original_preview_source(&expected_image_path, &loaded_image.path)?;
 
     let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
@@ -3744,6 +3757,22 @@ mod tests {
     fn preview_dispatch_accepts_the_expected_loaded_image() {
         assert!(
             validate_expected_preview_image("/photos/alaska-a.ARW", "/photos/alaska-a.ARW").is_ok()
+        );
+    }
+
+    #[test]
+    fn original_preview_rejects_a_stale_loaded_source() {
+        let error =
+            validate_original_preview_source("/photos/alaska-a.ARW", "/photos/alaska-b.ARW")
+                .expect_err("original compare must not render B for an A operation");
+
+        assert_eq!(
+            error,
+            "stale_original_preview_source: expected /photos/alaska-a.ARW but loaded /photos/alaska-b.ARW"
+        );
+        assert!(
+            validate_original_preview_source("/photos/alaska-a.ARW", "/photos/alaska-a.ARW")
+                .is_ok()
         );
     }
 
