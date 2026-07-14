@@ -133,6 +133,7 @@ export interface PreviewCoordinatorState {
   lastTransition: PreviewTransitionReceipt | null;
   nextOperationId: number;
   original: PreviewOperationState;
+  originalArtifact: PreviewArtifact | null;
   persistence: PreviewOperationState;
   quality: PreviewQualitySnapshot | null;
   settled: PreviewOperationState;
@@ -156,6 +157,7 @@ export type PreviewCoordinatorEvent =
   | { type: 'interaction-started' }
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
   | { type: 'operation-failed'; error: string; identity: PreviewOperationIdentity }
+  | { type: 'original-preview-cleared'; reason: string }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
   | { type: 'quality-decision-changed'; quality: PreviewQualitySnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
@@ -179,6 +181,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     lastTransition: null,
     nextOperationId: 1,
     original: idleOperation(),
+    originalArtifact: null,
     persistence: idleOperation(),
     quality: null,
     settled: idleOperation(),
@@ -252,6 +255,7 @@ function cancelActiveOperations(
   releaseVisibleArtifact = true,
 ): PreviewCoordinatorState {
   let next = state;
+  const releasedUrls = new Set<string>();
   for (const kind of previewOperationKindSchema.options) {
     const operation = operationForKind(next, kind);
     if (operation.identity === undefined || !['queued', 'running'].includes(operation.status)) continue;
@@ -260,7 +264,14 @@ function cancelActiveOperations(
   }
   if (releaseVisibleArtifact && next.visibleArtifact !== null) {
     effects.push({ type: 'release-url', url: next.visibleArtifact.url, reason });
+    releasedUrls.add(next.visibleArtifact.url);
     next = { ...next, visibleArtifact: null };
+  }
+  if (releaseVisibleArtifact && next.originalArtifact !== null) {
+    if (!releasedUrls.has(next.originalArtifact.url)) {
+      effects.push({ type: 'release-url', url: next.originalArtifact.url, reason });
+    }
+    next = { ...next, originalArtifact: null };
   }
   return next;
 }
@@ -315,6 +326,18 @@ export function reducePreviewCoordinator(
       viewport: null,
     };
     return { effects, state: withReceipt(state, event, event.reason ?? 'session-cancelled') };
+  }
+
+  if (event.type === 'original-preview-cleared') {
+    const original = state.original;
+    if (original.identity !== undefined && ['queued', 'running'].includes(original.status)) {
+      effects.push({ type: 'cancel', identity: original.identity, reason: event.reason });
+    }
+    if (state.originalArtifact !== null && state.originalArtifact.url !== state.visibleArtifact?.url) {
+      effects.push({ type: 'release-url', url: state.originalArtifact.url, reason: event.reason });
+    }
+    state = { ...state, original: idleOperation(), originalArtifact: null };
+    return { effects, state: withReceipt(state, event, event.reason) };
   }
 
   if (event.type === 'interaction-started') {
@@ -432,6 +455,14 @@ export function reducePreviewCoordinator(
       state.session === null ||
       !sameSession(state.session, identity.session)
     ) {
+      if (
+        event.type === 'operation-completed' &&
+        identity.kind === 'original' &&
+        event.artifact !== undefined &&
+        event.artifact.url !== state.originalArtifact?.url
+      ) {
+        effects.push({ type: 'release-url', url: event.artifact.url, reason: 'stale-original-artifact' });
+      }
       state = { ...state, staleCompletionCount: state.staleCompletionCount + 1 };
       return {
         effects,
@@ -445,6 +476,17 @@ export function reducePreviewCoordinator(
     }
 
     state = updateOperation(state, identity.kind, { identity, status: 'presented' });
+    if (identity.kind === 'original') {
+      if (event.artifact !== undefined) {
+        const previousUrl = state.originalArtifact?.url;
+        if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
+          effects.push({ type: 'release-url', url: previousUrl, reason: 'original-artifact-replaced' });
+        }
+        effects.push({ type: 'publish', artifact: event.artifact, identity, reason: 'operation-presented' });
+        state = { ...state, originalArtifact: event.artifact };
+      }
+      return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
+    }
     const shouldPublish =
       event.artifact !== undefined &&
       identity.kind !== 'analytics' &&

@@ -24,7 +24,7 @@ describe('QA watch planning', () => {
         'src/components/editor/CompareControls.tsx',
         'private-artifacts/qa/run.json',
       ]),
-    ).toEqual(['browser.editor.compare']);
+    ).toEqual(['browser.editor.original-compare-lifecycle', 'browser.editor.compare']);
     expect(watchedScenarioIds(['private-artifacts/qa/run.json'])).toEqual([]);
   });
 
