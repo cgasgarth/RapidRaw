@@ -1,4 +1,5 @@
 import { type ComponentType, createElement, lazy, type ReactNode } from 'react';
+import { FilmEmulationWorkspace } from '../../film/FilmEmulationWorkspace';
 import { Panel } from '../../ui/AppProperties';
 import ColorWorkspacePanel from './color/ColorWorkspacePanel';
 import Controls from './color/ControlsPanel';
@@ -46,6 +47,7 @@ const RIGHT_PANEL_RENDERERS: Record<Panel, RightPanelRenderer> = {
       selectedImage,
       setExportState,
     }),
+  [Panel.Film]: () => createElement(FilmEmulationWorkspace),
   [Panel.Masks]: () => createElement(MasksPanel),
   [Panel.Metadata]: () => createElement(MetadataPanel),
   [Panel.Presets]: ({ onNavigateToCommunity }) => createElement(PresetsPanel, { onNavigateToCommunity }),
