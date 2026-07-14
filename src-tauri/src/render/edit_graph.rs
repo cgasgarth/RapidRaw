@@ -115,6 +115,185 @@ impl EditNodeKind {
     }
 }
 
+/// Backend ownership and resource requirements for one executable graph node.
+/// The descriptor is deliberately backend-neutral: the current WGPU runtime
+/// may fuse several descriptors into one dispatch, but the graph still has one
+/// inspectable owner for each node.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EditNodeRuntimeDescriptor {
+    pub kind: EditNodeKind,
+    pub schema_version: u32,
+    pub implementation_version: u32,
+    pub cpu_implementation: Option<&'static str>,
+    pub wgpu_implementation: Option<&'static str>,
+    pub fused_phase: Option<&'static str>,
+    pub resource_requirements: &'static [&'static str],
+    pub supports_local: bool,
+    pub legacy_compatibility: bool,
+}
+
+macro_rules! runtime_descriptor {
+    ($kind:ident, $cpu:expr, $wgpu:expr, $phase:expr, $resources:expr, $local:expr, $legacy:expr) => {
+        EditNodeRuntimeDescriptor {
+            kind: EditNodeKind::$kind,
+            schema_version: 1,
+            implementation_version: 1,
+            cpu_implementation: $cpu,
+            wgpu_implementation: $wgpu,
+            fused_phase: $phase,
+            resource_requirements: $resources,
+            supports_local: $local,
+            legacy_compatibility: $legacy,
+        }
+    };
+}
+
+const NO_RESOURCES: &[&str] = &[];
+const SCENE_SPATIAL_RESOURCES: &[&str] = &["scene_guidance_v1"];
+const VIEW_RESOURCES: &[&str] = &["view_transform_lut_v1"];
+const DISPLAY_RESOURCES: &[&str] = &["display_lut_v1", "mask_layers_v1"];
+
+static CAMERA_INPUT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    CameraInputBoundary,
+    Some("camera_input_transform_v1"),
+    None,
+    None,
+    NO_RESOURCES,
+    false,
+    false
+);
+static GEOMETRY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    GeometryRetouch,
+    Some("geometry_retouch_cpu_v2"),
+    None,
+    None,
+    &["geometry_tiles_v1"],
+    false,
+    false
+);
+static PRE_GPU_DETAIL_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    PreGpuSpatialDetail,
+    Some("pre_gpu_detail_cpu_v1"),
+    None,
+    None,
+    &["detail_guidance_v1"],
+    false,
+    false
+);
+static SCENE_GLOBAL_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    SceneGlobalColorTone,
+    Some("edit_graph_cpu_reference_v2"),
+    Some("shader_wgsl_scene_phase_v2"),
+    Some("scene"),
+    SCENE_SPATIAL_RESOURCES,
+    false,
+    false
+);
+static SCENE_CURVE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    SceneCurve,
+    Some("scene_curve_cpu_v1"),
+    Some("scene_curve_wgsl_v1"),
+    Some("scene"),
+    NO_RESOURCES,
+    false,
+    false
+);
+static LOCAL_SCENE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    LocalSceneComposition,
+    Some("edit_graph_cpu_reference_v2"),
+    Some("shader_wgsl_scene_phase_v2"),
+    Some("scene"),
+    SCENE_SPATIAL_RESOURCES,
+    true,
+    false
+);
+static VIEW_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    SceneToViewTransform,
+    Some("edit_graph_cpu_reference_v2"),
+    Some("shader_wgsl_view_display_phase_v2"),
+    Some("view"),
+    VIEW_RESOURCES,
+    false,
+    false
+);
+static DISPLAY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    DisplayCreative,
+    Some("edit_graph_cpu_reference_v2"),
+    Some("shader_wgsl_view_display_phase_v2"),
+    Some("display"),
+    DISPLAY_RESOURCES,
+    true,
+    false
+);
+static OUTPUT_CURVE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    OutputCurve,
+    Some("output_curve_cpu_v1"),
+    Some("output_curve_wgsl_v1"),
+    Some("display"),
+    NO_RESOURCES,
+    false,
+    false
+);
+static LEGACY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    LegacyGpuSceneViewPass,
+    Some("native_color_mixer_post_wgpu_v1"),
+    Some("shader_wgsl_legacy_scene_view_v1"),
+    Some("legacy"),
+    &["legacy_scene_blur_v1", "mask_layers_v1"],
+    true,
+    true
+);
+static CLIPPING_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    ClippingOverlay,
+    None,
+    Some("clipping_overlay_wgsl_v1"),
+    Some("display"),
+    NO_RESOURCES,
+    false,
+    false
+);
+static TRANSPORT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    RenderTransport,
+    None,
+    Some("shader_transport_dither_v1"),
+    Some("transport"),
+    NO_RESOURCES,
+    false,
+    false
+);
+
+pub fn runtime_descriptor(kind: EditNodeKind) -> &'static EditNodeRuntimeDescriptor {
+    match kind {
+        EditNodeKind::CameraInputBoundary => &CAMERA_INPUT_RUNTIME,
+        EditNodeKind::GeometryRetouch => &GEOMETRY_RUNTIME,
+        EditNodeKind::PreGpuSpatialDetail => &PRE_GPU_DETAIL_RUNTIME,
+        EditNodeKind::SceneGlobalColorTone => &SCENE_GLOBAL_RUNTIME,
+        EditNodeKind::SceneCurve => &SCENE_CURVE_RUNTIME,
+        EditNodeKind::LocalSceneComposition => &LOCAL_SCENE_RUNTIME,
+        EditNodeKind::SceneToViewTransform => &VIEW_RUNTIME,
+        EditNodeKind::DisplayCreative => &DISPLAY_RUNTIME,
+        EditNodeKind::OutputCurve => &OUTPUT_CURVE_RUNTIME,
+        EditNodeKind::LegacyGpuSceneViewPass => &LEGACY_RUNTIME,
+        EditNodeKind::ClippingOverlay => &CLIPPING_RUNTIME,
+        EditNodeKind::RenderTransport => &TRANSPORT_RUNTIME,
+    }
+}
+
+pub const ALL_EDIT_NODE_KINDS: &[EditNodeKind] = &[
+    EditNodeKind::CameraInputBoundary,
+    EditNodeKind::GeometryRetouch,
+    EditNodeKind::PreGpuSpatialDetail,
+    EditNodeKind::SceneGlobalColorTone,
+    EditNodeKind::SceneCurve,
+    EditNodeKind::LocalSceneComposition,
+    EditNodeKind::SceneToViewTransform,
+    EditNodeKind::DisplayCreative,
+    EditNodeKind::OutputCurve,
+    EditNodeKind::LegacyGpuSceneViewPass,
+    EditNodeKind::ClippingOverlay,
+    EditNodeKind::RenderTransport,
+];
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NodeDependencies {
     pub source: bool,
@@ -986,6 +1165,11 @@ impl CompiledEditGraph {
     }
 
     pub fn validate_contract(&self) -> Result<(), &'static str> {
+        debug_assert!(
+            ALL_EDIT_NODE_KINDS
+                .iter()
+                .all(|kind| runtime_descriptor(*kind).kind == *kind)
+        );
         if self.schema_version == 0
             || self
                 .nodes
@@ -1010,6 +1194,15 @@ impl CompiledEditGraph {
             .any(|node| !node.payload.belongs_to(node.kind))
         {
             return Err("edit_graph.node_payload_kind_mismatch");
+        }
+        if self.nodes.iter().any(|node| {
+            let descriptor = runtime_descriptor(node.kind);
+            node.schema_version != descriptor.schema_version
+                || node.implementation_version != descriptor.implementation_version
+                || node.cpu_implementation != descriptor.cpu_implementation
+                || node.wgpu_implementation != descriptor.wgpu_implementation
+        }) {
+            return Err("edit_graph.runtime_ownership_mismatch");
         }
         if self
             .nodes
@@ -1059,6 +1252,12 @@ impl CompiledEditGraph {
                 },
                 "cpuImplementation": node.cpu_implementation,
                 "wgpuImplementation": node.wgpu_implementation,
+                "runtime": {
+                    "fusedPhase": runtime_descriptor(node.kind).fused_phase,
+                    "resourceRequirements": runtime_descriptor(node.kind).resource_requirements,
+                    "supportsLocal": runtime_descriptor(node.kind).supports_local,
+                    "legacyCompatibility": runtime_descriptor(node.kind).legacy_compatibility,
+                },
                 "payloadType": node.payload.kind_id(),
                 "payload": node.payload.diagnostic(),
                 "payloadFingerprint": format!("{:016x}", node.payload_fingerprint),
@@ -1253,32 +1452,33 @@ pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) ->
 #[allow(clippy::too_many_arguments)]
 fn node(
     kind: EditNodeKind,
-    input_domain: ColorDomain,
-    output_domain: ColorDomain,
-    stage_class: EditStageClass,
-    range_policy: ValueRangePolicy,
-    spatial_support: SpatialSupport,
-    local_adjustment_policy: LocalAdjustmentPolicy,
+    _input_domain: ColorDomain,
+    _output_domain: ColorDomain,
+    _stage_class: EditStageClass,
+    _range_policy: ValueRangePolicy,
+    _spatial_support: SpatialSupport,
+    _local_adjustment_policy: LocalAdjustmentPolicy,
     dependencies: NodeDependencies,
-    cpu_implementation: Option<&'static str>,
-    wgpu_implementation: Option<&'static str>,
+    _cpu_implementation: Option<&'static str>,
+    _wgpu_implementation: Option<&'static str>,
     payload_fingerprint: u64,
 ) -> CompiledEditNode {
+    let descriptor = runtime_descriptor(kind);
     CompiledEditNode {
         kind,
-        schema_version: 1,
-        implementation_version: 1,
-        input_domain,
-        output_domain,
-        stage_class,
-        range_policy,
+        schema_version: descriptor.schema_version,
+        implementation_version: descriptor.implementation_version,
+        input_domain: _input_domain,
+        output_domain: _output_domain,
+        stage_class: _stage_class,
+        range_policy: _range_policy,
         alpha_policy: AlphaPolicy::PreserveStraight,
         precision: PrecisionPolicy::Float16OrBetter,
         dependencies,
-        spatial_support,
-        local_adjustment_policy,
-        cpu_implementation,
-        wgpu_implementation,
+        spatial_support: _spatial_support,
+        local_adjustment_policy: _local_adjustment_policy,
+        cpu_implementation: descriptor.cpu_implementation,
+        wgpu_implementation: descriptor.wgpu_implementation,
         payload_fingerprint,
         payload: CompiledNodePayload::InputBoundary {
             source_fingerprint: 0,
@@ -1310,4 +1510,67 @@ fn graph_fingerprint(pipeline_version: u32, nodes: &[CompiledEditNode]) -> u64 {
         hasher.update(format!("{:?}", node.stage_class).as_bytes());
     }
     u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+}
+
+#[cfg(test)]
+mod runtime_registry_tests {
+    use super::*;
+
+    #[test]
+    fn every_edit_node_kind_has_one_stable_runtime_descriptor_and_backend_owner() {
+        let mut stable_ids = std::collections::HashSet::new();
+        for kind in ALL_EDIT_NODE_KINDS {
+            let descriptor = runtime_descriptor(*kind);
+            assert_eq!(descriptor.kind, *kind);
+            assert!(descriptor.schema_version > 0);
+            assert!(descriptor.implementation_version > 0);
+            assert!(
+                descriptor.cpu_implementation.is_some() || descriptor.wgpu_implementation.is_some(),
+                "{} must declare at least one backend owner",
+                kind.stable_id()
+            );
+            assert!(
+                stable_ids.insert(kind.stable_id()),
+                "duplicate node id {}",
+                kind.stable_id()
+            );
+        }
+        assert_eq!(stable_ids.len(), ALL_EDIT_NODE_KINDS.len());
+    }
+
+    #[test]
+    fn compiled_graph_uses_registry_ownership_and_fused_resource_receipts() {
+        let adjustments = AllAdjustments::default();
+        let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
+            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
+            version_was_explicit: true,
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &adjustments,
+            neutral_adjustments: &adjustments,
+            scene_curve: None,
+            output_curve: None,
+            has_geometry_or_retouch: false,
+            has_detail: false,
+            has_masks: false,
+            has_lut: false,
+            show_clipping: false,
+        });
+        graph
+            .validate_contract()
+            .expect("registry-backed graph is valid");
+        let receipt = graph.diagnostic_receipt();
+        let scene = receipt["nodes"]
+            .as_array()
+            .expect("node diagnostics are an array")
+            .iter()
+            .find(|node| node["id"] == EditNodeKind::SceneToViewTransform.stable_id())
+            .expect("view node is present");
+        assert_eq!(scene["runtime"]["fusedPhase"], "view");
+        assert!(scene["runtime"]["resourceRequirements"].is_array());
+    }
 }
