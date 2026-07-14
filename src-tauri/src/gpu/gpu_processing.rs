@@ -633,6 +633,21 @@ struct CachedMainBindGroup {
     bind_group: wgpu::BindGroup,
 }
 
+/// Device-generation-owned mutable GPU state. Keeping cache publication and
+/// execution receipts behind one owner prevents resources from one generation
+/// being mixed with another when a device is recreated. Callers hold this
+/// lock only for lookup/publish; allocation and queue uploads happen outside
+/// the lock in the prepare paths below.
+struct GpuResourceStore {
+    resource_cache: GpuResourceCache,
+    dehaze_analysis_cache: HazeAnalysisCache,
+    main_bind_group_cache: Option<CachedMainBindGroup>,
+    view_bind_group_cache: Option<CachedMainBindGroup>,
+    display_bind_group_cache: Option<CachedMainBindGroup>,
+    blur_surface_cache: BlurSurfaceCache,
+    last_execution_receipt: Option<GpuExecutionReceipt>,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct BlurPassNeeds {
     sharpness: bool,
@@ -1192,14 +1207,8 @@ fn create_flare_resources(
 pub struct GpuProcessor {
     context: GpuContext,
     generation: u64,
-    resource_cache: Mutex<GpuResourceCache>,
-    dehaze_analysis_cache: Mutex<HazeAnalysisCache>,
+    resources: Mutex<GpuResourceStore>,
     last_dehaze_receipt: Mutex<Option<DehazeReceiptV1>>,
-    main_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
-    view_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
-    display_bind_group_cache: Mutex<Option<CachedMainBindGroup>>,
-    blur_surface_cache: Mutex<BlurSurfaceCache>,
-    last_execution_receipt: Mutex<Option<GpuExecutionReceipt>>,
     execution_sequence: AtomicU64,
     blur_bgl: wgpu::BindGroupLayout,
     h_blur_pipeline: wgpu::ComputePipeline,
@@ -1236,11 +1245,11 @@ const FLARE_MAP_SIZE: u32 = 512;
 
 impl GpuProcessor {
     pub fn resource_cache_counters(&self) -> GpuResourceCacheCounters {
-        self.resource_cache.lock().unwrap().counters
+        self.resources.lock().unwrap().resource_cache.counters
     }
 
     pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
-        *self.last_execution_receipt.lock().unwrap()
+        self.resources.lock().unwrap().last_execution_receipt
     }
 
     pub fn last_dehaze_receipt(&self) -> Option<DehazeReceiptV1> {
@@ -1607,20 +1616,22 @@ impl GpuProcessor {
         let processor = Self {
             context,
             generation: NEXT_PROCESSOR_GENERATION.fetch_add(1, Ordering::Relaxed),
-            resource_cache: Mutex::new(GpuResourceCache {
-                counters: GpuResourceCacheCounters {
-                    sampler_creations: 2,
+            resources: Mutex::new(GpuResourceStore {
+                resource_cache: GpuResourceCache {
+                    counters: GpuResourceCacheCounters {
+                        sampler_creations: 2,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
+                dehaze_analysis_cache: HazeAnalysisCache::new(4),
+                main_bind_group_cache: None,
+                view_bind_group_cache: None,
+                display_bind_group_cache: None,
+                blur_surface_cache: BlurSurfaceCache::default(),
+                last_execution_receipt: None,
             }),
-            dehaze_analysis_cache: Mutex::new(HazeAnalysisCache::new(4)),
             last_dehaze_receipt: Mutex::new(None),
-            main_bind_group_cache: Mutex::new(None),
-            view_bind_group_cache: Mutex::new(None),
-            display_bind_group_cache: Mutex::new(None),
-            blur_surface_cache: Mutex::new(BlurSurfaceCache::default()),
-            last_execution_receipt: Mutex::new(None),
             execution_sequence: AtomicU64::new(0),
             blur_bgl,
             h_blur_pipeline,
@@ -1685,9 +1696,10 @@ impl GpuProcessor {
             identity.height,
         );
         let (analysis, analysis_cache_hit) = self
-            .dehaze_analysis_cache
+            .resources
             .lock()
             .unwrap()
+            .dehaze_analysis_cache
             .get_or_analyze(image, analysis_identity);
         let plan = apply_analysis_to_adjustments(&analysis, adjustments);
         *self.last_dehaze_receipt.lock().unwrap() = Some(dehaze_receipt(
@@ -1744,12 +1756,12 @@ impl GpuProcessor {
         let (mask_key, layer_fingerprints) =
             mask_texture_key_and_layers(device_generation, width, height, request.mask_bitmaps);
         let mask_hit = {
-            let mut cache = self.resource_cache.lock().unwrap();
-            cache.mask(mask_key)
+            let mut resources = self.resources.lock().unwrap();
+            resources.resource_cache.mask(mask_key)
         };
         let compatible_mask = if mask_hit.is_none() {
-            let mut cache = self.resource_cache.lock().unwrap();
-            cache.compatible_mask(mask_key)
+            let mut resources = self.resources.lock().unwrap();
+            resources.resource_cache.compatible_mask(mask_key)
         } else {
             None
         };
@@ -1810,7 +1822,8 @@ impl GpuProcessor {
             }
             resident.key = mask_key;
             resident.layer_fingerprints = layer_fingerprints;
-            let mut cache = self.resource_cache.lock().unwrap();
+            let mut resources = self.resources.lock().unwrap();
+            let cache = &mut resources.resource_cache;
             let upload_bytes = uploaded_layers * layer_bytes;
             cache.counters.gpu_upload_bytes += upload_bytes;
             cache.counters.cpu_conversion_bytes += upload_bytes;
@@ -1855,9 +1868,10 @@ impl GpuProcessor {
                 layer_fingerprints,
                 estimated_bytes: data.len() as u64,
             };
-            self.resource_cache
+            self.resources
                 .lock()
                 .unwrap()
+                .resource_cache
                 .insert_mask(entry.clone());
             entry
         };
@@ -1867,7 +1881,7 @@ impl GpuProcessor {
             .as_deref()
             .map(|lut| lut_texture_key(device_generation, lut));
         let resident_lut = if let (Some(lut_arc), Some(key)) = (&request.lut, lut_key) {
-            if let Some(hit) = self.resource_cache.lock().unwrap().lut(key) {
+            if let Some(hit) = self.resources.lock().unwrap().resource_cache.lut(key) {
                 Some(hit)
             } else {
                 let size = lut_arc.size;
@@ -1896,9 +1910,10 @@ impl GpuProcessor {
                     _texture: texture,
                     estimated_bytes: lut_arc.rgba16f.len() as u64 * size_of::<u16>() as u64,
                 };
-                self.resource_cache
+                self.resources
                     .lock()
                     .unwrap()
+                    .resource_cache
                     .insert_lut(entry.clone(), 0);
                 Some(entry)
             }
@@ -2156,9 +2171,10 @@ impl GpuProcessor {
                     };
                     if cache_one_tile
                         && self
-                            .blur_surface_cache
+                            .resources
                             .lock()
                             .unwrap()
+                            .blur_surface_cache
                             .is_valid(family, key)
                     {
                         blur_counters.cache_hits += 1;
@@ -2167,7 +2183,11 @@ impl GpuProcessor {
                     if cache_one_tile {
                         blur_counters.cache_misses += 1;
                     } else {
-                        self.blur_surface_cache.lock().unwrap().invalidate(family);
+                        self.resources
+                            .lock()
+                            .unwrap()
+                            .blur_surface_cache
+                            .invalidate(family);
                     }
 
                     let params = BlurParams {
@@ -2236,7 +2256,11 @@ impl GpuProcessor {
                     }
 
                     if cache_one_tile {
-                        self.blur_surface_cache.lock().unwrap().publish(family, key);
+                        self.resources
+                            .lock()
+                            .unwrap()
+                            .blur_surface_cache
+                            .publish(family, key);
                     }
                     blur_counters.record_family(u64::from(input_width) * u64::from(input_height));
                     true
@@ -2375,23 +2399,27 @@ impl GpuProcessor {
                     abi_version: MAIN_BIND_GROUP_ABI_VERSION + u32::from(split_scene_view_display),
                 };
                 let bind_group = {
-                    let mut cached = self.main_bind_group_cache.lock().unwrap();
-                    if let Some(hit) = cached.as_ref().filter(|entry| entry.key == bind_group_key) {
-                        self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
-                        hit.bind_group.clone()
+                    let mut resources = self.resources.lock().unwrap();
+                    if let Some(hit) = resources
+                        .main_bind_group_cache
+                        .as_ref()
+                        .filter(|entry| entry.key == bind_group_key)
+                        .map(|entry| entry.bind_group.clone())
+                    {
+                        resources.resource_cache.counters.bind_group_hits += 1;
+                        hit
                     } else {
                         let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
                             label: Some("Cached Tile Bind Group"),
                             layout: &self.main_bgl,
                             entries: &bind_group_entries,
                         });
-                        *cached = Some(CachedMainBindGroup {
+                        resources.main_bind_group_cache = Some(CachedMainBindGroup {
                             key: bind_group_key,
                             bind_group: created.clone(),
                         });
-                        let mut resources = self.resource_cache.lock().unwrap();
-                        resources.counters.bind_group_misses += 1;
-                        resources.counters.bind_group_creations += 1;
+                        resources.resource_cache.counters.bind_group_misses += 1;
+                        resources.resource_cache.counters.bind_group_creations += 1;
                         created
                     }
                 };
@@ -2421,26 +2449,28 @@ impl GpuProcessor {
                         },
                     ];
                     view_entries.extend(bind_group_entries.iter().skip(3).cloned());
-                    let mut cached = self.view_bind_group_cache.lock().unwrap();
+                    let mut resources = self.resources.lock().unwrap();
                     Some(
-                        if let Some(hit) =
-                            cached.as_ref().filter(|entry| entry.key == bind_group_key)
+                        if let Some(hit) = resources
+                            .view_bind_group_cache
+                            .as_ref()
+                            .filter(|entry| entry.key == bind_group_key)
+                            .map(|entry| entry.bind_group.clone())
                         {
-                            self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
-                            hit.bind_group.clone()
+                            resources.resource_cache.counters.bind_group_hits += 1;
+                            hit
                         } else {
                             let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
                                 label: Some("Cached View-pass Bind Group"),
                                 layout: &self.main_bgl,
                                 entries: &view_entries,
                             });
-                            *cached = Some(CachedMainBindGroup {
+                            resources.view_bind_group_cache = Some(CachedMainBindGroup {
                                 key: bind_group_key,
                                 bind_group: created.clone(),
                             });
-                            let mut resources = self.resource_cache.lock().unwrap();
-                            resources.counters.bind_group_misses += 1;
-                            resources.counters.bind_group_creations += 1;
+                            resources.resource_cache.counters.bind_group_misses += 1;
+                            resources.resource_cache.counters.bind_group_creations += 1;
                             created
                         },
                     )
@@ -2472,26 +2502,28 @@ impl GpuProcessor {
                         },
                     ];
                     display_entries.extend(bind_group_entries.iter().skip(3).cloned());
-                    let mut cached = self.display_bind_group_cache.lock().unwrap();
+                    let mut resources = self.resources.lock().unwrap();
                     Some(
-                        if let Some(hit) =
-                            cached.as_ref().filter(|entry| entry.key == bind_group_key)
+                        if let Some(hit) = resources
+                            .display_bind_group_cache
+                            .as_ref()
+                            .filter(|entry| entry.key == bind_group_key)
+                            .map(|entry| entry.bind_group.clone())
                         {
-                            self.resource_cache.lock().unwrap().counters.bind_group_hits += 1;
-                            hit.bind_group.clone()
+                            resources.resource_cache.counters.bind_group_hits += 1;
+                            hit
                         } else {
                             let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
                                 label: Some("Cached Display-pass Bind Group"),
                                 layout: &self.main_bgl,
                                 entries: &display_entries,
                             });
-                            *cached = Some(CachedMainBindGroup {
+                            resources.display_bind_group_cache = Some(CachedMainBindGroup {
                                 key: bind_group_key,
                                 bind_group: created.clone(),
                             });
-                            let mut resources = self.resource_cache.lock().unwrap();
-                            resources.counters.bind_group_misses += 1;
-                            resources.counters.bind_group_creations += 1;
+                            resources.resource_cache.counters.bind_group_misses += 1;
+                            resources.resource_cache.counters.bind_group_creations += 1;
                             created
                         },
                     )
@@ -2637,7 +2669,8 @@ impl GpuProcessor {
         }
 
         {
-            let mut cache = self.blur_surface_cache.lock().unwrap();
+            let mut resources = self.resources.lock().unwrap();
+            let cache = &mut resources.blur_surface_cache;
             cache.totals.families_requested += blur_counters.families_requested;
             cache.totals.encoders += blur_counters.encoders;
             cache.totals.bind_groups += blur_counters.bind_groups;
@@ -2690,10 +2723,10 @@ impl GpuProcessor {
             },
             dehaze: *self.last_dehaze_receipt.lock().unwrap(),
         };
-        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
         self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
-        *self.last_execution_receipt.lock().unwrap() = Some(receipt);
+        self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
 
         Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
     }
@@ -4478,7 +4511,12 @@ mod blur_pass_tests {
         let processor_guard = state.gpu_processor.lock().unwrap();
         let processor = &processor_guard.as_ref().unwrap().processor;
         assert_eq!(
-            processor.dehaze_analysis_cache.lock().unwrap().counters(),
+            processor
+                .resources
+                .lock()
+                .unwrap()
+                .dehaze_analysis_cache
+                .counters(),
             (4, 2)
         );
         let execution = processor
@@ -4771,9 +4809,10 @@ mod blur_pass_tests {
             .as_ref()
             .unwrap()
             .processor
-            .blur_surface_cache
+            .resources
             .lock()
             .unwrap()
+            .blur_surface_cache
             .totals;
         assert_eq!(blur.cache_misses, 1);
         assert_eq!(blur.cache_hits, 999);
@@ -5006,8 +5045,10 @@ mod blur_pass_tests {
         assert_eq!(counters.cpu_conversion_bytes, 16 * 16 * 2);
         assert_eq!(counters.bind_group_creations, 1);
         assert_eq!(counters.bind_group_hits, 19);
-        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
-        *processor.main_bind_group_cache.lock().unwrap() = None;
+        let mut resources = processor.resources.lock().unwrap();
+        resources.resource_cache = GpuResourceCache::default();
+        resources.main_bind_group_cache = None;
+        drop(resources);
         drop(processor_guard);
 
         let cold = render(0.0);
@@ -5071,8 +5112,10 @@ mod blur_pass_tests {
         assert_eq!(counters.mask_layers_uploaded, 3);
         assert_eq!(counters.mask_layers_cleared, 0);
 
-        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
-        *processor.main_bind_group_cache.lock().unwrap() = None;
+        let mut resources = processor.resources.lock().unwrap();
+        resources.resource_cache = GpuResourceCache::default();
+        resources.main_bind_group_cache = None;
+        drop(resources);
         drop(processor_guard);
         let cold_changed = render(
             &[
@@ -5094,8 +5137,10 @@ mod blur_pass_tests {
         assert_eq!(counters.texture_creations, 1);
         assert_eq!(counters.mask_partial_upload_bytes, 16 * 16);
         assert_eq!(counters.mask_layers_cleared, 1);
-        *processor.resource_cache.lock().unwrap() = GpuResourceCache::default();
-        *processor.main_bind_group_cache.lock().unwrap() = None;
+        let mut resources = processor.resources.lock().unwrap();
+        resources.resource_cache = GpuResourceCache::default();
+        resources.main_bind_group_cache = None;
+        drop(resources);
         drop(processor_guard);
         let cold_removed = render(std::slice::from_ref(&changed_mask), adjustments);
         assert_eq!(
