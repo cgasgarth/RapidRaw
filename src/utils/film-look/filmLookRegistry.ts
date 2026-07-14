@@ -175,6 +175,21 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
   }),
   makeGenericFilmLook({
     adjustmentPatch: {
+      contrast: 12,
+      grainAmount: 20,
+      grainRoughness: 60,
+      grainSize: 40,
+      saturation: -100,
+    },
+    category: 'black_and_white',
+    description:
+      'Project-owned D65 daylight-class measured RGB tristimulus fit; not universal spectral reconstruction or stock emulation.',
+    displayName: 'Measured Monochrome D65',
+    id: 'film_look.measured.monochrome_d65.v1',
+    strengthDefault: 75,
+  }),
+  makeGenericFilmLook({
+    adjustmentPatch: {
       blacks: -3,
       contrast: 24,
       glowAmount: 8,
