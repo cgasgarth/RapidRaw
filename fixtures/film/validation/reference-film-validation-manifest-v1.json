@@ -1,0 +1,49 @@
+{
+  "contract": "rapidraw.film_validation_fixture.v1",
+  "id": "film-validation.reference-analytic.v1",
+  "proofLevel": "analytic_numeric",
+  "source": {
+    "logicalId": "rapidraw.generated.film.reference-analytic.v1",
+    "pathOrPrivateRef": "fixtures/film/validation/reference-film-analytic-v1.json",
+    "sha256": "sha256:61b76551a57e867ebdd8b5e32a20238fed84072ea36a20595627b53ee239deac",
+    "mediaType": "application/json",
+    "licenseSpdx": ["AGPL-3.0-or-later"],
+    "noticePaths": ["LICENSE", "AGPL_COMPLIANCE.md"],
+    "publicRepoAllowed": true
+  },
+  "input": {
+    "domain": "acescg_linear_v1",
+    "inputTransformId": "generated_ap1_identity_v1",
+    "exposureOffsetEv": 0,
+    "orientation": 0
+  },
+  "regions": [
+    {
+      "id": "neutral-response-ramp",
+      "kind": "ramp",
+      "bounds": [0, 0, 1, 1]
+    }
+  ],
+  "render": {
+    "profileRefs": [
+      {
+        "id": "rapidraw.reference_film.v1",
+        "version": "1",
+        "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef"
+      }
+    ],
+    "viewTransforms": ["AgX v1"],
+    "outputProfiles": ["srgb"],
+    "bitDepths": [16, 32],
+    "proofCrops": [[0, 0, 1, 1]]
+  },
+  "thresholds": {
+    "maxAbs": 0.0000001,
+    "rmse": 0.00000001,
+    "neutralAxisDrift": 0.0001,
+    "identityDeltaE00": 0.0001,
+    "monotonicTolerance": 0.000001,
+    "grainRepeatTolerance": 0,
+    "opticalLeakage": 0.001
+  }
+}

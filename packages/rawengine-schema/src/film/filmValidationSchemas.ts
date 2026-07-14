@@ -42,6 +42,8 @@ export const filmValidationThresholdsV1Schema = z
     maxAbs: z.number().finite().nonnegative().max(0.1),
     rmse: z.number().finite().nonnegative().max(0.1),
     neutralAxisDrift: z.number().finite().nonnegative().max(0.1),
+    identityDeltaE00: z.number().finite().nonnegative().max(1),
+    monotonicTolerance: z.number().finite().nonnegative().max(0.01),
     grainRepeatTolerance: z.number().finite().nonnegative().max(0.1),
     opticalLeakage: z.number().finite().nonnegative().max(0.1),
   })
@@ -56,6 +58,7 @@ export const filmValidationFixtureV1Schema = z
     input: z
       .object({
         domain: z.literal('acescg_linear_v1'),
+        inputTransformId: z.string().trim().min(1),
         inputProfileId: z.string().trim().min(1).optional(),
         inputProfileSha256: sha256Schema.optional(),
         illuminant: z.string().trim().min(1).optional(),
@@ -94,6 +97,84 @@ export const filmValidationFixtureV1Schema = z
       context.addIssue({ code: 'custom', message: 'Private RAW proof cannot be marked public.', path: ['source'] });
   });
 
+export const filmAnalyticAssertionV1Schema = z.enum([
+  'identity_disabled',
+  'identity_mix_zero',
+  'finite_full_mix',
+  'neutral_full_mix',
+]);
+
+export const filmAnalyticVectorSetV1Schema = z
+  .object({
+    contract: z.literal('rapidraw.film_analytic_vectors.v1'),
+    profileRef: filmEmulationProfileRefV1Schema,
+    workingSpace: z.literal('acescg_linear_v1'),
+    samples: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^[a-z0-9][a-z0-9.-]*$/u),
+            input: rgbSchema,
+            assertions: z.array(filmAnalyticAssertionV1Schema).min(1),
+          })
+          .strict(),
+      )
+      .min(4),
+    neutralRamp: z
+      .object({
+        id: z.string().regex(/^[a-z0-9][a-z0-9.-]*$/u),
+        values: z.array(z.number().finite().nonnegative()).min(5),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((vectors, context) => {
+    const ids = [...vectors.samples.map(({ id }) => id), vectors.neutralRamp.id];
+    if (new Set(ids).size !== ids.length)
+      context.addIssue({ code: 'custom', message: 'Analytic vector IDs must be unique.', path: ['samples'] });
+    if (vectors.neutralRamp.values.some((value, index, values) => index > 0 && value <= (values[index - 1] ?? value)))
+      context.addIssue({
+        code: 'custom',
+        message: 'Neutral ramp values must increase.',
+        path: ['neutralRamp', 'values'],
+      });
+    const assertions = new Set(vectors.samples.flatMap(({ assertions: sampleAssertions }) => sampleAssertions));
+    for (const required of filmAnalyticAssertionV1Schema.options) {
+      if (!assertions.has(required))
+        context.addIssue({ code: 'custom', message: `Missing required analytic assertion: ${required}.` });
+    }
+  });
+
+export const filmNativeAnalyticSampleReportV1Schema = z
+  .object({
+    id: z.string().trim().min(1),
+    input: rgbSchema,
+    disabledOutput: rgbSchema,
+    mixZeroOutput: rgbSchema,
+    fullMixOutput: rgbSchema,
+  })
+  .strict();
+
+export const filmNativeAnalyticReportV1Schema = z
+  .object({
+    contract: z.literal('rapidraw.film_native_analytic_report.v1'),
+    fixtureId: filmValidationFixtureV1Schema.shape.id,
+    sourceSha256: sha256Schema,
+    profileRef: filmEmulationProfileRefV1Schema,
+    postFilmDomain: z.literal('acescg_linear_v1'),
+    maxAbs: z.number().finite().nonnegative(),
+    rmse: z.number().finite().nonnegative(),
+    neutralAxisDrift: z.number().finite().nonnegative(),
+    monotonicViolationCount: z.number().int().nonnegative(),
+    negativeComponentCount: z.number().int().nonnegative(),
+    highComponentCount: z.number().int().nonnegative(),
+    deterministicHash: sha256Schema,
+    samples: z.array(filmNativeAnalyticSampleReportV1Schema).min(1),
+    passed: z.boolean(),
+    failures: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const filmValidationReportV1Schema = z
   .object({
     contract: z.literal('rapidraw.film_validation_report.v1'),
@@ -113,3 +194,5 @@ export const filmValidationReportV1Schema = z
 
 export type FilmValidationFixtureV1 = z.infer<typeof filmValidationFixtureV1Schema>;
 export type FilmValidationReportV1 = z.infer<typeof filmValidationReportV1Schema>;
+export type FilmAnalyticVectorSetV1 = z.infer<typeof filmAnalyticVectorSetV1Schema>;
+export type FilmNativeAnalyticReportV1 = z.infer<typeof filmNativeAnalyticReportV1Schema>;

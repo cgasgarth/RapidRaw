@@ -1,43 +1,39 @@
 #!/usr/bin/env bun
 
-import { filmValidationFixtureV1Schema } from '../../../../packages/rawengine-schema/src/index.ts';
-import { classifyLinearRgbGamut } from '../../../../src/utils/color/runtime/gamutMappingRuntime.ts';
-import { calculateDeltaE00 } from '../../../../src/utils/deltaE00.ts';
-import {
-  createFilmAnalyticFixture,
-  type FilmAnalyticVector,
-  runFilmAnalyticConformance,
-} from '../../../../src/utils/film-look/filmValidation.ts';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
-const fixture = createFilmAnalyticFixture();
-const vectors: FilmAnalyticVector[] = [
-  { id: 'neutral-gray', before: [0.18, 0.18, 0.18], after: [0.18, 0.18, 0.18] },
-  { id: 'extended-range', before: [-0.1, 0.2, 1.2], after: [-0.1, 0.2, 1.2] },
-  { id: 'highlight-ramp', before: [0.8, 0.7, 0.6], after: [0.80005, 0.70004, 0.60003] },
-];
-const report = await runFilmAnalyticConformance(fixture, vectors);
-const repeat = await runFilmAnalyticConformance(fixture, vectors);
-if (!report.passed || report.failures.length > 0)
-  throw new Error(`Analytic Film gate failed: ${report.failures.join(',')}`);
-if (report.deterministicHash !== repeat.deterministicHash)
-  throw new Error('Analytic report hash is not deterministic.');
-if (
-  report.postFilmDomain !== 'acescg_linear_v1' ||
-  report.negativeComponentCount !== 1 ||
-  report.highComponentCount !== 1
-)
-  throw new Error('Post-Film AP1 range accounting is incorrect.');
-if (classifyLinearRgbGamut(vectors[1].after) !== 'mixed_out_of_gamut')
-  throw new Error('Gamut classification was not reused.');
-if (calculateDeltaE00({ l: 50, a: 0, b: 0 }, { l: 50, a: 0, b: 0 }) !== 0)
-  throw new Error('Existing DeltaE00 oracle did not remain usable.');
+import {
+  filmAnalyticVectorSetV1Schema,
+  filmValidationFixtureV1Schema,
+} from '../../../../packages/rawengine-schema/src/index.ts';
+
+const root = resolve(import.meta.dir, '../../../..');
+const manifestPath = resolve(root, 'fixtures/film/validation/reference-film-validation-manifest-v1.json');
+const manifest = filmValidationFixtureV1Schema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
+const sourcePath = resolve(root, manifest.source.pathOrPrivateRef);
+const sourceBytes = await readFile(sourcePath);
+const vectors = filmAnalyticVectorSetV1Schema.parse(JSON.parse(sourceBytes.toString('utf8')));
+const sourceHash = `sha256:${new Bun.CryptoHasher('sha256').update(sourceBytes).digest('hex')}`;
+if (sourceHash !== manifest.source.sha256) throw new Error('Governed Film source hash drifted.');
+if (JSON.stringify(vectors.profileRef) !== JSON.stringify(manifest.render.profileRefs[0]))
+  throw new Error('Governed Film profile identity drifted between manifest and vectors.');
 
 const privateAsPublic = {
-  ...fixture,
+  ...manifest,
   proofLevel: 'public_runtime_fixture' as const,
-  source: { ...fixture.source, publicRepoAllowed: false },
+  source: { ...manifest.source, publicRepoAllowed: false },
 };
 if (filmValidationFixtureV1Schema.safeParse(privateAsPublic).success)
   throw new Error('Private fixture was accepted as a public runtime fixture.');
+const ambiguousInputTransform = { ...manifest, input: { ...manifest.input, inputTransformId: '' } };
+if (filmValidationFixtureV1Schema.safeParse(ambiguousInputTransform).success)
+  throw new Error('Manifest accepted a missing input-transform identity.');
+const nonMonotoneVectors = {
+  ...vectors,
+  neutralRamp: { ...vectors.neutralRamp, values: [0, 0.18, 0.1, 1, 2] },
+};
+if (filmAnalyticVectorSetV1Schema.safeParse(nonMonotoneVectors).success)
+  throw new Error('Analytic source accepted a non-monotone neutral ramp.');
 
-console.log(`film validation manifest ok (${report.fixtureId}, deterministic analytic gate passed)`);
+console.log(`film validation manifest ok (${manifest.id}, ${String(vectors.samples.length)} production vectors)`);

@@ -1,0 +1,50 @@
+{
+  "contract": "rapidraw.film_analytic_vectors.v1",
+  "profileRef": {
+    "id": "rapidraw.reference_film.v1",
+    "version": "1",
+    "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef"
+  },
+  "workingSpace": "acescg_linear_v1",
+  "samples": [
+    {
+      "id": "black",
+      "input": [0, 0, 0],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix", "neutral_full_mix"]
+    },
+    {
+      "id": "deep-shadow-neutral",
+      "input": [0.001, 0.001, 0.001],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix", "neutral_full_mix"]
+    },
+    {
+      "id": "reference-gray",
+      "input": [0.18, 0.18, 0.18],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix", "neutral_full_mix"]
+    },
+    {
+      "id": "diffuse-white",
+      "input": [1, 1, 1],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix", "neutral_full_mix"]
+    },
+    {
+      "id": "signed-extended-range",
+      "input": [-0.1, 0.2, 1.2],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix"]
+    },
+    {
+      "id": "high-extended-range",
+      "input": [2, 1.5, 0.5],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix"]
+    },
+    {
+      "id": "saturated-warm-patch",
+      "input": [0.72, 0.18, 0.04],
+      "assertions": ["identity_disabled", "identity_mix_zero", "finite_full_mix"]
+    }
+  ],
+  "neutralRamp": {
+    "id": "neutral-response-ramp",
+    "values": [0, 0.0001, 0.001, 0.01, 0.05, 0.18, 0.5, 1, 2, 4]
+  }
+}
