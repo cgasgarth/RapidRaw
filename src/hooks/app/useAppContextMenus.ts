@@ -55,6 +55,10 @@ import {
   Panel,
 } from '../../components/ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
+import {
+  batchAutoAdjustPersistenceBarrierReceiptSchema,
+  batchAutoAdjustResultV1Schema,
+} from '../../schemas/batchAutoAdjustSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../../schemas/computational-merge/panoramaUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/computational-merge/superResolutionUiSchemas';
@@ -68,7 +72,14 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { type Adjustments, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { normalizeLoadedAdjustments } from '../../utils/adjustments';
+import {
+  type BatchAutoAdjustSelectionIdentity,
+  buildSelectedBatchAutoAdjustTransaction,
+  resolveBatchAutoAdjustAcceptanceIdentity,
+  selectedBatchAutoAdjustDisposition,
+  shouldCompensateBatchAutoAdjustPersistence,
+} from '../../utils/batchAutoAdjustTransaction';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from '../../utils/hdrAutoStackSelection';
@@ -79,6 +90,7 @@ import {
   planLibraryRelink,
   rewriteLibraryRelinkPath,
 } from '../../utils/libraryRelinkIdentity';
+import { protectNativeCommittedHydrationSession } from '../../utils/nativeCommittedHydrationAuthority';
 import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
@@ -86,7 +98,12 @@ import {
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { createSuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { useEditorActions } from '../editor/useEditorActions';
+import {
+  awaitMatchingEditorSave,
+  beginEditorPersistenceAuthorityBarrier,
+  debouncedSave,
+  useEditorActions,
+} from '../editor/useEditorActions';
 import { useLibraryActions } from '../library/useLibraryActions';
 import {
   buildColorLabelMenu,
@@ -110,10 +127,6 @@ export interface UseAppContextMenusProps {
 
 interface DeleteOptions {
   includeAssociated: boolean;
-}
-
-interface LoadedMetadata {
-  adjustments?: Adjustments | null;
 }
 
 interface FolderTreeRoot {
@@ -427,9 +440,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.preventDefault();
       event.stopPropagation();
 
-      const { selectedImage, copiedAdjustments, setEditor } = useEditorStore.getState();
-      const { multiSelectedPaths, imageList, libraryActivePath, albumTree, activeAlbumId, setLibrary } =
-        useLibraryStore.getState();
+      const editorAtContextOpen = useEditorStore.getState();
+      const { selectedImage, copiedAdjustments, setEditor } = editorAtContextOpen;
+      const { multiSelectedPaths, imageList, albumTree, activeAlbumId, setLibrary } = useLibraryStore.getState();
       const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { setUI, setRightPanel } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
@@ -547,32 +560,149 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const handleApplyAutoAdjustmentsToSelection = () => {
         if (finalSelection.length === 0) return;
-        finalSelection.forEach((p) => {
-          globalImageCache.delete(p);
-        });
+        const editor = editorAtContextOpen;
+        const capturedSelection: BatchAutoAdjustSelectionIdentity | null =
+          editor.selectedImage && finalSelection.includes(editor.selectedImage.path)
+            ? {
+                adjustmentRevision: editor.adjustmentRevision,
+                imageSessionId: editor.imageSession?.id ?? `editor-image-session:${String(editor.imageSessionId)}`,
+                path: editor.selectedImage.path,
+              }
+            : null;
+        const capturedAdjustments = capturedSelection === null ? null : structuredClone(editor.adjustments);
+        if (capturedSelection !== null) beginEditorPersistenceAuthorityBarrier();
+        let barrierPersisted = capturedSelection === null;
 
-        invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
-          .then(async () => {
-            if (selectedImage && finalSelection.includes(selectedImage.path)) {
-              const metadata = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: selectedImage.path });
-              if (metadata.adjustments && !metadata.adjustments['is_null']) {
-                const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-                setEditor({ adjustments: normalized });
-                useEditorStore.getState().resetHistory(normalized);
+        void (async () => {
+          let expectedBaseRevision: string | null = null;
+          if (capturedSelection !== null && capturedAdjustments !== null) {
+            const matchingSave = await awaitMatchingEditorSave(capturedSelection.path, capturedAdjustments);
+            const barrierReceipt =
+              matchingSave ??
+              (await invokeWithSchema(
+                Invokes.SaveMetadataAndUpdateThumbnail,
+                {
+                  adjustments: capturedAdjustments,
+                  path: capturedSelection.path,
+                  transaction: null,
+                },
+                batchAutoAdjustPersistenceBarrierReceiptSchema,
+              ));
+            barrierPersisted = true;
+            expectedBaseRevision = barrierReceipt.sidecarRevision;
+          }
+
+          const results = await invokeWithSchema(
+            Invokes.ApplyAutoAdjustmentsToPaths,
+            {
+              deferPath: capturedSelection?.path ?? null,
+              expectedBaseRevision,
+              paths: finalSelection,
+            },
+            batchAutoAdjustResultV1Schema,
+          );
+          for (const result of results) {
+            if (result.status === 'applied') globalImageCache.delete(result.path);
+          }
+
+          if (capturedSelection !== null && capturedAdjustments !== null) {
+            const selectedResult = results.find((result) => result.path === capturedSelection.path);
+            const current = useEditorStore.getState();
+            const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
+              ? {
+                  adjustmentRevision: current.adjustmentRevision,
+                  imageSessionId: current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`,
+                  path: current.selectedImage.path,
+                }
+              : null;
+            if (selectedResult?.status === 'prepared') {
+              const disposition = selectedBatchAutoAdjustDisposition(capturedSelection, currentSelection);
+              if (disposition !== 'reject-stale') {
+                const committed = await invokeWithSchema(
+                  Invokes.CommitBatchAutoAdjustment,
+                  { request: { path: capturedSelection.path, receipt: selectedResult.receipt } },
+                  batchAutoAdjustResultV1Schema.element,
+                );
+                if (committed.status === 'applied' || committed.status === 'no_op') {
+                  if (committed.status === 'applied') globalImageCache.delete(committed.path);
+                  if (useLibraryStore.getState().libraryActivePath === committed.path) {
+                    setLibrary({
+                      libraryActiveAdjustments: normalizeLoadedAdjustments(committed.receipt.adjustments),
+                    });
+                  }
+                  const latest = useEditorStore.getState();
+                  const latestSelection: BatchAutoAdjustSelectionIdentity | null = latest.selectedImage
+                    ? {
+                        adjustmentRevision: latest.adjustmentRevision,
+                        imageSessionId:
+                          latest.imageSession?.id ?? `editor-image-session:${String(latest.imageSessionId)}`,
+                        path: latest.selectedImage.path,
+                      }
+                    : null;
+                  const acceptanceIdentity = resolveBatchAutoAdjustAcceptanceIdentity({
+                    captured: capturedSelection,
+                    capturedAdjustments,
+                    current: latestSelection,
+                    currentAdjustments: latest.selectedImage ? latest.adjustments : null,
+                  });
+                  if (acceptanceIdentity !== null) {
+                    const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
+                    protectNativeCommittedHydrationSession(
+                      acceptanceIdentity.imageSessionId,
+                      committed.receipt.transactionId,
+                    );
+                    const transaction = buildSelectedBatchAutoAdjustTransaction({
+                      acceptedAdjustments,
+                      captured: capturedSelection,
+                      current: acceptanceIdentity,
+                      result: committed,
+                    });
+                    if (transaction !== null) latest.applyEditTransaction(transaction);
+                  }
+                } else if (committed.status === 'failed') {
+                  toast.error(t('contextMenus.toasts.failedApplyAuto', { err: committed.errorMessage }));
+                }
               }
             }
-            if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
-              const metadata = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: libraryActivePath });
-              if (metadata.adjustments && !metadata.adjustments['is_null']) {
-                const normalized = normalizeLoadedAdjustments(metadata.adjustments);
-                setLibrary({ libraryActiveAdjustments: normalized });
-              }
+          }
+
+          const currentLibraryPath = useLibraryStore.getState().libraryActivePath;
+          const libraryResult = results.find(
+            (result) => result.path === currentLibraryPath && result.status !== 'failed',
+          );
+          if (libraryResult?.status === 'applied') {
+            setLibrary({ libraryActiveAdjustments: normalizeLoadedAdjustments(libraryResult.receipt.adjustments) });
+          }
+
+          const failures = results.filter((result) => result.status === 'failed');
+          if (failures.length > 0) {
+            toast.error(t('contextMenus.toasts.failedApplyAuto', { err: failures[0]?.errorMessage }));
+          }
+        })().catch((err: unknown) => {
+          if (capturedSelection !== null && capturedAdjustments !== null) {
+            const current = useEditorStore.getState();
+            const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
+              ? {
+                  adjustmentRevision: current.adjustmentRevision,
+                  imageSessionId: current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`,
+                  path: current.selectedImage.path,
+                }
+              : null;
+            if (
+              shouldCompensateBatchAutoAdjustPersistence({
+                barrierPersisted,
+                captured: capturedSelection,
+                capturedAdjustments,
+                current: currentSelection,
+                currentAdjustments: current.selectedImage ? current.adjustments : null,
+              })
+            ) {
+              debouncedSave(capturedSelection.path, capturedAdjustments);
             }
-          })
-          .catch((err: unknown) => {
-            console.error('Failed to apply auto adjustments to paths:', err);
-            toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
-          });
+          }
+          console.error('Failed to apply auto adjustments to paths:', err);
+          toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
+        });
       };
 
       const onExportClick = () => {

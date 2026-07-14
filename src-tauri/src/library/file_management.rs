@@ -6,8 +6,8 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
@@ -63,6 +63,8 @@ use crate::thumbnail_scheduler::{
 use crate::xmp_sidecar::{
     extract_xmp_label, extract_xmp_rating, extract_xmp_tags, sync_metadata_to_xmp_sidecar,
 };
+
+static RENDER_SIDECAR_AUTHORITY_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 fn resolve_thumbnail_cache_dir(app_handle: &AppHandle) -> std::result::Result<PathBuf, String> {
     let cache_dir = app_handle
@@ -2253,7 +2255,7 @@ pub struct MetadataSaveReceipt {
     pub adjustments: Option<Value>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EditTransactionPersistenceContext {
     pub transaction_id: String,
@@ -2355,31 +2357,32 @@ pub fn save_metadata_and_update_thumbnail(
         transaction.validate()?;
     }
     let (source_path, sidecar_path) = parse_virtual_path(&path);
+    let metadata = {
+        let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
+        let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        let mut final_adjustments = adjustments;
+        {
+            let lens_db_guard = state.lens_db.lock().unwrap();
+            resolve_lens_params_in_adjustments(
+                &mut final_adjustments,
+                &metadata.exif,
+                lens_db_guard.as_deref(),
+            );
+        }
 
-    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        if let Some(adjustments_map) = final_adjustments.as_object_mut()
+            && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
+        {
+            metadata.raw_engine_artifacts = Some(
+                serde_json::from_value::<RawEngineArtifacts>(raw_engine_artifacts)
+                    .map_err(|err| format!("Invalid RawEngine artifact envelope: {}", err))?,
+            );
+        }
 
-    let mut final_adjustments = adjustments;
-    {
-        let lens_db_guard = state.lens_db.lock().unwrap();
-        resolve_lens_params_in_adjustments(
-            &mut final_adjustments,
-            &metadata.exif,
-            lens_db_guard.as_deref(),
-        );
-    }
-
-    if let Some(adjustments_map) = final_adjustments.as_object_mut()
-        && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
-    {
-        metadata.raw_engine_artifacts = Some(
-            serde_json::from_value::<RawEngineArtifacts>(raw_engine_artifacts)
-                .map_err(|err| format!("Invalid RawEngine artifact envelope: {}", err))?,
-        );
-    }
-
-    metadata.adjustments = final_adjustments;
-
-    save_metadata_sidecar(&sidecar_path, &metadata)?;
+        metadata.adjustments = final_adjustments;
+        save_metadata_sidecar(&sidecar_path, &metadata)?;
+        metadata
+    };
 
     if let Ok(settings) = load_settings(app_handle.clone())
         && settings.enable_xmp_sync.unwrap_or(false)
@@ -2667,117 +2670,407 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
     }
 }
 
+const BATCH_AUTO_ADJUST_CONTRACT_V1: &str = "rapidraw.batch_auto_adjust.v1";
+const LEGACY_AUTO_ADJUST_ENGINE_V1: &str = "rapidraw.legacy_auto_adjust.v1";
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAutoAdjustReceiptV1 {
+    pub base_adjustment_document_revision: String,
+    pub adjustment_document_revision: String,
+    pub adjustments: Value,
+    pub engine: String,
+    pub render_fingerprint: String,
+    pub source_identity: String,
+    pub source_revision: String,
+    pub thumbnail_revision: String,
+    pub transaction_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitBatchAutoAdjustmentRequestV1 {
+    pub path: String,
+    pub receipt: BatchAutoAdjustReceiptV1,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAutoAdjustPathResultV1 {
+    pub contract: &'static str,
+    pub path: String,
+    pub status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<BatchAutoAdjustReceiptV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+fn merge_auto_adjustment_document(
+    existing: &mut Value,
+    auto_adjustments: &Value,
+) -> Result<(), String> {
+    if existing.is_null() {
+        *existing = serde_json::json!({});
+    }
+    let existing_map = existing
+        .as_object_mut()
+        .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
+    let auto_map = auto_adjustments
+        .as_object()
+        .ok_or_else(|| "auto_adjust_invalid_analysis_document".to_string())?;
+    for (key, value) in auto_map {
+        if key == "sectionVisibility"
+            && let Some(existing_visibility) = existing_map.get_mut(key)
+            && let (Some(existing_visibility), Some(auto_visibility)) =
+                (existing_visibility.as_object_mut(), value.as_object())
+        {
+            for (visibility_key, visibility_value) in auto_visibility {
+                existing_visibility.insert(visibility_key.clone(), visibility_value.clone());
+            }
+        } else {
+            existing_map.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(())
+}
+
+fn load_auto_adjust_metadata(path: &str, sidecar_path: &Path) -> Result<ImageMetadata, String> {
+    let loaded = crate::exif_processing::load_sidecar_recovering(sidecar_path, Some(path))?;
+    let invalid_adjustments_quarantined = loaded
+        .metadata
+        .persisted_render_state
+        .as_ref()
+        .is_some_and(|state| {
+            state
+                .quarantined_extensions
+                .contains_key("invalidAdjustments")
+        });
+    if invalid_adjustments_quarantined {
+        return Err(format!(
+            "auto_adjust_invalid_adjustment_document_quarantined:{}",
+            loaded.backup_path.as_ref().map_or_else(
+                || sidecar_path.display().to_string(),
+                |backup| backup.display().to_string()
+            )
+        ));
+    }
+    Ok(loaded.metadata)
+}
+
+fn batch_auto_adjust_receipt(
+    path: &str,
+    source_path: &Path,
+    base_adjustment_document_revision: String,
+    metadata: &ImageMetadata,
+) -> Result<(BatchAutoAdjustReceiptV1, MetadataSaveReceipt), String> {
+    let persisted = metadata_save_receipt(path, metadata);
+    let source_revision = crate::source_revision::SourceRevision::from_path(source_path)
+        .map_err(|error| error.to_string())?
+        .identity();
+    let transaction_id = format!(
+        "blake3:{}",
+        blake3::hash(
+            format!(
+                "{}\0{}\0{}\0{}",
+                path, source_revision, persisted.sidecar_revision, LEGACY_AUTO_ADJUST_ENGINE_V1
+            )
+            .as_bytes()
+        )
+        .to_hex()
+    );
+    Ok((
+        BatchAutoAdjustReceiptV1 {
+            base_adjustment_document_revision,
+            adjustment_document_revision: persisted.sidecar_revision.clone(),
+            adjustments: metadata.adjustments.clone(),
+            engine: LEGACY_AUTO_ADJUST_ENGINE_V1.to_string(),
+            render_fingerprint: format!("u64:{:016x}", persisted.render_fingerprint),
+            source_identity: source_path.to_string_lossy().to_string(),
+            source_revision,
+            thumbnail_revision: persisted.thumbnail_revision.clone(),
+            transaction_id,
+        },
+        persisted,
+    ))
+}
+
+fn failed_batch_auto_adjust_result_with_code(
+    path: &str,
+    error_code: &str,
+    error: String,
+) -> BatchAutoAdjustPathResultV1 {
+    BatchAutoAdjustPathResultV1 {
+        contract: BATCH_AUTO_ADJUST_CONTRACT_V1,
+        path: path.to_string(),
+        status: "failed",
+        receipt: None,
+        error_code: Some(error_code.into()),
+        error_message: Some(error),
+    }
+}
+
+fn failed_batch_auto_adjust_result(path: &str, error: String) -> BatchAutoAdjustPathResultV1 {
+    let error_code = if error.starts_with("auto_adjust_invalid_adjustment_document_quarantined:") {
+        "invalid_adjustment_document_quarantined"
+    } else if error.starts_with("stale_adjustment_document:") {
+        "stale_adjustment_document"
+    } else {
+        "auto_adjust_path_failed"
+    };
+    failed_batch_auto_adjust_result_with_code(path, error_code, error)
+}
+
+fn validate_batch_auto_adjust_commit(
+    current_revision: &str,
+    receipt: &BatchAutoAdjustReceiptV1,
+) -> Result<(), &'static str> {
+    if !receipt.adjustments.is_object() {
+        return Err("invalid_prepared_adjustment_document");
+    }
+    if current_revision != receipt.base_adjustment_document_revision {
+        return Err("stale_adjustment_document");
+    }
+    Ok(())
+}
+
+fn validate_prepared_batch_auto_adjust_receipt(
+    expected: &BatchAutoAdjustReceiptV1,
+    received: &BatchAutoAdjustReceiptV1,
+) -> Result<(), &'static str> {
+    if expected != received {
+        return Err("invalid_prepared_receipt");
+    }
+    Ok(())
+}
+
+fn is_exact_batch_auto_adjust_retry(
+    current_revision: &str,
+    current_adjustments: &Value,
+    expected: &BatchAutoAdjustReceiptV1,
+    received: &BatchAutoAdjustReceiptV1,
+) -> bool {
+    current_revision == received.adjustment_document_revision
+        && current_adjustments == &received.adjustments
+        && validate_prepared_batch_auto_adjust_receipt(expected, received).is_ok()
+}
+
 #[tauri::command]
 pub async fn apply_auto_adjustments_to_paths(
     paths: Vec<String>,
+    defer_path: Option<String>,
+    expected_base_revision: Option<String>,
     app_handle: AppHandle,
-) -> Result<(), String> {
-    let state = app_handle.state::<AppState>();
-    add_to_thumbnail_queue(&state, paths.len(), &app_handle);
-
+) -> Result<Vec<BatchAutoAdjustPathResultV1>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
-
         let state = app_handle.state::<AppState>();
-        let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::warn!("Unable to initialize thumbnail cache directory: {}", e);
-                for path in &paths {
-                    emit_thumbnail_cache_setup_error(&app_handle, path, &e);
-                }
-                for _ in 0..paths.len() {
-                    increment_thumbnail_progress(&state, &app_handle);
-                }
-                return;
+
+        Ok::<Vec<BatchAutoAdjustPathResultV1>, String>(
+            paths
+                .par_iter()
+                .map(|path| {
+                    let applied = (|| -> Result<BatchAutoAdjustPathResultV1, String> {
+                        let (source_path, sidecar_path) = parse_virtual_path(path);
+                        let source_path_str = source_path.to_string_lossy().to_string();
+                        let file_bytes =
+                            fs::read(&source_path).map_err(|error| error.to_string())?;
+                        let image = image_loader::load_base_image_from_bytes(
+                            &file_bytes,
+                            &source_path_str,
+                            true,
+                            &settings,
+                            None,
+                        )
+                        .map_err(|error| error.to_string())?;
+                        let auto_adjustments = auto_results_to_json(&perform_auto_analysis(&image));
+                        let is_deferred = defer_path.as_deref() == Some(path.as_str());
+                        let (result, committed) = {
+                            let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
+                            let mut metadata = load_auto_adjust_metadata(path, &sidecar_path)?;
+                            let base_revision =
+                                metadata_save_receipt(path, &metadata).sidecar_revision;
+                            if is_deferred
+                                && expected_base_revision.as_deref() != Some(base_revision.as_str())
+                            {
+                                return Err(format!(
+                                    "stale_adjustment_document:expected {} but found {}",
+                                    expected_base_revision.as_deref().unwrap_or("missing"),
+                                    base_revision
+                                ));
+                            }
+                            let before = metadata.adjustments.clone();
+                            merge_auto_adjustment_document(
+                                &mut metadata.adjustments,
+                                &auto_adjustments,
+                            )?;
+                            let changed = before != metadata.adjustments;
+
+                            if changed && !is_deferred {
+                                save_metadata_sidecar(&sidecar_path, &metadata)?;
+                            }
+                            let (receipt, thumbnail_receipt) = batch_auto_adjust_receipt(
+                                path,
+                                &source_path,
+                                base_revision,
+                                &metadata,
+                            )?;
+                            let status = if !changed {
+                                "no_op"
+                            } else if is_deferred {
+                                "prepared"
+                            } else {
+                                "applied"
+                            };
+                            let result = BatchAutoAdjustPathResultV1 {
+                                contract: BATCH_AUTO_ADJUST_CONTRACT_V1,
+                                path: path.clone(),
+                                status,
+                                receipt: Some(receipt),
+                                error_code: None,
+                                error_message: None,
+                            };
+                            let committed =
+                                (changed && !is_deferred).then_some((metadata, thumbnail_receipt));
+                            (result, committed)
+                        };
+
+                        if let Some((metadata, thumbnail_receipt)) = committed {
+                            if enable_xmp_sync {
+                                sync_metadata_to_xmp(
+                                    &source_path,
+                                    &metadata,
+                                    create_xmp_if_missing,
+                                );
+                            }
+                            submit_thumbnail_invalidation(&state, &app_handle, &thumbnail_receipt);
+                        }
+                        Ok(result)
+                    })();
+                    applied.unwrap_or_else(|error| failed_batch_auto_adjust_result(path, error))
+                })
+                .collect(),
+        )
+    })
+    .await
+    .map_err(|error| format!("Auto adjustment worker failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn commit_batch_auto_adjustment(
+    request: CommitBatchAutoAdjustmentRequestV1,
+    app_handle: AppHandle,
+) -> Result<BatchAutoAdjustPathResultV1, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = request.path;
+        let receipt = request.receipt;
+        if receipt.engine != LEGACY_AUTO_ADJUST_ENGINE_V1 || receipt.source_identity.is_empty() {
+            return Ok(failed_batch_auto_adjust_result_with_code(
+                &path,
+                "invalid_prepared_receipt",
+                "Batch Auto Adjust prepared receipt identity is invalid".into(),
+            ));
+        }
+        let settings = load_settings_or_default(&app_handle);
+        let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
+        let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
+        let (source_path, sidecar_path) = parse_virtual_path(&path);
+        let committed = {
+            let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
+            let mut metadata = load_auto_adjust_metadata(&path, &sidecar_path)?;
+            let current_revision = metadata_save_receipt(&path, &metadata).sidecar_revision;
+            let (retry_receipt, _) = batch_auto_adjust_receipt(
+                &path,
+                &source_path,
+                receipt.base_adjustment_document_revision.clone(),
+                &metadata,
+            )?;
+            if is_exact_batch_auto_adjust_retry(
+                &current_revision,
+                &metadata.adjustments,
+                &retry_receipt,
+                &receipt,
+            ) {
+                return Ok(BatchAutoAdjustPathResultV1 {
+                    contract: BATCH_AUTO_ADJUST_CONTRACT_V1,
+                    path,
+                    status: "no_op",
+                    receipt: Some(retry_receipt),
+                    error_code: None,
+                    error_message: None,
+                });
             }
+            if let Err(error_code) = validate_batch_auto_adjust_commit(&current_revision, &receipt)
+            {
+                let error_message = if error_code == "stale_adjustment_document" {
+                    format!(
+                        "Batch Auto Adjust expected {} but found {}",
+                        receipt.base_adjustment_document_revision, current_revision
+                    )
+                } else {
+                    "Batch Auto Adjust prepared adjustments must be an object".into()
+                };
+                return Ok(failed_batch_auto_adjust_result_with_code(
+                    &path,
+                    error_code,
+                    error_message,
+                ));
+            }
+            let mut prepared_metadata = metadata.clone();
+            prepared_metadata.adjustments = receipt.adjustments.clone();
+            let (expected_receipt, _) = batch_auto_adjust_receipt(
+                &path,
+                &source_path,
+                current_revision.clone(),
+                &prepared_metadata,
+            )?;
+            if let Err(error_code) =
+                validate_prepared_batch_auto_adjust_receipt(&expected_receipt, &receipt)
+            {
+                return Ok(failed_batch_auto_adjust_result_with_code(
+                    &path,
+                    error_code,
+                    "Batch Auto Adjust prepared receipt seal is invalid".into(),
+                ));
+            }
+            if metadata.adjustments == receipt.adjustments {
+                let (current_receipt, _) =
+                    batch_auto_adjust_receipt(&path, &source_path, current_revision, &metadata)?;
+                return Ok(BatchAutoAdjustPathResultV1 {
+                    contract: BATCH_AUTO_ADJUST_CONTRACT_V1,
+                    path,
+                    status: "no_op",
+                    receipt: Some(current_receipt),
+                    error_code: None,
+                    error_message: None,
+                });
+            }
+            metadata.adjustments = receipt.adjustments;
+            save_metadata_sidecar(&sidecar_path, &metadata)?;
+            let (committed_receipt, thumbnail_receipt) =
+                batch_auto_adjust_receipt(&path, &source_path, current_revision, &metadata)?;
+            (metadata, committed_receipt, thumbnail_receipt)
         };
 
-        let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
-
-        paths.par_iter().for_each(|path| {
-            let loaded_image: Option<DynamicImage> = (|| -> Result<DynamicImage, String> {
-                let (source_path, sidecar_path) = parse_virtual_path(path);
-                let source_path_str = source_path.to_string_lossy().to_string();
-
-                let file_bytes = fs::read(&source_path).map_err(|e| e.to_string())?;
-                let image = image_loader::load_base_image_from_bytes(
-                    &file_bytes,
-                    &source_path_str,
-                    true,
-                    &settings,
-                    None,
-                )
-                .map_err(|e| e.to_string())?;
-
-                let auto_results = perform_auto_analysis(&image);
-                let auto_adjustments_json = auto_results_to_json(&auto_results);
-
-                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-                if existing_metadata.adjustments.is_null() {
-                    existing_metadata.adjustments = serde_json::json!({});
-                }
-
-                if let (Some(existing_map), Some(auto_map)) = (
-                    existing_metadata.adjustments.as_object_mut(),
-                    auto_adjustments_json.as_object(),
-                ) {
-                    for (k, v) in auto_map {
-                        if k == "sectionVisibility" {
-                            if let Some(existing_vis_val) = existing_map.get_mut(k) {
-                                if let (Some(existing_vis), Some(auto_vis)) =
-                                    (existing_vis_val.as_object_mut(), v.as_object())
-                                {
-                                    for (vis_k, vis_v) in auto_vis {
-                                        existing_vis.insert(vis_k.clone(), vis_v.clone());
-                                    }
-                                }
-                            } else {
-                                existing_map.insert(k.clone(), v.clone());
-                            }
-                        } else {
-                            existing_map.insert(k.clone(), v.clone());
-                        }
-                    }
-                }
-
-                save_metadata_sidecar_or_warn(
-                    &sidecar_path,
-                    &existing_metadata,
-                    "auto adjustments",
-                );
-
-                if enable_xmp_sync {
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-                }
-                Ok(image)
-            })()
-            .map_err(|e| eprintln!("Failed to apply auto adjustments to {}: {}", path, e))
-            .ok();
-
-            let result = generate_single_thumbnail_and_cache(
-                path,
-                &thumb_cache_dir,
-                gpu_context.as_ref(),
-                loaded_image.as_ref(),
-                true,
-                &app_handle,
-                &settings,
-                None,
-            );
-
-            if let Some(thumbnail) = result {
-                emit_thumbnail_result(&app_handle, path, thumbnail);
-            }
-
-            increment_thumbnail_progress(&state, &app_handle);
-        });
-    });
-
-    Ok(())
+        if enable_xmp_sync {
+            sync_metadata_to_xmp(&source_path, &committed.0, create_xmp_if_missing);
+        }
+        submit_thumbnail_invalidation(&app_handle.state::<AppState>(), &app_handle, &committed.2);
+        Ok(BatchAutoAdjustPathResultV1 {
+            contract: BATCH_AUTO_ADJUST_CONTRACT_V1,
+            path,
+            status: "applied",
+            receipt: Some(committed.1),
+            error_code: None,
+            error_message: None,
+        })
+    })
+    .await
+    .map_err(|error| format!("Batch Auto adjustment commit worker failed: {error}"))?
 }
 
 #[tauri::command]
@@ -4212,6 +4505,165 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
+
+    #[test]
+    fn batch_auto_adjust_merge_is_idempotent_and_preserves_visibility_members() {
+        let auto = serde_json::json!({
+            "exposure": 0.5,
+            "sectionVisibility": {"basic": true}
+        });
+        let mut existing = serde_json::json!({
+            "contrast": 8,
+            "sectionVisibility": {"details": false}
+        });
+
+        merge_auto_adjustment_document(&mut existing, &auto).unwrap();
+        let accepted = existing.clone();
+        merge_auto_adjustment_document(&mut existing, &auto).unwrap();
+
+        assert_eq!(existing, accepted);
+        assert_eq!(existing["contrast"], 8);
+        assert_eq!(existing["exposure"], 0.5);
+        assert_eq!(existing["sectionVisibility"]["basic"], true);
+        assert_eq!(existing["sectionVisibility"]["details"], false);
+    }
+
+    #[test]
+    fn batch_auto_adjust_rejects_malformed_adjustment_documents() {
+        let auto = serde_json::json!({"exposure": 0.5});
+        let mut malformed = serde_json::json!([{"exposure": 0.1}]);
+        assert_eq!(
+            merge_auto_adjustment_document(&mut malformed, &auto),
+            Err("auto_adjust_invalid_adjustment_document_quarantined".into())
+        );
+
+        let mut existing = serde_json::json!({});
+        assert_eq!(
+            merge_auto_adjustment_document(&mut existing, &serde_json::json!(0.5)),
+            Err("auto_adjust_invalid_analysis_document".into())
+        );
+
+        let failure = failed_batch_auto_adjust_result(
+            "/fixtures/malformed.raw",
+            "auto_adjust_invalid_adjustment_document_quarantined:/tmp/quarantine.json".into(),
+        );
+        assert_eq!(
+            failure.error_code.as_deref(),
+            Some("invalid_adjustment_document_quarantined")
+        );
+    }
+
+    #[test]
+    fn batch_auto_adjust_receipt_seals_document_source_and_thumbnail_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"raw-source").unwrap();
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({"exposure": 0.5}),
+            ..ImageMetadata::default()
+        };
+
+        let base_revision = format!("sha256:{}", "0".repeat(64));
+        let (receipt, thumbnail) = batch_auto_adjust_receipt(
+            source.to_str().unwrap(),
+            &source,
+            base_revision.clone(),
+            &metadata,
+        )
+        .unwrap();
+
+        assert_eq!(receipt.adjustments, metadata.adjustments);
+        assert_eq!(receipt.base_adjustment_document_revision, base_revision);
+        assert_eq!(receipt.engine, LEGACY_AUTO_ADJUST_ENGINE_V1);
+        assert!(receipt.adjustment_document_revision.starts_with("sha256:"));
+        assert!(receipt.render_fingerprint.starts_with("u64:"));
+        assert!(receipt.source_revision.starts_with("source-revision-v1:"));
+        assert!(receipt.transaction_id.starts_with("blake3:"));
+        assert_eq!(receipt.thumbnail_revision, thumbnail.thumbnail_revision);
+        assert!(is_exact_batch_auto_adjust_retry(
+            &receipt.adjustment_document_revision,
+            &metadata.adjustments,
+            &receipt,
+            &receipt,
+        ));
+
+        let mut mutants = Vec::new();
+        let mut mutant = receipt.clone();
+        mutant.adjustments = serde_json::json!({"exposure": 0.8});
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.adjustment_document_revision = format!("sha256:{}", "9".repeat(64));
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.render_fingerprint = "u64:9999999999999999".into();
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.thumbnail_revision = "tampered-thumbnail".into();
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.transaction_id = "blake3:tampered".into();
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.source_revision = format!("source-revision-v1:{}", "9".repeat(64));
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.source_identity = "/fixtures/tampered.raw".into();
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.engine = "tampered-engine".into();
+        mutants.push(mutant);
+        let mut mutant = receipt.clone();
+        mutant.base_adjustment_document_revision = format!("sha256:{}", "8".repeat(64));
+        mutants.push(mutant);
+
+        for mutant in mutants {
+            assert!(!is_exact_batch_auto_adjust_retry(
+                &receipt.adjustment_document_revision,
+                &metadata.adjustments,
+                &receipt,
+                &mutant,
+            ));
+            assert_eq!(
+                validate_prepared_batch_auto_adjust_receipt(&receipt, &mutant),
+                Err("invalid_prepared_receipt")
+            );
+        }
+    }
+
+    #[test]
+    fn batch_auto_adjust_commit_fails_closed_for_newer_or_malformed_documents() {
+        let base_revision = format!("sha256:{}", "0".repeat(64));
+        let receipt = BatchAutoAdjustReceiptV1 {
+            adjustment_document_revision: format!("sha256:{}", "1".repeat(64)),
+            adjustments: serde_json::json!({"exposure": 0.65}),
+            base_adjustment_document_revision: base_revision.clone(),
+            engine: LEGACY_AUTO_ADJUST_ENGINE_V1.into(),
+            render_fingerprint: "u64:1111111111111111".into(),
+            source_identity: "/fixtures/source.raw".into(),
+            source_revision: format!("source-revision-v1:{}", "2".repeat(64)),
+            thumbnail_revision: "thumbnail-revision-1".into(),
+            transaction_id: "blake3:batch-auto-adjust-1".into(),
+        };
+
+        assert_eq!(
+            validate_batch_auto_adjust_commit(&base_revision, &receipt),
+            Ok(())
+        );
+        assert_eq!(
+            validate_batch_auto_adjust_commit(&format!("sha256:{}", "3".repeat(64)), &receipt),
+            Err("stale_adjustment_document")
+        );
+        assert_eq!(
+            validate_batch_auto_adjust_commit(
+                &base_revision,
+                &BatchAutoAdjustReceiptV1 {
+                    adjustments: serde_json::json!([0.65]),
+                    ..receipt
+                },
+            ),
+            Err("invalid_prepared_adjustment_document")
+        );
+    }
 
     #[test]
     fn edit_transaction_persistence_context_requires_revision_promotion() {

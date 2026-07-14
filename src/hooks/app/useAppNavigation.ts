@@ -22,6 +22,7 @@ import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCach
 import { beginImageOpenWithSchema, scheduleImagePrefetchWithSchema } from '../../utils/imageOpenInvokes';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
 import { imagePrefetchScheduler } from '../../utils/imagePrefetchScheduler';
+import { isNativeCommittedHydrationSession } from '../../utils/nativeCommittedHydrationAuthority';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -337,6 +338,7 @@ export function useAppNavigation({
             setEditor((state) => ({
               adjustments:
                 !isSliderDragging &&
+                !isNativeCommittedHydrationSession(session.id) &&
                 acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
                 loadedMetadata.adjustments &&
                 !loadedMetadata.adjustments['is_null']

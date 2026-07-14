@@ -6,6 +6,7 @@ export enum Invokes {
   ApplyLibraryCatalogChanges = 'apply_library_catalog_changes',
   ApplyAdjustmentsToPaths = 'apply_adjustments_to_paths',
   ApplyAutoAdjustmentsToPaths = 'apply_auto_adjustments_to_paths',
+  CommitBatchAutoAdjustment = 'commit_batch_auto_adjustment',
   AnalyzeAutoEdit = 'analyze_auto_edit',
   ApplyAutoEditProposal = 'apply_auto_edit_proposal',
   ApplyDenoising = 'apply_denoising',

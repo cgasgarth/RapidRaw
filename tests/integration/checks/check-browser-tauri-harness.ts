@@ -112,7 +112,10 @@ try {
   page = await browser.newPage({ viewport });
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() === 'error') {
+      const location = message.location().url;
+      consoleErrors.push(location ? `${message.text()} (${location})` : message.text());
+    }
   });
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
@@ -179,6 +182,7 @@ try {
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
   await verifyAutoEditTransactionBoundary(page);
+  await verifyBatchAutoAdjustTransactionBoundary(page);
   const exposureValue = page.getByTestId('basic-control-exposure-value');
   await exposureValue.click();
   const exposureInput = page.getByTestId('basic-control-exposure-input');
@@ -482,6 +486,240 @@ async function verifyAutoEditTransactionBoundary(page: Page): Promise<void> {
       `Auto Edit acceptance did not persist one revision-scoped transaction: ${JSON.stringify(persisted)}`,
     );
   }
+}
+
+async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<void> {
+  const counts = async () =>
+    page.evaluate(() => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return {
+        autoAdjust: calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').length,
+        commit: calls.filter(({ command }) => command === 'commit_batch_auto_adjustment').length,
+        metadataLoad: calls.filter(({ command }) => command === 'load_metadata').length,
+        metadataSave: calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length,
+      };
+    });
+  const invokeFromContextMenu = async () => {
+    await page.waitForFunction(
+      () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
+      { timeout: 10_000 },
+    );
+    const selectedPath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+    if (!selectedPath) throw new Error('Selected editor path was unavailable for Batch Auto Adjust proof.');
+    const targetThumbnail = page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${selectedPath}"]`);
+    await targetThumbnail.click({ button: 'right' });
+    const productivity = page.getByRole('menuitem', { exact: true, name: 'Productivity' });
+    await productivity.waitFor({ timeout: 10_000 });
+    await productivity.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(
+      () => {
+        const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+          (element) => element.textContent?.trim() === 'Auto Adjust Image',
+        );
+        if (!item) return false;
+        item.click();
+        return true;
+      },
+      { timeout: 10_000 },
+    );
+  };
+  const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
+    const other = page.locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${activePath}"])`).first();
+    const otherPath = await other.getAttribute('data-image-path');
+    if (!otherPath) throw new Error('Batch Auto Adjust race proof requires a second filmstrip image.');
+    await other.click();
+    await page.waitForFunction(
+      (path) =>
+        document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+      otherPath,
+      { timeout: 10_000 },
+    );
+    await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${activePath}"]`).click();
+    await page.waitForFunction(
+      (path) =>
+        document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+      activePath,
+      { timeout: 10_000 },
+    );
+    if (waitForHydration) {
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
+        { timeout: 10_000 },
+      );
+    }
+  };
+
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(500);
+  const exposure = page.getByTestId('basic-control-exposure-value');
+  await exposure.click();
+  const exposureInput = page.getByTestId('basic-control-exposure-input');
+  await exposureInput.fill('0.55');
+  await exposureInput.press('Enter');
+  const standardActivePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  if (!standardActivePath) throw new Error('Batch Auto Adjust proof requires an active path.');
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__) {
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 1_000;
+    }
+  });
+  const baseline = await counts();
+  await invokeFromContextMenu();
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'apply_auto_adjustments_to_paths',
+      ).length ?? 0) === expected,
+    baseline.autoAdjust + 1,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(500);
+  const afterPrepare = await counts();
+  if (afterPrepare.commit !== baseline.commit + 1) {
+    const applyArgs = await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_auto_adjustments_to_paths')
+          .at(-1)?.args ?? null,
+    );
+    throw new Error(`Batch Auto Adjust did not reach selected-path commit: ${JSON.stringify(applyArgs)}`);
+  }
+  await switchAwayAndBack(standardActivePath);
+
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(450);
+  const afterApply = await counts();
+  if (
+    afterApply.metadataLoad !== baseline.metadataLoad ||
+    afterApply.metadataSave !== baseline.metadataSave + 1 ||
+    afterApply.commit !== baseline.commit + 1
+  ) {
+    const newSaveArgs = await page.evaluate((baselineSaveCount) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return calls
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .slice(baselineSaveCount)
+        .map(({ args }) => args ?? null);
+    }, baseline.metadataSave);
+    throw new Error(
+      `Batch Auto Adjust did not use exactly one persistence barrier and one native commit: ${JSON.stringify({ afterApply, baseline, newSaveArgs })}`,
+    );
+  }
+  const batchCalls = await page.evaluate((baselineSaveCount) => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      apply: calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').at(-1)?.args ?? null,
+      barrier:
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(baselineSaveCount)?.args ??
+        null,
+    };
+  }, baseline.metadataSave);
+  if (
+    batchCalls.barrier?.['adjustments']?.['exposure'] !== 0.55 ||
+    batchCalls.apply?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}`
+  ) {
+    throw new Error(`Batch Auto Adjust did not prepare from the flushed dirty document: ${JSON.stringify(batchCalls)}`);
+  }
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  await undo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.55',
+    { timeout: 10_000 },
+  );
+  const redo = page.locator('button[data-command-id="redo"]:visible').first();
+  await expectEnabled(redo, 'Redo after Batch Auto Adjust undo');
+  await redo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
+    { timeout: 10_000 },
+  );
+  if ((await exposure.textContent())?.trim() !== '0.65') {
+    throw new Error('Batch Auto Adjust did not restore its single accepted history boundary.');
+  }
+
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__) {
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 400;
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustPrepareDelayMs = 700;
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.imageOpenDelayMs = 1_500;
+    }
+  });
+  const raceBaseline = await counts();
+  const activePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  if (!activePath) throw new Error('Batch Auto Adjust race proof requires an active path.');
+  await invokeFromContextMenu();
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'apply_auto_adjustments_to_paths',
+      ).length ?? 0) === expected,
+    raceBaseline.autoAdjust + 1,
+    { timeout: 10_000 },
+  );
+  await switchAwayAndBack(activePath, false);
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'commit_batch_auto_adjustment',
+      ).length ?? 0) === expected,
+    raceBaseline.commit + 1,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(1_700);
+  if (Number((await exposure.textContent())?.trim()) !== 0.7) {
+    const commitArgs = await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'commit_batch_auto_adjustment')
+          .at(-1)?.args ?? null,
+    );
+    throw new Error(
+      `An unchanged successor A session did not accept the delayed Batch Auto Adjust commit: ${JSON.stringify({ commitArgs, exposure: await exposure.textContent() })}`,
+    );
+  }
+
+  const editedRaceBaseline = await counts();
+  await invokeFromContextMenu();
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'apply_auto_adjustments_to_paths',
+      ).length ?? 0) === expected,
+    editedRaceBaseline.autoAdjust + 1,
+    { timeout: 10_000 },
+  );
+  await switchAwayAndBack(activePath, false);
+  await exposure.click();
+  await exposureInput.fill('0.8');
+  await exposureInput.press('Enter');
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'commit_batch_auto_adjustment',
+      ).length ?? 0) === expected,
+    editedRaceBaseline.commit + 1,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(1_700);
+  if (Number((await exposure.textContent())?.trim()) !== 0.8) {
+    throw new Error('A delayed Batch Auto Adjust commit replaced an edited successor A session.');
+  }
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__) {
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 0;
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustPrepareDelayMs = 0;
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.imageOpenDelayMs = 250;
+    }
+  });
 }
 
 async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]): Promise<void> {

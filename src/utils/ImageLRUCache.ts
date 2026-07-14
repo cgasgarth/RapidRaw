@@ -128,7 +128,9 @@ export class ImageLRUCache {
     const revokeIfUnused = (url: string | null) => {
       if (!url?.startsWith('blob:')) return;
       const reused = replacement && (replacement.finalPreviewUrl === url || replacement.uncroppedPreviewUrl === url);
-      if (!reused) {
+      // get() transfers URL ownership from the cache to the editor surface.
+      // A later cache replacement must not revoke a URL it no longer owns.
+      if (!reused && this.protectedBlobUrls.has(url)) {
         this.protectedBlobUrls.delete(url);
         URL.revokeObjectURL(url);
       }
