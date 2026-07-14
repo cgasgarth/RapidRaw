@@ -736,7 +736,6 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         halation_amount,
         flare_amount,
         sharpness_threshold,
-        point_color,
     } = global;
     let _ = (
         exposure,
@@ -833,7 +832,6 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         halation_amount,
         flare_amount,
         sharpness_threshold,
-        point_color,
     );
 }
 
@@ -887,7 +885,6 @@ fn mask_abi_coverage_tripwire(mask: MaskAdjustments) {
         _pad_end5,
         _pad_end6,
         _pad_end7,
-        point_color,
     } = mask;
     let _ = (
         exposure,
@@ -937,7 +934,6 @@ fn mask_abi_coverage_tripwire(mask: MaskAdjustments) {
         _pad_end5,
         _pad_end6,
         _pad_end7,
-        point_color,
     );
 }
 
