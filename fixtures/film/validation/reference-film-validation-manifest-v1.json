@@ -44,6 +44,18 @@
     "identityDeltaE00": 0.0001,
     "monotonicTolerance": 0.000001,
     "grainRepeatTolerance": 0,
-    "opticalLeakage": 0.001
+    "grainMeanDrift": 0.02,
+    "grainVarianceMin": 0.0000005,
+    "grainVarianceMax": 0.05,
+    "grainCorrelationMin": 0.01,
+    "grainCorrelationMax": 0.99,
+    "grainFrequencyEnergyMin": 0.01,
+    "grainFrequencyEnergyMax": 1.99,
+    "grainDensityVarianceRatioMin": 1.01,
+    "opticalLeakage": 0.001,
+    "opticalEnergyMax": 2,
+    "opticalContinuityMaxStep": 1,
+    "opticalHalationRedRatioMin": 1.1,
+    "opticalBloomNeutralDrift": 0.1
   }
 }
