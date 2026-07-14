@@ -243,6 +243,7 @@ import {
   type NegativeLabQcDecision,
 } from './NegativeLabRollHealthModel';
 import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
+import { NegativeLabSourcePositiveComparison } from './NegativeLabSourcePositiveComparison';
 import { NegativeLabStagePreviewStrip } from './NegativeLabStagePreviewStrip';
 import { NegativeLabWorkspaceShell } from './NegativeLabWorkspaceShell';
 
@@ -6721,7 +6722,24 @@ function NegativeLabSession({
             </div>
           )}
 
-          {previewImageUrl !== null && (
+          {beforeAfterReview !== null && originalUrl !== null && (
+            <NegativeLabSourcePositiveComparison
+              finalUrl={stagePreviewUrl}
+              isLoading={isLoading}
+              onModeChange={(mode) => setIsCompareActive(mode !== 'final')}
+              proofModel={beforeAfterReview}
+              recipeHash={runtimePreviewDryRunResult?.dryRun.dryRunPlanId ?? beforeAfterReview.acceptedDryRunPlanHash}
+              sourceUrl={originalUrl}
+              viewport={{
+                containerRef,
+                handleMouseDown,
+                handleWheel,
+                imageTransformStyle,
+              }}
+            />
+          )}
+
+          {previewImageUrl !== null && (beforeAfterReview === null || originalUrl === null) && (
             <div
               className={cx(
                 'absolute inset-0 flex items-center justify-center',
@@ -6804,26 +6822,28 @@ function NegativeLabSession({
               <Maximize size={16} />
             </button>
             <div className="w-px h-5 bg-white/20 mx-1"></div>
-            <button
-              aria-label={t('modals.negativeConversion.compareTooltip')}
-              onMouseDown={() => {
-                setIsCompareActive(true);
-              }}
-              onMouseUp={() => {
-                setIsCompareActive(false);
-              }}
-              onMouseLeave={() => {
-                setIsCompareActive(false);
-              }}
-              className={cx(
-                'p-2 rounded-full transition-colors select-none',
-                isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
-              )}
-              data-testid="negative-lab-compare-control"
-              data-tooltip={t('modals.negativeConversion.compareTooltip')}
-            >
-              {isCompareActive ? <Eye size={18} /> : <EyeOff size={18} />}
-            </button>
+            {(beforeAfterReview === null || originalUrl === null) && (
+              <button
+                aria-label={t('modals.negativeConversion.compareTooltip')}
+                onMouseDown={() => {
+                  setIsCompareActive(true);
+                }}
+                onMouseUp={() => {
+                  setIsCompareActive(false);
+                }}
+                onMouseLeave={() => {
+                  setIsCompareActive(false);
+                }}
+                className={cx(
+                  'p-2 rounded-full transition-colors select-none',
+                  isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
+                )}
+                data-testid="negative-lab-compare-control"
+                data-tooltip={t('modals.negativeConversion.compareTooltip')}
+              >
+                {isCompareActive ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
