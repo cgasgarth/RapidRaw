@@ -393,6 +393,7 @@ function App() {
     handleStartHdr,
     handleSaveHdr,
     handleApplyDenoise,
+    handleCancelDenoise,
     handleBatchDenoise,
     handleSaveDenoisedImage,
     handleSaveCollage,
@@ -728,6 +729,7 @@ function App() {
           requestThumbnails={requestThumbnails}
           refreshImageList={handleLibraryRefresh}
           handleApplyDenoise={handleApplyDenoise}
+          handleCancelDenoise={handleCancelDenoise}
           handleBatchDenoise={handleBatchDenoise}
           handleSaveDenoisedImage={handleSaveDenoisedImage}
           handleCreateFolder={handleCreateFolder}
