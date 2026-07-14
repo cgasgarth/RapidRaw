@@ -226,6 +226,7 @@ import { throttle } from '../../../utils/timing';
 import Button from '../../ui/primitives/Button';
 import Slider from '../../ui/primitives/Slider';
 import UiText from '../../ui/primitives/Text';
+import { NegativeLabCompactControlPanels } from './NegativeLabCompactControlPanels';
 import { NegativeLabDensityScopesPanel } from './NegativeLabDensityScopesPanel';
 import { NegativeLabPatchSamplerPanel } from './NegativeLabPatchSamplerPanel';
 import {
@@ -617,6 +618,12 @@ function NegativeLabSession({
   const { t } = useTranslation();
   const selectedEditorImage = useEditorStore((state) => state.selectedImage);
   const setUI = useUIStore((state) => state.setUI);
+  const negativeLabWorkspaceLayout = useUIStore((state) => state.negativeLabWorkspaceLayout);
+  const isWorkspacePanelCollapsed = (
+    ...panelIds: Array<
+      'process-profile' | 'base-bounds' | 'print-color' | 'auto-sampling' | 'roll-qc' | 'export-output'
+    >
+  ) => panelIds.some((panelId) => negativeLabWorkspaceLayout.collapsedPanelIds.includes(panelId));
   const sessionSnapshot = useUIStore((state) =>
     reconcileNegativeLabSessionTargetPaths(state.negativeModalState.session ?? initialSessionSnapshot, targetPaths),
   );
@@ -4803,6 +4810,19 @@ function NegativeLabSession({
 
   const renderControls = () => (
     <div className="modal-adjustments-pane z-10 flex min-h-0 w-full shrink-0 flex-col border-t border-surface bg-bg-secondary xl:w-[25rem] xl:min-w-[25rem] xl:border-l xl:border-t-0">
+      <NegativeLabCompactControlPanels
+        onNavigate={(panelId) => {
+          const targetId =
+            panelId === 'process-profile' || panelId === 'base-bounds'
+              ? 'negative-lab-source-context'
+              : panelId === 'print-color' || panelId === 'auto-sampling'
+                ? 'negative-lab-correction-controls'
+                : panelId === 'roll-qc'
+                  ? 'negative-lab-qc'
+                  : 'negative-lab-export-output';
+          document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+      />
       <nav
         aria-label={t('modals.negativeConversion.title')}
         className="grid shrink-0 grid-cols-3 gap-px border-b border-surface bg-surface"
@@ -4833,6 +4853,7 @@ function NegativeLabSession({
           className={cx(
             'scroll-mt-3 transition-opacity duration-200',
             isSaving && 'pointer-events-none opacity-50 grayscale',
+            isWorkspacePanelCollapsed('process-profile', 'base-bounds') && 'hidden',
           )}
           id="negative-lab-source-context"
         >
@@ -4984,6 +5005,7 @@ function NegativeLabSession({
           className={cx(
             'scroll-mt-3 transition-opacity duration-200',
             isSaving && 'pointer-events-none opacity-50 grayscale',
+            isWorkspacePanelCollapsed('print-color', 'auto-sampling') && 'hidden',
           )}
           id="negative-lab-correction-controls"
         >
@@ -6277,6 +6299,7 @@ function NegativeLabSession({
           className={cx(
             'scroll-mt-3 transition-opacity duration-200',
             isSaving && 'pointer-events-none opacity-50 grayscale',
+            isWorkspacePanelCollapsed('roll-qc') && 'hidden',
           )}
           id="negative-lab-qc"
         >
@@ -6291,7 +6314,14 @@ function NegativeLabSession({
           </div>
         </section>
 
-        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+        <div
+          className={cx(
+            'transition-opacity duration-200',
+            isSaving && 'opacity-50 pointer-events-none grayscale',
+            isWorkspacePanelCollapsed('export-output') && 'hidden',
+          )}
+          id="negative-lab-export-output"
+        >
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.exportOptions')}
           </UiText>
