@@ -24,6 +24,11 @@ export {
   filmSceneInputV1Schema,
 } from './film/filmEmulationSchemas.js';
 export {
+  filmMonochromeFilterV1Schema,
+  filmMonochromePaperToneV1Schema,
+  filmMonochromeResponseV1Schema,
+} from './film/filmMonochromeSchemas.js';
+export {
   evaluateFilmProfileClaim,
   filmProfileManifestV1Schema,
   verifyFilmProfileManifestHash,
