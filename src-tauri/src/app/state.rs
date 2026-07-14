@@ -154,42 +154,6 @@ pub struct AnalyticsConfig {
     pub scheduler: Arc<crate::analytics_scheduler::AnalyticsScheduler>,
 }
 
-#[derive(Clone)]
-pub struct PendingHdrSourceRef {
-    pub content_hash: String,
-    pub image_path: String,
-    pub width: u32,
-    pub height: u32,
-    pub exposure_time_seconds: f32,
-    pub iso: f32,
-    pub source_index: usize,
-}
-
-#[derive(Clone)]
-pub struct PendingHdrMergePlan {
-    pub accepted_dry_run_plan_hash: String,
-    pub accepted_dry_run_plan_id: String,
-    pub alignment_policy_id: String,
-    pub source_content_hashes: Vec<String>,
-    pub source_paths: Vec<String>,
-    pub static_radiance_hash: Option<String>,
-    pub deghost_radiance_hash: Option<String>,
-    pub motion_probability_hash: Option<String>,
-    pub ownership_hash: Option<String>,
-    pub feather_hash: Option<String>,
-    pub unresolved_fraction: Option<f32>,
-    pub output_width: u64,
-    pub output_height: u64,
-    pub(crate) planned_sources: Vec<crate::merge::hdr::PlannedSource>,
-    pub(crate) motion_probability_bytes: Vec<u8>,
-    pub(crate) ownership_bytes: Vec<u8>,
-    pub(crate) feather_bytes: Vec<u8>,
-    pub scene_linear_artifact_hash: Option<String>,
-    pub tone_mapped_preview_hash: Option<String>,
-    pub motion_coverage: Option<f32>,
-    pub confidence_mean: Option<f32>,
-}
-
 pub struct ThumbnailProgressTracker {
     pub total: usize,
     pub completed: usize,
@@ -231,10 +195,6 @@ pub struct AppState {
     export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
-    pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
-    pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
-    pub hdr_plan_generation: Arc<AtomicUsize>,
-    pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
     pub burst_sr_accepted_runtime:
         Arc<Mutex<Option<crate::merge::super_resolution::job::AcceptedBurstSrRuntime>>>,
@@ -318,10 +278,6 @@ impl AppState {
             import_job: Mutex::new(None),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
-            hdr_result: Arc::new(Mutex::new(None)),
-            hdr_runtime_plan: Arc::new(Mutex::new(None)),
-            hdr_plan_generation: Arc::new(AtomicUsize::new(0)),
-            hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
             burst_sr_accepted_runtime: Arc::new(Mutex::new(None)),
