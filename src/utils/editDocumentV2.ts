@@ -92,3 +92,20 @@ export const updateEditDocumentV2Node = (
 
 export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>
   descriptorFor(nodeType)?.capabilities;
+
+/** Reset one node using its descriptor-owned defaults without touching other domains. */
+export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2): EditDocumentV2 => {
+  const parsed = editDocumentV2Schema.parse(document);
+  const descriptor = descriptorFor(nodeType);
+  const node = parsed.nodes[nodeType];
+  if (descriptor === undefined || node === undefined || !descriptor.capabilities.reset) return parsed;
+  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({
+    ...node,
+    enabled: true,
+    params: structuredClone(descriptor.defaultParams),
+  });
+  return editDocumentV2Schema.parse({
+    ...parsed,
+    nodes: { ...parsed.nodes, [nodeType]: nextNode },
+  });
+};
