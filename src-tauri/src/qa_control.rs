@@ -264,12 +264,22 @@ fn gpu_execution_receipt(app_state: &AppState) -> Value {
                 processor
                     .processor
                     .last_execution_receipt()
-                    .map(|receipt| (processor.processor.execution_sequence(), receipt))
+                    .map(|receipt| receipt)
             })
         })
-        .map(|(execution_sequence, receipt)| {
+        .map(|receipt| {
             json!({
-                "executionSequence": execution_sequence,
+                "executionSequence": receipt.execution_sequence,
+                "runtimeIdentity": receipt.runtime_identity.map(|identity| json!({
+                    "deviceGeneration": identity.device_generation,
+                    "processorGeneration": identity.processor_generation,
+                })),
+                "frameIdentity": receipt.frame_identity.map(|identity| json!({
+                    "sourceRevision": identity.source_revision,
+                    "stageRevision": identity.stage_revision,
+                    "width": identity.width,
+                    "height": identity.height,
+                })),
                 "graphFingerprint": receipt.graph_fingerprint,
                 "stageBits": receipt.stages.bits(),
                 "blurDispatchCount": receipt.blur_dispatch_count,
