@@ -16,7 +16,6 @@ use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::{CachedLutPath, Lut};
-use crate::panorama_stitching::PendingPanoramaResult;
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
 use crate::tethering::TetherSessionSnapshot;
@@ -196,7 +195,6 @@ pub struct AppState {
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
-    pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_artifacts:
         Arc<crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore>,
     pub active_denoise_artifact:
@@ -277,7 +275,6 @@ impl AppState {
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
-            panorama_result: Arc::new(Mutex::new(None)),
             denoise_artifacts: Arc::new(
                 crate::computational::denoise_artifact::EnhancedDenoiseArtifactStore::default(),
             ),

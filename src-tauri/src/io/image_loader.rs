@@ -1100,7 +1100,7 @@ pub(crate) async fn load_image_prepared(
 
         *state.active_denoise_artifact.lock().unwrap() = None;
         state.services.hdr.cancel();
-        *state.panorama_result.lock().unwrap() = None;
+        state.services.panorama.reset();
     }
 
     let (source_path, _) = parse_virtual_path(&path);
