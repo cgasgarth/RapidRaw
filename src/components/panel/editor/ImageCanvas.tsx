@@ -95,11 +95,7 @@ import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import {
-  createViewerInputRouter,
-  normalizeViewerPointerType,
-  type ViewerSurfacePointerEvent,
-} from './viewerInputRouter';
+import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
 import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
@@ -2510,7 +2506,7 @@ const ImageCanvas = memo(
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
-        onInputEvent={(event: ViewerSurfacePointerEvent) => {
+        onInputEvent={(event: ViewerSurfaceInputEvent) => {
           const transition =
             event.type === 'pointerdown'
               ? viewerInputRouter.dispatch({
@@ -2533,18 +2529,24 @@ const ImageCanvas = memo(
                     zoomed: isMaxZoom ?? false,
                   },
                 })
-              : viewerInputRouter.dispatch({
-                  type: event.type,
-                  pointerId: event.pointerId,
-                  sample: {
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                    pointerType: normalizeViewerPointerType(event.pointerType),
-                    pressure: event.pressure,
-                  },
-                });
+              : event.type === 'blur' || event.type === 'escape'
+                ? viewerInputRouter.dispatch({ type: event.type })
+                : viewerInputRouter.dispatch({
+                    type: event.type,
+                    pointerId: event.pointerId,
+                    sample: {
+                      clientX: event.clientX,
+                      clientY: event.clientY,
+                      pointerType: normalizeViewerPointerType(event.pointerType),
+                      pressure: event.pressure,
+                    },
+                  });
           viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
+          if (event.type === 'blur' || event.type === 'escape') {
+            viewerToolSessions.invalidate();
+            return;
+          }
           if (
             event.type === 'pointerdown' &&
             transition.resolution &&

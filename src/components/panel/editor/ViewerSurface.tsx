@@ -1,7 +1,11 @@
-import type { HTMLAttributes, PointerEvent, ReactNode } from 'react';
+import type { FocusEvent, HTMLAttributes, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
-import { normalizeViewerSurfacePointerEvent, type ViewerSurfacePointerEvent } from './viewerInputRouter';
+import {
+  normalizeViewerSurfacePointerEvent,
+  type ViewerSurfaceInputEvent,
+  type ViewerSurfacePointerEvent,
+} from './viewerInputRouter';
 
 /**
  * Presentation-only boundary for the editor viewer.
@@ -13,7 +17,7 @@ import { normalizeViewerSurfacePointerEvent, type ViewerSurfacePointerEvent } fr
 export interface ViewerSurfaceProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
   geometry: EditorOverlayGeometry;
-  onInputEvent?: (event: ViewerSurfacePointerEvent) => void;
+  onInputEvent?: (event: ViewerSurfaceInputEvent) => void;
   presentation: EditorPresentationDescriptor;
 }
 
@@ -47,6 +51,8 @@ export function ViewerSurface({
   onPointerMove,
   onPointerUp,
   onLostPointerCapture,
+  onBlur,
+  onKeyDown,
   presentation,
   role,
   tabIndex,
@@ -60,6 +66,7 @@ export function ViewerSurface({
       }),
     );
   };
+  const dispatchSemanticEvent = (type: 'blur' | 'escape'): void => onInputEvent?.({ type });
   const a11y = viewerSurfaceA11yAttributes({ role, tabIndex });
   return (
     <div
@@ -85,6 +92,17 @@ export function ViewerSurface({
       onLostPointerCapture={(event) => {
         dispatchPointerEvent(event, 'lostpointercapture');
         onLostPointerCapture?.(event);
+      }}
+      onBlur={(event: FocusEvent<HTMLDivElement>) => {
+        dispatchSemanticEvent('blur');
+        onBlur?.(event);
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          dispatchSemanticEvent('escape');
+        }
+        onKeyDown?.(event);
       }}
       role={a11y.role}
       tabIndex={a11y.tabIndex}
