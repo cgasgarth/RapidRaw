@@ -92,6 +92,130 @@ test('point curve exposes professional controls and keyboard point editing', asy
   expect(container.querySelector<HTMLInputElement>('input[aria-label="Y Axis"]')?.value).toBe('1');
 });
 
+test('scene and output domains persist typed V2 curve points without changing legacy curves', async () => {
+  const changes: Adjustments[] = [];
+  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  const legacy = structuredClone(initial.curves);
+  const { container } = await renderCurveEditor(changes, initial);
+
+  await click(getButton(container, 'Scene'));
+  expect(container.querySelector('[data-curve-domain="scene"]')).not.toBeNull();
+  await click(getButton(container, 'Add point'));
+  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
+  expect(changes.at(-1)?.sceneCurveV1?.points).toEqual([
+    { xEv: -16, yEv: -16 },
+    { xEv: 0, yEv: 0 },
+    { xEv: 16, yEv: 16 },
+  ]);
+
+  const sceneOutputs = container.querySelectorAll<HTMLInputElement>('input[aria-label="Output EV"]');
+  const middleOutput = sceneOutputs[1];
+  if (!middleOutput) throw new Error('Expected the middle scene output field.');
+  middleOutput.value = '2';
+  await act(async () => {
+    middleOutput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
+
+  await click(getButton(container, 'Output'));
+  await click(getButton(container, 'Add point'));
+  expect(changes.at(-1)?.outputCurveV1).toMatchObject({
+    domain: 'view_encoded',
+    targetIdentity: 'rapid-view-default',
+    sdrReferenceWhiteNits: 203,
+    peakNits: 203,
+    points: [
+      { input: 0, output: 0 },
+      { input: 0.5, output: 0.5 },
+      { input: 1, output: 1 },
+    ],
+  });
+  const outputInputs = container.querySelectorAll<HTMLInputElement>('input[aria-label="Input"]');
+  const middleInput = outputInputs[1];
+  if (!middleInput) throw new Error('Expected the middle output input field.');
+  middleInput.value = '4';
+  await act(async () => {
+    middleInput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
+    await flushPromises();
+  });
+  expect(changes.at(-1)?.outputCurveV1?.points[1]?.input).toBe(1 - 1 / 65_536);
+  expect(changes.at(-1)?.curves).toEqual(legacy);
+
+  await click(getButton(container, 'Reset'));
+  expect(changes.at(-1)?.outputCurveV1?.points).toEqual([
+    { input: 0, output: 0 },
+    { input: 1, output: 1 },
+  ]);
+  expect(changes.at(-1)?.sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
+
+  await click(getButton(container, 'Scene'));
+  await click(getButton(container, 'Reset'));
+  expect(changes.at(-1)?.sceneCurveV1?.points).toEqual([
+    { xEv: -16, yEv: -16 },
+    { xEv: 16, yEv: 16 },
+  ]);
+  expect(changes.at(-1)?.outputCurveV1?.points).toEqual([
+    { input: 0, output: 0 },
+    { input: 1, output: 1 },
+  ]);
+  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
+  expect(changes.at(-1)?.curves).toEqual(legacy);
+});
+
+test('output curve editing and reset retain extended HDR target identity and headroom', async () => {
+  const changes: Adjustments[] = [];
+  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  initial.rawEngineEditGraphVersion = 2;
+  initial.outputCurveV1 = {
+    domain: 'output_encoded',
+    targetIdentity: 'rec2100-pq-proof',
+    sdrReferenceWhiteNits: 100,
+    peakNits: 1_000,
+    points: [
+      { input: 0, output: 0 },
+      { input: 10, output: 10 },
+    ],
+  };
+  const { container } = await renderCurveEditor(changes, initial);
+
+  expect(container.querySelector('[data-curve-domain="output"]')).not.toBeNull();
+  await click(getButton(container, 'Add point'));
+  expect(changes.at(-1)?.outputCurveV1?.points[1]).toEqual({ input: 5, output: 5 });
+
+  await click(getButton(container, 'Reset'));
+  expect(changes.at(-1)?.outputCurveV1).toEqual({
+    domain: 'output_encoded',
+    targetIdentity: 'rec2100-pq-proof',
+    sdrReferenceWhiteNits: 100,
+    peakNits: 1_000,
+    points: [
+      { input: 0, output: 0 },
+      { input: 10, output: 10 },
+    ],
+  });
+  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
+});
+
+test('typed curve editor enforces the native 32-point limit before mutation', async () => {
+  const changes: Adjustments[] = [];
+  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  initial.rawEngineEditGraphVersion = 2;
+  initial.sceneCurveV1 = {
+    channelMode: 'luminance_preserving',
+    middleGrey: 0.18,
+    points: Array.from({ length: 32 }, (_, index) => {
+      const value = -16 + (32 * index) / 31;
+      return { xEv: value, yEv: value };
+    }),
+  };
+  const { container } = await renderCurveEditor(changes, initial);
+
+  expect(getButton(container, 'Add point').disabled).toBe(true);
+  await click(getButton(container, 'Add point'));
+  expect(changes).toHaveLength(0);
+});
+
 test('numeric point editing commits valid changes and Escape does not add history', async () => {
   const changes: Adjustments[] = [];
   const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);

@@ -284,7 +284,20 @@
       "resetAllParametric": "Сбросить все параметрические кривые",
       "resetAllPoint": "Сбросить все точечные кривые",
       "resetParametric": "Сбросить параметрическую кривую {{channel}}",
-      "resetPoint": "Сбросить точечную кривую {{channel}}"
+      "resetPoint": "Сбросить точечную кривую {{channel}}",
+      "typed": {
+        "addPoint": "",
+        "channelMode": "",
+        "legacyTab": "",
+        "linkedRgb": "",
+        "luminancePreserving": "",
+        "outputAxis": "",
+        "outputTab": "",
+        "outputTitle": "",
+        "sceneAxis": "",
+        "sceneTab": "",
+        "sceneTitle": ""
+      }
     },
     "details": {
       "amount": "",
@@ -423,6 +436,9 @@
       "resetSolved": "Reset solved correction",
       "retainedArea": "Retained area"
     }
+  },
+  "common": {
+    "reset": ""
   },
   "contextMenus": {
     "album": {
