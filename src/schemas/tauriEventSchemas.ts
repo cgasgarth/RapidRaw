@@ -202,6 +202,8 @@ export const gamutWarningOverlayPayloadSchema = z
       .optional()
       .nullable(),
     maximum_boundary_excess: z.number().nonnegative().optional().nullable(),
+    gamut_compressed_pixel_count: z.number().int().nonnegative().optional().nullable(),
+    gamut_hard_clipped_pixel_count: z.number().int().nonnegative().optional().nullable(),
     policy_status: z.string().trim().min(1),
     policy_version: z.string().trim().min(1),
     preview_basis: z.literal('export_preview'),

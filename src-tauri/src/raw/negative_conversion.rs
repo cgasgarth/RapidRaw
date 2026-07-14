@@ -3254,6 +3254,7 @@ fn build_negative_lab_runtime_base_fog_sample_summary(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_negative_lab_dry_run_preview_artifact(
     rendered_preview: &DynamicImage,
     normalized_density_preview: &DynamicImage,
