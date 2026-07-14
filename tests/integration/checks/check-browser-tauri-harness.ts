@@ -707,7 +707,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
                 disabled: 'disabled' in active && Boolean(active.disabled),
                 path: active.dataset.menuItemPath ?? null,
                 role: active.getAttribute('role'),
-                text: active.textContent?.trim() ?? '',
+                text: (active.textContent?.trim() ?? '').slice(0, 80),
                 visible: active.getClientRects().length > 0,
               }
             : null,
@@ -730,18 +730,31 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       );
       let productivityFocused = false;
       for (let step = 0; step < 32; step += 1) {
-        productivityFocused = await page.evaluate(
-          () =>
-            document.activeElement?.getAttribute('role') === 'menuitem' &&
-            document.activeElement.textContent?.trim() === 'Productivity',
-        );
+        productivityFocused = await page.evaluate(() => {
+          const active = document.activeElement as HTMLElement | null;
+          if (
+            active?.getAttribute('role') !== 'menuitem' ||
+            active.getClientRects().length === 0 ||
+            ('disabled' in active && Boolean(active.disabled))
+          ) {
+            return false;
+          }
+          const key = active.textContent?.trim() === 'Productivity' ? 'ArrowRight' : 'ArrowDown';
+          active.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              bubbles: true,
+              cancelable: true,
+              code: key,
+              key,
+            }),
+          );
+          return key === 'ArrowRight';
+        });
         if (productivityFocused) break;
-        await page.keyboard.press('ArrowDown');
       }
       if (!productivityFocused) {
         throw new Error(`Productivity keyboard target not reached: ${JSON.stringify(await menuDiagnostics())}`);
       }
-      await page.keyboard.press('ArrowRight');
       await page.waitForFunction(
         () => {
           const active = document.activeElement as HTMLElement | null;
@@ -786,7 +799,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
             ? {
                 path: active.dataset.menuItemPath ?? null,
                 role: active.getAttribute('role'),
-                text: active.textContent?.trim() ?? '',
+                text: (active.textContent?.trim() ?? '').slice(0, 80),
               }
             : null,
           count: calls.length,

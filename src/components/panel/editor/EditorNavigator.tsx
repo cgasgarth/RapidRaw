@@ -113,7 +113,6 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   }, []);
 
   useEffect(() => {
-    let frame = 0;
     const synchronize = () => {
       const next = transformControllerRef.current?.instance?.transformState;
       if (next) {
@@ -123,10 +122,10 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
           setTransform(resolved);
         }
       }
-      frame = requestAnimationFrame(synchronize);
     };
-    frame = requestAnimationFrame(synchronize);
-    return () => cancelAnimationFrame(frame);
+    synchronize();
+    const interval = window.setInterval(synchronize, 32);
+    return () => window.clearInterval(interval);
   }, [transformControllerRef]);
 
   const sourceSize = useMemo(
