@@ -4566,6 +4566,7 @@ pub fn run() {
             negative_conversion::preview_negative_conversion,
             negative_conversion::preflight_negative_lab_source,
             negative_conversion::fit_negative_lab_measured_profile,
+            negative_conversion::lock_negative_lab_roll_bounds,
             negative_conversion::render_negative_lab_dry_run_preview_artifact,
             negative_conversion::estimate_negative_base_fog,
             negative_conversion::suggest_negative_lab_neutral_patch_rgb_balance,
