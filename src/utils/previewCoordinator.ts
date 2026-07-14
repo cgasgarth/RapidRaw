@@ -429,6 +429,9 @@ export function reducePreviewCoordinator(
       event.artifact !== undefined &&
       identity.kind !== 'analytics' &&
       !(identity.kind === 'interactive' && state.visibleArtifact?.identity.kind === 'settled');
+    if (event.artifact !== undefined && !shouldPublish && event.artifact.url !== state.visibleArtifact?.url) {
+      effects.push({ type: 'release-url', url: event.artifact.url, reason: 'artifact-not-presented' });
+    }
     if (shouldPublish && event.artifact !== undefined) {
       const previousUrl = state.visibleArtifact?.url;
       if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
