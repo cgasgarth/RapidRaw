@@ -38,6 +38,22 @@
       "vibrance": 0,
       "workingSpace": "linear_srgb_d65"
     },
+    "cmyTiming": {
+      "algorithmVersion": 1,
+      "enabled": false,
+      "globalC": 0,
+      "globalM": 0,
+      "globalY": 0,
+      "shadowC": 0,
+      "shadowM": 0,
+      "shadowY": 0,
+      "highlightC": 0,
+      "highlightM": 0,
+      "highlightY": 0,
+      "transitionWidth": 0.15,
+      "source": "manual_global_v1",
+      "signConvention": "positive_density_reduces_channel_exposure_v1"
+    },
     "opticalFinish": {
       "algorithmVersion": 1,
       "enabled": false,

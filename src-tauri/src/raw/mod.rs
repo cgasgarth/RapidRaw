@@ -6,6 +6,7 @@ pub(crate) mod color_graph_trace;
 pub(crate) mod embedded_preview;
 pub(crate) mod highlight_reconstruction;
 pub(crate) mod negative_conversion;
+pub(crate) mod negative_lab_cmy_timing;
 pub(crate) mod negative_lab_color_finish;
 pub(crate) mod negative_lab_detail_finish;
 pub(crate) mod negative_lab_optical_finish;

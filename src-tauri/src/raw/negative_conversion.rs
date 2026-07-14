@@ -30,6 +30,9 @@ use super::negative_lab_optical_finish::{
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
+use crate::raw::negative_lab_cmy_timing::{
+    NegativeLabCmyTimingMetrics, NegativeLabCmyTimingParams, apply_cmy_timing_pixel,
+};
 use crate::raw::negative_lab_color_finish::{
     NegativeLabColorFinishMetrics, NegativeLabScannerColorFinishParams, apply_color_finish,
 };
@@ -81,6 +84,8 @@ pub struct NegativeConversionParams {
     pub source_interpretation_hash: Option<String>,
     #[serde(default)]
     pub color_finish: NegativeLabScannerColorFinishParams,
+    #[serde(default)]
+    pub cmy_timing: NegativeLabCmyTimingParams,
     #[serde(default)]
     pub detail_finish: NegativeLabDetailFinishParams,
     #[serde(default)]
@@ -246,6 +251,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub detail_finish_metrics: NegativeLabDetailFinishMetrics,
     pub color_finish_metrics: NegativeLabColorFinishMetrics,
     pub optical_finish_metrics: NegativeLabOpticalFinishMetrics,
+    pub cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub render_intent: NegativeLabRenderIntent,
@@ -1127,6 +1133,7 @@ impl Default for NegativeConversionParams {
             conversion_model: NegativeConversionModel::DensityRgbV1,
             source_interpretation_hash: None,
             color_finish: NegativeLabScannerColorFinishParams::default(),
+            cmy_timing: NegativeLabCmyTimingParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
             optical_finish: NegativeLabOpticalFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
@@ -2424,6 +2431,7 @@ impl NegativeConversionParams {
             conversion_model: self.conversion_model,
             source_interpretation_hash: self.source_interpretation_hash.clone(),
             color_finish: self.color_finish.sanitized(),
+            cmy_timing: self.cmy_timing.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
             optical_finish: self.optical_finish.sanitized(),
             render_intent: self.render_intent,
@@ -2557,6 +2565,7 @@ struct NegativeLabPipelineRender {
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
     color_finish_metrics: NegativeLabColorFinishMetrics,
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
+    cmy_timing_metrics: NegativeLabCmyTimingMetrics,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3338,6 +3347,7 @@ fn run_e6_positive_pipeline(
         detail_finish_metrics,
         color_finish_metrics: color_finish.metrics,
         optical_finish_metrics: optical_finish.metrics,
+        cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
     }
 }
 
@@ -3468,11 +3478,11 @@ fn run_pipeline_with_metrics(
                 metrics.observe(model_density);
                 normalized_density_pixel.copy_from_slice(&model_density);
 
-                let weighted_density = [
+                let weighted_density = apply_cmy_timing_pixel([
                     model_density[0] * weights[0],
                     model_density[1] * weights[1],
                     model_density[2] * weights[2],
-                ];
+                ], &params.cmy_timing);
 
                 let apply_curve = |x: f32| -> f32 {
                     let sigmoid = 1.0 / (1.0 + (-k * (x - x0)).exp());
@@ -3585,6 +3595,7 @@ fn run_pipeline_with_metrics(
         detail_finish_metrics,
         color_finish_metrics: color_finish.metrics,
         optical_finish_metrics: optical_finish.metrics,
+        cmy_timing_metrics: NegativeLabCmyTimingMetrics::default(),
     }
 }
 
@@ -4270,6 +4281,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
     color_finish_metrics: NegativeLabColorFinishMetrics,
     optical_finish_metrics: NegativeLabOpticalFinishMetrics,
+    cmy_timing_metrics: NegativeLabCmyTimingMetrics,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -4324,6 +4336,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         detail_finish_metrics,
         color_finish_metrics,
         optical_finish_metrics,
+        cmy_timing_metrics,
         dimensions,
         flat_log_master: params.flat_log_master,
         render_intent: params.render_intent,
@@ -4473,6 +4486,7 @@ pub async fn preview_negative_conversion(
         rendered_preview.detail_finish_metrics,
         rendered_preview.color_finish_metrics,
         rendered_preview.optical_finish_metrics,
+        rendered_preview.cmy_timing_metrics,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -4513,6 +4527,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         rendered_preview.detail_finish_metrics,
         rendered_preview.color_finish_metrics,
         rendered_preview.optical_finish_metrics,
+        rendered_preview.cmy_timing_metrics,
         &params,
         rendered_preview.density_scopes,
     )
@@ -7895,6 +7910,7 @@ mod tests {
             )
             .metrics,
             NegativeLabOpticalFinishMetrics::default(),
+            NegativeLabCmyTimingMetrics::default(),
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -7979,6 +7995,7 @@ mod tests {
             pipeline.detail_finish_metrics,
             pipeline.color_finish_metrics,
             pipeline.optical_finish_metrics,
+            pipeline.cmy_timing_metrics,
             &params,
             pipeline.density_scopes,
         )
