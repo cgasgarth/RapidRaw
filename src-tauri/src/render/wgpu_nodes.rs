@@ -8,7 +8,8 @@
 use std::sync::Arc;
 
 use crate::edit_graph::{
-    CompiledEditGraph, EditNodeKind, SpatialSupport, WgpuBindGroupLayoutKind, runtime_descriptor,
+    CompiledEditGraph, EditNodeKind, LEGACY_PIPELINE_VERSION, SCENE_REFERRED_PIPELINE_VERSION,
+    SpatialSupport, WgpuBindGroupLayoutKind, runtime_descriptor,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,6 +59,7 @@ fn shader_accepts_layout(shader_source: WgpuShaderSource, layout: WgpuBindGroupL
         WgpuShaderSource::FusedProduction => matches!(
             layout,
             WgpuBindGroupLayoutKind::FusedSceneSpatialV2
+                | WgpuBindGroupLayoutKind::FusedSceneSpatialMaskV2
                 | WgpuBindGroupLayoutKind::FusedViewLutV2
                 | WgpuBindGroupLayoutKind::FusedDisplayLutMaskV2
                 | WgpuBindGroupLayoutKind::FusedLegacySceneViewV1
@@ -194,12 +196,83 @@ pub(crate) struct WgpuNodeModule {
     pub(crate) halo_pixels: u16,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum WgpuDispatchPhase {
+    Legacy,
+    Scene,
+    View,
+    DisplayTransport,
+}
+
+impl WgpuDispatchPhase {
+    pub(crate) const fn stable_id(self) -> &'static str {
+        match self {
+            Self::Legacy => "legacy",
+            Self::Scene => "scene",
+            Self::View => "view",
+            Self::DisplayTransport => "display_transport",
+        }
+    }
+
+    pub(crate) const fn shader_execution_phase(self) -> u32 {
+        match self {
+            Self::Legacy => 0,
+            Self::Scene => 1,
+            Self::View => 2,
+            Self::DisplayTransport => 3,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct WgpuDispatchGroup {
+    pub(crate) phase: WgpuDispatchPhase,
+    pub(crate) entry_point: &'static str,
+    pub(crate) modules: Arc<[EditNodeKind]>,
+    pub(crate) active_resources: Arc<[&'static str]>,
+    pub(crate) max_halo_pixels: u16,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct WgpuNodeRuntime {
     modules: Arc<[WgpuNodeModule]>,
     fused_groups: Arc<[Arc<[EditNodeKind]>]>,
+    dispatch_groups: Arc<[WgpuDispatchGroup]>,
     active_resources: Arc<[&'static str]>,
     max_halo_pixels: u16,
+}
+
+fn classify_dispatch_phase(
+    pipeline_version: u32,
+    modules: &[WgpuNodeModule],
+) -> Result<WgpuDispatchPhase, &'static str> {
+    let phases = modules
+        .iter()
+        .map(|module| module.fused_phase)
+        .collect::<Vec<_>>();
+    match pipeline_version {
+        SCENE_REFERRED_PIPELINE_VERSION if phases.iter().all(|phase| *phase == "scene") => {
+            Ok(WgpuDispatchPhase::Scene)
+        }
+        SCENE_REFERRED_PIPELINE_VERSION if phases.iter().all(|phase| *phase == "view") => {
+            Ok(WgpuDispatchPhase::View)
+        }
+        SCENE_REFERRED_PIPELINE_VERSION
+            if phases
+                .iter()
+                .all(|phase| matches!(*phase, "display" | "transport")) =>
+        {
+            Ok(WgpuDispatchPhase::DisplayTransport)
+        }
+        LEGACY_PIPELINE_VERSION
+            if phases
+                .iter()
+                .all(|phase| matches!(*phase, "legacy" | "display" | "transport")) =>
+        {
+            Ok(WgpuDispatchPhase::Legacy)
+        }
+        _ => Err("edit_graph.wgpu_fused_phase_mismatch"),
+    }
 }
 
 impl WgpuNodeRuntime {
@@ -268,8 +341,10 @@ impl WgpuNodeRuntime {
         }
 
         let mut fused_groups: Vec<Arc<[EditNodeKind]>> = Vec::new();
+        let mut dispatch_groups = Vec::new();
         for group in graph.receipt.fused_gpu_groups.iter() {
             let mut kinds = Vec::new();
+            let mut group_modules = Vec::new();
             for stable_id in group.iter() {
                 let Some(module) = modules
                     .iter()
@@ -281,19 +356,89 @@ impl WgpuNodeRuntime {
                     return Err("edit_graph.wgpu_fused_group_duplicate_module");
                 }
                 kinds.push(module.kind);
+                group_modules.push(*module);
             }
             if !kinds.is_empty() {
-                fused_groups.push(Arc::from(kinds));
+                let phase = classify_dispatch_phase(graph.pipeline_version, &group_modules)?;
+                if group_modules
+                    .iter()
+                    .any(|module| module.entry_point != group_modules[0].entry_point)
+                {
+                    return Err("edit_graph.wgpu_fused_entry_point_mismatch");
+                }
+                let mut group_resources = Vec::new();
+                for module in &group_modules {
+                    for resource in module.resource_requirements {
+                        if !group_resources.contains(resource) {
+                            group_resources.push(*resource);
+                        }
+                    }
+                }
+                let kinds: Arc<[EditNodeKind]> = kinds.into();
+                dispatch_groups.push(WgpuDispatchGroup {
+                    phase,
+                    entry_point: group_modules[0].entry_point,
+                    modules: kinds.clone(),
+                    active_resources: group_resources.into(),
+                    max_halo_pixels: group_modules
+                        .iter()
+                        .map(|module| module.halo_pixels)
+                        .max()
+                        .unwrap_or(0),
+                });
+                fused_groups.push(kinds);
             }
         }
         let grouped_count: usize = fused_groups.iter().map(|group| group.len()).sum();
         if grouped_count != modules.len() {
             return Err("edit_graph.wgpu_fused_group_incomplete");
         }
+        let expected_phases: &[WgpuDispatchPhase] = match graph.pipeline_version {
+            SCENE_REFERRED_PIPELINE_VERSION => &[
+                WgpuDispatchPhase::Scene,
+                WgpuDispatchPhase::View,
+                WgpuDispatchPhase::DisplayTransport,
+            ],
+            LEGACY_PIPELINE_VERSION => &[WgpuDispatchPhase::Legacy],
+            _ => return Err("edit_graph.wgpu_unsupported_pipeline_version"),
+        };
+        let phases = dispatch_groups
+            .iter()
+            .map(|group| group.phase)
+            .collect::<Vec<_>>();
+        let phase_ranks = phases
+            .iter()
+            .map(|phase| {
+                expected_phases
+                    .iter()
+                    .position(|expected| expected == phase)
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or("edit_graph.wgpu_dispatch_phase_order_mismatch")?;
+        if phase_ranks.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err("edit_graph.wgpu_dispatch_phase_order_mismatch");
+        }
+        let dispatch_groups = expected_phases
+            .iter()
+            .map(|phase| {
+                dispatch_groups
+                    .iter()
+                    .find(|group| group.phase == *phase)
+                    .cloned()
+                    .unwrap_or_else(|| WgpuDispatchGroup {
+                        phase: *phase,
+                        entry_point: "main",
+                        modules: Arc::from([]),
+                        active_resources: Arc::from([]),
+                        max_halo_pixels: 0,
+                    })
+            })
+            .collect::<Vec<_>>();
 
         Ok(Self {
             modules: modules.into(),
             fused_groups: fused_groups.into(),
+            dispatch_groups: dispatch_groups.into(),
             active_resources: active_resources.into(),
             max_halo_pixels,
         })
@@ -305,6 +450,41 @@ impl WgpuNodeRuntime {
 
     pub(crate) fn fused_groups(&self) -> &[Arc<[EditNodeKind]>] {
         &self.fused_groups
+    }
+
+    pub(crate) fn dispatch_groups(&self) -> &[WgpuDispatchGroup] {
+        &self.dispatch_groups
+    }
+
+    pub(crate) fn validates_bound_resources(
+        &self,
+        has_lut: bool,
+        mask_count: usize,
+    ) -> Result<(), &'static str> {
+        if has_lut && !self.active_resources.contains(&"display_lut_v1") {
+            return Err("edit_graph.wgpu_lut_resource_without_owner");
+        }
+        if mask_count > 0 && !self.active_resources.contains(&"mask_layers_v1") {
+            return Err("edit_graph.wgpu_mask_resource_without_owner");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn execution_fingerprint(&self) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"rapidraw.wgpu-node-runtime.v1");
+        for group in self.dispatch_groups.iter() {
+            hasher.update(group.phase.stable_id().as_bytes());
+            hasher.update(group.entry_point.as_bytes());
+            for kind in group.modules.iter() {
+                hasher.update(kind.stable_id().as_bytes());
+            }
+            for resource in group.active_resources.iter() {
+                hasher.update(resource.as_bytes());
+            }
+            hasher.update(&group.max_halo_pixels.to_le_bytes());
+        }
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
     }
 
     pub(crate) fn active_resources(&self) -> &[&'static str] {
@@ -338,6 +518,15 @@ impl WgpuNodeRuntime {
             "fusedGroups": self.fused_groups.iter().map(|group| {
                 group.iter().map(|kind| kind.stable_id()).collect::<Vec<_>>()
             }).collect::<Vec<_>>(),
+            "dispatchGroups": self.dispatch_groups.iter().map(|group| serde_json::json!({
+                "phase": group.phase.stable_id(),
+                "shaderExecutionPhase": group.phase.shader_execution_phase(),
+                "entryPoint": group.entry_point,
+                "modules": group.modules.iter().map(|kind| kind.stable_id()).collect::<Vec<_>>(),
+                "activeResources": group.active_resources,
+                "maxHaloPixels": group.max_halo_pixels,
+            })).collect::<Vec<_>>(),
+            "executionFingerprint": format!("{:016x}", self.execution_fingerprint()),
             "activeResources": self.active_resources,
             "maxHaloPixels": self.max_halo_pixels,
         })
@@ -406,6 +595,30 @@ mod tests {
             has_geometry_or_retouch: true,
             has_detail: true,
             has_masks: true,
+            has_lut: true,
+            show_clipping: false,
+        })
+    }
+
+    fn graph_without_bound_resources() -> crate::edit_graph::CompiledEditGraph {
+        let adjustments = AllAdjustments::default();
+        crate::edit_graph::CompiledEditGraph::compile(EditGraphCompileInputs {
+            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
+            version_was_explicit: true,
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &adjustments,
+            neutral_adjustments: &adjustments,
+            scene_curve: None,
+            film_emulation: None,
+            output_curve: None,
+            has_geometry_or_retouch: false,
+            has_detail: false,
+            has_masks: false,
             has_lut: false,
             show_clipping: false,
         })
@@ -457,6 +670,25 @@ mod tests {
                 .sum::<usize>(),
             runtime.modules().len()
         );
+        assert_eq!(
+            runtime
+                .dispatch_groups()
+                .iter()
+                .map(|group| group.phase)
+                .collect::<Vec<_>>(),
+            vec![
+                WgpuDispatchPhase::Scene,
+                WgpuDispatchPhase::View,
+                WgpuDispatchPhase::DisplayTransport,
+            ]
+        );
+        assert!(
+            runtime
+                .dispatch_groups()
+                .iter()
+                .all(|group| group.entry_point == "main" && !group.modules.is_empty())
+        );
+        assert_ne!(runtime.execution_fingerprint(), 0);
         let scene_curve = runtime
             .modules()
             .iter()
@@ -465,6 +697,41 @@ mod tests {
         assert_eq!(
             scene_curve.bind_group_layout,
             WgpuBindGroupLayoutKind::CurveStorageV1
+        );
+    }
+
+    #[test]
+    fn dispatch_registry_rejects_cross_phase_fusion() {
+        let mut graph = graph_with_curves_and_local_resources();
+        let mut groups = graph.receipt.fused_gpu_groups.to_vec();
+        groups[0] = Arc::from([
+            EditNodeKind::SceneGlobalColorTone.stable_id(),
+            EditNodeKind::SceneToViewTransform.stable_id(),
+        ]);
+        graph.receipt.fused_gpu_groups = groups.into();
+        assert_eq!(
+            WgpuNodeRuntime::from_graph(&graph),
+            Err("edit_graph.wgpu_fused_phase_mismatch")
+        );
+    }
+
+    #[test]
+    fn runtime_validates_bound_resource_ownership() {
+        let local_runtime = WgpuNodeRuntime::from_graph(&graph_with_curves_and_local_resources())
+            .expect("local graph has a WGPU runtime");
+        assert_eq!(local_runtime.validates_bound_resources(false, 1), Ok(()));
+        assert_eq!(local_runtime.validates_bound_resources(true, 1), Ok(()));
+
+        let neutral_runtime = WgpuNodeRuntime::from_graph(&graph_without_bound_resources())
+            .expect("neutral graph has a WGPU runtime");
+        assert_eq!(neutral_runtime.validates_bound_resources(false, 0), Ok(()));
+        assert_eq!(
+            neutral_runtime.validates_bound_resources(true, 0),
+            Err("edit_graph.wgpu_lut_resource_without_owner")
+        );
+        assert_eq!(
+            neutral_runtime.validates_bound_resources(false, 1),
+            Err("edit_graph.wgpu_mask_resource_without_owner")
         );
     }
 
