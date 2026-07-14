@@ -4,7 +4,12 @@ import { createHash, randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { processStartToken } from '../qa/identity';
-import { readLiveNativeQaControlRecord, readNativeQaControlRecord, requestNativeQaControl } from '../qa/native-control';
+import {
+  nativeQaReadinessStatus,
+  readLiveNativeQaControlRecord,
+  readNativeQaControlRecord,
+  requestNativeQaControl,
+} from '../qa/native-control';
 import {
   assertNativeQaBuildAvailability,
   computeNativeQaIdentity,
@@ -154,16 +159,25 @@ if (shouldLaunch) {
       { mode: 0o600 },
     );
     await chmod(controlRecordPath, 0o600);
+    let frontendReady = false;
     for (let attempt = 0; attempt < 200; attempt += 1) {
+      const processAlive = (await processStartToken(process.pid)) === startToken;
       const control = await readNativeQaControlRecord(controlRecordPath);
-      if (control !== undefined) {
-        const response = await requestNativeQaControl(control, 'health').catch(() => undefined);
-        if (response?.ok) break;
+      const response =
+        control === undefined ? undefined : await requestNativeQaControl(control, 'health').catch(() => undefined);
+      const health =
+        response?.ok && typeof response.result === 'object' && response.result !== null && 'ready' in response.result
+          ? { ready: response.result.ready === true }
+          : undefined;
+      const readiness = nativeQaReadinessStatus(health, processAlive);
+      if (readiness === 'ready') {
+        frontendReady = true;
+        break;
       }
-      if (process.exitCode !== null) {
+      if (readiness === 'exited') {
         const log = await readFile(logPath, 'utf8').catch(() => 'native control log unavailable');
         throw new Error(
-          `Native QA app exited during launch (${process.exitCode}):\n${log.split('\n').slice(-30).join('\n')}`,
+          `Native QA app exited before frontend/window readiness:\n${log.split('\n').slice(-30).join('\n')}`,
         );
       }
       await Bun.sleep(50);
@@ -172,6 +186,7 @@ if (shouldLaunch) {
         throw new Error(`Native QA control channel did not become ready:\n${log.split('\n').slice(-30).join('\n')}`);
       }
     }
+    if (!frontendReady) throw new Error('Native QA app did not report frontend/window readiness.');
   }
 }
 

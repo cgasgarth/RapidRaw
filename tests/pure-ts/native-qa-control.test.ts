@@ -9,6 +9,7 @@ import {
   NATIVE_QA_BINARY_MARKERS,
   type NativeQaControlRecord,
   nativeQaControlRecordSchema,
+  nativeQaReadinessStatus,
   readLiveNativeQaControlRecord,
   requestNativeQaControl,
   verifyNativeQaBinaryBoundary,
@@ -23,6 +24,13 @@ afterEach(async () => {
 });
 
 describe('native QA control contracts', () => {
+  test('does not report a bundle healthy until its process and frontend are ready', () => {
+    expect(nativeQaReadinessStatus(undefined, true)).toBe('waiting');
+    expect(nativeQaReadinessStatus({ ready: false }, true)).toBe('waiting');
+    expect(nativeQaReadinessStatus({ ready: true }, true)).toBe('ready');
+    expect(nativeQaReadinessStatus({ ready: true }, false)).toBe('exited');
+  });
+
   test('requires a private token and exact worktree/build identity record', () => {
     expect(() =>
       nativeQaControlRecordSchema.parse({
