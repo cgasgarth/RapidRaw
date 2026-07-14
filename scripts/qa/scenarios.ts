@@ -513,7 +513,131 @@ export const qaScenarios: readonly QaScenario[] = [
       await openCommandPalette(page);
       await page.getByRole('button', { name: /Show crop tools/u }).click();
       await page.getByRole('heading', { name: 'Crop' }).waitFor();
-      await page.getByRole('button', { name: /Straighten Tool/u }).waitFor();
+      const straightenToggle = page.getByTestId('crop-panel-straighten-toggle');
+      await straightenToggle.waitFor();
+      await straightenToggle.click();
+      const surface = page.getByTestId('crop-straighten-input-surface');
+      await surface.waitFor();
+      const firstImageSession = await surface.getAttribute('data-controller-image-session');
+      const firstSourceIdentity = await surface.getAttribute('data-controller-source-identity');
+      if (
+        !firstImageSession?.startsWith('editor-image-session:') ||
+        !firstSourceIdentity?.endsWith('browser-harness.ARW')
+      )
+        throw new Error('Straighten controller was not keyed by the editor image session and presentation source.');
+      let box = await surface.boundingBox();
+      if (box === null || box.width < 40 || box.height < 40)
+        throw new Error('Straighten controller did not receive a usable crop render surface.');
+      const cropSurface = surface.locator('xpath=ancestor::*[@data-overlay-geometry-epoch][1]');
+      if (
+        (await surface.getAttribute('data-controller-geometry-epoch')) !==
+        (await cropSurface.getAttribute('data-overlay-geometry-epoch'))
+      )
+        throw new Error('Straighten controller and crop surface did not share one geometry epoch.');
+
+      let start = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.35 };
+      let end = { x: box.x + box.width * 0.7, y: box.y + box.height * 0.48 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 4 });
+      const guide = page.getByTestId('crop-straighten-guide');
+      await guide.waitFor({ timeout: 5_000 }).catch(() => {
+        throw new Error('Initial straighten gesture did not publish its declarative guide.');
+      });
+      if (
+        (await guide.getAttribute('data-overlay-geometry-epoch')) !==
+        (await surface.getAttribute('data-controller-geometry-epoch'))
+      )
+        throw new Error('Straighten guide published against a stale geometry epoch.');
+
+      await page.locator('[data-testid="filmstrip-thumbnail"][data-image-path$="/browser-harness-2.ARW"]').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="filmstrip-selection-summary"]')
+            ?.getAttribute('data-active-filename') === 'browser-harness-2.ARW',
+      );
+      await guide.waitFor({ state: 'detached' });
+      await page.mouse.up();
+      await page.locator('[data-testid="filmstrip-thumbnail"][data-image-path$="/browser-harness.ARW"]').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="filmstrip-selection-summary"]')
+            ?.getAttribute('data-active-filename') === 'browser-harness.ARW',
+      );
+      if (!(await page.getByRole('heading', { name: 'Crop' }).isVisible())) {
+        await openCommandPalette(page);
+        await page.getByRole('button', { name: /Show crop tools/u }).click();
+        await page.getByRole('heading', { name: 'Crop' }).waitFor();
+      }
+      if ((await straightenToggle.getAttribute('aria-pressed')) !== 'true') await straightenToggle.click();
+      await surface.waitFor();
+      const reopenedImageSession = await surface.getAttribute('data-controller-image-session');
+      if (
+        reopenedImageSession === null ||
+        reopenedImageSession === firstImageSession ||
+        (await surface.getAttribute('data-controller-source-identity')) !== firstSourceIdentity
+      )
+        throw new Error('Same-path reopen did not replace the keyed editor image session.');
+      box = await surface.boundingBox();
+      if (box === null || box.width < 40 || box.height < 40)
+        throw new Error('Reopened straighten controller did not receive a usable crop render surface.');
+      start = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.35 };
+      end = { x: box.x + box.width * 0.7, y: box.y + box.height * 0.48 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 4 });
+      await guide.waitFor({ timeout: 5_000 }).catch(() => {
+        throw new Error('Same-path reopened session did not accept a fresh straighten gesture.');
+      });
+
+      const callsBeforeCancel = await page.evaluate(
+        () =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'apply_adjustments',
+          ).length,
+      );
+      await page.keyboard.press('Escape');
+      await guide.waitFor({ state: 'detached' });
+      await page.mouse.up();
+      const callsAfterCancel = await page.evaluate(
+        () =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+            ({ command }) => command === 'apply_adjustments',
+          ).length,
+      );
+      if (callsAfterCancel !== callsBeforeCancel)
+        throw new Error('Cancelled straighten gesture committed an adjustment.');
+      if ((await straightenToggle.getAttribute('aria-pressed')) !== 'true') await straightenToggle.click();
+      await surface.waitFor();
+
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 4 });
+      await guide.waitFor({ timeout: 5_000 }).catch(() => {
+        throw new Error('Post-cancel straighten session did not accept a fresh gesture.');
+      });
+      await page.mouse.up();
+      await page.waitForFunction(
+        (priorCalls) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+            .filter(({ command }) => command === 'apply_adjustments')
+            .slice(priorCalls)
+            .some(({ args }) => {
+              const rotation = JSON.stringify(args ?? null).match(/"rotation":(-?\d+(?:\.\d+)?)/u)?.[1];
+              return rotation !== undefined && Math.abs(Number(rotation)) > 0.01;
+            }),
+        callsAfterCancel,
+      );
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-testid="crop-panel-straighten-toggle"]')?.getAttribute('aria-pressed') ===
+          'false',
+      );
+      await guide.waitFor({ state: 'detached' });
     },
   },
   {

@@ -35,9 +35,11 @@ test('keeps rendered predecessor and successor SVG base layers until successor o
 
   await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:base-b');
   expect(baseSources(rendered.container)).toEqual(['blob:base-a', 'blob:base-b']);
+  expect(rendered.presented).not.toContain('blob:base-b');
 
   await finishOpacityHandoff(rendered.container, 'svg-preview-base-layer', 'blob:base-b');
   expect(baseSources(rendered.container)).toEqual(['blob:base-b']);
+  expect(rendered.presented).toContain('blob:base-b');
   expect(rendered.released).toContain('base:/photo.ARW:blob:base-a:blob:base-a');
 });
 
@@ -133,6 +135,7 @@ function renderHandoff({
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
+  const presented: string[] = [];
   const released: string[] = [];
 
   const render = ({
@@ -153,6 +156,7 @@ function renderHandoff({
               incomingPatch: nextIncomingPatch,
               isCpuPreviewVisible: nextIsCpuPreviewVisible,
               isMaxZoom: false,
+              onBasePresented: (url: string) => presented.push(url),
               patchScopeKey: '/photo.ARW:geometry',
               reducedMotion: nextReducedMotion,
               releaseUrl: (owner: string, url: string) => released.push(`${owner}:${url}`),
@@ -166,7 +170,7 @@ function renderHandoff({
 
   render({ baseSource, incomingPatch, isCpuPreviewVisible, reducedMotion });
   renderedRoot = { container, root };
-  return { container, released, render };
+  return { container, presented, released, render };
 }
 
 function baseSources(container: Element): string[] {

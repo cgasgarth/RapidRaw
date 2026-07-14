@@ -303,6 +303,7 @@ interface SvgPreviewHandoffProps {
   incomingPatch: InteractivePatch | null;
   isCpuPreviewVisible: boolean;
   isMaxZoom: boolean | undefined;
+  onBasePresented: (url: string) => void;
   patchScopeKey: string;
   reducedMotion?: boolean | undefined;
   releaseUrl: (owner: string, url: string) => void;
@@ -315,6 +316,7 @@ export function SvgPreviewHandoff({
   incomingPatch,
   isCpuPreviewVisible,
   isMaxZoom,
+  onBasePresented,
   patchScopeKey,
   reducedMotion: reducedMotionOverride,
   releaseUrl,
@@ -346,6 +348,11 @@ export function SvgPreviewHandoff({
     targetKey: incomingPatch?.url ?? null,
   });
   const baseSuccessorIsVisible = baseHandoff.state.successor?.opacity === 1;
+  const presentedBaseUrl = baseHandoff.state.active?.status === 'visible' ? baseHandoff.state.active.value.url : null;
+
+  useEffect(() => {
+    if (presentedBaseUrl !== null) onBasePresented(presentedBaseUrl);
+  }, [onBasePresented, presentedBaseUrl]);
 
   useEffect(() => {
     if (!incomingPatch && baseSuccessorIsVisible) {

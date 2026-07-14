@@ -2203,6 +2203,7 @@ export default function Editor({
               gamutWarningOverlay={gamutWarningOverlay}
               handleCropComplete={handleCropComplete}
               handleCropStart={handleCropStart}
+              imageSessionId={editorImageSession?.id ?? null}
               imageRenderSize={imageRenderSize}
               originalImageRenderSize={comparePaneLayout.original}
               overlayGeometry={overlayGeometry}

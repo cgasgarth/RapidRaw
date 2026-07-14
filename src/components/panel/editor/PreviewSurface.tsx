@@ -19,6 +19,7 @@ interface PreviewSurfaceProps {
   originalImageRenderSize: RenderSize;
   originalLoaded: boolean;
   originalSrc: string | null;
+  onOriginalPresented: (url: string) => void;
   showOriginalCompare: boolean;
   showSideBySideCompare: boolean;
   showSplitCompare: boolean;
@@ -46,6 +47,7 @@ export function PreviewSurface({
   originalImageRenderSize,
   originalLoaded,
   originalSrc,
+  onOriginalPresented,
   showOriginalCompare,
   showSideBySideCompare,
   showSplitCompare,
@@ -106,6 +108,7 @@ export function PreviewSurface({
             <img
               alt={t('editor.canvas.originalAlt')}
               className={hasSizedImage ? 'pointer-events-none' : 'absolute inset-0 h-full w-full object-contain'}
+              onLoad={() => onOriginalPresented(originalSrc)}
               src={originalSrc}
               style={hasSizedImage ? originalStyle : { ...originalStyle, inset: '0px', objectFit: 'contain' }}
             />

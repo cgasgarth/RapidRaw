@@ -48,6 +48,7 @@ import {
   type BrushMaskCommandReceipt,
   buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
+import { presentedPreviewReleaseCoordinator } from '../../../utils/presentedPreviewReleaseCoordinator';
 import {
   buildViewerSamplerIdentity,
   isViewerSampleResultCurrent,
@@ -68,6 +69,7 @@ import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, ToolType } from '../right/layers/Masks';
 import { CompareOverlay } from './CompareOverlay';
 import { CropOverlaySurface } from './CropOverlaySurface';
+import type { CropStraightenSessionIdentity } from './cropStraightenController';
 import { createFocusRetouchCommandService } from './focusRetouchCommandService';
 import {
   imageCanvasLayerZIndex,
@@ -84,16 +86,16 @@ import {
 } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
+import { useViewerPickerControllers } from './useViewerPickerControllers';
+import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
-import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
-import { useViewerPickerControllers } from './useViewerPickerControllers';
 import {
   isViewerWhiteBalanceSampleCurrent,
   resolveViewerWhiteBalanceInteraction,
@@ -166,11 +168,6 @@ interface MaskInteractionEvent {
   };
 }
 
-interface StraightenLine {
-  end: Vector2d;
-  start: Vector2d;
-}
-
 type CanvasKonvaEvent = KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>;
 type CanvasMoveEvent = CanvasKonvaEvent | MouseEvent | TouchEvent;
 type RetouchHandleDragEvent = KonvaEventObject<DragEvent>;
@@ -240,6 +237,7 @@ interface ImageCanvasProps {
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   handleCropComplete: (c: Crop, cp: PercentCrop) => void;
   handleCropStart?: () => void;
+  imageSessionId: string | null;
   imageRenderSize: RenderSize;
   originalImageRenderSize?: RenderSize;
   overlayGeometry?: EditorOverlayGeometry;
@@ -316,6 +314,7 @@ const ImageCanvas = memo(
     gamutWarningOverlay,
     handleCropComplete,
     handleCropStart = () => undefined,
+    imageSessionId,
     imageRenderSize,
     originalImageRenderSize = imageRenderSize,
     overlayGeometry: providedOverlayGeometry,
@@ -417,8 +416,6 @@ const ImageCanvas = memo(
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
-    const [straightenLine, setStraightenLine] = useState<StraightenLine | null>(null);
-    const isStraightening = useRef(false);
     const overlayGeometry = useMemo(
       () =>
         providedOverlayGeometry ??
@@ -500,6 +497,29 @@ const ImageCanvas = memo(
         viewerSampleGraphRevision,
       ],
     );
+    const cropStraightenSession = useMemo<CropStraightenSessionIdentity | null>(
+      () =>
+        isCropping && imageSessionId !== null
+          ? {
+              geometryEpoch: overlayGeometry.geometryEpoch,
+              imageSessionId,
+              operationGeneration: adjustmentGeometryRevision,
+              sourceIdentity: presentationDescriptor.sourceIdentity,
+              sourceRevision: presentationDescriptor.graphRevision,
+              tool: isStraightenActive ? 'straighten' : 'crop',
+            }
+          : null,
+      [
+        adjustmentGeometryRevision,
+        imageSessionId,
+        isCropping,
+        isStraightenActive,
+        overlayGeometry.geometryEpoch,
+        presentationDescriptor.graphRevision,
+        presentationDescriptor.sourceIdentity,
+        selectedImage.path,
+      ],
+    );
     const pickerControllers = useViewerPickerControllers({
       adjustments,
       geometry: overlayGeometry,
@@ -508,6 +528,18 @@ const ImageCanvas = memo(
     });
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
+    const acknowledgeBasePreviewUrl = useCallback((url: string) => {
+      presentedPreviewReleaseCoordinator.acknowledge('base', url);
+    }, []);
+    const acknowledgeOriginalPreviewUrl = useCallback((url: string) => {
+      presentedPreviewReleaseCoordinator.acknowledge('original', url);
+    }, []);
+    useEffect(
+      () => () => {
+        presentedPreviewReleaseCoordinator.cancel();
+      },
+      [],
+    );
 
     const retainPreviewLayerUrl = useCallback(
       (owner: string, url: string) => {
@@ -1845,96 +1877,6 @@ const ImageCanvas = memo(
       selectedImage.path,
     ]);
 
-    const handleStraightenMouseDown = (e: CanvasKonvaEvent) => {
-      if (isNonPrimaryButton(e)) {
-        return;
-      }
-
-      isStraightening.current = true;
-      const pos = e.target.getStage()?.getPointerPosition() ?? null;
-      if (!pos) return;
-      setStraightenLine({ start: pos, end: pos });
-    };
-
-    const handleStraightenMouseMove = (e: CanvasKonvaEvent) => {
-      if (!isStraightening.current) {
-        return;
-      }
-
-      const pos = e.target.getStage()?.getPointerPosition() ?? null;
-      if (!pos) return;
-      setStraightenLine((prev: StraightenLine | null) => (prev ? { ...prev, end: pos } : prev));
-      if (e.evt.cancelable) e.evt.preventDefault();
-    };
-
-    const handleStraightenMouseUp = () => {
-      if (!isStraightening.current) {
-        return;
-      }
-      isStraightening.current = false;
-      if (
-        !straightenLine ||
-        (straightenLine.start.x === straightenLine.end.x && straightenLine.start.y === straightenLine.end.y)
-      ) {
-        setStraightenLine(null);
-        return;
-      }
-
-      const { start, end } = straightenLine;
-      const { rotation } = adjustments;
-      const theta_rad = (rotation * Math.PI) / 180;
-      const cos_t = Math.cos(theta_rad);
-      const sin_t = Math.sin(theta_rad);
-      const width = uncroppedImageRenderSize?.width ?? 0;
-      const height = uncroppedImageRenderSize?.height ?? 0;
-      const cx = width / 2;
-      const cy = height / 2;
-
-      const unrotate = (p: Coord) => {
-        const x = p.x - cx;
-        const y = p.y - cy;
-        return {
-          x: cx + x * cos_t + y * sin_t,
-          y: cy - x * sin_t + y * cos_t,
-        };
-      };
-
-      const start_unrotated = unrotate(start);
-      const end_unrotated = unrotate(end);
-      const dx = end_unrotated.x - start_unrotated.x;
-      const dy = end_unrotated.y - start_unrotated.y;
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      let targetAngle;
-
-      if (angle > -45 && angle <= 45) {
-        targetAngle = 0;
-      } else if (angle > 45 && angle <= 135) {
-        targetAngle = 90;
-      } else if (angle > 135 || angle <= -135) {
-        targetAngle = 180;
-      } else {
-        targetAngle = -90;
-      }
-
-      let correction = targetAngle - angle;
-      if (correction > 180) {
-        correction -= 360;
-      }
-      if (correction < -180) {
-        correction += 360;
-      }
-
-      onStraighten(correction);
-      setStraightenLine(null);
-    };
-
-    const handleStraightenMouseLeave = () => {
-      if (isStraightening.current) {
-        isStraightening.current = false;
-        setStraightenLine(null);
-      }
-    };
-
     const retouchPointToCanvas = useCallback(
       (point: RetouchCloneSource['sourcePoint']): Coord =>
         overlayGeometry.cropToView(
@@ -2460,6 +2402,7 @@ const ImageCanvas = memo(
             originalLoaded={originalLoaded}
             originalImageRenderSize={originalImageRenderSize}
             originalSrc={originalSrc}
+            onOriginalPresented={acknowledgeOriginalPreviewUrl}
             showOriginalCompare={showOriginalCompare}
             showSideBySideCompare={isSideBySideCompare}
             showSplitCompare={showSplitCompare}
@@ -2471,6 +2414,7 @@ const ImageCanvas = memo(
                 incomingPatch={coherentInteractivePatch}
                 isCpuPreviewVisible={!isWgpuActive}
                 isMaxZoom={isMaxZoom}
+                onBasePresented={acknowledgeBasePreviewUrl}
                 patchScopeKey={patchScopeKey}
                 releaseUrl={releasePreviewLayerUrl}
                 retainUrl={retainPreviewLayerUrl}
@@ -3212,53 +3156,15 @@ const ImageCanvas = memo(
           isCropViewVisible={isCropViewVisible}
           onCropPreviewError={() => setLoadedCropPreviewUrl(null)}
           onCropPreviewLoad={() => setLoadedCropPreviewUrl(cropPreviewUrl)}
+          onStraighten={onStraighten}
           isMaxZoom={isMaxZoom}
           isRotationActive={isRotationActive}
           isStraightenActive={isStraightenActive}
           overlayMode={overlayMode}
           overlayRotation={overlayRotation}
+          rotationDegrees={liveRotation ?? adjustments.rotation ?? 0}
+          session={cropStraightenSession}
           setCrop={setCrop}
-          straightenOverlay={
-            isStraightenActive && (
-              <Stage
-                height={uncroppedImageRenderSize?.height ?? 0}
-                onMouseDown={handleStraightenMouseDown}
-                onMouseLeave={handleStraightenMouseLeave}
-                onMouseMove={handleStraightenMouseMove}
-                onMouseUp={handleStraightenMouseUp}
-                onTouchEnd={handleStraightenMouseUp}
-                onTouchMove={handleStraightenMouseMove}
-                onTouchStart={handleStraightenMouseDown}
-                style={{
-                  cursor: 'crosshair',
-                  left: 0,
-                  position: 'absolute',
-                  top: 0,
-                  touchAction: 'none',
-                  zIndex: imageCanvasLayerZIndex('activeTool'),
-                }}
-                width={uncroppedImageRenderSize?.width ?? 0}
-              >
-                <Layer>
-                  {straightenLine && (
-                    <Line
-                      dash={[4, 4]}
-                      listening={false}
-                      points={[
-                        straightenLine.start.x,
-                        straightenLine.start.y,
-                        straightenLine.end.x,
-                        straightenLine.end.y,
-                      ]}
-                      stroke={canvasOverlayTokens.colors.active}
-                      {...canvasOverlayShadowProps}
-                      strokeWidth={2}
-                    />
-                  )}
-                </Layer>
-              </Stage>
-            )
-          }
         />
       </ViewerSurface>
     );

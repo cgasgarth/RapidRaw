@@ -2468,6 +2468,7 @@ function BrushMaskCanvasVisualSmoke() {
                 gamutWarningOverlay={null}
                 handleCropComplete={() => {}}
                 hasRenderedFirstFrame
+                imageSessionId="visual-smoke:brush-mask-canvas"
                 imageRenderSize={{
                   height: brushMaskCanvasImageHeight,
                   offsetX: 0,
@@ -2673,6 +2674,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                   setCropState(nextCrop);
                 }}
                 hasRenderedFirstFrame
+                imageSessionId="visual-smoke:crop-transform"
                 imageRenderSize={{ height: 405, offsetX: 0, offsetY: 0, scale: 1, width: 720 }}
                 isAiEditing={false}
                 isCropping={true}
@@ -2870,6 +2872,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     gamutWarningOverlay: null,
     handleCropComplete: () => {},
     hasRenderedFirstFrame: true,
+    imageSessionId: 'visual-smoke:professional-canvas',
     imageRenderSize,
     isExportSoftProofEnabled: false,
     isGamutWarningOverlayVisible: false,
