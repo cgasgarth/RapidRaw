@@ -77,6 +77,7 @@ export enum Invokes {
   GeneratePreviewForPath = 'generate_preview_for_path',
   RenderNegativeLabDryRunPreviewArtifact = 'render_negative_lab_dry_run_preview_artifact',
   PreflightNegativeLabSource = 'preflight_negative_lab_source',
+  FitNegativeLabMeasuredProfile = 'fit_negative_lab_measured_profile',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   PreviewAutoEditProposal = 'preview_auto_edit_proposal',
