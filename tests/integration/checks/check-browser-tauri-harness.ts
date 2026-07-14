@@ -692,7 +692,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     await targetThumbnail.click({ button: 'right' });
     const productivity = page.getByRole('menuitem', { exact: true, name: 'Productivity' });
     await productivity.waitFor({ timeout: 10_000 });
-    await productivity.hover();
+    await productivity.press('ArrowRight');
     await page.waitForFunction(
       () =>
         [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
@@ -702,6 +702,12 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     );
     const autoAdjust = page.getByRole('menuitem', { exact: true, name: 'Auto Adjust Image' });
     await autoAdjust.waitFor({ timeout: 10_000 });
+    await page.waitForFunction(
+      () =>
+        document.activeElement?.getAttribute('role') === 'menuitem' &&
+        document.activeElement.textContent?.trim() === 'Auto Adjust Image',
+      { timeout: 10_000 },
+    );
     await autoAdjust.press('Enter');
   };
   const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
