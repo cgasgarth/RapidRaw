@@ -30,6 +30,14 @@ export const negativeLabBaseFogSampleRectSchema = z
   });
 
 export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1', 'e6_positive_v1']);
+export const negativeLabRenderIntentSchema = z.enum(['print', 'flat_log_master']);
+export const negativeLabFlatLogMasterParamsSchema = z
+  .object({
+    algorithm_version: z.literal(1).default(1),
+    gain: z.number().min(0.1).max(2).default(1),
+    lift: z.number().min(0).max(0.25).default(0.02),
+  })
+  .strict();
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
 export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
 export const negativeLabDetailFinishParamsSchema = z
@@ -107,6 +115,8 @@ export const negativeLabPresetParamsSchema = z
     print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema.default('density_rgb_v1'),
     print_curve_output_tag: negativeLabDensityPrintOutputTagSchema.default('preview_display'),
     print_curve_v2: negativeLabDensityPrintV2ParamsSchema.nullable().default(null),
+    render_intent: negativeLabRenderIntentSchema.optional(),
+    flat_log_master: negativeLabFlatLogMasterParamsSchema.optional(),
     red_weight: z.number().min(0.5).max(2),
     white_point_offset: z.number().min(-0.25).max(0.25).default(0),
     white_point: z.number().min(0.05).max(1).default(1),
@@ -428,6 +438,10 @@ export const negativeLabSavedPositiveHandoffSchema = z
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
     frameExposureOverrides: z.unknown(),
     frameRgbBalanceOverrides: z.unknown(),
+    flatLogMaster: z
+      .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
+      .strict()
+      .optional(),
     outputArtifactId: z.string().trim().min(1),
     outputFormat: z.enum(['jpeg_proof', 'tiff16']),
     outputHash: z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u),
@@ -439,6 +453,7 @@ export const negativeLabSavedPositiveHandoffSchema = z
       .regex(/^fnv1a32:[a-f0-9]{8}$/u)
       .nullable(),
     replayPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    renderIntent: z.enum(['print', 'flat_log_master']).optional(),
     selectedAcquisitionProfile: z.unknown(),
     selectedProfile: z.unknown().nullable(),
     sidecarPath: z.string().trim().min(1),

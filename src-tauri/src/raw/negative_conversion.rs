@@ -68,6 +68,10 @@ pub struct NegativeConversionParams {
     pub color_finish: NegativeLabScannerColorFinishParams,
     #[serde(default)]
     pub detail_finish: NegativeLabDetailFinishParams,
+    #[serde(default)]
+    pub render_intent: NegativeLabRenderIntent,
+    #[serde(default)]
+    pub flat_log_master: NegativeLabFlatLogMasterParams,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -140,6 +144,9 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub detail_finish_metrics: NegativeLabDetailFinishMetrics,
     pub color_finish_metrics: NegativeLabColorFinishMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
+    pub flat_log_master: NegativeLabFlatLogMasterParams,
+    pub render_intent: NegativeLabRenderIntent,
+    pub bypassed_stage_ids: Vec<String>,
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
     pub renderer: String,
@@ -256,12 +263,69 @@ pub struct NegativeLabDensityScopes {
     pub schema_version: u8,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum NegativeConversionOutputFormat {
     JpegProof,
     #[default]
     Tiff16,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NegativeLabRenderIntent {
+    #[default]
+    Print,
+    FlatLogMaster,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct NegativeLabFlatLogMasterParams {
+    #[serde(default = "default_flat_log_gain")]
+    pub gain: f32,
+    #[serde(default = "default_flat_log_lift")]
+    pub lift: f32,
+    #[serde(default = "default_flat_log_algorithm_version")]
+    pub algorithm_version: u8,
+}
+
+const fn default_flat_log_gain() -> f32 {
+    1.0
+}
+const fn default_flat_log_lift() -> f32 {
+    0.02
+}
+const fn default_flat_log_algorithm_version() -> u8 {
+    1
+}
+
+impl Default for NegativeLabFlatLogMasterParams {
+    fn default() -> Self {
+        Self {
+            gain: 1.0,
+            lift: 0.02,
+            algorithm_version: 1,
+        }
+    }
+}
+
+impl NegativeLabFlatLogMasterParams {
+    fn sanitized(self) -> Self {
+        Self {
+            gain: if self.gain.is_finite() {
+                self.gain.clamp(0.1, 2.0)
+            } else {
+                default_flat_log_gain()
+            },
+            lift: if self.lift.is_finite() {
+                self.lift.clamp(0.0, 0.25)
+            } else {
+                default_flat_log_lift()
+            },
+            algorithm_version: 1,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -883,6 +947,8 @@ impl Default for NegativeConversionParams {
             conversion_model: NegativeConversionModel::DensityRgbV1,
             color_finish: NegativeLabScannerColorFinishParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
+            render_intent: NegativeLabRenderIntent::Print,
+            flat_log_master: NegativeLabFlatLogMasterParams::default(),
         }
     }
 }
@@ -1466,6 +1532,18 @@ fn build_negative_output_path(
     ))
 }
 
+fn validate_render_intent_output_format(
+    render_intent: NegativeLabRenderIntent,
+    output_format: NegativeConversionOutputFormat,
+) -> Result<(), String> {
+    if render_intent == NegativeLabRenderIntent::FlatLogMaster
+        && output_format != NegativeConversionOutputFormat::Tiff16
+    {
+        return Err("Flat-log master intent only supports TIFF16 output.".to_string());
+    }
+    Ok(())
+}
+
 fn negative_lab_output_sidecar_path(output_path: &Path) -> PathBuf {
     output_path.with_file_name(format!(
         "{}.rrdata",
@@ -1523,6 +1601,8 @@ struct NegativeLabConversionBundleOutputRef {
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     #[allow(dead_code)]
     color_finish_metrics: Option<NegativeLabColorFinishMetrics>,
+    flat_log_master: NegativeLabFlatLogMasterParams,
+    render_intent: NegativeLabRenderIntent,
     source_path: PathBuf,
     output_path: PathBuf,
     sidecar_path: PathBuf,
@@ -1545,6 +1625,7 @@ pub struct NegativeLabSavedPositiveHandoff {
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_finish_metrics: Option<NegativeLabColorFinishMetrics>,
+    pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub frame_exposure_overrides: NegativeLabFrameExposureOverridePayload,
     pub frame_rgb_balance_overrides: NegativeLabFrameRgbBalanceOverridePayload,
     pub output_artifact_id: String,
@@ -1555,6 +1636,7 @@ pub struct NegativeLabSavedPositiveHandoff {
     pub positive_variant_id: String,
     pub profile_provenance_hash: Option<String>,
     pub replay_plan_hash: String,
+    pub render_intent: NegativeLabRenderIntent,
     pub selected_acquisition_profile: NegativeLabAcquisitionProfileSnapshot,
     pub selected_profile: Option<NegativeLabSelectedProfileSnapshot>,
     pub sidecar_path: String,
@@ -1577,6 +1659,8 @@ struct NegativeLabOutputRenderReceipt<'a> {
     density_normalization_metrics: &'a NegativeLabDensityNormalizationMetrics,
     color_finish_metrics: Option<&'a NegativeLabColorFinishMetrics>,
     dimensions: NegativeLabSavedPositiveDimensions,
+    flat_log_master: NegativeLabFlatLogMasterParams,
+    render_intent: NegativeLabRenderIntent,
 }
 
 fn negative_lab_path_filename(path: &Path) -> String {
@@ -1633,11 +1717,13 @@ fn write_negative_lab_conversion_bundle(
                 "contentHash": hash_negative_lab_output_file(&output.output_path)?,
                 "densityNormalizationMetrics": output.density_normalization_metrics,
                 "colorFinishMetrics": output.color_finish_metrics,
+                "flatLogMaster": output.flat_log_master,
                 "dimensions": {
                     "height": output.output_height,
                     "width": output.output_width,
                 },
                 "format": output_format,
+                "renderIntent": output.render_intent,
                 "filename": negative_lab_path_filename(&output.output_path),
                 "path": output.output_path.to_string_lossy(),
                 "sidecarFilename": negative_lab_path_filename(&output.sidecar_path),
@@ -1671,6 +1757,8 @@ fn write_negative_lab_conversion_bundle(
             "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "outputFormat": output_format,
+            "renderIntent": params.render_intent,
+            "flatLogMaster": params.flat_log_master,
             "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -1813,8 +1901,10 @@ fn write_negative_lab_output_sidecar(
             "frameRgbBalanceOverrides": save_options.frame_rgb_balance_overrides.clone(),
             "densityNormalizationMetrics": render_receipt.density_normalization_metrics,
             "colorFinishMetrics": render_receipt.color_finish_metrics,
+            "flatLogMaster": render_receipt.flat_log_master,
             "noOverwritePolicy": "never_overwrite_original",
             "outputFormat": output_format,
+            "renderIntent": render_receipt.render_intent,
             "patchSamplerCorrections": save_options.patch_sampler_corrections.clone(),
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -2149,6 +2239,8 @@ impl NegativeConversionParams {
             conversion_model: self.conversion_model,
             color_finish: self.color_finish.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
+            render_intent: self.render_intent,
+            flat_log_master: self.flat_log_master.sanitized(),
         }
         .with_sanitized_endpoints()
     }
@@ -3026,6 +3118,8 @@ fn run_e6_positive_pipeline(
     let mut scene_image = Rgb32FImage::from_vec(width, height, scene_linear).unwrap();
     let detail_finish_metrics =
         apply_negative_lab_detail_finish(&mut scene_image, &params.detail_finish);
+    let color_finish_metrics =
+        apply_color_finish(&scene_image, &params.color_finish, false).metrics;
     let rendered = Rgb32FImage::from_vec(
         width,
         height,
@@ -3043,6 +3137,7 @@ fn run_e6_positive_pipeline(
         density_normalization_metrics: density_metrics,
         density_scopes,
         detail_finish_metrics,
+        color_finish_metrics,
     }
 }
 
@@ -3180,15 +3275,34 @@ fn run_pipeline_with_metrics(
 
     let normalized_density_img =
         Rgb32FImage::from_vec(width, height, normalized_density_buffer).unwrap();
-    let mut scene_linear_print_img =
-        Rgb32FImage::from_vec(width, height, scene_linear_print_buffer).unwrap();
-    let detail_finish_metrics =
-        apply_negative_lab_detail_finish(&mut scene_linear_print_img, &params.detail_finish);
-    let color_finish = apply_color_finish(
-        &scene_linear_print_img,
-        &params.color_finish,
-        params.conversion_model != NegativeConversionModel::NegativeLogDensityV1,
-    );
+    let is_flat_log_master = params.render_intent == NegativeLabRenderIntent::FlatLogMaster;
+    let mut scene_linear_print_img = if is_flat_log_master {
+        let flat = params.flat_log_master.sanitized();
+        Rgb32FImage::from_fn(width, height, |x, y| {
+            let density = normalized_density_img.get_pixel(x, y).0;
+            image::Rgb(density.map(|value| (flat.lift + flat.gain * (1.0 - value)).clamp(0.0, 1.0)))
+        })
+    } else {
+        Rgb32FImage::from_vec(width, height, scene_linear_print_buffer).unwrap()
+    };
+    let detail_finish_metrics = if is_flat_log_master {
+        NegativeLabDetailFinishMetrics::default()
+    } else {
+        apply_negative_lab_detail_finish(&mut scene_linear_print_img, &params.detail_finish)
+    };
+    let color_finish = if is_flat_log_master {
+        apply_color_finish(
+            &scene_linear_print_img,
+            &NegativeLabScannerColorFinishParams::default(),
+            false,
+        )
+    } else {
+        apply_color_finish(
+            &scene_linear_print_img,
+            &params.color_finish,
+            params.conversion_model != NegativeConversionModel::NegativeLogDensityV1,
+        )
+    };
     let finished_scene_linear = color_finish.image;
     let out_img = Rgb32FImage::from_fn(width, height, |x, y| {
         let pixel = finished_scene_linear.get_pixel(x, y).0;
@@ -3457,6 +3571,16 @@ fn build_negative_lab_dry_run_preview_artifact(
         detail_finish_metrics,
         color_finish_metrics,
         dimensions,
+        flat_log_master: params.flat_log_master,
+        render_intent: params.render_intent,
+        bypassed_stage_ids: if params.render_intent == NegativeLabRenderIntent::FlatLogMaster {
+            vec![
+                "h_and_d_print_curve".to_string(),
+                "detail_finish".to_string(),
+            ]
+        } else {
+            Vec::new()
+        },
         preview_data_url: jpeg_data_url(base64_str),
         stage_artifacts,
         renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
@@ -3791,6 +3915,10 @@ pub async fn convert_negatives(
         let save_options = options.unwrap_or_default().sanitized();
         save_options.validate_accepted_batch_plan(paths.len())?;
         let sanitized_params = params.sanitized();
+        validate_render_intent_output_format(
+            sanitized_params.render_intent,
+            save_options.output_format,
+        )?;
         let crosstalk_profile = save_options
             .selected_profile
             .as_ref()
@@ -3842,6 +3970,12 @@ pub async fn convert_negatives(
             let pipeline_render =
                 run_pipeline_with_metrics(&img, &effective_params, None, crosstalk_profile);
             let processed = pipeline_render.rendered_preview;
+            let output_pixels =
+                if effective_params.render_intent == NegativeLabRenderIntent::FlatLogMaster {
+                    pipeline_render.scene_linear_print_preview
+                } else {
+                    processed.clone()
+                };
             let density_normalization_metrics = pipeline_render.density_normalization_metrics;
             let color_finish_metrics = pipeline_render.color_finish_metrics;
 
@@ -3866,7 +4000,7 @@ pub async fn convert_negatives(
                         .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
                 }
                 NegativeConversionOutputFormat::Tiff16 => {
-                    processed
+                    output_pixels
                         .to_rgb16()
                         .save(&out_path)
                         .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
@@ -3888,11 +4022,15 @@ pub async fn convert_negatives(
                         height: processed.height(),
                         width: processed.width(),
                     },
+                    flat_log_master: effective_params.flat_log_master,
+                    render_intent: effective_params.render_intent,
                 },
             )?;
             bundle_outputs.push(NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: density_normalization_metrics.clone(),
                 color_finish_metrics: Some(color_finish_metrics.clone()),
+                flat_log_master: effective_params.flat_log_master,
+                render_intent: effective_params.render_intent,
                 output_height: processed.height(),
                 output_path: out_path.clone(),
                 output_width: processed.width(),
@@ -3905,6 +4043,7 @@ pub async fn convert_negatives(
                 conversion_bundle_path: None,
                 density_normalization_metrics,
                 color_finish_metrics: Some(color_finish_metrics),
+                flat_log_master: effective_params.flat_log_master,
                 dimensions: NegativeLabSavedPositiveDimensions {
                     height: processed.height(),
                     width: processed.width(),
@@ -3919,6 +4058,7 @@ pub async fn convert_negatives(
                 positive_variant_id: sidecar_receipt.positive_variant_id,
                 profile_provenance_hash: save_options.profile_provenance_hash.clone(),
                 replay_plan_hash: sidecar_receipt.replay_plan_hash,
+                render_intent: effective_params.render_intent,
                 selected_acquisition_profile: save_options.selected_acquisition_profile.clone(),
                 selected_profile: save_options.selected_profile.clone(),
                 sidecar_path: sidecar_receipt.sidecar_path.to_string_lossy().to_string(),
@@ -4031,6 +4171,8 @@ mod tests {
                 .iter()
                 .any(|code| code == "e6_positive_bypasses_base_fog")
         );
+        assert_eq!(render.color_finish_metrics.effective_radius_pixels, 0);
+        assert_eq!(render.color_finish_metrics.changed_pixel_ratio, 0.0);
     }
 
     fn luminance(pixel: image::Rgb<f32>) -> f32 {
@@ -5006,6 +5148,8 @@ mod tests {
                     height: 8,
                     width: 12,
                 },
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
             },
         )
         .expect("sidecar should be written");
@@ -5126,6 +5270,8 @@ mod tests {
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
                 color_finish_metrics: None,
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -5203,6 +5349,8 @@ mod tests {
                     height: 8,
                     width: 12,
                 },
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
             },
         )
         .expect("sidecar should be written");
@@ -5312,6 +5460,8 @@ mod tests {
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
                 color_finish_metrics: None,
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
                 output_height: 8,
                 output_path,
                 output_width: 12,
@@ -6081,6 +6231,8 @@ mod tests {
                     height: rendered.height(),
                     width: rendered.width(),
                 },
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
             },
         )
         .expect("write public negative positive sidecar");
@@ -6126,6 +6278,8 @@ mod tests {
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
                 color_finish_metrics: None,
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -6435,6 +6589,8 @@ mod tests {
                     height: rendered.height(),
                     width: rendered.width(),
                 },
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
             },
         )
         .expect("write private RAW Negative Lab sidecar");
@@ -6448,6 +6604,8 @@ mod tests {
             &[NegativeLabConversionBundleOutputRef {
                 density_normalization_metrics: fixture_density_metrics(),
                 color_finish_metrics: None,
+                flat_log_master: NegativeLabFlatLogMasterParams::default(),
+                render_intent: NegativeLabRenderIntent::Print,
                 output_height: rendered.height(),
                 output_path: output_path.clone(),
                 output_width: rendered.width(),
@@ -7264,6 +7422,77 @@ mod tests {
                 .h_and_d_curve
                 .windows(2)
                 .all(|points| points[0].input_density <= points[1].input_density)
+        );
+    }
+
+    #[test]
+    fn flat_log_master_is_positive_linear_and_bypasses_print_finish() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                3,
+                1,
+                vec![0.08, 0.16, 0.24, 0.32, 0.4, 0.48, 0.64, 0.72, 0.8],
+            )
+            .unwrap(),
+        );
+        let print =
+            run_pipeline_with_metrics(&input, &NegativeConversionParams::default(), None, None);
+        let flat_params = NegativeConversionParams {
+            render_intent: NegativeLabRenderIntent::FlatLogMaster,
+            flat_log_master: NegativeLabFlatLogMasterParams {
+                lift: 0.1,
+                gain: 0.8,
+                algorithm_version: 1,
+            },
+            ..NegativeConversionParams::default()
+        };
+        let flat = run_pipeline_with_metrics(&input, &flat_params, None, None);
+        assert_ne!(
+            print.rendered_preview.to_rgb8().as_raw(),
+            flat.rendered_preview.to_rgb8().as_raw()
+        );
+        assert_eq!(
+            flat.detail_finish_metrics,
+            NegativeLabDetailFinishMetrics::default()
+        );
+        let scene = flat.scene_linear_print_preview.to_rgb32f();
+        assert!(
+            scene
+                .as_raw()
+                .iter()
+                .all(|value| value.is_finite() && (0.0..=1.0).contains(value))
+        );
+        assert!(
+            scene
+                .as_raw()
+                .iter()
+                .zip(flat.rendered_preview.to_rgb32f().as_raw())
+                .any(|(linear, display)| { (*linear - *display).abs() > 0.001 })
+        );
+    }
+
+    #[test]
+    fn flat_log_master_rejects_jpeg_output() {
+        assert!(
+            validate_render_intent_output_format(
+                NegativeLabRenderIntent::FlatLogMaster,
+                NegativeConversionOutputFormat::JpegProof,
+            )
+            .is_err()
+        );
+        assert!(
+            validate_render_intent_output_format(
+                NegativeLabRenderIntent::FlatLogMaster,
+                NegativeConversionOutputFormat::Tiff16,
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_render_intent_output_format(
+                NegativeLabRenderIntent::Print,
+                NegativeConversionOutputFormat::JpegProof,
+            )
+            .is_ok()
         );
     }
 }

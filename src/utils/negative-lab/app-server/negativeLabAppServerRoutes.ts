@@ -96,10 +96,17 @@ export const buildNegativeLabConversionPlanResult = (
 
   return negativeLabConversionPlanResultSchema.parse({
     commandName: NegativeLabAppServerCommandName.ConversionPlan,
+    flatLogMaster: parsedCommand.flatLogMaster,
     outputFormat: parsedCommand.outputFormat,
     params: {
       ...profile.params,
       base_fog_sample: parsedCommand.sampleRect,
+      render_intent: parsedCommand.renderIntent,
+      flat_log_master: {
+        algorithm_version: parsedCommand.flatLogMaster.algorithmVersion,
+        gain: parsedCommand.flatLogMaster.gain,
+        lift: parsedCommand.flatLogMaster.lift,
+      },
     },
     paths: parsedCommand.paths,
     presetId: profile.presetId,
@@ -113,6 +120,7 @@ export const buildNegativeLabConversionPlanResult = (
       runtimeConversionHelper: 'src/utils/negative-lab/negativeLabDensityConversion.ts',
     },
     sampleRect: parsedCommand.sampleRect,
+    renderIntent: parsedCommand.renderIntent,
     scope: parsedCommand.scope,
     selectedProfileSnapshot,
     suffix: parsedCommand.suffix,
@@ -411,11 +419,13 @@ export const buildNegativeLabStockFamilyConversionRouteResult = (
   const conversionPlan = buildNegativeLabConversionPlanResult(
     {
       outputFormat: parsedCommand.outputFormat,
+      flatLogMaster: parsedCommand.flatLogMaster,
       paths: parsedCommand.paths,
       presetId: stockFamily.genericPresetId,
       sampleRect: parsedCommand.sampleRect,
       scope: parsedCommand.scope,
       suffix: parsedCommand.suffix,
+      renderIntent: parsedCommand.renderIntent,
     },
     runtimeCatalog,
   );

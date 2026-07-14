@@ -3746,6 +3746,7 @@
       "excludeScan": "Exclude",
       "exportOptions": "Opcje eksportu",
       "exposure": "Ekspozycja",
+      "flatLogMasterHint": "",
       "frameBlueWeightOffset": "Frame blue offset",
       "frameConversionStatus": {
         "preview_pending": "Preview pending",
@@ -3914,6 +3915,7 @@
       "redWeight": "Czerwony (Cyjan)",
       "rejectBaseSample": "Reject sample",
       "rejectDustCandidate": "Reject",
+      "renderIntent": "",
       "resetFrameCrop": "Reset crop",
       "resetFrameExposure": "Reset frame",
       "resetFrameRgbBalance": "Reset frame RGB",

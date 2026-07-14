@@ -14,6 +14,10 @@ import { negativeLabSelectedProfileSnapshotSchema } from './negativeLabProfileCo
 
 const fnv64HashSchema = z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u);
 const negativeLabOutputFormatIdSchema = z.enum(['jpeg_proof', 'tiff16']);
+const negativeLabRenderIntentSchema = z.enum(['print', 'flat_log_master']);
+const negativeLabFlatLogMasterSchema = z
+  .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
+  .strict();
 
 export const negativeLabConversionBundleOutputSchema = z
   .object({
@@ -21,6 +25,7 @@ export const negativeLabConversionBundleOutputSchema = z
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
     filename: z.string().trim().min(1),
     format: negativeLabOutputFormatIdSchema,
+    renderIntent: negativeLabRenderIntentSchema.default('print'),
     path: z.string().trim().min(1),
     sidecarFilename: z.string().trim().min(1),
     sidecarPath: z.string().trim().min(1),
@@ -63,6 +68,7 @@ export const negativeLabConversionBundleSchema = z
           schemaVersion: 1,
         }),
         outputFormat: negativeLabOutputFormatIdSchema,
+        flatLogMaster: negativeLabFlatLogMasterSchema.default({ algorithmVersion: 1, gain: 1, lift: 0.02 }),
         patchSamplerCorrections: negativeLabPatchSamplerCorrectionPayloadSchema.default({
           corrections: [],
           schemaVersion: 1,
@@ -71,6 +77,7 @@ export const negativeLabConversionBundleSchema = z
         profileProvenanceHash: negativeLabProfileProvenanceHashSchema.nullable(),
         selectedProfile: negativeLabSelectedProfileSnapshotSchema.nullable(),
         suffix: z.string().trim().min(1).max(40),
+        renderIntent: negativeLabRenderIntentSchema.default('print'),
       })
       .strict(),
     doesNotProve: z

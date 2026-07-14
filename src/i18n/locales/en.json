@@ -3700,6 +3700,7 @@
       "excludeScan": "Exclude",
       "exportOptions": "Export Options",
       "exposure": "Exposure",
+      "flatLogMasterHint": "Positive log signal with fixed lift/gain; TIFF16 only.",
       "frameBlueWeightOffset": "Frame blue offset",
       "frameConversionStatus": {
         "preview_pending": "Preview pending",
@@ -3870,6 +3871,11 @@
       "redWeight": "Red (Cyan)",
       "rejectBaseSample": "Reject sample",
       "rejectDustCandidate": "Reject",
+      "renderIntent": "Render intent",
+      "renderIntents": {
+        "flat_log_master": "Flat-log TIFF16 master",
+        "print": "Print positive"
+      },
       "resetFrameCrop": "Reset crop",
       "resetFrameExposure": "Reset frame",
       "resetFrameRgbBalance": "Reset frame RGB",

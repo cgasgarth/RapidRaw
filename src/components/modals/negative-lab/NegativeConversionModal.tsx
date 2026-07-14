@@ -2092,7 +2092,11 @@ function NegativeLabSession({
               command: runtimePreviewCommand,
               crosstalkProfile: selectedProfileSnapshot?.crosstalkProfile ?? null,
               path: previewImagePath,
-              recipeParams: currentParams,
+              recipeParams: {
+                ...currentParams,
+                render_intent: currentParams.render_intent ?? 'print',
+                flat_log_master: currentParams.flat_log_master ?? { algorithm_version: 1, gain: 1, lift: 0.02 },
+              },
             });
             if (
               previewRequestSequence !== previewRequestSequenceRef.current ||
@@ -2399,7 +2403,7 @@ function NegativeLabSession({
     selectedImagePath,
   ]);
 
-  const handleParamChange = (key: keyof NegativeParams, value: number) => {
+  const handleParamChange = <K extends keyof NegativeParams>(key: K, value: NegativeParams[K]) => {
     const newParams = { ...params, [key]: value };
     setSelectedPresetId('');
     if (key === 'red_weight' || key === 'green_weight' || key === 'blue_weight') {
@@ -6251,6 +6255,9 @@ function NegativeLabSession({
                 <button
                   key={format}
                   type="button"
+                  disabled={
+                    params.render_intent === 'flat_log_master' && format === NegativeLabOutputFormatId.JpegProof
+                  }
                   data-testid={
                     format === NegativeLabOutputFormatId.Tiff16
                       ? 'negative-lab-export-tiff16'
@@ -6265,12 +6272,52 @@ function NegativeLabSession({
                     saveOptions.outputFormat === format
                       ? 'border-accent bg-accent/10 text-text-primary'
                       : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+                    params.render_intent === 'flat_log_master' &&
+                      format === NegativeLabOutputFormatId.JpegProof &&
+                      'cursor-not-allowed opacity-40',
                   )}
                 >
                   {t(`modals.negativeConversion.outputFormats.${format}`)}
                 </button>
               ))}
             </div>
+            <div
+              aria-label={t('modals.negativeConversion.renderIntent')}
+              className="grid grid-cols-2 gap-2"
+              data-testid="negative-lab-render-intent"
+              role="group"
+            >
+              {(['print', 'flat_log_master'] as const).map((intent) => {
+                const selected = params.render_intent === intent;
+                return (
+                  <button
+                    key={intent}
+                    type="button"
+                    aria-pressed={selected}
+                    data-testid={`negative-lab-render-intent-${intent}`}
+                    onClick={() => {
+                      handleParamChange('render_intent', intent);
+                      if (intent === 'flat_log_master') {
+                        setSaveOptions((current) => ({ ...current, outputFormat: NegativeLabOutputFormatId.Tiff16 }));
+                      }
+                    }}
+                    className={cx(
+                      'rounded-md border px-3 py-2 text-sm transition-colors',
+                      selected
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+                    )}
+                  >
+                    {t(`modals.negativeConversion.renderIntents.${intent}`)}
+                  </button>
+                );
+              })}
+            </div>
+            {params.render_intent === 'flat_log_master' && (
+              <div className="rounded-md border border-surface bg-bg-primary p-3 text-xs text-text-tertiary">
+                {t('modals.negativeConversion.flatLogMasterHint')}
+              </div>
+            )}
             <label className="block">
               <UiText as="span" variant={TextVariants.small} className="mb-1 block text-text-secondary">
                 {t('modals.negativeConversion.outputSuffix')}

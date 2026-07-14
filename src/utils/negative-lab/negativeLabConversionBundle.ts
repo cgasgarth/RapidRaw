@@ -22,6 +22,8 @@ const paramsNear = (
   numbersNear(left.blue_weight, right.blue_weight) &&
   numbersNear(left.contrast, right.contrast) &&
   left.conversion_model === right.conversion_model &&
+  left.render_intent === right.render_intent &&
+  JSON.stringify(left.flat_log_master) === JSON.stringify(right.flat_log_master) &&
   numbersNear(left.exposure, right.exposure) &&
   numbersNear(left.green_weight, right.green_weight) &&
   left.print_curve_algorithm === right.print_curve_algorithm &&
@@ -46,11 +48,13 @@ export const validateNegativeLabConversionBundleReplay = (value: unknown): Negat
 
   const conversionPlan = buildNegativeLabConversionPlanResult({
     outputFormat: bundle.conversion.outputFormat,
+    flatLogMaster: bundle.conversion.flatLogMaster,
     paths: bundle.outputs.map((output) => output.source.path),
     presetId: selectedProfile.presetId,
     sampleRect: bundle.conversion.params.base_fog_sample,
     scope: bundle.outputs.length > 1 ? 'all' : 'active',
     suffix: bundle.conversion.suffix,
+    renderIntent: bundle.conversion.renderIntent,
   });
 
   if (conversionPlan.profileProvenanceHash !== selectedProfile.profileProvenanceHash) {

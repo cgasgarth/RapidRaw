@@ -75,12 +75,21 @@ export const negativeLabProfileProvenanceHashSchema = z.string().regex(/^fnv1a32
 
 export const negativeLabAppServerCommandSchema = z
   .object({
+    flatLogMaster: z
+      .object({
+        algorithmVersion: z.literal(1),
+        gain: z.number().min(0.1).max(2),
+        lift: z.number().min(0).max(0.25),
+      })
+      .strict()
+      .default({ algorithmVersion: 1, gain: 1, lift: 0.02 }),
     outputFormat: negativeLabAppServerOutputFormatSchema,
     paths: z.array(z.string().trim().min(1)).min(1),
     presetId: negativeLabRuntimePresetIdSchema,
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),
     scope: negativeLabAppServerScopeSchema,
     suffix: z.string().trim().min(1).max(40),
+    renderIntent: z.enum(['print', 'flat_log_master']).default('print'),
   })
   .strict();
 
@@ -408,6 +417,13 @@ export const negativeLabAppServerRouteManifestSchema = z
 export const negativeLabConversionPlanResultSchema = z
   .object({
     commandName: negativeLabConversionPlanCommandNameSchema,
+    flatLogMaster: z
+      .object({
+        algorithmVersion: z.literal(1),
+        gain: z.number().min(0.1).max(2),
+        lift: z.number().min(0).max(0.25),
+      })
+      .strict(),
     outputFormat: negativeLabAppServerOutputFormatSchema,
     params: negativeLabPresetParamsSchema,
     paths: z.array(z.string().trim().min(1)).min(1),
@@ -427,6 +443,7 @@ export const negativeLabConversionPlanResultSchema = z
     scope: negativeLabAppServerScopeSchema,
     selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema,
     suffix: z.string().trim().min(1).max(40),
+    renderIntent: z.enum(['print', 'flat_log_master']),
   })
   .strict()
   .superRefine((plan, context) => {
