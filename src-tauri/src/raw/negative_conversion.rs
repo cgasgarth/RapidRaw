@@ -20,6 +20,9 @@ use std::time::UNIX_EPOCH;
 use tauri::AppHandle;
 use uuid::Uuid;
 
+use super::negative_lab_detail_finish::{
+    NegativeLabDetailFinishMetrics, NegativeLabDetailFinishParams, apply_negative_lab_detail_finish,
+};
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
@@ -58,6 +61,8 @@ pub struct NegativeConversionParams {
     pub white_point: f32,
     #[serde(default)]
     pub conversion_model: NegativeConversionModel,
+    #[serde(default)]
+    pub detail_finish: NegativeLabDetailFinishParams,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -123,6 +128,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub content_hash: String,
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     pub density_scopes: NegativeLabDensityScopes,
+    pub detail_finish_metrics: NegativeLabDetailFinishMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
@@ -865,6 +871,7 @@ impl Default for NegativeConversionParams {
             white_point_offset: default_white_point_offset(),
             white_point: default_white_point(),
             conversion_model: NegativeConversionModel::DensityRgbV1,
+            detail_finish: NegativeLabDetailFinishParams::default(),
         }
     }
 }
@@ -2122,6 +2129,7 @@ impl NegativeConversionParams {
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
             conversion_model: self.conversion_model,
+            detail_finish: self.detail_finish.sanitized(),
         }
         .with_sanitized_endpoints()
     }
@@ -2244,6 +2252,7 @@ struct NegativeLabPipelineRender {
     scene_linear_print_preview: DynamicImage,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     density_scopes: NegativeLabDensityScopes,
+    detail_finish_metrics: NegativeLabDetailFinishMetrics,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3029,11 +3038,22 @@ fn run_pipeline_with_metrics(
     let density_scopes =
         build_negative_lab_density_scopes(&log_pixels, &out_buffer, clipped_pixel_count);
 
-    let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
     let normalized_density_img =
         Rgb32FImage::from_vec(width, height, normalized_density_buffer).unwrap();
-    let scene_linear_print_img =
+    let mut scene_linear_print_img =
         Rgb32FImage::from_vec(width, height, scene_linear_print_buffer).unwrap();
+    let detail_finish_metrics =
+        apply_negative_lab_detail_finish(&mut scene_linear_print_img, &params.detail_finish);
+    let out_img = Rgb32FImage::from_vec(
+        width,
+        height,
+        scene_linear_print_img
+            .as_raw()
+            .par_iter()
+            .map(|value| value.clamp(0.0, 1.0).powf(gamma_inv))
+            .collect(),
+    )
+    .unwrap();
 
     NegativeLabPipelineRender {
         normalized_density_preview: DynamicImage::ImageRgb32F(normalized_density_img),
@@ -3041,6 +3061,7 @@ fn run_pipeline_with_metrics(
         scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_linear_print_img),
         density_normalization_metrics: density_metrics,
         density_scopes,
+        detail_finish_metrics,
     }
 }
 
@@ -3239,6 +3260,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     scene_linear_print_preview: &DynamicImage,
     base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    detail_finish_metrics: NegativeLabDetailFinishMetrics,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -3289,6 +3311,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         content_hash,
         density_normalization_metrics,
         density_scopes,
+        detail_finish_metrics,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
         stage_artifacts,
@@ -3384,6 +3407,7 @@ pub async fn preview_negative_conversion(
         &rendered_preview.scene_linear_print_preview,
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
+        rendered_preview.detail_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -3419,6 +3443,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         &rendered_preview.scene_linear_print_preview,
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
+        rendered_preview.detail_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )
@@ -6484,6 +6509,7 @@ mod tests {
             &rendered_preview,
             summary.clone(),
             density_metrics,
+            NegativeLabDetailFinishMetrics::default(),
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -6542,6 +6568,7 @@ mod tests {
             &pipeline.scene_linear_print_preview,
             summary,
             pipeline.density_normalization_metrics,
+            pipeline.detail_finish_metrics,
             &params,
             pipeline.density_scopes,
         )
@@ -6917,6 +6944,41 @@ mod tests {
                 .zip([0.2, 0.6, 1.1])
                 .any(|(actual, original)| (actual - original).abs() > 0.01)
         );
+    }
+
+    #[test]
+    fn negative_lab_detail_finish_changes_native_render_and_disabled_path_is_identity() {
+        let input = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(16, 16, |x, y| {
+            let value = if x < 8 {
+                0.25 + y as f32 * 0.002
+            } else {
+                0.62 + y as f32 * 0.002
+            };
+            image::Rgb([value, value * 0.82, value * 0.64])
+        }));
+        let disabled = NegativeConversionParams::default();
+        let enabled = NegativeConversionParams {
+            detail_finish: NegativeLabDetailFinishParams {
+                enabled: true,
+                local_contrast_amount: 0.5,
+                sharpening_amount: 0.65,
+                ..Default::default()
+            },
+            ..disabled
+        };
+        let baseline = run_pipeline_with_metrics(&input, &disabled, None, None);
+        let identity = run_pipeline_with_metrics(&input, &disabled, None, None);
+        let finished = run_pipeline_with_metrics(&input, &enabled, None, None);
+        assert_eq!(
+            baseline.rendered_preview.to_rgb8(),
+            identity.rendered_preview.to_rgb8()
+        );
+        assert_ne!(
+            baseline.scene_linear_print_preview.to_rgb32f().as_raw(),
+            finished.scene_linear_print_preview.to_rgb32f().as_raw()
+        );
+        assert!(finished.detail_finish_metrics.changed_pixel_ratio > 0.0);
+        assert!(finished.detail_finish_metrics.chroma_drift_max < 1.0e-4);
     }
 
     #[test]

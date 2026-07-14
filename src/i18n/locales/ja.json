@@ -3397,6 +3397,13 @@
         "outputLumaHistogram": "",
         "title": ""
       },
+      "detailFinish": "",
+      "detailFinishContrastRadius": "",
+      "detailFinishEnabled": "",
+      "detailFinishLocalContrast": "",
+      "detailFinishOff": "",
+      "detailFinishSharpening": "",
+      "detailFinishSharpenRadius": "",
       "dustCandidate": {
         "dustSpot": "",
         "emulsionScratch": ""

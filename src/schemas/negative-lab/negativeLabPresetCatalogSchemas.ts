@@ -32,6 +32,20 @@ export const negativeLabBaseFogSampleRectSchema = z
 export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1']);
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
 export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
+export const negativeLabDetailFinishParamsSchema = z
+  .object({
+    algorithm_version: z.literal(1).default(1),
+    enabled: z.boolean().default(false),
+    local_contrast_amount: z.number().min(0).max(1).default(0),
+    local_contrast_clip_limit: z.number().min(0).max(1).default(0.25),
+    local_contrast_radius: z.number().min(0.0005).max(0.25).default(0.02),
+    scale_basis: z.literal('full_resolution_short_edge_v1').default('full_resolution_short_edge_v1'),
+    sharpening_amount: z.number().min(0).max(1).default(0),
+    sharpening_radius: z.number().min(0.0005).max(0.25).default(0.005),
+    sharpening_threshold: z.number().min(0).max(1).default(0.01),
+    working_space: z.literal('scene_linear_luminance_v1').default('scene_linear_luminance_v1'),
+  })
+  .strict();
 export const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
   'automatic_analysis',
   'manual_base_fog_sample',
@@ -73,6 +87,7 @@ export const negativeLabPresetParamsSchema = z
     color_range_clip: z.number().min(0.01).max(0.3).default(0.12),
     contrast: z.number().min(0.5).max(2.5),
     conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
+    detail_finish: negativeLabDetailFinishParamsSchema.optional(),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
     luma_range_clip: z.number().min(0.01).max(0.3).default(0.08),
