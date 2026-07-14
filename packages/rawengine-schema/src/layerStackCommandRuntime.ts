@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { brushMaskV1Schema } from './brushMaskV1.js';
 import { layerScopedAdjustmentStateV1Schema, layerScopedToneAdjustmentV1Schema } from './layerScopedToneSchemas.js';
 import {
   type LayerMaskCommandEnvelopeV1,
   type LayerMaskDryRunResultV1,
   type LayerMaskMutationResultV1,
   type LayerMaskParameterDiffV1,
+  layerMaskAttachedSubMaskV1Schema,
   layerMaskBlendModeV1Schema,
   layerMaskCloneSourceV1Schema,
   layerMaskCommandEnvelopeV1Schema,
@@ -16,23 +16,6 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from './rawEngineSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
-
-const unsupportedLegacySubMaskSchema = z
-  .looseObject({
-    id: z.string().trim().min(1),
-    invert: z.boolean().optional(),
-    mode: z.string().trim().min(1).optional(),
-    name: z.string().trim().min(1).optional(),
-    opacity: z.number().min(0).max(100).optional(),
-    parameters: z.record(z.string(), z.unknown()).optional(),
-    type: z.string().trim().min(1).optional(),
-    visible: z.boolean().optional(),
-  })
-  .superRefine((subMask, context) => {
-    if (!subMask.name && !subMask.type && subMask.parameters === undefined) {
-      context.addIssue({ code: 'custom', message: 'Legacy sub-mask metadata is empty.' });
-    }
-  });
 
 export const layerStackSidecarLayerV1Schema = z
   .object({
@@ -46,7 +29,7 @@ export const layerStackSidecarLayerV1Schema = z
     referenceMatchApplicationReceipt: matchLookApplicationReceiptV1Schema.optional(),
     retouchCloneSource: layerMaskCloneSourceV1Schema.optional(),
     retouchRemoveSource: layerMaskRemoveSourceV1Schema.optional(),
-    subMasks: z.array(z.union([brushMaskV1Schema, unsupportedLegacySubMaskSchema])).optional(),
+    subMasks: z.array(layerMaskAttachedSubMaskV1Schema).optional(),
     visible: z.boolean(),
   })
   .strict()
@@ -321,15 +304,13 @@ const applyCommandToLayers = (
       layerIndex(layers, command.parameters.layerId);
       return layers.map((layer) => {
         if (layer.id !== command.parameters.layerId) return layer;
+        const attachedMask = 'brushMask' in command.parameters ? command.parameters.brushMask : command.parameters.mask;
         const nextMaskIds = command.parameters.replaceExisting
           ? [command.parameters.maskId]
           : [...layer.maskIds.filter((maskId) => maskId !== command.parameters.maskId), command.parameters.maskId];
         const nextSubMasks = command.parameters.replaceExisting
-          ? [command.parameters.brushMask]
-          : [
-              ...(layer.subMasks ?? []).filter((mask) => mask.id !== command.parameters.maskId),
-              command.parameters.brushMask,
-            ];
+          ? [attachedMask]
+          : [...(layer.subMasks ?? []).filter((mask) => mask.id !== command.parameters.maskId), attachedMask];
         return { ...layer, maskIds: nextMaskIds, subMasks: nextSubMasks };
       });
     case 'layerMask.deleteLayer':

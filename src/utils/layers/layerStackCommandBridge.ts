@@ -11,6 +11,7 @@ import {
   type LayerScopedToneAdjustmentV1,
   type LayerStackSidecarLayerV1,
   type LayerStackSidecarV1,
+  layerMaskAttachedSubMaskV1Schema,
   layerMaskCommandEnvelopeV1Schema,
   layerStackSidecarLayerV1Schema,
   layerStackSidecarV1Schema,
@@ -182,6 +183,9 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
     type: 'brush_v1',
   };
 }
+
+const toAttachedSubMaskV1 = (subMask: MaskContainer['subMasks'][number]) =>
+  layerMaskAttachedSubMaskV1Schema.parse(structuredClone(subMask));
 
 const toPersistedSubMask = (subMask: MaskContainer['subMasks'][number]) =>
   subMask.type === Mask.Brush || subMask.type === Mask.Flow ? toBrushMaskV1(subMask) : structuredClone(subMask);
@@ -435,6 +439,18 @@ function buildLayerStackCommand(
         },
       });
     case 'attachMask':
+      if (operation.subMask.type !== 'brush' && operation.subMask.type !== 'flow') {
+        return layerMaskCommandEnvelopeV1Schema.parse({
+          ...base,
+          commandType: 'layerMask.attachMask',
+          parameters: {
+            layerId: operation.layerId,
+            mask: toAttachedSubMaskV1(operation.subMask),
+            maskId: operation.subMask.id,
+            replaceExisting: operation.replaceExisting,
+          },
+        });
+      }
       return layerMaskCommandEnvelopeV1Schema.parse({
         ...base,
         commandType: 'layerMask.attachMask',

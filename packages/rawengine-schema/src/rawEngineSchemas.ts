@@ -1956,6 +1956,26 @@ export const layerMaskRangeSelectionV1Schema = z.discriminatedUnion('rangeKind',
     }),
 ]);
 
+export const layerMaskAttachedSubMaskV1Schema = z.union([
+  brushMaskV1Schema,
+  z
+    .looseObject({
+      id: z.string().trim().min(1),
+      invert: z.boolean().optional(),
+      mode: z.string().trim().min(1).optional(),
+      name: z.string().trim().min(1).optional(),
+      opacity: z.number().min(0).max(100).optional(),
+      parameters: z.record(z.string(), z.unknown()).optional(),
+      type: z.string().trim().min(1).optional(),
+      visible: z.boolean().optional(),
+    })
+    .superRefine((subMask, context) => {
+      if (!subMask.name && !subMask.type && subMask.parameters === undefined) {
+        context.addIssue({ code: 'custom', message: 'Attached sub-mask metadata is empty.' });
+      }
+    }),
+]);
+
 export const layerMaskRefinementParametersV1Schema = z
   .object({
     density: z.number().min(0).max(1),
@@ -2196,14 +2216,24 @@ export const layerMaskCommandEnvelopeV1Schema = z
     layerMaskCommandBaseV1Schema
       .extend({
         commandType: z.literal('layerMask.attachMask'),
-        parameters: z
-          .object({
-            brushMask: brushMaskV1Schema,
-            layerId: z.string().trim().min(1),
-            maskId: z.string().trim().min(1),
-            replaceExisting: z.boolean(),
-          })
-          .strict(),
+        parameters: z.union([
+          z
+            .object({
+              brushMask: brushMaskV1Schema,
+              layerId: z.string().trim().min(1),
+              maskId: z.string().trim().min(1),
+              replaceExisting: z.boolean(),
+            })
+            .strict(),
+          z
+            .object({
+              layerId: z.string().trim().min(1),
+              mask: layerMaskAttachedSubMaskV1Schema,
+              maskId: z.string().trim().min(1),
+              replaceExisting: z.boolean(),
+            })
+            .strict(),
+        ]),
       })
       .strict(),
     layerMaskCommandBaseV1Schema

@@ -8,6 +8,7 @@ import i18next from 'i18next';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { readLayerStackSidecarsFromSidecar } from '../../../../packages/rawengine-schema/src';
 import { type AppSettings, Theme } from '../../../../src/components/ui/AppProperties';
 import { useEditorStore } from '../../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
@@ -77,6 +78,7 @@ try {
   await selectMixerWorkspace(rendered.container);
   await validateCompactMixerSurface(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
+  await validateColorRangeLocalAdjustmentTransaction(rendered.container);
   await validateOutputFocusEvent(rendered.container, true);
 
   window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'output');
@@ -338,13 +340,17 @@ async function validateCompactMixerSurface(container: Element) {
 
 async function validateDirectProfileToneSelection(container: Element) {
   const controls = getByTestId(container, 'profile-tone-controls');
-  const selects = controls.querySelectorAll<HTMLSelectElement>('select');
-  const profile = selects[0];
-  const toneCurve = selects[1];
-  assert.ok(profile, 'Camera Profile selector was not rendered.');
+  const profile = getByTestId(controls, 'camera-profile-browser').querySelector<HTMLButtonElement>('button');
+  const toneCurve = controls.querySelector<HTMLSelectElement>('select[aria-label="Tone Curve"]');
+  assert.ok(profile, 'Camera Profile browser was not rendered.');
   assert.ok(toneCurve, 'Tone Curve selector was not rendered.');
 
-  await changeSelect(profile, 'camera_portrait');
+  await click(profile);
+  const portraitProfile = Array.from(
+    getByTestId(controls, 'camera-profile-browser-popover').querySelectorAll<HTMLButtonElement>('button'),
+  ).find((button) => normalizeText(button.textContent) === 'Portrait');
+  assert.ok(portraitProfile, 'Portrait was not exposed in the profile browser.');
+  await click(portraitProfile);
   await changeSelect(toneCurve, 'soft_contrast');
   assert.equal(controls.dataset.cameraProfile, 'camera_portrait', 'Profile selector did not apply the selected value.');
   assert.equal(controls.dataset.toneCurve, 'soft_contrast', 'Tone Curve selector did not apply the selected value.');
@@ -380,6 +386,39 @@ async function validateHslSurfaceInteraction(container: Element) {
   await click(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range'));
   assert.equal(rangeCenter.value, '42', 'Resetting HSL must not reset the local mask range.');
   assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
+}
+
+async function validateColorRangeLocalAdjustmentTransaction(container: Element) {
+  const before = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'selective-color-create-local-adjustment'));
+  const committed = useEditorStore.getState();
+
+  assert.equal(
+    committed.adjustmentRevision,
+    before.adjustmentRevision + 1,
+    'Color-range layer creation must advance one canonical adjustment revision.',
+  );
+  assert.equal(
+    committed.history.length,
+    before.history.length + 1,
+    'Color-range layer creation must create exactly one undo boundary.',
+  );
+  assert.equal(committed.lastEditApplicationReceipt?.source, 'layer-command');
+  assert.equal(committed.lastEditApplicationReceipt?.persistence, 'commit');
+  assert.equal(committed.adjustments.masks.length, before.adjustments.masks.length + 1);
+  const createdLayer = committed.adjustments.masks.at(-1);
+  assert.ok(createdLayer, 'Color-range transaction did not publish its created layer.');
+  assert.equal(committed.activeMaskContainerId, createdLayer.id, 'Created layer was not selected after commit.');
+  assert.equal(
+    committed.activeMaskId,
+    createdLayer.subMasks[0]?.id,
+    'Created range mask was not selected after commit.',
+  );
+  assert.equal(
+    readLayerStackSidecarsFromSidecar(committed.adjustments).at(-1)?.sourceImagePath,
+    '/fixtures/color-foundation.raw',
+    'Color-range transaction did not preserve its replayable layer sidecar artifact.',
+  );
 }
 
 async function click(element: HTMLElement) {
