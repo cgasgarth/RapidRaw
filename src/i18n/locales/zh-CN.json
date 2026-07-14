@@ -451,6 +451,9 @@
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
+      "filmStages": {
+        "title": ""
+      },
       "glow": "发光",
       "grain": "颗粒",
       "grainChromaPlanned": "色度颗粒控制已规划；当前渲染器应用亮度颗粒。",

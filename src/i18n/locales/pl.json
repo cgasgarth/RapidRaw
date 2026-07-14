@@ -458,6 +458,9 @@
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
+      "filmStages": {
+        "title": ""
+      },
       "glow": "Poświata",
       "grain": "Ziarno",
       "grainChromaPlanned": "Sterowanie ziarnem chroma jest planowane; obecny renderer stosuje ziarno luma.",

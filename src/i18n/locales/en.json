@@ -453,6 +453,11 @@
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
+      "filmStages": {
+        "responseP": "Response shape",
+        "responsePDescription": "Renderer-owned reference response parameter.",
+        "title": "Film stages"
+      },
       "glow": "Glow",
       "grain": "Grain",
       "grainChromaPlanned": "Chroma grain controls are planned; current renderer applies luma grain.",

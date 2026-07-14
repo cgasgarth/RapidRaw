@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { FilmStageControlDescriptorV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
@@ -11,7 +12,13 @@ import {
   formatFilmLookPresetName,
   getFilmLookControlledAdjustmentKeys,
 } from '../../utils/film-look/filmLookBrowser';
+import {
+  buildFilmStageOperation,
+  FILM_REFERENCE_STAGE_DEFAULT_P,
+  getFilmStageControlDescriptors,
+} from '../../utils/film-look/filmStageControls';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
+import FilmStageControls from '../film/FilmStageControls';
 import type { AppSettings, Preset } from '../ui/AppProperties';
 import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
@@ -31,7 +38,12 @@ interface EffectsPanelProps {
   appSettings: AppSettings | null;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   onFilmEmulationOperation?:
-    | ((operation: { kind: 'set_profile'; profileId: string; mix: number }) => Promise<void>)
+    | ((
+        operation:
+          | { kind: 'set_profile'; profileId: string; mix: number }
+          | ReturnType<typeof buildFilmStageOperation>
+          | { kind: 'reset_to_profile' },
+      ) => Promise<void>)
     | undefined;
 }
 
@@ -81,6 +93,7 @@ export default function EffectsPanel({
 }: EffectsPanelProps) {
   const { t } = useTranslation();
   const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
+  const [filmStageP, setFilmStageP] = useState(FILM_REFERENCE_STAGE_DEFAULT_P);
 
   const handleAdjustmentChange = (key: string, value: number) => {
     setAdjustments((prev: Adjustments) => ({
@@ -111,6 +124,18 @@ export default function EffectsPanel({
       return;
     }
     await onFilmEmulationOperation({ kind: 'set_profile', profileId: look.id, mix: strength / 100 });
+  };
+
+  const filmStageDescriptors = getFilmStageControlDescriptors(filmStageP);
+  const handleFilmStageChange = (descriptor: FilmStageControlDescriptorV1, value: number) => {
+    const operation = buildFilmStageOperation(descriptor, value);
+    setFilmStageP(operation.patch.p);
+    if (onFilmEmulationOperation !== undefined) void onFilmEmulationOperation(operation);
+  };
+  const handleFilmStageReset = (descriptor: FilmStageControlDescriptorV1) => {
+    if (descriptor.parameterId !== 'reference_luminance_shaper_p') return;
+    setFilmStageP(FILM_REFERENCE_STAGE_DEFAULT_P);
+    if (onFilmEmulationOperation !== undefined) void onFilmEmulationOperation({ kind: 'reset_to_profile' });
   };
 
   const handleFilmGrainPresetApply = (preset: (typeof FILM_GRAIN_UI_PRESETS)[number]) => {
@@ -318,6 +343,17 @@ export default function EffectsPanel({
                 {filmLookPresetStatus}
               </UiText>
             )}
+          </div>
+
+          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.effects.filmStages.title', { defaultValue: 'Film stages' })}
+            </UiText>
+            <FilmStageControls
+              descriptors={filmStageDescriptors}
+              onChange={handleFilmStageChange}
+              onReset={handleFilmStageReset}
+            />
           </div>
 
           <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
