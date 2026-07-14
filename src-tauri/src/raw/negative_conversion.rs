@@ -243,28 +243,28 @@ pub struct NegativeLabStagePreviewArtifact {
     pub bounds_receipt: NegativeLabDensityBoundsReceipt,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityAxisBoundsSummary {
     pub min: f32,
     pub max: f32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityChannelBoundsSummary {
     pub min: f32,
     pub max: f32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityNormalizationAxisBounds {
     pub color: NegativeLabDensityAxisBoundsSummary,
     pub luma: NegativeLabDensityAxisBoundsSummary,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityNormalizationChannelBounds {
     pub r: NegativeLabDensityChannelBoundsSummary,
@@ -272,7 +272,7 @@ pub struct NegativeLabDensityNormalizationChannelBounds {
     pub b: NegativeLabDensityChannelBoundsSummary,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabDensityBoundsSet {
     pub axis_bounds: NegativeLabDensityNormalizationAxisBounds,
@@ -306,6 +306,55 @@ pub struct NegativeLabDensityNormalizationMetrics {
     pub density_range_unclamped: f32,
     pub epsilon_clamped_pixel_count: u32,
     pub renderer_version: u8,
+}
+
+/// Immutable per-frame density bounds used by the roll-level lock operation.
+/// These are loader/native-analysis outputs; the roll operation never feeds a
+/// mixed result back into local analysis.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRollBoundsFrameV1 {
+    pub anchor: bool,
+    pub eligible: bool,
+    pub frame_id: String,
+    pub local_bounds: NegativeLabDensityBoundsSet,
+    pub source_interpretation_hash: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRollBoundsRequestV1 {
+    pub analysis_version: String,
+    pub frames: Vec<NegativeLabRollBoundsFrameV1>,
+    pub source_interpretation_hash: String,
+    pub use_roll_colour: bool,
+    pub use_roll_luma: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRollBoundsFrameResultV1 {
+    pub anchor: bool,
+    pub eligible: bool,
+    pub final_bounds: NegativeLabDensityBoundsSet,
+    pub frame_id: String,
+    pub local_bounds: NegativeLabDensityBoundsSet,
+    pub roll_bounds: NegativeLabDensityBoundsSet,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabRollBoundsReceiptV1 {
+    pub algorithm_id: String,
+    pub analysis_version: String,
+    pub frame_results: Vec<NegativeLabRollBoundsFrameResultV1>,
+    pub plan_hash: String,
+    pub roll_bounds: NegativeLabDensityBoundsSet,
+    pub schema_version: u8,
+    pub source_interpretation_hash: String,
+    pub use_roll_colour: bool,
+    pub use_roll_luma: bool,
+    pub warning_codes: Vec<String>,
 }
 
 const NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS: usize = 32;
@@ -3744,11 +3793,152 @@ fn fit_negative_lab_profile(
     Ok(receipt)
 }
 
+fn validate_roll_bounds_set(bounds: &NegativeLabDensityBoundsSet) -> bool {
+    let axes = [bounds.axis_bounds.color, bounds.axis_bounds.luma];
+    let channels = [
+        bounds.channel_bounds.r,
+        bounds.channel_bounds.g,
+        bounds.channel_bounds.b,
+    ];
+    axes.into_iter()
+        .map(|axis| (axis.min, axis.max))
+        .chain(channels.into_iter().map(|axis| (axis.min, axis.max)))
+        .all(|(min, max)| min.is_finite() && max.is_finite() && min <= max)
+}
+
+fn median_finite(values: &mut [f32]) -> f32 {
+    values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+    percentile_from_sorted(values, 0.5)
+}
+
+fn aggregate_negative_lab_roll_bounds(
+    request: NegativeLabRollBoundsRequestV1,
+) -> Result<NegativeLabRollBoundsReceiptV1, String> {
+    if request.analysis_version != "fixed_grid_block_median_luma_color_v1" {
+        return Err("Negative Lab roll bounds analysis version is unsupported.".to_string());
+    }
+    if !request.source_interpretation_hash.starts_with("sha256:")
+        || request.source_interpretation_hash.len() != 71
+    {
+        return Err("Negative Lab roll bounds require a loader interpretation hash.".to_string());
+    }
+    if request.frames.is_empty() {
+        return Err("Negative Lab roll bounds require at least one frame.".to_string());
+    }
+    if request.frames.iter().any(|frame| {
+        frame.source_interpretation_hash != request.source_interpretation_hash
+            || frame.frame_id.trim().is_empty()
+            || !validate_roll_bounds_set(&frame.local_bounds)
+    }) {
+        return Err(
+            "Negative Lab roll bounds contain stale identity or invalid local bounds.".to_string(),
+        );
+    }
+    let eligible = request
+        .frames
+        .iter()
+        .filter(|frame| frame.eligible)
+        .collect::<Vec<_>>();
+    if eligible.is_empty() {
+        return Err("Negative Lab roll bounds require one eligible frame.".to_string());
+    }
+
+    let median_axis =
+        |selector: fn(NegativeLabDensityBoundsSet) -> NegativeLabDensityAxisBoundsSummary| {
+            let mut mins = eligible
+                .iter()
+                .map(|frame| selector(frame.local_bounds).min)
+                .collect::<Vec<_>>();
+            let mut maxs = eligible
+                .iter()
+                .map(|frame| selector(frame.local_bounds).max)
+                .collect::<Vec<_>>();
+            NegativeLabDensityAxisBoundsSummary {
+                min: median_finite(&mut mins),
+                max: median_finite(&mut maxs),
+            }
+        };
+    let median_channel =
+        |selector: fn(NegativeLabDensityBoundsSet) -> NegativeLabDensityChannelBoundsSummary| {
+            let mut mins = eligible
+                .iter()
+                .map(|frame| selector(frame.local_bounds).min)
+                .collect::<Vec<_>>();
+            let mut maxs = eligible
+                .iter()
+                .map(|frame| selector(frame.local_bounds).max)
+                .collect::<Vec<_>>();
+            NegativeLabDensityChannelBoundsSummary {
+                min: median_finite(&mut mins),
+                max: median_finite(&mut maxs),
+            }
+        };
+    let roll_bounds = NegativeLabDensityBoundsSet {
+        axis_bounds: NegativeLabDensityNormalizationAxisBounds {
+            color: median_axis(|bounds| bounds.axis_bounds.color),
+            luma: median_axis(|bounds| bounds.axis_bounds.luma),
+        },
+        channel_bounds: NegativeLabDensityNormalizationChannelBounds {
+            b: median_channel(|bounds| bounds.channel_bounds.b),
+            g: median_channel(|bounds| bounds.channel_bounds.g),
+            r: median_channel(|bounds| bounds.channel_bounds.r),
+        },
+    };
+    let frame_results = request
+        .frames
+        .iter()
+        .map(|frame| {
+            let mut final_bounds = frame.local_bounds;
+            if request.use_roll_luma {
+                final_bounds.axis_bounds.luma = roll_bounds.axis_bounds.luma;
+            }
+            if request.use_roll_colour {
+                final_bounds.axis_bounds.color = roll_bounds.axis_bounds.color;
+                final_bounds.channel_bounds = roll_bounds.channel_bounds;
+            }
+            NegativeLabRollBoundsFrameResultV1 {
+                anchor: frame.anchor,
+                eligible: frame.eligible,
+                final_bounds,
+                frame_id: frame.frame_id.clone(),
+                local_bounds: frame.local_bounds,
+                roll_bounds,
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut receipt = NegativeLabRollBoundsReceiptV1 {
+        algorithm_id: "native_negative_lab_roll_bounds_v1".to_string(),
+        analysis_version: request.analysis_version,
+        frame_results,
+        plan_hash: String::new(),
+        roll_bounds,
+        schema_version: 1,
+        source_interpretation_hash: request.source_interpretation_hash,
+        use_roll_colour: request.use_roll_colour,
+        use_roll_luma: request.use_roll_luma,
+        warning_codes: if eligible.len() == 1 {
+            vec!["single_frame_identity_plan".to_string()]
+        } else {
+            Vec::new()
+        },
+    };
+    let canonical = serde_json::to_vec(&receipt).map_err(|error| error.to_string())?;
+    receipt.plan_hash = format!("sha256:{}", hex::encode(Sha256::digest(canonical)));
+    Ok(receipt)
+}
+
 #[tauri::command]
 pub async fn fit_negative_lab_measured_profile(
     request: NegativeLabProfileFitRequestV1,
 ) -> Result<NegativeLabProfileFitReceiptV1, String> {
     fit_negative_lab_profile(request)
+}
+
+#[tauri::command]
+pub async fn lock_negative_lab_roll_bounds(
+    request: NegativeLabRollBoundsRequestV1,
+) -> Result<NegativeLabRollBoundsReceiptV1, String> {
+    aggregate_negative_lab_roll_bounds(request)
 }
 
 #[tauri::command]
@@ -4563,6 +4753,96 @@ mod tests {
             None,
         )
         .density_normalization_metrics
+    }
+
+    fn roll_bounds_fixture_frame(
+        frame_id: &str,
+        scale: f32,
+        eligible: bool,
+    ) -> NegativeLabRollBoundsFrameV1 {
+        let mut local_bounds = fixture_density_metrics().bounds_receipt.final_bounds;
+        local_bounds.axis_bounds.luma.min *= scale;
+        local_bounds.axis_bounds.luma.max *= scale;
+        local_bounds.axis_bounds.color.min *= scale;
+        local_bounds.axis_bounds.color.max *= scale;
+        NegativeLabRollBoundsFrameV1 {
+            anchor: frame_id.ends_with('1'),
+            eligible,
+            frame_id: frame_id.to_string(),
+            local_bounds,
+            source_interpretation_hash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_string(),
+        }
+    }
+
+    #[test]
+    fn roll_bounds_lock_keeps_local_inputs_and_applies_independent_axes() {
+        let frames = vec![
+            roll_bounds_fixture_frame("frame-1", 1.0, true),
+            roll_bounds_fixture_frame("frame-2", 1.2, true),
+            roll_bounds_fixture_frame("frame-3", 0.8, false),
+        ];
+        let luma_only = aggregate_negative_lab_roll_bounds(NegativeLabRollBoundsRequestV1 {
+            analysis_version: "fixed_grid_block_median_luma_color_v1".to_string(),
+            frames: frames.clone(),
+            source_interpretation_hash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_string(),
+            use_roll_colour: false,
+            use_roll_luma: true,
+        })
+        .expect("luma-only lock should fit");
+        let frame = luma_only
+            .frame_results
+            .iter()
+            .find(|frame| frame.frame_id == "frame-2")
+            .expect("frame result should be present");
+        assert_eq!(
+            frame.final_bounds.axis_bounds.color,
+            frame.local_bounds.axis_bounds.color
+        );
+        assert_eq!(
+            frame.final_bounds.channel_bounds,
+            frame.local_bounds.channel_bounds
+        );
+        assert_eq!(
+            frame.final_bounds.axis_bounds.luma,
+            luma_only.roll_bounds.axis_bounds.luma
+        );
+        assert_ne!(
+            frame.final_bounds.axis_bounds.luma,
+            frame.local_bounds.axis_bounds.luma
+        );
+
+        let colour_only = aggregate_negative_lab_roll_bounds(NegativeLabRollBoundsRequestV1 {
+            analysis_version: "fixed_grid_block_median_luma_color_v1".to_string(),
+            frames,
+            source_interpretation_hash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_string(),
+            use_roll_colour: true,
+            use_roll_luma: false,
+        })
+        .expect("colour-only lock should fit");
+        let colour_frame = colour_only
+            .frame_results
+            .iter()
+            .find(|frame| frame.frame_id == "frame-2")
+            .expect("frame result should be present");
+        assert_eq!(
+            colour_frame.final_bounds.axis_bounds.luma,
+            colour_frame.local_bounds.axis_bounds.luma
+        );
+        assert_eq!(
+            colour_frame.final_bounds.axis_bounds.color,
+            colour_only.roll_bounds.axis_bounds.color
+        );
+        assert_eq!(
+            colour_frame.final_bounds.channel_bounds,
+            colour_only.roll_bounds.channel_bounds
+        );
+        assert!(colour_only.plan_hash.starts_with("sha256:"));
     }
 
     #[test]
