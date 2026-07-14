@@ -9,7 +9,8 @@ use sha2::{Digest, Sha256};
 
 use crate::color::icc_profiles::{standardized_display_p3_profile, standardized_srgb_profile};
 use crate::color::working_to_output_transform::{
-    WorkingColorState, transform_acescg_image_to_output_rgb16,
+    OutputGamutMappingReceiptV1, WorkingColorState,
+    transform_acescg_image_to_output_rgb16_with_gamut_receipt,
 };
 
 use crate::gamut_mapping::{
@@ -137,15 +138,53 @@ pub(crate) fn export_rgb16_pixels_with_working_color_state(
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
 ) -> Result<(Vec<u16>, u32, u32, ColorProfile), String> {
+    let converted = export_rgb16_conversion_with_working_color_state(
+        image,
+        source_color_state,
+        color_profile,
+        rendering_intent,
+        black_point_compensation,
+    )?;
+    Ok((
+        converted.pixels,
+        converted.width,
+        converted.height,
+        converted.output_profile,
+    ))
+}
+
+#[derive(Debug)]
+pub(crate) struct ExportRgb16Conversion {
+    pub(crate) pixels: Vec<u16>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) output_profile: ColorProfile,
+    pub(crate) gamut_mapping: Option<OutputGamutMappingReceiptV1>,
+}
+
+pub(crate) fn export_rgb16_conversion_with_working_color_state(
+    image: &DynamicImage,
+    source_color_state: WorkingColorState,
+    color_profile: &ExportColorProfile,
+    rendering_intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<ExportRgb16Conversion, String> {
     if source_color_state == WorkingColorState::AcesCgLinearV1 {
         let output_profile = output_color_profile(color_profile)?;
-        let (pixels, width, height) = transform_acescg_image_to_output_rgb16(
-            image,
-            color_profile,
-            rendering_intent,
-            black_point_compensation,
-        )?;
-        return Ok((pixels, width, height, output_profile));
+        let (pixels, width, height, gamut_mapping) =
+            transform_acescg_image_to_output_rgb16_with_gamut_receipt(
+                image,
+                color_profile,
+                rendering_intent,
+                black_point_compensation,
+            )?;
+        return Ok(ExportRgb16Conversion {
+            pixels,
+            width,
+            height,
+            output_profile,
+            gamut_mapping: Some(gamut_mapping),
+        });
     }
     let (pixels, width, height) =
         export_source_rgb16_pixels(image, color_profile, rendering_intent);
@@ -162,7 +201,13 @@ pub(crate) fn export_rgb16_pixels_with_working_color_state(
                 rendering_intent,
                 true,
             )?;
-            return Ok((transformed, width, height, output_profile));
+            return Ok(ExportRgb16Conversion {
+                pixels: transformed,
+                width,
+                height,
+                output_profile,
+                gamut_mapping: None,
+            });
         }
 
         let src_profile = ColorProfile::new_srgb();
@@ -189,9 +234,21 @@ pub(crate) fn export_rgb16_pixels_with_working_color_state(
                 .map_err(|e| format!("Failed to convert export to {profile_label}: {e}"))?;
         }
 
-        Ok((transformed, width, height, output_profile))
+        Ok(ExportRgb16Conversion {
+            pixels: transformed,
+            width,
+            height,
+            output_profile,
+            gamut_mapping: None,
+        })
     } else {
-        Ok((pixels, width, height, output_profile))
+        Ok(ExportRgb16Conversion {
+            pixels,
+            width,
+            height,
+            output_profile,
+            gamut_mapping: None,
+        })
     }
 }
 
@@ -660,6 +717,7 @@ pub(crate) struct ExportReceiptMetadata {
     pub source_precision_path: String,
     pub transform_policy_fingerprint: String,
     pub transform_applied: bool,
+    pub gamut_mapping: Option<OutputGamutMappingReceiptV1>,
 }
 
 pub(crate) fn export_receipt_metadata(
@@ -712,6 +770,7 @@ pub(crate) fn export_receipt_metadata(
         source_precision_path: applied.source_precision_path,
         transform_policy_fingerprint,
         transform_applied: applied.plan.transform_applied,
+        gamut_mapping: None,
     })
 }
 

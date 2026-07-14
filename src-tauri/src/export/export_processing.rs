@@ -127,6 +127,7 @@ struct ExportReceiptOutput {
     source_precision_path: Option<String>,
     transform_policy_fingerprint: Option<String>,
     transform_applied: Option<bool>,
+    gamut_mapping: Option<crate::color::working_to_output_transform::OutputGamutMappingReceiptV1>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -3345,7 +3346,8 @@ fn export_receipt_output(
         transform_policy_fingerprint: metadata
             .as_ref()
             .map(|metadata| metadata.transform_policy_fingerprint.clone()),
-        transform_applied: metadata.map(|metadata| metadata.transform_applied),
+        transform_applied: metadata.as_ref().map(|metadata| metadata.transform_applied),
+        gamut_mapping: metadata.and_then(|metadata| metadata.gamut_mapping),
     })
 }
 
@@ -6439,11 +6441,34 @@ mod tests {
         assert_eq!((width, height), (2, 1));
         assert_eq!(proof.len(), 6);
         let expected_icc = encode_icc_profile(&profile).unwrap();
-        let mut jpeg_decoder = JpegDecoder::new(Cursor::new(jpeg.bytes)).unwrap();
+        let mut jpeg_decoder = JpegDecoder::new(Cursor::new(&jpeg.bytes)).unwrap();
         assert_eq!(jpeg_decoder.icc_profile().unwrap().unwrap(), expected_icc);
-        let mut tiff_decoder = TiffDecoder::new(Cursor::new(tiff.bytes)).unwrap();
+        let mut tiff_decoder = TiffDecoder::new(Cursor::new(&tiff.bytes)).unwrap();
         assert_eq!(tiff_decoder.icc_profile().unwrap().unwrap(), expected_icc);
         assert_eq!(tiff_decoder.dimensions(), (2, 1));
         assert_eq!(tiff_decoder.color_type(), ColorType::Rgb16);
+        let decoded_tiff = image::load_from_memory_with_format(&tiff.bytes, ImageFormat::Tiff)
+            .unwrap()
+            .to_rgb16()
+            .into_raw();
+        assert_eq!(quantize_rgb16_to_rgb8(&decoded_tiff), proof);
+        let jpeg_gamut = jpeg
+            .color_policy
+            .unwrap()
+            .gamut_mapping
+            .expect("typed AP1 JPEG must preserve the actual gamut receipt");
+        let tiff_gamut = tiff
+            .color_policy
+            .unwrap()
+            .gamut_mapping
+            .expect("typed AP1 TIFF must preserve the actual gamut receipt");
+        assert_eq!(jpeg_gamut, tiff_gamut);
+        assert_eq!(jpeg_gamut.pixel_count, 2);
+        assert!(jpeg_gamut.input_out_of_gamut_pixel_count >= 1);
+        assert!(jpeg_gamut.compressed_pixel_count >= 1);
+        assert_eq!(jpeg_gamut.hard_clipped_pixel_count, 0);
+        assert_eq!(jpeg_gamut.target, "DisplayP3");
+        assert_eq!(jpeg_gamut.mode, "Output");
+        assert!(jpeg_gamut.boundary_fingerprint.starts_with("sha256:"));
     }
 }

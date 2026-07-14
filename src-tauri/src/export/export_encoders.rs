@@ -10,9 +10,9 @@ use image::{
 use rapidraw_codecs::JpegPreset;
 use sha2::{Digest, Sha256};
 
-use crate::color::working_to_output_transform::WorkingColorState;
+use crate::color::working_to_output_transform::{OutputGamutMappingReceiptV1, WorkingColorState};
 use crate::export::export_color_policy::{
-    export_rgb16_pixels_with_working_color_state, output_color_profile,
+    export_rgb16_conversion_with_working_color_state, output_color_profile,
 };
 use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, encode_icc_profile,
@@ -31,6 +31,8 @@ pub(crate) struct EmbeddedSourceIccProfile {
     pub(crate) bytes: Vec<u8>,
     pub(crate) sha256: String,
 }
+
+type EncodedBytesWithGamutReceipt = (Vec<u8>, Option<OutputGamutMappingReceiptV1>);
 
 pub(crate) fn encode_image_to_bytes(
     image: &DynamicImage,
@@ -139,7 +141,7 @@ pub(crate) fn encode_image_with_working_color_state(
             }
         }
         "jpg" | "jpeg" => {
-            let bytes = encode_jpeg_to_bytes(
+            let (bytes, gamut_mapping) = encode_jpeg_to_bytes(
                 image,
                 source_color_state,
                 jpeg_quality,
@@ -148,7 +150,7 @@ pub(crate) fn encode_image_with_working_color_state(
                 black_point_compensation,
                 source_embedded_icc,
             )?;
-            let color_policy = export_receipt_metadata(
+            let mut color_policy = export_receipt_metadata(
                 &normalized_format,
                 color_profile,
                 rendering_intent,
@@ -156,6 +158,9 @@ pub(crate) fn encode_image_with_working_color_state(
                 &export_source_precision_receipt_label(image),
                 source_embedded_icc.map(|profile| profile.sha256.clone()),
             );
+            if let Some(metadata) = color_policy.as_mut() {
+                metadata.gamut_mapping = gamut_mapping;
+            }
             validate_export_file_readback_color_policy(
                 &bytes,
                 &normalized_format,
@@ -183,7 +188,7 @@ pub(crate) fn encode_image_with_working_color_state(
                 .map_err(|e| e.to_string())?;
         }
         "tiff" => {
-            let bytes = encode_tiff16_to_bytes(
+            let (bytes, gamut_mapping) = encode_tiff16_to_bytes(
                 image,
                 source_color_state,
                 color_profile,
@@ -191,7 +196,7 @@ pub(crate) fn encode_image_with_working_color_state(
                 black_point_compensation,
                 source_embedded_icc,
             )?;
-            let color_policy = export_receipt_metadata(
+            let mut color_policy = export_receipt_metadata(
                 &normalized_format,
                 color_profile,
                 rendering_intent,
@@ -199,6 +204,9 @@ pub(crate) fn encode_image_with_working_color_state(
                 &export_source_precision_receipt_label(image),
                 source_embedded_icc.map(|profile| profile.sha256.clone()),
             );
+            if let Some(metadata) = color_policy.as_mut() {
+                metadata.gamut_mapping = gamut_mapping;
+            }
             validate_export_file_readback_color_policy(
                 &bytes,
                 &normalized_format,
@@ -445,27 +453,35 @@ fn encode_tiff16_to_bytes(
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
     source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
-) -> Result<Vec<u8>, String> {
-    let (pixels, width, height, icc_profile) =
+) -> Result<EncodedBytesWithGamutReceipt, String> {
+    let (pixels, width, height, icc_profile, gamut_mapping) =
         if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
             let (pixels, width, height) =
                 export_source_rgb16_pixels(image, color_profile, rendering_intent);
             let source_icc = source_embedded_icc.ok_or_else(|| {
                 "Source embedded export profile requires a source ICC profile.".to_string()
             })?;
-            (pixels, width, height, source_icc.bytes.clone())
+            (pixels, width, height, source_icc.bytes.clone(), None)
         } else {
-            let (pixels, width, height, output_profile) =
-                export_rgb16_pixels_with_working_color_state(
-                    image,
-                    source_color_state,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                )?;
-            (pixels, width, height, encode_icc_profile(&output_profile)?)
+            let converted = export_rgb16_conversion_with_working_color_state(
+                image,
+                source_color_state,
+                color_profile,
+                rendering_intent,
+                black_point_compensation,
+            )?;
+            (
+                converted.pixels,
+                converted.width,
+                converted.height,
+                encode_icc_profile(&converted.output_profile)?,
+                converted.gamut_mapping,
+            )
         };
-    encode_rgb16_tiff_with_icc(&pixels, width, height, icc_profile)
+    Ok((
+        encode_rgb16_tiff_with_icc(&pixels, width, height, icc_profile)?,
+        gamut_mapping,
+    ))
 }
 
 fn encode_rgb16_tiff_with_icc(
@@ -509,8 +525,8 @@ fn encode_jpeg_to_bytes(
     rendering_intent: &ExportRenderingIntent,
     black_point_compensation: bool,
     source_embedded_icc: Option<&EmbeddedSourceIccProfile>,
-) -> Result<Vec<u8>, String> {
-    let (rgb_pixels, width, height, icc_profile) =
+) -> Result<EncodedBytesWithGamutReceipt, String> {
+    let (rgb_pixels, width, height, icc_profile, gamut_mapping) =
         if matches!(color_profile, ExportColorProfile::SourceEmbedded) {
             let (rgb16_pixels, width, height) =
                 export_source_rgb16_pixels(image, color_profile, rendering_intent);
@@ -522,25 +538,26 @@ fn encode_jpeg_to_bytes(
                 width,
                 height,
                 source_icc.bytes.clone(),
+                None,
             )
         } else {
-            let (rgb16_pixels, width, height, output_profile) =
-                export_rgb16_pixels_with_working_color_state(
-                    image,
-                    source_color_state,
-                    color_profile,
-                    rendering_intent,
-                    black_point_compensation,
-                )?;
+            let converted = export_rgb16_conversion_with_working_color_state(
+                image,
+                source_color_state,
+                color_profile,
+                rendering_intent,
+                black_point_compensation,
+            )?;
             (
-                quantize_rgb16_to_rgb8(&rgb16_pixels),
-                width,
-                height,
-                encode_icc_profile(&output_profile)?,
+                quantize_rgb16_to_rgb8(&converted.pixels),
+                converted.width,
+                converted.height,
+                encode_icc_profile(&converted.output_profile)?,
+                converted.gamut_mapping,
             )
         };
 
-    rapidraw_codecs::encode_jpeg_rgb(
+    let bytes = rapidraw_codecs::encode_jpeg_rgb(
         &rgb_pixels,
         width,
         height,
@@ -548,7 +565,8 @@ fn encode_jpeg_to_bytes(
         JpegPreset::Balanced,
         Some(icc_profile),
     )
-    .map_err(|e| format!("Failed to encode JPEG: {}", e))
+    .map_err(|e| format!("Failed to encode JPEG: {}", e))?;
+    Ok((bytes, gamut_mapping))
 }
 
 #[cfg(not(feature = "advanced-codecs"))]

@@ -727,6 +727,18 @@ fn encode_png(rgba: &[u8], w: u32, h: u32) -> Result<Vec<u8>, String> {
     Ok(out.into_inner())
 }
 
+pub fn encode_gamut_warning_mask_data_url(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    use base64::Engine;
+    Ok(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(encode_png(rgba, width, height)?)
+    ))
+}
+
 #[cfg(test)]
 pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramData, String> {
     let job = compat_job(image, AnalyticsProducts::HISTOGRAM);

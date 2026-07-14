@@ -1338,14 +1338,28 @@ fn generate_export_soft_proof_preview(
         &adjustments_clone,
         preview_dim,
     )?;
+    let source_color_state = if loaded_image.is_raw {
+        color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
+    } else {
+        color::working_to_output_transform::WorkingColorState::EncodedSrgbV1
+    };
+    let shared_gamut_warning = if source_color_state
+        == color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
+    {
+        Some(
+            color::working_to_output_transform::analyze_acescg_image_gamut_warning_with_mask(
+                &preview_image,
+                &request.color_profile,
+                &request.rendering_intent,
+            )?,
+        )
+    } else {
+        None
+    };
     let (proof_pixels, width, height, _) =
         export::export_processing::export_soft_proof_rgb_pixels_with_working_color_state(
             &preview_image,
-            if loaded_image.is_raw {
-                color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
-            } else {
-                color::working_to_output_transform::WorkingColorState::EncodedSrgbV1
-            },
+            source_color_state,
             &request.color_profile,
             &request.rendering_intent,
             request.black_point_compensation,
@@ -1402,6 +1416,19 @@ fn generate_export_soft_proof_preview(
         && let Ok(gamut_warning_data) =
             image_analytics::calculate_gamut_warning_overlay_from_image(proof_image)
     {
+        let shared_warning_mask_data_url = shared_gamut_warning
+            .as_ref()
+            .map(|analysis| {
+                image_analytics::encode_gamut_warning_mask_data_url(
+                    &analysis.mask_rgba,
+                    analysis.width,
+                    analysis.height,
+                )
+            })
+            .transpose()?;
+        let shared_gamut_warning = shared_gamut_warning
+            .as_ref()
+            .map(|analysis| &analysis.receipt);
         let source_image_path = &loaded_image.path;
         let _ = app_handle.emit(
             crate::events::GAMUT_WARNING_UPDATE,
@@ -1410,15 +1437,39 @@ fn generate_export_soft_proof_preview(
                 "data": {
                     "black_point_compensation": proof_metadata.black_point_compensation,
                     "color_managed_transform": proof_metadata.color_managed_transform,
-                    "coverage_ratio": gamut_warning_data.coverage_ratio,
+                    "coverage_ratio": shared_gamut_warning.as_ref().map_or(
+                        gamut_warning_data.coverage_ratio,
+                        |receipt| (receipt.out_of_gamut_pixel_percentage / 100.0) as f32,
+                    ),
                     "effective_color_profile": proof_metadata.effective_color_profile,
                     "effective_rendering_intent": proof_metadata.effective_rendering_intent,
                     "export_soft_proof_recipe_id": recipe_id,
-                    "height": gamut_warning_data.height,
-                    "mask_data_url": gamut_warning_data.mask_data_url,
+                    "height": shared_gamut_warning.map_or(gamut_warning_data.height, |_| height),
+                    "mask_data_url": shared_warning_mask_data_url.unwrap_or(gamut_warning_data.mask_data_url),
                     "max_channel_value": gamut_warning_data.max_channel_value,
                     "min_channel_value": gamut_warning_data.min_channel_value,
-                    "pixel_count": gamut_warning_data.pixel_count,
+                    "pixel_count": shared_gamut_warning.map_or(
+                        gamut_warning_data.pixel_count,
+                        |receipt| receipt.pixel_count,
+                    ),
+                    "gamut_mapping_implementation": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.implementation_id.clone(),
+                    ),
+                    "gamut_mapping_version": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.implementation_version,
+                    ),
+                    "gamut_target": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.target.clone(),
+                    ),
+                    "gamut_boundary_fingerprint": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.boundary_fingerprint.clone(),
+                    ),
+                    "gamut_warning_plan_fingerprint": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.plan_fingerprint.clone(),
+                    ),
+                    "maximum_boundary_excess": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.maximum_boundary_excess,
+                    ),
                     "policy_status": proof_metadata.policy_status,
                     "policy_version": proof_metadata.policy_version,
                     "preview_basis": "export_preview",
@@ -1426,8 +1477,11 @@ fn generate_export_soft_proof_preview(
                     "source_precision_path": proof_metadata.source_precision_path,
                     "transform_applied": proof_metadata.transform_applied,
                     "transform_policy_fingerprint": proof_metadata.transform_policy_fingerprint,
-                    "warning_pixel_count": gamut_warning_data.warning_pixel_count,
-                    "width": gamut_warning_data.width,
+                    "warning_pixel_count": shared_gamut_warning.as_ref().map_or(
+                        gamut_warning_data.warning_pixel_count,
+                        |receipt| receipt.out_of_gamut_pixel_count,
+                    ),
+                    "width": shared_gamut_warning.map_or(gamut_warning_data.width, |_| width),
                 }
             }),
         );

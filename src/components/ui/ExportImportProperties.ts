@@ -145,6 +145,22 @@ export interface ExportReceiptOutput {
   sourcePrecisionPath?: string | null | undefined;
   transformPolicyFingerprint?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
+  gamutMapping?: ExportGamutMappingReceipt | null | undefined;
+}
+
+export interface ExportGamutMappingReceipt {
+  implementationId: string;
+  implementationVersion: number;
+  target: string;
+  mode: 'Output';
+  renderingIntent: string;
+  boundaryFingerprint: string;
+  compressedPixelCount: number;
+  hardClippedPixelCount: number;
+  inputOutOfGamutPixelCount: number;
+  maximumBoundaryExcess: number;
+  pixelCount: number;
+  planFingerprint: string;
 }
 
 export interface ExportReceiptDigest {
