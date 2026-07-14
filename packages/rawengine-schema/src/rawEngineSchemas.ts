@@ -9000,6 +9000,15 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
             workingSpace: 'scene_linear_luminance_v1',
           }) as const,
       ),
+    renderIntent: z.enum(['print', 'flat_log_master']).default('print'),
+    flatLogMaster: z
+      .object({
+        algorithmVersion: z.literal(1).default(1),
+        gain: z.number().min(0.1).max(2).default(1),
+        lift: z.number().min(0).max(0.25).default(0.02),
+      })
+      .strict()
+      .default({ algorithmVersion: 1, gain: 1, lift: 0.02 }),
     curveModel: z
       .object({
         curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),

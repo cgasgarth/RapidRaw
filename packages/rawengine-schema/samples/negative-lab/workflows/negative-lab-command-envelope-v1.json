@@ -59,6 +59,12 @@
       "sharpeningThreshold": 0.01,
       "workingSpace": "scene_linear_luminance_v1"
     },
+    "renderIntent": "print",
+    "flatLogMaster": {
+      "algorithmVersion": 1,
+      "gain": 1,
+      "lift": 0.02
+    },
     "curveModel": {
       "curveFamily": "process_profile_monotonic_v1",
       "inversionCurveSet": {

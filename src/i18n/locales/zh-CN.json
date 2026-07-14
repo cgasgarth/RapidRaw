@@ -3539,6 +3539,7 @@
       "excludeScan": "Exclude",
       "exportOptions": "导出选项",
       "exposure": "曝光",
+      "flatLogMasterHint": "",
       "frameBlueWeightOffset": "Frame blue offset",
       "frameConversionStatus": {
         "preview_pending": "Preview pending",
@@ -3698,6 +3699,7 @@
       "redWeight": "红色（青色）",
       "rejectBaseSample": "Reject sample",
       "rejectDustCandidate": "Reject",
+      "renderIntent": "",
       "resetFrameCrop": "Reset crop",
       "resetFrameExposure": "Reset frame",
       "resetFrameRgbBalance": "Reset frame RGB",

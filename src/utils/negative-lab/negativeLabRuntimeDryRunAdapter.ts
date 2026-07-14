@@ -201,6 +201,10 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict()
       .optional(),
+    flatLogMaster: z
+      .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
+      .strict()
+      .optional(),
     dimensions: z
       .object({
         height: z.number().int().positive(),
@@ -208,6 +212,8 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     previewDataUrl: z.string().startsWith('data:image/jpeg;base64,'),
+    renderIntent: z.enum(['print', 'flat_log_master']).optional(),
+    bypassedStageIds: z.array(z.string().trim().min(1)).optional(),
     stageArtifacts: z
       .array(negativeLabStagePreviewArtifactFieldsSchema.extend({ boundsReceipt: nativeDensityBoundsReceiptSchema }))
       .optional(),
@@ -301,6 +307,12 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     color_range_clip: number;
     contrast: number;
     conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1' | 'e6_positive_v1';
+    render_intent?: 'print' | 'flat_log_master';
+    flat_log_master?: {
+      algorithm_version: 1;
+      gain: number;
+      lift: number;
+    };
     exposure: number;
     green_weight: number;
     luma_range_clip: number;
@@ -357,6 +369,8 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           vibrance: params.command.parameters.colorFinish.vibrance,
           working_space: params.command.parameters.colorFinish.workingSpace,
         },
+        render_intent: params.recipeParams.render_intent ?? 'print',
+        flat_log_master: params.recipeParams.flat_log_master ?? { algorithm_version: 1, gain: 1, lift: 0.02 },
       },
       ...(params.crosstalkProfile == null ? {} : { crosstalkProfile: params.crosstalkProfile }),
       path: params.path,
