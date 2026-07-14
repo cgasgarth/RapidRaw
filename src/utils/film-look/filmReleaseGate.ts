@@ -2,8 +2,10 @@ import Color from 'colorjs.io';
 
 import {
   type FilmNativeAnalyticReportV1,
+  type FilmNativeStochasticOpticalReportV1,
   type FilmValidationFixtureV1,
   filmNativeAnalyticReportV1Schema,
+  filmNativeStochasticOpticalReportV1Schema,
   filmValidationFixtureV1Schema,
 } from '../../../packages/rawengine-schema/src/index.js';
 import { classifyLinearRgbGamut, type GamutClassification } from '../color/runtime/gamutMappingRuntime';
@@ -13,6 +15,12 @@ export interface FilmReleaseGateResult {
   failures: string[];
   gamutClassifications: Record<GamutClassification, number>;
   maxIdentityDeltaE00: number;
+  passed: boolean;
+}
+
+export interface FilmStochasticOpticalReleaseGateResult {
+  densityVarianceRatio: number;
+  failures: string[];
   passed: boolean;
 }
 
@@ -82,4 +90,69 @@ export const evaluateFilmNativeReleaseGate = (rawFixture: unknown, rawReport: un
     maxIdentityDeltaE00,
     passed: uniqueFailures.length === 0,
   };
+};
+
+export const evaluateFilmStochasticOpticalReleaseGate = (
+  rawFixture: unknown,
+  rawReport: unknown,
+): FilmStochasticOpticalReleaseGateResult => {
+  const fixture = filmValidationFixtureV1Schema.parse(rawFixture);
+  const report: FilmNativeStochasticOpticalReportV1 = filmNativeStochasticOpticalReportV1Schema.parse(rawReport);
+  const failures = [...report.failures];
+  const profileRef = fixture.render.profileRefs[0];
+  if (
+    report.fixtureId !== fixture.id ||
+    report.sourceSha256 !== fixture.source.sha256 ||
+    profileRef === undefined ||
+    JSON.stringify(report.profileRef) !== JSON.stringify(profileRef) ||
+    report.postFilmDomain !== fixture.input.domain
+  )
+    failures.push('film_stochastic_optical_identity_mismatch');
+
+  const { grain, optical } = report;
+  const thresholds = fixture.thresholds;
+  if (grain.deterministicHash !== grain.repeatHash) failures.push('grain_repeat_hash_mismatch');
+  if (grain.tileMaxAbs > thresholds.grainRepeatTolerance) failures.push('grain_tile_continuity_failed');
+  if (grain.meanResidual.some((value) => Math.abs(value) > thresholds.grainMeanDrift))
+    failures.push('grain_mean_drift_failed');
+  if (
+    grain.varianceByChannel.some((value) => value < thresholds.grainVarianceMin || value > thresholds.grainVarianceMax)
+  )
+    failures.push('grain_variance_bounds_failed');
+  if (
+    [...grain.channelCorrelation, ...grain.adjacentCorrelation].some(
+      (value) => value < thresholds.grainCorrelationMin || value > thresholds.grainCorrelationMax,
+    )
+  )
+    failures.push('grain_correlation_bounds_failed');
+  if (
+    grain.frequencyEnergyRatio.some(
+      (value) => value < thresholds.grainFrequencyEnergyMin || value > thresholds.grainFrequencyEnergyMax,
+    )
+  )
+    failures.push('grain_frequency_energy_failed');
+  const densityMin = Math.min(...grain.densityVariance);
+  const densityMax = Math.max(...grain.densityVariance);
+  const densityVarianceRatio = densityMax / Math.max(densityMin, Number.EPSILON);
+  if (densityVarianceRatio < thresholds.grainDensityVarianceRatioMin) failures.push('grain_density_selectivity_failed');
+
+  if (optical.bypassMaxAbs > thresholds.grainRepeatTolerance) failures.push('optical_bypass_failed');
+  if (optical.subthresholdLeakage > thresholds.opticalLeakage) failures.push('optical_subthreshold_leakage_failed');
+  if (
+    optical.halationEnergy <= 0 ||
+    optical.bloomEnergy <= 0 ||
+    optical.halationEnergy > thresholds.opticalEnergyMax ||
+    optical.bloomEnergy > thresholds.opticalEnergyMax
+  )
+    failures.push('optical_energy_bounds_failed');
+  if (optical.halationRedRatio < thresholds.opticalHalationRedRatioMin)
+    failures.push('optical_halation_selectivity_failed');
+  if (optical.bloomNeutralDrift > thresholds.opticalBloomNeutralDrift) failures.push('optical_bloom_neutrality_failed');
+  if (optical.halationWeightedRadiusPx <= 0 || optical.bloomWeightedRadiusPx <= optical.halationWeightedRadiusPx)
+    failures.push('optical_radius_support_failed');
+  if (optical.continuityMaxStep > thresholds.opticalContinuityMaxStep) failures.push('optical_continuity_failed');
+  if (!report.passed) failures.push('native_stochastic_optical_gate_failed');
+
+  const uniqueFailures = [...new Set(failures)];
+  return { densityVarianceRatio, failures: uniqueFailures, passed: uniqueFailures.length === 0 };
 };
