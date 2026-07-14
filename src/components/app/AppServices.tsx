@@ -20,7 +20,5 @@ export const AppServices = memo(
   (previous, next) =>
     previous.imageProcessing.transformWrapperRef === next.imageProcessing.transformWrapperRef &&
     previous.imageProcessing.prevAdjustmentsRef === next.imageProcessing.prevAdjustmentsRef &&
-    previous.imageProcessing.previewJobIdRef === next.imageProcessing.previewJobIdRef &&
-    previous.imageProcessing.latestRenderedJobIdRef === next.imageProcessing.latestRenderedJobIdRef &&
     previous.imageProcessing.currentResRef === next.imageProcessing.currentResRef,
 );

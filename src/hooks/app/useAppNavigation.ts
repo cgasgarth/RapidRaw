@@ -88,8 +88,6 @@ export interface AppNavigationProps {
     transformWrapperRef: RefObject<TransformController | null>;
     preloadedDataRef: RefObject<PreloadedNavigationData>;
     isBackendReadyRef: RefObject<boolean>;
-    latestRenderedJobIdRef: RefObject<number>;
-    previewJobIdRef: RefObject<number>;
     currentResRef: RefObject<number>;
     prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
   };
@@ -120,15 +118,7 @@ export function useAppNavigation({
   requestThumbnails,
   refs,
 }: AppNavigationProps) {
-  const {
-    transformWrapperRef,
-    preloadedDataRef,
-    isBackendReadyRef,
-    latestRenderedJobIdRef,
-    previewJobIdRef,
-    currentResRef,
-    prevAdjustmentsRef,
-  } = refs;
+  const { transformWrapperRef, preloadedDataRef, isBackendReadyRef, currentResRef, prevAdjustmentsRef } = refs;
   const collectionRequestRef = useRef(0);
 
   const handleGoHome = useCallback(() => {
@@ -314,7 +304,6 @@ export function useAppNavigation({
 
         setLibrary({ isViewLoading: false });
 
-        latestRenderedJobIdRef.current = previewJobIdRef.current;
         isBackendReadyRef.current = false;
         currentResRef.current = Infinity;
 
@@ -419,7 +408,7 @@ export function useAppNavigation({
 
       setLibrary({ isViewLoading: true });
     },
-    [currentResRef, isBackendReadyRef, latestRenderedJobIdRef, prevAdjustmentsRef, previewJobIdRef, requestThumbnails],
+    [currentResRef, isBackendReadyRef, prevAdjustmentsRef, requestThumbnails],
   );
 
   const handleSelectSubfolder = useCallback(

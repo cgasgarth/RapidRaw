@@ -44,16 +44,15 @@ import {
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import {
-  createPreviewCoordinatorState,
   createPreviewQualityPolicy,
+  fingerprintPreviewGraphRevision,
   fingerprintPreviewRoi,
+  PreviewCoordinator,
   type PreviewCoordinatorEvent,
-  type PreviewCoordinatorState,
   type PreviewOperationIdentity,
   type PreviewQualitySnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
-  reducePreviewCoordinator,
 } from '../../utils/previewCoordinator';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
@@ -140,12 +139,10 @@ export function useImageProcessing(
   transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
   prevAdjustmentsRef: React.RefObject<PreviousAdjustments | null>,
   renderRefs: {
-    previewJobIdRef: React.RefObject<number>;
-    latestRenderedJobIdRef: React.RefObject<number>;
     currentResRef: React.RefObject<number>;
   },
 ) {
-  const { previewJobIdRef, latestRenderedJobIdRef, currentResRef } = renderRefs;
+  const { currentResRef } = renderRefs;
 
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const committedAdjustments = useEditorStore((state) => state.adjustments);
@@ -187,7 +184,15 @@ export function useImageProcessing(
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewerSampleGraphRevision = `${String(imageSessionId)}:${String(adjustmentSnapshot.adjustmentRevision)}:${referenceMatchPreview?.proposalFingerprint ?? 'committed'}:${String(proofRevision)}`;
+  const viewerSampleGraphRevision = fingerprintPreviewGraphRevision({
+    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+    geometryRevision: adjustmentSnapshot.geometryRevision,
+    imageSessionId,
+    maskRevision: adjustmentSnapshot.maskRevision,
+    patchRevision: adjustmentSnapshot.patchRevision,
+    proofRevision,
+    proposalFingerprint: referenceMatchPreview?.proposalFingerprint ?? 'committed',
+  });
 
   const latestInteractiveRequestIdRef = useRef(0);
   const executeInteractiveRenderRef = useRef<(request: InteractivePreviewRequest) => Promise<void>>(async () => {});
@@ -212,14 +217,14 @@ export function useImageProcessing(
     (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
   >(() => null);
   const previewQualityControllerRef = useRef(createPreviewQualityPolicy());
-  const previewCoordinatorStateRef = useRef<PreviewCoordinatorState>(createPreviewCoordinatorState());
-  const previewCoordinatorOperationsRef = useRef(new Map<number, PreviewOperationIdentity>());
+  const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
+  const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
+  previewCoordinatorRef.current = previewCoordinator;
   const displayResourceGenerationRef = useRef(1);
 
   const dispatchPreviewCoordinator = useCallback(
     (event: PreviewCoordinatorEvent) => {
-      const transition = reducePreviewCoordinator(previewCoordinatorStateRef.current, event);
-      previewCoordinatorStateRef.current = transition.state;
+      const transition = previewCoordinator.dispatch(event);
       for (const effect of transition.effects) {
         if (effect.type !== 'publish') continue;
         if (effect.identity.kind === 'settled') {
@@ -228,17 +233,9 @@ export function useImageProcessing(
           setEditor({ transformedOriginalUrl: effect.artifact.url });
         }
       }
-      const cancelledIds = new Set(
-        transition.effects.filter((effect) => effect.type === 'cancel').map((effect) => effect.identity.operationId),
-      );
-      if (cancelledIds.size > 0) {
-        for (const [requestId, identity] of previewCoordinatorOperationsRef.current) {
-          if (cancelledIds.has(identity.operationId)) previewCoordinatorOperationsRef.current.delete(requestId);
-        }
-      }
       return transition;
     },
-    [setEditor],
+    [previewCoordinator, setEditor],
   );
 
   const previewSessionIdentity = useCallback(
@@ -249,6 +246,7 @@ export function useImageProcessing(
         backend: scope.backend,
         displayGeneration: positive(displayResourceGenerationRef.current),
         geometryRevision: positive(Number(scope.geometryIdentity)),
+        graphRevision: scope.graphIdentity,
         imageSessionId: positive(scope.imageSessionId),
         maskRevision: positive(scope.maskRevision),
         patchRevision: positive(scope.patchRevision),
@@ -352,7 +350,15 @@ export function useImageProcessing(
         devicePixelRatio: dpr,
         adjustmentRevision: editor.adjustmentSnapshot.adjustmentRevision,
         geometryIdentity: editor.adjustmentSnapshot.geometryRevision,
-        graphIdentity: `${String(editor.imageSessionId)}:${String(editor.adjustmentSnapshot.adjustmentRevision)}:${String(editor.proofRevision)}`,
+        graphIdentity: fingerprintPreviewGraphRevision({
+          adjustmentRevision: editor.adjustmentSnapshot.adjustmentRevision,
+          geometryRevision: editor.adjustmentSnapshot.geometryRevision,
+          imageSessionId: editor.imageSessionId,
+          maskRevision: editor.adjustmentSnapshot.maskRevision,
+          patchRevision: editor.adjustmentSnapshot.patchRevision,
+          proofRevision: editor.proofRevision,
+          proposalFingerprint: editor.referenceMatchPreview?.proposalFingerprint ?? 'committed',
+        }),
         imageSessionId: editor.imageSessionId,
         maskRevision: editor.adjustmentSnapshot.maskRevision,
         patchRevision: editor.adjustmentSnapshot.patchRevision,
@@ -440,7 +446,7 @@ export function useImageProcessing(
   const executeApplyAdjustments = useCallback(
     async (request: PreviewRenderRequest) => {
       if (!isPreviewRequestCurrent(request)) return;
-      const coordinatorIdentity = previewCoordinatorOperationsRef.current.get(request.requestId);
+      const coordinatorIdentity = previewCoordinator.operationForRequest(request.requestId);
       if (coordinatorIdentity !== undefined) {
         dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-started' });
       }
@@ -456,13 +462,13 @@ export function useImageProcessing(
             type: 'operation-completed',
           });
         }
-        previewCoordinatorOperationsRef.current.delete(request.requestId);
+        previewCoordinator.forgetRequest(request.requestId);
         return transition.state.lastTransition?.staleCompletion !== true;
       };
       const failCoordinatorOperation = (error: unknown) => {
         if (coordinatorIdentity === undefined) return;
         dispatchPreviewCoordinator({ error: String(error), identity: coordinatorIdentity, type: 'operation-failed' });
-        previewCoordinatorOperationsRef.current.delete(request.requestId);
+        previewCoordinator.forgetRequest(request.requestId);
       };
       const dispatchedAt = previewNow();
       const inputToDispatchMs = Math.max(0, dispatchedAt - request.createdAt);
@@ -481,7 +487,7 @@ export function useImageProcessing(
       const { patchResidency } = useEditorStore.getState();
       const residency = patchResidency.snapshot();
       const { newlySentPatchIds, payload } = preparedPayloadCacheRef.current.prepare(request.snapshot, residency);
-      const jobId = ++previewJobIdRef.current;
+      const jobId = coordinatorIdentity?.operationId ?? request.requestId;
       let operation: AppOperationContext | null = null;
 
       try {
@@ -599,7 +605,6 @@ export function useImageProcessing(
           return;
         }
 
-        latestRenderedJobIdRef.current = jobId;
         const prefix = new TextDecoder().decode(buffer.slice(0, 11));
         if (prefix === 'WGPU_RENDER') {
           if (request.dragging) {
@@ -816,8 +821,7 @@ export function useImageProcessing(
       clearInteractivePatch,
       isPreviewRequestCurrent,
       isWaveformVisible,
-      latestRenderedJobIdRef,
-      previewJobIdRef,
+      previewCoordinator,
       selectedProofRecipe,
       setEditor,
       synchronizePreviewIdentity,
@@ -890,8 +894,8 @@ export function useImageProcessing(
           type: 'render-inputs-changed',
         });
         const coordinatorIdentity = transition.state.interactive.identity;
-        if (coordinatorIdentity !== undefined)
-          previewCoordinatorOperationsRef.current.set(requestId, coordinatorIdentity);
+        if (coordinatorIdentity === undefined || !previewCoordinator.bindRequest(requestId, coordinatorIdentity))
+          return;
         interactiveSchedulerRef.current?.schedule({
           snapshot: useEditorStore.getState().adjustmentSnapshot,
           createdAt,
@@ -910,8 +914,8 @@ export function useImageProcessing(
           type: 'render-inputs-changed',
         });
         const coordinatorIdentity = transition.state.settled.identity;
-        if (coordinatorIdentity !== undefined)
-          previewCoordinatorOperationsRef.current.set(requestId, coordinatorIdentity);
+        if (coordinatorIdentity === undefined || !previewCoordinator.bindRequest(requestId, coordinatorIdentity))
+          return;
         interactiveSchedulerRef.current?.clear();
         void executeApplyAdjustments({
           snapshot: useEditorStore.getState().adjustmentSnapshot,
@@ -931,6 +935,7 @@ export function useImageProcessing(
       clearInteractivePatch,
       executeApplyAdjustments,
       dispatchPreviewCoordinator,
+      previewCoordinator,
       resolveQualityDecision,
       previewSessionIdentity,
       selectedImage?.isReady,
