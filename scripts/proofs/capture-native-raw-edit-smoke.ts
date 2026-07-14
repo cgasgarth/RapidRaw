@@ -6,7 +6,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { rawOpenEditExportProofReportSchema } from '../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+import { rawOpenEditExportRunReportSchema } from '../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 
 const DEFAULT_ALASKA_RAW_DIR = '/Users/cgas/Pictures/Capture One/Alaska';
@@ -106,7 +106,7 @@ await runRequired('native RAW edit runtime proof', proofCommand, {
 });
 
 const workflowReportPath = join(outputDir, `${slugFromFixtureId(fixtureId)}-workflow-report.json`);
-const workflowReport = rawOpenEditExportProofReportSchema.parse(JSON.parse(await readFile(workflowReportPath, 'utf8')));
+const workflowReport = rawOpenEditExportRunReportSchema.parse(JSON.parse(await readFile(workflowReportPath, 'utf8')));
 const outputMetadata = await readOutputMetadata(workflowReport.artifacts);
 const sourceRawHash = await sha256File(linkedSourcePath);
 const scenarioReport = {
