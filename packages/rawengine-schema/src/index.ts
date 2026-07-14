@@ -19,6 +19,7 @@ export * from './editDocumentV2.js';
 export * from './editGraphMigrations.js';
 export * from './exportColorCapabilities.js';
 export * from './exportRecipeSchemas.js';
+export * from './film/filmEmulationOperationSchemas.js';
 export * from './film/filmEmulationSchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';
