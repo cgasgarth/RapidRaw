@@ -43,6 +43,14 @@ import {
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
+import {
+  createPreviewCoordinatorState,
+  type PreviewCoordinatorEvent,
+  type PreviewCoordinatorState,
+  type PreviewOperationIdentity,
+  type PreviewSessionIdentity,
+  reducePreviewCoordinator,
+} from '../../utils/previewCoordinator';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
@@ -200,6 +208,46 @@ export function useImageProcessing(
     (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
   >(() => null);
   const previewQualityControllerRef = useRef(new AdaptivePreviewQualityController());
+  const previewCoordinatorStateRef = useRef<PreviewCoordinatorState>(createPreviewCoordinatorState());
+  const previewCoordinatorOperationsRef = useRef(new Map<number, PreviewOperationIdentity>());
+  const displayResourceGenerationRef = useRef(1);
+
+  const dispatchPreviewCoordinator = useCallback((event: PreviewCoordinatorEvent) => {
+    const transition = reducePreviewCoordinator(previewCoordinatorStateRef.current, event);
+    previewCoordinatorStateRef.current = transition.state;
+    const cancelledIds = new Set(
+      transition.effects.filter((effect) => effect.type === 'cancel').map((effect) => effect.identity.operationId),
+    );
+    if (cancelledIds.size > 0) {
+      for (const [requestId, identity] of previewCoordinatorOperationsRef.current) {
+        if (cancelledIds.has(identity.operationId)) previewCoordinatorOperationsRef.current.delete(requestId);
+      }
+    }
+    return transition;
+  }, []);
+
+  const previewSessionIdentity = useCallback(
+    (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
+      const positive = (value: number): number => Math.max(1, Math.round(value));
+      return {
+        adjustmentRevision: positive(scope.adjustmentRevision),
+        backend: scope.backend,
+        displayGeneration: positive(displayResourceGenerationRef.current),
+        geometryRevision: positive(Number(scope.geometryIdentity)),
+        imageSessionId: positive(scope.imageSessionId),
+        maskRevision: positive(scope.maskRevision),
+        patchRevision: positive(scope.patchRevision),
+        proofRevision: positive(scope.proofRevision),
+        roiFingerprint: JSON.stringify(roi ?? [0, 0, 1, 1]),
+        sourceImagePath: scope.sourceImagePath,
+        sourceRevision: positive(scope.imageSessionId),
+        targetHeight: positive(targetRes),
+        targetWidth: positive(targetRes),
+        viewportRevision: positive(scope.viewportIdentity),
+      };
+    },
+    [],
+  );
 
   const clearInteractivePatch = useCallback(() => {
     setEditor({ interactivePatch: null });
@@ -370,6 +418,28 @@ export function useImageProcessing(
   const executeApplyAdjustments = useCallback(
     async (request: PreviewRenderRequest) => {
       if (!isPreviewRequestCurrent(request)) return;
+      const coordinatorIdentity = previewCoordinatorOperationsRef.current.get(request.requestId);
+      if (coordinatorIdentity !== undefined) {
+        dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-started' });
+      }
+      const completeCoordinatorOperation = (url?: string) => {
+        if (coordinatorIdentity === undefined) return;
+        if (url === undefined) {
+          dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-completed' });
+        } else {
+          dispatchPreviewCoordinator({
+            artifact: { identity: coordinatorIdentity, url },
+            identity: coordinatorIdentity,
+            type: 'operation-completed',
+          });
+        }
+        previewCoordinatorOperationsRef.current.delete(request.requestId);
+      };
+      const failCoordinatorOperation = (error: unknown) => {
+        if (coordinatorIdentity === undefined) return;
+        dispatchPreviewCoordinator({ error: String(error), identity: coordinatorIdentity, type: 'operation-failed' });
+        previewCoordinatorOperationsRef.current.delete(request.requestId);
+      };
       const dispatchedAt = previewNow();
       const inputToDispatchMs = Math.max(0, dispatchedAt - request.createdAt);
       const publishQualityStatus = (phase: PreviewQualityStatus['phase'], quality = request.quality) => {
@@ -494,6 +564,7 @@ export function useImageProcessing(
         }
 
         if (buffer.byteLength === 0) {
+          completeCoordinatorOperation();
           if (operation) logAppOperationSuccess(operation, { byteLength: 0, droppedReason: 'empty_buffer', jobId });
           publishQualityStatus('degraded_limited', {
             ...request.quality,
@@ -530,6 +601,7 @@ export function useImageProcessing(
             tier: request.quality.tier,
           });
           if (operation) logAppOperationSuccess(operation, { backend: 'wgpu', byteLength: buffer.byteLength, jobId });
+          completeCoordinatorOperation();
           return;
         }
 
@@ -619,6 +691,7 @@ export function useImageProcessing(
             renderMs,
             tier: request.quality.tier,
           });
+          completeCoordinatorOperation(url);
           return;
         }
 
@@ -675,6 +748,7 @@ export function useImageProcessing(
           tier: request.quality.tier,
         });
         clearInteractivePatch();
+        completeCoordinatorOperation(url);
         if (operation) {
           logAppOperationSuccess(operation, {
             byteLength: buffer.byteLength,
@@ -692,6 +766,7 @@ export function useImageProcessing(
           logAppOperationSuccess(operation, { droppedReason: 'superseded', jobId });
         }
         if (!expectedSupersession && isPreviewRequestCurrent(request)) {
+          failCoordinatorOperation(err);
           clearInteractivePatch();
           publishQualityStatus('degraded_limited', {
             ...request.quality,
@@ -726,9 +801,30 @@ export function useImageProcessing(
   useEffect(
     () => () => {
       interactiveSchedulerRef.current?.dispose();
+      dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
     },
-    [],
+    [dispatchPreviewCoordinator],
   );
+
+  useEffect(() => {
+    if (!selectedImage?.isReady) {
+      dispatchPreviewCoordinator({ reason: 'image-not-ready', type: 'cancel-session' });
+      return;
+    }
+    const scopeSnapshot = interactiveScopeRef.current(appSettings?.editorPreviewResolution ?? 1920, null);
+    if (scopeSnapshot === null) return;
+    dispatchPreviewCoordinator({
+      session: previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.scope.targetResolution, scopeSnapshot.roi),
+      type: 'image-session-installed',
+    });
+  }, [
+    appSettings?.editorPreviewResolution,
+    dispatchPreviewCoordinator,
+    previewSessionIdentity,
+    selectedImage?.path,
+    selectedImage?.isReady,
+    imageSessionId,
+  ]);
 
   useEffect(() => {
     previewQualityControllerRef.current.reset();
@@ -744,9 +840,19 @@ export function useImageProcessing(
       const synchronized = synchronizePreviewIdentity(normalizedTargetRes, quality.effectiveRoi);
       if (!synchronized) return;
       const createdAt = previewNow();
+      const coordinatorSession = previewSessionIdentity(synchronized.scope, normalizedTargetRes, synchronized.roi);
 
       if (dragging) {
         const requestId = ++latestInteractiveRequestIdRef.current;
+        const transition = dispatchPreviewCoordinator({
+          identity: coordinatorSession,
+          kind: 'interactive',
+          reason: 'interactive-inputs-changed',
+          type: 'render-inputs-changed',
+        });
+        const coordinatorIdentity = transition.state.interactive.identity;
+        if (coordinatorIdentity !== undefined)
+          previewCoordinatorOperationsRef.current.set(requestId, coordinatorIdentity);
         interactiveSchedulerRef.current?.schedule({
           snapshot: useEditorStore.getState().adjustmentSnapshot,
           createdAt,
@@ -757,7 +863,16 @@ export function useImageProcessing(
           targetRes: normalizedTargetRes,
         });
       } else {
-        latestInteractiveRequestIdRef.current += 1;
+        const requestId = ++latestInteractiveRequestIdRef.current;
+        const transition = dispatchPreviewCoordinator({
+          identity: coordinatorSession,
+          kind: 'settled',
+          reason: scopeRecovery ? 'scope-recovery' : 'settled-inputs-changed',
+          type: 'render-inputs-changed',
+        });
+        const coordinatorIdentity = transition.state.settled.identity;
+        if (coordinatorIdentity !== undefined)
+          previewCoordinatorOperationsRef.current.set(requestId, coordinatorIdentity);
         interactiveSchedulerRef.current?.clear();
         clearInteractivePatch();
         void executeApplyAdjustments({
@@ -767,7 +882,7 @@ export function useImageProcessing(
           identity: interactiveGenerationRef.current.supersede(synchronized.scope),
           quality,
           roi: synchronized.roi,
-          requestId: latestInteractiveRequestIdRef.current,
+          requestId,
           scopeRecovery,
           targetRes: normalizedTargetRes,
         });
@@ -777,7 +892,9 @@ export function useImageProcessing(
       appSettings?.editorPreviewResolution,
       clearInteractivePatch,
       executeApplyAdjustments,
+      dispatchPreviewCoordinator,
       resolveQualityDecision,
+      previewSessionIdentity,
       selectedImage?.isReady,
       synchronizePreviewIdentity,
     ],
@@ -791,7 +908,6 @@ export function useImageProcessing(
     applyAdjustments(adjustments, false, undefined, true);
   }, [adjustments, applyAdjustments, previewScopeRecoveryRequestId]);
 
-  const displayResourceGenerationRef = useRef(0);
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | undefined;
@@ -804,6 +920,10 @@ export function useImageProcessing(
       )
         return;
       displayResourceGenerationRef.current = parsed.data.displayResourceGeneration;
+      dispatchPreviewCoordinator({
+        generation: parsed.data.displayResourceGeneration,
+        type: 'display-generation-changed',
+      });
       applyAdjustments(useEditorStore.getState().adjustments, false);
     }).then((stop) => {
       if (active) unlisten = stop;
@@ -813,7 +933,7 @@ export function useImageProcessing(
       active = false;
       unlisten?.();
     };
-  }, [applyAdjustments]);
+  }, [applyAdjustments, dispatchPreviewCoordinator]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
