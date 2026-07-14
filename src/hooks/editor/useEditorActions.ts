@@ -25,6 +25,7 @@ import {
   hasBasicToneAdjustmentChange,
 } from '../../utils/basicToneCommandBridge';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
+import { EditorPersistenceAuthorityLedger } from '../../utils/editorPersistenceAuthority';
 import {
   type EditorZoomCommand,
   getEditorZoomDpr,
@@ -46,19 +47,44 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);
 }, 500);
 
+const editorPersistenceLedger = new EditorPersistenceAuthorityLedger();
+let editorPersistenceAuthorityEpoch = 0;
+
 export const debouncedSave = debounce(
   (path: string, adjustmentsToSave: Adjustments, transaction?: EditTransactionPersistenceContext) => {
-    invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
-      path,
-      adjustments: adjustmentsToSave,
-      transaction,
-    }).catch((err: unknown) => {
-      console.error('Auto-save failed:', err);
-      toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
-    });
+    void editorPersistenceLedger
+      .track(
+        path,
+        adjustmentsToSave,
+        invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
+          path,
+          adjustments: adjustmentsToSave,
+          transaction,
+        }),
+      )
+      .catch((err: unknown) => {
+        console.error('Auto-save failed:', err);
+        toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
+      });
   },
   300,
 );
+
+export const beginEditorPersistenceAuthorityBarrier = (): number => {
+  editorPersistenceAuthorityEpoch += 1;
+  debouncedSave.cancel();
+  return editorPersistenceAuthorityEpoch;
+};
+
+export const isEditorPersistenceAuthorityCurrent = (epoch: number): boolean =>
+  epoch === editorPersistenceAuthorityEpoch;
+
+export const getEditorPersistenceAuthorityEpoch = (): number => editorPersistenceAuthorityEpoch;
+
+export const awaitMatchingEditorSave = async (
+  path: string,
+  adjustments: Adjustments,
+): Promise<{ path: string; sidecarRevision: string } | null> => editorPersistenceLedger.receiptFor(path, adjustments);
 
 type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
 

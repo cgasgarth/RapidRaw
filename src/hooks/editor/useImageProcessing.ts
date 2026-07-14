@@ -66,7 +66,11 @@ import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMat
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
-import { debouncedSave } from './useEditorActions';
+import {
+  debouncedSave,
+  getEditorPersistenceAuthorityEpoch,
+  isEditorPersistenceAuthorityCurrent,
+} from './useEditorActions';
 
 interface PreviousAdjustments {
   adjustments: Adjustments;
@@ -1289,18 +1293,27 @@ export function useImageProcessing(
     }
     if (persistence.action === 'unchanged') return;
 
+    const persistenceAuthorityEpoch = getEditorPersistenceAuthorityEpoch();
     persistIdleTimer.current = scheduleAdjustmentPersistenceAfterInteraction(
       persistIdleTimer.current,
       isSliderDragging,
       () => {
+        if (!isEditorPersistenceAuthorityCurrent(persistenceAuthorityEpoch)) return;
         if (useEditorStore.getState().imageSessionId !== imageSessionId) return;
-        const transaction =
+        const currentReceipt =
           lastEditApplicationReceipt &&
           lastEditApplicationReceipt.imageSessionId ===
             (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
           lastEditApplicationReceipt.adjustmentRevision === canonicalAdjustmentRevision
-            ? buildEditTransactionPersistenceContext(lastEditApplicationReceipt, lastEditApplicationReceipt)
-            : undefined;
+            ? lastEditApplicationReceipt
+            : null;
+        if (currentReceipt?.persistence === 'native-committed') {
+          prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: committedAdjustments };
+          return;
+        }
+        const transaction = currentReceipt
+          ? buildEditTransactionPersistenceContext(currentReceipt, currentReceipt)
+          : undefined;
         debouncedSave(selectedImage.path, committedAdjustments, transaction);
         useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 

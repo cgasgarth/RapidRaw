@@ -528,17 +528,28 @@ const ImageCanvas = memo(
     });
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
-    const acknowledgeBasePreviewUrl = useCallback((url: string) => {
-      presentedPreviewReleaseCoordinator.acknowledge('base', url);
+    const releasePresentedPreviewUrl = useCallback((url: string) => {
+      // The cache may retain an outgoing surface for instant A -> B -> A reuse.
+      // Its eviction path owns revocation until get() transfers ownership back.
+      if (!globalImageCache.isProtected(url)) URL.revokeObjectURL(url);
     }, []);
-    const acknowledgeOriginalPreviewUrl = useCallback((url: string) => {
-      presentedPreviewReleaseCoordinator.acknowledge('original', url);
-    }, []);
+    const acknowledgeBasePreviewUrl = useCallback(
+      (url: string) => {
+        presentedPreviewReleaseCoordinator.acknowledge('base', url, releasePresentedPreviewUrl);
+      },
+      [releasePresentedPreviewUrl],
+    );
+    const acknowledgeOriginalPreviewUrl = useCallback(
+      (url: string) => {
+        presentedPreviewReleaseCoordinator.acknowledge('original', url, releasePresentedPreviewUrl);
+      },
+      [releasePresentedPreviewUrl],
+    );
     useEffect(
       () => () => {
-        presentedPreviewReleaseCoordinator.cancel();
+        presentedPreviewReleaseCoordinator.cancel(releasePresentedPreviewUrl);
       },
-      [],
+      [releasePresentedPreviewUrl],
     );
 
     const retainPreviewLayerUrl = useCallback(

@@ -3601,6 +3601,7 @@ pub fn run() {
             file_management::get_or_create_internal_library_root,
             file_management::reset_adjustments_for_paths,
             file_management::apply_auto_adjustments_to_paths,
+            file_management::commit_batch_auto_adjustment,
             presets::handle_import_presets_from_file,
             presets::handle_import_legacy_presets_from_file,
             presets::handle_export_presets_to_file,

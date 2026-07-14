@@ -14,7 +14,7 @@ export type EditMutationSource =
   | 'migration';
 
 export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'none' | 'reset';
-export type EditTransactionPersistence = 'commit' | 'preview-only';
+export type EditTransactionPersistence = 'commit' | 'native-committed' | 'preview-only';
 
 /**
  * Operations intentionally describe adjustment intent rather than a store update.
@@ -58,6 +58,7 @@ export interface EditApplicationReceipt {
   baseAdjustmentRevision: number;
   adjustmentRevision: number;
   changedKeys: readonly string[];
+  persistence: EditTransactionPersistence;
 }
 
 export interface EditTransactionPersistenceContext {
@@ -149,6 +150,7 @@ export const reduceEditTransaction = (
       baseAdjustmentRevision: currentAdjustmentRevision,
       adjustmentRevision: nextAdjustmentRevision,
       changedKeys: keys,
+      persistence: request.persistence,
     },
   };
 };

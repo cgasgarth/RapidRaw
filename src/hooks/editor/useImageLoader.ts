@@ -14,6 +14,7 @@ import { hydrateImageOpenAdjustments } from '../../utils/imageOpenAdjustmentHydr
 import { beginImageOpenWithSchema } from '../../utils/imageOpenInvokes';
 import { isImageOpenUpdateCurrent } from '../../utils/imageOpenPhaseCurrentness';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
+import { isNativeCommittedHydrationSession } from '../../utils/nativeCommittedHydrationAuthority';
 import {
   consumePendingNegativeConversionDustHealLayers,
   consumePendingNegativeConversionSavedPositiveHandoff,
@@ -41,6 +42,7 @@ export function useImageLoader() {
       let unlisten: (() => void) | undefined;
       const publishMetadataPhase = (metadata: ReturnType<typeof parseImageOpenUpdate> & { phase: 'metadataReady' }) => {
         if (!isEditorImageSessionCurrent(sessionId) || metadata.path !== selectedImagePath) return;
+        if (isNativeCommittedHydrationSession(sessionId)) return;
         acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
         const hydratedAdjustments = hydrateImageOpenAdjustments(metadata.metadata, selectedImagePath);
         setEditor({ adjustments: hydratedAdjustments });
@@ -114,9 +116,10 @@ export function useImageLoader() {
             selectedImagePath,
             openResult.metadataFingerprint,
           );
-          const decodedAdjustments = shouldHydrateDecodedMetadata
-            ? hydrateImageOpenAdjustments(loadedMetadata, selectedImagePath)
-            : null;
+          const decodedAdjustments =
+            shouldHydrateDecodedMetadata && !isNativeCommittedHydrationSession(sessionId)
+              ? hydrateImageOpenAdjustments(loadedMetadata, selectedImagePath)
+              : null;
 
           const { width, height } = loadImageResult;
           upsertReopenedDerivedOutputReceipt({

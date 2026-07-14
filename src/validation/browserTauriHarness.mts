@@ -53,6 +53,9 @@ declare global {
       failNextSettingsSave: boolean;
       originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
       revokedObjectUrls: Array<string>;
+      batchAutoAdjustCommitDelayMs: number;
+      batchAutoAdjustPrepareDelayMs: number;
+      imageOpenDelayMs: number;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
       callIndex: number;
@@ -78,6 +81,8 @@ const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === 
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'analyzeAutoEdit'
+  | 'applyAutoAdjustmentsToPaths'
+  | 'commitBatchAutoAdjustment'
   | 'applyAutoEditProposal'
   | 'cancelAutoEditAnalysis'
   | 'cancelThumbnailGeneration'
@@ -93,6 +98,7 @@ const commandNames: Record<
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
+  | 'applyAdjustmentsToPaths'
   | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
   | 'getLogFilePath'
@@ -133,9 +139,12 @@ const commandNames: Record<
   string
 > = {
   analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
+  applyAutoAdjustmentsToPaths: Invokes.ApplyAutoAdjustmentsToPaths,
+  commitBatchAutoAdjustment: Invokes.CommitBatchAutoAdjustment,
   applyAutoEditProposal: Invokes.ApplyAutoEditProposal,
   beginImageOpen: Invokes.BeginImageOpen,
   applyAdjustments: Invokes.ApplyAdjustments,
+  applyAdjustmentsToPaths: Invokes.ApplyAdjustmentsToPaths,
   applyLibraryCatalogChanges: Invokes.ApplyLibraryCatalogChanges,
   configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
@@ -210,6 +219,8 @@ const eventListeners = new Map<string, Set<number>>();
 let folderRevision = 1;
 let catalogCursor = 0;
 let catalogPageSize = 256;
+let batchAutoAdjustInvocation = 0;
+const harnessAdjustmentsByPath = new Map<string, unknown>();
 let harnessImages: BrowserHarnessImage[] = [
   {
     exif: null,
@@ -267,10 +278,13 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    batchAutoAdjustCommitDelayMs: 0,
+    batchAutoAdjustPrepareDelayMs: 0,
     calls,
     emitEvent,
     enabled: true,
     failNextSettingsSave: false,
+    imageOpenDelayMs: 250,
     originalPreviewResponses: [],
     revokedObjectUrls: [],
   };
@@ -279,7 +293,8 @@ export const installBrowserTauriHarness = (): void => {
     unregisterListener: () => {},
   };
   window.__TAURI_INTERNALS__ = {
-    convertFileSrc: (filePath) => filePath,
+    convertFileSrc: (filePath) =>
+      filePath.startsWith(browserHarnessRoot) ? `data:image/jpeg;base64,${harnessPreviewJpegBase64}` : filePath,
     invoke: (command, args, options) => {
       const call: BrowserTauriInvokeCall = {
         args,
@@ -342,6 +357,60 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             target: 'scene_global_color_tone',
           },
         ],
+      });
+    }
+    case commandNames.applyAutoAdjustmentsToPaths: {
+      const paths = getStringArrayArg(args, 'paths');
+      const deferPath = getStringArg(args, 'deferPath');
+      batchAutoAdjustInvocation += 1;
+      const exposure = Number((0.6 + batchAutoAdjustInvocation * 0.05).toFixed(2));
+      const results = paths.map((path, index) => ({
+        contract: 'rapidraw.batch_auto_adjust.v1',
+        path,
+        receipt: {
+          baseAdjustmentDocumentRevision: `sha256:${'a'.repeat(64)}`,
+          adjustmentDocumentRevision: `sha256:${String(index + 1)
+            .repeat(64)
+            .slice(0, 64)}`,
+          adjustments: { contrast: 12, exposure },
+          engine: 'rapidraw.legacy_auto_adjust.v1',
+          renderFingerprint: `u64:${String(index + 1)
+            .repeat(16)
+            .slice(0, 16)}`,
+          sourceIdentity: path,
+          sourceRevision: `source-revision-v1:${String(index + 1)
+            .repeat(64)
+            .slice(0, 64)}`,
+          thumbnailRevision: `browser-harness-auto-adjust-thumbnail-${String(index + 1)}`,
+          transactionId: `blake3:browser-harness-batch-auto-adjust-${String(index + 1)}`,
+        },
+        status: path === deferPath ? 'prepared' : 'applied',
+      }));
+      return new Promise((resolve) => {
+        window.setTimeout(
+          () => resolve(results),
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.batchAutoAdjustPrepareDelayMs ?? 0,
+        );
+      });
+    }
+    case commandNames.commitBatchAutoAdjustment: {
+      const request = args?.['request'] as { path?: string; receipt?: Record<string, unknown> } | undefined;
+      const delayMs = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.batchAutoAdjustCommitDelayMs ?? 0;
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          if (request?.path && request.receipt?.['adjustments']) {
+            harnessAdjustmentsByPath.set(request.path, structuredClone(request.receipt['adjustments']));
+          }
+          resolve({
+            contract: 'rapidraw.batch_auto_adjust.v1',
+            path: request?.path,
+            receipt: {
+              ...request?.receipt,
+              adjustmentDocumentRevision: `sha256:${'b'.repeat(64)}`,
+            },
+            status: 'applied',
+          });
+        }, delayMs);
       });
     }
     case commandNames.previewAutoEditProposal: {
@@ -418,8 +487,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.updateThumbnailQueue:
     case commandNames.cancelThumbnailGeneration:
     case commandNames.clearSessionCaches:
-    case commandNames.saveMetadataAndUpdateThumbnail:
+    case commandNames.applyAdjustmentsToPaths:
       return Promise.resolve(null);
+    case commandNames.saveMetadataAndUpdateThumbnail: {
+      const path = getStringArg(args, 'path') ?? `${browserHarnessRoot}/browser-harness.ARW`;
+      if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
+      return Promise.resolve({
+        path,
+        sidecarRevision: `sha256:${'a'.repeat(64)}`,
+      });
+    }
     case commandNames.exportImages:
       dispatchBrowserHarnessEvent('export-complete', createHarnessExportReceipt(args));
       return Promise.resolve(null);
@@ -506,7 +583,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.isImageCached:
       return Promise.resolve(false);
     case commandNames.loadMetadata:
-      return Promise.resolve({ adjustments: null });
+      return Promise.resolve({ adjustments: harnessAdjustmentsByPath.get(getStringArg(args, 'path') ?? '') ?? null });
     case commandNames.loadPresets:
       return Promise.resolve([]);
     case commandNames.loadImage:
@@ -527,7 +604,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },
         height: agentAuditE2eEnabled ? 4 : 768,
         is_raw: true,
-        metadata: { adjustments: null, harness: true },
+        metadata: { adjustments: harnessAdjustmentsByPath.get(request.path ?? '') ?? null, harness: true },
         width: agentAuditE2eEnabled ? 4 : 1024,
       };
       dispatchBrowserHarnessEvent('image-open-update', {
@@ -561,7 +638,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             metadataReadyMillis: 1,
             sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
           });
-        }, 250);
+        }, window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.imageOpenDelayMs ?? 250);
       });
     }
     case commandNames.scheduleImagePrefetch:

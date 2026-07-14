@@ -352,6 +352,7 @@ export default function EditorView({
           : 'editor-desktop-workspace grid grid-cols-[minmax(0,1fr)_auto] overflow-hidden',
       )}
       data-editor-resizing={isCompactPortrait ? undefined : String(isResizing)}
+      data-selected-image-path={selectedImage?.path}
       data-editor-shell={isCompactPortrait ? 'compact' : 'desktop'}
       data-testid="editor-workspace"
       data-viewer-lights-out={lightsOutLevel}
