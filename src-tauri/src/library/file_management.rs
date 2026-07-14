@@ -2242,6 +2242,35 @@ pub struct MetadataSaveReceipt {
     pub render_fingerprint: u64,
     pub thumbnail_revision: String,
     pub catalog_revision: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transaction_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adjustment_revision: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditTransactionPersistenceContext {
+    pub transaction_id: String,
+    pub image_session_id: String,
+    pub base_adjustment_revision: u64,
+    pub next_adjustment_revision: u64,
+}
+
+impl EditTransactionPersistenceContext {
+    fn validate(&self) -> Result<(), String> {
+        if self.transaction_id.trim().is_empty() || self.image_session_id.trim().is_empty() {
+            return Err("Edit transaction persistence requires non-empty identity fields".into());
+        }
+        if self.next_adjustment_revision <= self.base_adjustment_revision {
+            return Err(
+                "Edit transaction persistence requires a promoted adjustment revision".into(),
+            );
+        }
+        Ok(())
+    }
 }
 
 fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveReceipt {
@@ -2258,7 +2287,22 @@ fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveRe
         render_fingerprint: u64::from_le_bytes(fingerprint_bytes),
         thumbnail_revision,
         catalog_revision: None,
+        transaction_id: None,
+        image_session_id: None,
+        adjustment_revision: None,
     }
+}
+
+fn metadata_save_receipt_for_transaction(
+    path: &str,
+    metadata: &ImageMetadata,
+    transaction: &EditTransactionPersistenceContext,
+) -> MetadataSaveReceipt {
+    let mut receipt = metadata_save_receipt(path, metadata);
+    receipt.transaction_id = Some(transaction.transaction_id.clone());
+    receipt.image_session_id = Some(transaction.image_session_id.clone());
+    receipt.adjustment_revision = Some(transaction.next_adjustment_revision);
+    receipt
 }
 
 fn submit_thumbnail_invalidation(
@@ -2298,9 +2342,13 @@ fn submit_thumbnail_invalidation(
 pub fn save_metadata_and_update_thumbnail(
     path: String,
     adjustments: Value,
+    transaction: Option<EditTransactionPersistenceContext>,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<MetadataSaveReceipt, String> {
+    if let Some(transaction) = transaction.as_ref() {
+        transaction.validate()?;
+    }
     let (source_path, sidecar_path) = parse_virtual_path(&path);
 
     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -2335,7 +2383,10 @@ pub fn save_metadata_and_update_thumbnail(
         sync_metadata_to_xmp(&source_path, &metadata, create_if_missing);
     }
 
-    let receipt = metadata_save_receipt(&path, &metadata);
+    let receipt = transaction.as_ref().map_or_else(
+        || metadata_save_receipt(&path, &metadata),
+        |transaction| metadata_save_receipt_for_transaction(&path, &metadata, transaction),
+    );
     submit_thumbnail_invalidation(&state, &app_handle, &receipt);
     Ok(receipt)
 }
@@ -4142,6 +4193,41 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
+
+    #[test]
+    fn edit_transaction_persistence_context_requires_revision_promotion() {
+        let valid = EditTransactionPersistenceContext {
+            transaction_id: "tx-1".into(),
+            image_session_id: "session-1".into(),
+            base_adjustment_revision: 3,
+            next_adjustment_revision: 4,
+        };
+        assert!(valid.validate().is_ok());
+        let mut stale = valid.clone();
+        stale.next_adjustment_revision = stale.base_adjustment_revision;
+        assert!(stale.validate().is_err());
+        let mut missing_identity = valid;
+        missing_identity.transaction_id.clear();
+        assert!(missing_identity.validate().is_err());
+    }
+
+    #[test]
+    fn transaction_receipt_carries_commit_identity_without_changing_legacy_shape() {
+        let metadata = ImageMetadata::default();
+        let context = EditTransactionPersistenceContext {
+            transaction_id: "tx-2".into(),
+            image_session_id: "session-2".into(),
+            base_adjustment_revision: 7,
+            next_adjustment_revision: 8,
+        };
+        let receipt = metadata_save_receipt_for_transaction("image.raf", &metadata, &context);
+        assert_eq!(receipt.transaction_id.as_deref(), Some("tx-2"));
+        assert_eq!(receipt.image_session_id.as_deref(), Some("session-2"));
+        assert_eq!(receipt.adjustment_revision, Some(8));
+        let legacy = metadata_save_receipt("image.raf", &metadata);
+        assert!(legacy.transaction_id.is_none());
+        assert!(legacy.adjustment_revision.is_none());
+    }
 
     #[test]
     fn thumbnail_artifact_identity_tracks_technical_white_balance() {

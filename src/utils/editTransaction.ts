@@ -35,13 +35,46 @@ export interface EditTransactionRequest {
 
 export interface EditTransactionResult {
   transactionId: string;
+  imageSessionId: string;
   source: EditMutationSource;
   before: Adjustments;
   after: Adjustments;
   changedKeys: readonly string[];
   nextAdjustmentRevision: number;
   noOp: boolean;
+  invalidatedStages: readonly EditInvalidationStage[];
+  invalidatedProvenance: readonly string[];
+  applicationReceipt: EditApplicationReceipt;
 }
+
+export type EditInvalidationStage = 'preview' | 'navigator' | 'thumbnail' | 'geometry';
+
+export interface EditApplicationReceipt {
+  transactionId: string;
+  imageSessionId: string;
+  source: EditMutationSource;
+  baseAdjustmentRevision: number;
+  adjustmentRevision: number;
+  changedKeys: readonly string[];
+}
+
+export interface EditTransactionPersistenceContext {
+  transactionId: string;
+  imageSessionId: string;
+  baseAdjustmentRevision: number;
+  nextAdjustmentRevision: number;
+}
+
+export const buildEditTransactionPersistenceContext = (
+  request: Pick<EditTransactionRequest, 'transactionId' | 'imageSessionId' | 'baseAdjustmentRevision'>,
+  result: Pick<EditTransactionResult, 'nextAdjustmentRevision'> | Pick<EditApplicationReceipt, 'adjustmentRevision'>,
+): EditTransactionPersistenceContext => ({
+  transactionId: request.transactionId,
+  imageSessionId: request.imageSessionId,
+  baseAdjustmentRevision: request.baseAdjustmentRevision,
+  nextAdjustmentRevision:
+    'nextAdjustmentRevision' in result ? result.nextAdjustmentRevision : result.adjustmentRevision,
+});
 
 const assertFinitePatch = (patch: Partial<Adjustments>): void => {
   for (const [key, value] of Object.entries(patch)) {
@@ -63,6 +96,7 @@ export const reduceEditTransaction = (
   before: Adjustments,
   currentAdjustmentRevision: number,
   request: EditTransactionRequest,
+  currentImageSessionId?: string,
 ): EditTransactionResult => {
   if (request.baseAdjustmentRevision !== currentAdjustmentRevision) {
     throw new Error(
@@ -70,6 +104,9 @@ export const reduceEditTransaction = (
     );
   }
   if (request.operations.length === 0) throw new Error('edit_transaction.empty_operations');
+  if (currentImageSessionId !== undefined && request.imageSessionId !== currentImageSessionId) {
+    throw new Error(`edit_transaction.stale_session:${request.imageSessionId}:${currentImageSessionId}`);
+  }
 
   let after = structuredClone(before);
   for (const operation of request.operations) {
@@ -82,13 +119,34 @@ export const reduceEditTransaction = (
   }
 
   const keys = changedKeys(before, after);
+  const invalidatedStages: EditInvalidationStage[] = keys.length === 0 ? [] : ['preview', 'navigator', 'thumbnail'];
+  if (
+    keys.some((key) =>
+      ['crop', 'rotation', 'orientationSteps', 'flipHorizontal', 'flipVertical', 'perspectiveCorrection'].includes(key),
+    )
+  ) {
+    invalidatedStages.push('geometry');
+  }
+  const invalidatedProvenance = keys.length === 0 ? [] : ['reference-match', 'auto-edit', 'derived-render'];
+  const nextAdjustmentRevision = currentAdjustmentRevision + (keys.length > 0 ? 1 : 0);
   return {
     transactionId: request.transactionId,
+    imageSessionId: request.imageSessionId,
     source: request.source,
     before,
     after,
     changedKeys: keys,
-    nextAdjustmentRevision: currentAdjustmentRevision + (keys.length > 0 ? 1 : 0),
+    nextAdjustmentRevision,
     noOp: keys.length === 0,
+    invalidatedStages,
+    invalidatedProvenance,
+    applicationReceipt: {
+      transactionId: request.transactionId,
+      imageSessionId: request.imageSessionId,
+      source: request.source,
+      baseAdjustmentRevision: currentAdjustmentRevision,
+      adjustmentRevision: nextAdjustmentRevision,
+      changedKeys: keys,
+    },
   };
 };

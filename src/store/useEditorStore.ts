@@ -39,6 +39,7 @@ import {
 } from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import {
+  type EditApplicationReceipt,
   type EditTransactionRequest,
   type EditTransactionResult,
   reduceEditTransaction,
@@ -157,6 +158,7 @@ interface EditorState {
   adjustmentRevision: number;
   /** Once published, this adjustment object graph is immutable for the lifetime of the snapshot. */
   adjustmentSnapshot: AdjustmentSnapshot;
+  lastEditApplicationReceipt: EditApplicationReceipt | null;
   imageSessionId: number;
   imageSession: EditorImageSession | null;
   viewportRevision: number;
@@ -362,6 +364,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   adjustments: initialAdjustments,
   adjustmentRevision: 0,
   adjustmentSnapshot: initialAdjustmentSnapshot,
+  lastEditApplicationReceipt: null,
   imageSessionId: 1,
   imageSession: null,
   viewportRevision: 1,
@@ -449,6 +452,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         update.referenceMatchPreview = null;
         update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+        update.lastEditApplicationReceipt = null;
         Object.assign(
           update,
           resolveAiSelectionState(state, update.adjustments, {
@@ -539,7 +543,13 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (request.persistence === 'preview-only') {
         throw new Error('edit_transaction.preview_requires_proposal');
       }
-      const nextResult = reduceEditTransaction(state.adjustments, state.adjustmentRevision, request);
+      const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+      const nextResult = reduceEditTransaction(
+        state.adjustments,
+        state.adjustmentRevision,
+        request,
+        currentImageSessionId,
+      );
       result = nextResult;
       if (nextResult.noOp) return {};
       const nextHistory =
@@ -555,6 +565,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
+        lastEditApplicationReceipt: nextResult.applicationReceipt,
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,
