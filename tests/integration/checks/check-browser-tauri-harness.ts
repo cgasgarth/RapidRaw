@@ -178,24 +178,30 @@ try {
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
-  const previewCallsBeforeExposureEdit = await page.evaluate(
-    () =>
-      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter((call) => call.command === 'apply_adjustments').length ??
-      0,
-  );
-  const exposureRange = page.getByTestId('basic-control-exposure-range');
-  await exposureRange.waitFor({ timeout: 10_000 });
-  await exposureRange.evaluate((element) => {
-    const range = element as HTMLInputElement;
-    range.value = '0.75';
-    range.dispatchEvent(new Event('input', { bubbles: true }));
-    range.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  const exposureValue = page.getByTestId('basic-control-exposure-value');
+  await exposureValue.click();
+  const exposureInput = page.getByTestId('basic-control-exposure-input');
+  await exposureInput.fill('0.75');
+  await exposureInput.press('Enter');
+  await exposureValue.waitFor({ state: 'visible', timeout: 10_000 });
+  if ((await exposureValue.textContent())?.trim() !== '0.75') {
+    throw new Error('Exposure numeric control did not commit the requested value.');
+  }
   await page.waitForFunction(
-    (previousCallCount) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter((call) => call.command === 'apply_adjustments')
-        .length ?? 0) > previousCallCount,
-    previewCallsBeforeExposureEdit,
+    () => {
+      const request = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter((call) => call.command === 'apply_adjustments')
+        .at(-1)?.args?.['request'];
+      if (typeof request !== 'object' || request === null) return false;
+      const document = request['editDocumentV2'];
+      if (typeof document !== 'object' || document === null) return false;
+      const nodes = document['nodes'];
+      if (typeof nodes !== 'object' || nodes === null) return false;
+      const toneNode = nodes['scene_global_color_tone'];
+      if (typeof toneNode !== 'object' || toneNode === null) return false;
+      const params = toneNode['params'];
+      return typeof params === 'object' && params !== null && params['exposure'] === 0.75;
+    },
     { timeout: 10_000 },
   );
   const editDocumentPreviewProof = await page.evaluate(() => {
