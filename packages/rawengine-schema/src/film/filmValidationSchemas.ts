@@ -45,9 +45,29 @@ export const filmValidationThresholdsV1Schema = z
     identityDeltaE00: z.number().finite().nonnegative().max(1),
     monotonicTolerance: z.number().finite().nonnegative().max(0.01),
     grainRepeatTolerance: z.number().finite().nonnegative().max(0.1),
+    grainMeanDrift: z.number().finite().nonnegative().max(0.1),
+    grainVarianceMin: z.number().finite().positive().max(0.1),
+    grainVarianceMax: z.number().finite().positive().max(1),
+    grainCorrelationMin: z.number().finite().min(-1).max(1),
+    grainCorrelationMax: z.number().finite().min(-1).max(1),
+    grainFrequencyEnergyMin: z.number().finite().nonnegative().max(2),
+    grainFrequencyEnergyMax: z.number().finite().positive().max(4),
+    grainDensityVarianceRatioMin: z.number().finite().min(1).max(100),
     opticalLeakage: z.number().finite().nonnegative().max(0.1),
+    opticalEnergyMax: z.number().finite().positive().max(10),
+    opticalContinuityMaxStep: z.number().finite().positive().max(10),
+    opticalHalationRedRatioMin: z.number().finite().min(1).max(10),
+    opticalBloomNeutralDrift: z.number().finite().nonnegative().max(1),
   })
-  .strict();
+  .strict()
+  .superRefine((thresholds, context) => {
+    if (thresholds.grainVarianceMin >= thresholds.grainVarianceMax)
+      context.addIssue({ code: 'custom', message: 'Grain variance thresholds must be ordered.' });
+    if (thresholds.grainCorrelationMin >= thresholds.grainCorrelationMax)
+      context.addIssue({ code: 'custom', message: 'Grain correlation thresholds must be ordered.' });
+    if (thresholds.grainFrequencyEnergyMin >= thresholds.grainFrequencyEnergyMax)
+      context.addIssue({ code: 'custom', message: 'Grain frequency-energy thresholds must be ordered.' });
+  });
 
 export const filmValidationFixtureV1Schema = z
   .object({
@@ -175,6 +195,45 @@ export const filmNativeAnalyticReportV1Schema = z
   })
   .strict();
 
+export const filmNativeStochasticOpticalReportV1Schema = z
+  .object({
+    contract: z.literal('rapidraw.film_native_stochastic_optical_report.v1'),
+    fixtureId: filmValidationFixtureV1Schema.shape.id,
+    sourceSha256: sha256Schema,
+    profileRef: filmEmulationProfileRefV1Schema,
+    postFilmDomain: z.literal('acescg_linear_v1'),
+    grain: z
+      .object({
+        deterministicHash: sha256Schema,
+        repeatHash: sha256Schema,
+        meanResidual: rgbSchema,
+        varianceByChannel: rgbSchema,
+        densityVariance: rgbSchema,
+        channelCorrelation: rgbSchema,
+        adjacentCorrelation: rgbSchema,
+        frequencyEnergyRatio: rgbSchema,
+        tileMaxAbs: z.number().finite().nonnegative(),
+      })
+      .strict(),
+    optical: z
+      .object({
+        supportedSubset: z.literal('preblurred_scatter_kernel_v1'),
+        bypassMaxAbs: z.number().finite().nonnegative(),
+        subthresholdLeakage: z.number().finite().nonnegative(),
+        halationEnergy: z.number().finite().nonnegative(),
+        bloomEnergy: z.number().finite().nonnegative(),
+        halationRedRatio: z.number().finite().nonnegative(),
+        bloomNeutralDrift: z.number().finite().nonnegative(),
+        halationWeightedRadiusPx: z.number().finite().positive(),
+        bloomWeightedRadiusPx: z.number().finite().positive(),
+        continuityMaxStep: z.number().finite().nonnegative(),
+      })
+      .strict(),
+    passed: z.boolean(),
+    failures: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const filmValidationReportV1Schema = z
   .object({
     contract: z.literal('rapidraw.film_validation_report.v1'),
@@ -196,3 +255,4 @@ export type FilmValidationFixtureV1 = z.infer<typeof filmValidationFixtureV1Sche
 export type FilmValidationReportV1 = z.infer<typeof filmValidationReportV1Schema>;
 export type FilmAnalyticVectorSetV1 = z.infer<typeof filmAnalyticVectorSetV1Schema>;
 export type FilmNativeAnalyticReportV1 = z.infer<typeof filmNativeAnalyticReportV1Schema>;
+export type FilmNativeStochasticOpticalReportV1 = z.infer<typeof filmNativeStochasticOpticalReportV1Schema>;
