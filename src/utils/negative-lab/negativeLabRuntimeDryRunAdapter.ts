@@ -8,6 +8,7 @@ import {
 } from '../../../packages/rawengine-schema/src';
 import { negativeLabCmyTimingMetricsSchema } from '../../schemas/negative-lab/negativeLabCmyTimingSchemas';
 import type { NegativeLabCrosstalkProfile } from '../../schemas/negative-lab/negativeLabCrosstalkProfileSchemas';
+import { negativeLabNeutralAxisAnalysisSchema } from '../../schemas/negative-lab/negativeLabNeutralAxisSchemas';
 import { negativeLabOpticalFinishMetricsSchema } from '../../schemas/negative-lab/negativeLabOpticalFinishSchemas';
 import {
   negativeLabOutputTransformSchema,
@@ -232,6 +233,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       .optional(),
     opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
     cmyTimingMetrics: negativeLabCmyTimingMetricsSchema.optional(),
+    neutralAxisAnalysis: negativeLabNeutralAxisAnalysisSchema.optional(),
     flatLogMaster: z
       .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
       .strict()
@@ -323,6 +325,7 @@ const toRuntimePreviewRenderResult = (
     ...(artifact.detailFinishMetrics === undefined ? {} : { detailFinishMetrics: artifact.detailFinishMetrics }),
     ...(artifact.opticalFinishMetrics === undefined ? {} : { opticalFinishMetrics: artifact.opticalFinishMetrics }),
     ...(artifact.cmyTimingMetrics === undefined ? {} : { cmyTimingMetrics: artifact.cmyTimingMetrics }),
+    ...(artifact.neutralAxisAnalysis === undefined ? {} : { neutralAxisAnalysis: artifact.neutralAxisAnalysis }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
@@ -406,6 +409,17 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
           sign_convention?: 'positive_density_reduces_channel_exposure_v1';
         }
       | undefined;
+    neutral_axis?: {
+      algorithm_version?: 1;
+      enabled?: boolean;
+      strength?: number;
+      low_chroma_quantile?: number;
+      low_chroma_cap?: number;
+      min_support?: number;
+      confidence_threshold?: number;
+      allow_global_fallback?: boolean;
+      source?: string;
+    };
     color_finish?:
       | {
           algorithm_version: 1;
@@ -480,6 +494,21 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
                 transition_width: params.command.parameters.cmyTiming.transitionWidth,
                 source: params.command.parameters.cmyTiming.source,
                 sign_convention: params.command.parameters.cmyTiming.signConvention,
+              },
+            }
+          : {}),
+        ...(params.command.parameters.neutralAxis.enabled
+          ? {
+              neutral_axis: {
+                algorithm_version: params.command.parameters.neutralAxis.algorithmVersion,
+                enabled: params.command.parameters.neutralAxis.enabled,
+                strength: params.command.parameters.neutralAxis.strength,
+                low_chroma_quantile: params.command.parameters.neutralAxis.lowChromaQuantile,
+                low_chroma_cap: params.command.parameters.neutralAxis.lowChromaCap,
+                min_support: params.command.parameters.neutralAxis.minSupport,
+                confidence_threshold: params.command.parameters.neutralAxis.confidenceThreshold,
+                allow_global_fallback: params.command.parameters.neutralAxis.allowGlobalFallback,
+                source: params.command.parameters.neutralAxis.source,
               },
             }
           : {}),

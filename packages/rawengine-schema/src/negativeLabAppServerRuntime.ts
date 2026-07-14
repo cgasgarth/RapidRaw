@@ -79,6 +79,24 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     sampleCount: number;
     schemaVersion: 1;
   };
+  neutralAxisAnalysis?: {
+    algorithmId: 'native_negative_lab_neutral_axis_v1';
+    algorithmVersion: 1;
+    status: 'disabled_identity' | 'no_correction_low_confidence' | 'correction_applied';
+    fitMode: 'none' | 'quadratic_three_band_v1' | 'linear_two_band_v1' | 'global_one_band_v1';
+    confidence: number;
+    confidenceThreshold: number;
+    sampleCount: number;
+    bandSupport: [number, number, number];
+    bandReferences: [[number, number, number], [number, number, number], [number, number, number]];
+    residualBefore: number;
+    residualAfter: number;
+    effectiveGlobal: [number, number, number];
+    effectiveShadow: [number, number, number];
+    effectiveHighlight: [number, number, number];
+    source: string;
+    warningCodes: string[];
+  };
   detailFinishMetrics?: {
     changedPixelRatio: number;
     chromaDriftMax: number;
@@ -725,6 +743,9 @@ function buildNegativeLabRuntimeProofV1({
         rendererVersion: renderedPreview.densityNormalizationMetrics?.rendererVersion ?? 2,
       },
       ...(renderedPreview.densityScopes === undefined ? {} : { densityScopes: renderedPreview.densityScopes }),
+      ...(renderedPreview.neutralAxisAnalysis === undefined
+        ? {}
+        : { neutralAxisAnalysis: renderedPreview.neutralAxisAnalysis }),
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,
       previewArtifactHandle: previewArtifact,
@@ -878,6 +899,7 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
       frameCount,
       previewRequest: command.parameters.previewRequest,
       processFamily: command.parameters.processFamily,
+      neutralAxis: command.parameters.neutralAxis,
     }),
   );
   const p50AnchorDensity = Number((0.48 + frameCount * 0.01).toFixed(4));
@@ -909,6 +931,28 @@ function buildDefaultNegativeLabRuntimePreviewRenderResultV1(
       densityRangeUnclamped: Number((p50AnchorDensity + 0.42).toFixed(4)),
       epsilonClampedPixelCount: 0,
       rendererVersion: 2,
+    },
+    neutralAxisAnalysis: {
+      algorithmId: 'native_negative_lab_neutral_axis_v1',
+      algorithmVersion: 1,
+      status: command.parameters.neutralAxis.enabled ? 'no_correction_low_confidence' : 'disabled_identity',
+      fitMode: 'none',
+      confidence: 0,
+      confidenceThreshold: command.parameters.neutralAxis.confidenceThreshold,
+      sampleCount: 0,
+      bandSupport: [0, 0, 0],
+      bandReferences: [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ],
+      residualBefore: 0,
+      residualAfter: 0,
+      effectiveGlobal: [0, 0, 0],
+      effectiveShadow: [0, 0, 0],
+      effectiveHighlight: [0, 0, 0],
+      source: command.parameters.neutralAxis.source,
+      warningCodes: command.parameters.neutralAxis.enabled ? ['native_analysis_required'] : [],
     },
     dimensions: { height, width },
     renderer: 'rawengine_density_preview_runtime',

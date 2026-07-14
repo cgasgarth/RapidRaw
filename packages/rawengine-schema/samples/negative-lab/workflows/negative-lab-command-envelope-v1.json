@@ -54,6 +54,17 @@
       "source": "manual_global_v1",
       "signConvention": "positive_density_reduces_channel_exposure_v1"
     },
+    "neutralAxis": {
+      "algorithmVersion": 1,
+      "enabled": false,
+      "strength": 1,
+      "lowChromaQuantile": 0.2,
+      "lowChromaCap": 0.08,
+      "minSupport": 24,
+      "confidenceThreshold": 0.65,
+      "allowGlobalFallback": false,
+      "source": "manual_only_v1"
+    },
     "opticalFinish": {
       "algorithmVersion": 1,
       "enabled": false,

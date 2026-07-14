@@ -9052,6 +9052,30 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
         source: 'manual_global_v1',
         signConvention: 'positive_density_reduces_channel_exposure_v1',
       }),
+    neutralAxis: z
+      .object({
+        algorithmVersion: z.literal(1).default(1),
+        enabled: z.boolean().default(false),
+        strength: z.number().min(0).max(1).default(1),
+        lowChromaQuantile: z.number().min(0.01).max(0.5).default(0.2),
+        lowChromaCap: z.number().min(0.005).max(0.25).default(0.08),
+        minSupport: z.number().int().min(4).max(100000).default(24),
+        confidenceThreshold: z.number().min(0).max(1).default(0.65),
+        allowGlobalFallback: z.boolean().default(false),
+        source: z.string().trim().min(1).default('manual_only_v1'),
+      })
+      .strict()
+      .default({
+        algorithmVersion: 1,
+        enabled: false,
+        strength: 1,
+        lowChromaQuantile: 0.2,
+        lowChromaCap: 0.08,
+        minSupport: 24,
+        confidenceThreshold: 0.65,
+        allowGlobalFallback: false,
+        source: 'manual_only_v1',
+      }),
     opticalFinish: negativeLabOpticalFinishV1Schema.default({
       algorithmVersion: 1,
       enabled: false,
@@ -9696,6 +9720,35 @@ export const negativeLabRuntimeProofV1Schema = z
               .strict(),
             sampleCount: z.number().int().nonnegative(),
             schemaVersion: z.literal(1),
+          })
+          .strict()
+          .optional(),
+        neutralAxisAnalysis: z
+          .object({
+            algorithmId: z.literal('native_negative_lab_neutral_axis_v1'),
+            algorithmVersion: z.literal(1),
+            status: z.enum(['disabled_identity', 'no_correction_low_confidence', 'correction_applied']),
+            fitMode: z.enum(['none', 'quadratic_three_band_v1', 'linear_two_band_v1', 'global_one_band_v1']),
+            confidence: z.number().min(0).max(1),
+            confidenceThreshold: z.number().min(0).max(1),
+            sampleCount: z.number().int().nonnegative(),
+            bandSupport: z.tuple([
+              z.number().int().nonnegative(),
+              z.number().int().nonnegative(),
+              z.number().int().nonnegative(),
+            ]),
+            bandReferences: z.tuple([
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+              z.tuple([z.number(), z.number(), z.number()]),
+            ]),
+            residualBefore: z.number().nonnegative(),
+            residualAfter: z.number().nonnegative(),
+            effectiveGlobal: z.tuple([z.number(), z.number(), z.number()]),
+            effectiveShadow: z.tuple([z.number(), z.number(), z.number()]),
+            effectiveHighlight: z.tuple([z.number(), z.number(), z.number()]),
+            source: z.string().trim().min(1),
+            warningCodes: z.array(z.string().trim().min(1)),
           })
           .strict()
           .optional(),
