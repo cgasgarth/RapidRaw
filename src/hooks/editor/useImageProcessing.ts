@@ -360,13 +360,22 @@ export function useImageProcessing(
       if (!snapshot) return null;
 
       const synchronized = interactiveGenerationRef.current.synchronize(snapshot.scope);
+      dispatchPreviewCoordinator({
+        type: 'viewport-changed',
+        viewport: {
+          revision: snapshot.scope.viewportIdentity,
+          roiFingerprint: JSON.stringify(snapshot.roi ?? [0, 0, 1, 1]),
+          targetHeight: snapshot.scope.targetResolution,
+          targetWidth: snapshot.scope.targetResolution,
+        },
+      });
       if (synchronized.invalidated) {
         interactiveSchedulerRef.current?.clear();
         clearInteractivePatch();
       }
       return { identity: synchronized.identity, roi: snapshot.roi, scope: snapshot.scope };
     },
-    [clearInteractivePatch],
+    [clearInteractivePatch, dispatchPreviewCoordinator],
   );
 
   const isPreviewRequestCurrent = useCallback(
@@ -422,18 +431,20 @@ export function useImageProcessing(
       if (coordinatorIdentity !== undefined) {
         dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-started' });
       }
-      const completeCoordinatorOperation = (url?: string) => {
-        if (coordinatorIdentity === undefined) return;
+      const completeCoordinatorOperation = (url?: string): boolean => {
+        if (coordinatorIdentity === undefined) return true;
+        let transition: ReturnType<typeof dispatchPreviewCoordinator>;
         if (url === undefined) {
-          dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-completed' });
+          transition = dispatchPreviewCoordinator({ identity: coordinatorIdentity, type: 'operation-completed' });
         } else {
-          dispatchPreviewCoordinator({
+          transition = dispatchPreviewCoordinator({
             artifact: { identity: coordinatorIdentity, url },
             identity: coordinatorIdentity,
             type: 'operation-completed',
           });
         }
         previewCoordinatorOperationsRef.current.delete(request.requestId);
+        return transition.state.lastTransition?.staleCompletion !== true;
       };
       const failCoordinatorOperation = (error: unknown) => {
         if (coordinatorIdentity === undefined) return;
@@ -587,6 +598,7 @@ export function useImageProcessing(
               return;
             }
           }
+          if (!completeCoordinatorOperation()) return;
           if (!request.dragging) {
             setEditor({ renderedPreviewResolution: request.targetRes });
           }
@@ -607,6 +619,7 @@ export function useImageProcessing(
 
         const patch = request.dragging ? parseInteractivePreviewPatchPayload(buffer) : null;
         if (patch && !patch.ok) {
+          completeCoordinatorOperation();
           clearInteractivePatch();
           publishQualityStatus('degraded_limited', {
             ...request.quality,
@@ -660,6 +673,10 @@ export function useImageProcessing(
             URL.revokeObjectURL(url);
             return;
           }
+          if (!completeCoordinatorOperation(url)) {
+            URL.revokeObjectURL(url);
+            return;
+          }
           const commitStartedAt = previewNow();
           setEditor({
             interactivePatch: {
@@ -691,11 +708,14 @@ export function useImageProcessing(
             renderMs,
             tier: request.quality.tier,
           });
-          completeCoordinatorOperation(url);
           return;
         }
 
         if (!isPreviewRequestCurrent(request)) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        if (!completeCoordinatorOperation(url)) {
           URL.revokeObjectURL(url);
           return;
         }
@@ -748,7 +768,6 @@ export function useImageProcessing(
           tier: request.quality.tier,
         });
         clearInteractivePatch();
-        completeCoordinatorOperation(url);
         if (operation) {
           logAppOperationSuccess(operation, {
             byteLength: buffer.byteLength,
