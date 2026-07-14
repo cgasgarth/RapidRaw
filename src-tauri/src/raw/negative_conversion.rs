@@ -3118,6 +3118,11 @@ fn run_e6_positive_pipeline(
     let mut scene_image = Rgb32FImage::from_vec(width, height, scene_linear).unwrap();
     let detail_finish_metrics =
         apply_negative_lab_detail_finish(&mut scene_image, &params.detail_finish);
+    // E6 positive rendering keeps scanner color-finish disabled, but still
+    // emits the authoritative identity metrics required by the pipeline
+    // receipt. Calling the shared operation with `applicable = false` keeps
+    // pixels unchanged while preserving the same operation identity/hash
+    // contract as the negative pipeline.
     let color_finish_metrics =
         apply_color_finish(&scene_image, &params.color_finish, false).metrics;
     let rendered = Rgb32FImage::from_vec(
@@ -4173,6 +4178,14 @@ mod tests {
         );
         assert_eq!(render.color_finish_metrics.effective_radius_pixels, 0);
         assert_eq!(render.color_finish_metrics.changed_pixel_ratio, 0.0);
+        assert_eq!(
+            render.color_finish_metrics.before_hash,
+            render.color_finish_metrics.after_hash
+        );
+        assert_eq!(
+            render.color_finish_metrics.operation_id,
+            "negative_lab.scanner_color_finish"
+        );
     }
 
     fn luminance(pixel: image::Rgb<f32>) -> f32 {
