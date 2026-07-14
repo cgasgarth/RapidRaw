@@ -98,6 +98,10 @@ import { createViewerPickerCommandServices } from './viewerPickerCommandServices
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
+import {
+  isViewerWhiteBalanceSampleCurrent,
+  resolveViewerWhiteBalanceInteraction,
+} from './viewerWhiteBalanceInteractionController';
 
 declare global {
   interface Window {
@@ -896,9 +900,13 @@ const ImageCanvas = memo(
     const whiteBalancePreviewIdentityRef = useRef(finalPreviewUrl);
     const whiteBalancePickerActiveRef = useRef(isWbPickerActive);
     const whiteBalanceSampleSequenceRef = useRef(0);
+    const whiteBalanceSourceIdentityRef = useRef(selectedImage.path);
+    const whiteBalanceGeometryEpochRef = useRef(overlayGeometry.geometryEpoch);
     const lastWhiteBalanceHoverSampleAtRef = useRef(0);
     whiteBalancePreviewIdentityRef.current = finalPreviewUrl;
     whiteBalancePickerActiveRef.current = isWbPickerActive;
+    whiteBalanceSourceIdentityRef.current = selectedImage.path;
+    whiteBalanceGeometryEpochRef.current = overlayGeometry.geometryEpoch;
     viewerSamplerRef.current = viewerSampler;
     const transitionViewerSamplerRef = useRef<
       (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
@@ -1291,14 +1299,22 @@ const ImageCanvas = memo(
         if (!pointerPos) return;
 
         const cropPoint = overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(pointerPos.x, pointerPos.y));
-        const x = cropPoint.x;
-        const y = cropPoint.y;
         const imgLogicalWidth = overlayGeometry.cropRectInOrientedPixels.width;
         const imgLogicalHeight = overlayGeometry.cropRectInOrientedPixels.height;
         const sampleGeometryEpoch = captureGeometryEpoch(overlayGeometry);
         const sampleSequence = ++whiteBalanceSampleSequenceRef.current;
-
-        if (x < 0 || x > imgLogicalWidth || y < 0 || y > imgLogicalHeight) return;
+        const interaction = resolveViewerWhiteBalanceInteraction(
+          {
+            cropSize: { height: imgLogicalHeight, width: imgLogicalWidth },
+            geometryEpoch: sampleGeometryEpoch.geometryEpoch,
+            previewIdentity: finalPreviewUrl,
+            sourceIdentity: selectedImage.path,
+          },
+          { x: cropPoint.x, y: cropPoint.y },
+          sampleSequence,
+        );
+        if (interaction === null) return;
+        const { x, y } = interaction.imagePoint;
 
         const img = new Image();
         img.crossOrigin = 'Anonymous';
@@ -1306,8 +1322,16 @@ const ImageCanvas = memo(
 
         img.onload = () => {
           if (
-            !whiteBalancePickerActiveRef.current ||
-            sampleSequence !== whiteBalanceSampleSequenceRef.current ||
+            !isViewerWhiteBalanceSampleCurrent(
+              interaction.identity,
+              {
+                geometryEpoch: whiteBalanceGeometryEpochRef.current,
+                previewIdentity: whiteBalancePreviewIdentityRef.current ?? '',
+                sequence: whiteBalanceSampleSequenceRef.current,
+                sourceIdentity: whiteBalanceSourceIdentityRef.current,
+              },
+              whiteBalancePickerActiveRef.current,
+            ) ||
             !isGeometryEpochCurrent(sampleGeometryEpoch, overlayGeometry)
           )
             return;
