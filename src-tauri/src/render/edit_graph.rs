@@ -135,6 +135,17 @@ pub struct EditNodeRuntimeDescriptor {
     pub legacy_compatibility: bool,
 }
 
+impl EditNodeRuntimeDescriptor {
+    /// WGPU entry-point identity belongs to the node descriptor even when
+    /// compatible nodes are fused into one production dispatch.
+    pub const fn wgpu_entry_point(self) -> Option<&'static str> {
+        match self.wgpu_implementation {
+            Some(_) => Some("main"),
+            None => None,
+        }
+    }
+}
+
 macro_rules! runtime_descriptor {
     ($kind:ident, $cpu:expr, $wgpu:expr, $phase:expr, $resources:expr, $local:expr, $legacy:expr) => {
         EditNodeRuntimeDescriptor {
