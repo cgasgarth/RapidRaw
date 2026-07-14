@@ -692,27 +692,6 @@ fn analyze_perspective_correction(
     Ok(PerspectiveAnalysisResult { analysis, receipt })
 }
 
-#[tauri::command]
-fn cancel_thumbnail_generation(
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<(), String> {
-    state
-        .thumbnail_cancellation_token
-        .store(true, Ordering::SeqCst);
-
-    let mut tracker = state.thumbnail_progress.lock().unwrap();
-    tracker.total = 0;
-    tracker.completed = 0;
-    drop(tracker);
-
-    let _ = app_handle.emit(
-        crate::events::THUMBNAIL_PROGRESS,
-        serde_json::json!({ "current": 0, "total": 0 }),
-    );
-    Ok(())
-}
-
 pub fn get_cached_full_warped_image(
     state: &tauri::State<AppState>,
     js_adjustments: &serde_json::Value,
@@ -4059,7 +4038,7 @@ pub fn run() {
             library::catalog::apply_library_catalog_changes,
             library::catalog::get_library_catalog_report,
             library::catalog::get_library_folder_aggregates,
-            cancel_thumbnail_generation,
+            app::commands::thumbnail::cancel_thumbnail_generation,
             app::commands::wgpu_presentation::update_wgpu_transform,
             app::commands::wgpu_presentation::flush_wgpu_presentation,
             app::commands::wgpu_presentation::get_wgpu_presentation_report,
