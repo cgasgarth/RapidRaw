@@ -23,6 +23,14 @@ pub enum DetailProcessV1 {
     AtrousLumaV1,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DetailStageClassV1 {
+    CaptureCorrection,
+    CreativeDetail,
+    OutputSharpening,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MultiscaleDetailSettingsV1 {
@@ -50,7 +58,20 @@ pub struct MultiscaleDetailPlanV1 {
     pub effective_radii_px: [usize; MULTISCALE_DETAIL_BAND_COUNT],
     pub fingerprint: u64,
     pub implementation_version: u32,
+    pub stage_class: DetailStageClassV1,
     pub settings: MultiscaleDetailSettingsV1,
+    pub target_dimensions: [u32; 2],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiscaleDetailReceiptV1 {
+    pub effective_radii_px: [usize; MULTISCALE_DETAIL_BAND_COUNT],
+    pub fingerprint: String,
+    pub implementation_version: u32,
+    pub process: DetailProcessV1,
+    pub reference_scale_px: f32,
+    pub stage_class: DetailStageClassV1,
     pub target_dimensions: [u32; 2],
 }
 
@@ -92,6 +113,15 @@ impl MultiscaleDetailPlanV1 {
         width: u32,
         height: u32,
     ) -> Result<Self, MultiscaleDetailValidationError> {
+        Self::compile_for_stage(settings, width, height, DetailStageClassV1::CreativeDetail)
+    }
+
+    pub fn compile_for_stage(
+        settings: MultiscaleDetailSettingsV1,
+        width: u32,
+        height: u32,
+        stage_class: DetailStageClassV1,
+    ) -> Result<Self, MultiscaleDetailValidationError> {
         settings.validate()?;
         let long_edge = width.max(height).max(1) as f32;
         let scale = long_edge / settings.reference_scale_px;
@@ -102,11 +132,12 @@ impl MultiscaleDetailPlanV1 {
             previous = distinct;
             distinct
         });
-        let fingerprint = fingerprint(&settings, [width, height], effective_radii_px);
+        let fingerprint = fingerprint(&settings, [width, height], effective_radii_px, stage_class);
         Ok(Self {
             effective_radii_px,
             fingerprint,
             implementation_version: MULTISCALE_DETAIL_IMPLEMENTATION_VERSION,
+            stage_class,
             settings,
             target_dimensions: [width, height],
         })
@@ -119,6 +150,18 @@ impl MultiscaleDetailPlanV1 {
                 .bands
                 .iter()
                 .all(|band| band.gain.abs() <= f32::EPSILON)
+    }
+
+    pub fn receipt(&self) -> MultiscaleDetailReceiptV1 {
+        MultiscaleDetailReceiptV1 {
+            effective_radii_px: self.effective_radii_px,
+            fingerprint: format!("{:016x}", self.fingerprint),
+            implementation_version: self.implementation_version,
+            process: self.settings.process,
+            reference_scale_px: self.settings.reference_scale_px,
+            stage_class: self.stage_class,
+            target_dimensions: self.target_dimensions,
+        }
     }
 }
 
@@ -240,11 +283,13 @@ fn fingerprint(
     settings: &MultiscaleDetailSettingsV1,
     target_dimensions: [u32; 2],
     radii: [usize; MULTISCALE_DETAIL_BAND_COUNT],
+    stage_class: DetailStageClassV1,
 ) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     MULTISCALE_DETAIL_IMPLEMENTATION_VERSION.hash(&mut hasher);
     target_dimensions.hash(&mut hasher);
     radii.hash(&mut hasher);
+    stage_class.hash(&mut hasher);
     (settings.process as u8).hash(&mut hasher);
     settings.overall_amount.to_bits().hash(&mut hasher);
     settings.halo_suppression.to_bits().hash(&mut hasher);
@@ -339,6 +384,63 @@ mod tests {
         assert_eq!(preview.effective_radii_px, [1, 2, 4, 8, 16]);
         assert_eq!(export.effective_radii_px, [4, 8, 16, 32, 64]);
         assert_ne!(preview.fingerprint, export.fingerprint);
+    }
+
+    #[test]
+    fn stage_receipts_prevent_capture_creative_and_output_aliasing() {
+        let settings = settings(0.5);
+        let capture = MultiscaleDetailPlanV1::compile_for_stage(
+            settings.clone(),
+            1_024,
+            768,
+            DetailStageClassV1::CaptureCorrection,
+        )
+        .unwrap();
+        let creative = MultiscaleDetailPlanV1::compile(settings.clone(), 1_024, 768).unwrap();
+        let output = MultiscaleDetailPlanV1::compile_for_stage(
+            settings,
+            1_024,
+            768,
+            DetailStageClassV1::OutputSharpening,
+        )
+        .unwrap();
+
+        assert_eq!(creative.stage_class, DetailStageClassV1::CreativeDetail);
+        assert_ne!(capture.fingerprint, creative.fingerprint);
+        assert_ne!(creative.fingerprint, output.fingerprint);
+        let receipt = output.receipt();
+        assert_eq!(receipt.stage_class, DetailStageClassV1::OutputSharpening);
+        assert_eq!(receipt.target_dimensions, [1_024, 768]);
+        assert_eq!(receipt.effective_radii_px, [1, 2, 4, 8, 16]);
+        assert_eq!(receipt.fingerprint, format!("{:016x}", output.fingerprint));
+        assert_eq!(
+            serde_json::to_value(receipt).unwrap()["stageClass"],
+            "output_sharpening"
+        );
+    }
+
+    #[test]
+    fn output_stage_executes_on_final_target_pixels_with_target_bound_receipt() {
+        let mut output_pixels = fixture();
+        let before = output_pixels.clone();
+        let plan = MultiscaleDetailPlanV1::compile_for_stage(
+            settings(0.75),
+            output_pixels.width(),
+            output_pixels.height(),
+            DetailStageClassV1::OutputSharpening,
+        )
+        .unwrap();
+        apply_multiscale_detail(&mut output_pixels, &plan);
+
+        assert!(max_delta(&before, &output_pixels) > 0.0001);
+        assert_eq!(plan.receipt().target_dimensions, [64, 48]);
+        assert!(
+            output_pixels
+                .to_rgb32f()
+                .as_raw()
+                .iter()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]
