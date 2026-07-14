@@ -8,6 +8,37 @@ export const filmEmulationProfileRefV1Schema = z
   })
   .strict();
 
+export const filmResidualLutManifestV1Schema = z
+  .object({
+    model: z.literal('scene_log_opponent_residual_tetrahedral_v1'),
+    workingSpace: z.literal('acescg_linear_v1'),
+    gridSize: z.union([z.literal(17), z.literal(33)]),
+    exposureDomainEv: z.tuple([z.number().finite(), z.number().finite()]),
+    opponentDomain: z.tuple([
+      z.tuple([z.number().finite(), z.number().finite()]),
+      z.tuple([z.number().finite(), z.number().finite()]),
+    ]),
+    edgeFadeFraction: z.number().finite().min(0.01).max(0.5),
+    neutralGateC0: z.number().finite().min(0).max(1),
+    storage: z.enum(['f16_le', 'f32_le']),
+    assetPath: z.string().trim().min(1),
+    assetSha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    decodedValueSha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const domains = [manifest.exposureDomainEv, ...manifest.opponentDomain];
+    domains.forEach((domain, index) => {
+      if (domain[0] >= domain[1]) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Residual LUT domains must be strictly ordered.',
+          path: [index === 0 ? 'exposureDomainEv' : 'opponentDomain', index === 0 ? 0 : index - 1],
+        });
+      }
+    });
+  });
+
 export const filmEmulationNodeV1Schema = z
   .object({
     nodeType: z.literal('film_emulation'),
@@ -20,6 +51,7 @@ export const filmEmulationNodeV1Schema = z
       })
       .strict()
       .optional(),
+    residualLut: filmResidualLutManifestV1Schema.optional(),
     mix: z.number().finite().min(0).max(1),
     workingSpace: z.literal('acescg_linear_v1'),
     seedPolicy: z.literal('source_stable_v1'),

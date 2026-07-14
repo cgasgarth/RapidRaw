@@ -7,6 +7,7 @@ import type {
   filmEmulationNodeV1Schema,
   filmEmulationProfileRefV1Schema,
   filmEmulationReceiptV1Schema,
+  filmResidualLutManifestV1Schema,
   filmSceneInputV1Schema,
 } from './film/filmEmulationSchemas.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panorama/panoramaHomographyDiagnostics.js';
@@ -19,6 +20,7 @@ export {
   filmEmulationNodeV1Schema,
   filmEmulationProfileRefV1Schema,
   filmEmulationReceiptV1Schema,
+  filmResidualLutManifestV1Schema,
   filmSceneInputV1Schema,
 } from './film/filmEmulationSchemas.js';
 
@@ -11661,4 +11663,5 @@ export type ToneColorWheelV1 = z.infer<typeof toneColorWheelV1Schema>;
 export type FilmEmulationNodeV1 = z.infer<typeof filmEmulationNodeV1Schema>;
 export type FilmEmulationProfileRefV1 = z.infer<typeof filmEmulationProfileRefV1Schema>;
 export type FilmEmulationReceiptV1 = z.infer<typeof filmEmulationReceiptV1Schema>;
+export type FilmResidualLutManifestV1 = z.infer<typeof filmResidualLutManifestV1Schema>;
 export type FilmSceneInputV1 = z.infer<typeof filmSceneInputV1Schema>;
