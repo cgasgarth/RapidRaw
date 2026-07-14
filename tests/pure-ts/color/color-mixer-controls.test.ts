@@ -42,12 +42,12 @@ describe('Color Mixer range model', () => {
 });
 
 describe('Advanced mixer view models', () => {
-  test('seeds only the selected B&W channel when enabling an all-zero mixer', () => {
+  test('starts untouched B&W edits on the continuous scene process', () => {
     const enabled = enableBlackWhiteMixer(structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer), 'oranges');
 
     expect(enabled.enabled).toBe(true);
-    expect(enabled.weights.oranges).toBe(20);
-    expect(Object.entries(enabled.weights).filter(([, value]) => value !== 0)).toEqual([['oranges', 20]]);
+    expect(enabled.process).toBe('continuous_sensitivity_v1');
+    expect(Object.values(enabled.weights).every((value) => value === 0)).toBe(true);
   });
 
   test('preserves stored B&W weights when enabling', () => {

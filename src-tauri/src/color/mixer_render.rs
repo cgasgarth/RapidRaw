@@ -11,7 +11,10 @@ use crate::adjustments::abi::GlobalAdjustments;
 use crate::adjustments::abi::{
     BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings, ColorBalanceRgbSettings,
 };
-use crate::monochrome::{NEUTRAL_PANCHROMATIC_V1, neutral_panchromatic_v1};
+use crate::monochrome::{
+    CONTINUOUS_SENSITIVITY_V1, NEUTRAL_PANCHROMATIC_V1, continuous_sensitivity_v1,
+    neutral_panchromatic_v1,
+};
 
 const REC709_RED: f32 = 0.2126;
 const REC709_GREEN: f32 = 0.7152;
@@ -166,6 +169,24 @@ pub(crate) fn apply_black_white_mixer(
             == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1
     {
         return neutral_panchromatic_v1(color);
+    }
+    if settings.process == CONTINUOUS_SENSITIVITY_V1
+        && settings.implementation_version
+            == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1
+    {
+        return continuous_sensitivity_v1(
+            color,
+            [
+                settings.reds,
+                settings.oranges,
+                settings.yellows,
+                settings.greens,
+                settings.aquas,
+                settings.blues,
+                settings.purples,
+                settings.magentas,
+            ],
+        );
     }
 
     let luma = scene_luminance(color, preserve_extended);
@@ -753,6 +774,90 @@ mod gpu_runtime_tests {
         assert!(
             gpu.to_rgba32f().pixels().any(|pixel| pixel[0] > 1.0),
             "unclamped output proof must retain scene headroom"
+        );
+    }
+
+    #[test]
+    fn continuous_scene_monochrome_matches_cpu_wgpu_and_separates_colors() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(8, 4, |x, y| {
+            let scale = 1.0 + y as f32 * 0.25;
+            if x < 4 {
+                Rgba([8.0 * scale, 0.25 * scale, 0.08 * scale, 0.71])
+            } else {
+                Rgba([0.08 * scale, 0.35 * scale, 8.0 * scale, 0.71])
+            }
+        }));
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "blackWhiteMixer": {
+                "enabled": true,
+                "process": "continuous_sensitivity_v1",
+                "weights": {
+                    "reds": 100, "oranges": 70, "yellows": 20, "greens": -40,
+                    "aquas": -80, "blues": -100, "purples": -20, "magentas": 60
+                }
+            }
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 7, 8, 9),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("continuous monochrome plan compiles");
+        assert_eq!(plan.adjustments.global.black_white_mixer.process, 2);
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU continuous monochrome render succeeds");
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            crate::gpu_processing::PreGpuImageIdentity::for_test_source(
+                &source,
+                "continuous_scene_monochrome_v1",
+            ),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                    plan.edit_graph,
+                ),
+            },
+            "continuous_scene_monochrome_v1",
+        )
+        .expect("WGPU continuous monochrome render succeeds");
+
+        let parity_delta = max_rgb_delta(&cpu, &gpu);
+        assert!(parity_delta <= 0.008, "CPU/WGPU delta {parity_delta}");
+        for pixel in gpu.to_rgba32f().pixels() {
+            assert!((pixel[0] - pixel[1]).abs() <= 0.002);
+            assert!((pixel[1] - pixel[2]).abs() <= 0.002);
+            assert!((pixel[3] - 0.71).abs() <= 0.002);
+        }
+        let output = gpu.to_rgba32f();
+        assert!(
+            (output.get_pixel(0, 0)[0] - output.get_pixel(7, 0)[0]).abs() > 0.1,
+            "continuous sensitivity must separate distinct source colors"
         );
     }
 }
