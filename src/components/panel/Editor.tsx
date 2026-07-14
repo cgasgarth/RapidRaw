@@ -95,6 +95,7 @@ import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMat
 import { debounce } from '../../utils/timing';
 import {
   applyWhiteBalancePickerHoverPreview,
+  buildWhiteBalancePickerEditTransaction,
   cancelWhiteBalancePickerPreview,
   createWhiteBalancePickerPreviewSession,
   type WhiteBalancePickerPreviewSession,
@@ -256,6 +257,8 @@ export default function Editor({
   const wgpuFailureSerial = useEditorStore((s) => s.wgpuFailureSerial);
 
   const setEditor = useEditorStore((s) => s.setEditor);
+  const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
+  const publishWhiteBalancePickerPreview = useEditorStore((s) => s.publishWhiteBalancePickerPreview);
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
@@ -469,22 +472,20 @@ export default function Editor({
 
   const handleWbPicked = useCallback(
     (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+      const previewSession = wbPickerPreviewSessionRef.current;
+      if (previewSession?.previewActive) {
+        publishWhiteBalancePickerPreview(cancelWhiteBalancePickerPreview(previewSession, receipt.selectedImagePath));
+      }
+      const state = useEditorStore.getState();
+      const request = buildWhiteBalancePickerEditTransaction(state, receipt, nextAdjustments, crypto.randomUUID());
+      const result = applyEditTransaction(request);
       wbPickerPreviewSessionRef.current = null;
       setEditor({
-        adjustments: nextAdjustments,
-        exportSoftProofTransform: null,
-        finalPreviewUrl: null,
-        gamutWarningOverlay: null,
-        interactivePatch: null,
         isWbPickerActive: false,
-        lastWhiteBalancePickerReceipt: receipt,
-        previewScopeStatus: null,
-        transformedOriginalUrl: null,
-        uncroppedAdjustedPreviewUrl: null,
+        ...(result.noOp ? {} : { lastWhiteBalancePickerReceipt: receipt }),
       });
-      pushHistory(nextAdjustments);
     },
-    [pushHistory, setEditor],
+    [applyEditTransaction, publishWhiteBalancePickerPreview, setEditor],
   );
 
   const handleWbPreview = useCallback(
@@ -494,15 +495,9 @@ export default function Editor({
       if (receipt.selectedImagePath !== selectedImage.path) return;
       const preview = applyWhiteBalancePickerHoverPreview(session, nextAdjustments, receipt);
       wbPickerPreviewSessionRef.current = preview.session;
-      setEditor({
-        adjustments: preview.adjustments,
-        finalPreviewUrl: null,
-        interactivePatch: null,
-        transformedOriginalUrl: null,
-        uncroppedAdjustedPreviewUrl: null,
-      });
+      publishWhiteBalancePickerPreview(preview.adjustments);
     },
-    [selectedImage, setEditor],
+    [publishWhiteBalancePickerPreview, selectedImage],
   );
 
   const handleWbPreviewCancel = useCallback(() => {
@@ -510,14 +505,8 @@ export default function Editor({
     if (!session?.previewActive || !selectedImage || session.sourceIdentity !== selectedImage.path) return;
     const baseAdjustments = cancelWhiteBalancePickerPreview(session, selectedImage.path);
     wbPickerPreviewSessionRef.current = { ...session, lastPreviewIdentity: null, previewActive: false };
-    setEditor({
-      adjustments: baseAdjustments,
-      finalPreviewUrl: null,
-      interactivePatch: null,
-      transformedOriginalUrl: null,
-      uncroppedAdjustedPreviewUrl: null,
-    });
-  }, [selectedImage, setEditor]);
+    publishWhiteBalancePickerPreview(baseAdjustments);
+  }, [publishWhiteBalancePickerPreview, selectedImage]);
 
   useEffect(() => {
     if (isWbPickerActive) {
@@ -531,16 +520,10 @@ export default function Editor({
     }
     const session = wbPickerPreviewSessionRef.current;
     if (session?.previewActive && selectedImage && session.sourceIdentity === selectedImage.path) {
-      setEditor({
-        adjustments: cancelWhiteBalancePickerPreview(session, selectedImage.path),
-        finalPreviewUrl: null,
-        interactivePatch: null,
-        transformedOriginalUrl: null,
-        uncroppedAdjustedPreviewUrl: null,
-      });
+      publishWhiteBalancePickerPreview(cancelWhiteBalancePickerPreview(session, selectedImage.path));
     }
     wbPickerPreviewSessionRef.current = null;
-  }, [adjustments, isWbPickerActive, selectedImage, setEditor]);
+  }, [adjustments, isWbPickerActive, publishWhiteBalancePickerPreview, selectedImage]);
 
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;
