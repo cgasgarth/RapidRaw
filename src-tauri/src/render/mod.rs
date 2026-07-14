@@ -11,6 +11,7 @@ pub(crate) mod film_density_grain;
 pub(crate) mod film_emulation;
 pub(crate) mod film_look_render;
 pub(crate) mod film_monochrome;
+pub(crate) mod film_optical_scatter;
 pub(crate) mod film_print_scan;
 pub(crate) mod film_profile_registry;
 pub(crate) mod film_residual_lut;

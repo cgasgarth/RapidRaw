@@ -247,24 +247,26 @@ pub(crate) fn execute_cpu_edit_graph(
             adjustments.global.is_raw_image == 1,
         );
         color *= 2.0_f32.powf(effective.exposure);
-        color = apply_glow_bloom(
-            color,
-            structure_surface,
-            effective.glow,
-            adjustments.global.is_raw_image == 1,
-            effective.exposure,
-            effective.brightness,
-            effective.whites,
-        );
-        color = apply_halation(
-            color,
-            clarity_surface,
-            effective.halation,
-            adjustments.global.is_raw_image == 1,
-            effective.exposure,
-            effective.brightness,
-            effective.whites,
-        );
+        if graph.film_emulation().is_none() {
+            color = apply_glow_bloom(
+                color,
+                structure_surface,
+                effective.glow,
+                adjustments.global.is_raw_image == 1,
+                effective.exposure,
+                effective.brightness,
+                effective.whites,
+            );
+            color = apply_halation(
+                color,
+                clarity_surface,
+                effective.halation,
+                adjustments.global.is_raw_image == 1,
+                effective.exposure,
+                effective.brightness,
+                effective.whites,
+            );
+        }
         color = apply_flare(
             color,
             flare_map.as_deref(),
@@ -402,6 +404,12 @@ pub(crate) fn execute_cpu_edit_graph(
             color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
         }
         if let Some(film) = graph.film_emulation() {
+            color = crate::render::film_optical_scatter::apply(
+                color,
+                clarity_surface,
+                structure_surface,
+                &crate::render::film_optical_scatter::reference(),
+            );
             color = crate::render::film_emulation::apply_pixel_at(color, film, x, y);
         }
         if preserve_extended {
