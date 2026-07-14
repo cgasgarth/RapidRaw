@@ -77,6 +77,7 @@ export enum Invokes {
   PreviewAutoEditProposal = 'preview_auto_edit_proposal',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   GetExportColorCapabilities = 'get_export_color_capabilities',
+  GetHdrExportCapabilities = 'get_hdr_export_capabilities',
   GetAiModelRegistryReport = 'get_ai_model_registry_report',
   GetImageDimensions = 'get_image_dimensions',
   GetImageOpenDiagnostics = 'get_image_open_diagnostics',

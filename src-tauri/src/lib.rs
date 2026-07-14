@@ -4419,6 +4419,7 @@ pub fn run() {
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
             export::export_processing::get_export_color_capabilities,
+            export::export_processing::get_hdr_export_capabilities,
             export::export_processing::export_images,
             export::export_processing::resume_export,
             export::export_processing::cancel_export,
