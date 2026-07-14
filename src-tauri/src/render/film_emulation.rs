@@ -13,6 +13,7 @@ use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
 use super::film_color_coupler::{
     apply as apply_color_coupler, reference as reference_color_coupler,
 };
+use super::film_print_scan::{apply as apply_print_scan, reference as reference_print_scan};
 
 pub const FILM_NODE_TYPE: &str = "film_emulation";
 pub const FILM_CONTRACT_VERSION: u32 = 1;
@@ -157,7 +158,8 @@ pub fn apply_pixel(rgb: Vec3, params: FilmEmulationParams) -> Vec3 {
         0.0
     };
     let coupled = apply_color_coupler(shaped, exposure_ev, &reference_color_coupler());
-    rgb + params.mix * (coupled - rgb)
+    let printed = apply_print_scan(coupled, &reference_print_scan());
+    rgb + params.mix * (printed - rgb)
 }
 
 #[allow(dead_code)]
