@@ -106,6 +106,7 @@ use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
+use crate::geometry::preview::PreviewGeometryService;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
@@ -626,47 +627,14 @@ fn preview_geometry_source_scale(
     adjustments: &serde_json::Value,
     preview_dim: u32,
 ) -> f32 {
-    let orientation_steps = adjustments[adjustment_fields::ORIENTATION_STEPS]
-        .as_u64()
-        .unwrap_or(0) as u8;
-    let (oriented_width, oriented_height) = if orientation_steps % 2 == 1 {
-        (source_height, source_width)
-    } else {
-        (source_width, source_height)
-    };
-    let target_long_edge =
-        serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone())
-            .ok()
-            .map(|crop| crop.width.max(crop.height) as f32)
-            .filter(|dimension| dimension.is_finite() && *dimension > 0.0)
-            .unwrap_or_else(|| oriented_width.max(oriented_height) as f32);
-
-    if target_long_edge <= preview_dim.max(1) as f32 {
-        1.0
-    } else {
-        preview_dim.max(1) as f32 / target_long_edge
-    }
+    PreviewGeometryService::source_scale(source_width, source_height, adjustments, preview_dim)
 }
 
 fn scale_preview_geometry_adjustments(
     adjustments: &serde_json::Value,
     source_scale: f32,
 ) -> serde_json::Value {
-    if source_scale >= 1.0 {
-        return adjustments.clone();
-    }
-    let mut scaled = adjustments.clone();
-    if let Some(crop_value) = scaled.get_mut(adjustment_fields::CROP)
-        && let Ok(mut crop) = serde_json::from_value::<Crop>(crop_value.clone())
-    {
-        let scale = f64::from(source_scale);
-        crop.x *= scale;
-        crop.y *= scale;
-        crop.width *= scale;
-        crop.height *= scale;
-        *crop_value = serde_json::to_value(crop).unwrap_or(serde_json::Value::Null);
-    }
-    scaled
+    PreviewGeometryService::scale_adjustments(adjustments, source_scale)
 }
 
 /// Authoritative full-resolution geometry/retouch path for export and pixel-critical operations.
