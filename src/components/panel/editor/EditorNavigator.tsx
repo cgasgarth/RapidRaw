@@ -50,17 +50,22 @@ export function navigatorPreviewReducer(
 const sameTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
   left.scale === right.scale && left.positionX === right.positionX && left.positionY === right.positionY;
 
+const isSettledTransform = (left: ViewportTransform, right: ViewportTransform): boolean =>
+  Math.abs(left.scale - right.scale) <= 0.001 &&
+  Math.abs(left.positionX - right.positionX) <= 0.5 &&
+  Math.abs(left.positionY - right.positionY) <= 0.5;
+
+const isValidTransform = (transform: ViewportTransform): boolean =>
+  Number.isFinite(transform.scale) &&
+  transform.scale > 0 &&
+  Number.isFinite(transform.positionX) &&
+  Number.isFinite(transform.positionY);
+
 export function resolveNavigatorTransformUpdate(
   current: ViewportTransform,
   candidate: ViewportTransform,
 ): ViewportTransform {
-  if (
-    !Number.isFinite(candidate.scale) ||
-    candidate.scale <= 0 ||
-    !Number.isFinite(candidate.positionX) ||
-    !Number.isFinite(candidate.positionY) ||
-    sameTransform(current, candidate)
-  ) {
+  if (!isValidTransform(candidate) || sameTransform(current, candidate)) {
     return current;
   }
   return { ...candidate };
@@ -94,6 +99,8 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
     () => transformControllerRef.current?.instance?.transformState ?? { positionX: 0, positionY: 0, scale: 1 },
   );
   const publishedTransformRef = useRef(transform);
+  const observedTransformRef = useRef(transform);
+  const stableObservationCountRef = useRef(0);
   const [preview, dispatchPreview] = useReducer(navigatorPreviewReducer, artifact, createNavigatorPreviewState);
   const [imageBox, setImageBox] = useState({ height: 0, left: 0, top: 0, width: 0 });
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -115,11 +122,19 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   useEffect(() => {
     const synchronize = () => {
       const next = transformControllerRef.current?.instance?.transformState;
-      if (next) {
-        const resolved = resolveNavigatorTransformUpdate(publishedTransformRef.current, next);
-        if (resolved !== publishedTransformRef.current) {
-          publishedTransformRef.current = resolved;
-          setTransform(resolved);
+      if (next && isValidTransform(next)) {
+        if (isSettledTransform(observedTransformRef.current, next)) {
+          stableObservationCountRef.current += 1;
+        } else {
+          observedTransformRef.current = { ...next };
+          stableObservationCountRef.current = 1;
+        }
+        if (stableObservationCountRef.current >= 2) {
+          const resolved = resolveNavigatorTransformUpdate(publishedTransformRef.current, observedTransformRef.current);
+          if (resolved !== publishedTransformRef.current) {
+            publishedTransformRef.current = resolved;
+            setTransform(resolved);
+          }
         }
       }
     };
