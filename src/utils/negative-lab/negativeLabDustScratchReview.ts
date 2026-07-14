@@ -6,6 +6,7 @@ import {
   parseNegativeLabDustScratchReviewReport,
   parseNegativeLabQcProofReport,
 } from '../../schemas/negative-lab/negativeLabWorkspaceSchemas';
+import { detectNegativeLabLongScratches, type NegativeLabScratchAnalysisInput } from './negativeLabScratchDetector';
 
 type NegativeLabDustScratchCandidate = NegativeLabDustScratchReviewReport['frames'][number]['candidates'][number];
 
@@ -15,11 +16,12 @@ const buildCandidateId = (frameId: string, kind: NegativeLabDustScratchCandidate
 const buildReviewCandidates = (
   frameId: string,
   reviewNeeded: boolean,
+  scratchAnalysis: NegativeLabScratchAnalysisInput | undefined,
   status: NegativeLabDustScratchCandidate['status'] = 'pending',
 ): NegativeLabDustScratchCandidate[] => {
   if (!reviewNeeded) return [];
 
-  return [
+  const candidates: NegativeLabDustScratchCandidate[] = [
     {
       candidateId: buildCandidateId(frameId, 'dust_spot', 1),
       confidence: 0.68,
@@ -34,26 +36,17 @@ const buildReviewCandidates = (
       kind: 'dust_spot',
       status,
     },
-    {
-      candidateId: buildCandidateId(frameId, 'emulsion_scratch', 1),
-      confidence: 0.62,
-      geometry: {
-        coordinateSpace: 'normalized_frame',
-        height: 0.24,
-        kind: 'rect',
-        width: 0.035,
-        x: 0.71,
-        y: 0.42,
-      },
-      kind: 'emulsion_scratch',
-      status,
-    },
   ];
+  if (scratchAnalysis !== undefined) {
+    candidates.push(...detectNegativeLabLongScratches(scratchAnalysis).map((candidate) => ({ ...candidate, status })));
+  }
+  return candidates;
 };
 
 export const buildNegativeLabDustScratchReviewReport = (
   frameHealthReport: NegativeLabFrameHealthReport,
   previewReady: boolean,
+  scratchAnalysisByFrameId: Readonly<Record<string, NegativeLabScratchAnalysisInput | undefined>> = {},
 ): NegativeLabDustScratchReviewReport => {
   const frames = frameHealthReport.frames.map((frame) => {
     if (!frame.included) {
@@ -82,7 +75,7 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.batchDisposition === 'review' && frame.batchDispositionReason === 'acquisition_review_required') {
       return {
-        candidates: buildReviewCandidates(frame.frameId, true),
+        candidates: buildReviewCandidates(frame.frameId, true, scratchAnalysisByFrameId[frame.frameId]),
         findingCodes: [
           'acquisition_review_required',
           'candidate_dust_spot',
@@ -112,7 +105,7 @@ export const buildNegativeLabDustScratchReviewReport = (
 
     if (frame.warningCodes.includes('base_estimate_active_frame_only')) {
       return {
-        candidates: buildReviewCandidates(frame.frameId, true, 'acknowledged'),
+        candidates: buildReviewCandidates(frame.frameId, true, scratchAnalysisByFrameId[frame.frameId], 'acknowledged'),
         findingCodes: [
           'base_fog_only_review',
           'candidate_dust_spot',

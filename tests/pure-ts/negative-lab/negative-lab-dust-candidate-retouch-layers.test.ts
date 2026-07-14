@@ -39,7 +39,14 @@ const scratchCandidate: DustReviewCandidate = {
   geometry: {
     coordinateSpace: 'normalized_frame',
     height: 0.22,
-    kind: 'rect',
+    kind: 'polyline',
+    points: [
+      { x: 0.71, y: 0.2 },
+      { x: 0.705, y: 0.32 },
+      { x: 0.715, y: 0.44 },
+      { x: 0.7, y: 0.56 },
+      { x: 0.71, y: 0.68 },
+    ],
     width: 0.03,
     x: 0.7,
     y: 0.2,
@@ -153,7 +160,7 @@ describe('negative lab dust candidate retouch layers', () => {
     });
   });
 
-  test('keeps scratch candidates review-only when accept is requested', () => {
+  test('converts accepted scratch polylines into ordered editable heal segments', () => {
     const state = applyDustCandidateDecisionTransition({
       candidate: scratchCandidate,
       decision: 'accepted',
@@ -166,8 +173,13 @@ describe('negative lab dust candidate retouch layers', () => {
       },
     });
 
-    expect(state.decisionByCandidateId[scratchCandidate.candidateId]).toBe('rejected');
-    expect(Object.keys(state.healLayerByCandidateId)).toHaveLength(0);
+    expect(state.decisionByCandidateId[scratchCandidate.candidateId]).toBe('accepted');
+    expect(Object.keys(state.healLayerByCandidateId)).toEqual([
+      'negative_lab_scratch_frame_001_1_heal_layer_1',
+      'negative_lab_scratch_frame_001_1_heal_layer_2',
+      'negative_lab_scratch_frame_001_1_heal_layer_3',
+      'negative_lab_scratch_frame_001_1_heal_layer_4',
+    ]);
   });
 
   test('builds accepted layer provenance with frame, candidate, hashes, and changed pixels', () => {

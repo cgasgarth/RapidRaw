@@ -252,9 +252,20 @@ export const buildNegativeLabQcContactSheetArtifact = ({
         });
       }
       for (const candidate of frame.candidates) {
+        const geometry =
+          candidate.geometry.kind === 'polyline'
+            ? {
+                coordinateSpace: candidate.geometry.coordinateSpace,
+                height: candidate.geometry.height,
+                kind: 'rect' as const,
+                width: candidate.geometry.width,
+                x: candidate.geometry.x,
+                y: candidate.geometry.y,
+              }
+            : candidate.geometry;
         overlays.push({
           frameId: frame.frameId,
-          geometry: candidate.geometry,
+          geometry,
           label: `${candidate.kind === 'dust_spot' ? 'Dust candidate' : 'Scratch candidate'}: ${frame.scanLabel}`,
           overlayId: `overlay_negative_lab_qc_${candidate.kind}_${frame.contactSheetSlot}_${candidate.candidateId}`,
           overlayKind: candidate.kind === 'dust_spot' ? ('dust_candidate' as const) : ('scratch_candidate' as const),

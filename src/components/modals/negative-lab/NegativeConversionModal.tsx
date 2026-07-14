@@ -6429,6 +6429,32 @@ function NegativeLabSession({
     </div>
   );
 
+  const renderScratchCandidateOverlays = () => {
+    const activeFrame = dustScratchReviewReport.frames.find(
+      (frame) => frame.frameId === frameHealthReport.activeFrameId,
+    );
+    if (activeFrame === undefined) return null;
+    return activeFrame.candidates
+      .filter((candidate) => candidate.kind === 'emulsion_scratch' && candidate.geometry.kind === 'polyline')
+      .map((candidate) => {
+        if (candidate.geometry.kind !== 'polyline') return null;
+        const points = candidate.geometry.points.map((point) => `${point.x * 100},${point.y * 100}`).join(' ');
+        return (
+          <svg
+            aria-label={t('modals.negativeConversion.dustCandidate.emulsionScratch')}
+            className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+            data-candidate-id={candidate.candidateId}
+            data-testid={`negative-lab-scratch-overlay-${candidate.candidateId}`}
+            key={candidate.candidateId}
+            preserveAspectRatio="none"
+            viewBox="0 0 100 100"
+          >
+            <polyline fill="none" points={points} stroke="#facc15" strokeDasharray="2 1" strokeWidth="0.6" />
+          </svg>
+        );
+      });
+  };
+
   const renderContent = () => (
     <div className="modal-preview-adjustments flex h-full w-full flex-col overflow-hidden xl:flex-row">
       <div
@@ -6505,6 +6531,7 @@ function NegativeLabSession({
                   {renderBaseFogSampleOverlay()}
                   {renderPatchProbeOverlays()}
                   {renderDraftPatchOverlay()}
+                  {renderScratchCandidateOverlays()}
                   {isCompareActive && originalUrl !== null && (
                     <UiText
                       as="div"
