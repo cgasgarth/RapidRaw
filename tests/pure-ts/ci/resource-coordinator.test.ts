@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { acquireResourceLease } from '../../../scripts/lib/ci/resource-coordinator';
 
 const temporaryRoots: string[] = [];
 const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
@@ -184,6 +185,37 @@ await lease.release();`,
     );
     await expectSuccessfulExit(child);
     expect(await new Response(child.stdout).text()).toContain('portable-acquired');
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  });
+
+  test('aborted queued acquisition removes its waiter without touching the live owner', async () => {
+    const root = await temporaryRoot();
+    const holder = await acquireResourceLease({ label: 'holder', resource: 'native-heavy', root });
+    const controller = new AbortController();
+    let markQueued: (() => void) | undefined;
+    const queued = new Promise<void>((resolve) => {
+      markQueued = resolve;
+    });
+    const waiting = acquireResourceLease({
+      label: 'cancelled-waiter',
+      onQueued: () => markQueued?.(),
+      pollMs: 1,
+      resource: 'native-heavy',
+      root,
+      signal: controller.signal,
+    });
+
+    try {
+      await queued;
+      controller.abort();
+      await expect(waiting).rejects.toThrow('resource_wait_cancelled');
+      expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('holder')).toBeTrue();
+      expect(await queuedLabels(root)).toEqual([]);
+    } finally {
+      controller.abort();
+      await Promise.allSettled([waiting]);
+      await holder.release();
+    }
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
 

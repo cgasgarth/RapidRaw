@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
+import { acquireResourceLease } from '../../scripts/lib/ci/resource-coordinator';
 import { selectAffectedPerformanceScenarios } from '../../scripts/perf/affected';
 import { createPerformanceBisectPlan, executePerformanceBisect, renderBisectPlan } from '../../scripts/perf/bisect';
 import {
@@ -235,6 +236,8 @@ describe('performance regression diagnosis and routing', () => {
 
   test('executes git bisect and reports exact or skipped-candidate synthetic regressions', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-'));
+    const coordinationRoot = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-coordination-'));
+    const evaluatorMilestone = resolve(coordinationRoot, 'evaluator-started');
     const environment = isolatedGitEnvironment();
     const git = (...args: string[]) => {
       const result = Bun.spawnSync(['git', ...args], {
@@ -260,6 +263,7 @@ describe('performance regression diagnosis and routing', () => {
         resolve(directory, 'evaluate.sh'),
         `#!/bin/sh
 value="$(cat value)"
+echo "$value" >> ${JSON.stringify(evaluatorMilestone)}
 if [ "\${1:-}" = "$value" ]; then exit 125; fi
 if [ "$value" -lt 3 ]; then exit 0; fi
 exit 1
@@ -304,10 +308,73 @@ exit 1
       expect(skipped.firstBadCommit).toBeUndefined();
       expect(git('rev-parse', 'HEAD')).toBe(bad);
       expect(git('status', '--porcelain=v1')).toBe('');
+
+      for (let repetition = 0; repetition < 3; repetition += 1) {
+        await rm(evaluatorMilestone, { force: true });
+        const holder = await acquireResourceLease({
+          label: `synthetic-native-load-${repetition}`,
+          resource: 'native-heavy',
+          root: coordinationRoot,
+        });
+        let markQueued: (() => void) | undefined;
+        const queued = new Promise<void>((resolveQueued) => {
+          markQueued = resolveQueued;
+        });
+        const execution = executeOwnedPerformanceBisect({
+          cwd: directory,
+          good,
+          bad,
+          evaluator: { command: './evaluate.sh', args: [] },
+          coordination: { root: coordinationRoot, onQueued: () => markQueued?.() },
+        });
+        try {
+          await queued;
+          expect(await Bun.file(evaluatorMilestone).exists()).toBeFalse();
+        } finally {
+          await holder.release();
+        }
+        await expect(execution).resolves.toMatchObject({ firstBadCommit: firstBad });
+        expect(await Bun.file(evaluatorMilestone).exists()).toBeTrue();
+      }
     } finally {
+      await rm(coordinationRoot, { force: true, recursive: true });
       await rm(directory, { force: true, recursive: true });
     }
-  }, 10_000);
+  }, 0);
+
+  test('forced cancellation while queued never starts a bisect or leaks its lease ticket', async () => {
+    const coordinationRoot = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-wait-cancel-'));
+    const holder = await acquireResourceLease({
+      label: 'native-build',
+      resource: 'native-heavy',
+      root: coordinationRoot,
+    });
+    let markQueued: (() => void) | undefined;
+    const queued = new Promise<void>((resolveQueued) => {
+      markQueued = resolveQueued;
+    });
+    const execution = beginOwnedPerformanceBisect({
+      cwd: coordinationRoot,
+      good: 'a'.repeat(40),
+      bad: 'b'.repeat(40),
+      evaluator: { command: 'must-not-run', args: [] },
+      coordination: { root: coordinationRoot, onQueued: () => markQueued?.() },
+    });
+    try {
+      await queued;
+      execution.abort();
+      await expect(execution.result).rejects.toThrow('performance_bisect_cancelled');
+      expect(
+        (await readFile(resolve(coordinationRoot, 'native-heavy.owner.json'), 'utf8')).includes('native-build'),
+      ).toBeTrue();
+      expect(await Bun.file(resolve(coordinationRoot, 'native-heavy.queue')).exists()).toBeFalse();
+    } finally {
+      execution.abort();
+      await Promise.allSettled([execution.result]);
+      await holder.release();
+      await rm(coordinationRoot, { force: true, recursive: true });
+    }
+  }, 0);
 
   test('forced bisect cancellation terminates and reaps the evaluator process group', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-cancel-'));
@@ -372,7 +439,7 @@ exit 1
       await rm(evaluatorPidPath, { force: true });
       await rm(directory, { force: true, recursive: true });
     }
-  }, 10_000);
+  }, 0);
 
   test('publishes a conservative affected-validation contract for #5396', () => {
     expect(selectAffectedPerformanceScenarios(['src/utils/adjustmentSnapshots.ts'], performanceScenarios)).toEqual({

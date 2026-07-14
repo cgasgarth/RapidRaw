@@ -17,7 +17,9 @@ interface LeaseWaiter extends LeaseOwner {
 export interface ResourceLeaseOptions {
   capacity?: number;
   label: string;
+  onQueued?: () => void;
   resource: string;
+  signal?: AbortSignal;
   timeoutMs?: number;
   pollMs?: number;
   root?: string;
@@ -141,6 +143,7 @@ const liveWaiters = async (queuePath: string): Promise<Array<{ path: string; wai
 };
 
 export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
+  if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
   const capacity = options.capacity ?? 1;
   if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error(`invalid resource capacity: ${capacity}`);
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
@@ -183,7 +186,9 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   );
 
   try {
+    options.onQueued?.();
     while (true) {
+      if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
       try {
         const acquired = await withQueueMutex(queueMutexPath, pollMs, async () => {
           const queue = await liveWaiters(queuePath);
@@ -252,6 +257,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
           lastDiagnosticAt = waitedMs;
         }
         await Bun.sleep(pollMs);
+        if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
       }
     }
   } finally {
