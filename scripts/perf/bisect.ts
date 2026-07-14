@@ -39,8 +39,11 @@ const run = async (cwd: string, command: string, args: readonly string[]) => {
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  return { exitCode, output: `${stdout}\n${stderr}`.trim() };
+  return { exitCode, output: stdout.trim(), stderr: stderr.trim() };
 };
+
+const diagnosticOutput = (result: Awaited<ReturnType<typeof run>>): string =>
+  [result.output, result.stderr].filter((value) => value.length > 0).join('\n');
 
 export async function executePerformanceBisect(options: {
   cwd: string;
@@ -54,7 +57,7 @@ export async function executePerformanceBisect(options: {
   const status = await run(parsed.cwd, 'git', ['status', '--porcelain=v1']);
   if (status.exitCode !== 0 || status.output !== '') throw new Error('Performance bisect requires a clean worktree.');
   const started = await run(parsed.cwd, 'git', ['bisect', 'start', parsed.bad, parsed.good]);
-  if (started.exitCode !== 0) throw new Error(`git bisect start failed:\n${started.output.slice(-8_000)}`);
+  if (started.exitCode !== 0) throw new Error(`git bisect start failed:\n${diagnosticOutput(started).slice(-8_000)}`);
   let evaluated: Awaited<ReturnType<typeof run>> | undefined;
   try {
     evaluated = await run(parsed.cwd, 'git', ['bisect', 'run', options.evaluator.command, ...options.evaluator.args]);
@@ -68,7 +71,8 @@ export async function executePerformanceBisect(options: {
   )?.[1];
   const candidateCommits =
     firstBadCommit === undefined ? (ambiguousBlock?.match(/[0-9a-f]{40}/gu) ?? []) : [firstBadCommit];
-  if (candidateCommits.length === 0) throw new Error(`git bisect run failed:\n${evaluated.output.slice(-8_000)}`);
+  if (candidateCommits.length === 0)
+    throw new Error(`git bisect run failed:\n${diagnosticOutput(evaluated).slice(-8_000)}`);
   return performanceBisectReportSchema.parse({
     schemaVersion: 1,
     good: parsed.good,
@@ -76,7 +80,7 @@ export async function executePerformanceBisect(options: {
     firstBadCommit,
     candidateCommits,
     evaluator: options.evaluator,
-    outputTail: evaluated.output.slice(-8_000),
+    outputTail: diagnosticOutput(evaluated).slice(-8_000),
   });
 }
 
