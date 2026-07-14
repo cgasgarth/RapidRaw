@@ -16,7 +16,10 @@ const MAX_CACHE_BYTES: usize = 64 * 1024 * 1024;
 const PIPELINE_MANIFEST: &[(&str, &str, &str, &str)] = &[
     (
         "main",
-        include_str!("../shaders/shader.wgsl"),
+        concat!(
+            include_str!("../shaders/generated_bindings.wgsl"),
+            include_str!("../shaders/shader.wgsl")
+        ),
         "main",
         "main-layout-v1",
     ),
@@ -301,7 +304,13 @@ impl GpuPipelineRegistry {
                 let cache = registry.pipeline_cache();
                 let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("Warmup image processing shader"),
-                    source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
+                    source: wgpu::ShaderSource::Wgsl(
+                        concat!(
+                            include_str!("../shaders/generated_bindings.wgsl"),
+                            include_str!("../shaders/shader.wgsl")
+                        )
+                        .into(),
+                    ),
                 });
                 let blur = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some("Warmup blur shader"),

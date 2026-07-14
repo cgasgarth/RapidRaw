@@ -1,0 +1,35 @@
+# RapidRaw render ABI manifest v1.
+#
+# This file owns the stable resource identities used by the main adjustment
+# storage buffer. Processing equations remain handwritten in Rust/WGSL.
+schema_version = 1
+layout_version = 2
+max_mask_bindings = 1
+
+[bindings.main]
+input_texture = 0
+output_texture = 1
+adjustments = 2
+mask_textures = 3
+lut_texture = 4
+lut_sampler = 5
+sharpness_blur = 6
+tonal_blur = 7
+clarity_blur = 8
+structure_blur = 9
+dehaze_blur = 10
+flare_texture = 11
+flare_sampler = 12
+
+[structs.all_adjustments]
+rust = "AllAdjustments"
+wgsl = "AllAdjustments"
+fields = ["global", "mask_adjustments", "mask_count", "tile_offset_x", "tile_offset_y", "mask_atlas_cols", "blur_pass_flags", "execution_phase", "source_width", "source_height"]
+
+[structs.global_adjustments]
+rust = "GlobalAdjustments"
+wgsl = "GlobalAdjustments"
+
+[structs.mask_adjustments]
+rust = "MaskAdjustments"
+wgsl = "MaskAdjustments"
