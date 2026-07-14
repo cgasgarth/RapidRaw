@@ -19,6 +19,7 @@ import {
 } from '../../schemas/focus-stack/focusStackCandidateRuntimeSchemas';
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -313,7 +314,10 @@ export default function AppModals(props: AppModalsProps) {
             }
             onClose={() => {
               const launchId = useOperationLaunchStore.getState().launches.hdr?.launchId;
-              if (launchId !== undefined) useOperationLaunchStore.getState().close('hdr', launchId);
+              if (launchId !== undefined) {
+                useHdrWorkflowStore.getState().close(launchId);
+                useOperationLaunchStore.getState().close('hdr', launchId);
+              }
               setUI({
                 hdrModalState: createDefaultHdrModalState(hdrModalState.settings),
               });
@@ -326,6 +330,9 @@ export default function AppModals(props: AppModalsProps) {
               props.handleStartHdr(hdrModalState.stitchingSourcePaths, operationId);
             }}
             onSettingsChange={(settings) => {
+              const launchId = useOperationLaunchStore.getState().launches.hdr?.launchId;
+              if (launchId !== undefined)
+                useHdrWorkflowStore.getState().dispatch({ type: 'settings', launchId, settings });
               setUI((state) => ({
                 hdrModalState: resetHdrStateForSettingsChange(state.hdrModalState, settings),
               }));
