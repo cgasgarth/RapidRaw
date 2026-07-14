@@ -192,6 +192,28 @@ pub struct PointColorGpuSettings {
     pub skin_control: [f32; 4],
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default, PartialEq)]
+#[repr(C)]
+pub struct PerceptualGradingGpuRange {
+    /// hue degrees, chroma, saturation, brilliance.
+    pub color: [f32; 4],
+    /// luminance EV followed by reserved values.
+    pub tone: [f32; 4],
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default, PartialEq)]
+#[repr(C)]
+pub struct PerceptualGradingGpuSettings {
+    pub shadows: PerceptualGradingGpuRange,
+    pub midtones: PerceptualGradingGpuRange,
+    pub highlights: PerceptualGradingGpuRange,
+    pub global: PerceptualGradingGpuRange,
+    /// shadow fulcrum EV, highlight fulcrum EV, falloff, balance.
+    pub range: [f32; 4],
+    /// blending, neutral protection, skin protection, enabled.
+    pub policy: [f32; 4],
+}
+
 impl Default for ToneEqualizerGpuSettings {
     fn default() -> Self {
         Self {
@@ -298,6 +320,7 @@ pub struct GlobalAdjustments {
     pub sharpness_threshold: f32,
     pub tone_equalizer: ToneEqualizerGpuSettings,
     pub point_color: PointColorGpuSettings,
+    pub perceptual_grading: PerceptualGradingGpuSettings,
     pub scene_curve_knots: [GpuCurveKnot; 32],
     pub scene_curve_parameters: GpuCurveParameters,
     pub output_curve_knots: [GpuOutputCurveKnot; 32],
@@ -354,6 +377,7 @@ pub struct MaskAdjustments {
     pub(crate) _pad_end7: f32,
     pub tone_equalizer: ToneEqualizerGpuSettings,
     pub point_color: PointColorGpuSettings,
+    pub perceptual_grading: PerceptualGradingGpuSettings,
 }
 
 pub const MAX_MASKS: usize = 32;

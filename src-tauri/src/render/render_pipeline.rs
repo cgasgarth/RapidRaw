@@ -7,9 +7,6 @@ use crate::adjustments::abi::AllAdjustments;
 use crate::deblur_render::{apply_deblur_stage, calculate_deblur_render_hash};
 use crate::denoise_cpu_reference::DenoiseSourceClass;
 use crate::denoise_render::{apply_denoise_stage_for_source, calculate_denoise_render_hash};
-use crate::grading_render::{
-    apply_perceptual_grading_stage, calculate_perceptual_grading_render_hash,
-};
 use crate::wavelet_render::{apply_wavelet_detail_stage, calculate_wavelet_detail_render_hash};
 
 pub(crate) struct PreGpuDetailStageResult<'a> {
@@ -54,17 +51,15 @@ pub(crate) fn apply_pre_gpu_detail_stages<'a>(
     let deblur_render_hash = calculate_deblur_render_hash(denoise_render_hash, adjustments);
     let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), adjustments);
     let wavelet_render_hash = calculate_wavelet_detail_render_hash(deblur_render_hash, adjustments);
-    let grading_image = apply_perceptual_grading_stage(wavelet_image.as_ref(), adjustments);
-    let render_hash = calculate_perceptual_grading_render_hash(wavelet_render_hash, adjustments);
+    let render_hash = wavelet_render_hash;
 
     let stage_changed = matches!(denoised_image, Cow::Owned(_))
         || matches!(deblurred_image.image, Cow::Owned(_))
-        || matches!(wavelet_image, Cow::Owned(_))
-        || matches!(grading_image, Cow::Owned(_));
+        || matches!(wavelet_image, Cow::Owned(_));
 
     PreGpuDetailStageResult {
         image: if stage_changed {
-            Cow::Owned(grading_image.into_owned())
+            Cow::Owned(wavelet_image.into_owned())
         } else {
             Cow::Borrowed(image)
         },
@@ -172,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn perceptual_grading_runs_in_authoritative_pre_gpu_pipeline() {
+    fn perceptual_grading_is_deferred_to_authoritative_edit_graph() {
         let image = test_image();
         let result = apply_pre_gpu_detail_stages(
             &image,
@@ -197,17 +192,7 @@ mod tests {
             true,
         );
 
-        assert!(matches!(result.image, Cow::Owned(_)));
-        assert_ne!(result.render_hash, 42);
-        assert_ne!(result.image.to_rgb32f(), image.to_rgb32f());
-        assert!(
-            result
-                .image
-                .to_rgb32f()
-                .as_raw()
-                .iter()
-                .all(|channel| channel.is_finite())
-        );
+        assert!(matches!(result.image, Cow::Borrowed(_)));
     }
 
     #[test]

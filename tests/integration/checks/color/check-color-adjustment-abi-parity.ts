@@ -19,6 +19,8 @@ const STRUCTS = [
   'LevelsSettings',
   'ColorBalanceRgbSettings',
   'ToneEqualizerGpuSettings',
+  'PerceptualGradingGpuRange',
+  'PerceptualGradingGpuSettings',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',

@@ -134,6 +134,20 @@ struct PointColorGpuSettings {
     skin_control: vec4<f32>,
 }
 
+struct PerceptualGradingGpuRange {
+    color: vec4<f32>,
+    tone: vec4<f32>,
+}
+
+struct PerceptualGradingGpuSettings {
+    shadows: PerceptualGradingGpuRange,
+    midtones: PerceptualGradingGpuRange,
+    highlights: PerceptualGradingGpuRange,
+    global: PerceptualGradingGpuRange,
+    range: vec4<f32>,
+    policy: vec4<f32>,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -230,6 +244,7 @@ struct GlobalAdjustments {
     sharpness_threshold: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
     point_color: PointColorGpuSettings,
+    perceptual_grading: PerceptualGradingGpuSettings,
     scene_curve_knots: array<GpuCurveKnot, 32>,
     scene_curve_parameters: GpuCurveParameters,
     output_curve_knots: array<GpuOutputCurveKnot, 32>,
@@ -288,6 +303,7 @@ struct MaskAdjustments {
     _pad_end7: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
     point_color: PointColorGpuSettings,
+    perceptual_grading: PerceptualGradingGpuSettings,
 }
 
 struct AllAdjustments {
@@ -1419,6 +1435,108 @@ fn apply_point_color(color: vec3<f32>, settings: PointColorGpuSettings) -> vec3<
         return mix(grayscale, edited, visualization_weight);
     }
     return edited;
+}
+
+fn grading_signed_cbrt(value: f32) -> f32 {
+    return sign(value) * pow(abs(value), 1.0 / 3.0);
+}
+
+fn grading_ap1_to_oklab(ap1: vec3<f32>) -> vec3<f32> {
+    let rgb = vec3<f32>(
+        1.7050515 * ap1.r - 0.6217907 * ap1.g - 0.0832584 * ap1.b,
+        -0.1302571 * ap1.r + 1.1408029 * ap1.g - 0.0105485 * ap1.b,
+        -0.0240033 * ap1.r - 0.1289688 * ap1.g + 1.1529717 * ap1.b,
+    );
+    let l = grading_signed_cbrt(0.41222146 * rgb.r + 0.53633255 * rgb.g + 0.051445995 * rgb.b);
+    let m = grading_signed_cbrt(0.2119035 * rgb.r + 0.6806995 * rgb.g + 0.10739696 * rgb.b);
+    let s = grading_signed_cbrt(0.08830246 * rgb.r + 0.28171885 * rgb.g + 0.6299787 * rgb.b);
+    return vec3<f32>(
+        0.21045426 * l + 0.7936178 * m - 0.004072047 * s,
+        1.9779985 * l - 2.4285922 * m + 0.4505937 * s,
+        0.025904037 * l + 0.78277177 * m - 0.80867577 * s,
+    );
+}
+
+fn grading_oklab_to_ap1(lab: vec3<f32>) -> vec3<f32> {
+    let l = pow(lab.x + 0.39633778 * lab.y + 0.21580376 * lab.z, 3.0);
+    let m = pow(lab.x - 0.105561346 * lab.y - 0.06385417 * lab.z, 3.0);
+    let s = pow(lab.x - 0.08948418 * lab.y - 1.2914855 * lab.z, 3.0);
+    let rgb = vec3<f32>(
+        4.0767417 * l - 3.3077116 * m + 0.23096994 * s,
+        -1.268438 * l + 2.6097574 * m - 0.34131938 * s,
+        -0.0041960863 * l - 0.7034186 * m + 1.7076147 * s,
+    );
+    return vec3<f32>(
+        0.6131324 * rgb.r + 0.339538 * rgb.g + 0.0474167 * rgb.b,
+        0.0701244 * rgb.r + 0.916394 * rgb.g + 0.0134515 * rgb.b,
+        0.0205877 * rgb.r + 0.1095746 * rgb.g + 0.8697854 * rgb.b,
+    );
+}
+
+fn grading_canonical_hue(degrees: f32) -> f32 {
+    return degrees - floor((degrees + 180.0) / 360.0) * 360.0;
+}
+
+fn grading_range_weights(ev: f32, settings: PerceptualGradingGpuSettings) -> vec3<f32> {
+    let shift = settings.range.w * 2.0;
+    let width = settings.range.z * (0.5 + settings.policy.x * 1.5);
+    let shadow = 1.0 - smoothstep(settings.range.x + shift - width, settings.range.x + shift + width, ev);
+    let highlight = smoothstep(settings.range.y + shift - width, settings.range.y + shift + width, ev);
+    let midtone = max(1.0 - shadow - highlight, 0.0);
+    let total = shadow + midtone + highlight;
+    return select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(shadow, midtone, highlight) / total, total > 1.0e-7);
+}
+
+fn grading_apply_range(
+    input: vec3<f32>,
+    range: PerceptualGradingGpuRange,
+    weight: f32,
+    policy: vec4<f32>,
+) -> vec3<f32> {
+    if (weight <= 1.0e-7) {
+        return input;
+    }
+    let chroma = length(input.yz);
+    let hue = atan2(input.z, input.y);
+    let neutral_guard = 1.0 - policy.y * exp(-chroma / 0.035);
+    let hue_degrees = degrees(hue);
+    let raw_skin_distance = abs(hue_degrees - 50.0) % 360.0;
+    let skin_distance = min(raw_skin_distance, 360.0 - raw_skin_distance);
+    let skin_guard = 1.0 - policy.z * (1.0 - smoothstep(20.0, 65.0, skin_distance));
+    let color_weight = weight * neutral_guard * skin_guard;
+    let rotated_hue = hue + radians(grading_canonical_hue(range.color.x)) * color_weight;
+    let saturated = chroma * exp2(range.color.z * color_weight);
+    let target_chroma = max(saturated + range.color.y * 0.12 * color_weight, 0.0);
+    var output = input;
+    output.x *= exp2(range.tone.x * weight / 3.0);
+    output.x += range.color.w * target_chroma * weight * 0.22;
+    let brilliant_chroma = target_chroma * max(1.0 + range.color.w * weight * 0.18, 0.0);
+    output.y = brilliant_chroma * cos(rotated_hue);
+    output.z = brilliant_chroma * sin(rotated_hue);
+    return output;
+}
+
+fn apply_perceptual_grading(color: vec3<f32>, settings: PerceptualGradingGpuSettings) -> vec3<f32> {
+    if (settings.policy.w <= 0.5) {
+        return color;
+    }
+    let scene_luma = max(dot(color, vec3<f32>(0.27222872, 0.67408174, 0.05368952)), 1.0e-8);
+    let weights = grading_range_weights(clamp(log2(scene_luma / 0.18), -24.0, 24.0), settings);
+    let color_controls = abs(settings.shadows.color) + abs(settings.midtones.color)
+        + abs(settings.highlights.color) + abs(settings.global.color);
+    if (all(color_controls < vec4<f32>(1.0e-7))) {
+        let luminance_ev = settings.shadows.tone.x * weights.x
+            + settings.midtones.tone.x * weights.y
+            + settings.highlights.tone.x * weights.z
+            + settings.global.tone.x;
+        return color * exp2(luminance_ev);
+    }
+    var lab = grading_ap1_to_oklab(color);
+    lab = grading_apply_range(lab, settings.shadows, weights.x, settings.policy);
+    lab = grading_apply_range(lab, settings.midtones, weights.y, settings.policy);
+    lab = grading_apply_range(lab, settings.highlights, weights.z, settings.policy);
+    lab = grading_apply_range(lab, settings.global, 1.0, settings.policy);
+    return grading_oklab_to_ap1(lab);
 }
 
 fn apply_color_grading(color: vec3<f32>, shadows: ColorGradeSettings, midtones: ColorGradeSettings, highlights: ColorGradeSettings, global: ColorGradeSettings, blending: f32, balance: f32) -> vec3<f32> {
@@ -2583,6 +2701,25 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         if (influence > 0.001) {
             let local_point_color = apply_point_color(composite_rgb_linear, adjustments.mask_adjustments[i].point_color);
             composite_rgb_linear = mix(composite_rgb_linear, local_point_color, influence);
+        }
+    }
+    composite_rgb_linear = apply_perceptual_grading(
+        composite_rgb_linear,
+        adjustments.global.perceptual_grading,
+    );
+    for (var i = 0u; i < adjustments.mask_count; i += 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let local_perceptual_grade = apply_perceptual_grading(
+                composite_rgb_linear,
+                adjustments.mask_adjustments[i].perceptual_grading,
+            );
+            composite_rgb_linear = blend_mask_layer(
+                composite_rgb_linear,
+                local_perceptual_grade,
+                influence,
+                adjustments.mask_adjustments[i].blend_mode,
+            );
         }
     }
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
