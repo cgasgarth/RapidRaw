@@ -26,6 +26,7 @@
     "check:types": "bun run typecheck",
     "typecheck": "bun scripts/ci/run-compact-command.ts --label typecheck -- bun node_modules/typescript/bin/tsc --noEmit --pretty false --checkers 4",
     "check:rust": "bun run check:rust:fmt && bun run check:rust:clippy",
+    "check:render-abi": "bun scripts/checks/ci/check-render-abi.ts",
     "check:native-profiles": "bun scripts/checks/ci/check-native-profiles.ts",
     "check:rust:fmt": "bun scripts/ci/run-compact-command.ts --label rust:fmt --cwd src-tauri -- cargo fmt --all -- --check",
     "check:rust:clippy": "bun scripts/ci/run-resource-coordinated.ts --resource native-heavy --label rust-clippy -- bun scripts/ci/run-compact-command.ts --label rust:clippy --cwd src-tauri -- cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings -W clippy::redundant_clone",

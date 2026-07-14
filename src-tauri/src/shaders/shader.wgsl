@@ -367,23 +367,23 @@ const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
     50.0,
 );
 
-@group(0) @binding(0) var input_texture: texture_2d<f32>;
-@group(0) @binding(1) var output_texture: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(2) var<storage, read> adjustments: AllAdjustments;
+@group(0) @binding(MAIN_BINDING_INPUT_TEXTURE) var input_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_OUTPUT_TEXTURE) var output_texture: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(MAIN_BINDING_ADJUSTMENTS) var<storage, read> adjustments: AllAdjustments;
 
-@group(0) @binding(3) var mask_textures: texture_2d_array<f32>;
+@group(0) @binding(MAIN_BINDING_MASK_TEXTURES) var mask_textures: texture_2d_array<f32>;
 
-@group(0) @binding(4) var lut_texture: texture_3d<f32>;
-@group(0) @binding(5) var lut_sampler: sampler;
+@group(0) @binding(MAIN_BINDING_LUT_TEXTURE) var lut_texture: texture_3d<f32>;
+@group(0) @binding(MAIN_BINDING_LUT_SAMPLER) var lut_sampler: sampler;
 
-@group(0) @binding(6) var sharpness_blur_texture: texture_2d<f32>;
-@group(0) @binding(7) var tonal_blur_texture: texture_2d<f32>;
-@group(0) @binding(8) var clarity_blur_texture: texture_2d<f32>;
-@group(0) @binding(9) var structure_blur_texture: texture_2d<f32>;
-@group(0) @binding(10) var dehaze_blur_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_SHARPNESS_BLUR) var sharpness_blur_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_TONAL_BLUR) var tonal_blur_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_CLARITY_BLUR) var clarity_blur_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_STRUCTURE_BLUR) var structure_blur_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_DEHAZE_BLUR) var dehaze_blur_texture: texture_2d<f32>;
 
-@group(0) @binding(11) var flare_texture: texture_2d<f32>;
-@group(0) @binding(12) var flare_sampler: sampler;
+@group(0) @binding(MAIN_BINDING_FLARE_TEXTURE) var flare_texture: texture_2d<f32>;
+@group(0) @binding(MAIN_BINDING_FLARE_SAMPLER) var flare_sampler: sampler;
 
 const ACESCG_LUMINANCE_COEFF = vec3<f32>(0.27222872, 0.67408174, 0.05368952);
 const VIEW_ENCODED_LUMA_COEFF = vec3<f32>(0.2126, 0.7152, 0.0722);
