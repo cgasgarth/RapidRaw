@@ -33,6 +33,8 @@ export interface ViewerSurfacePointerEvent {
   readonly type: 'lostpointercapture' | 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
 }
 
+export type ViewerSurfaceInputEvent = ViewerSurfacePointerEvent | { readonly type: 'blur' | 'escape' };
+
 export const normalizeViewerSurfacePointerEvent = (event: {
   altKey?: boolean;
   button?: number;
