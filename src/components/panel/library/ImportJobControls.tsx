@@ -14,11 +14,17 @@ import UiText from '../../ui/primitives/Text';
 
 export function ImportCancellationButton() {
   const { t } = useTranslation();
+  const generation = useProcessStore((state) => state.importState.generation);
+  const jobId = useProcessStore((state) => state.importState.jobId);
+  const authority = generation === undefined || jobId === undefined ? null : { generation, jobId };
   return (
     <Button
       aria-label={t('modals.importSettings.cancel')}
       className="h-7 px-2"
-      onClick={() => void cancelImportWithSchema()}
+      disabled={authority === null}
+      onClick={() => {
+        if (authority) void cancelImportWithSchema(authority);
+      }}
       size="sm"
     >
       <XCircle size={14} className="mr-1" /> {t('modals.importSettings.cancel')}
@@ -45,10 +51,13 @@ export function ImportResumeButton({ importState }: { importState: ImportState }
                 );
                 return;
               }
-              return resumeImportJobWithSchema(jobId).then(() => {
-                useProcessStore.getState().setImportState({
-                  resumeError: '',
-                  status: Status.Importing,
+              return resumeImportJobWithSchema(jobId).then((authority) => {
+                useProcessStore.getState().setImportState((state) => {
+                  if (state.generation === authority.generation && state.jobId === authority.jobId)
+                    return { resumeError: '' };
+                  if (state.generation === undefined || authority.generation > state.generation)
+                    return { ...authority, resumeError: '', status: Status.Importing };
+                  return { resumeError: '' };
                 });
                 toast.success(
                   `Import resumed: ${String(validation.resumable.length)} remaining, ${String(validation.verifiedCompleted.length)} already complete.`,

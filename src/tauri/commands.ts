@@ -115,6 +115,7 @@ export enum Invokes {
   HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
   CancelImport = 'cancel_import',
+  GetActiveImportJobStatus = 'get_active_import_job_status',
   GetImportJobReceipt = 'get_import_job_receipt',
   ValidateImportJobResume = 'validate_import_job_resume',
   ResumeImportJob = 'resume_import_job',

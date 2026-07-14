@@ -5,6 +5,7 @@ describe('import pipeline event contracts', () => {
   test('accepts staged byte progress and incremental catalog publication', () => {
     const payload = parseImportProgressPayload({
       jobId: 'import-123',
+      generation: 4,
       stage: 'cataloging',
       current: 2,
       total: 10,
@@ -22,8 +23,13 @@ describe('import pipeline event contracts', () => {
     expect(payload.bytesCopied).toBe(12_000_000);
   });
 
-  test('retains compatibility with legacy progress and optional job ids', () => {
-    expect(parseImportStartPayload({ total: 2 })).toEqual({ total: 2 });
-    expect(parseImportProgressPayload({ current: 1, total: 2, path: 'one.ARW' }).path).toBe('one.ARW');
+  test('requires exact job authority on starts and progress', () => {
+    expect(parseImportStartPayload({ jobId: 'import-123', generation: 4, total: 2 })).toEqual({
+      jobId: 'import-123',
+      generation: 4,
+      total: 2,
+    });
+    expect(() => parseImportStartPayload({ total: 2 })).toThrow();
+    expect(() => parseImportProgressPayload({ current: 1, total: 2, path: 'one.ARW' })).toThrow();
   });
 });

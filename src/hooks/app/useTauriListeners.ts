@@ -17,8 +17,10 @@ import {
   parseDenoiseProgressPayload,
   parseExportReceiptPayload,
   parseHdrCompletePayload,
+  parseImportErrorPayload,
   parseImportProgressPayload,
   parseImportStartPayload,
+  parseImportTerminalPayload,
   parsePanoramaCompletePayload,
   parseProgressPayload,
   parseRenderPathPayload,
@@ -49,6 +51,7 @@ import {
   hasCommittedExportOutputs,
   shouldRefreshLibraryForExportReceipt,
 } from '../../utils/export/exportTerminalReceipt';
+import { isCurrentImportAuthority, shouldAcceptImportStart } from '../../utils/importEventAuthority';
 import { applyNativeQaOpenFixture, applyNativeQaReset } from '../../utils/nativeQaControlEvents';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
@@ -518,10 +521,11 @@ export function useTauriListeners({
       }),
       listen<unknown>(IMPORT_START_EVENT, (event) => {
         const payload = parseImportStartPayload(event.payload);
-        if (isEffectActive)
+        if (isEffectActive && shouldAcceptImportStart(payload, useProcessStore.getState().importState))
           useProcessStore.getState().setImportState({
             errorMessage: '',
-            ...(payload.jobId ? { jobId: payload.jobId } : {}),
+            generation: payload.generation,
+            jobId: payload.jobId,
             path: '',
             progress: { current: 0, total: payload.total },
             status: Status.Importing,
@@ -529,6 +533,7 @@ export function useTauriListeners({
       }),
       listen<unknown>(IMPORT_PROGRESS_EVENT, (event) => {
         const payload = parseImportProgressPayload(event.payload);
+        if (!isCurrentImportAuthority(payload, useProcessStore.getState().importState)) return;
         if (isEffectActive)
           useProcessStore.getState().setImportState({
             path: payload.path,
@@ -541,11 +546,14 @@ export function useTauriListeners({
           refs.current.refreshImageList();
         }
       }),
-      listen(IMPORT_CANCELLED_EVENT, () => {
-        if (isEffectActive) useProcessStore.getState().setImportState({ status: Status.Cancelled });
+      listen<unknown>(IMPORT_CANCELLED_EVENT, (event) => {
+        const payload = parseImportTerminalPayload(event.payload);
+        if (isEffectActive && isCurrentImportAuthority(payload, useProcessStore.getState().importState))
+          useProcessStore.getState().setImportState({ status: Status.Cancelled });
       }),
-      listen(IMPORT_COMPLETE_EVENT, () => {
-        if (isEffectActive) {
+      listen<unknown>(IMPORT_COMPLETE_EVENT, (event) => {
+        const payload = parseImportTerminalPayload(event.payload);
+        if (isEffectActive && isCurrentImportAuthority(payload, useProcessStore.getState().importState)) {
           useProcessStore.getState().setImportState({ status: Status.Success });
           refs.current.refreshAllFolderTrees();
           const currentPath = useLibraryStore.getState().currentFolderPath;
@@ -555,10 +563,11 @@ export function useTauriListeners({
         }
       }),
       listen<unknown>(IMPORT_ERROR_EVENT, (event) => {
-        if (isEffectActive)
+        const payload = parseImportErrorPayload(event.payload);
+        if (isEffectActive && isCurrentImportAuthority(payload, useProcessStore.getState().importState))
           useProcessStore.getState().setImportState({
             status: Status.Error,
-            errorMessage: parseStringPayload(event.payload),
+            errorMessage: payload.message,
           });
       }),
       listen<unknown>(DENOISE_PROGRESS_EVENT, (event) => {

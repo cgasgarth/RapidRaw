@@ -13,11 +13,15 @@ let resumeValidation = {
   resumable: [2, 3],
   verifiedCompleted: [0, 1],
 };
+let beforeResumeResponse: (() => void) | null = null;
 const invoke = mock(async (command: string, args: unknown) => {
   invocations.push({ args, command });
   if (command === 'cancel_import') return true;
   if (command === 'validate_import_job_resume') return resumeValidation;
-  if (command === 'resume_import_job') return 'import-100';
+  if (command === 'resume_import_job') {
+    beforeResumeResponse?.();
+    return { generation: 2, jobId: 'import-100' };
+  }
   throw new Error(`Unexpected invoke: ${command}`);
 });
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
@@ -36,6 +40,7 @@ let runtime: { container: HTMLDivElement; root: Root } | null = null;
 beforeEach(() => {
   invocations.length = 0;
   invoke.mockClear();
+  beforeResumeResponse = null;
   resumeValidation = {
     invalid: [],
     jobId: 'import-100',
@@ -45,6 +50,7 @@ beforeEach(() => {
   useProcessStore.setState({
     importState: {
       errorMessage: '',
+      generation: 1,
       jobId: 'import-100',
       path: '',
       progress: { current: 2, total: 4 },
@@ -63,7 +69,27 @@ describe('import command controls', () => {
   test('Cancel invokes cooperative cancellation from the visible import action', async () => {
     const { container } = await renderControl(createElement(ImportCancellationButton));
     await click(container, 'Cancel');
-    expect(invocations).toEqual([{ args: {}, command: 'cancel_import' }]);
+    expect(invocations).toEqual([{ args: { generation: 1, jobId: 'import-100' }, command: 'cancel_import' }]);
+  });
+
+  test('Cancel follows a successor job authority instead of retaining the predecessor', async () => {
+    const { container } = await renderControl(createElement(ImportCancellationButton));
+    await act(async () => {
+      useProcessStore.getState().setImportState({ generation: 2, jobId: 'import-200' });
+      await Promise.resolve();
+    });
+    await click(container, 'Cancel');
+    expect(invocations).toEqual([{ args: { generation: 2, jobId: 'import-200' }, command: 'cancel_import' }]);
+  });
+
+  test('Cancel follows the resumed generation of the same job ID', async () => {
+    const { container } = await renderControl(createElement(ImportCancellationButton));
+    await act(async () => {
+      useProcessStore.getState().setImportState({ generation: 2 });
+      await Promise.resolve();
+    });
+    await click(container, 'Cancel');
+    expect(invocations).toEqual([{ args: { generation: 2, jobId: 'import-100' }, command: 'cancel_import' }]);
   });
 
   test('Resume validates the journal, invokes resume, and returns UI state to importing', async () => {
@@ -76,6 +102,7 @@ describe('import command controls', () => {
       { args: { jobId: 'import-100' }, command: 'resume_import_job' },
     ]);
     expect(useProcessStore.getState().importState.status).toBe(Status.Importing);
+    expect(useProcessStore.getState().importState.generation).toBe(2);
     expect(useProcessStore.getState().importState.resumeValidation?.resumable).toEqual([2, 3]);
   });
 
@@ -100,6 +127,23 @@ describe('import command controls', () => {
     expect(invocations.map(({ command }) => command)).toEqual(['validate_import_job_resume']);
     expect(useProcessStore.getState().importState.status).toBe(Status.Cancelled);
     expect(useProcessStore.getState().importState.resumeValidation?.invalid).toHaveLength(1);
+  });
+
+  test('Resume invoke resolution cannot overwrite a keyed terminal event that arrived first', async () => {
+    beforeResumeResponse = () => {
+      useProcessStore.getState().setImportState({ generation: 2, jobId: 'import-100', status: Status.Success });
+    };
+    const { container } = await renderControl(
+      createElement(ImportResumeButton, { importState: useProcessStore.getState().importState }),
+    );
+
+    await click(container, 'Resume Import');
+
+    expect(useProcessStore.getState().importState).toMatchObject({
+      generation: 2,
+      jobId: 'import-100',
+      status: Status.Success,
+    });
   });
 });
 

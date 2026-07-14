@@ -106,6 +106,7 @@ pub struct AppServices {
     pub(crate) burst_sr:
         Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
     pub(crate) panorama: Arc<crate::merge::panorama_stitching::service::PanoramaService>,
+    pub(crate) import_jobs: Arc<crate::library::import_job_service::ImportJobService>,
     pub jobs: Arc<JobCoordinator>,
 }
 

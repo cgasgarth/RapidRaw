@@ -4,6 +4,12 @@ export const fileOperationPathSchema = z.string().trim().min(1);
 export const fileOperationPathListSchema = z.array(fileOperationPathSchema).min(1);
 export const fileOperationVoidResponseSchema = z.unknown().transform(() => undefined);
 export const importJobIdSchema = z.string().min(1);
+export const importJobAuthoritySchema = z
+  .object({
+    generation: z.number().int().positive(),
+    jobId: importJobIdSchema,
+  })
+  .strict();
 export const importStageSchema = z.enum([
   'preflight',
   'inspecting',
@@ -94,6 +100,7 @@ export type CopyMoveFilesRequest = z.infer<typeof copyMoveFilesRequestSchema>;
 export type CreateFolderRequest = z.infer<typeof createFolderRequestSchema>;
 export type DeleteFilesRequest = z.infer<typeof deleteFilesRequestSchema>;
 export type ImportFilesRequest = z.infer<typeof importFilesRequestSchema>;
+export type ImportJobAuthority = z.infer<typeof importJobAuthoritySchema>;
 export type ImportResumeValidation = z.infer<typeof importResumeValidationSchema>;
 export type RenameFilesRequest = z.infer<typeof renameFilesRequestSchema>;
 export type RenameFolderRequest = z.infer<typeof renameFolderRequestSchema>;

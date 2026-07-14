@@ -158,12 +158,6 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
-pub struct ImportJob {
-    pub job_id: String,
-    pub cancellation_token: Arc<AtomicBool>,
-    pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
-}
-
 pub struct WarpedImageCache {
     pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
     pub image: Arc<DynamicImage>,
@@ -192,7 +186,6 @@ pub struct AppState {
     #[cfg(feature = "ai")]
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     export_jobs: crate::export::job_registry::ExportJobRegistry,
-    pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
@@ -266,7 +259,6 @@ impl AppState {
                 Arc::clone(&cache_budget),
             ),
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
-            import_job: Mutex::new(None),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
