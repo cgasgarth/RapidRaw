@@ -4,6 +4,7 @@ import {
   Camera,
   Crop,
   FileInput,
+  Film,
   Info,
   Layers,
   Paintbrush,
@@ -75,6 +76,18 @@ const withHost = (
 
 export const RIGHT_PANEL_GROUPS = [
   [
+    withHost(
+      {
+        fallbackLabel: 'Film',
+        icon: Film,
+        id: Panel.Film,
+        keywords: ['film', 'emulation', 'profile', 'grain', 'print'],
+        priority: 'primary',
+        shortLabel: 'Film',
+        tooltipKey: 'editor.switcher.tooltips.film',
+      },
+      workspacePanel('Film Emulation'),
+    ),
     withHost(
       {
         fallbackLabel: 'Color',
@@ -211,6 +224,7 @@ export const DEFAULT_EDITOR_RIGHT_PANEL = Panel.Color;
 export const EDITING_RIGHT_PANELS = [
   Panel.Color,
   Panel.Adjustments,
+  Panel.Film,
   Panel.Crop,
   Panel.Masks,
   Panel.Agent,
