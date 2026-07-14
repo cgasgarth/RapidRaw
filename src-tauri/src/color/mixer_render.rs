@@ -165,14 +165,12 @@ pub(crate) fn apply_black_white_mixer(
     }
 
     if settings.process == NEUTRAL_PANCHROMATIC_V1
-        && settings.implementation_version
-            == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1
+        && settings.implementation_version == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
     {
         return neutral_panchromatic_v1(color);
     }
     if settings.process == CONTINUOUS_SENSITIVITY_V1
-        && settings.implementation_version
-            == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION_V1
+        && settings.implementation_version == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
     {
         return continuous_sensitivity_v1(
             color,
@@ -311,7 +309,7 @@ mod tests {
     };
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::monochrome::{
-        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION_V1, NEUTRAL_PANCHROMATIC_V1,
+        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION, NEUTRAL_PANCHROMATIC_V1,
     };
 
     fn source_image() -> DynamicImage {
@@ -450,7 +448,7 @@ mod tests {
         assert_eq!(settings.process, LEGACY_FIXED_BAND_V1);
         assert_eq!(
             settings.implementation_version,
-            MONOCHROME_IMPLEMENTATION_VERSION_V1
+            MONOCHROME_IMPLEMENTATION_VERSION
         );
 
         for (source, expected) in [
@@ -488,7 +486,7 @@ mod tests {
         assert_eq!(settings.process, NEUTRAL_PANCHROMATIC_V1);
         assert_eq!(
             settings.implementation_version,
-            MONOCHROME_IMPLEMENTATION_VERSION_V1
+            MONOCHROME_IMPLEMENTATION_VERSION
         );
         let output = apply_black_white_mixer([4.0, 2.0, 0.5], settings, false);
         assert!(
@@ -859,5 +857,125 @@ mod gpu_runtime_tests {
             (output.get_pixel(0, 0)[0] - output.get_pixel(7, 0)[0]).abs() > 0.1,
             "continuous sensitivity must separate distinct source colors"
         );
+    }
+
+    #[test]
+    fn scene_monochrome_toning_matches_cpu_wgpu_preview_export_and_batch() {
+        use std::sync::Arc;
+
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(4, 3, |x, y| {
+            let scale = 0.6 + (x + y) as f32 * 0.3;
+            Rgba([1.2 * scale, 0.45 * scale, 0.18 * scale, 0.82])
+        }));
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "blackWhiteMixer": {
+                "enabled": true,
+                "process": "continuous_sensitivity_v1",
+                "weights": {
+                    "reds": 35, "oranges": 20, "yellows": 0, "greens": -10,
+                    "aquas": -20, "blues": -30, "purples": 0, "magentas": 20
+                }
+            },
+            "colorGrading": {
+                "shadows": {"hue": 220, "saturation": 20, "luminance": 0},
+                "midtones": {"hue": 35, "saturation": 12, "luminance": 0},
+                "highlights": {"hue": 48, "saturation": 18, "luminance": 0},
+                "global": {"hue": 32, "saturation": 16, "luminance": 0},
+                "blending": 50,
+                "balance": 0
+            }
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 11, 12, 13),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("toned monochrome plan compiles");
+        assert_eq!(
+            plan.adjustments
+                .global
+                .black_white_mixer
+                .implementation_version,
+            crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
+        );
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU toned monochrome render succeeds");
+        let mut legacy_raw = raw.clone();
+        legacy_raw["blackWhiteMixer"]["process"] = json!("legacy_fixed_band_v1");
+        let legacy_plan = crate::render_plan::compile_render_plan(
+            &legacy_raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&legacy_raw, 11, 12, 14),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("legacy toned monochrome plan compiles");
+        let legacy = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &legacy_plan.adjustments,
+            &[],
+            None,
+            &legacy_plan.edit_graph,
+        )
+        .expect("legacy monochrome render succeeds");
+        assert!(legacy.to_rgba32f().pixels().all(|pixel| {
+            (pixel[0] - pixel[1]).abs() <= 1.0e-6 && (pixel[1] - pixel[2]).abs() <= 1.0e-6
+        }));
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let render = |consumer: &str| {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, consumer),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: &[],
+                    lut: None,
+                    roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&plan.edit_graph),
+                    ),
+                },
+                consumer,
+            )
+            .expect("WGPU toned monochrome render succeeds")
+        };
+        let preview = render("monochrome_toning_preview");
+        let export = render("monochrome_toning_export");
+        let batch = render("monochrome_toning_batch");
+
+        assert!(max_rgb_delta(&cpu, &preview) <= 0.008);
+        assert!(max_rgb_delta(&preview, &export) <= 0.001);
+        assert!(max_rgb_delta(&export, &batch) <= 0.001);
+        assert!(
+            preview.to_rgba32f().pixels().any(|pixel| {
+                (pixel[0] - pixel[1]).abs().max((pixel[1] - pixel[2]).abs()) > 0.01
+            })
+        );
+        assert!(preview.to_rgba32f().pixels().all(|pixel| {
+            pixel.0.iter().all(|channel| channel.is_finite()) && (pixel[3] - 0.82).abs() <= 0.002
+        }));
     }
 }
