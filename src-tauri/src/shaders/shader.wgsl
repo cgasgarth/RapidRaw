@@ -2082,6 +2082,60 @@ fn agx_full_transform(color_in: vec3<f32>) -> vec3<f32> {
     return final_color;
 }
 
+fn film_coupler_periodic_field(angle_deg: f32) -> vec2<f32> {
+    let angle = ((angle_deg % 360.0) + 360.0) % 360.0;
+    let segment = floor(angle / 60.0);
+    let local = (angle - segment * 60.0) / 60.0;
+    let t = local * local * (3.0 - 2.0 * local);
+    if (segment < 1.0) { return mix(vec2<f32>(0.0, 0.0), vec2<f32>(4.0, 0.05), t); }
+    if (segment < 2.0) { return mix(vec2<f32>(4.0, 0.05), vec2<f32>(7.0, 0.08), t); }
+    if (segment < 3.0) { return mix(vec2<f32>(7.0, 0.08), vec2<f32>(3.0, -0.04), t); }
+    if (segment < 4.0) { return mix(vec2<f32>(3.0, -0.04), vec2<f32>(-2.0, -0.06), t); }
+    if (segment < 5.0) { return mix(vec2<f32>(-2.0, -0.06), vec2<f32>(-1.0, 0.02), t); }
+    return mix(vec2<f32>(-1.0, 0.02), vec2<f32>(0.0, 0.0), t);
+}
+
+fn film_coupler_matrix(exposure_ev: f32) -> vec4<f32> {
+    if (exposure_ev <= -4.0) { return vec4<f32>(1.02, 0.03, -0.02, 0.98); }
+    if (exposure_ev <= 0.0) {
+        let t = (exposure_ev + 4.0) / 4.0;
+        return mix(vec4<f32>(1.01, 0.02, -0.015, 1.01), vec4<f32>(1.0, 0.015, -0.01, 1.02), t);
+    }
+    if (exposure_ev <= 4.0) {
+        let t = exposure_ev / 4.0;
+        return mix(vec4<f32>(1.0, 0.015, -0.01, 1.02), vec4<f32>(0.98, -0.01, 0.02, 1.03), t);
+    }
+    if (exposure_ev <= 8.0) {
+        let t = (exposure_ev - 4.0) / 4.0;
+        return mix(vec4<f32>(0.98, -0.01, 0.02, 1.03), vec4<f32>(0.96, -0.02, 0.03, 1.04), t);
+    }
+    return vec4<f32>(0.96, -0.02, 0.03, 1.04);
+}
+
+fn apply_film_color_coupler(color_in: vec3<f32>, exposure_ev: f32) -> vec3<f32> {
+    let luminance = dot(vec3<f32>(0.27222872, 0.67408177, 0.05368952), color_in);
+    if (luminance != luminance || abs(luminance) > 3.4e38 || abs(luminance) <= 1.0e-8) { return color_in; }
+    let distance = abs(color_in - vec3<f32>(luminance));
+    if (max(max(distance.x, distance.y), distance.z) <= 1.0e-6) { return color_in; }
+    let normalized = (color_in - vec3<f32>(luminance)) / abs(luminance);
+    let matrix = film_coupler_matrix(exposure_ev);
+    let o1 = matrix.x * (normalized.x - normalized.y) + matrix.y * (normalized.z - normalized.y);
+    let o2 = matrix.z * (normalized.x - normalized.y) + matrix.w * (normalized.z - normalized.y);
+    let chroma = length(vec2<f32>(o1, o2));
+    if (chroma != chroma || chroma > 3.4e38 || chroma <= 1.0e-8) { return color_in; }
+    let gate = chroma / (chroma + 0.08);
+    let hue = atan2(o2, o1);
+    let field = film_coupler_periodic_field(degrees(hue));
+    let hue_delta = clamp(gate * field.x, -12.0, 12.0);
+    let chroma_scale = clamp(exp(gate * field.y), 1.0 / 1.35, 1.35);
+    let output_chroma = min(chroma * chroma_scale, 1.5);
+    let output_hue = hue + radians(hue_delta);
+    let output_o1 = output_chroma * cos(output_hue);
+    let output_o2 = output_chroma * sin(output_hue);
+    let q_y = -(0.27222872 * output_o1 + 0.05368952 * output_o2);
+    return vec3<f32>(luminance) + abs(luminance) * vec3<f32>(q_y + output_o1, q_y, q_y + output_o2);
+}
+
 fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
     let mix_amount = clamp(adjustments.global._pad_cg1, 0.0, 1.0);
     let shaper_p = max(adjustments.global._pad_cg2, 1.0e-6);
@@ -2094,7 +2148,10 @@ fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
     }
     let shaped = luminance * (1.0 + shaper_p) / (luminance + shaper_p);
     let scale = shaped / luminance;
-    return color_in + mix_amount * (color_in * scale - color_in);
+    let shaped = color_in + (color_in * scale - color_in);
+    let exposure_ev = log2(abs(shaped.x * 0.27222872 + shaped.y * 0.67408177 + shaped.z * 0.05368952) / 0.18);
+    let coupled = apply_film_color_coupler(shaped, exposure_ev);
+    return color_in + mix_amount * (coupled - color_in);
 }
 
 fn rapid_view_softplus(value: f32, width: f32) -> f32 {

@@ -10,6 +10,9 @@ use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
 
 use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
+use super::film_color_coupler::{
+    apply as apply_color_coupler, reference as reference_color_coupler,
+};
 
 pub const FILM_NODE_TYPE: &str = "film_emulation";
 pub const FILM_CONTRACT_VERSION: u32 = 1;
@@ -147,7 +150,14 @@ pub fn apply_pixel(rgb: Vec3, params: FilmEmulationParams) -> Vec3 {
         .iter_mut()
         .for_each(|response| *response *= response_scale);
     let shaped = apply_direct_positive(rgb, &curve);
-    rgb + params.mix * (shaped - rgb)
+    let luminance = AP1_LUMINANCE.dot(shaped);
+    let exposure_ev = if luminance.is_finite() && luminance.abs() > 1.0e-8 {
+        (luminance.abs() / 0.18).log2()
+    } else {
+        0.0
+    };
+    let coupled = apply_color_coupler(shaped, exposure_ev, &reference_color_coupler());
+    rgb + params.mix * (coupled - rgb)
 }
 
 #[allow(dead_code)]

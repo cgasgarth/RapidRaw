@@ -6,6 +6,7 @@ pub(crate) mod cpu_edit_graph;
 pub(crate) mod culling;
 pub(crate) mod edit_graph;
 pub(crate) mod film_characteristic_curve;
+pub(crate) mod film_color_coupler;
 pub(crate) mod film_emulation;
 pub(crate) mod film_look_render;
 pub(crate) mod image_analytics;
