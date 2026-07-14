@@ -31,6 +31,12 @@ describe('viewer input resolver', () => {
       shouldCapturePointer: false,
     });
     expect(resolve({ activeTool: 'brush', pointerType: 'touch' }).owner).toBe('active-tool');
+    expect(resolve({ activeTool: 'focus-retouch', pointerType: 'pen' })).toMatchObject({
+      cursor: 'crosshair',
+      owner: 'active-tool',
+      reason: 'active-tool',
+      shouldCapturePointer: true,
+    });
     expect(resolve({ activeTool: 'retouch' }).owner).toBe('active-tool');
   });
 
