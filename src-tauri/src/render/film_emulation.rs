@@ -355,6 +355,77 @@ pub struct FilmOperationTargetV1 {
     pub variant_id: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmBatchTargetV1 {
+    pub variant_id: String,
+    pub expected_graph_revision: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmBatchResultEntryV1 {
+    pub variant_id: String,
+    pub status: String,
+    pub previous_graph_revision: String,
+    pub resulting_graph_revision: Option<String>,
+    pub error_code: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmMultiTargetResultV1 {
+    pub command_id: String,
+    pub ordered_results: Vec<FilmBatchResultEntryV1>,
+}
+
+/// Build a deterministic per-target receipt before any target mutation. Each
+/// target is independent: stale targets are rejected while valid targets stay
+/// eligible for the canonical single-target operation.
+pub fn plan_multi_target(
+    command_id: &str,
+    targets: &[FilmBatchTargetV1],
+    current_revisions: &std::collections::HashMap<String, String>,
+) -> Result<FilmMultiTargetResultV1, &'static str> {
+    if command_id.is_empty() || targets.is_empty() {
+        return Err("film_batch_invalid_command");
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut ordered_results = Vec::with_capacity(targets.len());
+    for target in targets {
+        if target.variant_id.is_empty()
+            || target.expected_graph_revision.is_empty()
+            || !seen.insert(&target.variant_id)
+        {
+            return Err("film_batch_duplicate_or_invalid_target");
+        }
+        let current = current_revisions
+            .get(&target.variant_id)
+            .ok_or("film_batch_target_missing")?;
+        if current != &target.expected_graph_revision {
+            ordered_results.push(FilmBatchResultEntryV1 {
+                variant_id: target.variant_id.clone(),
+                status: "stale_revision".to_string(),
+                previous_graph_revision: current.clone(),
+                resulting_graph_revision: None,
+                error_code: Some("stale_revision".to_string()),
+            });
+        } else {
+            ordered_results.push(FilmBatchResultEntryV1 {
+                variant_id: target.variant_id.clone(),
+                status: "applied".to_string(),
+                previous_graph_revision: current.clone(),
+                resulting_graph_revision: Some(format!("{}:film", current)),
+                error_code: None,
+            });
+        }
+    }
+    Ok(FilmMultiTargetResultV1 {
+        command_id: command_id.to_string(),
+        ordered_results,
+    })
+}
+
 impl ApplyFilmEmulationOperationV1 {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.command_type != "edit.apply_film_emulation_operation"
@@ -749,5 +820,46 @@ mod tests {
         transfer.profile_ref.content_sha256 = REFERENCE_PROFILE_CONTENT_SHA256.to_string();
         transfer.stack_position = "scene_creative_custom".to_string();
         assert!(transfer.validate().is_err());
+    }
+
+    #[test]
+    fn multi_target_planner_preserves_order_and_isolates_stale_targets() {
+        let targets = vec![
+            FilmBatchTargetV1 {
+                variant_id: "valid".into(),
+                expected_graph_revision: "r1".into(),
+            },
+            FilmBatchTargetV1 {
+                variant_id: "stale".into(),
+                expected_graph_revision: "r1".into(),
+            },
+        ];
+        let current = std::collections::HashMap::from([
+            ("valid".to_string(), "r1".to_string()),
+            ("stale".to_string(), "r2".to_string()),
+        ]);
+        let result = plan_multi_target("batch-1", &targets, &current).unwrap();
+        assert_eq!(result.ordered_results[0].status, "applied");
+        assert_eq!(result.ordered_results[1].status, "stale_revision");
+        assert_eq!(result.ordered_results[1].resulting_graph_revision, None);
+    }
+
+    #[test]
+    fn multi_target_planner_rejects_duplicate_targets_before_mutation() {
+        let targets = vec![
+            FilmBatchTargetV1 {
+                variant_id: "same".into(),
+                expected_graph_revision: "r1".into(),
+            },
+            FilmBatchTargetV1 {
+                variant_id: "same".into(),
+                expected_graph_revision: "r1".into(),
+            },
+        ];
+        let current = std::collections::HashMap::from([("same".to_string(), "r1".to_string())]);
+        assert_eq!(
+            plan_multi_target("batch-duplicate", &targets, &current),
+            Err("film_batch_duplicate_or_invalid_target")
+        );
     }
 }
