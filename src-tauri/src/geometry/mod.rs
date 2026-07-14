@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use std::f32::consts::PI;
 
 pub mod perspective;
+pub(crate) mod preview;
 
 pub trait IntoCowImage<'a> {
     fn into_cow(self) -> Cow<'a, DynamicImage>;
