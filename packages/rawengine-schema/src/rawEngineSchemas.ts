@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
 import { brushMaskV1Schema } from './brushMaskV1.js';
+import { applyFilmEmulationOperationV1Schema } from './film/filmEmulationOperationSchemas.js';
 import type {
   filmEmulationNodeV1Schema,
   filmEmulationProfileRefV1Schema,
@@ -13,6 +14,7 @@ import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
 export type { ArtifactHandleV1 } from './artifactSchemas.js';
 export { artifactHandleV1Schema, negativeLabPositiveArtifactHandleV1Schema } from './artifactSchemas.js';
+export { applyFilmEmulationOperationV1Schema } from './film/filmEmulationOperationSchemas.js';
 export {
   filmEmulationNodeV1Schema,
   filmEmulationProfileRefV1Schema,
@@ -10279,6 +10281,7 @@ const rawEngineAppServerKnownInputSchemas = {
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   ExportCommandEnvelopeV1: exportCommandEnvelopeV1Schema,
+  FilmEmulationOperationV1: applyFilmEmulationOperationV1Schema,
   LayerMaskCommandEnvelopeV1: layerMaskCommandEnvelopeV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,

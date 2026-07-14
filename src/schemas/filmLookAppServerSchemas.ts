@@ -6,7 +6,10 @@ import {
   FilmLookAppServerSchemaName,
 } from '../utils/film-look/filmLookAppServerRouteIds';
 
-export const filmLookAppServerCommandNameSchema = z.literal(FilmLookAppServerCommandName.BuildAdjustmentPatch);
+export const filmLookAppServerCommandNameSchema = z.union([
+  z.literal(FilmLookAppServerCommandName.ApplyFilmEmulationOperation),
+  z.literal(FilmLookAppServerCommandName.BuildAdjustmentPatch),
+]);
 
 export const filmLookAppServerCommandSchema = z
   .object({
@@ -18,8 +21,14 @@ export const filmLookAppServerCommandSchema = z
 export const filmLookAppServerRouteSchema = z
   .object({
     commandName: filmLookAppServerCommandNameSchema,
-    inputSchemaName: z.literal(FilmLookAppServerSchemaName.Command),
-    outputSchemaName: z.literal(FilmLookAppServerSchemaName.PatchResult),
+    inputSchemaName: z.union([
+      z.literal(FilmLookAppServerSchemaName.Command),
+      z.literal(FilmLookAppServerSchemaName.FilmOperation),
+    ]),
+    outputSchemaName: z.union([
+      z.literal(FilmLookAppServerSchemaName.PatchResult),
+      z.literal(FilmLookAppServerSchemaName.FilmOperationResult),
+    ]),
     reason: z.string().trim().min(1),
     status: z.literal(FilmLookAppServerRouteStatus.Mapped),
   })

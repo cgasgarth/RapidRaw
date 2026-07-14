@@ -1,7 +1,34 @@
 import { z } from 'zod';
 
-import { approvalRequirementSchema, RAW_ENGINE_SCHEMA_VERSION, rawEngineActorSchema } from '../rawEngineSchemas.js';
 import { filmEmulationNodeV1Schema, filmEmulationProfileRefV1Schema } from './filmEmulationSchemas.js';
+
+const filmCommandActorSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    kind: z.enum(['agent', 'batch', 'cli', 'plugin', 'server', 'test', 'ui']),
+    sessionId: z.string().trim().min(1).optional(),
+  })
+  .strict();
+const filmCommandApprovalSchema = z
+  .object({
+    approvalClass: z.enum([
+      'batch_apply',
+      'cloud_service',
+      'edit_apply',
+      'expensive_job',
+      'external_model',
+      'file_mutation',
+      'generative_edit',
+      'model_supply_chain',
+      'preview_only',
+      'safe_read',
+      'unsafe_import',
+    ]),
+    reason: z.string().trim().min(1),
+    recordId: z.string().trim().min(1).optional(),
+    state: z.enum(['not_required', 'pending', 'approved', 'denied']),
+  })
+  .strict();
 
 const variantIdSchema = z.string().trim().min(1).max(256);
 
@@ -81,8 +108,8 @@ export const filmEmulationOperationV1Schema = z.discriminatedUnion('kind', [
 
 export const applyFilmEmulationOperationV1Schema = z
   .object({
-    actor: rawEngineActorSchema,
-    approval: approvalRequirementSchema,
+    actor: filmCommandActorSchema,
+    approval: filmCommandApprovalSchema,
     commandId: z.string().trim().min(1).max(256),
     commandType: z.literal('edit.apply_film_emulation_operation'),
     contractVersion: z.literal(1),
@@ -91,7 +118,7 @@ export const applyFilmEmulationOperationV1Schema = z
     expectedGraphRevision: z.string().trim().min(1).max(256),
     idempotencyKey: z.string().trim().min(1).max(256).optional(),
     operation: filmEmulationOperationV1Schema,
-    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    schemaVersion: z.literal(1),
     target: z
       .object({
         kind: z.enum(['image', 'virtual_copy']),

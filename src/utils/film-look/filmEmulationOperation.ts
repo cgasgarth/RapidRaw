@@ -12,6 +12,8 @@ import {
   filmEmulationTargetStateV1Schema,
 } from '../../../packages/rawengine-schema/src/index.js';
 
+export type { FilmEmulationTargetStateV1 } from '../../../packages/rawengine-schema/src/index.js';
+
 const PROFILE_REF = {
   id: 'rapidraw.reference_film.v1',
   version: '1',
