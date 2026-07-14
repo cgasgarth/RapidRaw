@@ -100,6 +100,7 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import type { ViewerActiveTool } from './viewerInputResolver';
+import { createViewerInputRouter, normalizeViewerPointerType } from './viewerInputRouter';
 
 declare global {
   interface Window {
@@ -395,6 +396,20 @@ const ImageCanvas = memo(
     const currentLine = useRef<DrawnLine | null>(null);
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
+    const viewerInputRouter = useMemo(() => createViewerInputRouter(), []);
+    const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
+      null,
+    );
+    useEffect(
+      () => () => {
+        viewerInputRouter.dispatch({ type: 'session-invalidated' });
+      },
+      [viewerInputRouter],
+    );
+    useEffect(() => {
+      const transition = viewerInputRouter.dispatch({ type: 'session-invalidated' });
+      setViewerInputOwnerState(transition.state.owner);
+    }, [adjustmentGeometryRevision, selectedImage.path, viewerInputRouter]);
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
@@ -2497,6 +2512,7 @@ const ImageCanvas = memo(
       isMaskInteractionActive: effectiveMaskInteractionActive,
       isToolActive,
     });
+    const viewerInputOwner = viewerInputOwnerState ?? viewerInputRouter.getState().owner ?? canvasPointerOwner;
 
     return (
       <div
@@ -2504,6 +2520,7 @@ const ImageCanvas = memo(
         data-canvas-overlay-status={activeCanvasOverlayStatus}
         data-canvas-overlay-tool={activeCanvasOverlayTool}
         data-canvas-pointer-owner={canvasPointerOwner}
+        data-viewer-input-owner={viewerInputOwner}
         data-canvas-pointer-policy="explicit"
         data-editor-compare-overlay-disabled-reason={compareOverlayDisabledReason}
         data-editor-compare-mode={compareMode}
@@ -2546,6 +2563,22 @@ const ImageCanvas = memo(
         data-testid="image-canvas"
         onPointerLeave={handleViewerSamplerPointerLeave}
         onPointerDown={(event) => {
+          const transition = viewerInputRouter.dispatch({
+            type: 'pointerdown',
+            pointerId: event.pointerId,
+            input: {
+              activeTool: viewerInputState?.activeTool ?? 'none',
+              button: event.button,
+              focusContext: isSliderDragging ? 'editable' : 'viewer',
+              isDragging: false,
+              isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
+              pointerCount: 1,
+              pointerType: normalizeViewerPointerType(event.pointerType),
+              zoomed: isMaxZoom ?? false,
+            },
+          });
+          setViewerInputOwnerState(transition.state.owner);
+          if (transition.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
           if (pointColorPickerActive) {
             event.preventDefault();
             void handlePointColorPickerPointerDown(event);
@@ -2563,6 +2596,7 @@ const ImageCanvas = memo(
           }
         }}
         onPointerMove={(event) => {
+          viewerInputRouter.dispatch({ type: 'pointermove', pointerId: event.pointerId });
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
             tonePickerDrag.currentClientY = event.clientY;
@@ -2573,6 +2607,8 @@ const ImageCanvas = memo(
             captureFocusRetouchPoint(event);
         }}
         onPointerUp={(event) => {
+          const transition = viewerInputRouter.dispatch({ type: 'pointerup', pointerId: event.pointerId });
+          setViewerInputOwnerState(transition.state.owner);
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
             tonePickerDrag.currentClientY = event.clientY;
@@ -2588,6 +2624,8 @@ const ImageCanvas = memo(
           }
         }}
         onPointerCancel={(event) => {
+          const transition = viewerInputRouter.dispatch({ type: 'pointercancel', pointerId: event.pointerId });
+          setViewerInputOwnerState(transition.state.owner);
           if (tonePickerDragRef.current?.pointerId === event.pointerId) tonePickerDragRef.current = null;
         }}
         style={{
