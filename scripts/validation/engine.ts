@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, stat, statfs, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 import { acquireResourceLease, type ResourceLease } from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
@@ -107,6 +107,22 @@ const digest = (parts: readonly (string | Uint8Array)[]): string => {
 
 export const validationOutputResource = (root: string, output: string): string =>
   `validation-output-${digest([resolve(root), output]).slice(0, 20)}`;
+
+const validationOutputPath = (root: string, output: string): string => {
+  const resolvedRoot = resolve(root);
+  const path = resolve(resolvedRoot, output);
+  const relativePath = relative(resolvedRoot, path);
+  if (relativePath === '' || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error(`validation output must stay below its worktree root: ${output}`);
+  }
+  return path;
+};
+
+const clearValidationOutputs = async (root: string, node: ValidationNode): Promise<void> => {
+  for (const output of node.outputs ?? []) {
+    await rm(validationOutputPath(root, output), { force: true, recursive: true });
+  }
+};
 
 export interface ValidationSnapshot {
   files: readonly string[];
@@ -428,6 +444,10 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       if (interrupted) throw new Error('validation_interrupted');
       if (options.explainCache) console.log(`${cached ? 'VERIFY' : 'MISS'} ${node.id} key=${key}`);
+      // The run owns every declared output root at this point. Always prepare a
+      // producer from an empty root so cache mismatches, interrupted children,
+      // and prior failed runs cannot leak partial artifacts into its inputs.
+      await clearValidationOutputs(options.root, node);
       const before = Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
         cwd: options.root,
         stdout: 'pipe',
@@ -484,6 +504,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         );
         writeBoundedOutput(`${node.id} stdout`, stdout);
         writeBoundedOutput(`${node.id} stderr`, stderr);
+        await clearValidationOutputs(options.root, node);
       } else {
         console.log(`PASS ${node.id} (${durationMs}ms cpu=${metrics.cpuMs}ms rss=${metrics.peakRssBytes})`);
         if (node.cachePolicy !== 'none') {

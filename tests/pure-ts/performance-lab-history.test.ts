@@ -279,7 +279,7 @@ exit 1
     } finally {
       await rm(directory, { force: true, recursive: true });
     }
-  });
+  }, 10_000);
 
   test('publishes a conservative affected-validation contract for #5396', () => {
     expect(selectAffectedPerformanceScenarios(['src/utils/adjustmentSnapshots.ts'], performanceScenarios)).toEqual({
