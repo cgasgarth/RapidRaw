@@ -1,5 +1,5 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { mkdir, readdir, readFile, rm, stat, statfs, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 import { acquireResourceLease, type ResourceLease } from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
@@ -224,7 +224,48 @@ const cacheRoot = async (root: string): Promise<string> => {
   if (process.env.RAWENGINE_VALIDATION_CACHE_ROOT) return resolve(root, process.env.RAWENGINE_VALIDATION_CACHE_ROOT);
   const command = Bun.spawnSync(['git', 'rev-parse', '--git-common-dir'], { cwd: root, stdout: 'pipe' });
   const common = command.exitCode === 0 ? command.stdout.toString().trim() : '.git';
-  return resolve(root, common, 'codex-validation-cache-v1');
+  // git-common-dir is shared by all linked worktrees. Keep records isolated by
+  // worktree identity so a producer can never reuse another worktree's output.
+  return join(
+    isAbsolute(common) ? common : resolve(root, common),
+    'codex-validation-cache-v1',
+    digest([resolve(root)]).slice(0, 24),
+  );
+};
+
+const pruneCacheDirectory = async (directory: string): Promise<void> => {
+  const maxEntries = Number(process.env.RAWENGINE_VALIDATION_CACHE_MAX_ENTRIES ?? 256);
+  const maxBytes = Number(process.env.RAWENGINE_VALIDATION_CACHE_MAX_BYTES ?? 512 * 1024 * 1024);
+  const entries = (await readdir(directory, { withFileTypes: true }).catch(() => [])).filter(
+    (entry) => entry.isFile() && entry.name.endsWith('.json'),
+  );
+  const measured = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(directory, entry.name);
+      const metadata = await stat(path).catch(() => ({ size: 0, mtimeMs: 0 }));
+      return { path, size: metadata.size, mtimeMs: metadata.mtimeMs };
+    }),
+  );
+  let totalBytes = measured.reduce((total, entry) => total + entry.size, 0);
+  const ordered = measured.toSorted((left, right) => left.mtimeMs - right.mtimeMs);
+  while (ordered.length > maxEntries || totalBytes > maxBytes) {
+    const oldest = ordered.shift();
+    if (!oldest) break;
+    await rm(oldest.path, { force: true });
+    totalBytes -= oldest.size;
+  }
+};
+
+const assertFreeSpace = async (root: string): Promise<void> => {
+  const minimumBytes = Number(process.env.RAWENGINE_VALIDATION_MIN_FREE_BYTES ?? 512 * 1024 * 1024);
+  const filesystem = await statfs(root).catch(() => undefined);
+  if (!filesystem) return;
+  const availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize);
+  if (availableBytes < minimumBytes) {
+    throw new Error(
+      `validation disk pressure: ${availableBytes} bytes free below ${minimumBytes}; clean disposable caches before retrying`,
+    );
+  }
 };
 
 export const readCacheRecord = async (
@@ -264,6 +305,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   const activeResources = new Map<ResourceClass, number>();
   const cacheDirectory = await cacheRoot(options.root);
   await mkdir(cacheDirectory, { recursive: true });
+  await pruneCacheDirectory(cacheDirectory);
+  await assertFreeSpace(cacheDirectory);
   const snapshot = await freezeValidationSnapshot(options.root);
   const children = new Set<ReturnType<typeof Bun.spawn>>();
   let failed = false;
@@ -333,7 +376,20 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         })
       : undefined;
     let cacheLease: ResourceLease | undefined;
+    const outputLeases: ResourceLease[] = [];
     try {
+      // Producers that write shared paths (dist, bundle reports, native outputs)
+      // must own those paths for the whole producer/readback transaction. This
+      // keeps lightweight checks parallel while preventing stale/colliding output.
+      for (const output of [...(node.outputs ?? [])].sort()) {
+        outputLeases.push(
+          await acquireResourceLease({
+            label: `validation-output:${node.id}:${output}`,
+            resource: `validation-output-${digest([output]).slice(0, 20)}`,
+            root: options.resourceCoordinatorRoot,
+          }),
+        );
+      }
       cacheLease =
         node.cachePolicy === 'none'
           ? undefined
@@ -423,11 +479,13 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           };
           await mkdir(dirname(recordPath), { recursive: true });
           await writeFile(recordPath, `${JSON.stringify(record)}\n`);
+          await pruneCacheDirectory(cacheDirectory);
         }
       }
       completed.set(node.id, { ok, key });
     } finally {
       await cacheLease?.release();
+      for (const lease of outputLeases.reverse()) await lease.release();
       await classLease?.release();
     }
   };
