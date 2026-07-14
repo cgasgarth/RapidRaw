@@ -27,19 +27,56 @@ export const performanceBisectReportSchema = z.object({
 
 export type PerformanceBisectReport = z.infer<typeof performanceBisectReportSchema>;
 
-const run = async (cwd: string, command: string, args: readonly string[]) => {
+const signalProcessGroup = (pid: number, signal: 'SIGTERM' | 'SIGKILL'): void => {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // The process group already exited.
+    }
+  }
+};
+
+const run = async (cwd: string, command: string, args: readonly string[], signal?: AbortSignal) => {
+  if (signal?.aborted) throw new Error('performance_bisect_cancelled');
   const child = Bun.spawn([command, ...args], {
     cwd,
+    detached: true,
     env: isolatedGitEnvironment(),
     stderr: 'pipe',
     stdout: 'pipe',
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  return { exitCode, output: stdout.trim(), stderr: stderr.trim() };
+  let cancelled = false;
+  let escalation: ReturnType<typeof setTimeout> | undefined;
+  const cancel = () => {
+    cancelled = true;
+    signalProcessGroup(child.pid, 'SIGTERM');
+    escalation = setTimeout(() => {
+      if (child.exitCode === null) signalProcessGroup(child.pid, 'SIGKILL');
+    }, 1_000);
+    escalation.unref();
+  };
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    if (cancelled) throw new Error('performance_bisect_cancelled');
+    return { exitCode, output: stdout.trim(), stderr: stderr.trim() };
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+    if (escalation !== undefined) clearTimeout(escalation);
+    if (child.exitCode === null) {
+      signalProcessGroup(child.pid, 'SIGTERM');
+      const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(1_000).then(() => false)]);
+      if (!exited) signalProcessGroup(child.pid, 'SIGKILL');
+      await child.exited;
+    }
+  }
 };
 
 const diagnosticOutput = (result: Awaited<ReturnType<typeof run>>): string =>
@@ -50,17 +87,23 @@ export async function executePerformanceBisect(options: {
   good: string;
   bad: string;
   evaluator: { command: string; args: string[] };
+  signal?: AbortSignal;
 }): Promise<PerformanceBisectReport> {
   const parsed = z
     .object({ cwd: z.string().startsWith('/'), good: shaSchema, bad: shaSchema })
     .parse({ cwd: options.cwd, good: options.good, bad: options.bad });
-  const status = await run(parsed.cwd, 'git', ['status', '--porcelain=v1']);
+  const status = await run(parsed.cwd, 'git', ['status', '--porcelain=v1'], options.signal);
   if (status.exitCode !== 0 || status.output !== '') throw new Error('Performance bisect requires a clean worktree.');
-  const started = await run(parsed.cwd, 'git', ['bisect', 'start', parsed.bad, parsed.good]);
+  const started = await run(parsed.cwd, 'git', ['bisect', 'start', parsed.bad, parsed.good], options.signal);
   if (started.exitCode !== 0) throw new Error(`git bisect start failed:\n${diagnosticOutput(started).slice(-8_000)}`);
   let evaluated: Awaited<ReturnType<typeof run>> | undefined;
   try {
-    evaluated = await run(parsed.cwd, 'git', ['bisect', 'run', options.evaluator.command, ...options.evaluator.args]);
+    evaluated = await run(
+      parsed.cwd,
+      'git',
+      ['bisect', 'run', options.evaluator.command, ...options.evaluator.args],
+      options.signal,
+    );
   } finally {
     await run(parsed.cwd, 'git', ['bisect', 'reset']);
   }
