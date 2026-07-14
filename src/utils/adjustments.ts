@@ -225,6 +225,30 @@ export interface ParametricCurve {
   red: ParametricCurveSettings;
 }
 
+export interface SceneCurvePointV1 {
+  xEv: number;
+  yEv: number;
+}
+
+export interface SceneCurveSettingsV1 {
+  channelMode: 'luminance_preserving' | 'linked_rgb';
+  middleGrey: number;
+  points: Array<SceneCurvePointV1>;
+}
+
+export interface OutputCurvePointV1 {
+  input: number;
+  output: number;
+}
+
+export interface OutputCurveSettingsV1 {
+  domain: 'view_encoded' | 'output_encoded';
+  peakNits: number;
+  points: Array<OutputCurvePointV1>;
+  sdrReferenceWhiteNits: number;
+  targetIdentity: string;
+}
+
 export interface Adjustments {
   [index: string]: unknown;
   aiPatches: Array<AiPatch>;
@@ -248,6 +272,8 @@ export interface Adjustments {
   pointCurves?: Curves;
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
+  sceneCurveV1?: SceneCurveSettingsV1;
+  outputCurveV1?: OutputCurveSettingsV1;
   rawProcessingModeOverride: RawProcessingModeOverride;
   /** Persisted native edit-graph process version; legacy sidecars default to v1. */
   rawEngineEditGraphVersion: number;
@@ -1174,6 +1200,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       ? deepCloneParametric(loadedAdjustments.parametricCurve)
       : getDefaultParametricCurve(),
     curveMode: loadedAdjustments.curveMode ?? 'point',
+    ...(loadedAdjustments.sceneCurveV1 ? { sceneCurveV1: structuredClone(loadedAdjustments.sceneCurveV1) } : {}),
+    ...(loadedAdjustments.outputCurveV1 ? { outputCurveV1: structuredClone(loadedAdjustments.outputCurveV1) } : {}),
     deblurEnabled: loadedAdjustments.deblurEnabled ?? INITIAL_ADJUSTMENTS.deblurEnabled,
     deblurSigmaPx: loadedAdjustments.deblurSigmaPx ?? INITIAL_ADJUSTMENTS.deblurSigmaPx,
     deblurStrength: loadedAdjustments.deblurStrength ?? INITIAL_ADJUSTMENTS.deblurStrength,
@@ -1214,7 +1242,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     {
       label: 'modals.copyPaste.groups.curves',
-      keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
+      keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode', 'sceneCurveV1', 'outputCurveV1'],
     },
   ],
   color: [
@@ -1345,6 +1373,11 @@ export interface PickAdjustmentValuesOptions {
 
 export const cloneAdjustmentValue = <Value>(value: Value): Value => structuredClone(value);
 
+export const bindTypedCurveGraphVersion = (adjustments: Partial<Adjustments>): Partial<Adjustments> =>
+  adjustments.sceneCurveV1 !== undefined || adjustments.outputCurveV1 !== undefined
+    ? { ...adjustments, rawEngineEditGraphVersion: 2 }
+    : adjustments;
+
 export const hasAdjustmentKey = (source: Partial<Adjustments>, key: string): boolean => Object.hasOwn(source, key);
 
 export const pickAdjustmentValues = (
@@ -1390,7 +1423,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     BasicAdjustment.Exposure,
     'toneMapper',
   ],
-  curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
+  curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode', 'sceneCurveV1', 'outputCurveV1'],
   color: [
     ColorAdjustment.Saturation,
     ColorAdjustment.CameraProfile,
