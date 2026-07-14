@@ -8902,6 +8902,19 @@ export const negativeLabDensityBoundsParamsV1Schema = z
   })
   .strict();
 
+export const negativeLabScannerColorFinishV1Schema = z
+  .object({
+    algorithmVersion: z.literal(1).default(1),
+    chromaDenoiseRadius: z.number().min(0).max(0.1).default(0),
+    chromaDenoiseStrength: z.number().min(0).max(1).default(0),
+    enabled: z.boolean().default(false),
+    saturationTrim: z.number().min(0).max(0.25).default(0),
+    transformId: z.literal('linear_srgb_d65_cielab_v1').default('linear_srgb_d65_cielab_v1'),
+    vibrance: z.number().min(-0.25).max(0.25).default(0),
+    workingSpace: z.literal('linear_srgb_d65').default('linear_srgb_d65'),
+  })
+  .strict();
+
 export const negativeLabSetConversionRecipeParametersV1Schema = z
   .object({
     baseStrategy: z
@@ -8925,6 +8938,16 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
         negativeDensityTolerance: z.number().nonnegative(),
       })
       .strict(),
+    colorFinish: negativeLabScannerColorFinishV1Schema.default({
+      algorithmVersion: 1,
+      chromaDenoiseRadius: 0,
+      chromaDenoiseStrength: 0,
+      enabled: false,
+      saturationTrim: 0,
+      transformId: 'linear_srgb_d65_cielab_v1',
+      vibrance: 0,
+      workingSpace: 'linear_srgb_d65',
+    }),
     densityBounds: negativeLabDensityBoundsParamsV1Schema.default({
       analysisBuffer: 0.04,
       baseFogProvenance: 'automatic_analysis',

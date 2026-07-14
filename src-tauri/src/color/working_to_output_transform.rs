@@ -80,6 +80,11 @@ pub(crate) struct GamutWarningReceiptV1 {
     pub(crate) out_of_gamut_pixel_count: u64,
     pub(crate) out_of_gamut_pixel_percentage: f64,
     pub(crate) maximum_boundary_excess: f64,
+    /// Warning analysis never compresses pixels, but reports the same action
+    /// counters as output mapping so proof and export diagnostics can be
+    /// compared without inferring missing values.
+    pub(crate) compressed_pixel_count: u64,
+    pub(crate) hard_clipped_pixel_count: u64,
 }
 
 pub(crate) struct GamutWarningAnalysisV1 {
@@ -112,11 +117,13 @@ pub(crate) fn analyze_acescg_image_gamut_warning_with_mask(
     let pixel_count = u64::from(width) * u64::from(height);
     let mut mask_rgba = Vec::with_capacity(width as usize * height as usize * 4);
     let mut out_of_gamut_pixel_count = 0;
+    let mut hard_clipped_pixel_count = 0;
     let mut maximum_boundary_excess: f64 = 0.0;
     for pixel in rgba.as_raw().chunks_exact(4) {
         let linear = target_linear_from_ap1(pixel, profile)?;
         let classified = plan.map_target_linear(linear);
         out_of_gamut_pixel_count += u64::from(classified.receipt.input_was_out_of_gamut);
+        hard_clipped_pixel_count += u64::from(classified.receipt.hard_clipped);
         mask_rgba.extend_from_slice(if classified.receipt.input_was_out_of_gamut {
             &[255, 0, 255, 160]
         } else {
@@ -139,6 +146,8 @@ pub(crate) fn analyze_acescg_image_gamut_warning_with_mask(
             100.0 * out_of_gamut_pixel_count as f64 / pixel_count as f64
         },
         maximum_boundary_excess,
+        compressed_pixel_count: 0,
+        hard_clipped_pixel_count,
     };
     Ok(GamutWarningAnalysisV1 {
         receipt,
@@ -429,6 +438,8 @@ mod tests {
             assert_eq!(warning.target, receipt.target);
             assert_eq!(warning.implementation_id, receipt.implementation_id);
             assert_eq!(warning.out_of_gamut_pixel_percentage, 50.0);
+            assert_eq!(warning.compressed_pixel_count, 0);
+            assert_eq!(warning.hard_clipped_pixel_count, 0);
             let warning_with_mask = analyze_acescg_image_gamut_warning_with_mask(
                 &source,
                 &profile,

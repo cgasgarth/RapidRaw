@@ -28,6 +28,16 @@
       "epsilonPolicyId": "density_epsilon_v1",
       "negativeDensityTolerance": 0.02
     },
+    "colorFinish": {
+      "algorithmVersion": 1,
+      "chromaDenoiseRadius": 0,
+      "chromaDenoiseStrength": 0,
+      "enabled": false,
+      "saturationTrim": 0,
+      "transformId": "linear_srgb_d65_cielab_v1",
+      "vibrance": 0,
+      "workingSpace": "linear_srgb_d65"
+    },
     "densityBounds": {
       "analysisBuffer": 0.04,
       "baseFogProvenance": "automatic_analysis",

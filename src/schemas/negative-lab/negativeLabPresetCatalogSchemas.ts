@@ -85,6 +85,19 @@ export const negativeLabPresetParamsSchema = z
     base_fog_strength: z.number().min(0).max(1.25).default(1),
     base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
     color_range_clip: z.number().min(0.01).max(0.3).default(0.12),
+    color_finish: z
+      .object({
+        algorithm_version: z.literal(1),
+        chroma_denoise_radius: z.number().min(0).max(0.1),
+        chroma_denoise_strength: z.number().min(0).max(1),
+        enabled: z.boolean(),
+        saturation_trim: z.number().min(0).max(0.25),
+        transform_id: z.literal('linear_srgb_d65_cielab_v1'),
+        vibrance: z.number().min(-0.25).max(0.25),
+        working_space: z.literal('linear_srgb_d65'),
+      })
+      .strict()
+      .optional(),
     contrast: z.number().min(0.5).max(2.5),
     conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
     detail_finish: negativeLabDetailFinishParamsSchema.optional(),
@@ -389,10 +402,28 @@ export const negativeLabNativeDensityNormalizationMetricsSchema = z
   })
   .strict();
 
+export const negativeLabColorFinishMetricsSchema = z
+  .object({
+    afterHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    algorithmId: z.literal('negative_lab_scanner_color_finish_v1'),
+    algorithmVersion: z.literal(1),
+    beforeHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    changedPixelRatio: z.number().min(0).max(1),
+    effectiveRadiusPixels: z.number().int().nonnegative(),
+    gamutClippedPixelCount: z.number().int().nonnegative(),
+    luminancePreservationError: z.number().nonnegative(),
+    operationId: z.literal('negative_lab.scanner_color_finish'),
+    transformId: z.literal('linear_srgb_d65_cielab_v1'),
+    warningCodes: z.array(z.enum(['gamut_clipping_before_output_policy', 'inapplicable_mode_identity'])),
+    workingSpace: z.literal('linear_srgb_d65'),
+  })
+  .strict();
+
 export const negativeLabSavedPositiveHandoffSchema = z
   .object({
     artifactId: z.string().trim().min(1),
     conversionBundlePath: z.string().trim().min(1).nullable(),
+    colorFinishMetrics: negativeLabColorFinishMetricsSchema.optional(),
     densityNormalizationMetrics: negativeLabNativeDensityNormalizationMetricsSchema.optional(),
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
     frameExposureOverrides: z.unknown(),

@@ -1439,6 +1439,12 @@ fn generate_export_soft_proof_preview(
                     "maximum_boundary_excess": shared_gamut_warning.as_ref().map(
                         |receipt| receipt.maximum_boundary_excess,
                     ),
+                    "gamut_compressed_pixel_count": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.compressed_pixel_count,
+                    ),
+                    "gamut_hard_clipped_pixel_count": shared_gamut_warning.as_ref().map(
+                        |receipt| receipt.hard_clipped_pixel_count,
+                    ),
                     "policy_status": proof_metadata.policy_status,
                     "policy_version": proof_metadata.policy_version,
                     "preview_basis": "export_preview",
