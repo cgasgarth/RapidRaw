@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { planValidation, runValidation } from './engine';
 import { type ValidationMode, validationManifest } from './manifest';
+import { readStagedAutofixPaths, runScopedAutofix } from './scopedAutofix';
 
 const args = process.argv.slice(2);
 const valueAfter = (flag: string): string | undefined => {
@@ -11,9 +12,9 @@ const mode = (valueAfter('--mode') ?? 'commit') as ValidationMode;
 if (!['commit', 'push', 'pr', 'full', 'release'].includes(mode)) throw new Error(`invalid validation mode: ${mode}`);
 const root = process.cwd();
 if (args.includes('--fix')) {
-  const fix = Bun.spawnSync(['bun', 'run', 'lint:fix'], { cwd: root, stdout: 'inherit', stderr: 'inherit' });
-  if (fix.exitCode !== 0) process.exit(fix.exitCode);
-  Bun.spawnSync(['git', 'add', '-u'], { cwd: root });
+  const stagedPaths = readStagedAutofixPaths(root);
+  const fixExitCode = runScopedAutofix(root, stagedPaths);
+  if (fixExitCode !== 0) process.exit(fixExitCode);
 }
 const diffArgs = args.includes('--staged')
   ? ['git', 'diff', '--cached', '--name-only', '--diff-filter=ACMR']
