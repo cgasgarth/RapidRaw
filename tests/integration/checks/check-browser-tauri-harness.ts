@@ -692,19 +692,17 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     await targetThumbnail.click({ button: 'right' });
     const productivity = page.getByRole('menuitem', { exact: true, name: 'Productivity' });
     await productivity.waitFor({ timeout: 10_000 });
-    await productivity.focus();
-    await page.keyboard.press('ArrowRight');
+    await productivity.hover();
     await page.waitForFunction(
-      () => {
-        const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
-          (element) => element.textContent?.trim() === 'Auto Adjust Image',
-        );
-        if (!item) return false;
-        item.click();
-        return true;
-      },
+      () =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
+          (item) => item.textContent?.trim() === 'Productivity' && item.getAttribute('aria-expanded') === 'true',
+        ),
       { timeout: 10_000 },
     );
+    const autoAdjust = page.getByRole('menuitem', { exact: true, name: 'Auto Adjust Image' });
+    await autoAdjust.waitFor({ timeout: 10_000 });
+    await autoAdjust.press('Enter');
   };
   const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
     const other = page.locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${activePath}"])`).first();
