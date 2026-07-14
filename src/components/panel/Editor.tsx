@@ -65,6 +65,7 @@ import {
 import {
   getEditorZoomDpr,
   getEditorZoomModeForCommand,
+  getEditorZoomModeForTransformScale,
   getEditorZoomResolutionState,
   getEditorZoomSourceSize,
   isEditorPixelInspectionZoom,
@@ -787,6 +788,27 @@ export default function Editor({
     [animateTransform, applyTransform, captureFocalPoint, clampToBounds, transformStateRef],
   );
 
+  const synchronizeGestureZoomMode = useCallback(
+    (transformScale: number) => {
+      const nextMode = getEditorZoomModeForTransformScale({
+        devicePixelRatio,
+        renderScale: imageRenderSize.scale,
+        transformScale,
+      });
+      setEditor((state) => {
+        const current = state.zoomMode;
+        if (
+          current.kind === 'ratio' &&
+          Math.abs(current.devicePixelsPerImagePixel - nextMode.devicePixelsPerImagePixel) < 0.0001
+        ) {
+          return {};
+        }
+        return { zoomMode: nextMode };
+      });
+    },
+    [devicePixelRatio, imageRenderSize.scale, setEditor],
+  );
+
   useImperativeHandle(
     transformWrapperRef,
     () => ({
@@ -971,6 +993,7 @@ export default function Editor({
 
         const bounded = clampToBounds(newX, newY, newScale);
         applyTransform(bounded.x, bounded.y, bounded.scale);
+        synchronizeGestureZoomMode(bounded.scale);
         captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
       } else {
         if (transformStateRef.current.scale <= 1.01) return;
@@ -1006,6 +1029,7 @@ export default function Editor({
     maxScaleRef,
     minScaleRef,
     startPhysicsLoop,
+    synchronizeGestureZoomMode,
     transformStateRef,
     wheelSnapTimeout,
     appSettings?.canvasInputMode,
@@ -1132,6 +1156,7 @@ export default function Editor({
 
           const bounded = clampToBounds(newX, newY, newScale);
           applyTransform(bounded.x, bounded.y, bounded.scale);
+          synchronizeGestureZoomMode(bounded.scale);
           captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
         }
 
@@ -1146,6 +1171,7 @@ export default function Editor({
       maxScaleRef,
       minScaleRef,
       setIsPanningState,
+      synchronizeGestureZoomMode,
       transformStateRef,
     ],
   );

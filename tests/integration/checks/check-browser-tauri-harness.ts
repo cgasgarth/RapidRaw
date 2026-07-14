@@ -371,6 +371,7 @@ async function expectEnabled(locator: Locator, label: string): Promise<void> {
 async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]): Promise<void> {
   const previewPanel = page.getByTestId('editor-image-preview-panel');
   const zoomSelector = page.getByTestId('viewer-footer-zoom-select');
+  const sourceIdentity = '/tmp/rawengine-browser-harness/browser-harness.ARW';
   await previewPanel.waitFor({ timeout: 10_000 });
   await zoomSelector.waitFor({ timeout: 10_000 });
   await waitForStablePreview(page);
@@ -398,8 +399,11 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   samples.push(await collectBoundsSample(page, 'keyboard-zoom-out'));
   await assertLatestBoundsSample(samples);
 
+  const canonicalBaseHref = await page.getByTestId('svg-preview-base-layer').getAttribute('href');
+  if (canonicalBaseHref === null) throw new Error('Zoom proof could not identify the canonical base preview.');
   await zoomSelector.selectOption('2');
   await assertRenderedImageGeometry(page, { height: 1536, label: 'selector-zoom-200', width: 2048 });
+  await assertPositionedZoomOutput(page, { canonicalBaseHref, sourceIdentity });
   samples.push(await collectBoundsSample(page, 'selector-zoom-200'));
   await assertLatestBoundsSample(samples);
 
@@ -420,8 +424,82 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await assertRenderedImageGeometry(page, { height: 1536, label: 'repeated-selector-zoom-200', width: 2048 });
   await zoomSelector.selectOption('fit');
   await assertRenderedImageGeometry(page, { height: 397, label: 'repeated-reset-to-fit', width: 529.33 });
+  await assertSingleFullFrameOutput(page, sourceIdentity);
+
+  await previewPanel.hover();
+  await page.mouse.wheel(0, -320);
+  await page.waitForFunction(() => document.querySelector('[data-editor-zoom-mode="ratio"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  const gestureScale = Number(await previewPanel.getAttribute('data-editor-transform-scale'));
+  const resolvedGestureScale = Number(await previewPanel.getAttribute('data-editor-resolved-transform-scale'));
+  if (
+    !Number.isFinite(gestureScale) ||
+    !Number.isFinite(resolvedGestureScale) ||
+    Math.abs(gestureScale - resolvedGestureScale) > 0.001
+  ) {
+    throw new Error(
+      `Wheel zoom split visible transform ${String(gestureScale)} from semantic transform ${String(resolvedGestureScale)}.`,
+    );
+  }
+  const gestureBaseHref = await page.getByTestId('svg-preview-base-layer').getAttribute('href');
+  if (gestureBaseHref === null) throw new Error('Wheel zoom removed the canonical base before its ROI successor.');
+  await assertPositionedZoomOutput(page, { canonicalBaseHref: gestureBaseHref, sourceIdentity });
+  await zoomSelector.selectOption('fit');
+  await assertRenderedImageGeometry(page, { height: 397, label: 'wheel-reset-to-fit', width: 529.33 });
+  await assertSingleFullFrameOutput(page, sourceIdentity);
 
   await writeBoundsReport('passed');
+}
+
+async function assertPositionedZoomOutput(
+  page: Page,
+  expected: { canonicalBaseHref: string; sourceIdentity: string },
+): Promise<void> {
+  await page.waitForFunction(
+    ({ canonicalBaseHref, sourceIdentity }) => {
+      const bases = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]'));
+      const patches = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-patch-layer"]'));
+      if (bases.length !== 1 || patches.length !== 1) return false;
+      const base = bases[0];
+      const patch = patches[0];
+      if (!base || !patch) return false;
+      return (
+        base.getAttribute('href') === canonicalBaseHref &&
+        base.dataset.previewSourceIdentity === sourceIdentity &&
+        patch.dataset.previewSourceIdentity === sourceIdentity &&
+        Number(patch.dataset.previewFullWidth) > 0 &&
+        Number(patch.dataset.previewFullHeight) > 0 &&
+        Number(patch.dataset.previewPixelWidth) > 0 &&
+        Number(patch.dataset.previewPixelHeight) > 0 &&
+        Number.parseFloat(patch.style.opacity) === 1 &&
+        patch.getBoundingClientRect().width > 0 &&
+        patch.getBoundingClientRect().height > 0
+      );
+    },
+    expected,
+    { timeout: 10_000 },
+  );
+}
+
+async function assertSingleFullFrameOutput(page: Page, sourceIdentity: string): Promise<void> {
+  await page.waitForFunction(
+    (expectedSourceIdentity) => {
+      const bases = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]'));
+      const patches = document.querySelectorAll('[data-testid="svg-preview-patch-layer"]');
+      const base = bases[0];
+      return (
+        bases.length === 1 &&
+        patches.length === 0 &&
+        base?.dataset.previewSourceIdentity === expectedSourceIdentity &&
+        Number.parseFloat(base.style.opacity) === 1 &&
+        base.getBoundingClientRect().width > 0 &&
+        base.getBoundingClientRect().height > 0
+      );
+    },
+    sourceIdentity,
+    { timeout: 10_000 },
+  );
 }
 
 async function assertRenderedImageGeometry(

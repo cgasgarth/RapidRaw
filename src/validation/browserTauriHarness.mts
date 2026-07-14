@@ -465,7 +465,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         stalePhaseDrops: 0,
       });
     case commandNames.applyAdjustments:
-      return Promise.resolve(decodeHarnessApplyPreview());
+      return createHarnessApplyPreview(args);
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview:
@@ -873,4 +873,80 @@ const decodeHarnessApplyPreview = (): ArrayBuffer => {
   bytes[frameIndex + 7] = 0x06;
   bytes[frameIndex + 8] = 0x00;
   return buffer;
+};
+
+interface HarnessApplyPreviewRequest {
+  isInteractive: boolean;
+  roi: [number, number, number, number] | null;
+  targetResolution: number;
+}
+
+const normalizeHarnessApplyPreviewRequest = (args: Record<string, unknown> | undefined): HarnessApplyPreviewRequest => {
+  const candidate = args?.['request'];
+  const request = typeof candidate === 'object' && candidate !== null ? (candidate as Record<string, unknown>) : {};
+  const roiCandidate = request['roi'];
+  const roi =
+    Array.isArray(roiCandidate) &&
+    roiCandidate.length === 4 &&
+    roiCandidate.every((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      ? ([roiCandidate[0], roiCandidate[1], roiCandidate[2], roiCandidate[3]] as [number, number, number, number])
+      : null;
+  const requestedResolution = request['targetResolution'];
+  return {
+    isInteractive: request['isInteractive'] === true,
+    roi,
+    targetResolution:
+      typeof requestedResolution === 'number' && Number.isFinite(requestedResolution)
+        ? Math.min(4096, Math.max(1, Math.round(requestedResolution)))
+        : 1024,
+  };
+};
+
+const encodeHarnessPreviewJpeg = async (
+  width: number,
+  height: number,
+  offsetX: number,
+  offsetY: number,
+): Promise<ArrayBuffer> => {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (context === null) throw new Error('Browser harness could not create preview canvas context.');
+  const gradient = context.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, `rgb(${String(48 + (offsetX % 80))}, 88, 136)`);
+  gradient.addColorStop(1, `rgb(168, ${String(104 + (offsetY % 80))}, 64)`);
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) => (value === null ? reject(new Error('Browser harness JPEG encode failed.')) : resolve(value)),
+      'image/jpeg',
+      0.9,
+    );
+  });
+  return blob.arrayBuffer();
+};
+
+const createHarnessApplyPreview = async (args: Record<string, unknown> | undefined): Promise<ArrayBuffer> => {
+  const request = normalizeHarnessApplyPreviewRequest(args);
+  if (agentAuditE2eEnabled || (!request.isInteractive && request.roi === null)) {
+    return decodeHarnessApplyPreview();
+  }
+
+  const fullWidth = request.targetResolution;
+  const fullHeight = Math.max(1, Math.round((fullWidth * 3) / 4));
+  const [normX, normY, normWidth, normHeight] = request.roi ?? [0, 0, 1, 1];
+  const x = Math.min(fullWidth - 1, Math.max(0, Math.round(normX * fullWidth)));
+  const y = Math.min(fullHeight - 1, Math.max(0, Math.round(normY * fullHeight)));
+  const width = Math.min(fullWidth - x, Math.max(1, Math.round(normWidth * fullWidth)));
+  const height = Math.min(fullHeight - y, Math.max(1, Math.round(normHeight * fullHeight)));
+  const jpeg = await encodeHarnessPreviewJpeg(width, height, x, y);
+  const response = new ArrayBuffer(24 + jpeg.byteLength);
+  const view = new DataView(response);
+  for (const [index, value] of [x, y, width, height, fullWidth, fullHeight].entries()) {
+    view.setUint32(index * 4, value, true);
+  }
+  new Uint8Array(response, 24).set(new Uint8Array(jpeg));
+  return response;
 };

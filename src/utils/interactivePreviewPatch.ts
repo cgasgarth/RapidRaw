@@ -197,6 +197,14 @@ export interface InvalidInteractivePreviewPatchPayload {
 
 export type ParsedInteractivePreviewPatch = InteractivePreviewPatchPayload | InvalidInteractivePreviewPatchPayload;
 
+export const usesPositionedPreviewPatch = ({
+  dragging,
+  roi,
+}: {
+  dragging: boolean;
+  roi: readonly [number, number, number, number] | null;
+}): boolean => dragging || roi !== null;
+
 export function isCurrentInteractivePreviewRequest({
   currentJobId,
   jobId,
