@@ -126,7 +126,11 @@ export function NegativeLabSourcePositiveComparison({
           </div>
         )}
         {(sourceUrl !== null || finalUrl !== null) && (
-          <div className="origin-center" style={viewport.imageTransformStyle}>
+          <div
+            className="origin-center"
+            data-testid="negative-lab-preview-image-layer"
+            style={viewport.imageTransformStyle}
+          >
             {effectiveMode === 'side_by_side' ? (
               <div className="flex max-h-[90vh] max-w-[95vw] items-center gap-2">
                 <ComparisonPane
@@ -140,6 +144,7 @@ export function NegativeLabSourcePositiveComparison({
                   className={imageClassName}
                   label={t('modals.negativeConversion.beforeAfterGeneratedPositive')}
                   src={finalUrl}
+                  testId="negative-lab-preview-image"
                 />
               </div>
             ) : effectiveMode === 'split' ? (
@@ -149,6 +154,7 @@ export function NegativeLabSourcePositiveComparison({
                   className={imageClassName}
                   label={t('modals.negativeConversion.beforeAfterGeneratedPositive')}
                   src={finalUrl}
+                  testId="negative-lab-preview-image"
                 />
                 <div
                   className="absolute inset-0 overflow-hidden"
@@ -168,6 +174,7 @@ export function NegativeLabSourcePositiveComparison({
                 className={imageClassName}
                 label={imageLabel}
                 src={effectiveMode === 'hold_source' ? sourceUrl : finalUrl}
+                testId={effectiveMode === 'hold_source' ? undefined : 'negative-lab-preview-image'}
               />
             )}
           </div>
@@ -224,18 +231,20 @@ function ComparisonPane({
   className,
   label,
   src,
+  testId,
 }: {
   alt: string;
   className: string;
   label: string;
   src: string | null;
+  testId?: string | undefined;
 }) {
   return (
     <div className="relative flex min-h-16 min-w-16 items-center justify-center">
       {src === null ? (
         <span className="text-xs text-white/50">{label}</span>
       ) : (
-        <img alt={alt} className={className} draggable={false} src={src} />
+        <img alt={alt} className={className} data-testid={testId} draggable={false} src={src} />
       )}
       {src !== null && (
         <span className="absolute left-2 top-2 rounded bg-black/65 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/90">
