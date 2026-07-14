@@ -5,7 +5,10 @@ import {
   type CommandPaletteCommandId,
   commandPaletteCommandSchema,
 } from '../schemas/commandPaletteSchemas';
-import type { UIState } from '../store/useUIStore';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../schemas/computational-merge/hdrMergeUiSchemas';
+import { useHdrWorkflowStore } from '../store/useHdrWorkflowStore';
+import { useOperationLaunchStore } from '../store/useOperationLaunchStore';
+import { type UIState, useUIStore } from '../store/useUIStore';
 import { createFocusStackSourcePreflightMetadata } from './focusStackSourcePreflight';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from './hdrAutoStackSelection';
 import { openNegativeLabModalSession } from './negative-lab/negativeLabModalSession';
@@ -399,9 +402,13 @@ export function createCommandPaletteAction(
 
   if (command.id === 'hdrMerge') {
     return () => {
+      const currentSources = useUIStore.getState().hdrModalState.stitchingSourcePaths;
+      const hdrLaunchSourcePaths =
+        selectedCommandPaths.length > 0 ? resolveHdrLaunchSourcePaths(imageList, selectedCommandPaths) : currentSources;
+      const launch = useOperationLaunchStore.getState().launch('hdr', hdrLaunchSourcePaths, Date.now());
+      useHdrWorkflowStore.getState().open(launch, DEFAULT_HDR_MERGE_UI_SETTINGS);
       setUI((state) => {
         const { lastDryRunCommand: _lastDryRunCommand, ...hdrModalState } = state.hdrModalState;
-        const hdrLaunchSourcePaths = resolveHdrLaunchSourcePaths(imageList, selectedCommandPaths);
         return {
           hdrModalState: {
             ...hdrModalState,

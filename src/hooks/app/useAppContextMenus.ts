@@ -61,6 +61,7 @@ import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../../schemas/computationa
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../../schemas/focus-stack/focusStackUiSchemas';
 import { libraryRelinkIdentitySchema } from '../../schemas/library/libraryRelinkSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -752,7 +753,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: Images,
               label: mergeLabel,
               onClick: () => {
-                useOperationLaunchStore.getState().launch('hdr', hdrStackSelection, Date.now());
+                const launch = useOperationLaunchStore.getState().launch('hdr', hdrStackSelection, Date.now());
+                useHdrWorkflowStore.getState().open(launch, DEFAULT_HDR_MERGE_UI_SETTINGS);
                 setUI({
                   hdrModalState: {
                     activeOperationId: null,
