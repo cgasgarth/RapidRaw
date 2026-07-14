@@ -555,12 +555,14 @@ export const useEditorStore = create<EditorState>((set) => ({
       const nextHistory =
         request.history === 'none'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
-          : pushEditHistoryEntryWithCheckpoints(
-              state.history,
-              state.historyIndex,
-              nextResult.after,
-              state.historyCheckpoints,
-            );
+          : request.history === 'reset'
+            ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
+            : pushEditHistoryEntryWithCheckpoints(
+                state.history,
+                state.historyIndex,
+                nextResult.after,
+                state.historyCheckpoints,
+              );
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after),
