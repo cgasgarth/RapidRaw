@@ -83,6 +83,7 @@ describe('editor right panel persistence', () => {
   test('defaults the pro editing rail to Color first', () => {
     expect(DEFAULT_EDITOR_RIGHT_PANEL).toBe(Panel.Color);
     expect(RIGHT_PANEL_ORDER.slice(0, EDITING_RIGHT_PANELS.length)).toEqual([
+      Panel.Film,
       Panel.Color,
       Panel.Adjustments,
       Panel.Crop,
@@ -250,6 +251,7 @@ describe('editor right panel persistence', () => {
 
   test('registry exposes compact labels for every panel in rail order', () => {
     expect(RIGHT_PANEL_ORDER.map((panel) => getRightPanelEntry(panel).shortLabel)).toEqual([
+      'Film',
       'Color',
       'Adjust',
       'Crop',

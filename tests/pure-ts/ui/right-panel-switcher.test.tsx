@@ -71,17 +71,17 @@ describe('right panel switcher', () => {
     expect(document.activeElement).toBe(input);
 
     await keyDown(input, 'ArrowDown');
-    const colorResult = required<HTMLButtonElement>(container, '[data-testid="right-panel-search-result-row-color"]');
-    expect(document.activeElement).toBe(colorResult);
+    const filmResult = required<HTMLButtonElement>(container, '[data-testid="right-panel-search-result-row-film"]');
+    expect(document.activeElement).toBe(filmResult);
 
-    await keyDown(colorResult, 'End');
+    await keyDown(filmResult, 'End');
     const exportResult = required<HTMLButtonElement>(container, '[data-testid="right-panel-search-result-row-export"]');
     expect(document.activeElement).toBe(exportResult);
 
     await keyDown(exportResult, 'Home');
-    expect(document.activeElement).toBe(colorResult);
+    expect(document.activeElement).toBe(filmResult);
 
-    await keyDown(colorResult, 'ArrowUp');
+    await keyDown(filmResult, 'ArrowUp');
     expect(document.activeElement).toBe(input);
 
     await setInputValue(input, 'output');
