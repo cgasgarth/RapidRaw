@@ -14,6 +14,12 @@ export const filmEmulationNodeV1Schema = z
     contractVersion: z.literal(1),
     enabled: z.boolean(),
     profileRef: filmEmulationProfileRefV1Schema,
+    stageParams: z
+      .object({
+        referenceLuminanceShaperP: z.number().finite().min(0.0001).max(4),
+      })
+      .strict()
+      .optional(),
     mix: z.number().finite().min(0).max(1),
     workingSpace: z.literal('acescg_linear_v1'),
     seedPolicy: z.literal('source_stable_v1'),

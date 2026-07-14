@@ -3,6 +3,8 @@
 //! The first profile is intentionally small and project-owned: a monotone
 //! luminance shaper that preserves AP1 hue and extended-range values.
 
+#![allow(dead_code)]
+
 use glam::Vec3;
 use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
@@ -32,9 +34,17 @@ pub struct FilmEmulationNodeV1 {
     pub contract_version: u32,
     pub enabled: bool,
     pub profile_ref: FilmEmulationProfileRef,
+    #[serde(default)]
+    pub stage_params: Option<FilmEmulationStageParamsV1>,
     pub mix: f32,
     pub working_space: String,
     pub seed_policy: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmEmulationStageParamsV1 {
+    pub reference_luminance_shaper_p: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,10 +108,19 @@ impl FilmEmulationNodeV1 {
         if !self.mix.is_finite() || !(0.0..=1.0).contains(&self.mix) {
             return Err("film_emulation_invalid_mix");
         }
+        let shaper_p = self
+            .stage_params
+            .as_ref()
+            .map_or(REFERENCE_SHAPER_P, |stage| {
+                stage.reference_luminance_shaper_p
+            });
+        if !shaper_p.is_finite() || !(0.0001..=4.0).contains(&shaper_p) {
+            return Err("film_emulation_invalid_stage_params");
+        }
         Ok(FilmEmulationParams {
             enabled: self.enabled && self.mix > 0.0,
             mix: self.mix,
-            shaper_p: REFERENCE_SHAPER_P,
+            shaper_p,
         })
     }
 }
@@ -135,6 +154,345 @@ pub fn apply_image(image: &mut Rgb32FImage, params: FilmEmulationParams) {
     }
     for pixel in image.pixels_mut() {
         pixel.0 = apply_pixel(Vec3::from_array(pixel.0), params).to_array();
+    }
+}
+
+/// Rust trust-boundary representation of the canonical single-target Film operation.
+/// This is deliberately independent of UI adjustment patches: callers must provide the
+/// version-pinned profile and a revision before this boundary will plan a mutation.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmOperationActorV1 {
+    pub id: String,
+    pub kind: String,
+    pub session_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmOperationApprovalV1 {
+    pub approval_class: String,
+    pub reason: String,
+    pub record_id: Option<String>,
+    pub state: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+pub enum FilmEmulationOperationV1 {
+    SetProfile {
+        #[serde(rename = "profileRef")]
+        profile_ref: FilmEmulationProfileRef,
+    },
+    SetMix {
+        mix: f32,
+    },
+    SetEnabled {
+        enabled: bool,
+    },
+    SetStageParams {
+        stage: String,
+        patch: FilmStagePatchV1,
+    },
+    SetStackPosition {
+        position: String,
+        #[serde(rename = "afterNodeId")]
+        after_node_id: Option<String>,
+    },
+    ResetToProfile,
+    RemoveNode,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmStagePatchV1 {
+    pub p: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ApplyFilmEmulationOperationV1 {
+    pub actor: FilmOperationActorV1,
+    pub approval: FilmOperationApprovalV1,
+    pub command_id: String,
+    pub command_type: String,
+    pub contract_version: u32,
+    pub correlation_id: String,
+    pub dry_run: bool,
+    pub expected_graph_revision: String,
+    pub idempotency_key: Option<String>,
+    pub operation: FilmEmulationOperationV1,
+    pub schema_version: u32,
+    pub target: FilmOperationTargetV1,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilmOperationTargetV1 {
+    pub kind: String,
+    pub variant_id: String,
+}
+
+impl ApplyFilmEmulationOperationV1 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.command_type != "edit.apply_film_emulation_operation"
+            || self.contract_version != 1
+            || self.schema_version != 1
+        {
+            return Err("film_operation_invalid_contract");
+        }
+        if self.command_id.is_empty()
+            || self.correlation_id.is_empty()
+            || self.expected_graph_revision.is_empty()
+        {
+            return Err("film_operation_missing_identity");
+        }
+        if self.target.variant_id.is_empty()
+            || !matches!(self.target.kind.as_str(), "image" | "virtual_copy")
+        {
+            return Err("film_operation_invalid_target");
+        }
+        let expected_class = if self.dry_run {
+            "preview_only"
+        } else {
+            "edit_apply"
+        };
+        if self.approval.approval_class != expected_class
+            || (!self.dry_run && self.approval.state != "approved")
+        {
+            return Err("film_operation_invalid_approval");
+        }
+        match &self.operation {
+            FilmEmulationOperationV1::SetProfile { profile_ref } => {
+                if profile_ref.id != REFERENCE_PROFILE_ID
+                    || profile_ref.version != REFERENCE_PROFILE_VERSION
+                    || profile_ref.content_sha256 != REFERENCE_PROFILE_CONTENT_SHA256
+                {
+                    return Err("film_operation_profile_hash_mismatch");
+                }
+            }
+            FilmEmulationOperationV1::SetMix { mix } => {
+                if !mix.is_finite() || !(0.0..=1.0).contains(mix) {
+                    return Err("film_operation_invalid_mix");
+                }
+            }
+            FilmEmulationOperationV1::SetStageParams { stage, patch } => {
+                if stage != "reference_luminance_shaper_v1" {
+                    return Err("film_operation_unsupported_stage");
+                }
+                if !patch.p.is_finite() || !(0.0001..=4.0).contains(&patch.p) {
+                    return Err("film_operation_invalid_stage_params");
+                }
+            }
+            FilmEmulationOperationV1::SetStackPosition {
+                position,
+                after_node_id,
+            } => {
+                if position == "scene_creative_custom"
+                    && after_node_id.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err("film_operation_custom_placement_requires_node");
+                }
+                if position != "scene_creative_end" && position != "scene_creative_custom" {
+                    return Err("film_operation_illegal_placement");
+                }
+                if position == "scene_creative_end" && after_node_id.is_some() {
+                    return Err("film_operation_illegal_placement");
+                }
+            }
+            FilmEmulationOperationV1::SetEnabled { .. }
+            | FilmEmulationOperationV1::ResetToProfile
+            | FilmEmulationOperationV1::RemoveNode => {}
+        }
+        Ok(())
+    }
+}
+
+fn reference_node() -> FilmEmulationNodeV1 {
+    FilmEmulationNodeV1 {
+        node_type: FILM_NODE_TYPE.to_string(),
+        contract_version: FILM_CONTRACT_VERSION,
+        enabled: true,
+        profile_ref: FilmEmulationProfileRef {
+            id: REFERENCE_PROFILE_ID.to_string(),
+            version: REFERENCE_PROFILE_VERSION.to_string(),
+            content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
+        },
+        stage_params: None,
+        mix: 1.0,
+        working_space: "acescg_linear_v1".to_string(),
+        seed_policy: "source_stable_v1".to_string(),
+    }
+}
+
+pub fn apply_operation_to_node(
+    current: Option<FilmEmulationNodeV1>,
+    operation: &FilmEmulationOperationV1,
+) -> Result<Option<FilmEmulationNodeV1>, &'static str> {
+    let mut node = current.unwrap_or_else(reference_node);
+    match operation {
+        FilmEmulationOperationV1::SetProfile { profile_ref } => {
+            node.profile_ref = profile_ref.clone()
+        }
+        FilmEmulationOperationV1::SetMix { mix } => node.mix = *mix,
+        FilmEmulationOperationV1::SetEnabled { enabled } => node.enabled = *enabled,
+        FilmEmulationOperationV1::SetStageParams { patch, .. } => {
+            node.stage_params = Some(FilmEmulationStageParamsV1 {
+                reference_luminance_shaper_p: patch.p,
+            });
+        }
+        FilmEmulationOperationV1::SetStackPosition { .. } => {}
+        FilmEmulationOperationV1::ResetToProfile => node = reference_node(),
+        FilmEmulationOperationV1::RemoveNode => return Ok(None),
+    }
+    node.validate().map(|_| Some(node))
+}
+
+#[cfg(test)]
+mod operation_contract {
+    use super::*;
+    use serde_json::json;
+
+    fn command(operation: FilmEmulationOperationV1) -> ApplyFilmEmulationOperationV1 {
+        ApplyFilmEmulationOperationV1 {
+            actor: FilmOperationActorV1 {
+                id: "test".into(),
+                kind: "test".into(),
+                session_id: None,
+            },
+            approval: FilmOperationApprovalV1 {
+                approval_class: "edit_apply".into(),
+                reason: "test".into(),
+                record_id: None,
+                state: "approved".into(),
+            },
+            command_id: "cmd-1".into(),
+            command_type: "edit.apply_film_emulation_operation".into(),
+            contract_version: 1,
+            correlation_id: "corr-1".into(),
+            dry_run: false,
+            expected_graph_revision: "film.graph.v1:0".into(),
+            idempotency_key: None,
+            operation,
+            schema_version: 1,
+            target: FilmOperationTargetV1 {
+                kind: "image".into(),
+                variant_id: "variant-1".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn operation_contract_rejects_unknown_and_bad_profile() {
+        let value = json!({"kind":"SetMix","mix":0.5,"unexpected":true});
+        assert!(serde_json::from_value::<FilmEmulationOperationV1>(value).is_err());
+        let mut invalid = command(FilmEmulationOperationV1::SetProfile {
+            profile_ref: FilmEmulationProfileRef {
+                id: REFERENCE_PROFILE_ID.into(),
+                version: "1".into(),
+                content_sha256: "sha256:bad".into(),
+            },
+        });
+        assert_eq!(
+            invalid.validate(),
+            Err("film_operation_profile_hash_mismatch")
+        );
+        invalid.operation = FilmEmulationOperationV1::SetStageParams {
+            stage: "post_view".into(),
+            patch: FilmStagePatchV1 { p: 0.35 },
+        };
+        assert_eq!(invalid.validate(), Err("film_operation_unsupported_stage"));
+    }
+
+    #[test]
+    fn every_operation_member_validates() {
+        for operation in [
+            FilmEmulationOperationV1::SetProfile {
+                profile_ref: FilmEmulationProfileRef {
+                    id: REFERENCE_PROFILE_ID.into(),
+                    version: "1".into(),
+                    content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.into(),
+                },
+            },
+            FilmEmulationOperationV1::SetMix { mix: 0.5 },
+            FilmEmulationOperationV1::SetEnabled { enabled: false },
+            FilmEmulationOperationV1::SetStageParams {
+                stage: "reference_luminance_shaper_v1".into(),
+                patch: FilmStagePatchV1 { p: 0.5 },
+            },
+            FilmEmulationOperationV1::SetStackPosition {
+                position: "scene_creative_end".into(),
+                after_node_id: None,
+            },
+            FilmEmulationOperationV1::ResetToProfile,
+            FilmEmulationOperationV1::RemoveNode,
+        ] {
+            assert!(command(operation).validate().is_ok());
+        }
+    }
+}
+
+#[cfg(test)]
+mod operation_history {
+    use super::*;
+
+    #[test]
+    fn operation_sequence_preserves_exact_node_and_supports_remove_reset() {
+        let profile = FilmEmulationProfileRef {
+            id: REFERENCE_PROFILE_ID.into(),
+            version: REFERENCE_PROFILE_VERSION.into(),
+            content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.into(),
+        };
+        let initial = apply_operation_to_node(
+            None,
+            &FilmEmulationOperationV1::SetProfile {
+                profile_ref: profile,
+            },
+        )
+        .unwrap();
+        let mixed =
+            apply_operation_to_node(initial, &FilmEmulationOperationV1::SetMix { mix: 0.42 })
+                .unwrap();
+        let staged = apply_operation_to_node(
+            mixed,
+            &FilmEmulationOperationV1::SetStageParams {
+                stage: "reference_luminance_shaper_v1".into(),
+                patch: FilmStagePatchV1 { p: 0.8 },
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            staged
+                .as_ref()
+                .and_then(|node| node.stage_params.as_ref())
+                .map(|params| params.reference_luminance_shaper_p),
+            Some(0.8)
+        );
+        assert_eq!(staged.as_ref().map(|node| node.mix), Some(0.42));
+        let reset =
+            apply_operation_to_node(staged, &FilmEmulationOperationV1::ResetToProfile).unwrap();
+        assert_eq!(reset.as_ref().map(|node| node.mix), Some(1.0));
+        assert!(
+            reset
+                .as_ref()
+                .is_some_and(|node| node.stage_params.is_none())
+        );
+        assert!(
+            apply_operation_to_node(reset, &FilmEmulationOperationV1::RemoveNode)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn invalid_operation_cannot_mutate_node() {
+        let node = reference_node();
+        let invalid = FilmEmulationOperationV1::SetMix { mix: f32::NAN };
+        assert_eq!(
+            apply_operation_to_node(Some(node.clone()), &invalid),
+            Err("film_emulation_invalid_mix")
+        );
+        assert_eq!(node.validate().unwrap().mix, 1.0);
     }
 }
 
