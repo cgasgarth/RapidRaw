@@ -58,7 +58,6 @@ pub(crate) use render::*;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
-use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -79,7 +78,6 @@ use rapidraw_codecs::JpegPreset;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
-use tempfile::NamedTempFile;
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_commands as build_ai_commands;
@@ -2806,14 +2804,6 @@ async fn generate_all_community_previews(
     Ok(results)
 }
 
-#[tauri::command]
-async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
-    let mut temp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
-    temp_file.write_all(&bytes).map_err(|e| e.to_string())?;
-    let (_file, path) = temp_file.keep().map_err(|e| e.to_string())?;
-    Ok(path.to_string_lossy().to_string())
-}
-
 type LoadedHdrMergeItem = (String, String, DynamicImage, Duration, f32);
 
 fn validate_hdr_merge_dimensions(loaded_items: &[LoadedHdrMergeItem]) -> Result<(), String> {
@@ -4271,7 +4261,7 @@ pub fn run() {
             load_and_parse_lut,
             fetch_community_presets,
             generate_all_community_previews,
-            save_temp_file,
+            app::commands::temporary_artifacts::save_temp_file,
             app::commands::source::get_image_dimensions,
             analyze_perspective_correction,
             app::commands::source::is_original_file_available,
