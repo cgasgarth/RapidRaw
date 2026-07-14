@@ -19,6 +19,5 @@ export const AppServices = memo(
   AppServicesComponent,
   (previous, next) =>
     previous.imageProcessing.transformWrapperRef === next.imageProcessing.transformWrapperRef &&
-    previous.imageProcessing.prevAdjustmentsRef === next.imageProcessing.prevAdjustmentsRef &&
-    previous.imageProcessing.currentResRef === next.imageProcessing.currentResRef,
+    previous.imageProcessing.prevAdjustmentsRef === next.imageProcessing.prevAdjustmentsRef,
 );

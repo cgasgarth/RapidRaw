@@ -225,13 +225,65 @@ try {
   await verifyAutoEditTransactionBoundary(page);
   await verifyBatchAutoAdjustTransactionBoundary(page);
   const exposureValue = page.getByTestId('basic-control-exposure-value');
-  await exposureValue.click();
-  const exposureInput = page.getByTestId('basic-control-exposure-input');
-  await exposureInput.fill('0.75');
-  await exposureInput.press('Enter');
-  await exposureValue.waitFor({ state: 'visible', timeout: 10_000 });
+  const applyBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [220, 20, 20], delayMs: 700 },
+      { color: [20, 20, 220], delayMs: 350 },
+      { color: [20, 220, 20], delayMs: 30 },
+    );
+  });
+  for (const [index, exposure] of ['0.10', '0.20', '0.75'].entries()) {
+    await exposureValue.click();
+    const exposureInput = page.getByTestId('basic-control-exposure-input');
+    await exposureInput.fill(exposure);
+    await exposureInput.press('Enter');
+    await exposureValue.waitFor({ state: 'visible', timeout: 10_000 });
+    await page.waitForFunction(
+      (expected) =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+          .length ?? 0) >= expected,
+      applyBaseline + index + 1,
+      { timeout: 10_000 },
+    );
+  }
   if ((await exposureValue.textContent())?.trim() !== '0.75') {
     throw new Error('Exposure numeric control did not commit the requested value.');
+  }
+  await page.waitForTimeout(800);
+  const editedPreviewPixel = await page.evaluate(async () => {
+    const layers = [...document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]')];
+    const visible = layers.findLast((layer) => Number.parseFloat(getComputedStyle(layer).opacity) > 0.99);
+    const href = visible?.getAttribute('href');
+    if (!href) return null;
+    const image = new Image();
+    image.src = href;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (context === null) return null;
+    context.drawImage(image, 0, 0, 1, 1);
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  });
+  if (
+    editedPreviewPixel === null ||
+    editedPreviewPixel[1] === undefined ||
+    editedPreviewPixel[0] === undefined ||
+    editedPreviewPixel[2] === undefined ||
+    editedPreviewPixel[1] < 160 ||
+    editedPreviewPixel[0] > 80 ||
+    editedPreviewPixel[2] > 80
+  ) {
+    throw new Error(
+      'Reordered edited-preview completion did not preserve the green A-successor: ' +
+        JSON.stringify(editedPreviewPixel),
+    );
   }
   await page.waitForFunction(
     () => {

@@ -35,6 +35,11 @@ interface BrowserHarnessOriginalPreviewResponse {
   url: string;
 }
 
+interface BrowserHarnessApplyPreviewResponse {
+  color: [number, number, number];
+  delayMs: number;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -51,6 +56,7 @@ declare global {
       enabled: boolean;
       emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
+      applyPreviewResponses: Array<BrowserHarnessApplyPreviewResponse>;
       originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
       revokedObjectUrls: Array<string>;
       batchAutoAdjustCommitDelayMs: number;
@@ -279,6 +285,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    applyPreviewResponses: [],
     batchAutoAdjustCommitDelayMs: 0,
     batchAutoAdjustPrepareDelayMs: 0,
     calls,
@@ -1177,6 +1184,25 @@ const encodeHarnessPreviewJpeg = async (
 
 const createHarnessApplyPreview = async (args: Record<string, unknown> | undefined): Promise<ArrayBuffer> => {
   const request = normalizeHarnessApplyPreviewRequest(args);
+  const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.shift();
+  if (injected !== undefined) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 3;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('Browser harness could not create injected preview canvas context.');
+    context.fillStyle = `rgb(${injected.color.map(String).join(',')})`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (value) => (value === null ? reject(new Error('Browser harness JPEG encode failed.')) : resolve(value)),
+        'image/jpeg',
+        0.95,
+      );
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, injected.delayMs));
+    return blob.arrayBuffer();
+  }
   if (agentAuditE2eEnabled || (!request.isInteractive && request.roi === null)) {
     return decodeHarnessApplyPreview();
   }

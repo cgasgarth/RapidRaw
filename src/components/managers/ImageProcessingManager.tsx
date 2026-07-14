@@ -5,7 +5,6 @@ import type { Adjustments } from '../../utils/adjustments';
 interface Props {
   transformWrapperRef: RefObject<TransformController | null>;
   prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
-  currentResRef: RefObject<number>;
 }
 
 interface TransformController {
@@ -28,9 +27,7 @@ interface PreviousAdjustments {
 }
 
 export default function ImageProcessingManager(props: Props) {
-  useImageProcessing(props.transformWrapperRef, props.prevAdjustmentsRef, {
-    currentResRef: props.currentResRef,
-  });
+  useImageProcessing(props.transformWrapperRef, props.prevAdjustmentsRef);
 
   return null;
 }
