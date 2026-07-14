@@ -160,12 +160,51 @@ try {
   const sideBySideCompareButton = page.getByRole('menuitemcheckbox', { name: /Compare side by side/u });
   await splitCompareButton.waitFor({ timeout: 10_000 });
   await sideBySideCompareButton.waitFor({ timeout: 10_000 });
+  const originalPreviewBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'generate_original_transformed_preview',
+      ).length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.originalPreviewResponses.push(
+      {
+        delayMs: 700,
+        url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='3'%3E%3Crect width='4' height='3' fill='red'/%3E%3C/svg%3E",
+      },
+      {
+        delayMs: 30,
+        url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='3'%3E%3Crect width='4' height='3' fill='green'/%3E%3C/svg%3E",
+      },
+    );
+  });
   await splitCompareButton.click();
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'generate_original_transformed_preview',
+      ).length ?? 0) === expected,
+    originalPreviewBaseline + 1,
+    { timeout: 10_000 },
+  );
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('1');
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'generate_original_transformed_preview',
+      ).length ?? 0) === expected,
+    originalPreviewBaseline + 2,
+    { timeout: 10_000 },
+  );
   await imageCanvas.waitFor({ timeout: 10_000 });
   if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'split-wipe') {
     throw new Error('Split-wipe compare mode did not activate on the image canvas.');
   }
   await page.getByTestId('editor-compare-split-divider').waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(750);
+  if ((await imageCanvas.getAttribute('data-editor-compare-original-ready')) !== 'true') {
+    throw new Error('A late superseded original completion replaced the visible current compare artifact.');
+  }
   await commandOverflowButton.click();
   await sideBySideCompareButton.click();
   if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'side-by-side') {
@@ -177,6 +216,8 @@ try {
   if ((await imageCanvas.getAttribute('data-editor-compare-mode')) !== 'off') {
     throw new Error('Compare mode did not return to off after toggling side-by-side.');
   }
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('fit');
+  await waitForStablePreview(page);
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
@@ -344,6 +385,10 @@ try {
     calls: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.map((call) => call.command) ?? [],
     enabled: window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.enabled === true,
     hasTauriInternals: window.__TAURI_INTERNALS__ !== undefined,
+    originalPreviewRequests:
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter((call) => call.command === 'generate_original_transformed_preview')
+        .map((call) => call.args) ?? [],
     startupRecords:
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
         .filter((call) => call.command === 'record_frontend_startup_phase')
@@ -351,6 +396,18 @@ try {
   }));
   if (!harnessProof.enabled || !harnessProof.hasTauriInternals) {
     throw new Error('Browser Tauri harness was not installed.');
+  }
+  if (
+    harnessProof.originalPreviewRequests.length < 2 ||
+    harnessProof.originalPreviewRequests.some(
+      (request) =>
+        request?.['expectedImagePath'] !== '/tmp/rawengine-browser-harness/browser-harness.ARW' ||
+        typeof request?.['viewerSampleGraphRevision'] !== 'string',
+    )
+  ) {
+    throw new Error(
+      'Original preview effects did not preserve exact source and graph identity across zoom replacement.',
+    );
   }
   for (const requiredCommand of [
     'load_settings',
