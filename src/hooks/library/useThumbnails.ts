@@ -1,21 +1,28 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef } from 'react';
-import { Invokes } from '../../tauri/commands';
+import type { ThumbnailOperationAuthority } from '../../schemas/thumbnailOperationSchemas';
 import {
   ThumbnailDemandScheduler,
   type ThumbnailSchedulerMetrics,
   type ThumbnailViewportDemand,
 } from '../../thumbnails/ThumbnailDemandScheduler';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
+import {
+  cancelThumbnailGenerationWithSchema,
+  updateThumbnailQueueWithSchema,
+} from '../../utils/thumbnailOperationInvokes';
 
 export type ThumbnailViewportUpdate = Omit<ThumbnailViewportDemand, 'generation'> & { contextKey: string };
 
 export function useThumbnails() {
   const schedulerRef = useRef<ThumbnailDemandScheduler | null>(null);
+  const authorityRef = useRef<ThumbnailOperationAuthority | null>(null);
   const viewportContextRef = useRef<string | null>(null);
   if (schedulerRef.current === null) {
     schedulerRef.current = new ThumbnailDemandScheduler({
-      dispatch: (request) => invoke(Invokes.UpdateThumbnailQueue, { request }),
+      dispatch: async (request) => {
+        const authority = await updateThumbnailQueueWithSchema(request);
+        if (schedulerRef.current?.currentGeneration === authority.generation) authorityRef.current = authority;
+      },
       isResident: (path) => thumbnailCache.has(path),
     });
   }
@@ -34,9 +41,14 @@ export function useThumbnails() {
     (path: string, generation?: number): boolean => schedulerRef.current?.markResident(path, generation) ?? false,
     [],
   );
-  const clearThumbnailQueue = useCallback(() => {
+  const clearThumbnailQueue = useCallback(async () => {
+    const authority = authorityRef.current;
+    const scheduler = schedulerRef.current;
+    if (authority && scheduler?.currentGeneration === authority.generation)
+      await cancelThumbnailGenerationWithSchema(authority);
+    authorityRef.current = null;
     viewportContextRef.current = null;
-    schedulerRef.current?.clear();
+    scheduler?.clear();
   }, []);
   const invalidateThumbnails = useCallback((paths: readonly string[]) => schedulerRef.current?.invalidate(paths), []);
   const invalidateThumbnailRevision = useCallback(
@@ -49,6 +61,9 @@ export function useThumbnails() {
   );
   useEffect(
     () => () => {
+      const authority = authorityRef.current;
+      if (authority) void cancelThumbnailGenerationWithSchema(authority);
+      authorityRef.current = null;
       schedulerRef.current?.dispose();
       schedulerRef.current = null;
     },

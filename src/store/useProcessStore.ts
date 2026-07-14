@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Progress } from '../components/ui/AppProperties';
 import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
+import type { ThumbnailOperationAuthority } from '../schemas/thumbnailOperationSchemas';
 import { thumbnailCache } from '../thumbnails/thumbnailCacheInstance';
 import type { AiModelProgressById } from '../utils/aiModelProgress';
 
@@ -10,6 +11,7 @@ interface ProcessState {
   isIndexing: boolean;
   indexingProgress: Progress;
   thumbnailProgress: Progress;
+  thumbnailAuthority: ThumbnailOperationAuthority | null;
   aiModelDownloadStatus: string | null;
   aiModelDownloads: AiModelProgressById;
   copiedFilePaths: Array<string>;
@@ -33,6 +35,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
   isIndexing: false,
   indexingProgress: { current: 0, total: 0 },
   thumbnailProgress: { current: 0, total: 0 },
+  thumbnailAuthority: null,
   aiModelDownloadStatus: null,
   aiModelDownloads: {},
   copiedFilePaths: [],

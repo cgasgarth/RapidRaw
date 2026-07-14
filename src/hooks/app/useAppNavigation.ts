@@ -82,7 +82,7 @@ interface NavigationSettings extends AppSettings {
 }
 
 export interface AppNavigationProps {
-  clearThumbnailQueue: () => void;
+  clearThumbnailQueue: () => Promise<void>;
   invalidateThumbnails: (paths: readonly string[]) => void;
   requestThumbnails: (paths: string[]) => void;
   refs: {
@@ -441,8 +441,7 @@ export function useAppNavigation({
       const libraryViewMode = appSettings?.libraryViewMode;
 
       if (!preserveEditor) {
-        await invoke(Invokes.CancelThumbnailGeneration);
-        clearThumbnailQueue();
+        await clearThumbnailQueue();
         setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
         thumbnailCache.clearGeneration();
@@ -602,8 +601,7 @@ export function useAppNavigation({
       const { setUI } = useUIStore.getState();
 
       if (!preserveEditor) {
-        await invoke(Invokes.CancelThumbnailGeneration);
-        clearThumbnailQueue();
+        await clearThumbnailQueue();
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
         setLibrary({ libraryScrollTop: 0 });
         globalImageCache.clear();

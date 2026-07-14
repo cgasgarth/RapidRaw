@@ -500,9 +500,26 @@ impl ThumbnailScheduler {
     pub fn snapshot(&self) -> GenerationProgress {
         self.state.lock().unwrap().progress.clone()
     }
-    pub fn shutdown(&self) {
-        self.state.lock().unwrap().shutdown = true;
+    pub fn cancel_generation(&self, generation: ThumbnailGeneration) -> Option<GenerationProgress> {
+        let mut state = self.state.lock().unwrap();
+        if generation != state.active_generation {
+            return None;
+        }
+        for item in state.in_flight.values() {
+            item.job.cancellation.cancel();
+        }
+        let cancelled = state.pending_by_path.len() + state.in_flight.len();
+        state.progress.cancelled += cancelled;
+        state.pending_by_path.clear();
+        state.in_flight.clear();
+        state.heap.clear();
+        state.demanded_by_path.clear();
+        state.last_invalidation_by_path.clear();
+        Self::recount(&mut state);
+        let progress = state.progress.clone();
+        drop(state);
         self.wake.notify_all();
+        Some(progress)
     }
     fn recount(state: &mut ThumbnailSchedulerState) {
         state.progress.pending = state.pending_by_path.len();
@@ -636,6 +653,36 @@ mod tests {
         assert!(
             scheduler
                 .finish(&job, FinishOutcome::Completed { cache_hit: false })
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn exact_generation_cancel_rejects_stale_and_removes_publish_authority() {
+        let scheduler = ThumbnailScheduler::new(Default::default());
+        scheduler
+            .update(update(
+                8,
+                vec![spec("active", 0, ThumbnailDemandClass::Visible)],
+            ))
+            .unwrap();
+        let active = scheduler.claim().unwrap();
+
+        assert!(
+            scheduler
+                .cancel_generation(ThumbnailGeneration(7))
+                .is_none()
+        );
+        assert!(scheduler.is_publishable(&active));
+
+        let cancelled = scheduler.cancel_generation(ThumbnailGeneration(8)).unwrap();
+        assert_eq!((cancelled.pending, cancelled.in_flight), (0, 0));
+        assert_eq!(cancelled.cancelled, 1);
+        assert!(active.cancellation.is_cancelled());
+        assert!(!scheduler.is_publishable(&active));
+        assert!(
+            scheduler
+                .finish(&active, FinishOutcome::Completed { cache_hit: false })
                 .is_none()
         );
     }

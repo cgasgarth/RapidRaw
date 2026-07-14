@@ -30,5 +30,6 @@ pub const PANORAMA_PROGRESS: &str = "panorama-progress";
 pub const PANORAMA_WARNING: &str = "panorama-warning";
 pub const PREVIEW_UPDATE_UNCROPPED: &str = "preview-update-uncropped";
 pub const THUMBNAIL_GENERATION_COMPLETE: &str = "thumbnail-generation-complete";
+pub const THUMBNAIL_GENERATION_ERROR: &str = "thumbnail-generation-error";
 pub const THUMBNAIL_PROGRESS: &str = "thumbnail-progress";
 pub const WGPU_FRAME_READY: &str = "wgpu-frame-ready";
