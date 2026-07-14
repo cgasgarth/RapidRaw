@@ -1,6 +1,11 @@
 use image::{DynamicImage, GenericImageView, imageops};
 use serde::{Deserialize, Serialize};
 
+use crate::detail::multiscale::{
+    DetailBandSettingsV1, DetailProcessV1, DetailStageClassV1, MultiscaleDetailPlanV1,
+    MultiscaleDetailSettingsV1, apply_multiscale_detail,
+};
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum ResizeMode {
@@ -180,7 +185,7 @@ fn apply_watermark(
 }
 
 fn apply_output_sharpening(
-    image: DynamicImage,
+    mut image: DynamicImage,
     settings: &OutputSharpeningSettings,
 ) -> DynamicImage {
     let amount = (settings.amount / 100.0).clamp(0.0, 1.0);
@@ -188,36 +193,47 @@ fn apply_output_sharpening(
         return image;
     }
 
-    let target_multiplier = match settings.target {
-        OutputSharpeningTarget::Screen => 0.8,
-        OutputSharpeningTarget::Print => 1.15,
-        OutputSharpeningTarget::Custom => 1.0,
+    let (target_multiplier, band_shape) = match settings.target {
+        OutputSharpeningTarget::Screen => (0.8, [1.0, 0.72, 0.24, 0.08, 0.0]),
+        OutputSharpeningTarget::Print => (1.15, [0.72, 1.0, 0.55, 0.18, 0.04]),
+        OutputSharpeningTarget::Custom => (1.0, [1.0, 0.85, 0.4, 0.12, 0.02]),
     };
     let effective_amount = amount * target_multiplier;
-    let threshold = settings.threshold.clamp(0.0, 1.0);
     let radius = settings.radius_px.clamp(0.3, 3.0);
-
-    let mut output = image.to_rgb32f();
-    let blurred = DynamicImage::ImageRgb32F(output.clone())
-        .blur(radius)
-        .to_rgb32f();
-    let output_pixels = output.as_mut();
-    let blurred_pixels = blurred.as_raw();
-
-    for (out, blurred) in output_pixels.chunks_mut(3).zip(blurred_pixels.chunks(3)) {
-        let detail_r = out[0] - blurred[0];
-        let detail_g = out[1] - blurred[1];
-        let detail_b = out[2] - blurred[2];
-        let detail_luma = (0.299 * detail_r + 0.587 * detail_g + 0.114 * detail_b).abs();
-
-        if detail_luma >= threshold {
-            out[0] = (out[0] + detail_r * effective_amount).clamp(0.0, 1.0);
-            out[1] = (out[1] + detail_g * effective_amount).clamp(0.0, 1.0);
-            out[2] = (out[2] + detail_b * effective_amount).clamp(0.0, 1.0);
-        }
-    }
-
-    DynamicImage::ImageRgb32F(output)
+    let threshold = settings.threshold.clamp(0.0, 1.0) * 0.05;
+    let long_edge = image.width().max(image.height()).max(1) as f32;
+    let reference_scale_px = (long_edge / radius).clamp(256.0, 20_000.0);
+    let detail_settings = MultiscaleDetailSettingsV1 {
+        bands: std::array::from_fn(|index| DetailBandSettingsV1 {
+            edge_protection: 0.9 - index as f32 * 0.1,
+            gain: band_shape[index],
+            noise_protection: 0.95 - index as f32 * 0.15,
+            threshold,
+        }),
+        chroma_detail: 0.0,
+        halo_suppression: 0.88,
+        highlight_protection: 0.9,
+        overall_amount: effective_amount,
+        process: DetailProcessV1::AtrousLumaV1,
+        reference_scale_px,
+        ringing_suppression: 0.9,
+        shadow_noise_protection: 0.9,
+    };
+    let Ok(plan) = MultiscaleDetailPlanV1::compile_for_stage(
+        detail_settings,
+        image.width(),
+        image.height(),
+        DetailStageClassV1::OutputSharpening,
+    ) else {
+        return image;
+    };
+    let receipt = apply_multiscale_detail(&mut image, &plan);
+    log::trace!(
+        "output_multiscale_detail_receipt={}",
+        serde_json::to_string(&receipt)
+            .unwrap_or_else(|error| format!("receipt_encode_error:{error}"))
+    );
+    image
 }
 
 #[cfg(test)]
@@ -226,7 +242,7 @@ mod tests {
         OutputSharpeningSettings, OutputSharpeningTarget, ResizeMode, ResizeOptions,
         WatermarkAnchor, WatermarkSettings, apply_export_postprocess, calculate_resize_target,
     };
-    use image::{DynamicImage, ImageBuffer, Rgb, Rgba};
+    use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb, Rgba};
 
     fn synthetic_export_edge() -> DynamicImage {
         let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(11, 5);
@@ -347,6 +363,79 @@ mod tests {
                 assert_eq!(red_channel(&after, x, y), red_channel(&before, x, y));
             }
         }
+    }
+
+    #[test]
+    fn output_sharpening_is_target_specific_and_runs_after_final_resize() {
+        let input = DynamicImage::ImageRgb32F(ImageBuffer::from_fn(40, 24, |x, y| {
+            let edge = if x >= 20 { 0.72 } else { 0.18 };
+            let texture = (((x * 13 + y * 7) % 11) as f32 - 5.0) * 0.002;
+            Rgb([edge + texture, edge + texture, edge + texture])
+        }));
+        let resize = ResizeOptions {
+            mode: ResizeMode::Width,
+            value: 20,
+            dont_enlarge: false,
+        };
+        let settings = |target| OutputSharpeningSettings {
+            target,
+            amount: 75.0,
+            radius_px: 1.0,
+            threshold: 0.0,
+        };
+        let screen = apply_export_postprocess(
+            input.clone(),
+            Some(&resize),
+            Some(&settings(OutputSharpeningTarget::Screen)),
+            None,
+        )
+        .unwrap();
+        let print = apply_export_postprocess(
+            input,
+            Some(&resize),
+            Some(&settings(OutputSharpeningTarget::Print)),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(screen.dimensions(), (20, 12));
+        assert_eq!(print.dimensions(), (20, 12));
+        assert!(
+            screen
+                .to_rgb32f()
+                .as_raw()
+                .iter()
+                .zip(print.to_rgb32f().as_raw())
+                .any(|(screen, print)| (screen - print).abs() > 1.0e-6),
+            "screen and print recipes must not alias"
+        );
+    }
+
+    #[test]
+    fn output_sharpening_preserves_scene_linear_headroom_until_encoding() {
+        let input = DynamicImage::ImageRgb32F(ImageBuffer::from_fn(32, 16, |x, _| {
+            let value = if x >= 16 { 1.35 } else { 0.82 };
+            Rgb([value, value * 0.92, value * 0.8])
+        }));
+        let output = apply_export_postprocess(
+            input,
+            None,
+            Some(&OutputSharpeningSettings {
+                target: OutputSharpeningTarget::Print,
+                amount: 60.0,
+                radius_px: 1.2,
+                threshold: 0.0,
+            }),
+            None,
+        )
+        .unwrap()
+        .to_rgb32f();
+
+        assert!(output.as_raw().iter().all(|value| value.is_finite()));
+        assert!(
+            output.as_raw().iter().any(|value| *value > 1.0),
+            "output detail must not clamp HDR headroom before export encoding"
+        );
     }
 
     #[test]
