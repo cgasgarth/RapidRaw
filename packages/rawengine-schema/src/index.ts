@@ -33,6 +33,7 @@ export * from './film/filmMonochromeSchemas.js';
 export * from './film/filmOpticalScatterSchemas.js';
 export * from './film/filmPrintScanSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
+export * from './film/filmRenderSchedulingSchemas.js';
 export * from './film/filmResourceCacheSchemas.js';
 export * from './film/filmStageControlSchemas.js';
 export * from './film/filmValidationSchemas.js';
