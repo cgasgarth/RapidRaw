@@ -32,6 +32,8 @@ export enum Invokes {
   ClearSessionCaches = 'clear_session_caches',
   ClearThumbnailCache = 'clear_thumbnail_cache',
   ConvertNegatives = 'convert_negatives',
+  ReadNegativeLabMeasuredProfileLibrary = 'read_negative_lab_measured_profile_library',
+  WriteNegativeLabMeasuredProfileLibrary = 'write_negative_lab_measured_profile_library',
   CompareRawReconstructionModes = 'compare_raw_reconstruction_modes',
   CopyFiles = 'copy_files',
   CreateFolder = 'create_folder',
