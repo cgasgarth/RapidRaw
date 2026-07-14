@@ -32,7 +32,11 @@ import {
   getEditorZoomSourceSize,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
-import type { EditTransactionPersistenceContext, EditTransactionRequest } from '../../utils/editTransaction';
+import {
+  buildEditTransactionPersistenceContext,
+  type EditTransactionPersistenceContext,
+  type EditTransactionRequest,
+} from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
@@ -321,7 +325,18 @@ export function useEditorActions() {
         setAdjustments({ ...adjustments, ...adjustmentsToApply });
       }
 
-      invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
+      const selectedTransaction = useEditorStore.getState().lastEditApplicationReceipt;
+      const transaction =
+        selectedImage &&
+        pathsToUpdate.includes(selectedImage.path) &&
+        selectedTransaction &&
+        buildEditTransactionPersistenceContext(selectedTransaction, selectedTransaction);
+
+      invoke(Invokes.ApplyAdjustmentsToPaths, {
+        paths: pathsToUpdate,
+        adjustments: adjustmentsToApply,
+        transaction: transaction || undefined,
+      })
         .then(() => {
           if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
             void invoke<MetadataResponse>(Invokes.LoadMetadata, { path: selectedImage.path })
