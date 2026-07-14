@@ -31,6 +31,7 @@ export * from './film/filmEmulationTransferSchemas.js';
 export * from './film/filmExecutionSchemas.js';
 export * from './film/filmMeasuredReversalCalibrationSchemas.js';
 export * from './film/filmMonochromeSchemas.js';
+export * from './film/filmMultiTargetOperationSchemas.js';
 export * from './film/filmOpticalScatterSchemas.js';
 export * from './film/filmPrintScanSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
