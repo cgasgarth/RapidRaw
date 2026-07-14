@@ -21,6 +21,7 @@ import {
   getFilmLookControlledAdjustmentKeys,
 } from './filmLookBrowser';
 import { FILM_LOOK_BROWSER_ITEMS } from './filmLookRegistry';
+import { getReferenceFilmProfileClaimDecision } from './filmProfileRegistry';
 
 export const FILM_LOOK_APP_SERVER_ROUTE_MANIFEST = filmLookAppServerRouteManifestSchema.parse({
   routes: [
@@ -46,6 +47,10 @@ export const FILM_LOOK_APP_SERVER_ROUTE_MANIFEST = filmLookAppServerRouteManifes
 /** Adapter over the #5042 mutator; no patch or client-supplied hash is trusted. */
 export const applyFilmEmulationAppServerOperation = (command: unknown, state: FilmEmulationTargetStateV1) => {
   const parsed = applyFilmEmulationOperationV1Schema.parse(command);
+  const claimDecision = getReferenceFilmProfileClaimDecision();
+  if (claimDecision.status !== 'allowed') {
+    throw new Error(`Film profile is not applicable: ${claimDecision.reasonCodes.join(',')}`);
+  }
   const applied = applyFilmEmulationOperation(parsed, state);
   return filmEmulationOperationResultV1Schema.parse(applied.result);
 };

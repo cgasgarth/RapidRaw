@@ -23,6 +23,11 @@ export {
   filmResidualLutManifestV1Schema,
   filmSceneInputV1Schema,
 } from './film/filmEmulationSchemas.js';
+export {
+  evaluateFilmProfileClaim,
+  filmProfileManifestV1Schema,
+  verifyFilmProfileManifestHash,
+} from './film/filmProfileRegistrySchemas.js';
 
 export const RAW_ENGINE_SCHEMA_VERSION = 1;
 
