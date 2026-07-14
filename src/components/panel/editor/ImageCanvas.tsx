@@ -50,8 +50,6 @@ import {
   buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
 import {
-  applyToneEqualizerPickerSelection,
-  applyToneEqualizerTargetedDelta,
   isToneEqualizerPickerResultCurrent,
   type ToneEqualizerPickerResponse,
 } from '../../../utils/toneEqualizerPicker';
@@ -95,6 +93,7 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
+import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   createViewerInputRouter,
@@ -386,6 +385,10 @@ const ImageCanvas = memo(
     const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
     const focusRetouchPoints = useRef<Array<{ x: number; y: number }>>([]);
     const focusRetouchCommandService = useMemo(() => createFocusRetouchCommandService(), []);
+    const viewerAdjustmentCommandServices = useMemo(
+      () => createViewerAdjustmentCommandServices(setAdjustments),
+      [setAdjustments],
+    );
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
@@ -1082,14 +1085,10 @@ const ImageCanvas = memo(
         const result = interaction.result;
         if (!result) return;
         const deltaEv = Math.max(-4, Math.min(4, (interaction.startClientY - interaction.currentClientY) / 80));
-        setAdjustments(() =>
-          Math.abs(deltaEv) < 0.01
-            ? applyToneEqualizerPickerSelection(interaction.baseline, result)
-            : applyToneEqualizerTargetedDelta(interaction.baseline, result, deltaEv),
-        );
+        viewerAdjustmentCommandServices.commitToneEqualizerPicker(interaction.baseline, result, deltaEv);
         tonePickerDragRef.current = null;
       },
-      [setAdjustments],
+      [viewerAdjustmentCommandServices],
     );
     const handleToneEqualizerPickerPointerDown = useCallback(
       async (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1227,15 +1226,7 @@ const ImageCanvas = memo(
             saturationShift: 0,
             variance: 1,
           } satisfies Adjustments['pointColor']['points'][number];
-          setAdjustments((previous) => ({
-            ...previous,
-            pointColor: {
-              ...previous.pointColor,
-              enabled: true,
-              points: [...previous.pointColor.points, point],
-              selectedPointId: pointId,
-            },
-          }));
+          viewerAdjustmentCommandServices.appendPointColorSample(point);
           setUI({
             pointColorPickerActive: false,
             pointColorPickerReceipt: {
@@ -1253,7 +1244,7 @@ const ImageCanvas = memo(
         adjustments,
         overlayGeometry,
         selectedImage.path,
-        setAdjustments,
+        viewerAdjustmentCommandServices,
         setUI,
         viewerPickerCommandServices,
         viewerSampleGraphRevision,
@@ -1446,7 +1437,7 @@ const ImageCanvas = memo(
           delete newParams.isInitialDraw;
 
           const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-          updateSubMask(activeId, { parameters: newParams });
+          viewerAdjustmentCommandServices.updateSubMask(activeId, { parameters: newParams });
           return;
         }
 
@@ -1556,7 +1547,7 @@ const ImageCanvas = memo(
             };
             const receipt = recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
-            updateSubMask(activeId, {
+            viewerAdjustmentCommandServices.updateSubMask(activeId, {
               parameters: withBrushCommandReceipt(nextParameters, receipt),
             });
 
@@ -1617,7 +1608,7 @@ const ImageCanvas = memo(
         activeSubMask,
         activeSubMaskParameters,
         recordBrushMaskCommandCapture,
-        updateSubMask,
+        viewerAdjustmentCommandServices,
         effectiveImageDimensions,
         isToolActive,
         brushImageSpaceSize,
@@ -1733,7 +1724,7 @@ const ImageCanvas = memo(
 
           const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
           if (activeId) {
-            updateSubMask(activeId, { parameters: updatedParams });
+            viewerAdjustmentCommandServices.updateSubMask(activeId, { parameters: updatedParams });
           }
 
           if (isKonvaEvent(e) && e.evt.cancelable) e.evt.preventDefault();
@@ -1812,7 +1803,7 @@ const ImageCanvas = memo(
         isInitialDrawing,
         activeMaskId,
         activeAiSubMaskId,
-        updateSubMask,
+        viewerAdjustmentCommandServices,
         onLiveMaskPreview,
         activeContainer,
         activeSubMask,
@@ -1868,7 +1859,7 @@ const ImageCanvas = memo(
           }
         }
 
-        updateSubMask(activeId, { parameters: newParams });
+        viewerAdjustmentCommandServices.updateSubMask(activeId, { parameters: newParams });
         finishCanvasToolInteraction('pointer-up');
         return;
       }
@@ -1893,7 +1884,7 @@ const ImageCanvas = memo(
         }
 
         if (activeId) {
-          updateSubMask(activeId, {
+          viewerAdjustmentCommandServices.updateSubMask(activeId, {
             parameters: {
               ...activeSubMaskParameters,
               startX: startPoint.x,
@@ -1949,7 +1940,7 @@ const ImageCanvas = memo(
         };
         const receipt = recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
-        updateSubMask(activeId, {
+        viewerAdjustmentCommandServices.updateSubMask(activeId, {
           parameters: withBrushCommandReceipt(nextParameters, receipt),
         });
 
@@ -1971,7 +1962,7 @@ const ImageCanvas = memo(
       isMasking,
       onGenerateAiMask,
       onQuickErase,
-      updateSubMask,
+      viewerAdjustmentCommandServices,
       recordBrushMaskCommandCapture,
       getImageSpacePoint,
       withBrushCommandReceipt,
@@ -2163,38 +2154,12 @@ const ImageCanvas = memo(
 
     const updateRetouchHandlePoint = useCallback(
       (layerId: string, handle: RetouchHandleKind, point: RetouchCloneSource['sourcePoint']) => {
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          masks: prev.masks.map((mask: MaskContainer) => {
-            if (mask.id !== layerId || mask.retouchCloneSource === undefined) return mask;
-            let syncedTargetMask = false;
-            const updatedSubMasks =
-              handle === 'targetPoint'
-                ? mask.subMasks.map((subMask: SubMask) => {
-                    if (subMask.type !== Mask.Radial || syncedTargetMask) return subMask;
-                    syncedTargetMask = true;
-                    return {
-                      ...subMask,
-                      parameters: {
-                        ...subMask.parameters,
-                        centerX: point.x * effectiveImageDimensions.width,
-                        centerY: point.y * effectiveImageDimensions.height,
-                      },
-                    };
-                  })
-                : mask.subMasks;
-            return {
-              ...mask,
-              retouchCloneSource: {
-                ...mask.retouchCloneSource,
-                [handle]: point,
-              },
-              subMasks: updatedSubMasks,
-            };
-          }),
-        }));
+        viewerAdjustmentCommandServices.updateRetouchCloneHandle(layerId, handle, point, {
+          height: effectiveImageDimensions.height,
+          width: effectiveImageDimensions.width,
+        });
       },
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, setAdjustments],
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, viewerAdjustmentCommandServices],
     );
 
     const handleRetouchHandleDragEnd = useCallback(
@@ -2232,34 +2197,12 @@ const ImageCanvas = memo(
 
     const updateRemoveTargetPoint = useCallback(
       (layerId: string, removeSource: RetouchRemoveSource, point: RetouchCloneSource['sourcePoint']) => {
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          masks: prev.masks.map((mask: MaskContainer) => {
-            if (mask.id !== layerId || mask.retouchRemoveSource === undefined) return mask;
-            const retouchRemoveSource = { ...mask.retouchRemoveSource };
-            delete retouchRemoveSource.resolvedSourcePoint;
-            return {
-              ...mask,
-              retouchRemoveSource: {
-                ...retouchRemoveSource,
-                status: 'needs_regeneration',
-              },
-              subMasks: mask.subMasks.map((subMask: SubMask) => {
-                if (subMask.id !== removeSource.targetMaskId || subMask.type !== Mask.Radial) return subMask;
-                return {
-                  ...subMask,
-                  parameters: {
-                    ...subMask.parameters,
-                    centerX: point.x * effectiveImageDimensions.width,
-                    centerY: point.y * effectiveImageDimensions.height,
-                  },
-                };
-              }),
-            };
-          }),
-        }));
+        viewerAdjustmentCommandServices.updateRetouchRemoveTarget(layerId, removeSource, point, {
+          height: effectiveImageDimensions.height,
+          width: effectiveImageDimensions.width,
+        });
       },
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, setAdjustments],
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, viewerAdjustmentCommandServices],
     );
 
     const handleRemoveTargetDragEnd = useCallback(
