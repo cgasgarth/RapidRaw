@@ -18,6 +18,24 @@ export interface ReferenceMatchTransferAcceptance {
   transferMode: ReferenceMatchTransferMode;
 }
 
+type ReferenceMatchReceipt = NonNullable<Adjustments['referenceMatchApplicationReceipt']>;
+
+const receiptsMatch = (
+  left: ReferenceMatchReceipt | null | undefined,
+  right: ReferenceMatchReceipt | null | undefined,
+): boolean =>
+  left === right ||
+  (left !== null &&
+    left !== undefined &&
+    right !== null &&
+    right !== undefined &&
+    left.appliedAt === right.appliedAt &&
+    left.destination === right.destination &&
+    left.layerId === right.layerId &&
+    left.proposalFingerprint === right.proposalFingerprint &&
+    left.resultingGraphFingerprint === right.resultingGraphFingerprint &&
+    left.targetAnalysisFingerprint === right.targetAnalysisFingerprint);
+
 export const acceptReferenceMatchAdjustmentTransfer = ({
   adjustments,
   transferMode,
@@ -40,7 +58,7 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
   const globalReceipt = previous.referenceMatchApplicationReceipt;
   if (
     globalReceipt !== null &&
-    next.referenceMatchApplicationReceipt === globalReceipt &&
+    receiptsMatch(next.referenceMatchApplicationReceipt, globalReceipt) &&
     globalReceipt.appliedDiffs.some((diff) => previous[diff.key] !== next[diff.key])
   ) {
     reconciled = { ...reconciled, referenceMatchApplicationReceipt: null };
@@ -52,7 +70,7 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
     const previousLayer = previousLayers.get(layer.id);
     if (previousLayer === undefined) continue;
     const receipt = previousLayer.referenceMatchApplicationReceipt;
-    if (receipt === undefined || layer.referenceMatchApplicationReceipt !== receipt) continue;
+    if (receipt === undefined || !receiptsMatch(layer.referenceMatchApplicationReceipt, receipt)) continue;
     const changed =
       previousLayer.opacity !== layer.opacity ||
       receipt.appliedDiffs.some((diff) => previousLayer.adjustments[diff.key] !== layer.adjustments[diff.key]);
@@ -63,3 +81,6 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
   }
   return reconciledMasks === reconciled.masks ? reconciled : { ...reconciled, masks: reconciledMasks };
 };
+
+export const buildReceiptSafePresetApplication = (current: Adjustments, patch: Partial<Adjustments>): Adjustments =>
+  reconcileReferenceMatchReceiptsAfterEdit(current, { ...current, ...patch });

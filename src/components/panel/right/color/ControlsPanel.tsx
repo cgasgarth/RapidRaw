@@ -61,6 +61,7 @@ import {
 import {
   highConfidenceAutoEditGroups,
   isCurrentAutoEditCompletion,
+  mergeAutoEditAdjustments,
   recommendedAutoEditGroups,
   toggleAutoEditGroup,
 } from '../../../../utils/autoEditWorkflow';
@@ -250,11 +251,6 @@ export default function Controls() {
     })),
   );
 
-  const mergeAutoEditAdjustments = useCallback(
-    (base: Adjustments, payload: Record<string, unknown>): Adjustments => ({ ...base, ...payload }) as Adjustments,
-    [],
-  );
-
   const previewAutoEdit = useCallback(
     async (proposal: AutoEditProposalV1, groups: Set<AutoEditGroup>, impact: number) => {
       const base = autoEditBaseRef.current;
@@ -293,7 +289,7 @@ export default function Controls() {
         if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
       }
     },
-    [mergeAutoEditAdjustments, setEditor],
+    [setEditor],
   );
 
   const beginAutoEdit = useCallback(async () => {
@@ -416,7 +412,7 @@ export default function Controls() {
         if (serial === autoEditRequestSerial.current) setIsAutoEditApplying(false);
       }
     },
-    [autoEditImpact, autoEditProposal, autoEditSelectedGroups, mergeAutoEditAdjustments, setEditor],
+    [autoEditImpact, autoEditProposal, autoEditSelectedGroups, setEditor],
   );
 
   useEffect(() => {

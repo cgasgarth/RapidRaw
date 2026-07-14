@@ -1,4 +1,9 @@
 import type { AutoEditGroup, AutoEditProposalV1 } from '../schemas/autoEditSchemas';
+import type { Adjustments } from './adjustments';
+import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
+
+export const mergeAutoEditAdjustments = (base: Adjustments, payload: Record<string, unknown>): Adjustments =>
+  reconcileReferenceMatchReceiptsAfterEdit(base, { ...base, ...payload } as Adjustments);
 
 export const recommendedAutoEditGroups = (proposal: AutoEditProposalV1): Set<AutoEditGroup> =>
   new Set(
