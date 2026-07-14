@@ -172,3 +172,48 @@ test('original compare completion is rejected when a newer viewport request supe
   expect(late.state.visibleArtifact).toBeNull();
   expect(late.effects).toEqual([]);
 });
+
+test('viewport changes cancel active work and retain one canonical ROI snapshot', () => {
+  let state = createPreviewCoordinatorState();
+  const started = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  state = transition(started.state, { identity: started.state.settled.identity!, type: 'operation-started' }).state;
+  const viewport = transition(state, {
+    type: 'viewport-changed',
+    viewport: { revision: 2, roiFingerprint: '[0.1,0.1,0.8,0.8]', targetHeight: 900, targetWidth: 1600 },
+  });
+  expect(viewport.effects).toContainEqual({
+    type: 'cancel',
+    identity: started.state.settled.identity,
+    reason: 'viewport-changed',
+  });
+  expect(viewport.state.viewport).toEqual({
+    revision: 2,
+    roiFingerprint: '[0.1,0.1,0.8,0.8]',
+    targetHeight: 900,
+    targetWidth: 1600,
+  });
+  const unchanged = transition(viewport.state, {
+    type: 'viewport-changed',
+    viewport: { revision: 2, roiFingerprint: '[0.1,0.1,0.8,0.8]', targetHeight: 900, targetWidth: 1600 },
+  });
+  expect(unchanged.effects).toEqual([]);
+});
+
+test('display generation invalidates visible artifacts before a replacement render', () => {
+  let state = createPreviewCoordinatorState();
+  const started = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  state = transition(started.state, { type: 'operation-started', identity: started.state.settled.identity! }).state;
+  state = transition(state, {
+    artifact: artifact(started.state.settled.identity!, 'blob:display-old'),
+    identity: started.state.settled.identity!,
+    type: 'operation-completed',
+  }).state;
+  const invalidated = transition(state, { generation: 2, type: 'display-generation-changed' });
+  expect(invalidated.effects).toContainEqual({
+    type: 'release-url',
+    url: 'blob:display-old',
+    reason: 'display-generation-changed',
+  });
+  expect(invalidated.state.visibleArtifact).toBeNull();
+  expect(invalidated.state.displayGeneration).toBe(2);
+});

@@ -67,6 +67,13 @@ export interface PreviewIntent {
   reason: string;
 }
 
+export interface PreviewViewportSnapshot {
+  revision: number;
+  roiFingerprint: string;
+  targetHeight: number;
+  targetWidth: number;
+}
+
 export interface PreviewTransitionReceipt {
   event: PreviewCoordinatorEvent['type'];
   operationId?: number;
@@ -89,6 +96,7 @@ export interface PreviewCoordinatorState {
   session: PreviewSessionIdentity | null;
   staleCompletionCount: number;
   visibleArtifact: PreviewArtifact | null;
+  viewport: PreviewViewportSnapshot | null;
 }
 
 export type PreviewCoordinatorEffect =
@@ -105,6 +113,7 @@ export type PreviewCoordinatorEvent =
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
   | { type: 'operation-failed'; error: string; identity: PreviewOperationIdentity }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
+  | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
   | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
 
 export interface PreviewCoordinatorTransition {
@@ -130,6 +139,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     session: null,
     staleCompletionCount: 0,
     visibleArtifact: null,
+    viewport: null,
   };
 }
 
@@ -251,6 +261,7 @@ export function reducePreviewCoordinator(
       original: idleOperation(),
       settled: idleOperation(),
       session: null,
+      viewport: null,
     };
     return { effects, state: withReceipt(state, event, event.reason ?? 'session-cancelled') };
   }
@@ -285,8 +296,30 @@ export function reducePreviewCoordinator(
   }
 
   if (event.type === 'display-generation-changed') {
-    state = { ...state, displayGeneration: positiveRevisionSchema.parse(event.generation) };
+    state = cancelActiveOperations(state, effects, 'display-generation-changed');
+    state = {
+      ...state,
+      desired: null,
+      displayGeneration: positiveRevisionSchema.parse(event.generation),
+      interactive: idleOperation(),
+      original: idleOperation(),
+      settled: idleOperation(),
+      viewport: null,
+    };
     return { effects, state: withReceipt(state, event, 'display-generation-changed') };
+  }
+
+  if (event.type === 'viewport-changed') {
+    const viewport = event.viewport;
+    const unchanged =
+      state.viewport?.revision === viewport.revision &&
+      state.viewport?.roiFingerprint === viewport.roiFingerprint &&
+      state.viewport?.targetHeight === viewport.targetHeight &&
+      state.viewport?.targetWidth === viewport.targetWidth;
+    if (unchanged) return { effects, state: withReceipt(state, event, 'viewport-unchanged') };
+    state = cancelActiveOperations(state, effects, 'viewport-changed');
+    state = { ...state, desired: null, viewport };
+    return { effects, state: withReceipt(state, event, 'viewport-changed') };
   }
 
   if (event.type === 'render-inputs-changed') {
