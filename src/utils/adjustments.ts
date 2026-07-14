@@ -499,6 +499,15 @@ interface Hsl {
 export interface BlackWhiteMixerSettings {
   enabled: boolean;
   process: 'continuous_sensitivity_v1' | 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
+  presetId:
+    | 'manual'
+    | 'neutral_panchromatic'
+    | 'yellow_filter'
+    | 'orange_filter'
+    | 'red_filter'
+    | 'green_filter'
+    | 'blue_filter';
+  sourceClass: 'color_source' | 'monochrome_sensor' | 'encoded_grayscale' | 'already_monochrome_working';
   weights: {
     aquas: number;
     blues: number;
@@ -752,6 +761,8 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
 const INITIAL_BLACK_WHITE_MIXER: BlackWhiteMixerSettings = {
   enabled: false,
   process: 'legacy_fixed_band_v1',
+  presetId: 'manual',
+  sourceClass: 'color_source',
   weights: {
     aquas: 0,
     blues: 0,

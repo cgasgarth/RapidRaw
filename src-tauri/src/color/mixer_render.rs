@@ -171,6 +171,7 @@ pub(crate) fn apply_black_white_mixer(
     }
     if settings.process == CONTINUOUS_SENSITIVITY_V1
         && settings.implementation_version == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
+        && settings.source_class == crate::monochrome::COLOR_SOURCE
     {
         return continuous_sensitivity_v1(
             color,
@@ -185,6 +186,11 @@ pub(crate) fn apply_black_white_mixer(
                 settings.magentas,
             ],
         );
+    }
+    if settings.process == CONTINUOUS_SENSITIVITY_V1
+        && settings.implementation_version == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
+    {
+        return neutral_panchromatic_v1(color);
     }
 
     let luma = scene_luminance(color, preserve_extended);
@@ -309,7 +315,8 @@ mod tests {
     };
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::monochrome::{
-        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION, NEUTRAL_PANCHROMATIC_V1,
+        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION, MONOCHROME_SENSOR_SOURCE,
+        NEUTRAL_PANCHROMATIC_V1,
     };
 
     fn source_image() -> DynamicImage {
@@ -494,6 +501,30 @@ mod tests {
             "neutral scene process must not apply an SDR clamp"
         );
         assert_eq!(output, [output[0]; 3]);
+    }
+
+    #[test]
+    fn continuous_process_abstains_for_true_monochrome_sources() {
+        let adjustments = get_all_adjustments_from_json(
+            &json!({
+                "blackWhiteMixer": {
+                    "enabled": true,
+                    "process": "continuous_sensitivity_v1",
+                    "sourceClass": "monochrome_sensor",
+                    "weights": {
+                        "reds": 100, "oranges": 0, "yellows": 0, "greens": 0,
+                        "aquas": 0, "blues": -100, "purples": 0, "magentas": 0
+                    }
+                }
+            }),
+            false,
+            None,
+        );
+        let settings = adjustments.global.black_white_mixer;
+        assert_eq!(settings.source_class, MONOCHROME_SENSOR_SOURCE);
+        let output = apply_black_white_mixer([8.0, 0.4, 0.2], settings, true);
+        assert_eq!(output, [output[0]; 3]);
+        assert!(output[0] > 1.0);
     }
 
     #[test]

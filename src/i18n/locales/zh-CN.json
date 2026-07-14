@@ -62,6 +62,15 @@
         "contribution": "{{name}} 贡献",
         "disabled": "关",
         "enabled": "开",
+        "filterPreset": "",
+        "filterPresetAria": "",
+        "manualResponse": "",
+        "sourceClass": "",
+        "sourceClassAria": "",
+        "sourceColor": "",
+        "sourceEncodedGrayscale": "",
+        "sourceMonochromeSensor": "",
+        "sourceWorkingMonochrome": "",
         "title": "黑白混合器"
       },
       "calibration": {

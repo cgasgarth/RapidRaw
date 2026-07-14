@@ -14,6 +14,7 @@ import type {
   ColorBalanceRgbSettings,
 } from '../../../schemas/color/colorBalanceRgbSchemas';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
@@ -63,6 +64,8 @@ export const enableBlackWhiteMixer = (
 export const isBlackWhiteMixerModified = (settings: BlackWhiteMixerSettings): boolean =>
   settings.enabled !== INITIAL_ADJUSTMENTS.blackWhiteMixer.enabled ||
   settings.process !== INITIAL_ADJUSTMENTS.blackWhiteMixer.process ||
+  settings.presetId !== INITIAL_ADJUSTMENTS.blackWhiteMixer.presetId ||
+  settings.sourceClass !== INITIAL_ADJUSTMENTS.blackWhiteMixer.sourceClass ||
   Object.keys(settings.weights).some(
     (channel) =>
       settings.weights[channel as BlackWhiteMixerChannel] !==
@@ -630,6 +633,7 @@ const AdvancedMixerControls = ({
           ...previous.blackWhiteMixer.weights,
           [activeColor]: INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor],
         },
+        presetId: 'manual',
       },
     }));
   };
@@ -746,6 +750,76 @@ const AdvancedMixerControls = ({
             data-enabled={String(blackWhite.enabled)}
             data-testid="black-white-mixer-controls"
           >
+            <div className="grid grid-cols-2 gap-1 px-1 pt-1">
+              <label className="grid gap-0.5 text-[10px] text-text-secondary">
+                <span>{t('adjustments.color.blackWhiteMixer.filterPreset', { defaultValue: 'Filter preset' })}</span>
+                <select
+                  aria-label={t('adjustments.color.blackWhiteMixer.filterPresetAria', {
+                    defaultValue: 'Black and White filter preset',
+                  })}
+                  className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
+                  data-testid="black-white-mixer-preset"
+                  onChange={(event) =>
+                    setAdjustments((previous) => ({
+                      ...previous,
+                      blackWhiteMixer: applyMonochromePreset(
+                        previous.blackWhiteMixer,
+                        event.target.value as typeof previous.blackWhiteMixer.presetId,
+                      ),
+                    }))
+                  }
+                  value={blackWhite.presetId}
+                >
+                  <option value="manual">
+                    {t('adjustments.color.blackWhiteMixer.manualResponse', { defaultValue: 'Manual response' })}
+                  </option>
+                  {MONOCHROME_PRESETS.map((preset) => (
+                    <option key={preset.id} title={preset.description} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-0.5 text-[10px] text-text-secondary">
+                <span>{t('adjustments.color.blackWhiteMixer.sourceClass', { defaultValue: 'Source class' })}</span>
+                <select
+                  aria-label={t('adjustments.color.blackWhiteMixer.sourceClassAria', {
+                    defaultValue: 'Black and White source class',
+                  })}
+                  className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
+                  data-testid="black-white-mixer-source-class"
+                  onChange={(event) =>
+                    setAdjustments((previous) => ({
+                      ...previous,
+                      blackWhiteMixer: {
+                        ...previous.blackWhiteMixer,
+                        sourceClass: event.target.value as typeof previous.blackWhiteMixer.sourceClass,
+                      },
+                    }))
+                  }
+                  value={blackWhite.sourceClass}
+                >
+                  <option value="color_source">
+                    {t('adjustments.color.blackWhiteMixer.sourceColor', { defaultValue: 'Color source' })}
+                  </option>
+                  <option value="monochrome_sensor">
+                    {t('adjustments.color.blackWhiteMixer.sourceMonochromeSensor', {
+                      defaultValue: 'Monochrome sensor',
+                    })}
+                  </option>
+                  <option value="encoded_grayscale">
+                    {t('adjustments.color.blackWhiteMixer.sourceEncodedGrayscale', {
+                      defaultValue: 'Encoded grayscale',
+                    })}
+                  </option>
+                  <option value="already_monochrome_working">
+                    {t('adjustments.color.blackWhiteMixer.sourceWorkingMonochrome', {
+                      defaultValue: 'Working monochrome',
+                    })}
+                  </option>
+                </select>
+              </label>
+            </div>
             <div
               aria-label={t('adjustments.color.blackWhiteMixer.title')}
               className="grid grid-cols-8 gap-px"
@@ -802,6 +876,7 @@ const AdvancedMixerControls = ({
                     blackWhiteMixer: {
                       ...previous.blackWhiteMixer,
                       weights: { ...previous.blackWhiteMixer.weights, [activeColor]: value },
+                      presetId: 'manual',
                     },
                   }))
                 }
