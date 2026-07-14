@@ -101,7 +101,11 @@ import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import { createViewerInputRouter, normalizeViewerPointerType } from './viewerInputRouter';
+import {
+  createViewerInputRouter,
+  normalizeViewerPointerType,
+  type ViewerSurfacePointerEvent,
+} from './viewerInputRouter';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
 declare global {
@@ -400,6 +404,7 @@ const ImageCanvas = memo(
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
     const viewerInputRouter = useMemo(() => createViewerInputRouter(), []);
     const viewerToolSessions = useMemo(() => createViewerToolSessionRegistry(), []);
+    const viewerInputTransitionRef = useRef<ReturnType<typeof viewerInputRouter.dispatch> | null>(null);
     const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
       null,
     );
@@ -2568,24 +2573,35 @@ const ImageCanvas = memo(
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
-        onPointerLeave={handleViewerSamplerPointerLeave}
-        onPointerDown={(event) => {
-          const transition = viewerInputRouter.dispatch({
-            type: 'pointerdown',
-            pointerId: event.pointerId,
-            input: {
-              activeTool: viewerInputState?.activeTool ?? 'none',
-              button: event.button,
-              focusContext: isSliderDragging ? 'editable' : 'viewer',
-              isDragging: false,
-              isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
-              pointerCount: 1,
-              pointerType: normalizeViewerPointerType(event.pointerType),
-              zoomed: isMaxZoom ?? false,
-            },
-          });
+        onInputEvent={(event: ViewerSurfacePointerEvent) => {
+          const transition =
+            event.type === 'pointerdown'
+              ? viewerInputRouter.dispatch({
+                  type: 'pointerdown',
+                  pointerId: event.pointerId,
+                  input: {
+                    activeTool: viewerInputState?.activeTool ?? 'none',
+                    button: event.button,
+                    focusContext: isSliderDragging ? 'editable' : 'viewer',
+                    isDragging: false,
+                    isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
+                    pointerCount: 1,
+                    pointerType: normalizeViewerPointerType(event.pointerType),
+                    zoomed: isMaxZoom ?? false,
+                  },
+                })
+              : viewerInputRouter.dispatch({
+                  type: event.type === 'pointermove' ? 'pointermove' : event.type,
+                  pointerId: event.pointerId,
+                });
+          viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
-          if (transition.resolution && transition.state.owner !== null && transition.state.owner !== 'blocked') {
+          if (
+            event.type === 'pointerdown' &&
+            transition.resolution &&
+            transition.state.owner !== null &&
+            transition.state.owner !== 'blocked'
+          ) {
             viewerToolSessions.begin(
               {
                 geometryEpoch: overlayGeometry.geometryEpoch,
@@ -2597,8 +2613,18 @@ const ImageCanvas = memo(
               event.pointerId,
               transition.state.owner,
             );
+          } else if (event.type === 'pointermove') {
+            viewerToolSessions.reduce({ kind: 'update', pointerId: event.pointerId });
+          } else if (event.type === 'pointerup') {
+            viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
+          } else if (event.type === 'pointercancel') {
+            viewerToolSessions.reduce({ kind: 'cancel', pointerId: event.pointerId });
           }
-          if (transition.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerLeave={handleViewerSamplerPointerLeave}
+        onPointerDown={(event) => {
+          const transition = viewerInputTransitionRef.current;
+          if (transition?.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
           if (pointColorPickerActive) {
             event.preventDefault();
             void handlePointColorPickerPointerDown(event);
@@ -2616,8 +2642,6 @@ const ImageCanvas = memo(
           }
         }}
         onPointerMove={(event) => {
-          viewerInputRouter.dispatch({ type: 'pointermove', pointerId: event.pointerId });
-          viewerToolSessions.reduce({ kind: 'update', pointerId: event.pointerId });
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
             tonePickerDrag.currentClientY = event.clientY;
@@ -2628,9 +2652,6 @@ const ImageCanvas = memo(
             captureFocusRetouchPoint(event);
         }}
         onPointerUp={(event) => {
-          const transition = viewerInputRouter.dispatch({ type: 'pointerup', pointerId: event.pointerId });
-          viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
-          setViewerInputOwnerState(transition.state.owner);
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
             tonePickerDrag.currentClientY = event.clientY;
@@ -2646,9 +2667,6 @@ const ImageCanvas = memo(
           }
         }}
         onPointerCancel={(event) => {
-          const transition = viewerInputRouter.dispatch({ type: 'pointercancel', pointerId: event.pointerId });
-          viewerToolSessions.reduce({ kind: 'cancel', pointerId: event.pointerId });
-          setViewerInputOwnerState(transition.state.owner);
           if (tonePickerDragRef.current?.pointerId === event.pointerId) tonePickerDragRef.current = null;
         }}
         style={{
