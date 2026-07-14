@@ -111,6 +111,19 @@ for (const [section, rustName, wgslName] of [
   );
 }
 
+for (const [section, fields] of Object.entries(parsedManifest.rustStructFields)) {
+  const constant = section.toUpperCase();
+  const expected = `pub(super) const RENDER_ABI_${constant}_FIELDS: &[&str] = &[${fields
+    .map((field) => `"${field}"`)
+    .join(', ')}];`;
+  expect(rustBindings.includes(expected), `Rust generated field identity metadata drift for ${section}`);
+}
+for (const [section, fields] of Object.entries(parsedManifest.structFields)) {
+  const constant = section.toUpperCase();
+  const expected = `const RAPIDRAW_RENDER_ABI_${constant}_FIELD_COUNT: u32 = ${fields.length}u;`;
+  expect(wgslBindings.includes(expected), `WGSL generated field count metadata drift for ${section}`);
+}
+
 if (failures.length > 0) {
   console.error('Render ABI manifest check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
