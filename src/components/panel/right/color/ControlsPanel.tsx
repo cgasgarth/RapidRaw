@@ -27,7 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
-import { debouncedSave, useEditorActions } from '../../../../hooks/editor/useEditorActions';
+import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import {
   type AppliedAutoEditV1,
   type AutoEditGroup,
@@ -58,6 +58,13 @@ import {
   pickAdjustmentValues,
   TransformAdjustment,
 } from '../../../../utils/adjustments';
+import {
+  type AutoEditProposalBase,
+  buildAutoEditTransactionRequest,
+  clearAutoEditPreviewSession,
+  createAutoEditPreviewSession,
+  setAutoEditPreviewBypass,
+} from '../../../../utils/autoEditTransaction';
 import {
   highConfidenceAutoEditGroups,
   isCurrentAutoEditCompletion,
@@ -211,13 +218,8 @@ export default function Controls() {
   const [isAutoEditAnalyzing, setIsAutoEditAnalyzing] = useState(false);
   const [isAutoEditApplying, setIsAutoEditApplying] = useState(false);
   const autoEditRequestSerial = useRef(0);
-  const autoEditPreviewRef = useRef<Adjustments | null>(null);
-  const autoEditBaseRef = useRef<{
-    adjustments: Adjustments;
-    graphRevision: string;
-    imageSessionId: string;
-    path: string;
-  } | null>(null);
+  const autoEditPreviewKeyRef = useRef<string | null>(null);
+  const autoEditBaseRef = useRef<AutoEditProposalBase | null>(null);
   const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
 
   const { appSettings, theme } = useSettingsStore(
@@ -241,15 +243,34 @@ export default function Controls() {
     })),
   );
 
-  const { adjustments, copiedSectionAdjustments, histogram, selectedImage, setEditor } = useEditorStore(
+  const {
+    adjustmentRevision,
+    adjustments,
+    copiedSectionAdjustments,
+    histogram,
+    selectedImage,
+    selectedImageSessionId,
+    setEditor,
+  } = useEditorStore(
     useShallow((state) => ({
+      adjustmentRevision: state.adjustmentRevision,
       adjustments: state.adjustments,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
       selectedImage: state.selectedImage,
+      selectedImageSessionId: state.imageSession?.id ?? null,
       setEditor: state.setEditor,
     })),
   );
+
+  const clearCurrentAutoEditPreview = useCallback(() => {
+    const previewKey = autoEditPreviewKeyRef.current;
+    if (previewKey === null) return;
+    setEditor((state) => ({
+      autoEditPreviewSession: clearAutoEditPreviewSession(state.autoEditPreviewSession, previewKey),
+    }));
+    autoEditPreviewKeyRef.current = null;
+  }, [setEditor]);
 
   const previewAutoEdit = useCallback(
     async (proposal: AutoEditProposalV1, groups: Set<AutoEditGroup>, impact: number) => {
@@ -283,8 +304,16 @@ export default function Controls() {
           return;
         }
         const previewAdjustments = mergeAutoEditAdjustments(base.adjustments, preview.adjustments);
-        autoEditPreviewRef.current = previewAdjustments;
-        setEditor({ adjustments: previewAdjustments });
+        const previewSession = createAutoEditPreviewSession({
+          adjustments: previewAdjustments,
+          base,
+          committedSnapshot: state.adjustmentSnapshot,
+          currentAdjustmentRevision: state.adjustmentRevision,
+          previewIdentity: preview.previewIdentity,
+          proposalId: proposal.proposalId,
+        });
+        autoEditPreviewKeyRef.current = previewSession.key;
+        setEditor({ autoEditPreviewSession: previewSession });
       } catch (error) {
         if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
       }
@@ -298,9 +327,15 @@ export default function Controls() {
     const imageSessionId = state.imageSession?.id;
     if (!image?.isReady || !imageSessionId) return;
     const graphRevision = `history_${String(state.historyIndex)}`;
-    const base = { adjustments: state.adjustments, graphRevision, imageSessionId, path: image.path };
+    const base = {
+      adjustmentRevision: state.adjustmentRevision,
+      adjustments: state.adjustments,
+      graphRevision,
+      imageSessionId,
+      path: image.path,
+    };
     autoEditBaseRef.current = base;
-    autoEditPreviewRef.current = null;
+    autoEditPreviewKeyRef.current = null;
     setIsAutoEditOpen(true);
     setIsAutoEditAnalyzing(true);
     setAutoEditError(null);
@@ -344,24 +379,15 @@ export default function Controls() {
   const cancelAutoEdit = useCallback(() => {
     autoEditRequestSerial.current += 1;
     void invoke(Invokes.CancelAutoEditAnalysis);
-    const base = autoEditBaseRef.current;
-    const state = useEditorStore.getState();
-    if (
-      base &&
-      base.imageSessionId === state.imageSession?.id &&
-      base.graphRevision === `history_${String(state.historyIndex)}`
-    ) {
-      setEditor({ adjustments: base.adjustments });
-    }
+    clearCurrentAutoEditPreview();
     autoEditBaseRef.current = null;
-    autoEditPreviewRef.current = null;
     setAutoEditProposal(null);
     setAutoEditSelectedGroups(new Set());
     setAutoEditError(null);
     setIsAutoEditOpen(false);
     setIsAutoEditAnalyzing(false);
     setIsAutoEditApplying(false);
-  }, [setEditor]);
+  }, [clearCurrentAutoEditPreview]);
 
   const applyAutoEdit = useCallback(
     async (groups = autoEditSelectedGroups) => {
@@ -399,34 +425,57 @@ export default function Controls() {
           return;
         }
         const nextAdjustments = mergeAutoEditAdjustments(base.adjustments, applied.adjustments);
-        setEditor({ adjustments: nextAdjustments });
-        useEditorStore.getState().pushHistory(nextAdjustments);
-        debouncedSave(base.path, nextAdjustments);
+        const transactionRequest = buildAutoEditTransactionRequest(
+          base,
+          nextAdjustments,
+          applied.receipt.historyTransactionId,
+        );
+        useEditorStore.getState().applyEditTransaction(transactionRequest);
+        // A successful no-op intentionally does not publish canonical state, so
+        // explicitly dispose the keyed preview in both changed and no-op cases.
+        clearCurrentAutoEditPreview();
         autoEditBaseRef.current = null;
-        autoEditPreviewRef.current = null;
         setAutoEditProposal(null);
         setIsAutoEditOpen(false);
       } catch (error) {
-        if (serial === autoEditRequestSerial.current) setAutoEditError(formatUnknownError(error));
+        if (serial === autoEditRequestSerial.current) {
+          clearCurrentAutoEditPreview();
+          setAutoEditError(formatUnknownError(error));
+        }
       } finally {
         if (serial === autoEditRequestSerial.current) setIsAutoEditApplying(false);
       }
     },
-    [autoEditImpact, autoEditProposal, autoEditSelectedGroups, setEditor],
+    [autoEditImpact, autoEditProposal, autoEditSelectedGroups, clearCurrentAutoEditPreview],
   );
 
   useEffect(() => {
     const base = autoEditBaseRef.current;
-    if (base && selectedImage?.path !== base.path) {
+    if (
+      base &&
+      (selectedImage?.path !== base.path ||
+        selectedImageSessionId !== base.imageSessionId ||
+        adjustmentRevision !== base.adjustmentRevision)
+    ) {
       autoEditRequestSerial.current += 1;
+      clearCurrentAutoEditPreview();
       autoEditBaseRef.current = null;
-      autoEditPreviewRef.current = null;
       setAutoEditProposal(null);
       setIsAutoEditOpen(false);
       setIsAutoEditAnalyzing(false);
       setIsAutoEditApplying(false);
     }
-  }, [selectedImage?.path]);
+  }, [adjustmentRevision, clearCurrentAutoEditPreview, selectedImage?.path, selectedImageSessionId]);
+
+  useEffect(
+    () => () => {
+      autoEditRequestSerial.current += 1;
+      if (autoEditBaseRef.current !== null) void invoke(Invokes.CancelAutoEditAnalysis);
+      clearCurrentAutoEditPreview();
+      autoEditBaseRef.current = null;
+    },
+    [clearCurrentAutoEditPreview],
+  );
 
   const activeClippingStatusChips = useMemo(
     () => getEditorClippingStatusChips(adjustments).filter((chip) => chip.active),
@@ -1450,10 +1499,18 @@ export default function Controls() {
               }}
               onCancel={cancelAutoEdit}
               onCompareEnd={() => {
-                if (autoEditPreviewRef.current) setEditor({ adjustments: autoEditPreviewRef.current });
+                const previewKey = autoEditPreviewKeyRef.current;
+                if (previewKey === null) return;
+                setEditor((state) => ({
+                  autoEditPreviewSession: setAutoEditPreviewBypass(state.autoEditPreviewSession, previewKey, false),
+                }));
               }}
               onCompareStart={() => {
-                if (autoEditBaseRef.current) setEditor({ adjustments: autoEditBaseRef.current.adjustments });
+                const previewKey = autoEditPreviewKeyRef.current;
+                if (previewKey === null) return;
+                setEditor((state) => ({
+                  autoEditPreviewSession: setAutoEditPreviewBypass(state.autoEditPreviewSession, previewKey, true),
+                }));
               }}
               onImpactChange={(impact) => {
                 setAutoEditImpact(impact);

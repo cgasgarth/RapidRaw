@@ -70,6 +70,9 @@ const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === '1';
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
+  | 'analyzeAutoEdit'
+  | 'applyAutoEditProposal'
+  | 'cancelAutoEditAnalysis'
   | 'cancelThumbnailGeneration'
   | 'beginImageOpen'
   | 'checkAiConnectorStatus'
@@ -107,6 +110,7 @@ const commandNames: Record<
   | 'loadSettings'
   | 'mergeHdr'
   | 'previewNegativeConversion'
+  | 'previewAutoEditProposal'
   | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
   | 'preflightNegativeLabSource'
@@ -121,11 +125,14 @@ const commandNames: Record<
   | 'updateThumbnailQueue',
   string
 > = {
+  analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
+  applyAutoEditProposal: Invokes.ApplyAutoEditProposal,
   beginImageOpen: Invokes.BeginImageOpen,
   applyAdjustments: Invokes.ApplyAdjustments,
   applyLibraryCatalogChanges: Invokes.ApplyLibraryCatalogChanges,
   configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
+  cancelAutoEditAnalysis: Invokes.CancelAutoEditAnalysis,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
   exportImages: Invokes.ExportImages,
@@ -158,6 +165,7 @@ const commandNames: Record<
   loadSettings: Invokes.LoadSettings,
   mergeHdr: Invokes.MergeHdr,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  previewAutoEditProposal: Invokes.PreviewAutoEditProposal,
   planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   preflightNegativeLabSource: Invokes.PreflightNegativeLabSource,
@@ -286,6 +294,92 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.analyzeAutoEdit: {
+      const request = args?.['request'] as { graphRevision?: string; imageSessionId?: string } | undefined;
+      return Promise.resolve({
+        analysisIdentity: {
+          analysisDomain: 'raw_scene_linear',
+          analysisResolution: [1024, 768],
+          cameraProfileFingerprint: 'u64:0000000000000002',
+          decodePlanFingerprint: 'u64:0000000000000001',
+          geometryFingerprint: 'u64:0000000000000004',
+          implementationVersion: 1,
+          sourceIdentity: `${browserHarnessRoot}/browser-harness.ARW`,
+          sourceRevision: `source-revision-v1:${'0'.repeat(64)}`,
+          whiteBalanceFingerprint: 'u64:0000000000000003',
+        },
+        baseGraphFingerprint: 'blake3:browser-harness-auto-edit-base',
+        baseGraphRevision: request?.graphRevision ?? 'history_0',
+        contract: 'rapidraw.auto_edit.v1',
+        defaultEnabledGroups: ['light'],
+        imageSessionId: request?.imageSessionId ?? 'browser-harness-image-session',
+        impact: 1,
+        implementationVersion: 1,
+        proposalId: 'blake3:browser-harness-auto-edit-proposal',
+        recommendations: [
+          {
+            confidence: 0.94,
+            evidenceCodes: ['scene_midpoint_below_target'],
+            expectedEffect: 'scene_light',
+            group: 'light',
+            proposedParameters: { exposure: 0.5 },
+            safeToBatch: true,
+            state: 'recommended',
+            target: 'scene_global_color_tone',
+          },
+        ],
+      });
+    }
+    case commandNames.previewAutoEditProposal: {
+      const request = args?.['request'] as
+        | {
+            impact?: number;
+            proposal?: { proposalId?: string };
+            resultingGraphRevision?: string;
+            selectedGroups?: string[];
+          }
+        | undefined;
+      return Promise.resolve({
+        adjustments: { exposure: 0.5 },
+        graphRevision: request?.resultingGraphRevision ?? 'history_1',
+        impact: request?.impact ?? 1,
+        previewIdentity: 'blake3:browser-harness-auto-edit-preview',
+        proposalId: request?.proposal?.proposalId ?? 'blake3:browser-harness-auto-edit-proposal',
+        selectedGroups: request?.selectedGroups ?? ['light'],
+        sourceRevision: `source-revision-v1:${'0'.repeat(64)}`,
+      });
+    }
+    case commandNames.applyAutoEditProposal: {
+      const request = args?.['request'] as
+        | {
+            expectedGraphRevision?: string;
+            impact?: number;
+            proposal?: { proposalId?: string };
+            resultingGraphRevision?: string;
+            selectedGroups?: string[];
+          }
+        | undefined;
+      return Promise.resolve({
+        adjustments: { exposure: 0.5 },
+        receipt: {
+          afterGraphFingerprint: 'blake3:browser-harness-auto-edit-after',
+          appliedGroups: request?.selectedGroups ?? ['light'],
+          baseGraphRevision: request?.expectedGraphRevision ?? 'history_0',
+          beforeGraphFingerprint: 'blake3:browser-harness-auto-edit-before',
+          contract: 'rapidraw.auto_edit.v1',
+          historyTransactionId: 'blake3:browser-harness-auto-edit-transaction',
+          impact: request?.impact ?? 1,
+          implementationVersion: 1,
+          parameterDiffs: [{ after: 0.5, before: 0, group: 'light', key: 'exposure' }],
+          proposalId: request?.proposal?.proposalId ?? 'blake3:browser-harness-auto-edit-proposal',
+          resultingGraphRevision: request?.resultingGraphRevision ?? 'history_1',
+          skippedGroups: [],
+          sourceRevision: `source-revision-v1:${'0'.repeat(64)}`,
+        },
+      });
+    }
+    case commandNames.cancelAutoEditAnalysis:
+      return Promise.resolve(null);
     case commandNames.getNativeCapabilities:
       return Promise.resolve({
         schemaVersion: 1,
