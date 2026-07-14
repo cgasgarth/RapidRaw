@@ -139,6 +139,50 @@ pub(crate) fn create_curve_bind_group_layout(
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WgpuResourceKind {
+    SampledTexture2d,
+    SampledTexture3d,
+    SampledTexture2dArray,
+}
+
+impl WgpuResourceKind {
+    fn stable_id(self) -> &'static str {
+        match self {
+            Self::SampledTexture2d => "sampled_texture_2d",
+            Self::SampledTexture3d => "sampled_texture_3d",
+            Self::SampledTexture2dArray => "sampled_texture_2d_array",
+        }
+    }
+
+    fn binding_type(self) -> wgpu::BindingType {
+        wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            view_dimension: match self {
+                Self::SampledTexture2d => wgpu::TextureViewDimension::D2,
+                Self::SampledTexture3d => wgpu::TextureViewDimension::D3,
+                Self::SampledTexture2dArray => wgpu::TextureViewDimension::D2Array,
+            },
+            multisampled: false,
+        }
+    }
+}
+
+fn resource_kind(resource: &str) -> Result<WgpuResourceKind, &'static str> {
+    match resource {
+        "scene_guidance_v1" | "detail_guidance_v1" | "legacy_scene_blur_v1" => {
+            Ok(WgpuResourceKind::SampledTexture2d)
+        }
+        "view_transform_lut_v1" | "display_lut_v1" => Ok(WgpuResourceKind::SampledTexture3d),
+        "mask_layers_v1" => Ok(WgpuResourceKind::SampledTexture2dArray),
+        _ => Err("edit_graph.wgpu_unknown_resource_kind"),
+    }
+}
+
+pub(crate) fn resource_binding_type(resource: &str) -> Result<wgpu::BindingType, &'static str> {
+    resource_kind(resource).map(WgpuResourceKind::binding_type)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct WgpuNodeModule {
     pub(crate) kind: EditNodeKind,
     pub(crate) implementation: &'static str,
@@ -182,6 +226,9 @@ impl WgpuNodeRuntime {
             }
             if !shader_accepts_layout(shader_source, bind_group_layout) {
                 return Err("edit_graph.wgpu_shader_layout_mismatch");
+            }
+            for resource in descriptor.resource_requirements {
+                resource_kind(resource)?;
             }
             let halo_pixels = descriptor.wgpu_halo_pixels();
             let declared_halo = match node.spatial_support {
@@ -278,6 +325,14 @@ impl WgpuNodeRuntime {
                 "entryPoint": module.entry_point,
                 "fusedPhase": module.fused_phase,
                 "resourceRequirements": module.resource_requirements,
+                "resourceBindings": module.resource_requirements.iter().map(|resource| {
+                    serde_json::json!({
+                        "id": resource,
+                        "kind": resource_kind(resource)
+                            .expect("WGPU runtime validated every resource")
+                            .stable_id(),
+                    })
+                }).collect::<Vec<_>>(),
                 "haloPixels": module.halo_pixels,
             })).collect::<Vec<_>>(),
             "fusedGroups": self.fused_groups.iter().map(|group| {
@@ -461,6 +516,68 @@ mod tests {
             };
             assert_eq!(module.halo_pixels, declared_halo);
         }
+    }
+
+    #[test]
+    fn resource_registry_fails_closed_for_unknown_resources() {
+        for descriptor in crate::edit_graph::EDIT_NODE_RUNTIME_REGISTRY
+            .iter()
+            .filter(|descriptor| descriptor.wgpu_implementation.is_some())
+        {
+            for resource in descriptor.resource_requirements {
+                resource_kind(resource).unwrap_or_else(|error| {
+                    panic!(
+                        "{} has unregistered WGPU resource {resource}: {error}",
+                        descriptor.kind.stable_id()
+                    )
+                });
+            }
+        }
+        assert_eq!(
+            resource_kind("scene_guidance_v1"),
+            Ok(WgpuResourceKind::SampledTexture2d)
+        );
+        assert_eq!(
+            resource_kind("display_lut_v1"),
+            Ok(WgpuResourceKind::SampledTexture3d)
+        );
+        assert_eq!(
+            resource_kind("mask_layers_v1"),
+            Ok(WgpuResourceKind::SampledTexture2dArray)
+        );
+        assert_eq!(
+            resource_kind("future_unregistered_resource_v1"),
+            Err("edit_graph.wgpu_unknown_resource_kind")
+        );
+    }
+
+    #[test]
+    fn registered_resource_kinds_create_the_physical_shader_dimensions() {
+        let dimension = |resource| match resource_binding_type(resource).unwrap() {
+            wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                view_dimension,
+                multisampled: false,
+            } => view_dimension,
+            other => panic!("unexpected binding type for {resource}: {other:?}"),
+        };
+        assert_eq!(
+            dimension("scene_guidance_v1"),
+            wgpu::TextureViewDimension::D2
+        );
+        assert_eq!(
+            dimension("legacy_scene_blur_v1"),
+            wgpu::TextureViewDimension::D2
+        );
+        assert_eq!(
+            dimension("view_transform_lut_v1"),
+            wgpu::TextureViewDimension::D3
+        );
+        assert_eq!(dimension("display_lut_v1"), wgpu::TextureViewDimension::D3);
+        assert_eq!(
+            dimension("mask_layers_v1"),
+            wgpu::TextureViewDimension::D2Array
+        );
     }
 
     #[test]
