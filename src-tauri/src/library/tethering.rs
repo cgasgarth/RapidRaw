@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -76,6 +77,74 @@ struct TetherCapturedImport {
     ingest: TetherCaptureIngestSummary,
     imported_path: String,
     metadata: TetherCaptureMetadataSummary,
+}
+
+#[derive(Default)]
+pub(crate) struct TetherSessionService {
+    session: Mutex<Option<TetherSessionSnapshot>>,
+}
+
+impl TetherSessionService {
+    fn open(&self, session: TetherSessionSnapshot) -> TetherSessionSnapshot {
+        *self.session.lock().expect("tether session poisoned") = Some(session.clone());
+        session
+    }
+
+    fn snapshot(&self) -> Option<TetherSessionSnapshot> {
+        self.session
+            .lock()
+            .expect("tether session poisoned")
+            .clone()
+    }
+
+    fn close(&self) {
+        *self.session.lock().expect("tether session poisoned") = None;
+    }
+
+    fn mark_reconnect_required(&self, session_id: &str, recovery: TetherRecoverySummary) -> bool {
+        let mut session = self.session.lock().expect("tether session poisoned");
+        let Some(session) = session
+            .as_mut()
+            .filter(|session| session.session_id == session_id)
+        else {
+            return false;
+        };
+        session.status = "reconnect_required".to_string();
+        session.recovery = recovery;
+        true
+    }
+
+    fn previous_import(&self, session_id: &str, checksum: &str) -> Option<TetherCapturedImport> {
+        let session = self.session.lock().expect("tether session poisoned");
+        session
+            .as_ref()
+            .filter(|session| session.session_id == session_id)?
+            .captured_imports_by_checksum
+            .get(checksum)
+            .cloned()
+    }
+
+    fn commit_capture(&self, response: &TetherCaptureResponse, capture_counter: usize) -> bool {
+        let mut session = self.session.lock().expect("tether session poisoned");
+        let Some(session) = session
+            .as_mut()
+            .filter(|session| session.session_id == response.session_id)
+        else {
+            return false;
+        };
+        session.capture_counter = session.capture_counter.max(capture_counter);
+        session.captured_imports_by_checksum.insert(
+            response.checksum.clone(),
+            TetherCapturedImport {
+                bytes: response.bytes,
+                captured_at: response.captured_at.clone(),
+                ingest: response.ingest.clone(),
+                imported_path: response.imported_path.clone(),
+                metadata: response.metadata.clone(),
+            },
+        );
+        true
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -310,7 +379,7 @@ pub fn open_tether_session(
 
 #[tauri::command]
 pub fn get_tether_session(state: tauri::State<'_, AppState>) -> TetherSessionResponse {
-    let session = state.tether_session.lock().unwrap().clone();
+    let session = state.services.tether.snapshot();
     TetherSessionResponse {
         status: session
             .as_ref()
@@ -465,7 +534,7 @@ fn open_tether_session_for_state(
         status: "open".to_string(),
     };
 
-    *state.tether_session.lock().unwrap() = Some(session.clone());
+    let session = state.services.tether.open(session);
     Ok(TetherSessionResponse {
         session: Some(session),
         status: "open".to_string(),
@@ -473,7 +542,7 @@ fn open_tether_session_for_state(
 }
 
 fn close_tether_session_for_state(state: &AppState) -> TetherSessionResponse {
-    *state.tether_session.lock().unwrap() = None;
+    state.services.tether.close();
     TetherSessionResponse {
         session: None,
         status: "closed".to_string(),
@@ -492,13 +561,11 @@ fn trigger_tether_capture_for_state(
         ingest_preset_id: None,
         metadata_template_id: None,
     });
-    let session = {
-        let guard = state.tether_session.lock().unwrap();
-        let session = guard
-            .as_ref()
-            .ok_or_else(|| "Open a tether session before capture.".to_string())?;
-        session.clone()
-    };
+    let session = state
+        .services
+        .tether
+        .snapshot()
+        .ok_or_else(|| "Open a tether session before capture.".to_string())?;
     let capture_counter = session.capture_counter + 1;
 
     if session.provider_mode != "fake" {
@@ -617,8 +684,13 @@ fn trigger_tether_capture_for_state(
         source_path: source_path.to_string_lossy().to_string(),
         status: "captured".to_string(),
     };
-    commit_tether_capture_counter(state, &response.session_id, committed_capture_counter);
-    record_tether_import(state, &response);
+    if !state
+        .services
+        .tether
+        .commit_capture(&response, committed_capture_counter)
+    {
+        return Err("Tether session changed before capture publication.".to_string());
+    }
     Ok(response)
 }
 
@@ -639,14 +711,10 @@ fn ensure_session_camera_available_for_state(
         "{} disconnected. Refresh tether discovery and reopen the session before the next capture.",
         session.camera_display_name
     );
-    let mut guard = state.tether_session.lock().unwrap();
-    if let Some(current_session) = guard.as_mut()
-        && current_session.session_id == session.session_id
-    {
-        current_session.status = "reconnect_required".to_string();
-        current_session.recovery =
-            tether_recovery_summary("reconnect_required", 0, Vec::new(), &message);
-    }
+    state.services.tether.mark_reconnect_required(
+        &session.session_id,
+        tether_recovery_summary("reconnect_required", 0, Vec::new(), &message),
+    );
     Err(message)
 }
 
@@ -655,43 +723,7 @@ fn find_previous_tether_import(
     session_id: &str,
     checksum: &str,
 ) -> Option<TetherCapturedImport> {
-    let guard = state.tether_session.lock().unwrap();
-    let session = guard.as_ref()?;
-    if session.session_id != session_id {
-        return None;
-    }
-    session.captured_imports_by_checksum.get(checksum).cloned()
-}
-
-fn record_tether_import(state: &AppState, response: &TetherCaptureResponse) {
-    let mut guard = state.tether_session.lock().unwrap();
-    let Some(session) = guard.as_mut() else {
-        return;
-    };
-    if session.session_id != response.session_id {
-        return;
-    }
-    session.captured_imports_by_checksum.insert(
-        response.checksum.clone(),
-        TetherCapturedImport {
-            bytes: response.bytes,
-            captured_at: response.captured_at.clone(),
-            ingest: response.ingest.clone(),
-            imported_path: response.imported_path.clone(),
-            metadata: response.metadata.clone(),
-        },
-    );
-}
-
-fn commit_tether_capture_counter(state: &AppState, session_id: &str, capture_counter: usize) {
-    let mut guard = state.tether_session.lock().unwrap();
-    let Some(session) = guard.as_mut() else {
-        return;
-    };
-    if session.session_id != session_id {
-        return;
-    }
-    session.capture_counter = session.capture_counter.max(capture_counter);
+    state.services.tether.previous_import(session_id, checksum)
 }
 
 fn write_verified_primary_capture(
@@ -1389,6 +1421,108 @@ fn proof(boundary: &str) -> TetherDiscoveryProof {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    fn service_session(session_id: &str) -> TetherSessionSnapshot {
+        TetherSessionSnapshot {
+            camera_display_name: "Fixture Camera".to_string(),
+            camera_id: "fixture-camera".to_string(),
+            capture_counter: 0,
+            captured_imports_by_checksum: BTreeMap::new(),
+            destination_root: None,
+            opened_at: "2026-07-14T00:00:00Z".to_string(),
+            provider_mode: "fake".to_string(),
+            recovery: tether_recovery_summary("clean", 0, Vec::new(), "ready"),
+            session_id: session_id.to_string(),
+            status: "open".to_string(),
+        }
+    }
+
+    fn service_capture(session_id: &str, checksum: &str) -> TetherCaptureResponse {
+        TetherCaptureResponse {
+            backup: TetherCaptureBackupSummary {
+                bytes: None,
+                checksum: None,
+                destination_path: None,
+                enabled: false,
+                error: None,
+                status: "disabled".to_string(),
+            },
+            bytes: 3,
+            camera_display_name: "Fixture Camera".to_string(),
+            camera_control_values: BTreeMap::new(),
+            checksum: checksum.to_string(),
+            captured_at: "2026-07-14T00:00:01Z".to_string(),
+            ingest: TetherCaptureIngestSummary {
+                add_tags: Vec::new(),
+                apply_preset_ids: Vec::new(),
+                collision_index: 0,
+                file_name: "fixture.ARW".to_string(),
+                naming_template: "source".to_string(),
+                preset_id: "none".to_string(),
+            },
+            imported_path: "/fixtures/fixture.ARW".to_string(),
+            metadata: TetherCaptureMetadataSummary {
+                applied: false,
+                applied_fields: Vec::new(),
+                sidecar_path: None,
+                template_id: "none".to_string(),
+            },
+            provider_mode: "fake".to_string(),
+            session_id: session_id.to_string(),
+            source_path: "/fixtures/source.ARW".to_string(),
+            status: "captured".to_string(),
+        }
+    }
+
+    #[test]
+    fn session_service_rejects_stale_a_b_a_capture_publication_atomically() {
+        let service = TetherSessionService::default();
+        service.open(service_session("a-first"));
+        let stale_capture = service_capture("a-first", "stale-checksum");
+        service.open(service_session("b"));
+        service.open(service_session("a-successor"));
+
+        assert!(!service.commit_capture(&stale_capture, 7));
+        let successor = service.snapshot().unwrap();
+        assert_eq!(successor.session_id, "a-successor");
+        assert_eq!(successor.capture_counter, 0);
+        assert!(successor.captured_imports_by_checksum.is_empty());
+
+        let accepted = service_capture("a-successor", "accepted-checksum");
+        assert!(service.commit_capture(&accepted, 1));
+        let successor = service.snapshot().unwrap();
+        assert_eq!(successor.capture_counter, 1);
+        assert!(
+            successor
+                .captured_imports_by_checksum
+                .contains_key("accepted-checksum")
+        );
+    }
+
+    #[test]
+    fn concurrent_old_capture_cannot_mutate_a_successor_session() {
+        let service = Arc::new(TetherSessionService::default());
+        service.open(service_session("old"));
+        let release = Arc::new(Barrier::new(2));
+        let worker = {
+            let release = Arc::clone(&release);
+            let service = Arc::clone(&service);
+            thread::spawn(move || {
+                release.wait();
+                service.commit_capture(&service_capture("old", "old-checksum"), 9)
+            })
+        };
+
+        service.open(service_session("successor"));
+        release.wait();
+        assert!(!worker.join().unwrap());
+        let successor = service.snapshot().unwrap();
+        assert_eq!(successor.session_id, "successor");
+        assert_eq!(successor.capture_counter, 0);
+        assert!(successor.captured_imports_by_checksum.is_empty());
+    }
 
     #[test]
     fn fake_tether_provider_returns_one_ready_camera() {
@@ -1480,11 +1614,11 @@ mod tests {
         );
         assert_eq!(session.session.as_ref().unwrap().capture_counter, 0);
         assert_eq!(session.session.as_ref().unwrap().recovery.status, "clean");
-        assert!(state.tether_session.lock().unwrap().is_some());
+        assert!(state.services.tether.snapshot().is_some());
 
         let closed = close_tether_session_for_state(&state);
         assert_eq!(closed.status, "closed");
-        assert!(state.tether_session.lock().unwrap().is_none());
+        assert!(state.services.tether.snapshot().is_none());
     }
 
     #[test]
@@ -1501,7 +1635,7 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("not available"));
-        assert!(state.tether_session.lock().unwrap().is_none());
+        assert!(state.services.tether.snapshot().is_none());
     }
 
     #[test]
@@ -2043,13 +2177,7 @@ mod tests {
         assert_eq!(capture.ingest.collision_index, 1);
         assert_eq!(capture.ingest.file_name, "source_0012.ARW");
         assert_eq!(
-            state
-                .tether_session
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .capture_counter,
+            state.services.tether.snapshot().unwrap().capture_counter,
             12
         );
 
@@ -2124,13 +2252,7 @@ mod tests {
         assert_eq!(duplicate.backup.destination_path, None);
         assert!(!root.join("duplicate-backup").exists());
         assert_eq!(
-            state
-                .tether_session
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .capture_counter,
+            state.services.tether.snapshot().unwrap().capture_counter,
             1,
             "duplicate suppression should not consume the next capture sequence"
         );
@@ -2185,13 +2307,7 @@ mod tests {
 
         assert!(error.contains("Fake capture source does not exist"));
         assert_eq!(
-            state
-                .tether_session
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .capture_counter,
+            state.services.tether.snapshot().unwrap().capture_counter,
             0,
             "failed capture attempts should not consume the next capture sequence"
         );
@@ -2219,7 +2335,7 @@ mod tests {
         let error =
             ensure_session_camera_available_for_state(&state, &session, &detached_discovery)
                 .unwrap_err();
-        let current_session = state.tether_session.lock().unwrap().clone().unwrap();
+        let current_session = state.services.tether.snapshot().unwrap();
 
         assert!(error.contains("disconnected"));
         assert_eq!(current_session.status, "reconnect_required");

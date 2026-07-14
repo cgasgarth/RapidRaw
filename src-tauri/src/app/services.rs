@@ -114,6 +114,7 @@ pub struct AppServices {
     pub(crate) thumbnails:
         Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
+    pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
 }
 
@@ -132,6 +133,7 @@ impl AppServices {
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),
+            tether: Arc::default(),
             jobs: Arc::default(),
         }
     }
