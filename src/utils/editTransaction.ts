@@ -4,11 +4,7 @@ import {
   getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
-import {
-  editDocumentV2ToLegacyAdjustments,
-  legacyAdjustmentsToEditDocumentV2,
-  updateEditDocumentV2Node,
-} from './editDocumentV2';
+import { legacyAdjustmentsToEditDocumentV2, updateEditDocumentV2Node } from './editDocumentV2';
 
 /** The caller's intent, kept explicit so new mutation paths can be audited. */
 export type EditMutationSource =
@@ -125,6 +121,27 @@ const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
       : JSON.stringify(before[key as keyof Adjustments]) !== JSON.stringify(after[key as keyof Adjustments]),
   );
 
+/**
+ * Project only one authoritative node back through the compatibility surface.
+ * Unmigrated domains still live in the flat bag, so rebuilding that whole bag
+ * from a document captured before their latest edit would erase valid state.
+ */
+const projectEditDocumentNodeToAdjustments = (
+  before: Adjustments,
+  document: EditDocumentV2,
+  nodeType: EditDocumentNodeTypeV2,
+): Adjustments => {
+  const descriptor = getEditDocumentNodeDescriptor(nodeType);
+  const node = document.nodes[nodeType];
+  if (descriptor === undefined || node === undefined) throw new Error(`edit_transaction.unknown_node:${nodeType}`);
+
+  const projected: Record<string, unknown> = {};
+  for (const field of descriptor.legacyFields) {
+    if (Object.hasOwn(node.params, field)) projected[field] = structuredClone(node.params[field]);
+  }
+  return { ...before, ...projected };
+};
+
 /** Route a focused migrated-node edit without widening it back into flat replacement authority. */
 export const buildAdjustmentMutationOperations = (
   before: Adjustments,
@@ -164,7 +181,7 @@ export const reduceEditTransaction = (
     throw new Error(`edit_transaction.stale_session:${request.imageSessionId}:${currentImageSessionId}`);
   }
 
-  let after = structuredClone(before);
+  let after = before;
   let afterEditDocumentV2 = currentEditDocumentV2;
   for (const operation of request.operations) {
     if (operation.type === 'replace-adjustments') {
@@ -178,7 +195,7 @@ export const reduceEditTransaction = (
         ...params,
         ...structuredClone(operation.patch),
       }));
-      after = editDocumentV2ToLegacyAdjustments(afterEditDocumentV2);
+      after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
       continue;
     }
     assertFinitePatch(operation.patch);

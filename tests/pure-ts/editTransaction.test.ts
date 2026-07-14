@@ -114,6 +114,67 @@ describe('reduceEditTransaction', () => {
     expect(result.changedKeys).toEqual(['exposure', 'highlights']);
   });
 
+  test('focused Light reset preserves newer unmigrated Detail and Effects state', () => {
+    const before = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      brightness: 0.42,
+      clarity: 18,
+      contrast: 12,
+      glowAmount: 16,
+    };
+    const staleDocument = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const afterReset = {
+      ...before,
+      brightness: INITIAL_ADJUSTMENTS.brightness,
+      contrast: INITIAL_ADJUSTMENTS.contrast,
+    };
+    const result = reduceEditTransaction(
+      before,
+      4,
+      request({ operations: buildAdjustmentMutationOperations(before, afterReset) }),
+      undefined,
+      staleDocument,
+    );
+
+    expect(result.changedKeys).toEqual(['brightness', 'contrast']);
+    expect(result.after).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
+    expect(result.after.masks).toBe(before.masks);
+    expect(result.after.levels).toBe(before.levels);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+      brightness: 0,
+      contrast: 0,
+    });
+  });
+
+  test('atomic hydration publishes mixed domains before a focused Light reset', () => {
+    const hydratedAdjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      brightness: 0.42,
+      clarity: 18,
+      contrast: 12,
+      glowAmount: 16,
+    };
+    useEditorStore.getState().setEditor({ adjustments: hydratedAdjustments });
+    const hydrated = useEditorStore.getState();
+
+    expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
+    expect(hydrated.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity).toBe(18);
+    expect(hydrated.adjustmentSnapshot.value.glowAmount).toBe(16);
+
+    const afterReset = { ...hydrated.adjustments, brightness: 0, contrast: 0 };
+    hydrated.applyEditTransaction(
+      request({
+        baseAdjustmentRevision: hydrated.adjustmentRevision,
+        imageSessionId: 'editor-image-session:1',
+        operations: buildAdjustmentMutationOperations(hydrated.adjustments, afterReset),
+      }),
+    );
+    const reset = useEditorStore.getState();
+
+    expect(reset.adjustments).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
+    expect(reset.adjustmentSnapshot.editDocumentV2).toBe(reset.editDocumentV2);
+  });
+
   test('rejects fields and values outside scene-tone node ownership', () => {
     const wrongField = request({
       operations: [

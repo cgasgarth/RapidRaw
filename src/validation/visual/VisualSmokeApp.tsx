@@ -105,7 +105,6 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE, useUIStore } from '../../store/useUIStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
-import { publishAdjustmentSnapshot } from '../../utils/adjustmentSnapshots';
 import {
   ActiveChannel,
   type Adjustments,
@@ -343,7 +342,7 @@ function useAdjustmentPanelSmokeState() {
         effects: false,
       },
     };
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments,
       copiedSectionAdjustments: {
         section: 'basic',
@@ -1170,7 +1169,7 @@ function useProfessionalEditorToolbarSmokeState() {
       },
       osPlatform: 'macos',
     });
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: masks,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform: {
@@ -1199,7 +1198,7 @@ function useProfessionalEditorToolbarSmokeState() {
 function useProfessionalEditorSmokeState() {
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments,
       displaySize: { height: 540, width: 810 },
       histogram: null,
@@ -1227,7 +1226,7 @@ function useProfessionalFilmstripContextSmokeState() {
       highlights: -28,
       shadows: 18,
     };
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments,
       copiedAdjustments: { contrast: adjustments.contrast, exposure: adjustments.exposure },
       displaySize: { height: 680, width: 1020 },
@@ -1482,7 +1481,7 @@ function useProfessionalEditorStatusChipsSmokeState() {
       width: 240,
     };
 
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform,
@@ -2607,7 +2606,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
       rotation: 2.4,
     };
 
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: nextAdjustments,
       displaySize: { height: 405, width: 720 },
       finalPreviewUrl: brushMaskCanvasImageDataUrl,
@@ -2707,7 +2706,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 overlayRotation={overlayRotation}
                 selectedImage={cropTransformSmokeImage}
                 setAdjustments={(updater) => {
-                  useEditorStore.setState((state) => ({ adjustments: updater(state.adjustments) }));
+                  useEditorStore.getState().setEditor((state) => ({ adjustments: updater(state.adjustments) }));
                 }}
                 setCrop={(nextCrop: Crop, _percentageCrop: PercentCrop) => {
                   setCropState(nextCrop);
@@ -3120,7 +3119,7 @@ function WorkflowRailVisualSmoke() {
 
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments,
       histogram: null,
       history: [adjustments],
@@ -8148,9 +8147,8 @@ function FilmEmulationWorkspaceVisualSmoke() {
 
   useEffect(() => {
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
       adjustments: initial,
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
