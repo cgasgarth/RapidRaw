@@ -759,6 +759,28 @@ function HdrMergeSession({
                   src={runtimePlan.deghostPreview.ownershipDataUrl}
                 />
               </div>
+              {runtimePlan.staticRadiancePreview.headroomMax !== undefined && (
+                <div
+                  className="grid grid-cols-2 gap-x-3 gap-y-1 rounded border border-border-color bg-surface p-2 text-xs"
+                  data-headroom-coverage={runtimePlan.staticRadiancePreview.headroomCoverage ?? 0}
+                  data-headroom-max={runtimePlan.staticRadiancePreview.headroomMax}
+                  data-headroom-p99={runtimePlan.staticRadiancePreview.headroomP99 ?? 0}
+                  data-testid="hdr-scene-headroom-scope"
+                >
+                  <span>{t('modals.hdr.headroom.max')}</span>
+                  <span className="text-right tabular-nums">
+                    {runtimePlan.staticRadiancePreview.headroomMax.toFixed(3)}
+                  </span>
+                  <span>{t('modals.hdr.headroom.p99')}</span>
+                  <span className="text-right tabular-nums">
+                    {(runtimePlan.staticRadiancePreview.headroomP99 ?? 0).toFixed(3)}
+                  </span>
+                  <span>{t('modals.hdr.headroom.coverage')}</span>
+                  <span className="text-right tabular-nums">
+                    {((runtimePlan.staticRadiancePreview.headroomCoverage ?? 0) * 100).toFixed(2)}%
+                  </span>
+                </div>
+              )}
               {runtimePlan.sources.map((source) =>
                 'alignment' in source ? (
                   <div

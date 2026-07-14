@@ -3034,6 +3034,11 @@
       "handoffSourceCount": "",
       "handoffSourceRefs": "",
       "handoffToneMappedNotice": "",
+      "headroom": {
+        "coverage": "",
+        "max": "",
+        "p99": ""
+      },
       "initializing": "初始化中...",
       "mergedAlt": "",
       "merging": "合併 HDR 中",

@@ -3237,6 +3237,11 @@
       "handoffSourceCount": "Source count",
       "handoffSourceRefs": "Source refs",
       "handoffToneMappedNotice": "Saved HDR opens as an editable derived source. The current output is display-referred and tone-mapped; RAW-quality HDR color claims require bracketed RAW validation.",
+      "headroom": {
+        "coverage": "",
+        "max": "",
+        "p99": ""
+      },
       "initializing": "Inizializzazione...",
       "mergedAlt": "",
       "merging": "Unione HDR in corso",
