@@ -1433,22 +1433,16 @@ impl GpuProcessor {
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_MASK_TEXTURES,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2Array,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("mask_layers_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
 
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_LUT_TEXTURE,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D3,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("display_lut_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
@@ -1461,51 +1455,36 @@ impl GpuProcessor {
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_SHARPNESS_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("scene_guidance_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_TONAL_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("scene_guidance_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_CLARITY_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("scene_guidance_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_STRUCTURE_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("scene_guidance_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
         bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
             binding: MAIN_BINDING_DEHAZE_BLUR,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
+            ty: crate::render::wgpu_nodes::resource_binding_type("scene_guidance_v1")
+                .map_err(str::to_owned)?,
             count: None,
         });
 
