@@ -94,6 +94,40 @@ mod tests {
     }
 
     #[test]
+    fn typed_multiscale_detail_executes_in_the_production_pre_gpu_pipeline() {
+        let image = test_image();
+        let adjustments = json!({
+            "rawEngineEditGraphVersion": 2,
+            "multiscaleDetailV1": {
+                "bands": [
+                    {"gain": 0.8, "threshold": 0.01, "edgeProtection": 0.7, "noiseProtection": 0.9},
+                    {"gain": 0.6, "threshold": 0.01, "edgeProtection": 0.7, "noiseProtection": 0.8},
+                    {"gain": 0.4, "threshold": 0.01, "edgeProtection": 0.6, "noiseProtection": 0.6},
+                    {"gain": 0.2, "threshold": 0.01, "edgeProtection": 0.5, "noiseProtection": 0.4},
+                    {"gain": 0.1, "threshold": 0.01, "edgeProtection": 0.4, "noiseProtection": 0.2}
+                ],
+                "overallAmount": 1.0,
+                "haloSuppression": 0.75,
+                "ringingSuppression": 0.8,
+                "shadowNoiseProtection": 0.85,
+                "highlightProtection": 0.8,
+                "chromaDetail": 0.0,
+                "referenceScalePx": 1024.0,
+                "process": "atrous_luma_v1"
+            }
+        });
+        let disabled = apply_pre_gpu_detail_stages(&image, 42, &json!({}), true);
+        let enabled = apply_pre_gpu_detail_stages(&image, 42, &adjustments, true);
+
+        assert!(matches!(enabled.image, Cow::Owned(_)));
+        assert_ne!(disabled.render_hash, enabled.render_hash);
+        assert_ne!(
+            image.to_rgb32f().into_raw(),
+            enabled.image.as_ref().to_rgb32f().into_raw()
+        );
+    }
+
+    #[test]
     fn authoritative_pre_stage_suppresses_only_duplicate_global_shader_denoise() {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.luma_noise_reduction = 0.7;
