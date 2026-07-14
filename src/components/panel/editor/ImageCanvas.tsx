@@ -2527,10 +2527,7 @@ const ImageCanvas = memo(
                     zoomed: isMaxZoom ?? false,
                   },
                 })
-              : viewerInputRouter.dispatch({
-                  type: event.type === 'pointermove' ? 'pointermove' : event.type,
-                  pointerId: event.pointerId,
-                });
+              : viewerInputRouter.dispatch({ type: event.type, pointerId: event.pointerId });
           viewerInputTransitionRef.current = transition;
           setViewerInputOwnerState(transition.state.owner);
           if (
@@ -2554,7 +2551,7 @@ const ImageCanvas = memo(
             viewerToolSessions.reduce({ kind: 'update', pointerId: event.pointerId });
           } else if (event.type === 'pointerup') {
             viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
-          } else if (event.type === 'pointercancel') {
+          } else if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {
             viewerToolSessions.reduce({ kind: 'cancel', pointerId: event.pointerId });
           }
         }}

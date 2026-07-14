@@ -9,7 +9,7 @@ import {
 export type ViewerInputEvent =
   | { type: 'pointerdown'; pointerId: number; input: ResolveViewerInputInput }
   | { type: 'pointermove'; pointerId: number }
-  | { type: 'pointerup' | 'pointercancel'; pointerId: number }
+  | { type: 'pointerup' | 'pointercancel' | 'lostpointercapture'; pointerId: number }
   | { type: 'blur' | 'escape' | 'session-invalidated' };
 
 export interface ViewerSurfacePointerEvent {
@@ -23,7 +23,7 @@ export interface ViewerSurfacePointerEvent {
   readonly pointerType: ViewerPointerType;
   readonly pressure: number;
   readonly shiftKey: boolean;
-  readonly type: 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
+  readonly type: 'lostpointercapture' | 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
 }
 
 export const normalizeViewerSurfacePointerEvent = (event: {
@@ -98,10 +98,12 @@ export const reduceViewerInputRouter = (
   if (
     event.type === 'pointerup' ||
     event.type === 'pointercancel' ||
+    event.type === 'lostpointercapture' ||
     event.type === 'blur' ||
     event.type === 'escape'
   ) {
-    const isPointerRelease = event.type === 'pointerup' || event.type === 'pointercancel';
+    const isPointerRelease =
+      event.type === 'pointerup' || event.type === 'pointercancel' || event.type === 'lostpointercapture';
     const ignored = isPointerRelease && state.activePointerId !== event.pointerId;
     return { state: ignored ? state : clearGesture(state), resolution: null, ignored };
   }
