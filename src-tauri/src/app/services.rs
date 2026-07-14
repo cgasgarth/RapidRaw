@@ -102,6 +102,8 @@ pub struct AppServices {
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
+    pub(crate) burst_sr:
+        Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
     pub jobs: Arc<JobCoordinator>,
 }
 
