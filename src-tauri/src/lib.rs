@@ -36,6 +36,8 @@ mod raw;
 mod render;
 mod tagging;
 pub mod tone;
+#[cfg(test)]
+mod validation;
 mod window_customizer;
 
 pub(crate) use color::*;
