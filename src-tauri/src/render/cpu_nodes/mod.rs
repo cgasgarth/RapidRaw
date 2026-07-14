@@ -6,7 +6,7 @@
 
 use glam::Vec3;
 
-use crate::edit_graph::{CompiledEditGraph, CompiledNodePayload, EditNodeKind};
+use crate::edit_graph::{CompiledEditGraph, CompiledNodePayload, EditNodeKind, runtime_descriptor};
 use crate::tone::curves::CompiledCurvePlanV1;
 use crate::tone::output_curves::CompiledOutputCurvePlanV1;
 
@@ -17,13 +17,6 @@ pub(crate) enum CpuNodeExecutor {
 }
 
 impl CpuNodeExecutor {
-    pub(crate) fn kind(&self) -> EditNodeKind {
-        match self {
-            Self::SceneCurve(_) => EditNodeKind::SceneCurve,
-            Self::OutputCurve(_) => EditNodeKind::OutputCurve,
-        }
-    }
-
     pub(crate) fn apply(&self, color: Vec3) -> Vec3 {
         match self {
             Self::SceneCurve(plan) => Vec3::from_array(plan.evaluate_rgb(color.to_array())),
@@ -32,47 +25,76 @@ impl CpuNodeExecutor {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct CpuNodeBinding {
+    kind: EditNodeKind,
+    implementation: &'static str,
+    executor: Option<CpuNodeExecutor>,
+}
+
+impl CpuNodeBinding {
+    pub(crate) fn executor(&self) -> Option<&CpuNodeExecutor> {
+        self.executor.as_ref()
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CpuNodeRuntime {
-    scene_curve: Option<CpuNodeExecutor>,
-    output_curve: Option<CpuNodeExecutor>,
+    bindings: Vec<CpuNodeBinding>,
 }
 
 impl CpuNodeRuntime {
     pub(crate) fn from_graph(graph: &CompiledEditGraph) -> Result<Self, &'static str> {
         let mut runtime = Self::default();
         for node in graph.nodes.iter() {
+            let Some(implementation) = node.cpu_implementation else {
+                continue;
+            };
+            let descriptor = runtime_descriptor(node.kind);
+            if descriptor.cpu_implementation != Some(implementation) {
+                return Err("edit_graph.cpu_runtime_ownership_mismatch");
+            }
+            if runtime
+                .bindings
+                .iter()
+                .any(|binding| binding.kind == node.kind)
+            {
+                return Err("edit_graph.cpu_node_duplicate_executor");
+            }
             let executor = match (&node.payload, node.kind) {
                 (CompiledNodePayload::SceneCurve(plan), EditNodeKind::SceneCurve) => {
-                    CpuNodeExecutor::SceneCurve(plan.clone())
+                    Some(CpuNodeExecutor::SceneCurve(plan.clone()))
                 }
                 (CompiledNodePayload::OutputCurve(plan), EditNodeKind::OutputCurve) => {
-                    CpuNodeExecutor::OutputCurve(plan.clone())
+                    Some(CpuNodeExecutor::OutputCurve(plan.clone()))
                 }
-                _ => continue,
+                _ => None,
             };
-            match executor.kind() {
-                EditNodeKind::SceneCurve if runtime.scene_curve.is_none() => {
-                    runtime.scene_curve = Some(executor);
-                }
-                EditNodeKind::OutputCurve if runtime.output_curve.is_none() => {
-                    runtime.output_curve = Some(executor);
-                }
-                EditNodeKind::SceneCurve | EditNodeKind::OutputCurve => {
-                    return Err("edit_graph.cpu_node_duplicate_executor");
-                }
-                _ => unreachable!("only curve nodes are registered by this runtime slice"),
+            let binding = CpuNodeBinding {
+                kind: node.kind,
+                implementation,
+                executor,
+            };
+            if binding.implementation != implementation {
+                return Err("edit_graph.cpu_runtime_binding_mismatch");
             }
+            runtime.bindings.push(binding);
         }
         Ok(runtime)
     }
 
+    pub(crate) fn binding(&self, kind: EditNodeKind) -> Option<&CpuNodeBinding> {
+        self.bindings.iter().find(|binding| binding.kind == kind)
+    }
+
     pub(crate) fn scene_curve(&self) -> Option<&CpuNodeExecutor> {
-        self.scene_curve.as_ref()
+        self.binding(EditNodeKind::SceneCurve)
+            .and_then(CpuNodeBinding::executor)
     }
 
     pub(crate) fn output_curve(&self) -> Option<&CpuNodeExecutor> {
-        self.output_curve.as_ref()
+        self.binding(EditNodeKind::OutputCurve)
+            .and_then(CpuNodeBinding::executor)
     }
 }
 
@@ -136,12 +158,22 @@ mod tests {
             show_clipping: false,
         });
         let runtime = CpuNodeRuntime::from_graph(&graph).unwrap();
+        for node in graph.nodes.iter() {
+            let Some(implementation) = node.cpu_implementation else {
+                continue;
+            };
+            let binding = runtime
+                .binding(node.kind)
+                .expect("every CPU-owned graph node has one runtime binding");
+            assert_eq!(binding.implementation, implementation);
+            assert_eq!(binding.kind, node.kind);
+        }
         assert_eq!(
-            runtime.scene_curve().unwrap().kind(),
+            runtime.binding(EditNodeKind::SceneCurve).unwrap().kind,
             EditNodeKind::SceneCurve
         );
         assert_eq!(
-            runtime.output_curve().unwrap().kind(),
+            runtime.binding(EditNodeKind::OutputCurve).unwrap().kind,
             EditNodeKind::OutputCurve
         );
         let input = Vec3::new(0.18, 0.32, 0.64);
