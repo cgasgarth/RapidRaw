@@ -10,6 +10,7 @@ import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   batchUpdateEditDocumentV2Nodes,
   copyEditDocumentV2Node,
+  buildEditDocumentV2Diagnostics,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
@@ -142,6 +143,25 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(updated?.[0]?.nodes.geometry).toEqual(documents[0]?.nodes.geometry);
     expect(batchUpdateEditDocumentV2Nodes(documents, 'layers', () => ({}))).toBeNull();
     expect(batchUpdateEditDocumentV2Nodes(documents, 'source_artifacts', () => ({}))).toBeNull();
+  });
+
+  test('diagnostics expose node ownership, migration, quarantine, and render fingerprints', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.75 });
+    const diagnostics = buildEditDocumentV2Diagnostics({
+      ...document,
+      extensions: { ...document.extensions, quarantinedNodes: { future_color_v9: { enabled: true } } },
+      nodes: {
+        ...document.nodes,
+        scene_curve: { ...document.nodes.scene_curve, enabled: false },
+      },
+    });
+
+    expect(diagnostics.schemaVersion).toBe(2);
+    expect(diagnostics.activeNodeTypes).toEqual(editDocumentV2NodeInventory(document));
+    expect(diagnostics.legacyNodeTypes).toEqual(['geometry']);
+    expect(diagnostics.nodeDiagnostics.find(({ nodeType }) => nodeType === 'scene_curve')?.status).toBe('disabled');
+    expect(diagnostics.quarantinedNodeTypes).toEqual(['future_color_v9']);
+    expect(diagnostics.renderStageFingerprints[0]?.fingerprint).toContain('scene_global_color_tone');
   });
 
   test('reset uses descriptor defaults and preserves unrelated domains', () => {
