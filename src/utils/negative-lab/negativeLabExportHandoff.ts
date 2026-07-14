@@ -67,6 +67,7 @@ export interface NegativeLabPositiveOutputReceipt {
   sidecarPath: string;
   sourceContentHash: string;
   sourcePath: string;
+  state: 'planned';
 }
 
 export interface NegativeLabPositiveOutputRejectedFrame {
@@ -246,6 +247,7 @@ export const buildNegativeLabPositiveOutputReceipts = ({
       sidecarPath,
       sourceContentHash: positive.sourceContentHash,
       sourcePath: frame.sourcePath,
+      state: 'planned',
     });
   }
 

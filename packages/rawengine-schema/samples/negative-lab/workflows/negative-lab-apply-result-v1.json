@@ -118,7 +118,8 @@
       "replayPlanHash": "sha256:dry_run_plan_negative_conversion_sample",
       "sidecarPath": "/roll/001-positive-frame_0001.tif.rawengine-negative-lab.json",
       "sourceImageRef": "/roll/001.CR3",
-      "sourcePath": "/roll/001.CR3"
+      "sourcePath": "/roll/001.CR3",
+      "state": "planned"
     }
   ],
   "schemaVersion": 1,
