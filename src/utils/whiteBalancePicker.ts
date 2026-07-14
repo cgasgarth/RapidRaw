@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Adjustments } from './adjustments';
 import { buildTechnicalWhiteBalance, cctToXy, technicalWhiteBalanceSchema } from './color/whiteBalance';
+import type { EditTransactionRequest } from './editTransaction';
+import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
 const sliderMinimum = -100;
 const sliderMaximum = 100;
@@ -92,6 +94,41 @@ export interface WhiteBalancePickerPreviewSession {
   previewActive: boolean;
   sourceIdentity: string;
 }
+
+export interface WhiteBalancePickerEditTransactionState {
+  adjustmentRevision: number;
+  adjustments: Adjustments;
+  imageSession: { id: string } | null;
+  imageSessionId: number;
+  selectedImage: { path: string } | null;
+}
+
+export const buildWhiteBalancePickerEditTransaction = (
+  state: WhiteBalancePickerEditTransactionState,
+  receipt: WhiteBalancePickerRuntimeReceipt,
+  nextAdjustments: Adjustments,
+  transactionId: string,
+): EditTransactionRequest => {
+  if (state.selectedImage?.path !== receipt.selectedImagePath) {
+    throw new Error(
+      `white_balance_picker_stale_source:${receipt.selectedImagePath}:${state.selectedImage?.path ?? 'none'}`,
+    );
+  }
+  return {
+    baseAdjustmentRevision: state.adjustmentRevision,
+    history: 'single-entry',
+    imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+    operations: [
+      {
+        adjustments: reconcileReferenceMatchReceiptsAfterEdit(state.adjustments, nextAdjustments),
+        type: 'replace-adjustments',
+      },
+    ],
+    persistence: 'commit',
+    source: 'picker',
+    transactionId,
+  };
+};
 
 export const createWhiteBalancePickerPreviewSession = (
   baseAdjustments: Adjustments,

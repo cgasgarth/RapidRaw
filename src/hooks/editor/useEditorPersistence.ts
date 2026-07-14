@@ -24,7 +24,7 @@ export function useEditorPersistence(prevAdjustmentsRef: React.RefObject<Previou
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const imageSession = useEditorStore((state) => state.imageSession);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
-  const interactionActive = useEditorStore((state) => state.isSliderDragging);
+  const interactionActive = useEditorStore((state) => state.isSliderDragging || state.isWbPickerActive);
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const includedAdjustments = useSettingsStore(
