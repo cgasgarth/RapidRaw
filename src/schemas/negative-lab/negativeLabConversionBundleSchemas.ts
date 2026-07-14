@@ -37,7 +37,9 @@ export const negativeLabConversionBundleOutputSchema = z
       })
       .strict(),
   })
-  .strict();
+  // Native output evidence grows independently of replay identity. Preserve
+  // unknown evidence fields while keeping the envelope and conversion strict.
+  .passthrough();
 
 export const negativeLabConversionBundleSchema = z
   .object({

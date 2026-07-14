@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readTextFile } from '@tauri-apps/plugin-fs';
 import cx from 'clsx';
 import {
   CheckCircle2,
@@ -103,6 +105,7 @@ import {
   buildNegativeLabBatchApplyReceipt,
   type NegativeLabBatchApplyReceipt,
 } from '../../../utils/negative-lab/negativeLabBatchApplyReceipt';
+import { replayNegativeLabConversionBundle } from '../../../utils/negative-lab/negativeLabConversionBundle';
 import { buildNegativeBaseFogDensitometerReadout } from '../../../utils/negative-lab/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
@@ -699,6 +702,8 @@ function NegativeLabSession({
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImportingConversionBundle, setIsImportingConversionBundle] = useState(false);
+  const [conversionBundleReplayError, setConversionBundleReplayError] = useState<string | null>(null);
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
@@ -848,6 +853,30 @@ function NegativeLabSession({
     },
     [updateSessionSnapshot],
   );
+  const handleImportConversionBundle = useCallback(async () => {
+    setConversionBundleReplayError(null);
+    const selected = await open({
+      directory: false,
+      multiple: false,
+      filters: [{ name: 'Negative Lab conversion bundle', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingConversionBundle(true);
+    try {
+      const replay = replayNegativeLabConversionBundle({
+        bundleValue: JSON.parse(await readTextFile(selected)),
+        sessionId: `${operationId}:bundle-replay`,
+        source: { path: targetPaths[0] ?? '' },
+        targetPaths,
+      });
+      updateSessionSnapshot(() => replay.snapshot);
+    } catch (error) {
+      setConversionBundleReplayError(error instanceof Error ? error.message : 'Negative Lab bundle replay failed.');
+    } finally {
+      setIsImportingConversionBundle(false);
+    }
+  }, [operationId, targetPaths, updateSessionSnapshot]);
   const includedPathSet = sessionFrameViewState.includedPathSet;
   const setIncludedPathSet = useCallback(
     (nextState: SetStateAction<Set<string>>) => {
@@ -6245,6 +6274,48 @@ function NegativeLabSession({
                     : 'modals.negativeConversion.conversionBundleDisabled',
                 )}
               </span>
+            </div>
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-replay-status={sessionSnapshot.proofState.conversionBundleReplay?.status ?? 'none'}
+              data-testid="negative-lab-conversion-bundle-replay"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-text-secondary">
+                  {t('modals.negativeConversion.conversionBundleReplay')}
+                </span>
+                <button
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-primary hover:bg-surface disabled:opacity-50"
+                  data-testid="negative-lab-import-conversion-bundle"
+                  disabled={isImportingConversionBundle || isSaving}
+                  onClick={() => {
+                    void handleImportConversionBundle();
+                  }}
+                  type="button"
+                >
+                  {isImportingConversionBundle
+                    ? t('modals.negativeConversion.conversionBundleImporting')
+                    : t('modals.negativeConversion.conversionBundleImport')}
+                </button>
+              </div>
+              {sessionSnapshot.proofState.conversionBundleReplay !== null && (
+                <div
+                  className="text-[11px] text-text-tertiary"
+                  data-testid="negative-lab-conversion-bundle-replay-report"
+                >
+                  {t(
+                    `modals.negativeConversion.conversionBundleReplayStatus.${sessionSnapshot.proofState.conversionBundleReplay.status}`,
+                  )}
+                  {sessionSnapshot.proofState.conversionBundleReplay.reasons.length > 0
+                    ? ` · ${sessionSnapshot.proofState.conversionBundleReplay.reasons.join(', ')}`
+                    : ''}
+                </div>
+              )}
+              {conversionBundleReplayError !== null && (
+                <div className="text-[11px] text-red-300" data-testid="negative-lab-conversion-bundle-replay-error">
+                  {conversionBundleReplayError}
+                </div>
+              )}
             </div>
             <div
               aria-label={t('modals.negativeConversion.exportOptions')}
