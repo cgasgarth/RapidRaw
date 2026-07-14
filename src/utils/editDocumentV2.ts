@@ -2,52 +2,34 @@ import {
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  editDocumentNodeEnvelopeV2Schema,
   editDocumentV2Schema,
+  getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 
-const NODE_FIELDS: Record<EditDocumentNodeTypeV2, readonly string[]> = {
-  camera_input: ['cameraProfile', 'temperature', 'tint', 'whiteBalance'],
-  detail_denoise_dehaze: [
-    'clarity',
-    'colorNoiseReduction',
-    'dehaze',
-    'denoiseContrastProtection',
-    'denoiseDetail',
-    'denoiseNaturalGrain',
-    'denoiseShadowBias',
-    'lumaNoiseReduction',
-    'sharpness',
-  ],
-  display_creative: ['filmCurve', 'grainAmount', 'halationAmount', 'lutIntensity', 'vignetteAmount'],
-  geometry: ['aspectRatio', 'crop', 'flipHorizontal', 'flipVertical', 'orientationSteps', 'rotation'],
-  layers: ['masks'],
-  scene_curve: ['outputToneCurve', 'sceneCurve', 'toneCurve'],
-  scene_global_color_tone: [
-    'blacks',
-    'brightness',
-    'contrast',
-    'exposure',
-    'highlights',
-    'saturation',
-    'shadows',
-    'whites',
-  ],
-  source_artifacts: ['aiPatches', 'generatedProfile', 'referenceMatchApplicationReceipt'],
+const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
+
+const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
+  const descriptor = EDIT_DOCUMENT_NODE_DESCRIPTORS.find((candidate) =>
+    candidate.legacyFields.some((field) => field === key),
+  );
+  return descriptor?.nodeType ?? null;
 };
-
-const descriptorFor = (nodeType: EditDocumentNodeTypeV2) =>
-  EDIT_DOCUMENT_NODE_DESCRIPTORS.find((descriptor) => descriptor.nodeType === nodeType);
-
-const isNodeField = (key: string): boolean => Object.values(NODE_FIELDS).some((fields) => fields.includes(key));
 
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Adjustments): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
+  const mapped = entries
+    .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
+    .filter((entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } => entry.nodeType !== null);
   const nodes = Object.fromEntries(
     EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
-      const fields = NODE_FIELDS[nodeType];
-      const params = Object.fromEntries(entries.filter(([key]) => (fields ?? []).includes(key)));
       const descriptor = descriptorFor(nodeType);
+      const params = Object.fromEntries(
+        mapped
+          .filter((entry) => entry.nodeType === nodeType)
+          .map(({ key }) => [key, adjustments[key as keyof Adjustments]]),
+      );
       return [
         nodeType,
         {
@@ -60,7 +42,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Adjustments): Edi
       ];
     }),
   );
-  const legacyAdjustments = Object.fromEntries(entries.filter(([key]) => !isNodeField(key)));
+  const legacyAdjustments = Object.fromEntries(entries.filter(([key]) => nodeTypeForField(key) === null));
   return editDocumentV2Schema.parse({
     extensions: { legacyAdjustments },
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
@@ -68,6 +50,13 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Adjustments): Edi
     graphProcess: 'scene_referred_v2',
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     layers: nodes['layers']?.params ?? {},
+    migration: {
+      defaulted: [],
+      disabled: [],
+      mapped: mapped.map(({ key, nodeType }) => `${nodeType}.${key}`).sort(),
+      quarantined: Object.keys(legacyAdjustments).sort(),
+      sourceSchemaVersion: 1,
+    },
     nodes,
     provenance: {},
     schemaVersion: 2,
@@ -89,3 +78,17 @@ export const editDocumentV2ToLegacyAdjustments = (document: EditDocumentV2): Adj
 
 export const editDocumentV2NodeInventory = (document: EditDocumentV2): readonly EditDocumentNodeTypeV2[] =>
   Object.keys(document.nodes) as EditDocumentNodeTypeV2[];
+
+export const updateEditDocumentV2Node = (
+  document: EditDocumentV2,
+  nodeType: EditDocumentNodeTypeV2,
+  update: (params: Readonly<Record<string, unknown>>) => Record<string, unknown>,
+): EditDocumentV2 => {
+  const node = document.nodes[nodeType];
+  if (node === undefined) return document;
+  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: update(node.params) });
+  return { ...document, nodes: { ...document.nodes, [nodeType]: nextNode } };
+};
+
+export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>
+  descriptorFor(nodeType)?.capabilities;
