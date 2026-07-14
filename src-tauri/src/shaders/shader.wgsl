@@ -950,6 +950,40 @@ fn rgb_to_hue_degrees(color: vec3<f32>) -> f32 {
     return ((color.r - color.g) / chroma) * 60.0 + 240.0;
 }
 
+fn monochrome_oklab_from_ap1(color: vec3<f32>) -> vec3<f32> {
+    let linear_srgb = vec3<f32>(
+        1.7050515 * color.r - 0.6217907 * color.g - 0.0832584 * color.b,
+        -0.1302571 * color.r + 1.1408029 * color.g - 0.0105485 * color.b,
+        -0.0240033 * color.r - 0.1289688 * color.g + 1.1529717 * color.b,
+    );
+    let lms = vec3<f32>(
+        dot(linear_srgb, vec3<f32>(0.41222146, 0.53633255, 0.051445995)),
+        dot(linear_srgb, vec3<f32>(0.2119035, 0.6806995, 0.10739696)),
+        dot(linear_srgb, vec3<f32>(0.08830246, 0.28171885, 0.6299787)),
+    );
+    let lms_root = sign(lms) * pow(abs(lms), vec3<f32>(1.0 / 3.0));
+    return vec3<f32>(
+        dot(lms_root, vec3<f32>(0.21045426, 0.7936178, -0.004072047)),
+        dot(lms_root, vec3<f32>(1.9779985, -2.4285922, 0.4505937)),
+        dot(lms_root, vec3<f32>(0.025904037, 0.78277177, -0.80867577)),
+    );
+}
+
+fn monochrome_periodic_response(hue_degrees: f32, response_ev: array<f32, 8>) -> f32 {
+    let anchors = array<f32, 8>(0.0, 25.0, 60.0, 115.0, 180.0, 225.0, 280.0, 330.0);
+    let hue = hue_degrees % 360.0;
+    for (var index = 0u; index < 8u; index = index + 1u) {
+        let next = (index + 1u) % 8u;
+        let end = select(anchors[next], 360.0, next == 0u);
+        if (hue >= anchors[index] && hue <= end) {
+            let position = (hue - anchors[index]) / (end - anchors[index]);
+            let blend = 0.5 - 0.5 * cos(3.14159265359 * position);
+            return mix(response_ev[index], response_ev[next], blend);
+        }
+    }
+    return response_ev[0];
+}
+
 fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
@@ -958,6 +992,28 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, 
     if (settings.process == 1u && settings.implementation_version == 1u) {
         let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
         return vec3<f32>(dot(storage_safe, ACESCG_LUMINANCE_COEFF));
+    }
+    if (settings.process == 2u && settings.implementation_version == 1u) {
+        let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
+        let lab = monochrome_oklab_from_ap1(storage_safe);
+        let chroma = length(lab.yz);
+        var hue = degrees(atan2(lab.z, lab.y));
+        if (hue < 0.0) {
+            hue += 360.0;
+        }
+        let response_ev = array<f32, 8>(
+            settings.reds,
+            settings.oranges,
+            settings.yellows,
+            settings.greens,
+            settings.aquas,
+            settings.blues,
+            settings.purples,
+            settings.magentas,
+        );
+        let response = monochrome_periodic_response(hue, response_ev) * smoothstep(0.005, 0.08, chroma);
+        let energy = dot(storage_safe, ACESCG_LUMINANCE_COEFF) * exp2(clamp(response, -2.0, 2.0));
+        return vec3<f32>(energy);
     }
 
     let hue = rgb_to_hue_degrees(color);
