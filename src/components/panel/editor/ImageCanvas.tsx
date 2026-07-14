@@ -99,13 +99,13 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
-import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   createViewerInputRouter,
   normalizeViewerPointerType,
   type ViewerSurfacePointerEvent,
 } from './viewerInputRouter';
+import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
 declare global {

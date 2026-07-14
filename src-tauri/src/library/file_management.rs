@@ -2396,7 +2396,11 @@ pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
     adjustments: Value,
     app_handle: AppHandle,
+    transaction: Option<EditTransactionPersistenceContext>,
 ) -> Result<Vec<MetadataSaveReceipt>, String> {
+    if let Some(transaction) = transaction.as_ref() {
+        transaction.validate()?;
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
@@ -2409,40 +2413,50 @@ pub async fn apply_adjustments_to_paths(
             .unwrap()
             .clone();
 
-        let receipts: Vec<_> = paths
-            .par_iter()
-            .filter_map(|path| {
-                let (_, sidecar_path) = parse_virtual_path(path);
+        let mut backups = Vec::with_capacity(paths.len());
+        let mut receipts = Vec::with_capacity(paths.len());
+        for path in &paths {
+            let (_, sidecar_path) = parse_virtual_path(path);
+            backups.push((sidecar_path.clone(), fs::read(&sidecar_path).ok()));
 
-                let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+            let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+            let mut new_adjustments =
+                merge_adjustments_for_batch_target(existing_metadata.adjustments, &adjustments);
+            resolve_lens_params_in_adjustments(
+                &mut new_adjustments,
+                &existing_metadata.exif,
+                lens_db.as_deref(),
+            );
+            existing_metadata.adjustments = new_adjustments;
 
-                let mut new_adjustments =
-                    merge_adjustments_for_batch_target(existing_metadata.adjustments, &adjustments);
-
-                resolve_lens_params_in_adjustments(
-                    &mut new_adjustments,
-                    &existing_metadata.exif,
-                    lens_db.as_deref(),
-                );
-
-                existing_metadata.adjustments = new_adjustments;
-
-                if let Err(error) = save_metadata_sidecar(&sidecar_path, &existing_metadata) {
-                    log::error!(
-                        "Failed to persist pasted adjustments for '{}': {}",
-                        path,
-                        error
-                    );
-                    return None;
+            if let Err(error) = save_metadata_sidecar(&sidecar_path, &existing_metadata) {
+                for (backup_path, bytes) in backups.iter().rev() {
+                    match bytes {
+                        Some(bytes) => {
+                            let _ = fs::write(backup_path, bytes);
+                        }
+                        None => {
+                            let _ = fs::remove_file(backup_path);
+                        }
+                    }
                 }
+                return Err(format!(
+                    "Failed to persist batch edit transaction for '{}': {}. Prior paths rolled back.",
+                    path, error
+                ));
+            }
 
-                if enable_xmp_sync {
-                    let source_path = parse_virtual_path(path).0;
-                    sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
-                }
-                Some(metadata_save_receipt(path, &existing_metadata))
-            })
-            .collect();
+            let receipt = transaction.as_ref().map_or_else(
+                || metadata_save_receipt(path, &existing_metadata),
+                |transaction| metadata_save_receipt_for_transaction(path, &existing_metadata, transaction),
+            );
+            receipts.push(receipt);
+
+            if enable_xmp_sync {
+                let source_path = parse_virtual_path(path).0;
+                sync_metadata_to_xmp(&source_path, &existing_metadata, create_xmp_if_missing);
+            }
+        }
 
         let state = app_handle.state::<AppState>();
         for receipt in &receipts {
