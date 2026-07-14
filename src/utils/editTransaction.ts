@@ -10,6 +10,7 @@ import { legacyAdjustmentsToEditDocumentV2, updateEditDocumentV2Node } from './e
 export type EditMutationSource =
   | 'manual-control'
   | 'picker'
+  | 'geometry-tool'
   | 'auto-edit'
   | 'preset'
   | 'copy-paste'

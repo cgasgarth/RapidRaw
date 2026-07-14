@@ -223,7 +223,7 @@ interface ImageCanvasProps {
   onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
-  onStraighten: (val: number) => void;
+  onStraighten: (val: number, identity: CropStraightenSessionIdentity) => void;
   selectedImage: SelectedImage;
   setCrop: (crop: Crop, perfentCrop: PercentCrop) => void;
   setIsMaskHovered: (isHovered: boolean) => void;
