@@ -38,6 +38,11 @@ import {
   reduceEditorCompare,
 } from '../utils/editorCompare';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
+import {
+  type EditTransactionRequest,
+  type EditTransactionResult,
+  reduceEditTransaction,
+} from '../utils/editTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
@@ -148,6 +153,8 @@ interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
+  /** Monotonic revision used to reject stale preview/commit proposals. */
+  adjustmentRevision: number;
   /** Once published, this adjustment object graph is immutable for the lifetime of the snapshot. */
   adjustmentSnapshot: AdjustmentSnapshot;
   imageSessionId: number;
@@ -237,6 +244,7 @@ interface EditorState {
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
   setReferenceMatchReferences: (
@@ -352,6 +360,7 @@ const viewportRevisionKeys: Array<keyof EditorState> = [
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: initialAdjustments,
+  adjustmentRevision: 0,
   adjustmentSnapshot: initialAdjustmentSnapshot,
   imageSessionId: 1,
   imageSession: null,
@@ -436,6 +445,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       const update: Partial<EditorState> = { ...rawUpdate };
 
       if ('adjustments' in update && update.adjustments !== undefined) {
+        if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
         update.referenceMatchPreview = null;
         update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
@@ -521,6 +531,37 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return { ...update, gamutWarningOverlay: null };
     });
+  },
+
+  applyEditTransaction: (request) => {
+    let result: EditTransactionResult | null = null;
+    set((state) => {
+      if (request.persistence === 'preview-only') {
+        throw new Error('edit_transaction.preview_requires_proposal');
+      }
+      const nextResult = reduceEditTransaction(state.adjustments, state.adjustmentRevision, request);
+      result = nextResult;
+      if (nextResult.noOp) return {};
+      const nextHistory =
+        request.history === 'none'
+          ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
+          : pushEditHistoryEntryWithCheckpoints(
+              state.history,
+              state.historyIndex,
+              nextResult.after,
+              state.historyCheckpoints,
+            );
+      return {
+        ...historyNavigationPreviewInvalidation,
+        ...publishAdjustmentState(state, nextResult.after),
+        adjustmentRevision: nextResult.nextAdjustmentRevision,
+        history: nextHistory.history,
+        historyCheckpoints: nextHistory.checkpoints,
+        historyIndex: nextHistory.historyIndex,
+      };
+    });
+    if (!result) throw new Error('edit_transaction.not_applied');
+    return result;
   },
 
   applyAiEditCommand: (command) => {

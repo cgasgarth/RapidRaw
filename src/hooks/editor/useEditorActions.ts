@@ -32,6 +32,7 @@ import {
   getEditorZoomSourceSize,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
+import type { EditTransactionRequest } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
@@ -67,6 +68,7 @@ const getChangedBasicToneKeys = (previous: Adjustments, next: Adjustments): Arra
 
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
+  const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
 
   const setAdjustments = useCallback(
     (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
@@ -113,10 +115,19 @@ export function useEditorActions() {
         }
       }
 
-      setEditor({ adjustments: newAdjustments, lastBasicToneCommand });
-      useEditorStore.getState().pushHistory(newAdjustments);
+      const request: EditTransactionRequest = {
+        transactionId: createOperationId(),
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        baseAdjustmentRevision: state.adjustmentRevision,
+        source: 'manual-control',
+        operations: [{ type: 'replace-adjustments', adjustments: newAdjustments }],
+        history: 'single-entry',
+        persistence: 'commit',
+      };
+      applyEditTransaction(request);
+      if (lastBasicToneCommand !== state.lastBasicToneCommand) setEditor({ lastBasicToneCommand });
     },
-    [setEditor],
+    [applyEditTransaction, setEditor],
   );
 
   const handleRotate = useCallback(
