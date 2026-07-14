@@ -1,3 +1,4 @@
+pub(crate) mod logging;
 pub(crate) mod lut;
 pub(crate) mod source;
 pub(crate) mod temporary_artifacts;

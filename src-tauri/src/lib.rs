@@ -3597,40 +3597,6 @@ fn setup_logging(app_handle: &tauri::AppHandle) {
     );
 }
 
-#[tauri::command]
-fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let log_dir = app_handle.path().app_log_dir().map_err(|e| e.to_string())?;
-    let log_file_path = log_dir.join("app.log");
-    Ok(log_file_path.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-fn frontend_log(level: String, message: String) -> Result<(), String> {
-    let trimmed = message.trim();
-    if trimmed.is_empty() {
-        return Ok(());
-    }
-
-    let log_line = |line: &str| match level.to_lowercase().as_str() {
-        "error" => log::error!("[frontend] {}", line),
-        "warn" => log::warn!("[frontend] {}", line),
-        "info" if line.starts_with("[app-event]") => log::warn!("[frontend] {}", line),
-        "debug" => log::debug!("[frontend] {}", line),
-        "trace" => log::trace!("[frontend] {}", line),
-        _ => log::info!("[frontend] {}", line),
-    };
-
-    for line in trimmed
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-    {
-        log_line(line);
-    }
-
-    Ok(())
-}
-
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str()
         && let Err(e) = app_handle.emit(crate::events::OPEN_WITH_FILE, path_str)
@@ -4233,8 +4199,8 @@ pub fn run() {
             generate_preset_preview,
             generate_uncropped_preview,
             preview_geometry_transform,
-            get_log_file_path,
-            frontend_log,
+            app::commands::logging::get_log_file_path,
+            app::commands::logging::frontend_log,
             save_collage,
             merge_hdr,
             cancel_hdr_plan,
