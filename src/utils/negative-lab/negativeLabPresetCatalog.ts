@@ -51,6 +51,7 @@ const makeNegativeLabPreset = (
       | 'print_curve_algorithm'
       | 'print_curve_output_tag'
       | 'print_curve_v2'
+      | 'process_family'
       | 'white_point_offset'
       | 'white_point'
     >;
@@ -72,6 +73,7 @@ const makeNegativeLabPreset = (
     print_curve_algorithm: 'density_rgb_v1',
     print_curve_output_tag: 'preview_display',
     print_curve_v2: null,
+    process_family: preset.processFamily,
     white_point_offset: 0,
     white_point: 1,
   },

@@ -156,6 +156,7 @@ export const negativeLabPresetParamsSchema = z
     print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema.default('density_rgb_v1'),
     print_curve_output_tag: negativeLabDensityPrintOutputTagSchema.default('preview_display'),
     print_curve_v2: negativeLabDensityPrintV2ParamsSchema.nullable().default(null),
+    process_family: negativeLabUiPresetProcessFamilySchema.default('c41_color_negative'),
     render_intent: negativeLabRenderIntentSchema.optional(),
     flat_log_master: negativeLabFlatLogMasterParamsSchema.optional(),
     red_weight: z.number().min(0.5).max(2),
