@@ -81,15 +81,18 @@ const menuPath = (path: number[]): string => path.join('-');
 const afterMenuRender = (callback: () => void): void => {
   window.setTimeout(callback, 0);
 };
+const focusMenuElement = (item: HTMLElement | null | undefined): void => {
+  item?.focus({ preventScroll: true });
+};
 const focusMenuItemByPath = (path: number[]): boolean => {
   const item = document.querySelector<HTMLButtonElement>(`[data-menu-item-path="${menuPath(path)}"]`);
-  item?.focus();
+  focusMenuElement(item);
   return Boolean(item);
 };
 
 const focusFirstMenuItem = (root: ParentNode | null): void => {
   const firstItem = root?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
-  firstItem?.focus();
+  focusMenuElement(firstItem);
 };
 
 const firstEnabledOptionPath = (
@@ -240,7 +243,7 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
   const handleMouseEnter = () => {
     cancelCloseSubmenu();
     if (!option.disabled) {
-      itemRef.current?.focus();
+      focusMenuElement(itemRef.current);
     }
     hoverTimeoutRef.current = setTimeout(() => {
       if (option.disabled) {
@@ -276,7 +279,7 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
 
     const items = Array.from(currentMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])'));
     if (!currentItem) {
-      items[0]?.focus();
+      focusMenuElement(items[0]);
       return;
     }
 
@@ -286,7 +289,7 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
     }
 
     const nextIndex = (currentIndex + direction + items.length) % items.length;
-    items[nextIndex]?.focus();
+    focusMenuElement(items[nextIndex]);
   };
 
   const openKeyboardSubmenu = () => {
@@ -343,7 +346,7 @@ function MenuItem({ option, path, hideContextMenu }: MenuItemProps) {
         const items = Array.from(
           currentMenu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? [],
         );
-        items.at(-1)?.focus();
+        focusMenuElement(items.at(-1));
         break;
       }
       case 'ArrowRight':

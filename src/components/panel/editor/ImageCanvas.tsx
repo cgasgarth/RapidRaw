@@ -4,20 +4,12 @@ import type { Crop, PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Stage as KonvaStage } from 'konva/lib/Stage';
-import type { Vector2d } from 'konva/lib/types';
-import { Circle, Group, Text as KonvaText, Label, Layer, Line, Rect, Stage, Tag } from 'react-konva';
+import { Circle, Group, Layer, Rect, Stage } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
-import type {
-  Adjustments,
-  AiPatch,
-  Coord,
-  MaskContainer,
-  RetouchCloneSource,
-  RetouchRemoveSource,
-} from '../../../utils/adjustments';
+import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -73,17 +65,15 @@ import {
   resolveImageCanvasPointerOwner,
 } from './imageCanvasContracts';
 import { getEdgeFadeStyle, MaskOverlay, OptimizedBrushLine } from './MaskOverlaySurface';
-import {
-  type CanvasOverlayStatus,
-  canvasOverlayStatusColor,
-  canvasOverlayTokens,
-} from './overlays/canvasOverlayTokens';
+import { type CanvasOverlayStatus, canvasOverlayTokens } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
 import { useViewerPickerControllers } from './useViewerPickerControllers';
+import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
 import { ViewerPickerOverlay } from './ViewerPickerOverlay';
+import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
@@ -156,8 +146,6 @@ interface MaskInteractionEvent {
 
 type CanvasKonvaEvent = KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>;
 type CanvasMoveEvent = CanvasKonvaEvent | MouseEvent | TouchEvent;
-type RetouchHandleDragEvent = KonvaEventObject<DragEvent>;
-type RetouchHandleKind = 'sourcePoint' | 'targetPoint';
 const toMaskParameters = (parameters: SubMask['parameters']): MaskParameters => parameters as MaskParameters;
 
 const isNonPrimaryButton = (event: CanvasKonvaEvent): boolean =>
@@ -193,38 +181,11 @@ const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
 const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
 const cssPercent = (value: number): string => `${String(value)}%`;
 const svgNumber = (value: number): string => String(value);
-const getRemoveCanvasStatusColor = (status: RetouchRemoveSource['status']): string => {
-  switch (status) {
-    case 'ready':
-      return canvasOverlayStatusColor('ready');
-    case 'fallback_unchanged':
-    case 'stale':
-      return canvasOverlayStatusColor('stale');
-    case 'needs_regeneration':
-    case undefined:
-      return canvasOverlayStatusColor('warning');
-  }
-};
 const canvasOverlayShadowProps = {
   shadowBlur: canvasOverlayTokens.shadow.blur,
   shadowColor: canvasOverlayTokens.shadow.color,
   shadowOpacity: canvasOverlayTokens.shadow.opacity,
 } as const;
-const canvasOverlayLabelTextProps = {
-  fill: canvasOverlayTokens.label.text,
-  fontFamily: canvasOverlayTokens.label.fontFamily,
-  fontSize: canvasOverlayTokens.label.fontSize,
-  fontStyle: canvasOverlayTokens.label.fontStyle,
-  padding: canvasOverlayTokens.label.padding,
-} as const;
-const clamp01 = (value: number): number => {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(1, value));
-};
-const numberParameter = (parameters: SubMask['parameters'], key: string, fallback: number): number => {
-  const value = parameters?.[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-};
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
@@ -1727,126 +1688,6 @@ const ImageCanvas = memo(
       viewerBrushController,
     ]);
 
-    const retouchPointToCanvas = useCallback(
-      (point: RetouchCloneSource['sourcePoint']): Coord =>
-        overlayGeometry.cropToView(
-          overlayGeometry.orientedToCrop(
-            overlayGeometry.normalizedOrientedToOriented(
-              overlayPoint<'normalized-oriented'>(clamp01(point.x), clamp01(point.y)),
-            ),
-          ),
-        ),
-      [overlayGeometry],
-    );
-
-    const canvasPointToRetouchPoint = useCallback(
-      (point: Coord): RetouchCloneSource['sourcePoint'] => {
-        const normalized = overlayGeometry.orientedToNormalized(
-          overlayGeometry.cropToOriented(overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(point.x, point.y))),
-        );
-        return { x: clamp01(normalized.x), y: clamp01(normalized.y) };
-      },
-      [overlayGeometry],
-    );
-
-    const dragBoundRetouchHandle = useCallback(
-      (point: Vector2d): Vector2d => ({
-        x: Math.max(0, Math.min(overlayGeometry.displayedImageRectInViewCssPixels.width, point.x)),
-        y: Math.max(0, Math.min(overlayGeometry.displayedImageRectInViewCssPixels.height, point.y)),
-      }),
-      [overlayGeometry],
-    );
-    const retouchGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
-    const captureRetouchGeometryEpoch = useCallback(() => {
-      retouchGeometryEpochRef.current = captureGeometryEpoch(overlayGeometry);
-    }, [overlayGeometry]);
-
-    const updateRetouchHandlePoint = useCallback(
-      (layerId: string, handle: RetouchHandleKind, point: RetouchCloneSource['sourcePoint']) => {
-        viewerAdjustmentCommandServices.updateRetouchCloneHandle(layerId, handle, point, {
-          height: effectiveImageDimensions.height,
-          width: effectiveImageDimensions.width,
-        });
-      },
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, viewerAdjustmentCommandServices],
-    );
-
-    const handleRetouchHandleDragEnd = useCallback(
-      (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
-        event.evt.stopPropagation();
-        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
-        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
-        updateRetouchHandlePoint(layerId, handle, point);
-      },
-      [canvasPointToRetouchPoint, overlayGeometry, updateRetouchHandlePoint],
-    );
-    const handleRetouchHandleDragMove = useCallback(
-      (layerId: string, handle: RetouchHandleKind, event: RetouchHandleDragEvent) => {
-        event.evt.stopPropagation();
-        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
-        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
-        updateRetouchHandlePoint(layerId, handle, point);
-      },
-      [canvasPointToRetouchPoint, overlayGeometry, updateRetouchHandlePoint],
-    );
-    const handleRetouchCanvasClick = useCallback(
-      (layerId: string, event: CanvasKonvaEvent) => {
-        if (isNonPrimaryButton(event)) return;
-        event.evt.stopPropagation();
-        const pointer = event.target.getStage()?.getPointerPosition();
-        if (!pointer) return;
-        const point = canvasPointToRetouchPoint({
-          x: pointer.x / maxSafeScale - groupOffsetX,
-          y: pointer.y / maxSafeScale - groupOffsetY,
-        });
-        updateRetouchHandlePoint(layerId, event.evt.altKey ? 'sourcePoint' : 'targetPoint', point);
-      },
-      [canvasPointToRetouchPoint, groupOffsetX, groupOffsetY, maxSafeScale, updateRetouchHandlePoint],
-    );
-
-    const updateRemoveTargetPoint = useCallback(
-      (layerId: string, removeSource: RetouchRemoveSource, point: RetouchCloneSource['sourcePoint']) => {
-        viewerAdjustmentCommandServices.updateRetouchRemoveTarget(layerId, removeSource, point, {
-          height: effectiveImageDimensions.height,
-          width: effectiveImageDimensions.width,
-        });
-      },
-      [effectiveImageDimensions.height, effectiveImageDimensions.width, viewerAdjustmentCommandServices],
-    );
-
-    const handleRemoveTargetDragEnd = useCallback(
-      (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
-        event.evt.stopPropagation();
-        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
-        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
-        updateRemoveTargetPoint(layerId, removeSource, point);
-      },
-      [canvasPointToRetouchPoint, overlayGeometry, updateRemoveTargetPoint],
-    );
-    const handleRemoveTargetDragMove = useCallback(
-      (layerId: string, removeSource: RetouchRemoveSource, event: RetouchHandleDragEvent) => {
-        event.evt.stopPropagation();
-        if (!isGeometryEpochCurrent(retouchGeometryEpochRef.current, overlayGeometry)) return;
-        const point = canvasPointToRetouchPoint({ x: event.target.x(), y: event.target.y() });
-        updateRemoveTargetPoint(layerId, removeSource, point);
-      },
-      [canvasPointToRetouchPoint, overlayGeometry, updateRemoveTargetPoint],
-    );
-    const handleRemoveCanvasClick = useCallback(
-      (layerId: string, removeSource: RetouchRemoveSource, event: CanvasKonvaEvent) => {
-        if (isNonPrimaryButton(event)) return;
-        event.evt.stopPropagation();
-        const pointer = event.target.getStage()?.getPointerPosition();
-        if (!pointer) return;
-        const point = canvasPointToRetouchPoint({
-          x: pointer.x / maxSafeScale - groupOffsetX,
-          y: pointer.y / maxSafeScale - groupOffsetY,
-        });
-        updateRemoveTargetPoint(layerId, removeSource, point);
-      },
-      [canvasPointToRetouchPoint, groupOffsetX, groupOffsetY, maxSafeScale, updateRemoveTargetPoint],
-    );
-
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const isCropViewVisible = resolveCropPreviewVisibility({ cropPreviewUrl, isCropping, loadedCropPreviewUrl });
     const originalSrc = transformedOriginalUrl;
@@ -1896,8 +1737,22 @@ const ImageCanvas = memo(
       showSideBySideCompare,
       showSplitCompare,
     } = overlayVisibility;
+    const retouchHandlesController = useViewerRetouchHandlesController({
+      activeCloneLayer: activeRetouchLayer,
+      activeRemoveLayer,
+      activeRemoveTargetSubMask,
+      adjustments: viewerAdjustmentCommandServices,
+      altPressed: isAltPressed,
+      geometry: overlayGeometry,
+      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+      presentation: presentationDescriptor,
+      visible: showRetouchRemoveHandles && imageRenderSize.width > 0 && imageRenderSize.height > 0,
+    });
     const showInteractiveToolOverlayStage =
-      (isMasking || isAiEditing || Boolean(isWbPickerActive)) && !isCompareModeActive && !showGamutWarningOverlay;
+      (isMasking || isAiEditing || Boolean(isWbPickerActive)) &&
+      retouchHandlesController.activeMode === null &&
+      !isCompareModeActive &&
+      !showGamutWarningOverlay;
 
     useEffect(() => {
       if (!originalSrc) {
@@ -2034,21 +1889,19 @@ const ImageCanvas = memo(
           ? 'white-balance'
           : focusRetouchController.active
             ? 'focus-retouch'
-            : activeRetouchSource
-              ? 'retouch'
-              : activeRemoveSource
-                ? 'remove'
-                : isBrushActive
-                  ? 'brush'
-                  : isAiSubjectActive
-                    ? 'object-prompt'
-                    : isParametricActive
-                      ? 'parametric-mask'
-                      : isMasking || isAiEditing
-                        ? 'mask'
-                        : showGamutWarningOverlay
-                          ? 'soft-proof'
-                          : 'pan-zoom';
+            : retouchHandlesController.activeMode
+              ? retouchHandlesController.activeMode
+              : isBrushActive
+                ? 'brush'
+                : isAiSubjectActive
+                  ? 'object-prompt'
+                  : isParametricActive
+                    ? 'parametric-mask'
+                    : isMasking || isAiEditing
+                      ? 'mask'
+                      : showGamutWarningOverlay
+                        ? 'soft-proof'
+                        : 'pan-zoom';
     const viewerInteractionContext: ViewerInteractionContext = {
       activeTool:
         pickerControllers.activeTool ??
@@ -2295,511 +2148,18 @@ const ImageCanvas = memo(
             )}
           </PreviewSurface>
 
-          {activeRetouchLayer &&
-            activeRetouchSource &&
-            showRetouchRemoveHandles &&
-            imageRenderSize.width > 0 &&
-            imageRenderSize.height > 0 &&
-            (() => {
-              const sourcePoint = retouchPointToCanvas(activeRetouchSource.sourcePoint);
-              const targetPoint = retouchPointToCanvas(activeRetouchSource.targetPoint);
-              const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
-              const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
-              const retouchRadius = overlayGeometry.viewRadiusFromCrop(activeRetouchSource.radiusPx ?? 0);
-              const retouchFeatherRadius = overlayGeometry.viewRadiusFromCrop(
-                Math.max(0, (activeRetouchSource.radiusPx ?? 0) + (activeRetouchSource.featherRadiusPx ?? 0)),
-              );
-              const retouchScale = Math.max(0.1, activeRetouchSource.scale);
-              const sourceFootprintRadius = retouchRadius / retouchScale;
-              const sourceFootprintAxisLength = Math.max(handleRadius * 1.5, sourceFootprintRadius);
-              const sourceFootprintRadians = (-activeRetouchSource.rotationDegrees * Math.PI) / 180;
-              const sourceFootprintAxisEnd = {
-                x: sourcePoint.x + sourceFootprintAxisLength * Math.cos(sourceFootprintRadians),
-                y: sourcePoint.y + sourceFootprintAxisLength * Math.sin(sourceFootprintRadians),
-              };
-              const retouchMode = activeRetouchSource.retouchMode ?? 'clone';
-              const activePlacementHandle: RetouchHandleKind = isAltPressed ? 'sourcePoint' : 'targetPoint';
-              const sourceHandleRadius =
-                activePlacementHandle === 'sourcePoint' ? handleRadius + Math.max(1, strokeWidth) : handleRadius;
-              const targetHandleRadius =
-                activePlacementHandle === 'targetPoint' ? handleRadius + Math.max(1, strokeWidth) : handleRadius;
-              const sourceHandleStrokeWidth = activePlacementHandle === 'sourcePoint' ? strokeWidth + 1 : strokeWidth;
-              const targetHandleStrokeWidth = activePlacementHandle === 'targetPoint' ? strokeWidth + 1 : strokeWidth;
-              const retouchModeLabel = t(
-                retouchMode === 'heal'
-                  ? 'editor.layers.retouchSource.modes.heal'
-                  : 'editor.layers.retouchSource.modes.clone',
-              );
-
-              return (
-                <div
-                  aria-label={t('editor.layers.retouchSource.title')}
-                  className="absolute"
-                  data-retouch-handle-layer-id={activeRetouchLayer.id}
-                  data-retouch-handle-mode={retouchMode}
-                  data-retouch-handle-mode-label={retouchModeLabel}
-                  data-retouch-handle-radius-px={activeRetouchSource.radiusPx ?? ''}
-                  data-retouch-handle-feather-radius-px={activeRetouchSource.featherRadiusPx ?? ''}
-                  data-retouch-handle-rotation-degrees={activeRetouchSource.rotationDegrees}
-                  data-retouch-handle-scale={activeRetouchSource.scale}
-                  data-retouch-handle-source-x={activeRetouchSource.sourcePoint.x}
-                  data-retouch-handle-source-y={activeRetouchSource.sourcePoint.y}
-                  data-retouch-handle-target-x={activeRetouchSource.targetPoint.x}
-                  data-retouch-handle-target-y={activeRetouchSource.targetPoint.y}
-                  data-retouch-canvas-active-handle={activePlacementHandle}
-                  data-retouch-canvas-alt-pressed={String(isAltPressed)}
-                  data-testid="image-canvas-retouch-handles"
-                  style={{
-                    height: stageHeight * maxSafeScale,
-                    left: stageLeft,
-                    opacity: showRetouchRemoveHandles ? 1 : 0,
-                    pointerEvents: showRetouchRemoveHandles ? 'auto' : 'none',
-                    top: stageTop,
-                    touchAction: 'none',
-                    transform: `scale(${svgNumber(1 / maxSafeScale)})`,
-                    transformOrigin: '0 0',
-                    transition: 'opacity 150ms ease-in-out',
-                    userSelect: 'none',
-                    width: stageWidth * maxSafeScale,
-                    zIndex: imageCanvasLayerZIndex('toolGeometry'),
-                  }}
-                >
-                  <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
-                    <Layer>
-                      <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
-                        <Group x={groupOffsetX} y={groupOffsetY}>
-                          <Rect
-                            cursor="crosshair"
-                            data-retouch-canvas-click-target="source-or-target"
-                            data-retouch-canvas-click-source-modifier="Alt"
-                            data-retouch-canvas-click-active-handle={activePlacementHandle}
-                            data-testid="image-canvas-retouch-click-target"
-                            fill="rgba(0, 0, 0, 0)"
-                            height={overlayGeometry.displayedImageRectInViewCssPixels.height}
-                            onClick={(event) => {
-                              handleRetouchCanvasClick(activeRetouchLayer.id, event);
-                            }}
-                            onTap={(event) => {
-                              handleRetouchCanvasClick(activeRetouchLayer.id, event);
-                            }}
-                            width={overlayGeometry.displayedImageRectInViewCssPixels.width}
-                            x={0}
-                            y={0}
-                          />
-                          <Line
-                            dash={[4, 4]}
-                            listening={false}
-                            points={[sourcePoint.x, sourcePoint.y, targetPoint.x, targetPoint.y]}
-                            stroke={canvasOverlayTokens.colors.neutral}
-                            strokeScaleEnabled={false}
-                            strokeWidth={strokeWidth}
-                            {...canvasOverlayShadowProps}
-                          />
-                          {retouchFeatherRadius > retouchRadius && (
-                            <Circle
-                              dash={[5, 5]}
-                              listening={false}
-                              radius={retouchFeatherRadius}
-                              stroke={canvasOverlayTokens.colors.neutral}
-                              strokeOpacity={0.55}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              {...canvasOverlayShadowProps}
-                              x={targetPoint.x}
-                              y={targetPoint.y}
-                            />
-                          )}
-                          {retouchRadius > 0 && (
-                            <Circle
-                              listening={false}
-                              radius={retouchRadius}
-                              stroke={canvasOverlayTokens.colors.target}
-                              strokeOpacity={0.8}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              {...canvasOverlayShadowProps}
-                              x={targetPoint.x}
-                              y={targetPoint.y}
-                            />
-                          )}
-                          {retouchRadius > 0 && (
-                            <>
-                              <Circle
-                                dash={[3, 3]}
-                                data-retouch-source-footprint-radius={sourceFootprintRadius}
-                                data-testid="image-canvas-retouch-source-footprint"
-                                listening={false}
-                                radius={sourceFootprintRadius}
-                                stroke={canvasOverlayTokens.colors.active}
-                                strokeOpacity={0.65}
-                                strokeScaleEnabled={false}
-                                strokeWidth={strokeWidth}
-                                {...canvasOverlayShadowProps}
-                                x={sourcePoint.x}
-                                y={sourcePoint.y}
-                              />
-                              <Line
-                                data-retouch-source-footprint-rotation-degrees={activeRetouchSource.rotationDegrees}
-                                data-retouch-source-footprint-scale={activeRetouchSource.scale}
-                                data-testid="image-canvas-retouch-source-footprint-axis"
-                                listening={false}
-                                points={[
-                                  sourcePoint.x,
-                                  sourcePoint.y,
-                                  sourceFootprintAxisEnd.x,
-                                  sourceFootprintAxisEnd.y,
-                                ]}
-                                stroke={canvasOverlayTokens.colors.active}
-                                strokeOpacity={0.85}
-                                strokeScaleEnabled={false}
-                                strokeWidth={strokeWidth}
-                                {...canvasOverlayShadowProps}
-                              />
-                            </>
-                          )}
-                          <Circle
-                            dragBoundFunc={dragBoundRetouchHandle}
-                            draggable
-                            fill={canvasOverlayTokens.colors.active}
-                            onDragStart={captureRetouchGeometryEpoch}
-                            onDragEnd={(event) => {
-                              handleRetouchHandleDragEnd(activeRetouchLayer.id, 'sourcePoint', event);
-                            }}
-                            onDragMove={(event) => {
-                              handleRetouchHandleDragMove(activeRetouchLayer.id, 'sourcePoint', event);
-                            }}
-                            onMouseDown={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            onTouchStart={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            shadowOpacity={activePlacementHandle === 'sourcePoint' ? 0.7 : 0.45}
-                            shadowBlur={canvasOverlayTokens.shadow.blur}
-                            shadowColor={canvasOverlayTokens.shadow.color}
-                            stroke={canvasOverlayTokens.colors.neutral}
-                            strokeScaleEnabled={false}
-                            strokeWidth={sourceHandleStrokeWidth}
-                            x={sourcePoint.x}
-                            y={sourcePoint.y}
-                            radius={sourceHandleRadius}
-                          />
-                          <Label
-                            data-retouch-canvas-handle="sourcePoint"
-                            data-retouch-canvas-mode={retouchMode}
-                            data-testid="image-canvas-retouch-source-label"
-                            listening={false}
-                            x={sourcePoint.x + handleRadius + 8}
-                            y={sourcePoint.y - handleRadius - 28}
-                          >
-                            <Tag
-                              cornerRadius={6}
-                              fill={canvasOverlayTokens.label.fill}
-                              lineJoin="round"
-                              stroke={canvasOverlayTokens.colors.active}
-                              strokeWidth={1}
-                            />
-                            <KonvaText
-                              {...canvasOverlayLabelTextProps}
-                              text={`${retouchModeLabel} ${t('editor.layers.retouchSource.sourceLabel')}`}
-                            />
-                          </Label>
-                          <Circle
-                            dragBoundFunc={dragBoundRetouchHandle}
-                            draggable
-                            fill={canvasOverlayTokens.colors.target}
-                            onDragStart={captureRetouchGeometryEpoch}
-                            onDragEnd={(event) => {
-                              handleRetouchHandleDragEnd(activeRetouchLayer.id, 'targetPoint', event);
-                            }}
-                            onDragMove={(event) => {
-                              handleRetouchHandleDragMove(activeRetouchLayer.id, 'targetPoint', event);
-                            }}
-                            onMouseDown={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            onTouchStart={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            shadowOpacity={activePlacementHandle === 'targetPoint' ? 0.7 : 0.45}
-                            shadowBlur={canvasOverlayTokens.shadow.blur}
-                            shadowColor={canvasOverlayTokens.shadow.color}
-                            stroke={canvasOverlayTokens.colors.neutral}
-                            strokeScaleEnabled={false}
-                            strokeWidth={targetHandleStrokeWidth}
-                            x={targetPoint.x}
-                            y={targetPoint.y}
-                            radius={targetHandleRadius}
-                          />
-                          <Label
-                            data-retouch-canvas-handle="targetPoint"
-                            data-retouch-canvas-mode={retouchMode}
-                            data-testid="image-canvas-retouch-target-label"
-                            listening={false}
-                            x={targetPoint.x + handleRadius + 8}
-                            y={targetPoint.y - handleRadius - 28}
-                          >
-                            <Tag
-                              cornerRadius={6}
-                              fill={canvasOverlayTokens.label.fill}
-                              lineJoin="round"
-                              stroke={canvasOverlayTokens.colors.target}
-                              strokeWidth={1}
-                            />
-                            <KonvaText
-                              {...canvasOverlayLabelTextProps}
-                              text={`${retouchModeLabel} ${t('editor.layers.retouchSource.targetLabel')}`}
-                            />
-                          </Label>
-                        </Group>
-                      </Group>
-                    </Layer>
-                  </Stage>
-                </div>
-              );
-            })()}
-
-          {activeRemoveLayer &&
-            activeRemoveSource &&
-            activeRemoveTargetSubMask &&
-            showRetouchRemoveHandles &&
-            imageRenderSize.width > 0 &&
-            imageRenderSize.height > 0 &&
-            (() => {
-              const targetX = numberParameter(
-                activeRemoveTargetSubMask.parameters,
-                'centerX',
-                effectiveImageDimensions.width * 0.5,
-              );
-              const targetY = numberParameter(
-                activeRemoveTargetSubMask.parameters,
-                'centerY',
-                effectiveImageDimensions.height * 0.5,
-              );
-              const targetPoint = overlayGeometry.cropToView(
-                overlayGeometry.orientedToCrop(overlayPoint<'oriented-pixels'>(targetX, targetY)),
-              );
-              const resolvedSourcePoint =
-                activeRemoveSource.resolvedSourcePoint === undefined
-                  ? null
-                  : retouchPointToCanvas(activeRemoveSource.resolvedSourcePoint);
-              const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, transformState.scale)));
-              const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, transformState.scale));
-              const removeRadius = overlayGeometry.viewRadiusFromCrop(activeRemoveSource.radiusPx ?? 48);
-              const removeSearchRadius = overlayGeometry.viewRadiusFromCrop(
-                (activeRemoveSource.radiusPx ?? 48) * activeRemoveSource.searchRadiusMultiplier,
-              );
-              const removeFeatherRadius = overlayGeometry.viewRadiusFromCrop(
-                Math.max(0, (activeRemoveSource.radiusPx ?? 48) + (activeRemoveSource.featherRadiusPx ?? 24)),
-              );
-              const removeStatus = activeRemoveSource.status ?? 'needs_regeneration';
-              const removeStatusLabel = t(`editor.layers.removeSource.status.${removeStatus}`);
-              const removeStatusColor = getRemoveCanvasStatusColor(activeRemoveSource.status);
-              const isOriginalPreserved = removeStatus === 'fallback_unchanged' && resolvedSourcePoint === null;
-              const removeTargetStrokeOpacity = isOriginalPreserved ? 0.55 : 0.8;
-              const removeTargetDash = isOriginalPreserved ? [7, 5] : [];
-
-              return (
-                <div
-                  aria-label={t('editor.layers.removeSource.title')}
-                  className="absolute"
-                  data-remove-handle-layer-id={activeRemoveLayer.id}
-                  data-remove-handle-radius-px={activeRemoveSource.radiusPx ?? ''}
-                  data-remove-handle-feather-radius-px={activeRemoveSource.featherRadiusPx ?? ''}
-                  data-remove-handle-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
-                  data-remove-handle-search-radius-px={removeSearchRadius}
-                  data-remove-handle-status-color={removeStatusColor}
-                  data-remove-handle-status={activeRemoveSource.status ?? 'needs_regeneration'}
-                  data-remove-handle-status-label={removeStatusLabel}
-                  data-remove-handle-original-preserved={String(isOriginalPreserved)}
-                  data-remove-handle-target-x={targetX}
-                  data-remove-handle-target-y={targetY}
-                  data-remove-handle-resolved-source-x={activeRemoveSource.resolvedSourcePoint?.x ?? ''}
-                  data-remove-handle-resolved-source-y={activeRemoveSource.resolvedSourcePoint?.y ?? ''}
-                  data-remove-handle-source-resolved={String(activeRemoveSource.resolvedSourcePoint !== undefined)}
-                  data-testid="image-canvas-remove-handles"
-                  style={{
-                    height: stageHeight * maxSafeScale,
-                    left: stageLeft,
-                    opacity: showRetouchRemoveHandles ? 1 : 0,
-                    pointerEvents: showRetouchRemoveHandles ? 'auto' : 'none',
-                    top: stageTop,
-                    touchAction: 'none',
-                    transform: `scale(${svgNumber(1 / maxSafeScale)})`,
-                    transformOrigin: '0 0',
-                    transition: 'opacity 150ms ease-in-out',
-                    userSelect: 'none',
-                    width: stageWidth * maxSafeScale,
-                    zIndex: imageCanvasLayerZIndex('toolGeometry'),
-                  }}
-                >
-                  <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
-                    <Layer>
-                      <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
-                        <Group x={groupOffsetX} y={groupOffsetY}>
-                          <Rect
-                            data-remove-canvas-click-target="target"
-                            data-testid="image-canvas-remove-click-target"
-                            fill="rgba(0, 0, 0, 0)"
-                            height={overlayGeometry.displayedImageRectInViewCssPixels.height}
-                            onClick={(event) => {
-                              handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
-                            }}
-                            onTap={(event) => {
-                              handleRemoveCanvasClick(activeRemoveLayer.id, activeRemoveSource, event);
-                            }}
-                            width={overlayGeometry.displayedImageRectInViewCssPixels.width}
-                            x={0}
-                            y={0}
-                          />
-                          {resolvedSourcePoint && (
-                            <Line
-                              dash={[4, 4]}
-                              listening={false}
-                              points={[resolvedSourcePoint.x, resolvedSourcePoint.y, targetPoint.x, targetPoint.y]}
-                              stroke={canvasOverlayTokens.colors.neutral}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              {...canvasOverlayShadowProps}
-                            />
-                          )}
-                          {removeSearchRadius > removeRadius && (
-                            <Circle
-                              dash={[10, 7]}
-                              data-remove-canvas-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
-                              data-remove-canvas-search-radius-px={removeSearchRadius}
-                              data-testid="image-canvas-remove-search-radius"
-                              listening={false}
-                              radius={removeSearchRadius}
-                              stroke={canvasOverlayTokens.colors.remove}
-                              strokeOpacity={0.45}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              {...canvasOverlayShadowProps}
-                              x={targetPoint.x}
-                              y={targetPoint.y}
-                            />
-                          )}
-                          {removeFeatherRadius > removeRadius && (
-                            <Circle
-                              dash={[5, 5]}
-                              listening={false}
-                              radius={removeFeatherRadius}
-                              stroke={canvasOverlayTokens.colors.neutral}
-                              strokeOpacity={0.55}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              {...canvasOverlayShadowProps}
-                              x={targetPoint.x}
-                              y={targetPoint.y}
-                            />
-                          )}
-                          <Circle
-                            listening={false}
-                            radius={removeRadius}
-                            stroke={removeStatusColor}
-                            dash={removeTargetDash}
-                            strokeOpacity={removeTargetStrokeOpacity}
-                            strokeScaleEnabled={false}
-                            strokeWidth={strokeWidth}
-                            {...canvasOverlayShadowProps}
-                            x={targetPoint.x}
-                            y={targetPoint.y}
-                          />
-                          {resolvedSourcePoint && (
-                            <Circle
-                              fill={canvasOverlayTokens.colors.active}
-                              listening={false}
-                              radius={handleRadius}
-                              {...canvasOverlayShadowProps}
-                              stroke={canvasOverlayTokens.colors.neutral}
-                              strokeScaleEnabled={false}
-                              strokeWidth={strokeWidth}
-                              x={resolvedSourcePoint.x}
-                              y={resolvedSourcePoint.y}
-                            />
-                          )}
-                          {resolvedSourcePoint && (
-                            <Label
-                              data-remove-canvas-handle="resolvedSource"
-                              data-remove-canvas-source-label={removeStatusLabel}
-                              data-testid="image-canvas-remove-source-label"
-                              listening={false}
-                              x={resolvedSourcePoint.x + handleRadius + 8}
-                              y={resolvedSourcePoint.y - handleRadius - 28}
-                            >
-                              <Tag
-                                cornerRadius={6}
-                                fill={canvasOverlayTokens.label.fill}
-                                lineJoin="round"
-                                stroke={canvasOverlayTokens.colors.active}
-                                strokeWidth={1}
-                              />
-                              <KonvaText
-                                {...canvasOverlayLabelTextProps}
-                                text={t('editor.layers.removeSource.sourceResolved')}
-                              />
-                            </Label>
-                          )}
-                          <Circle
-                            dragBoundFunc={dragBoundRetouchHandle}
-                            draggable
-                            fill={removeStatusColor}
-                            onDragEnd={(event) => {
-                              handleRemoveTargetDragEnd(activeRemoveLayer.id, activeRemoveSource, event);
-                            }}
-                            onDragMove={(event) => {
-                              handleRemoveTargetDragMove(activeRemoveLayer.id, activeRemoveSource, event);
-                            }}
-                            onMouseDown={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            onTouchStart={(event) => {
-                              event.evt.stopPropagation();
-                            }}
-                            radius={handleRadius}
-                            {...canvasOverlayShadowProps}
-                            stroke={canvasOverlayTokens.colors.neutral}
-                            strokeScaleEnabled={false}
-                            strokeWidth={strokeWidth}
-                            x={targetPoint.x}
-                            y={targetPoint.y}
-                          />
-                          <Label
-                            data-remove-canvas-original-preserved={String(isOriginalPreserved)}
-                            data-remove-canvas-search-radius-multiplier={activeRemoveSource.searchRadiusMultiplier}
-                            data-remove-canvas-seed={activeRemoveSource.seed}
-                            data-remove-canvas-status={removeStatus}
-                            data-remove-canvas-source-resolved={String(resolvedSourcePoint !== null)}
-                            data-testid="image-canvas-remove-status-label"
-                            listening={false}
-                            x={targetPoint.x + handleRadius + 8}
-                            y={targetPoint.y - handleRadius - 28}
-                          >
-                            <Tag
-                              cornerRadius={6}
-                              fill={canvasOverlayTokens.label.fill}
-                              lineJoin="round"
-                              stroke={removeStatusColor}
-                              strokeWidth={1}
-                            />
-                            <KonvaText
-                              {...canvasOverlayLabelTextProps}
-                              text={t('editor.layers.removeSource.canvasStatus', {
-                                searchMultiplier: activeRemoveSource.searchRadiusMultiplier,
-                                seedValue: activeRemoveSource.seed,
-                                status: removeStatusLabel,
-                              })}
-                            />
-                          </Label>
-                        </Group>
-                      </Group>
-                    </Layer>
-                  </Stage>
-                </div>
-              );
-            })()}
-
+          <ViewerRetouchHandlesOverlay
+            binding={retouchHandlesController}
+            geometry={overlayGeometry}
+            groupOffsetX={groupOffsetX}
+            groupOffsetY={groupOffsetY}
+            maxSafeScale={maxSafeScale}
+            stageHeight={stageHeight}
+            stageLeft={stageLeft}
+            stageTop={stageTop}
+            stageWidth={stageWidth}
+            zoomScale={transformState.scale}
+          />
           {showInteractiveToolOverlayStage && (
             <div
               data-brush-command-expected-graph-revision={lastBrushCommandCapture?.expectedGraphRevision ?? ''}

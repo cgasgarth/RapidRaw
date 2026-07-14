@@ -2866,6 +2866,10 @@ const professionalCanvasGamutOverlay: GamutWarningOverlayPayload = {
 
 function ProfessionalCanvasOverlaysVisualSmoke() {
   const [crop, setCropState] = useState<Crop>({ height: 62, unit: '%', width: 66, x: 18, y: 18 });
+  const [retouchAdjustments, setRetouchAdjustments] = useState<Adjustments>(() => ({
+    ...INITIAL_ADJUSTMENTS,
+    masks: [professionalCanvasRetouchContainer],
+  }));
   const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
   const cardClassName = 'relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black';
   const imageRenderSize = { height: 180, offsetX: 0, offsetY: 0, scale: 0.5, width: 320 };
@@ -2974,19 +2978,37 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
               />
             </div>
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-retouch-remove">
+              <Button
+                className="sr-only"
+                data-testid="professional-canvas-show-remove"
+                onClick={() =>
+                  setRetouchAdjustments((previous) => ({
+                    ...previous,
+                    masks: previous.masks.map((mask) => {
+                      if (mask.id !== professionalCanvasRetouchLayerId) return mask;
+                      const { retouchCloneSource: _retouchCloneSource, ...removeOnlyMask } = mask;
+                      return removeOnlyMask;
+                    }),
+                  }))
+                }
+                variant="editorQuiet"
+              >
+                {copy.professionalCanvasActiveStates}
+              </Button>
               <ImageCanvas
                 {...baseCanvasProps}
                 activeAiPatchContainerId={null}
                 activeAiSubMaskId={null}
                 activeMaskContainerId={professionalCanvasRetouchLayerId}
                 activeMaskId={professionalCanvasRetouchTargetMaskId}
-                adjustments={{ ...INITIAL_ADJUSTMENTS, masks: [professionalCanvasRetouchContainer] }}
+                adjustments={retouchAdjustments}
                 brushSettings={null}
                 crop={null}
                 isAiEditing={false}
                 isCropping={false}
                 isMasking
                 maskOverlayUrl={null}
+                setAdjustments={setRetouchAdjustments}
               />
             </div>
             <div

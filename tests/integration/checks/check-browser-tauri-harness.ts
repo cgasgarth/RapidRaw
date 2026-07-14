@@ -684,27 +684,149 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const invokeFromContextMenu = async () => {
     await page.waitForFunction(
       () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
+      undefined,
       { timeout: 10_000 },
     );
     const selectedPath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
     if (!selectedPath) throw new Error('Selected editor path was unavailable for Batch Auto Adjust proof.');
     const targetThumbnail = page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${selectedPath}"]`);
     await targetThumbnail.click({ button: 'right' });
-    const productivity = page.getByRole('menuitem', { exact: true, name: 'Productivity' });
-    await productivity.waitFor({ timeout: 10_000 });
-    await productivity.focus();
-    await page.keyboard.press('ArrowRight');
-    await page.waitForFunction(
-      () => {
-        const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
-          (element) => element.textContent?.trim() === 'Auto Adjust Image',
-        );
-        if (!item) return false;
-        item.click();
-        return true;
-      },
-      { timeout: 10_000 },
-    );
+    const menuDiagnostics = () =>
+      page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const visibleItems = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+          .filter((item) => item.getClientRects().length > 0)
+          .map((item) => ({
+            expanded: item.getAttribute('aria-expanded'),
+            path: item.dataset.menuItemPath ?? null,
+            text: item.textContent?.trim() ?? '',
+          }));
+        return {
+          active: active
+            ? {
+                disabled: 'disabled' in active && Boolean(active.disabled),
+                path: active.dataset.menuItemPath ?? null,
+                role: active.getAttribute('role'),
+                text: (active.textContent?.trim() ?? '').slice(0, 80),
+                visible: active.getClientRects().length > 0,
+              }
+            : null,
+          visibleItems,
+        };
+      });
+    try {
+      await page.waitForFunction(
+        () => {
+          const active = document.activeElement as HTMLButtonElement | null;
+          return (
+            active?.getAttribute('role') === 'menuitem' &&
+            !active.disabled &&
+            active.getClientRects().length > 0 &&
+            active.closest('[role="menu"]')?.parentElement?.closest('[role="menu"]') === null
+          );
+        },
+        undefined,
+        { timeout: 10_000 },
+      );
+      let productivityFocused = false;
+      for (let step = 0; step < 32; step += 1) {
+        productivityFocused = await page.evaluate(() => {
+          const active = document.activeElement as HTMLElement | null;
+          if (
+            active?.getAttribute('role') !== 'menuitem' ||
+            active.getClientRects().length === 0 ||
+            ('disabled' in active && Boolean(active.disabled))
+          ) {
+            return false;
+          }
+          const key = active.textContent?.trim() === 'Productivity' ? 'ArrowRight' : 'ArrowDown';
+          active.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              bubbles: true,
+              cancelable: true,
+              code: key,
+              key,
+            }),
+          );
+          return key === 'ArrowRight';
+        });
+        if (productivityFocused) break;
+      }
+      if (!productivityFocused) {
+        throw new Error(`Productivity keyboard target not reached: ${JSON.stringify(await menuDiagnostics())}`);
+      }
+      await page.waitForFunction(
+        () => {
+          const active = document.activeElement as HTMLElement | null;
+          const ready =
+            active?.getAttribute('role') === 'menuitem' &&
+            active.textContent?.trim() === 'Auto Adjust Image' &&
+            active.getClientRects().length > 0 &&
+            [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
+              (item) => item.textContent?.trim() === 'Productivity' && item.getAttribute('aria-expanded') === 'true',
+            );
+          if (!ready) return false;
+          active.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              bubbles: true,
+              cancelable: true,
+              code: 'Enter',
+              key: 'Enter',
+            }),
+          );
+          return true;
+        },
+        undefined,
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      throw new Error(`Batch Auto Adjust keyboard menu activation failed: ${JSON.stringify(await menuDiagnostics())}`, {
+        cause: error,
+      });
+    }
+  };
+  const waitForSingleAutoAdjustInvocation = async (baselineCount: number) => {
+    const expected = baselineCount + 1;
+    const diagnostics = () =>
+      page.evaluate(() => {
+        const calls =
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+            ({ command }) => command === 'apply_auto_adjustments_to_paths',
+          ) ?? [];
+        const active = document.activeElement as HTMLElement | null;
+        return {
+          active: active
+            ? {
+                path: active.dataset.menuItemPath ?? null,
+                role: active.getAttribute('role'),
+                text: (active.textContent?.trim() ?? '').slice(0, 80),
+              }
+            : null,
+          count: calls.length,
+          lastArgs: calls.at(-1)?.args ?? null,
+          visibleMenuItems: [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => item.textContent?.trim() ?? ''),
+        };
+      });
+    try {
+      await page.waitForFunction(
+        (minimum) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+            ({ command }) => command === 'apply_auto_adjustments_to_paths',
+          ).length ?? 0) >= minimum,
+        expected,
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      throw new Error(`Batch Auto Adjust invocation did not arrive: ${JSON.stringify(await diagnostics())}`, {
+        cause: error,
+      });
+    }
+    const observed = await diagnostics();
+    if (observed.count !== expected) {
+      throw new Error(`Batch Auto Adjust invocation was not singular: ${JSON.stringify({ expected, ...observed })}`);
+    }
   };
   const switchAwayAndBack = async (activePath: string, waitForHydration = true) => {
     const other = page.locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${activePath}"])`).first();
@@ -738,6 +860,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     { timeout: 10_000 },
   );
   await page.waitForTimeout(500);
+  const baseline = await counts();
   const exposure = page.getByTestId('basic-control-exposure-value');
   await exposure.click();
   const exposureInput = page.getByTestId('basic-control-exposure-input');
@@ -750,16 +873,8 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 1_000;
     }
   });
-  const baseline = await counts();
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    baseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(baseline.autoAdjust);
   await page.waitForTimeout(500);
   const afterPrepare = await counts();
   if (afterPrepare.commit !== baseline.commit + 1) {
@@ -777,7 +892,17 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(450);
+  await page.waitForFunction(
+    (expectedSaveCount) => {
+      const saves =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'save_metadata_and_update_thumbnail',
+        ) ?? [];
+      return saves.length >= expectedSaveCount && saves[expectedSaveCount - 1]?.endedAtMs !== null;
+    },
+    baseline.metadataSave + 1,
+    { timeout: 10_000 },
+  );
   const afterApply = await counts();
   if (
     afterApply.metadataLoad !== baseline.metadataLoad ||
@@ -797,16 +922,22 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   }
   const batchCalls = await page.evaluate((baselineSaveCount) => {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const apply = calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').at(-1) ?? null;
+    const barrier =
+      calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(baselineSaveCount) ?? null;
     return {
-      apply: calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').at(-1)?.args ?? null,
-      barrier:
-        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(baselineSaveCount)?.args ??
-        null,
+      applyArgs: apply?.args ?? null,
+      applyStartedAtMs: apply?.startedAtMs ?? null,
+      barrierArgs: barrier?.args ?? null,
+      barrierEndedAtMs: barrier?.endedAtMs ?? null,
     };
   }, baseline.metadataSave);
   if (
-    batchCalls.barrier?.['adjustments']?.['exposure'] !== 0.55 ||
-    batchCalls.apply?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}`
+    batchCalls.barrierArgs?.['adjustments']?.['exposure'] !== 0.55 ||
+    batchCalls.applyArgs?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}` ||
+    typeof batchCalls.barrierEndedAtMs !== 'number' ||
+    typeof batchCalls.applyStartedAtMs !== 'number' ||
+    batchCalls.applyStartedAtMs < batchCalls.barrierEndedAtMs
   ) {
     throw new Error(`Batch Auto Adjust did not prepare from the flushed dirty document: ${JSON.stringify(batchCalls)}`);
   }
@@ -839,14 +970,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const activePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
   if (!activePath) throw new Error('Batch Auto Adjust race proof requires an active path.');
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    raceBaseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(raceBaseline.autoAdjust);
   await switchAwayAndBack(activePath, false);
   await page.waitForFunction(
     (expected) =>
@@ -871,14 +995,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
 
   const editedRaceBaseline = await counts();
   await invokeFromContextMenu();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'apply_auto_adjustments_to_paths',
-      ).length ?? 0) === expected,
-    editedRaceBaseline.autoAdjust + 1,
-    { timeout: 10_000 },
-  );
+  await waitForSingleAutoAdjustInvocation(editedRaceBaseline.autoAdjust);
   await switchAwayAndBack(activePath, false);
   await exposure.click();
   await exposureInput.fill('0.8');
