@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, Weak},
 };
 
 use crate::panorama_utils::alignment_plan::AlignmentCancellation;
@@ -17,8 +17,45 @@ pub(crate) struct PanoramaAcceptedLease {
 }
 
 pub(crate) struct PanoramaSavePayload {
-    pub lease: PanoramaAcceptedLease,
+    pub lease: PanoramaSaveLease,
     pub pending: Arc<PendingPanoramaResult>,
+}
+
+pub(crate) struct PanoramaSaveLease {
+    service: Weak<PanoramaService>,
+    handle: PanoramaPlanHandle,
+    completed: bool,
+}
+
+impl PanoramaSaveLease {
+    pub(crate) fn authorize_publication(&self) -> Result<(), String> {
+        self.service
+            .upgrade()
+            .ok_or_else(|| "panorama_save_state_unavailable".to_string())?
+            .authorize_save(self.handle)
+            .then_some(())
+            .ok_or_else(|| "panorama_save_stale_completion".to_string())
+    }
+
+    pub(crate) fn complete(mut self) -> bool {
+        let completed = self
+            .service
+            .upgrade()
+            .is_some_and(|service| service.complete_save(self.handle));
+        self.completed = true;
+        completed
+    }
+}
+
+impl Drop for PanoramaSaveLease {
+    fn drop(&mut self) {
+        if self.completed {
+            return;
+        }
+        if let Some(service) = self.service.upgrade() {
+            service.release_save(self.handle);
+        }
+    }
 }
 
 struct State<P = PanoramaPlanResult, R = Arc<PendingPanoramaResult>> {
@@ -26,6 +63,7 @@ struct State<P = PanoramaPlanResult, R = Arc<PendingPanoramaResult>> {
     source_paths: Vec<String>,
     plan: Option<P>,
     result: Option<R>,
+    save_in_flight: Option<PanoramaPlanHandle>,
     cancellations: HashMap<String, Arc<AlignmentCancellation>>,
 }
 
@@ -36,6 +74,7 @@ impl<P, R> Default for State<P, R> {
             source_paths: Vec::new(),
             plan: None,
             result: None,
+            save_in_flight: None,
             cancellations: HashMap::new(),
         }
     }
@@ -65,6 +104,7 @@ impl PanoramaService {
             state.source_paths = source_paths;
             state.plan = None;
             state.result = None;
+            state.save_in_flight = None;
             state.cancellations.clear();
             state.cancellations.insert(cancellation_id, cancellation);
             PanoramaPlanHandle(state.generation)
@@ -143,7 +183,9 @@ impl PanoramaService {
             .lock()
             .map_err(|_| "panorama_state_unavailable")?;
         state.cancellations.remove(cancellation_id);
-        publish_result(&mut state, lease, Arc::new(result))
+        publish_result(&mut state, lease, Arc::new(result))?;
+        state.save_in_flight = None;
+        Ok(())
     }
 
     pub(crate) fn fail_render(&self, cancellation_id: &str) {
@@ -152,39 +194,48 @@ impl PanoramaService {
         }
     }
 
-    pub(crate) fn acquire_save(&self) -> Result<PanoramaSavePayload, &'static str> {
-        let state = self
+    pub(crate) fn acquire_save(self: &Arc<Self>) -> Result<PanoramaSavePayload, &'static str> {
+        let mut state = self
             .state
             .lock()
             .map_err(|_| "panorama_state_unavailable")?;
         let pending = acquire_result(&state).ok_or(
             "No panorama image found in memory to save. It might have already been saved.",
         )?;
+        let handle = reserve_save(&mut state)?;
         Ok(PanoramaSavePayload {
-            lease: PanoramaAcceptedLease {
-                generation: state.generation,
-                source_paths: state.source_paths.clone(),
+            lease: PanoramaSaveLease {
+                service: Arc::downgrade(self),
+                handle,
+                completed: false,
             },
             pending,
         })
     }
 
-    pub(crate) fn authorize(&self, lease: &PanoramaAcceptedLease) -> Result<(), String> {
+    fn authorize_save(&self, handle: PanoramaPlanHandle) -> bool {
         self.state
             .lock()
-            .is_ok_and(|state| current(&state, lease))
-            .then_some(())
-            .ok_or_else(|| "panorama_save_stale_completion".to_string())
+            .is_ok_and(|state| save_is_current(&state, handle))
     }
 
-    pub(crate) fn complete_save(&self, lease: &PanoramaAcceptedLease) -> bool {
+    fn release_save(&self, handle: PanoramaPlanHandle) {
+        if let Ok(mut state) = self.state.lock()
+            && save_is_current(&state, handle)
+        {
+            state.save_in_flight = None;
+        }
+    }
+
+    fn complete_save(&self, handle: PanoramaPlanHandle) -> bool {
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
-        if !current(&state, lease) {
+        if !save_is_current(&state, handle) {
             return false;
         }
         state.result = None;
+        state.save_in_flight = None;
         true
     }
 
@@ -201,6 +252,7 @@ impl PanoramaService {
                 .expect("panorama generation exhausted");
             state.plan = None;
             state.result = None;
+            state.save_in_flight = None;
             true
         })
         .expect("atomic output publication lock poisoned")
@@ -219,6 +271,7 @@ impl PanoramaService {
             state.source_paths.clear();
             state.plan = None;
             state.result = None;
+            state.save_in_flight = None;
             state.cancellations.clear();
         })
         .expect("atomic output publication lock poisoned");
@@ -227,6 +280,19 @@ impl PanoramaService {
 
 fn acquire_result<P, R: Clone>(state: &State<P, R>) -> Option<R> {
     state.result.clone()
+}
+
+fn reserve_save<P, R>(state: &mut State<P, R>) -> Result<PanoramaPlanHandle, &'static str> {
+    if state.save_in_flight.is_some() {
+        return Err("panorama_save_already_in_progress");
+    }
+    let handle = PanoramaPlanHandle(state.generation);
+    state.save_in_flight = Some(handle);
+    Ok(handle)
+}
+
+fn save_is_current<P, R>(state: &State<P, R>, handle: PanoramaPlanHandle) -> bool {
+    state.generation == handle.0 && state.save_in_flight == Some(handle)
 }
 
 fn publish_plan<P, R>(
@@ -238,6 +304,7 @@ fn publish_plan<P, R>(
         return Err("panorama_plan_stale_completion");
     }
     state.plan = Some(plan);
+    state.save_in_flight = None;
     Ok(())
 }
 
@@ -263,6 +330,11 @@ fn same_identity<P, R>(state: &State<P, R>, lease: &PanoramaAcceptedLease) -> bo
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        sync::{Arc, Barrier, Mutex},
+        thread,
+    };
+
     use super::*;
 
     #[cfg(feature = "tauri-test")]
@@ -368,6 +440,113 @@ mod tests {
         drop(first);
         let retry = acquire_result(&state).unwrap();
         assert!(Arc::ptr_eq(&result, &retry));
+    }
+
+    #[test]
+    fn concurrent_save_reservations_admit_exactly_one_owner() {
+        let state = Arc::new(Mutex::new(State::<(), Arc<()>> {
+            generation: 9,
+            plan: Some(()),
+            result: Some(Arc::new(())),
+            ..State::default()
+        }));
+        let barrier = Arc::new(Barrier::new(3));
+        let workers = (0..2)
+            .map(|_| {
+                let state = Arc::clone(&state);
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    reserve_save(&mut state.lock().expect("save state"))
+                })
+            })
+            .collect::<Vec<_>>();
+
+        barrier.wait();
+        let results = workers
+            .into_iter()
+            .map(|worker| worker.join().expect("save reservation worker"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter_map(|result| result.err())
+                .collect::<Vec<_>>(),
+            vec!["panorama_save_already_in_progress"]
+        );
+    }
+
+    #[test]
+    fn failed_save_drop_releases_owner_for_retry() {
+        let service = Arc::new(PanoramaService::default());
+        let handle = PanoramaPlanHandle(7);
+        {
+            let mut state = service.state.lock().unwrap();
+            state.generation = handle.0;
+            state.save_in_flight = Some(handle);
+        }
+        let failed_attempt = PanoramaSaveLease {
+            service: Arc::downgrade(&service),
+            handle,
+            completed: false,
+        };
+
+        drop(failed_attempt);
+
+        let mut state = service.state.lock().unwrap();
+        assert_eq!(reserve_save(&mut state), Ok(handle));
+    }
+
+    #[test]
+    fn successor_plan_winning_publication_race_invalidates_save_owner() {
+        let service = Arc::new(PanoramaService::default());
+        let stale_handle = PanoramaPlanHandle(1);
+        {
+            let mut state = service.state.lock().unwrap();
+            state.generation = stale_handle.0;
+            state.save_in_flight = Some(stale_handle);
+        }
+        let stale_save = PanoramaSaveLease {
+            service: Arc::downgrade(&service),
+            handle: stale_handle,
+            completed: false,
+        };
+
+        let successor = service.begin_plan(
+            vec!["new-a".into(), "new-b".into()],
+            "successor".into(),
+            Arc::new(AlignmentCancellation::default()),
+        );
+
+        assert_eq!(successor, PanoramaPlanHandle(2));
+        assert_eq!(
+            stale_save.authorize_publication(),
+            Err("panorama_save_stale_completion".to_string())
+        );
+    }
+
+    #[test]
+    fn cancel_winning_publication_race_invalidates_save_owner() {
+        let service = Arc::new(PanoramaService::default());
+        let handle = service.begin_plan(
+            vec!["a".into(), "b".into()],
+            "render".into(),
+            Arc::new(AlignmentCancellation::default()),
+        );
+        service.state.lock().unwrap().save_in_flight = Some(handle);
+        let stale_save = PanoramaSaveLease {
+            service: Arc::downgrade(&service),
+            handle,
+            completed: false,
+        };
+
+        assert!(service.cancel("render"));
+        assert_eq!(
+            stale_save.authorize_publication(),
+            Err("panorama_save_stale_completion".to_string())
+        );
     }
 
     #[test]

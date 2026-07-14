@@ -1003,7 +1003,7 @@ pub async fn save_panorama(
         .save(&temp_output_path)
         .map_err(|e| format!("Failed to save panorama image: {}", e))?;
     let publish = crate::merge::atomic_derived_output::with_atomic_output_publish_lock(|| {
-        service.authorize(&payload.lease)?;
+        payload.lease.authorize_publication()?;
         fs::rename(&temp_output_path, &output_path).map_err(|error| {
             format!(
                 "Failed to atomically publish panorama image {}: {error}",
@@ -1033,7 +1033,12 @@ pub async fn save_panorama(
         ));
     }
 
-    let _ = service.complete_save(&payload.lease);
+    if !payload.lease.complete() {
+        let (image_cleanup, sidecar_cleanup) = rollback_panorama_publication(&output_path);
+        return Err(format!(
+            "panorama_save_stale_completion; rollback_image={image_cleanup:?}; rollback_sidecar={sidecar_cleanup:?}"
+        ));
+    }
 
     Ok(output_path.to_string_lossy().to_string())
 }
