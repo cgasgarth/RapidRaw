@@ -1,7 +1,7 @@
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
-    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point,
+    GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MaskAdjustments, Point, ToneEqualizerGpuSettings,
 };
 use crate::adjustments::scales::SCALES;
 use crate::color::view_transform::{
@@ -235,6 +235,63 @@ fn convert_points_to_aligned(frontend_points: Vec<JsonValue>) -> [Point; 16] {
         }
     }
     aligned_points
+}
+
+fn parse_tone_equalizer(value: &JsonValue) -> ToneEqualizerGpuSettings {
+    let tone = value.get("toneEqualizer").cloned().unwrap_or_default();
+    let bounded = |key: &str, default: f32, minimum: f32, maximum: f32| {
+        (tone
+            .get(key)
+            .and_then(JsonValue::as_f64)
+            .unwrap_or(default as f64) as f32)
+            .clamp(minimum, maximum)
+    };
+    let mut bands = [0.0_f32; 9];
+    if let Some(values) = tone
+        .get("bandEv")
+        .and_then(JsonValue::as_array)
+        .filter(|values| values.len() == bands.len())
+    {
+        for (target, value) in bands.iter_mut().zip(values.iter()) {
+            *target = (value.as_f64().unwrap_or(0.0) as f32).clamp(-4.0, 4.0);
+        }
+    }
+    ToneEqualizerGpuSettings {
+        bands0: [bands[0], bands[1], bands[2], bands[3]],
+        bands1: [bands[4], bands[5], bands[6], bands[7]],
+        bands2: [
+            bands[8],
+            tone.get("selectedBand")
+                .and_then(JsonValue::as_u64)
+                .unwrap_or(4)
+                .min(8) as f32,
+            0.0,
+            0.0,
+        ],
+        params0: [
+            if tone
+                .get("enabled")
+                .and_then(JsonValue::as_bool)
+                .unwrap_or(false)
+            {
+                1.0
+            } else {
+                0.0
+            },
+            bounded("pivotEv", 0.0, -8.0, 8.0),
+            bounded("rangeEv", 16.0, 4.0, 24.0),
+            bounded("detailPreservation", 0.65, 0.0, 1.0),
+        ],
+        params1: [
+            bounded("edgeRefinement", 2.0, 0.0, 8.0),
+            bounded("smoothingRadius", 32.0, 4.0, 64.0),
+            bounded("maskExposureCompensation", 0.0, -4.0, 4.0),
+            tone.get("previewMode")
+                .and_then(JsonValue::as_u64)
+                .unwrap_or(0)
+                .min(4) as f32,
+        ],
+    }
 }
 
 fn curve_points(
@@ -620,6 +677,7 @@ fn get_global_adjustments_from_json(
             SCALES.sharpness_threshold,
             Some(15.0),
         ),
+        tone_equalizer: parse_tone_equalizer(js_adjustments),
     }
 }
 
@@ -736,6 +794,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         _pad_end5: 0.0,
         _pad_end6: 0.0,
         _pad_end7: 0.0,
+        tone_equalizer: parse_tone_equalizer(adj),
     }
 }
 
@@ -945,5 +1004,82 @@ mod tests {
             customized.global.rapid_view_parameters2[2].to_bits(),
             rapid.global.rapid_view_parameters2[2].to_bits()
         );
+    }
+
+    #[test]
+    fn tone_equalizer_settings_pack_identically_for_global_and_local_paths() {
+        let tone_equalizer = json!({
+            "autoPlacement": true,
+            "bandEv": [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0],
+            "detailPreservation": 0.8,
+            "edgeRefinement": 3.5,
+            "enabled": true,
+            "maskExposureCompensation": 0.2,
+            "pivotEv": -0.5,
+            "previewMode": 2,
+            "rangeEv": 14.0,
+            "selectedBand": 6,
+            "smoothingRadius": 48.0
+        });
+        let parsed = get_all_adjustments_from_json(
+            &json!({
+                "rawEngineEditGraphVersion": 2,
+                "toneEqualizer": tone_equalizer,
+                "masks": [{
+                    "id": "local-tone",
+                    "name": "Local tone",
+                    "visible": true,
+                    "invert": false,
+                    "blendMode": "normal",
+                    "opacity": 100,
+                    "adjustments": { "toneEqualizer": tone_equalizer },
+                    "subMasks": []
+                }]
+            }),
+            true,
+            None,
+        );
+
+        assert_eq!(parsed.mask_count, 1);
+        assert_eq!(
+            parsed.global.tone_equalizer.bands0,
+            [-1.0, -0.75, -0.5, -0.25]
+        );
+        assert_eq!(parsed.global.tone_equalizer.bands1, [0.0, 0.25, 0.5, 0.75]);
+        assert_eq!(parsed.global.tone_equalizer.bands2, [1.0, 6.0, 0.0, 0.0]);
+        assert_eq!(
+            parsed.mask_adjustments[0].tone_equalizer,
+            parsed.global.tone_equalizer
+        );
+    }
+
+    #[test]
+    fn tone_equalizer_runtime_parse_rejects_partial_bands_and_bounds_authority_values() {
+        let parsed = get_all_adjustments_from_json(
+            &json!({
+                "toneEqualizer": {
+                    "enabled": true,
+                    "bandEv": [99],
+                    "pivotEv": -99,
+                    "rangeEv": 99,
+                    "detailPreservation": 5,
+                    "edgeRefinement": -5,
+                    "smoothingRadius": 500,
+                    "maskExposureCompensation": -10,
+                    "selectedBand": 99,
+                    "previewMode": 99
+                }
+            }),
+            true,
+            None,
+        )
+        .global
+        .tone_equalizer;
+
+        assert_eq!(parsed.bands0, [0.0; 4]);
+        assert_eq!(parsed.bands1, [0.0; 4]);
+        assert_eq!(parsed.bands2, [0.0, 8.0, 0.0, 0.0]);
+        assert_eq!(parsed.params0, [1.0, -8.0, 24.0, 1.0]);
+        assert_eq!(parsed.params1, [0.0, 64.0, -4.0, 4.0]);
     }
 }

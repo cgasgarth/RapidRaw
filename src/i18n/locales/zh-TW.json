@@ -18,6 +18,28 @@
       "reset": "重置",
       "shadowRolloff": "陰影滾降",
       "shadows": "陰影",
+      "toneEqualizer": {
+        "analysisUnavailable": "Scene analysis unavailable",
+        "analyzing": "Analyzing scene…",
+        "autoPlace": "Auto Place",
+        "detailPreservation": "Detail preservation",
+        "edgeRefinement": "Edge refinement",
+        "enable": "Enable",
+        "histogram": "Scene exposure histogram",
+        "on": "On",
+        "pickerReceipt": "Zone {{band}} · {{ev}} EV",
+        "pickZone": "Pick zone",
+        "preview": {
+          "band": "Band",
+          "clip": "Clip",
+          "filter": "Filter",
+          "image": "Image",
+          "zones": "Zones"
+        },
+        "resetZones": "Reset zones",
+        "smoothingRadius": "Smoothing radius",
+        "title": "Tone Equalizer"
+      },
       "toneMapper": "色調映射",
       "viewContrast": "顯示對比",
       "whites": "白色"

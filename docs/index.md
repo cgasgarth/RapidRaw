@@ -43,6 +43,7 @@ generator before the release workflow needs one.
 - [Current color pipeline audit](color/architecture/current-color-pipeline-audit-2026-06-15.md)
 - [Color-science conformance lab](color/validation/color-science-conformance-lab.md)
 - [White balance runtime validation](color/runtime/white-balance-picker-validation-2026-06-14.md)
+- [Scene-referred tone equalizer ADR](color/architecture/tone-equalizer-adr-2026-07-13.md)
 - [ColorChecker fixture manifest](color/fixtures/colorchecker-fixtures-2026-06-14.md)
 - [Selective color ranges](color/selective-color/selective-color-ranges-2026-06-14.md)
 - [Selective color falloff](color/selective-color/selective-color-falloff-2026-06-14.md)
