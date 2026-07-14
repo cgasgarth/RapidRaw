@@ -29,6 +29,7 @@ impl CpuNodeExecutor {
 pub(crate) struct CpuNodeBinding {
     kind: EditNodeKind,
     implementation: &'static str,
+    resource_requirements: &'static [&'static str],
     executor: Option<CpuNodeExecutor>,
 }
 
@@ -73,6 +74,7 @@ impl CpuNodeRuntime {
             let binding = CpuNodeBinding {
                 kind: node.kind,
                 implementation,
+                resource_requirements: descriptor.resource_requirements,
                 executor,
             };
             if binding.implementation != implementation {
@@ -85,6 +87,17 @@ impl CpuNodeRuntime {
 
     pub(crate) fn binding(&self, kind: EditNodeKind) -> Option<&CpuNodeBinding> {
         self.bindings.iter().find(|binding| binding.kind == kind)
+    }
+
+    pub(crate) fn diagnostic_receipt(&self) -> serde_json::Value {
+        serde_json::json!({
+            "bindings": self.bindings.iter().map(|binding| serde_json::json!({
+                "id": binding.kind.stable_id(),
+                "implementation": binding.implementation,
+                "resourceRequirements": binding.resource_requirements,
+                "typedExecutor": binding.executor.is_some(),
+            })).collect::<Vec<_>>(),
+        })
     }
 
     pub(crate) fn scene_curve(&self) -> Option<&CpuNodeExecutor> {
