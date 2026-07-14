@@ -114,6 +114,7 @@ pub struct AppServices {
     pub(crate) thumbnails:
         Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
+    pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
@@ -132,6 +133,7 @@ impl AppServices {
             catalog_indexing: Arc::default(),
             thumbnails: Arc::default(),
             analytics: Arc::default(),
+            full_warp_cache: Arc::default(),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),

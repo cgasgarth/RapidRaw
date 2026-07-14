@@ -1389,6 +1389,10 @@ pub(crate) async fn load_image_prepared(
             .services
             .viewer_sampling
             .install_session(my_generation as u64, &path);
+        state
+            .services
+            .full_warp_cache
+            .install_session(my_generation as u64, &artifact_source);
         *state.original_image.lock().unwrap() = Some(LoadedImage {
             path,
             image: pristine_arc,

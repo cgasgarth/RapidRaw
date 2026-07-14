@@ -48,9 +48,7 @@ impl<'a> RenderCaches<'a> {
         if let Ok(mut preview_cache) = self.state.cached_preview.lock() {
             *preview_cache = None;
         }
-        if let Ok(mut warped_cache) = self.state.full_warped_cache.lock() {
-            *warped_cache = None;
-        }
+        self.state.services.full_warp_cache.clear_frame();
     }
 
     /// Drops only artifacts whose pixels/resources depend on the GPU device generation.
@@ -122,6 +120,7 @@ impl<'a> RenderCaches<'a> {
         if let Ok(mut original_image) = self.state.original_image.lock() {
             *original_image = None;
         }
+        self.state.services.full_warp_cache.clear_session();
         self.state.services.viewer_sampling.clear_session();
         self.clear_gpu_dependent_preview();
         self.clear_session_caches();
