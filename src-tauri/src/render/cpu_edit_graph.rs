@@ -402,7 +402,7 @@ pub(crate) fn execute_cpu_edit_graph(
             color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
         }
         if let Some(film) = graph.film_emulation() {
-            color = crate::render::film_emulation::apply_pixel(color, film);
+            color = crate::render::film_emulation::apply_pixel_at(color, film, x, y);
         }
         if preserve_extended {
             // V2 crosses a real RGBA16F scene intermediate before the view
@@ -441,7 +441,9 @@ pub(crate) fn execute_cpu_edit_graph(
                 adjustments.global.lut_intensity,
             );
         }
-        color = apply_grain(color, x, y, width, height, adjustments);
+        if graph.film_emulation().is_none() {
+            color = apply_grain(color, x, y, width, height, adjustments);
+        }
         if let Some(curve) = graph.output_curve() {
             color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
         }

@@ -2153,7 +2153,72 @@ fn apply_film_print_scan(color_in: vec3<f32>) -> vec3<f32> {
     return output;
 }
 
-fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
+fn film_grain_hash(seed: u32, x: i32, y: i32, layer: u32, channel: u32) -> f32 {
+    var value = seed ^ bitcast<u32>(x) * 0x9e3779b9u;
+    value = value ^ (bitcast<u32>(y) * 0x85ebca6bu);
+    value = value ^ (layer * 0xc2b2ae35u);
+    value = value ^ (channel * 0x27d4eb2du);
+    value = value ^ (value >> 16u);
+    value = value * 0x7feb352du;
+    value = value ^ (value >> 15u);
+    value = value * 0x846ca68bu;
+    value = value ^ (value >> 16u);
+    return f32(value) / 4294967295.0 * 2.0 - 1.0;
+}
+
+fn film_grain_bilinear(coord: vec2<f32>, layer: u32, channel: u32) -> f32 {
+    let lower = vec2<i32>(floor(coord));
+    let fraction = coord - vec2<f32>(lower);
+    let tx = fraction.x * fraction.x * (3.0 - 2.0 * fraction.x);
+    let ty = fraction.y * fraction.y * (3.0 - 2.0 * fraction.y);
+    let a = film_grain_hash(0x52415731u, lower.x, lower.y, layer, channel);
+    let b = film_grain_hash(0x52415731u, lower.x + 1, lower.y, layer, channel);
+    let c = film_grain_hash(0x52415731u, lower.x, lower.y + 1, layer, channel);
+    let d = film_grain_hash(0x52415731u, lower.x + 1, lower.y + 1, layer, channel);
+    return a * (1.0 - tx) * (1.0 - ty) + b * tx * (1.0 - ty) + c * (1.0 - tx) * ty + d * tx * ty;
+}
+
+fn film_grain_layered_noise(coord: vec2<u32>, channel: u32) -> f32 {
+    let base = vec2<f32>(coord);
+    let fine = film_grain_bilinear(base / 1.0, 0u, channel);
+    let coarse = film_grain_bilinear(base / 3.5, 1u, channel);
+    return (fine * 0.72 + coarse * 0.28) / sqrt(0.72 * 0.72 + 0.28 * 0.28);
+}
+
+fn film_grain_sigma(density: f32, channel: u32) -> f32 {
+    let d = clamp(density, 0.0, 4.0);
+    var values = array<f32, 6>(0.18, 0.13, 0.09, 0.07, 0.10, 0.16);
+    if (channel == 1u) { values = array<f32, 6>(0.16, 0.12, 0.085, 0.065, 0.095, 0.15); }
+    if (channel == 2u) { values = array<f32, 6>(0.20, 0.15, 0.10, 0.075, 0.11, 0.18); }
+    if (d <= 0.25) { return mix(values[0], values[1], d / 0.25); }
+    if (d <= 0.75) { return mix(values[1], values[2], (d - 0.25) / 0.5); }
+    if (d <= 1.5) { return mix(values[2], values[3], (d - 0.75) / 0.75); }
+    if (d <= 2.5) { return mix(values[3], values[4], d - 1.5); }
+    return mix(values[4], values[5], (d - 2.5) / 1.5);
+}
+
+fn apply_film_density_grain(color_in: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
+    let density = -log2(max(abs(color_in), vec3<f32>(1.0e-6))) * 0.3010299957;
+    let independent = vec3<f32>(
+        film_grain_layered_noise(coord, 0u),
+        film_grain_layered_noise(coord, 1u),
+        film_grain_layered_noise(coord, 2u),
+    );
+    let correlated = vec3<f32>(
+        independent.x,
+        0.38 * independent.x + 0.925 * independent.y,
+        0.22 * independent.x + 0.278 * independent.y + 0.938 * independent.z,
+    );
+    let perturbed = density + vec3<f32>(
+        film_grain_sigma(density.x, 0u) * correlated.x,
+        film_grain_sigma(density.y, 1u) * correlated.y,
+        film_grain_sigma(density.z, 2u) * correlated.z,
+    ) * 0.24;
+    let output = pow(vec3<f32>(10.0), -clamp(perturbed, vec3<f32>(-8.0), vec3<f32>(8.0)));
+    return select(output, -output, color_in < vec3<f32>(0.0));
+}
+
+fn apply_film_emulation(color_in: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
     let mix_amount = clamp(adjustments.global._pad_cg1, 0.0, 1.0);
     let shaper_p = max(adjustments.global._pad_cg2, 1.0e-6);
     if (adjustments.global._pad_cg3 < 0.5 || mix_amount <= 0.0) {
@@ -2168,7 +2233,8 @@ fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
     let shaped = color_in + (color_in * scale - color_in);
     let exposure_ev = log2(abs(shaped.x * 0.27222872 + shaped.y * 0.67408177 + shaped.z * 0.05368952) / 0.18);
     let coupled = apply_film_color_coupler(shaped, exposure_ev);
-    let printed = apply_film_print_scan(coupled);
+    let grained = apply_film_density_grain(coupled, coord);
+    let printed = apply_film_print_scan(grained);
     return color_in + mix_amount * (printed - color_in);
 }
 
@@ -2910,7 +2976,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if (scene_input_phase) {
         composite_rgb_linear = apply_scene_curve(composite_rgb_linear);
-        composite_rgb_linear = apply_film_emulation(composite_rgb_linear);
+        composite_rgb_linear = apply_film_emulation(composite_rgb_linear, absolute_coord);
     }
 
     if (adjustments.execution_phase == 1u) {
@@ -2975,7 +3041,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
 
-    if (adjustments.global.grain_amount > 0.0) {
+    if (adjustments.global.grain_amount > 0.0 && adjustments.global._pad_cg3 < 0.5) {
         let coord = vec2<f32>(absolute_coord_i);
         let amount = adjustments.global.grain_amount * 0.5;
         let grain_frequency = (1.0 / max(adjustments.global.grain_size, 0.1)) / scale;
