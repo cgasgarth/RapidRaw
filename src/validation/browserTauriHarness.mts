@@ -91,6 +91,7 @@ const commandNames: Record<
   | 'commitBatchAutoAdjustment'
   | 'applyAutoEditProposal'
   | 'cancelAutoEditAnalysis'
+  | 'cancelBackgroundIndexing'
   | 'cancelThumbnailGeneration'
   | 'beginImageOpen'
   | 'checkAiConnectorStatus'
@@ -154,6 +155,7 @@ const commandNames: Record<
   applyLibraryCatalogChanges: Invokes.ApplyLibraryCatalogChanges,
   configureLibraryChangefeed: Invokes.ConfigureLibraryChangefeed,
   cancelThumbnailGeneration: Invokes.CancelThumbnailGeneration,
+  cancelBackgroundIndexing: Invokes.CancelBackgroundIndexing,
   cancelAutoEditAnalysis: Invokes.CancelAutoEditAnalysis,
   checkAiConnectorStatus: Invokes.CheckAIConnectorStatus,
   clearSessionCaches: Invokes.ClearSessionCaches,
@@ -225,6 +227,7 @@ const eventListeners = new Map<string, Set<number>>();
 let folderRevision = 1;
 let catalogCursor = 0;
 let thumbnailOperationId = 0;
+let catalogIndexingOperationId = 0;
 let catalogPageSize = 256;
 let batchAutoAdjustInvocation = 0;
 const harnessAdjustmentsByPath = new Map<string, unknown>();
@@ -491,10 +494,14 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       window.localStorage.setItem(browserHarnessSettingsStorageKey, JSON.stringify(harnessSettings));
       return Promise.resolve(null);
     case commandNames.frontendReady:
-    case commandNames.startBackgroundIndexing:
     case commandNames.clearSessionCaches:
     case commandNames.applyAdjustmentsToPaths:
       return Promise.resolve(null);
+    case commandNames.startBackgroundIndexing:
+      catalogIndexingOperationId += 1;
+      return Promise.resolve({ generation: catalogIndexingOperationId, operationId: catalogIndexingOperationId });
+    case commandNames.cancelBackgroundIndexing:
+      return Promise.resolve(true);
     case commandNames.updateThumbnailQueue:
       thumbnailOperationId += 1;
       return Promise.resolve({

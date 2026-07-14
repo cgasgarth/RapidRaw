@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
+import { isCurrentCatalogIndexingAuthority } from '../../schemas/catalogIndexingSchemas';
 import { parseLoadedMetadata } from '../../schemas/imageLoaderSchemas';
 import { createEditorImageSession, isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -15,6 +16,10 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import {
+  cancelBackgroundIndexingWithSchema,
+  startBackgroundIndexingWithSchema,
+} from '../../utils/catalogIndexingInvokes';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
@@ -96,6 +101,25 @@ export interface AppNavigationProps {
 
 const getNavigationSettings = (): NavigationSettings | null => useSettingsStore.getState().appSettings;
 
+const cancelActiveCatalogIndexing = async (): Promise<void> => {
+  const authority = useProcessStore.getState().indexingAuthority;
+  if (!authority) return;
+  try {
+    const cancelled = await cancelBackgroundIndexingWithSchema(authority);
+    if (!cancelled) {
+      useProcessStore
+        .getState()
+        .setProcess((state) =>
+          isCurrentCatalogIndexingAuthority(authority, state.indexingAuthority)
+            ? { indexingAuthority: null, indexingProgress: { current: 0, total: 0 }, isIndexing: false }
+            : {},
+        );
+    }
+  } catch (error) {
+    console.error('Failed to cancel background indexing:', error);
+  }
+};
+
 const folderTreeContainsPath = (nodes: FolderTree[], path: string): boolean =>
   nodes.some((node) => node.path === path || folderTreeContainsPath(node.children, path));
 
@@ -123,6 +147,7 @@ export function useAppNavigation({
   const collectionRequestRef = useRef(0);
 
   const handleGoHome = useCallback(() => {
+    void cancelActiveCatalogIndexing();
     const editor = useEditorStore.getState();
     const outgoingCacheEntry = buildImageCacheEntry(editor);
     if (editor.selectedImage?.path && outgoingCacheEntry) {
@@ -436,11 +461,11 @@ export function useAppNavigation({
         appendCatalogPage,
       } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
-      const { setProcess } = useProcessStore.getState();
       const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
       const libraryViewMode = appSettings?.libraryViewMode;
 
       if (!preserveEditor) {
+        await cancelActiveCatalogIndexing();
         await clearThumbnailQueue();
         setLibrary({ isViewLoading: true, activeAlbumId: null, libraryScrollTop: 0 });
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
@@ -580,8 +605,8 @@ export function useAppNavigation({
           });
         }
 
-        if (!preserveEditor) {
-          invoke(Invokes.StartBackgroundIndexing, { folderPath: path }).catch((err: unknown) => {
+        if (!preserveEditor && path) {
+          void startBackgroundIndexingWithSchema(path).catch((err: unknown) => {
             console.error('Failed to start background indexing:', err);
           });
         }
@@ -601,6 +626,7 @@ export function useAppNavigation({
       const { setUI } = useUIStore.getState();
 
       if (!preserveEditor) {
+        await cancelActiveCatalogIndexing();
         await clearThumbnailQueue();
         useLibraryStore.getState().setSearchCriteria({ tags: [], text: '', mode: 'OR' });
         setLibrary({ libraryScrollTop: 0 });

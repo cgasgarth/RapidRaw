@@ -4,6 +4,12 @@ import { toast } from 'react-toastify';
 import type { ChannelConfig } from '../../components/adjustments/Curves';
 import type { AnalyticsResourceDescriptor, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
+import {
+  catalogIndexingErrorSchema,
+  catalogIndexingSnapshotSchema,
+  isCurrentCatalogIndexingAuthority,
+  reduceCatalogIndexingSnapshot,
+} from '../../schemas/catalogIndexingSchemas';
 import { isCurrentDenoiseEvent } from '../../schemas/denoiseWorkflowSchemas';
 import {
   denoiseErrorPayloadSchema,
@@ -82,6 +88,7 @@ import {
   IMPORT_ERROR_EVENT,
   IMPORT_PROGRESS_EVENT,
   IMPORT_START_EVENT,
+  INDEXING_ERROR_EVENT,
   INDEXING_FINISHED_EVENT,
   INDEXING_PROGRESS_EVENT,
   INDEXING_STARTED_EVENT,
@@ -488,22 +495,70 @@ export function useTauriListeners({
           return { aiModelDownloads, aiModelDownloadStatus: formatAiModelProgress(aiModelDownloads) };
         });
       }),
-      listen(INDEXING_STARTED_EVENT, () => {
-        if (isEffectActive)
-          useProcessStore.getState().setProcess({ isIndexing: true, indexingProgress: { current: 0, total: 0 } });
+      listen<unknown>(INDEXING_STARTED_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const snapshot = catalogIndexingSnapshotSchema.parse(event.payload);
+        useProcessStore.getState().setProcess((state) => {
+          const next = reduceCatalogIndexingSnapshot(
+            {
+              authority: state.indexingAuthority,
+              isIndexing: state.isIndexing,
+              progress: state.indexingProgress,
+            },
+            snapshot,
+          );
+          return {
+            indexingAuthority: next.authority,
+            indexingProgress: next.progress,
+            isIndexing: next.isIndexing,
+          };
+        });
       }),
       listen<unknown>(INDEXING_PROGRESS_EVENT, (event) => {
-        if (isEffectActive)
-          useProcessStore.getState().setProcess({ indexingProgress: parseProgressPayload(event.payload) });
+        if (!isEffectActive) return;
+        const snapshot = catalogIndexingSnapshotSchema.parse(event.payload);
+        useProcessStore.getState().setProcess((state) => {
+          const next = reduceCatalogIndexingSnapshot(
+            {
+              authority: state.indexingAuthority,
+              isIndexing: state.isIndexing,
+              progress: state.indexingProgress,
+            },
+            snapshot,
+          );
+          return {
+            indexingAuthority: next.authority,
+            indexingProgress: next.progress,
+            isIndexing: next.isIndexing,
+          };
+        });
       }),
-      listen(INDEXING_FINISHED_EVENT, () => {
-        if (isEffectActive) {
-          useProcessStore.getState().setProcess({ isIndexing: false, indexingProgress: { current: 0, total: 0 } });
-          const currentPath = useLibraryStore.getState().currentFolderPath;
-          if (currentPath) {
-            refs.current.refreshImageList();
-          }
+      listen<unknown>(INDEXING_ERROR_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const payload = catalogIndexingErrorSchema.parse(event.payload);
+        if (isCurrentCatalogIndexingAuthority(payload.authority, useProcessStore.getState().indexingAuthority)) {
+          console.error('Background indexing failed:', payload.error);
         }
+      }),
+      listen<unknown>(INDEXING_FINISHED_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const snapshot = catalogIndexingSnapshotSchema.parse(event.payload);
+        const process = useProcessStore.getState();
+        if (!isCurrentCatalogIndexingAuthority(snapshot.authority, process.indexingAuthority)) return;
+        const next = reduceCatalogIndexingSnapshot(
+          {
+            authority: process.indexingAuthority,
+            isIndexing: process.isIndexing,
+            progress: process.indexingProgress,
+          },
+          snapshot,
+        );
+        process.setProcess({
+          indexingAuthority: next.authority,
+          indexingProgress: next.progress,
+          isIndexing: next.isIndexing,
+        });
+        if (snapshot.folderPath === useLibraryStore.getState().currentFolderPath) refs.current.refreshImageList();
       }),
       listen<unknown>(BATCH_EXPORT_PROGRESS_EVENT, (event) => {
         if (isEffectActive)

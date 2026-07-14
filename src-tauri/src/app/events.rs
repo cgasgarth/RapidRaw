@@ -23,6 +23,7 @@ pub const IMPORT_RECEIPT: &str = "import-terminal-receipt";
 pub const IMPORT_START: &str = "import-start";
 pub const INDEXING_ERROR: &str = "indexing-error";
 pub const INDEXING_FINISHED: &str = "indexing-finished";
+pub const INDEXING_PROGRESS: &str = "indexing-progress";
 pub const INDEXING_STARTED: &str = "indexing-started";
 pub const OPEN_WITH_FILE: &str = "open-with-file";
 pub const PANORAMA_ERROR: &str = "panorama-error";

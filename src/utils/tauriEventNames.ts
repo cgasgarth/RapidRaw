@@ -25,6 +25,7 @@ export const IMPORT_PROGRESS_EVENT = 'import-progress';
 export const IMPORT_START_EVENT = 'import-start';
 export const IMAGE_OPEN_UPDATE_EVENT = 'image-open-update';
 export const INDEXING_FINISHED_EVENT = 'indexing-finished';
+export const INDEXING_ERROR_EVENT = 'indexing-error';
 export const INDEXING_PROGRESS_EVENT = 'indexing-progress';
 export const INDEXING_STARTED_EVENT = 'indexing-started';
 export const OPEN_WITH_FILE_EVENT = 'open-with-file';
