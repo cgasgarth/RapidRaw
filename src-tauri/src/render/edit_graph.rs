@@ -1357,6 +1357,9 @@ impl CompiledEditGraph {
             "wgpuRuntime": crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(self)
                 .ok()
                 .map(|runtime| runtime.diagnostic_receipt()),
+            "cpuRuntime": crate::render::cpu_nodes::CpuNodeRuntime::from_graph(self)
+                .ok()
+                .map(|runtime| runtime.diagnostic_receipt()),
         })
     }
 }
@@ -1699,5 +1702,12 @@ mod runtime_registry_tests {
             .expect("view node is present");
         assert_eq!(scene["runtime"]["fusedPhase"], "view");
         assert!(scene["runtime"]["resourceRequirements"].is_array());
+        let cpu_bindings = receipt["cpuRuntime"]["bindings"]
+            .as_array()
+            .expect("CPU runtime ownership is diagnostic");
+        assert!(cpu_bindings.iter().any(|binding| {
+            binding["id"] == EditNodeKind::SceneToViewTransform.stable_id()
+                && binding["typedExecutor"] == false
+        }));
     }
 }
