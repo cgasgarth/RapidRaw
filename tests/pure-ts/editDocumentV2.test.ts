@@ -6,6 +6,7 @@ import {
   getEditDocumentNodeDescriptor,
   parseEditDocumentV2WithQuarantine,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   batchUpdateEditDocumentV2Nodes,
@@ -17,9 +18,46 @@ import {
   legacyAdjustmentsToEditDocumentV2,
   pasteEditDocumentV2Node,
   prepareEditDocumentV2ForRender,
+  replaceEditDocumentV2SourceArtifacts,
   resetEditDocumentV2Node,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
+
+const referenceMatchReceipt = matchLookApplicationReceiptV1Schema.parse({
+  appliedDiffs: [{ after: 0.75, before: 0, key: 'exposure' }],
+  appliedAt: '2026-07-14T20:00:00.000Z',
+  baseGraphFingerprint: `fnv1a64:${'0'.repeat(16)}`,
+  destination: 'global-adjustments',
+  effectiveReferences: [{ role: 'creative', sourceFingerprint: `fnv1a64:${'4'.repeat(16)}`, weight: 1 }],
+  enabledGroups: ['tone'],
+  historyEntriesAdded: 1,
+  impact: 75,
+  proposalFingerprint: `fnv1a64:${'1'.repeat(16)}`,
+  resultingGraphFingerprint: `fnv1a64:${'2'.repeat(16)}`,
+  schemaVersion: 1,
+  targetAnalysisFingerprint: `fnv1a64:${'3'.repeat(16)}`,
+});
+
+const sourcePatch = {
+  id: 'patch-1',
+  invert: false,
+  isLoading: false,
+  name: 'Repair',
+  patchData: { pixels: 'resident-payload' },
+  prompt: 'remove distraction',
+  subMasks: [
+    {
+      id: 'mask-1',
+      invert: false,
+      mode: 'additive' as const,
+      opacity: 80,
+      parameters: { mask_data_base64: 'encoded-mask' },
+      type: 'brush' as const,
+      visible: true,
+    },
+  ],
+  visible: true,
+};
 
 describe('EditDocumentV2 legacy adapter', () => {
   test('maps adjustment ownership into a stable node inventory', () => {
@@ -57,6 +95,44 @@ describe('EditDocumentV2 legacy adapter', () => {
       true,
     );
     expect(editDocumentV2ToLegacyAdjustments(first).customFutureField).toEqual({ enabled: true });
+  });
+
+  test('separates strict source artifacts from provenance and round-trips idempotently', () => {
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aiPatches: [sourcePatch],
+      generatedProfile: { obsolete: true },
+      referenceMatchApplicationReceipt: referenceMatchReceipt,
+    };
+    const first = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const reopened = legacyAdjustmentsToEditDocumentV2(editDocumentV2ToLegacyAdjustments(first));
+
+    expect(first.sourceArtifacts.aiPatches).toEqual([sourcePatch]);
+    expect(first.nodes.source_artifacts?.params).toEqual(first.sourceArtifacts);
+    expect(first.nodes.source_artifacts?.params).not.toHaveProperty('referenceMatchApplicationReceipt');
+    expect(first.provenance.referenceMatchApplicationReceipt).toEqual(referenceMatchReceipt);
+    expect(first.extensions.legacyAdjustments).toMatchObject({ generatedProfile: { obsolete: true } });
+    expect(reopened).toEqual(first);
+  });
+
+  test('rejects malformed, duplicate, and ambiguous source artifacts', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aiPatches: [sourcePatch],
+    });
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        sourceArtifacts: { aiPatches: [{ ...sourcePatch, unsupported: true }] },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        sourceArtifacts: { aiPatches: [sourcePatch, sourcePatch] },
+      }),
+    ).toThrow('unique');
+    expect(() => editDocumentV2Schema.parse({ ...document, sourceArtifacts: { aiPatches: [] } })).toThrow('disagrees');
   });
 
   test('strict document schema rejects unknown top-level fields', () => {
@@ -98,11 +174,11 @@ describe('EditDocumentV2 legacy adapter', () => {
           params: { ...document.nodes.scene_global_color_tone?.params, exposure: 1 },
         },
       },
-      provenance: { source: 'test' },
+      provenance: { referenceMatchApplicationReceipt: null },
     });
 
     expect(next.nodes.geometry).toEqual(document.nodes.geometry);
-    expect(next.provenance).toEqual({ source: 'test' });
+    expect(next.provenance).toEqual({ referenceMatchApplicationReceipt: null });
     expect(next.nodes.scene_global_color_tone?.params.exposure).toBe(1);
   });
 
@@ -230,6 +306,17 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('non-resettable source artifacts remain unchanged', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     expect(resetEditDocumentV2Node(document, 'source_artifacts')).toEqual(document);
+  });
+
+  test('source-artifact replacement is atomic and structurally isolates unrelated nodes', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const next = replaceEditDocumentV2SourceArtifacts(document, { aiPatches: [sourcePatch] });
+
+    expect(next.sourceArtifacts.aiPatches).toEqual([sourcePatch]);
+    expect(next.nodes.source_artifacts?.params).toEqual(next.sourceArtifacts);
+    expect(next.nodes.scene_global_color_tone).toBe(document.nodes.scene_global_color_tone);
+    expect(next.nodes.geometry).toBe(document.nodes.geometry);
+    expect(next.provenance).toEqual(document.provenance);
   });
 
   test('copy and paste derive eligibility from descriptors and isolate node state', () => {

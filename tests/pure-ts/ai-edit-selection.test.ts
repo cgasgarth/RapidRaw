@@ -127,6 +127,9 @@ describe('AI edit store command', () => {
     expect(state.brushSettings?.tool).toBe(ToolType.Brush);
     expect(state.historyIndex).toBe(1);
     expect(state.history[1]).toBe(state.adjustments);
+    expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
+    expect(state.editDocumentV2.nodes.source_artifacts?.params).toEqual(state.editDocumentV2.sourceArtifacts);
+    expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
   });
 
   test('rejects a stale pending command without changing patches, selection, or history', () => {

@@ -24,7 +24,7 @@ import {
   type BasicToneCommandEnvelope,
 } from '../utils/basicToneCommandBridge';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
+import { legacyAdjustmentsToEditDocumentV2, replaceEditDocumentV2SourceArtifacts } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -648,6 +648,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       const selection = resolveAiEditSelection(result.aiPatches, result.selection);
       const adjustments = { ...state.adjustments, aiPatches: result.aiPatches };
+      const editDocumentV2 = replaceEditDocumentV2SourceArtifacts(state.editDocumentV2, {
+        aiPatches: result.aiPatches,
+      });
       const nextHistory = pushEditHistoryEntryWithCheckpoints(
         state.history,
         state.historyIndex,
@@ -657,7 +660,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       committedSelection = selection;
 
       return {
-        ...publishAdjustmentState(state, adjustments),
+        ...publishAdjustmentState(state, adjustments, editDocumentV2),
         activeAiPatchContainerId: selection.containerId,
         activeAiSubMaskId: selection.subMaskId,
         brushSettings: result.selectBrushTool
