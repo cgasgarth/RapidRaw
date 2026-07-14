@@ -29,7 +29,7 @@ export const negativeLabBaseFogSampleRectSchema = z
     message: 'Negative Lab base/fog sample rect must stay within normalized image bounds.',
   });
 
-export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1']);
+export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1', 'e6_positive_v1']);
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
 export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
 export const negativeLabDetailFinishParamsSchema = z

@@ -300,7 +300,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     bounds_schema_version: 1;
     color_range_clip: number;
     contrast: number;
-    conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1';
+    conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1' | 'e6_positive_v1';
     exposure: number;
     green_weight: number;
     luma_range_clip: number;
@@ -338,7 +338,9 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
   const conversionModel =
     params.command.parameters.conversionModel.algorithmId === 'negative_log_density_v1'
       ? 'negative_log_density_v1'
-      : 'density_rgb_v1';
+      : params.command.parameters.conversionModel.algorithmId === 'e6_positive_v1'
+        ? 'e6_positive_v1'
+        : 'density_rgb_v1';
   const nativeArtifact = await invokeWithSchema(
     Invokes.RenderNegativeLabDryRunPreviewArtifact,
     {
