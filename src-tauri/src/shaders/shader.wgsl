@@ -2082,6 +2082,21 @@ fn agx_full_transform(color_in: vec3<f32>) -> vec3<f32> {
     return final_color;
 }
 
+fn apply_film_emulation(color_in: vec3<f32>) -> vec3<f32> {
+    let mix_amount = clamp(adjustments.global._pad_cg1, 0.0, 1.0);
+    let shaper_p = max(adjustments.global._pad_cg2, 1.0e-6);
+    if (adjustments.global._pad_cg3 < 0.5 || mix_amount <= 0.0) {
+        return color_in;
+    }
+    let luminance = dot(vec3<f32>(0.2722287168, 0.6740817658, 0.0536895174), color_in);
+    if (luminance != luminance || abs(luminance) > 3.4e38 || luminance <= 1.0e-8) {
+        return color_in;
+    }
+    let shaped = luminance * (1.0 + shaper_p) / (luminance + shaper_p);
+    let scale = shaped / luminance;
+    return color_in + mix_amount * (color_in * scale - color_in);
+}
+
 fn rapid_view_softplus(value: f32, width: f32) -> f32 {
     let scaled = value / width;
     if (scaled > 16.0) { return value; }
@@ -2820,6 +2835,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if (scene_input_phase) {
         composite_rgb_linear = apply_scene_curve(composite_rgb_linear);
+        composite_rgb_linear = apply_film_emulation(composite_rgb_linear);
     }
 
     if (adjustments.execution_phase == 1u) {

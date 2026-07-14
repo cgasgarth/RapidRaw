@@ -268,6 +268,14 @@ pub fn compile_render_plan(
     }
     validate_finite(raw, "$")?;
     let effective = normalize_film_look_adjustments_for_render(raw).into_owned();
+    let film_emulation =
+        crate::render::film_emulation::parse_node(&effective).map_err(|message| {
+            RenderPlanError {
+                code: "render_plan.invalid_film_emulation",
+                field: "filmEmulation",
+                message: message.to_string(),
+            }
+        })?;
     let version_was_explicit = effective.get("rawEngineEditGraphVersion").is_some();
     let pipeline_version = match effective.get("rawEngineEditGraphVersion") {
         None => crate::edit_graph::LEGACY_PIPELINE_VERSION,
@@ -346,6 +354,10 @@ pub fn compile_render_plan(
         &masks,
         lut.as_deref(),
     );
+    if let Some(film) = effective.get("filmEmulation") {
+        let film_bytes = serde_json::to_vec(film).expect("validated Film node is serializable");
+        fingerprints.color = hash_parts(&[&fingerprints.color.to_le_bytes(), &film_bytes]);
+    }
     let (scene_curve, output_curve) = compile_typed_curves(&effective, pipeline_version)?;
     if let Some(curve) = &scene_curve {
         fingerprints.color = hash_parts(&[
@@ -386,6 +398,7 @@ pub fn compile_render_plan(
         adjustments: &adjustments,
         neutral_adjustments: &neutral_adjustments,
         scene_curve: scene_curve.as_ref(),
+        film_emulation,
         output_curve: output_curve.as_ref(),
         has_geometry_or_retouch: has_geometry || has_retouch,
         has_detail: fingerprints.detail != neutral_detail,
@@ -873,6 +886,7 @@ fn validate_finite(value: &Value, path: &str) -> Result<(), RenderPlanError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{DynamicImage, ImageBuffer, Rgba};
     use serde_json::json;
     use std::collections::HashSet;
 
@@ -1257,6 +1271,66 @@ mod tests {
         assert_eq!(
             invalid.validate_contract(),
             Err("edit_graph.invalid_domain_transition")
+        );
+    }
+
+    #[test]
+    fn film_node_is_persisted_before_view_and_changes_scene_pixels() {
+        let film = json!({
+            "rawEngineEditGraphVersion": 2,
+            "filmEmulation": {
+                "nodeType": "film_emulation",
+                "contractVersion": 1,
+                "enabled": true,
+                "profileRef": {
+                    "id": "rapidraw.reference_film.v1",
+                    "version": "1",
+                    "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef"
+                },
+                "mix": 1.0,
+                "workingSpace": "acescg_linear_v1",
+                "seedPolicy": "source_stable_v1"
+            }
+        });
+        let with_film = compile_render_plan(&film, context(901), None).unwrap();
+        let without_film =
+            compile_render_plan(&json!({"rawEngineEditGraphVersion": 2}), context(902), None)
+                .unwrap();
+        let ordered = with_film.edit_graph.receipt.ordered_node_ids.as_ref();
+        let film_index = ordered
+            .iter()
+            .position(|id| *id == "film_emulation_v1")
+            .unwrap();
+        let view_index = ordered
+            .iter()
+            .position(|id| *id == "scene_to_view_transform")
+            .unwrap();
+        assert!(film_index < view_index);
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            2,
+            2,
+            Rgba([0.18, 0.12, 0.08, 1.0]),
+        ));
+        let rendered = |plan: &CompiledRenderPlan| {
+            crate::cpu_edit_graph::execute_cpu_edit_graph(
+                &source,
+                &plan.adjustments,
+                &[],
+                None,
+                &plan.edit_graph,
+            )
+            .unwrap()
+            .to_rgba32f()
+            .get_pixel(0, 0)
+            .0
+        };
+        assert_ne!(rendered(&with_film)[..3], rendered(&without_film)[..3]);
+        assert!(
+            with_film
+                .edit_graph
+                .receipt
+                .ordered_node_ids
+                .contains(&"film_emulation_v1")
         );
     }
 

@@ -12,6 +12,7 @@ use crate::adjustments::abi::{
     ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
     MaskAdjustments, Point, ToneEqualizerGpuSettings,
 };
+use crate::render::film_emulation::FilmEmulationParams;
 use crate::tone::curves::CompiledCurvePlanV1;
 use crate::tone::output_curves::CompiledOutputCurvePlanV1;
 
@@ -87,6 +88,7 @@ pub enum EditNodeKind {
     PreGpuSpatialDetail,
     SceneGlobalColorTone,
     SceneCurve,
+    FilmEmulation,
     LocalSceneComposition,
     SceneToViewTransform,
     DisplayCreative,
@@ -104,6 +106,7 @@ impl EditNodeKind {
             Self::PreGpuSpatialDetail => "pre_gpu_spatial_detail",
             Self::SceneGlobalColorTone => "scene_global_color_tone",
             Self::SceneCurve => "scene_curve_v1",
+            Self::FilmEmulation => "film_emulation_v1",
             Self::LocalSceneComposition => "local_scene_composition",
             Self::SceneToViewTransform => "scene_to_view_transform",
             Self::DisplayCreative => "display_creative",
@@ -198,6 +201,15 @@ static SCENE_CURVE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     false,
     false
 );
+static FILM_EMULATION_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
+    FilmEmulation,
+    Some("film_emulation_cpu_v1"),
+    Some("film_emulation_wgsl_v1"),
+    Some("scene"),
+    NO_RESOURCES,
+    false,
+    false
+);
 static LOCAL_SCENE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     LocalSceneComposition,
     Some("edit_graph_cpu_reference_v2"),
@@ -269,6 +281,7 @@ pub fn runtime_descriptor(kind: EditNodeKind) -> &'static EditNodeRuntimeDescrip
         EditNodeKind::PreGpuSpatialDetail => &PRE_GPU_DETAIL_RUNTIME,
         EditNodeKind::SceneGlobalColorTone => &SCENE_GLOBAL_RUNTIME,
         EditNodeKind::SceneCurve => &SCENE_CURVE_RUNTIME,
+        EditNodeKind::FilmEmulation => &FILM_EMULATION_RUNTIME,
         EditNodeKind::LocalSceneComposition => &LOCAL_SCENE_RUNTIME,
         EditNodeKind::SceneToViewTransform => &VIEW_RUNTIME,
         EditNodeKind::DisplayCreative => &DISPLAY_RUNTIME,
@@ -285,6 +298,7 @@ pub const ALL_EDIT_NODE_KINDS: &[EditNodeKind] = &[
     EditNodeKind::PreGpuSpatialDetail,
     EditNodeKind::SceneGlobalColorTone,
     EditNodeKind::SceneCurve,
+    EditNodeKind::FilmEmulation,
     EditNodeKind::LocalSceneComposition,
     EditNodeKind::SceneToViewTransform,
     EditNodeKind::DisplayCreative,
@@ -332,6 +346,7 @@ pub enum CompiledNodePayload {
     LegacyShaderAbi(Box<AllAdjustments>),
     SceneGlobal(Box<SceneGlobalPayload>),
     SceneCurve(CompiledCurvePlanV1),
+    FilmEmulation(FilmEmulationParams),
     LocalScene(LocalScenePayload),
     ViewTransform(ViewTransformPayload),
     DisplayCreative(Box<DisplayCreativePayload>),
@@ -349,6 +364,7 @@ impl CompiledNodePayload {
             Self::LegacyShaderAbi(_) => "legacy_all_adjustments_shader_abi_v1",
             Self::SceneGlobal(_) => "scene_global_typed_v2",
             Self::SceneCurve(_) => "scene_curve_typed_v1",
+            Self::FilmEmulation(_) => "film_emulation_typed_v1",
             Self::LocalScene(_) => "local_scene_typed_v2",
             Self::ViewTransform(_) => "view_transform_typed_v2",
             Self::DisplayCreative(_) => "display_creative_typed_v2",
@@ -375,6 +391,7 @@ impl CompiledNodePayload {
                 )
                 | (Self::SceneGlobal(_), EditNodeKind::SceneGlobalColorTone)
                 | (Self::SceneCurve(_), EditNodeKind::SceneCurve)
+                | (Self::FilmEmulation(_), EditNodeKind::FilmEmulation)
                 | (Self::LocalScene(_), EditNodeKind::LocalSceneComposition)
                 | (Self::ViewTransform(_), EditNodeKind::SceneToViewTransform)
                 | (Self::DisplayCreative(_), EditNodeKind::DisplayCreative)
@@ -430,6 +447,13 @@ impl CompiledNodePayload {
                 "points": curve.points.iter().map(|point| [point.x_ev, point.y_ev]).collect::<Vec<_>>(),
                 "fingerprint": format!("{:016x}", curve.fingerprint),
                 "implementationVersion": curve.implementation_version,
+            }),
+            Self::FilmEmulation(params) => serde_json::json!({
+                "enabled": params.enabled,
+                "mix": params.mix,
+                "shaperP": params.shaper_p,
+                "profile": crate::render::film_emulation::REFERENCE_PROFILE_ID,
+                "receipt": crate::render::film_emulation::runtime_receipt(*params, "uncomputed"),
             }),
             Self::LocalScene(local) => serde_json::json!({
                 "layerCount": local.layers.len(),
@@ -715,6 +739,7 @@ pub struct EditGraphCompileInputs<'a> {
     pub adjustments: &'a AllAdjustments,
     pub neutral_adjustments: &'a AllAdjustments,
     pub scene_curve: Option<&'a CompiledCurvePlanV1>,
+    pub film_emulation: Option<FilmEmulationParams>,
     pub output_curve: Option<&'a CompiledOutputCurvePlanV1>,
     pub has_geometry_or_retouch: bool,
     pub has_detail: bool,
@@ -877,6 +902,27 @@ impl CompiledEditGraph {
                 ));
             } else {
                 omitted.push(EditNodeKind::SceneCurve.stable_id());
+            }
+            if let Some(film) = inputs.film_emulation.filter(|film| film.enabled) {
+                nodes.push(node(
+                    EditNodeKind::FilmEmulation,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    ColorDomain::AcesCgSceneLinearExtended,
+                    EditStageClass::SceneCreative,
+                    ValueRangePolicy::PreserveFiniteExtended,
+                    SpatialSupport::Pointwise,
+                    LocalAdjustmentPolicy::GlobalOnly,
+                    NodeDependencies {
+                        source: true,
+                        adjustments: true,
+                        ..NodeDependencies::default()
+                    },
+                    Some("film_emulation_cpu_v1"),
+                    Some("film_emulation_wgsl_v1"),
+                    film_fingerprint(film),
+                ));
+            } else {
+                omitted.push(EditNodeKind::FilmEmulation.stable_id());
             }
             nodes.push(node(
                 EditNodeKind::SceneToViewTransform,
@@ -1049,6 +1095,7 @@ impl CompiledEditGraph {
                 || inputs.has_detail
                 || gpu_adjustments_active
                 || inputs.scene_curve.is_some()
+                || inputs.film_emulation.is_some_and(|film| film.enabled)
                 || inputs.output_curve.is_some()
                 || inputs.show_clipping
                 // Choosing the scene-referred process is itself a persisted,
@@ -1107,6 +1154,13 @@ impl CompiledEditGraph {
     pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
         self.nodes.iter().find_map(|node| match &node.payload {
             CompiledNodePayload::SceneCurve(curve) => Some(curve),
+            _ => None,
+        })
+    }
+
+    pub fn film_emulation(&self) -> Option<FilmEmulationParams> {
+        self.nodes.iter().find_map(|node| match &node.payload {
+            CompiledNodePayload::FilmEmulation(params) => Some(*params),
             _ => None,
         })
     }
@@ -1375,6 +1429,11 @@ fn compile_node_payload(
                 .expect("scene curve node requires compiled payload")
                 .clone(),
         ),
+        EditNodeKind::FilmEmulation => CompiledNodePayload::FilmEmulation(
+            inputs
+                .film_emulation
+                .expect("film node requires compiled payload"),
+        ),
         EditNodeKind::LocalSceneComposition => CompiledNodePayload::LocalScene(LocalScenePayload {
             layers: inputs.adjustments.mask_adjustments[..inputs.adjustments.mask_count as usize]
                 .iter()
@@ -1494,6 +1553,15 @@ fn combine(values: &[u64]) -> u64 {
     u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 
+fn film_fingerprint(params: FilmEmulationParams) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.film-emulation-node.v1");
+    hasher.update(&[u8::from(params.enabled)]);
+    hasher.update(&params.mix.to_le_bytes());
+    hasher.update(&params.shaper_p.to_le_bytes());
+    u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+}
+
 fn graph_fingerprint(pipeline_version: u32, nodes: &[CompiledEditNode]) -> u64 {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"rapidraw.compiled-edit-graph.v1");
@@ -1553,6 +1621,7 @@ mod runtime_registry_tests {
             adjustments: &adjustments,
             neutral_adjustments: &adjustments,
             scene_curve: None,
+            film_emulation: None,
             output_curve: None,
             has_geometry_or_retouch: false,
             has_detail: false,

@@ -13,6 +13,7 @@ use crate::color::view_transform::{
 use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
+use crate::render::film_emulation::parse_node as parse_film_node;
 #[cfg(test)]
 use serde::Deserialize;
 
@@ -525,6 +526,7 @@ fn get_global_adjustments_from_json(
         (0, 1.0)
     };
 
+    let film_params = parse_film_node(js_adjustments).ok().flatten();
     let mut global = GlobalAdjustments {
         exposure: scaled_section_value(js_adjustments, "basic", "exposure", SCALES.exposure, None),
         brightness: scaled_section_value(
@@ -700,9 +702,9 @@ fn get_global_adjustments_from_json(
         rapid_view_parameters0: rapid_view_parameters[0],
         rapid_view_parameters1: rapid_view_parameters[1],
         rapid_view_parameters2: rapid_view_parameters[2],
-        _pad_cg1: 0.0,
-        _pad_cg2: 0.0,
-        _pad_cg3: 0.0,
+        _pad_cg1: film_params.map_or(0.0, |params| params.mix),
+        _pad_cg2: film_params.map_or(0.0, |params| params.shaper_p),
+        _pad_cg3: f32::from(film_params.is_some_and(|params| params.enabled)),
         _pad_cg4: 0.0,
         color_grading_shadows: if section_is_visible(js_adjustments, "color") {
             parse_color_grade_settings(&cg_obj["shadows"])
