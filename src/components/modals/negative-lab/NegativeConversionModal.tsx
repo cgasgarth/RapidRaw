@@ -222,6 +222,7 @@ import { throttle } from '../../../utils/timing';
 import Button from '../../ui/primitives/Button';
 import Slider from '../../ui/primitives/Slider';
 import UiText from '../../ui/primitives/Text';
+import { NegativeLabDensityScopesPanel } from './NegativeLabDensityScopesPanel';
 import { NegativeLabPatchSamplerPanel } from './NegativeLabPatchSamplerPanel';
 import {
   NegativeLabProfileComparisonGrid,
@@ -982,6 +983,7 @@ function NegativeLabSession({
   const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : stagePreviewUrl;
   const runtimePreviewDensityNormalizationMetrics =
     runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.densityNormalizationMetrics ?? null;
+  const runtimePreviewDensityScopes = runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.densityScopes ?? null;
   const activePatchProbe = patchProbeByRole[patchRole] ?? null;
   const patchProbeEstimate = activePatchProbe?.estimate ?? null;
   const patchProbeRect = activePatchProbe?.rect ?? null;
@@ -4538,6 +4540,7 @@ function NegativeLabSession({
       </nav>
 
       <div className="grow space-y-5 overflow-y-auto scroll-smooth p-3 sm:p-4">
+        <NegativeLabDensityScopesPanel scopes={runtimePreviewDensityScopes} />
         <section
           className={cx(
             'scroll-mt-3 transition-opacity duration-200',

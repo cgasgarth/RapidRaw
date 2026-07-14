@@ -78,6 +78,26 @@ const nativeDensityBoundsReceiptSchema = z
     warningCodes: [...LEGACY_NATIVE_DENSITY_BOUNDS_RECEIPT.warningCodes],
   }));
 
+const nativeDensityScopesSchema = z
+  .object({
+    algorithmId: z.literal('native_negative_lab_density_scopes_v1'),
+    clippedPixelCount: z.number().int().nonnegative(),
+    densityHistogram: z
+      .object({ bins: z.array(z.number().int().nonnegative()).length(32), max: z.number(), min: z.number() })
+      .strict(),
+    gamutOutOfRangePixelCount: z.number().int().nonnegative(),
+    hAndDCurve: z
+      .array(z.object({ inputDensity: z.number(), outputLuma: z.number() }).strict())
+      .min(1)
+      .max(17),
+    outputLumaHistogram: z
+      .object({ bins: z.array(z.number().int().nonnegative()).length(32), max: z.number(), min: z.number() })
+      .strict(),
+    sampleCount: z.number().int().nonnegative(),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
 export const negativeLabDryRunPreviewArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -152,6 +172,7 @@ export const negativeLabDryRunPreviewArtifactSchema = z
         rendererVersion: z.number().int().positive(),
       })
       .strict(),
+    densityScopes: nativeDensityScopesSchema.optional(),
     dimensions: z
       .object({
         height: z.number().int().positive(),
@@ -227,6 +248,7 @@ const toRuntimePreviewRenderResult = (
       epsilonClampedPixelCount: artifact.densityNormalizationMetrics.epsilonClampedPixelCount,
       rendererVersion: artifact.densityNormalizationMetrics.rendererVersion,
     },
+    ...(artifact.densityScopes === undefined ? {} : { densityScopes: artifact.densityScopes }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),

@@ -60,6 +60,19 @@ const invokeMock = mock((command: string) => {
       epsilonClampedPixelCount: 1,
       rendererVersion: 1,
     },
+    densityScopes: {
+      algorithmId: 'native_negative_lab_density_scopes_v1',
+      clippedPixelCount: 3,
+      densityHistogram: { bins: Array.from({ length: 32 }, (_, index) => index), max: 1.2, min: 0.1 },
+      gamutOutOfRangePixelCount: 2,
+      hAndDCurve: [
+        { inputDensity: 0.1, outputLuma: 0.04 },
+        { inputDensity: 0.8, outputLuma: 0.92 },
+      ],
+      outputLumaHistogram: { bins: Array.from({ length: 32 }, (_, index) => 31 - index), max: 1, min: 0 },
+      sampleCount: 400,
+      schemaVersion: 1,
+    },
     dimensions: {
       height: 480,
       width: 720,
@@ -256,6 +269,11 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
       baseFogProvenance: 'automatic_analysis',
       schemaVersion: 1,
     });
+    expect(result.nativeArtifact.densityScopes?.densityHistogram.bins).toHaveLength(32);
+    expect(result.runtimeDryRun.dryRun.proof?.runtimePreview.densityScopes?.hAndDCurve).toEqual([
+      { inputDensity: 0.1, outputLuma: 0.04 },
+      { inputDensity: 0.8, outputLuma: 0.92 },
+    ]);
     expect(result.runtimeDryRun.dryRun.changeSet.createdPositiveVariantIds).toEqual([]);
     expect(NEGATIVE_LAB_AGENT_TOOL_MANIFEST.tools[0]?.toolName).toBe(NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME);
   });

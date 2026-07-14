@@ -122,6 +122,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     pub content_hash: String,
     pub density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    pub density_scopes: NegativeLabDensityScopes,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
@@ -206,6 +207,37 @@ pub struct NegativeLabDensityNormalizationMetrics {
     pub density_range_unclamped: f32,
     pub epsilon_clamped_pixel_count: u32,
     pub renderer_version: u8,
+}
+
+const NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS: usize = 32;
+const NEGATIVE_LAB_SCOPE_CURVE_SAMPLES: usize = 17;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabScopeHistogram {
+    pub bins: Vec<u32>,
+    pub max: f32,
+    pub min: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityScopePoint {
+    pub input_density: f32,
+    pub output_luma: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabDensityScopes {
+    pub algorithm_id: String,
+    pub clipped_pixel_count: u32,
+    pub density_histogram: NegativeLabScopeHistogram,
+    pub gamut_out_of_range_pixel_count: u32,
+    pub h_and_d_curve: Vec<NegativeLabDensityScopePoint>,
+    pub output_luma_histogram: NegativeLabScopeHistogram,
+    pub sample_count: u32,
+    pub schema_version: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
@@ -2211,6 +2243,7 @@ struct NegativeLabPipelineRender {
     rendered_preview: DynamicImage,
     scene_linear_print_preview: DynamicImage,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
+    density_scopes: NegativeLabDensityScopes,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -2233,6 +2266,94 @@ fn negative_lab_count_density_input_guards(raw_pixels: &[f32]) -> (u32, u32) {
                 clipped_count + u32::from(clipped_hit),
             )
         })
+}
+
+fn build_negative_lab_scope_histogram(values: &[f32]) -> NegativeLabScopeHistogram {
+    let finite_values: Vec<f32> = values
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect();
+    let min = finite_values
+        .iter()
+        .copied()
+        .reduce(f32::min)
+        .unwrap_or(0.0);
+    let max = finite_values
+        .iter()
+        .copied()
+        .reduce(f32::max)
+        .unwrap_or(1.0)
+        .max(min);
+    let span = (max - min).max(f32::EPSILON);
+    let mut bins = vec![0_u32; NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS];
+    for value in finite_values {
+        let position = ((value - min) / span).clamp(0.0, 1.0);
+        let index = ((position * NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS as f32).floor() as usize)
+            .min(NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS - 1);
+        bins[index] = bins[index].saturating_add(1);
+    }
+    NegativeLabScopeHistogram { bins, max, min }
+}
+
+fn build_negative_lab_density_scopes(
+    log_pixels: &[f32],
+    out_buffer: &[f32],
+    clipped_pixel_count: u32,
+) -> NegativeLabDensityScopes {
+    let mut density_values = Vec::with_capacity(log_pixels.len() / 3);
+    let mut output_luma_values = Vec::with_capacity(out_buffer.len() / 3);
+    let mut gamut_out_of_range_pixel_count = 0_u32;
+    for (log_pixel, output_pixel) in log_pixels.chunks_exact(3).zip(out_buffer.chunks_exact(3)) {
+        let input_density = (log_pixel[0] + log_pixel[1] + log_pixel[2]) / 3.0;
+        let output_luma =
+            0.2126 * output_pixel[0] + 0.7152 * output_pixel[1] + 0.0722 * output_pixel[2];
+        density_values.push(input_density);
+        output_luma_values.push(output_luma);
+        if output_pixel
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+        {
+            gamut_out_of_range_pixel_count = gamut_out_of_range_pixel_count.saturating_add(1);
+        }
+    }
+
+    let mut curve_pairs: Vec<(f32, f32)> = density_values
+        .iter()
+        .copied()
+        .zip(output_luma_values.iter().copied())
+        .collect();
+    curve_pairs.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let sample_count = curve_pairs.len() as u32;
+    let h_and_d_curve = if curve_pairs.is_empty() {
+        Vec::new()
+    } else {
+        (0..NEGATIVE_LAB_SCOPE_CURVE_SAMPLES)
+            .map(|sample_index| {
+                let position = if NEGATIVE_LAB_SCOPE_CURVE_SAMPLES == 1 {
+                    0.0
+                } else {
+                    sample_index as f32 / (NEGATIVE_LAB_SCOPE_CURVE_SAMPLES - 1) as f32
+                };
+                let index = ((curve_pairs.len() - 1) as f32 * position).round() as usize;
+                NegativeLabDensityScopePoint {
+                    input_density: curve_pairs[index].0,
+                    output_luma: curve_pairs[index].1,
+                }
+            })
+            .collect()
+    };
+
+    NegativeLabDensityScopes {
+        algorithm_id: "native_negative_lab_density_scopes_v1".to_string(),
+        clipped_pixel_count,
+        density_histogram: build_negative_lab_scope_histogram(&density_values),
+        gamut_out_of_range_pixel_count,
+        h_and_d_curve,
+        output_luma_histogram: build_negative_lab_scope_histogram(&output_luma_values),
+        sample_count,
+        schema_version: 1,
+    }
 }
 
 fn sanitize_sample_rect(rect: NegativeBaseFogSampleRect) -> Option<NegativeBaseFogSampleRect> {
@@ -2905,6 +3026,8 @@ fn run_pipeline_with_metrics(
             robust_bounds.receipt,
         );
     density_metrics.crosstalk_receipt = crosstalk_receipt;
+    let density_scopes =
+        build_negative_lab_density_scopes(&log_pixels, &out_buffer, clipped_pixel_count);
 
     let out_img = Rgb32FImage::from_vec(width, height, out_buffer).unwrap();
     let normalized_density_img =
@@ -2917,6 +3040,7 @@ fn run_pipeline_with_metrics(
         rendered_preview: DynamicImage::ImageRgb32F(out_img),
         scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_linear_print_img),
         density_normalization_metrics: density_metrics,
+        density_scopes,
     }
 }
 
@@ -3116,6 +3240,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     base_fog_sample_summary: NegativeLabRuntimeBaseFogSampleSummary,
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     params: &NegativeConversionParams,
+    density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let rgb8 = rendered_preview.to_rgb8();
     let dimensions = NegativeLabPreviewArtifactDimensions {
@@ -3163,6 +3288,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         base_fog_sample_summary,
         content_hash,
         density_normalization_metrics,
+        density_scopes,
         dimensions,
         preview_data_url: jpeg_data_url(base64_str),
         stage_artifacts,
@@ -3259,6 +3385,7 @@ pub async fn preview_negative_conversion(
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
         &params,
+        rendered_preview.density_scopes,
     )?
     .preview_data_url)
 }
@@ -3293,6 +3420,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         base_fog_sample_summary,
         rendered_preview.density_normalization_metrics,
         &params,
+        rendered_preview.density_scopes,
     )
 }
 
@@ -6357,6 +6485,7 @@ mod tests {
             summary.clone(),
             density_metrics,
             &NegativeConversionParams::default(),
+            build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
         .expect("build preview artifact");
         let rgb8 = rendered_preview.to_rgb8();
@@ -6414,6 +6543,7 @@ mod tests {
             summary,
             pipeline.density_normalization_metrics,
             &params,
+            pipeline.density_scopes,
         )
         .expect("build native stage artifacts");
 
@@ -6834,5 +6964,38 @@ mod tests {
     fn negative_lab_crosstalk_rejects_singular_matrices() {
         let singular = crosstalk_profile([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]], 1.0);
         assert!(resolve_negative_lab_crosstalk(Some(&singular)).is_err());
+    }
+
+    #[test]
+    fn native_density_scopes_are_bounded_and_derived_from_render_buffers() {
+        let scopes = build_negative_lab_density_scopes(
+            &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+            &[0.0, 0.1, 0.2, 0.8, 0.9, 1.0],
+            2,
+        );
+        assert_eq!(scopes.algorithm_id, "native_negative_lab_density_scopes_v1");
+        assert_eq!(scopes.schema_version, 1);
+        assert_eq!(
+            scopes.density_histogram.bins.len(),
+            NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS
+        );
+        assert_eq!(
+            scopes.output_luma_histogram.bins.len(),
+            NEGATIVE_LAB_SCOPE_HISTOGRAM_BINS
+        );
+        assert_eq!(scopes.h_and_d_curve.len(), NEGATIVE_LAB_SCOPE_CURVE_SAMPLES);
+        assert_eq!(scopes.sample_count, 2);
+        assert_eq!(scopes.clipped_pixel_count, 2);
+        assert_eq!(scopes.gamut_out_of_range_pixel_count, 0);
+        assert_eq!(scopes.h_and_d_curve[0].input_density, 0.2);
+        assert!((scopes.h_and_d_curve[0].output_luma - 0.08596).abs() < 0.001);
+        assert_eq!(scopes.h_and_d_curve[16].input_density, 0.5);
+        assert!((scopes.h_and_d_curve[16].output_luma - 0.88596).abs() < 0.001);
+        assert!(
+            scopes
+                .h_and_d_curve
+                .windows(2)
+                .all(|points| points[0].input_density <= points[1].input_density)
+        );
     }
 }

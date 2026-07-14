@@ -70,6 +70,16 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     epsilonClampedPixelCount: number;
     rendererVersion: number;
   };
+  densityScopes?: {
+    algorithmId: 'native_negative_lab_density_scopes_v1';
+    clippedPixelCount: number;
+    densityHistogram: { bins: number[]; max: number; min: number };
+    gamutOutOfRangePixelCount: number;
+    hAndDCurve: Array<{ inputDensity: number; outputLuma: number }>;
+    outputLumaHistogram: { bins: number[]; max: number; min: number };
+    sampleCount: number;
+    schemaVersion: 1;
+  };
   dimensions: { height: number; width: number };
   renderer:
     | 'rawengine_density_preview_runtime'
@@ -603,6 +613,7 @@ function buildNegativeLabRuntimeProofV1({
         epsilonClampedPixelCount: renderedPreview.densityNormalizationMetrics?.epsilonClampedPixelCount ?? 0,
         rendererVersion: renderedPreview.densityNormalizationMetrics?.rendererVersion ?? 2,
       },
+      ...(renderedPreview.densityScopes === undefined ? {} : { densityScopes: renderedPreview.densityScopes }),
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,
       previewArtifactHandle: previewArtifact,
