@@ -14,6 +14,28 @@ import {
 import { renderNegativeLabRuntimeDryRunPreview } from '../../../src/utils/negative-lab/negativeLabRuntimeDryRunAdapter';
 
 const invokeMock = mock((command: string) => {
+  if (command === Invokes.PreflightNegativeLabSource) {
+    return Promise.resolve({
+      appliedLinearization: 'native_raw_to_scene_linear_v1',
+      bitDepth: 32,
+      blockReasons: [],
+      confidence: 0.95,
+      decoderBackend: 'rawler',
+      decoderVersion: 'rawengine_rawler_v1',
+      dimensions: { height: 480, width: 720 },
+      embeddedIccProfile: false,
+      interpretationHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      nonFiniteFraction: 0,
+      orientation: 'unknown',
+      rawDemosaicMode: 'Linear',
+      sampleFormat: 'Rgba32F',
+      schemaVersion: 1,
+      sourceHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      sourceType: 'raw',
+      transferFunction: 'camera_rgb_profiled',
+      warningCodes: [],
+    });
+  }
   if (command !== Invokes.RenderNegativeLabDryRunPreviewArtifact) {
     throw new Error(`Unexpected invoke: ${command}`);
   }
@@ -203,6 +225,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'density_rgb_v1',
+        source_interpretation_hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         exposure: 0,
         flat_log_master: { algorithm_version: 1, gain: 1, lift: 0.02 },
         green_weight: 1,
@@ -234,6 +257,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'density_rgb_v1',
+        source_interpretation_hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         exposure: 0,
         flat_log_master: { algorithm_version: 1, gain: 1, lift: 0.02 },
         render_intent: 'print',
@@ -413,6 +437,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'negative_log_density_v1',
+        source_interpretation_hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         exposure: 0,
         flat_log_master: { algorithm_version: 1, gain: 1, lift: 0.02 },
         render_intent: 'print',

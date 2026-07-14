@@ -8122,6 +8122,30 @@ export const negativeLabSourceAssetRefV1Schema = z
   })
   .strict();
 
+/** Loader-grounded source contract shared by Negative Lab preview and save. */
+export const negativeLabSourceInterpretationV1Schema = z
+  .object({
+    appliedLinearization: z.string().trim().min(1),
+    bitDepth: z.number().int().positive(),
+    blockReasons: z.array(z.string().trim().min(1)),
+    confidence: z.number().min(0).max(1),
+    decoderBackend: z.string().trim().min(1),
+    decoderVersion: z.string().trim().min(1),
+    dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    embeddedIccProfile: z.boolean(),
+    interpretationHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    nonFiniteFraction: z.number().min(0).max(1),
+    orientation: z.string().trim().min(1),
+    rawDemosaicMode: z.string().trim().min(1).nullable(),
+    sampleFormat: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+    sourceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    sourceType: z.enum(['raw', 'linear_tiff_candidate', 'rendered_jpeg', 'unknown']),
+    transferFunction: z.string().trim().min(1),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const negativeLabFrameDetectionRequestV1Schema = z
   .object({
     borderPolicy: z.enum(['require_visible_border', 'prefer_visible_border', 'allow_cropped']),
@@ -11520,6 +11544,7 @@ export type NegativeLabSetConversionRecipeParametersV1 = z.infer<
 >;
 export type NegativeLabSetFrameQcStatusParametersV1 = z.infer<typeof negativeLabSetFrameQcStatusParametersV1Schema>;
 export type NegativeLabSourceAssetRefV1 = z.infer<typeof negativeLabSourceAssetRefV1Schema>;
+export type NegativeLabSourceInterpretationV1 = z.infer<typeof negativeLabSourceInterpretationV1Schema>;
 export type NegativeLabSupportedProcessFamilyV1 = z.infer<typeof negativeLabSupportedProcessFamilyV1Schema>;
 export type NegativeLabUpdateBaseSamplesParametersV1 = z.infer<typeof negativeLabUpdateBaseSamplesParametersV1Schema>;
 export type NegativeFrameRecordV1 = z.infer<typeof negativeFrameRecordV1Schema>;
