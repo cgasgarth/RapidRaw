@@ -182,6 +182,11 @@ pub struct PointColorGpuSettings {
     pub points: [PointColorGpuPoint; MAX_POINT_COLOR_POINTS],
     /// active point count, visualize mode, process version, reserved.
     pub control: [u32; 4],
+    pub skin_range: PointColorGpuPoint,
+    /// target lightness, chroma, hue degrees, enabled.
+    pub skin_target: [f32; 4],
+    /// hue, chroma, lightness uniformity, preserve extremes.
+    pub skin_control: [f32; 4],
 }
 
 impl Default for ToneEqualizerGpuSettings {

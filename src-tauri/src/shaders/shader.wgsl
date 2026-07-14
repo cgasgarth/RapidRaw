@@ -101,6 +101,9 @@ struct PointColorGpuPoint {
 struct PointColorGpuSettings {
     points: array<PointColorGpuPoint, 8>,
     control: vec4<u32>,
+    skin_range: PointColorGpuPoint,
+    skin_target: vec4<f32>,
+    skin_control: vec4<f32>,
 }
 
 struct GlobalAdjustments {
@@ -1218,6 +1221,25 @@ fn apply_point_color(color: vec3<f32>, settings: PointColorGpuSettings) -> vec3<
             max(oklch.y + point.edit.z * weight, max(0.0, saturation * (1.0 + point.control.x * weight)) * max(oklch.x, 0.01)),
             (oklch.z + point.edit.y * weight + 360.0) % 360.0,
         );
+    }
+    if (settings.skin_target.w > 0.5) {
+        let point = settings.skin_range;
+        var membership = 0.0;
+        for (var sample_index = 0u; sample_index < min(u32(point.control.z), 4u); sample_index += 1u) {
+            let sample = point.samples[sample_index];
+            let distance = length(vec3<f32>(point_color_hue_distance(oklch.z, sample.z) / max(point.range.x, 0.1), abs(oklch.y - sample.y) / max(point.range.y, 0.001), abs(oklch.x - sample.x) / max(point.range.z, 0.001))) / clamp(point.range.w, 0.25, 4.0);
+            let weight = (1.0 - smoothstep(max(0.0, 1.0 - clamp(point.edit.x, 0.0, 1.0)), 1.0, distance)) * smoothstep(0.003, 0.02, min(oklch.y, sample.y)) * clamp(sample.w, 0.0, 1.0);
+            membership = 1.0 - (1.0 - membership) * (1.0 - weight);
+        }
+        let extremes = clamp(1.0 - smoothstep(0.0, 0.12, oklch.x) + smoothstep(0.82, 1.0, oklch.x), 0.0, 1.0);
+        let influence = membership * (1.0 - clamp(settings.skin_control.w, 0.0, 1.0) * extremes);
+        let hue_delta = ((settings.skin_target.z - oklch.z + 540.0) % 360.0) - 180.0;
+        oklch = vec3<f32>(
+            oklch.x + (settings.skin_target.x - oklch.x) * clamp(settings.skin_control.z, 0.0, 1.0) * influence,
+            oklch.y + (settings.skin_target.y - oklch.y) * clamp(settings.skin_control.y, 0.0, 1.0) * influence,
+            (oklch.z + hue_delta * clamp(settings.skin_control.x, 0.0, 1.0) * influence + 360.0) % 360.0,
+        );
+        visualization_weight = max(visualization_weight, membership);
     }
     let edited = point_color_oklch_to_ap1(oklch);
     if (settings.control.y == 1u) { return vec3<f32>(visualization_weight); }

@@ -60,6 +60,9 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
       ),
     });
   };
+  const updateSkin = (update: Partial<Adjustments['pointColor']['skinUniformity']>) => {
+    updatePlan({ skinUniformity: { ...plan.skinUniformity, ...update } });
+  };
 
   return (
     <details className="group border-b border-editor-border" data-testid="point-color-controls" open>
@@ -233,6 +236,52 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
               step={0.01}
               value={selected.lightnessShift}
             />
+            <div className="border-t border-editor-border pt-1" data-testid="point-color-skin-uniformity">
+              <button
+                aria-pressed={plan.skinUniformity.enabled}
+                className="rounded border border-editor-border px-2 py-1 text-xs"
+                onClick={() =>
+                  updateSkin({
+                    enabled: !plan.skinUniformity.enabled,
+                    range: selected,
+                    target: sample.sourceColor,
+                  })
+                }
+                type="button"
+              >
+                {t('adjustments.color.skinToneUniformity.title')}
+              </button>
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.color.skinToneUniformity.hue')}
+                max={1}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => updateSkin({ hueUniformity: value })}
+                step={0.01}
+                value={plan.skinUniformity.hueUniformity}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.color.skinToneUniformity.saturation')}
+                max={1}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => updateSkin({ chromaUniformity: value })}
+                step={0.01}
+                value={plan.skinUniformity.chromaUniformity}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label={t('adjustments.color.skinToneUniformity.lightness')}
+                max={1}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => updateSkin({ lightnessUniformity: value })}
+                step={0.01}
+                value={plan.skinUniformity.lightnessUniformity}
+              />
+            </div>
           </div>
         ) : null}
       </div>

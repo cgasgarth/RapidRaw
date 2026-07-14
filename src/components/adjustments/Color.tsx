@@ -102,19 +102,6 @@ const rememberSessionColorWorkspaceTab = (tabId: ColorWorkspaceTabId) => {
   }
 };
 
-const skinTonePreviewHsl = (settings: Adjustments['skinToneUniformity']) => {
-  const hueDelta = Math.min(
-    settings.maxHueShiftDegrees,
-    Math.max(-settings.maxHueShiftDegrees, settings.targetHueDegrees - 18),
-  );
-
-  return {
-    hue: (hueDelta * settings.hueUniformity).toFixed(1),
-    luminance: ((settings.targetLuminance - 0.5) * 100 * settings.luminanceUniformity).toFixed(1),
-    saturation: ((settings.targetSaturation - 0.45) * 100 * settings.saturationUniformity).toFixed(1),
-  };
-};
-
 export default function ColorPanel({
   adjustments,
   setAdjustments,
@@ -250,18 +237,8 @@ export default function ColorPanel({
   };
 
   const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
-    const nextPreview = skinTonePreviewHsl(nextSettings);
     setAdjustments((prev) => ({
       ...prev,
-      hsl: {
-        ...prev.hsl,
-        oranges: {
-          ...prev.hsl.oranges,
-          hue: nextSettings.enabled ? Number(nextPreview.hue) : 0,
-          luminance: nextSettings.enabled ? Number(nextPreview.luminance) : 0,
-          saturation: nextSettings.enabled ? Number(nextPreview.saturation) : 0,
-        },
-      },
       skinToneUniformity: nextSettings,
     }));
   };

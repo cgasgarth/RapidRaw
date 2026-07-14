@@ -261,7 +261,7 @@
       },
       "saturation": "Saturation",
       "skinToneUniformity": {
-        "description": "Sampled HSL-range convergence routed through the typed color workflow.",
+        "description": "Perceptual sampled-range convergence with independent hue, chroma, and lightness axes.",
         "disabled": "Off",
         "enabled": "On",
         "hue": "Hue uniformity",
@@ -273,7 +273,7 @@
         "targetLightness": "Target lightness",
         "targetSaturation": "Target saturation",
         "title": "Skin tone - sampled uniformity (Experimental)",
-        "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
+        "warning": "Uses the selected manual color range; it does not detect skin automatically or smooth spatial texture."
       },
       "temperature": "Temperature",
       "tint": "Tint",

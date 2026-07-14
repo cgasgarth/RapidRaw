@@ -350,6 +350,46 @@ fn parse_point_color(value: &JsonValue) -> PointColorGpuSettings {
         1,
         0,
     ];
+    let skin = &plan["skinUniformity"];
+    if skin["enabled"].as_bool() == Some(true)
+        && let (Some(range), Some(target)) = (skin.get("range"), skin.get("target"))
+    {
+        let mut packed = PointColorGpuPoint::default();
+        if let Some(samples) = range["samples"].as_array() {
+            for (sample_index, sample) in samples.iter().take(4).enumerate() {
+                let color = &sample["sourceColor"];
+                packed.samples[sample_index] = [
+                    color["lightness"].as_f64().unwrap_or(0.0) as f32,
+                    color["chroma"].as_f64().unwrap_or(0.0) as f32,
+                    color["hueDegrees"].as_f64().unwrap_or(0.0) as f32,
+                    sample["confidence"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0) as f32,
+                ];
+            }
+            packed.control[2] = samples.len().min(4) as f32;
+        }
+        packed.range = [
+            range["hueRadiusDegrees"].as_f64().unwrap_or(25.0) as f32,
+            range["chromaRadius"].as_f64().unwrap_or(0.08) as f32,
+            range["lightnessRadius"].as_f64().unwrap_or(0.2) as f32,
+            range["variance"].as_f64().unwrap_or(1.0) as f32,
+        ];
+        packed.edit[0] = range["feather"].as_f64().unwrap_or(0.4) as f32;
+        packed.control[1] = range["opacity"].as_f64().unwrap_or(1.0) as f32;
+        packed.control[3] = 1.0;
+        output.skin_range = packed;
+        output.skin_target = [
+            target["lightness"].as_f64().unwrap_or(0.0) as f32,
+            target["chroma"].as_f64().unwrap_or(0.0) as f32,
+            target["hueDegrees"].as_f64().unwrap_or(0.0) as f32,
+            1.0,
+        ];
+        output.skin_control = [
+            skin["hueUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["chromaUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["lightnessUniformity"].as_f64().unwrap_or(0.0) as f32,
+            skin["preserveExtremes"].as_f64().unwrap_or(0.5) as f32,
+        ];
+    }
     output
 }
 

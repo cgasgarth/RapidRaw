@@ -256,6 +256,30 @@ pub fn apply_gpu_plan_ap1(rgb: [f32; 3], settings: &PointColorGpuSettings) -> [f
             hue_degrees: (color.hue_degrees + point.edit[1] * weight).rem_euclid(360.0),
         };
     }
+    if settings.skin_target[3] > 0.5 {
+        let membership = packed_membership(color, &settings.skin_range);
+        let shadow_extreme = 1.0 - smoothstep(0.0, 0.12, color.lightness);
+        let highlight_extreme = smoothstep(0.82, 1.0, color.lightness);
+        let guard = 1.0
+            - settings.skin_control[3].clamp(0.0, 1.0)
+                * (shadow_extreme + highlight_extreme).clamp(0.0, 1.0);
+        let influence = membership * guard;
+        let hue_delta =
+            (settings.skin_target[2] - color.hue_degrees + 180.0).rem_euclid(360.0) - 180.0;
+        color = PerceptualColorCoordinate {
+            lightness: color.lightness
+                + (settings.skin_target[0] - color.lightness)
+                    * settings.skin_control[2].clamp(0.0, 1.0)
+                    * influence,
+            chroma: color.chroma
+                + (settings.skin_target[1] - color.chroma)
+                    * settings.skin_control[1].clamp(0.0, 1.0)
+                    * influence,
+            hue_degrees: (color.hue_degrees
+                + hue_delta * settings.skin_control[0].clamp(0.0, 1.0) * influence)
+                .rem_euclid(360.0),
+        };
+    }
     let edited = oklch_to_ap1(color);
     match settings.control[1] {
         1 => [visualization_weight; 3],
@@ -471,5 +495,47 @@ mod tests {
         assert!((output.hue_degrees - 50.0).abs() < 1e-5);
         assert_eq!(output.chroma, color.chroma);
         assert_eq!(output.lightness, color.lightness);
+    }
+
+    #[test]
+    fn packed_skin_execution_matches_reference_and_preserves_independent_axes() {
+        let rgb = [0.45, 0.2, 0.12];
+        let color = ap1_to_oklch(rgb);
+        let range = point(color);
+        let target = PerceptualColorCoordinate {
+            lightness: color.lightness + 0.1,
+            chroma: color.chroma + 0.03,
+            hue_degrees: color.hue_degrees + 12.0,
+        };
+        let skin = SkinUniformityV1 {
+            samples: range.samples.clone(),
+            target,
+            hue_uniformity: 1.0,
+            chroma_uniformity: 0.0,
+            lightness_uniformity: 0.0,
+            preserve_extremes: 0.0,
+            range: range.clone(),
+            enabled: true,
+        };
+        let expected = oklch_to_ap1(apply_skin_uniformity(color, &skin));
+        let mut packed = PointColorGpuSettings::default();
+        packed.skin_range.samples[0] = [color.lightness, color.chroma, color.hue_degrees, 1.0];
+        packed.skin_range.range = [
+            range.hue_radius_degrees,
+            range.chroma_radius,
+            range.lightness_radius,
+            range.variance,
+        ];
+        packed.skin_range.edit[0] = range.feather;
+        packed.skin_range.control = [0.0, 1.0, 1.0, 1.0];
+        packed.skin_target = [target.lightness, target.chroma, target.hue_degrees, 1.0];
+        packed.skin_control = [1.0, 0.0, 0.0, 0.0];
+        let actual = apply_gpu_plan_ap1(rgb, &packed);
+        assert!(
+            expected
+                .into_iter()
+                .zip(actual)
+                .all(|(left, right)| (left - right).abs() < 2e-5)
+        );
     }
 }
