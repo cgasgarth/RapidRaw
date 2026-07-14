@@ -6,7 +6,6 @@ import {
   type NegativeLabApplyPlanRequestV1,
   type NegativeLabApplyResultV1,
   type NegativeLabAppServerToolDefinitionV1,
-  type NegativeLabCommandEnvelopeV1,
   type NegativeLabDensityBoundsReceiptV1,
   type NegativeLabDryRunResultV1,
   type NegativeLabPositiveOutputReceiptV1,
@@ -107,6 +106,10 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
 }
 
 export interface NegativeLabAppServerRuntimeToolBusOptionsV1 {
+  applyNative?: (
+    request: NegativeLabApplyPlanRequestV1,
+    acceptedPlan: Readonly<AcceptedNegativeLabDryRunPlanV1>,
+  ) => NegativeLabApplyResultV1 | Promise<NegativeLabApplyResultV1>;
   renderPreview?: (command: NegativeLabSetConversionRecipeCommandV1) => NegativeLabRuntimePreviewRenderResultV1;
 }
 
@@ -127,7 +130,7 @@ export type NegativeLabAppServerRuntimeToolResultV1 =
   | NegativeLabAppServerRuntimeApplyToolResultV1
   | NegativeLabAppServerRuntimeDryRunToolResultV1;
 
-interface AcceptedNegativeLabDryRunPlanV1 {
+export interface AcceptedNegativeLabDryRunPlanV1 {
   command: NegativeLabSetConversionRecipeCommandV1;
   dryRun: NegativeLabDryRunResultV1;
   hash: string;
@@ -141,6 +144,7 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
   readonly #renderPreview: (
     command: NegativeLabSetConversionRecipeCommandV1,
   ) => NegativeLabRuntimePreviewRenderResultV1;
+  #applyNative: NegativeLabAppServerRuntimeToolBusOptionsV1['applyNative'];
   readonly #toolsByName: Map<NegativeLabAppServerRuntimeToolNameV1, NegativeLabAppServerToolDefinitionV1> = new Map<
     NegativeLabAppServerRuntimeToolNameV1,
     NegativeLabAppServerToolDefinitionV1
@@ -149,6 +153,7 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
   constructor(manifestValue: unknown, options: NegativeLabAppServerRuntimeToolBusOptionsV1 = {}) {
     const manifest = negativeLabAppServerToolManifestV1Schema.parse(manifestValue);
     this.#renderPreview = options.renderPreview ?? buildDefaultNegativeLabRuntimePreviewRenderResultV1;
+    this.#applyNative = options.applyNative;
     for (const tool of manifest.tools) {
       const parsedToolName = negativeLabAppServerRuntimeToolNameV1Schema.safeParse(tool.toolName);
       if (parsedToolName.success) this.#toolsByName.set(parsedToolName.data, tool);
@@ -166,6 +171,28 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
       return this.#executeDryRun(tool, request.request);
     }
     return this.#executeApply(tool, request.request);
+  }
+
+  /**
+   * Async counterpart used by the app-server host. Preview stays synchronous
+   * and shares this bus's accepted-plan registry; apply awaits the injected
+   * native save executor instead of constructing receipts locally.
+   */
+  async executeAsync(requestValue: unknown): Promise<NegativeLabAppServerRuntimeToolResultV1> {
+    const request = negativeLabAppServerRuntimeToolRequestV1Schema.parse(requestValue);
+    const tool = this.#toolsByName.get(request.toolName);
+    if (tool === undefined) {
+      throw new Error(`Negative Lab runtime app-server bus has no registered tool named ${request.toolName}.`);
+    }
+
+    if (request.toolName === 'negativelab.preview_conversion') {
+      return this.#executeDryRun(tool, request.request);
+    }
+    return this.#executeApplyAsync(tool, request.request);
+  }
+
+  setApplyNativeExecutor(applyNative: NegativeLabAppServerRuntimeToolBusOptionsV1['applyNative']): void {
+    this.#applyNative = applyNative;
   }
 
   #executeDryRun(
@@ -227,9 +254,70 @@ export class NegativeLabAppServerRuntimeToolBusV1 {
     if (acceptedPlan.command.parameters.sessionId !== request.sessionId) {
       throw new Error(`${tool.toolName} rejected a Negative Lab apply for a different session.`);
     }
+    const acknowledgedWarningCodes = new Set(request.acknowledgedWarningCodes);
+    const unacknowledgedWarning = acceptedPlan.dryRun.warnings.find(
+      (warning) => !acknowledgedWarningCodes.has(warning.code),
+    );
+    if (unacknowledgedWarning !== undefined) {
+      throw new Error(`${tool.toolName} rejected an apply with unacknowledged warning ${unacknowledgedWarning.code}.`);
+    }
+
+    if (this.#applyNative === undefined) {
+      throw new Error(
+        `${tool.toolName} requires an injected native commit executor; synthetic output receipts are disabled.`,
+      );
+    }
+
+    const apply = this.#applyNative(request, acceptedPlan);
+    if (apply instanceof Promise) {
+      throw new Error(`${tool.toolName} has an asynchronous native executor; use executeAsync instead.`);
+    }
 
     return {
-      apply: buildNegativeLabRuntimeApplyV1(request, acceptedPlan),
+      apply,
+      kind: 'apply',
+      toolName: 'negativelab.apply_planned_command',
+    };
+  }
+
+  async #executeApplyAsync(
+    tool: NegativeLabAppServerToolDefinitionV1,
+    requestValue: unknown,
+  ): Promise<NegativeLabAppServerRuntimeApplyToolResultV1> {
+    if (!tool.mutates || !tool.requiresDryRunPlan || tool.executionMode !== 'apply_dry_run_plan') {
+      throw new Error(`${tool.toolName} requires a mutating Negative Lab apply request.`);
+    }
+
+    const request = negativeLabApplyPlanRequestV1Schema.parse(requestValue);
+    const acceptedPlan = this.#acceptedDryRunPlansById.get(request.dryRunPlanId);
+    if (
+      acceptedPlan === undefined ||
+      acceptedPlan.hash !== request.acceptedDryRunPlanHash ||
+      acceptedPlan.command.commandId !== request.commandId
+    ) {
+      throw new Error(`${tool.toolName} rejected an unaccepted Negative Lab dry-run plan.`);
+    }
+    if (acceptedPlan.command.expectedGraphRevision !== request.expectedSessionRevision) {
+      throw new Error(`${tool.toolName} rejected a stale Negative Lab dry-run session revision.`);
+    }
+    if (acceptedPlan.command.parameters.sessionId !== request.sessionId) {
+      throw new Error(`${tool.toolName} rejected a Negative Lab apply for a different session.`);
+    }
+    const acknowledgedWarningCodes = new Set(request.acknowledgedWarningCodes);
+    const unacknowledgedWarning = acceptedPlan.dryRun.warnings.find(
+      (warning) => !acknowledgedWarningCodes.has(warning.code),
+    );
+    if (unacknowledgedWarning !== undefined) {
+      throw new Error(`${tool.toolName} rejected an apply with unacknowledged warning ${unacknowledgedWarning.code}.`);
+    }
+    if (this.#applyNative === undefined) {
+      throw new Error(
+        `${tool.toolName} requires an injected native commit executor; synthetic output receipts are disabled.`,
+      );
+    }
+
+    return {
+      apply: await this.#applyNative(request, acceptedPlan),
       kind: 'apply',
       toolName: 'negativelab.apply_planned_command',
     };
@@ -338,7 +426,7 @@ function buildNegativeLabRuntimeDryRunV1(
   };
 }
 
-function buildNegativeLabRuntimeApplyV1(
+export function buildNegativeLabRuntimeApplyV1(
   request: NegativeLabApplyPlanRequestV1,
   acceptedPlan: AcceptedNegativeLabDryRunPlanV1,
 ): NegativeLabApplyResultV1 {
