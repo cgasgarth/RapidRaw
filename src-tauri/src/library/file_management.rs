@@ -2248,6 +2248,9 @@ pub struct MetadataSaveReceipt {
     pub image_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_revision: Option<u64>,
+    /// Canonical persisted adjustments for receipt-driven client state updates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adjustments: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -2290,6 +2293,7 @@ fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveRe
         transaction_id: None,
         image_session_id: None,
         adjustment_revision: None,
+        adjustments: None,
     }
 }
 
@@ -2302,6 +2306,7 @@ fn metadata_save_receipt_for_transaction(
     receipt.transaction_id = Some(transaction.transaction_id.clone());
     receipt.image_session_id = Some(transaction.image_session_id.clone());
     receipt.adjustment_revision = Some(transaction.next_adjustment_revision);
+    receipt.adjustments = Some(metadata.adjustments.clone());
     receipt
 }
 
@@ -4238,9 +4243,11 @@ mod tests {
         assert_eq!(receipt.transaction_id.as_deref(), Some("tx-2"));
         assert_eq!(receipt.image_session_id.as_deref(), Some("session-2"));
         assert_eq!(receipt.adjustment_revision, Some(8));
+        assert_eq!(receipt.adjustments, Some(metadata.adjustments.clone()));
         let legacy = metadata_save_receipt("image.raf", &metadata);
         assert!(legacy.transaction_id.is_none());
         assert!(legacy.adjustment_revision.is_none());
+        assert!(legacy.adjustments.is_none());
     }
 
     #[test]
