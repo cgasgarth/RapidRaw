@@ -567,6 +567,120 @@
       }
     },
     {
+      "adjustmentFingerprint": "c79a592b47e91b1d7bdf595d72f2860193f4819a511f31d004468011212205e1",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 12
+        },
+        {
+          "label": "Saturation",
+          "value": -100
+        },
+        {
+          "label": "Grain",
+          "value": 20
+        },
+        {
+          "label": "Grain Roughness",
+          "value": 60
+        },
+        {
+          "label": "Grain Size",
+          "value": 40
+        }
+      ],
+      "category": "black_and_white",
+      "description": "Project-owned D65 daylight-class measured RGB tristimulus fit; not universal spectral reconstruction or stock emulation.",
+      "displayName": "Measured Monochrome D65",
+      "id": "film_look.measured.monochrome_d65.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strengthDefault": 75,
+      "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 12,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": 0,
+          "saturation": -100,
+          "glowAmount": 0,
+          "grainAmount": 20,
+          "grainRoughness": 60,
+          "grainSize": 40,
+          "halationAmount": 0
+        },
+        "default": {
+          "contrast": 9,
+          "saturation": -75,
+          "grainAmount": 15,
+          "grainRoughness": 58,
+          "grainSize": 36
+        },
+        "half": {
+          "contrast": 6,
+          "saturation": -50,
+          "grainAmount": 10,
+          "grainRoughness": 55,
+          "grainSize": 33
+        },
+        "full": {
+          "contrast": 12,
+          "saturation": -100,
+          "grainAmount": 20,
+          "grainRoughness": 60,
+          "grainSize": 40
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 9,
+            "saturation": -75,
+            "grainAmount": 15,
+            "grainRoughness": 58,
+            "grainSize": 36
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Measured Monochrome D65 75%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 6,
+            "saturation": -50,
+            "grainAmount": 10,
+            "grainRoughness": 55,
+            "grainSize": 33
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Measured Monochrome D65 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 12,
+            "saturation": -100,
+            "grainAmount": 20,
+            "grainRoughness": 60,
+            "grainSize": 40
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Measured Monochrome D65 100%",
+          "presetType": "style"
+        }
+      }
+    },
+    {
       "adjustmentFingerprint": "85610c2580d95d156d2e4f5950d5b3c2b656d1c344275eb4bf82b34933b26b00",
       "adjustmentSummaries": [
         {
