@@ -125,7 +125,9 @@ test('settled completion wins over a late interactive result and releases replac
     type: 'operation-completed',
   });
   expect(interactiveDone.state.visibleArtifact?.url).toBe('blob:settled');
-  expect(interactiveDone.effects).toEqual([]);
+  expect(interactiveDone.effects).toEqual([
+    { type: 'release-url', url: 'blob:interactive', reason: 'artifact-not-presented' },
+  ]);
 
   const replacementQueued = transition(interactiveDone.state, {
     identity: session({ adjustmentRevision: 2, viewportRevision: 2 }),
