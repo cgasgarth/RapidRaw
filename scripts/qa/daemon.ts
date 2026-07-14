@@ -18,6 +18,7 @@ const engine = new QaDaemonEngine(
   createBrowserLifecycleAdapter(resolve(worktree, 'private-artifacts/qa/daemon')),
 );
 let closing = false;
+let forcedShutdownTimer: ReturnType<typeof setTimeout> | undefined;
 const server = createServer((socket) => {
   socket.setEncoding('utf8');
   let buffer = '';
@@ -74,6 +75,12 @@ const shutdown = async () => {
   closing = true;
   engine.cancel();
   server.close();
+  // A signal can arrive while Bun still owns an accepted socket or a browser
+  // adapter is unwinding. Do not leave the ownership record behind forever.
+  forcedShutdownTimer = setTimeout(() => {
+    void releaseDaemonState(state).finally(() => process.exit(0));
+  }, 5_000);
+  forcedShutdownTimer.unref();
 };
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => void shutdown());
 
@@ -85,6 +92,7 @@ try {
   await chmod(state.socketPath, 0o600);
   await new Promise<void>((done) => server.once('close', () => done()));
 } finally {
+  if (forcedShutdownTimer !== undefined) clearTimeout(forcedShutdownTimer);
   await engine.close();
   await releaseDaemonState(state);
 }
