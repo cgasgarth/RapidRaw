@@ -38,7 +38,7 @@
     "check:docs": "bun scripts/ci/run-compact-command.ts --label docs:format -- biome ci --linter-enabled=false --assist-enabled=false docs && bun tests/integration/checks/check-markdown-links.ts",
     "check:security": "bun scripts/ci/run-compact-command.ts --label security:js -- bun audit --audit-level moderate && bun tests/integration/checks/check-rust-advisory-waivers.ts && bun run check:security:rust",
     "check:security:rust": "bun scripts/ci/run-compact-command.ts --label security:rust -- cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195",
-    "check:actions": "bun scripts/ci/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml && bun tests/integration/checks/check-color-lab-workflows.ts && bun tests/integration/checks/check-workflow-concurrency-contract.ts",
+    "check:actions": "bun scripts/ci/run-compact-command.ts --label actionlint -- go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml && bun tests/integration/checks/check-color-lab-workflows.ts && bun tests/integration/checks/check-workflow-concurrency-contract.ts && bun tests/integration/checks/check-performance-workflow-routing.ts",
     "lint": "bun scripts/ci/run-compact-command.ts --label lint -- biome ci --formatter-enabled=false --assist-enabled=false .",
     "lint:fix": "bun scripts/ci/run-compact-command.ts --label lint:fix -- biome check --write .",
     "format": "bun scripts/ci/run-compact-command.ts --label format -- biome format --write .",
