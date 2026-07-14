@@ -388,6 +388,15 @@ try {
   if (previewEditDocument.nodes.scene_global_color_tone?.params.exposure !== 0.9) {
     throw new Error('Exposure UI edit did not reach the scene_global_color_tone render node.');
   }
+  if (
+    JSON.stringify(previewEditDocument.nodes.source_artifacts?.params) !==
+    JSON.stringify(previewEditDocument.sourceArtifacts)
+  ) {
+    throw new Error('Preview source-artifact node disagreed with its explicit render domain.');
+  }
+  if ('referenceMatchApplicationReceipt' in (previewEditDocument.nodes.source_artifacts?.params ?? {})) {
+    throw new Error('Preview source artifacts incorrectly carried reference-match provenance.');
+  }
   await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await verifyViewerPickerControllers(page);

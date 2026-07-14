@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 
@@ -107,8 +108,8 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: false, copy: false, paste: false, provenance: 'regenerate', reset: false },
-    defaultParams: {},
-    legacyFields: ['aiPatches', 'generatedProfile', 'referenceMatchApplicationReceipt'],
+    defaultParams: { aiPatches: [] },
+    legacyFields: ['aiPatches'],
     nodeType: 'source_artifacts',
     process: 'scene_referred_v2',
     renderStage: 'source_artifacts',
@@ -148,6 +149,107 @@ export const editDocumentNodeEnvelopeV2Schema = z
   })
   .strict();
 
+export type EditDocumentJsonValue =
+  | boolean
+  | null
+  | number
+  | string
+  | readonly EditDocumentJsonValue[]
+  | { readonly [key: string]: EditDocumentJsonValue };
+
+export const editDocumentJsonValueSchema: z.ZodType<EditDocumentJsonValue> = z.lazy(() =>
+  z.union([
+    z.boolean(),
+    z.null(),
+    z.number().finite(),
+    z.string(),
+    z.array(editDocumentJsonValueSchema),
+    z.record(z.string(), editDocumentJsonValueSchema),
+  ]),
+);
+
+const sourceArtifactMaskTypeV2Schema = z.enum([
+  'ai-depth',
+  'ai-foreground',
+  'ai-object',
+  'ai-person',
+  'ai-sky',
+  'ai-subject',
+  'all',
+  'brush',
+  'color',
+  'flow',
+  'linear',
+  'luminance',
+  'quick-eraser',
+  'radial',
+]);
+
+export const editDocumentSourceArtifactSubMaskV2Schema = z
+  .object({
+    id: z.string().trim().min(1),
+    invert: z.boolean(),
+    mode: z.enum(['additive', 'intersect', 'subtractive']),
+    name: z.string().optional(),
+    opacity: z.number().finite().min(0).max(100),
+    parameters: z.record(z.string(), editDocumentJsonValueSchema).optional(),
+    type: sourceArtifactMaskTypeV2Schema,
+    visible: z.boolean(),
+  })
+  .strict();
+
+export const editDocumentSourceArtifactAiPatchV2Schema = z
+  .object({
+    id: z.string().trim().min(1),
+    invert: z.boolean(),
+    isLoading: z.boolean(),
+    name: z.string(),
+    patchData: editDocumentJsonValueSchema.nullable(),
+    prompt: z.string(),
+    subMasks: z.array(editDocumentSourceArtifactSubMaskV2Schema),
+    visible: z.boolean(),
+  })
+  .strict()
+  .superRefine((patch, context) => {
+    const subMaskIds = patch.subMasks.map(({ id }) => id);
+    if (new Set(subMaskIds).size !== subMaskIds.length) {
+      context.addIssue({ code: 'custom', message: 'AI patch sub-mask IDs must be unique.', path: ['subMasks'] });
+    }
+  });
+
+export const editDocumentSourceArtifactsV2Schema = z
+  .object({ aiPatches: z.array(editDocumentSourceArtifactAiPatchV2Schema) })
+  .strict()
+  .superRefine((artifacts, context) => {
+    const patchIds = artifacts.aiPatches.map(({ id }) => id);
+    if (new Set(patchIds).size !== patchIds.length) {
+      context.addIssue({ code: 'custom', message: 'AI patch IDs must be unique.', path: ['aiPatches'] });
+    }
+  });
+
+export const editDocumentProvenanceV2Schema = z
+  .object({ referenceMatchApplicationReceipt: matchLookApplicationReceiptV1Schema.nullable().default(null) })
+  .strict();
+
+const sameJsonValue = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((v, i) => sameJsonValue(v, right[i]))
+    );
+  }
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftEntries = Object.entries(left);
+  const rightRecord = right as Record<string, unknown>;
+  return (
+    leftEntries.length === Object.keys(rightRecord).length &&
+    leftEntries.every(([key, value]) => Object.hasOwn(rightRecord, key) && sameJsonValue(value, rightRecord[key]))
+  );
+};
+
 const editDocumentNodesV2Schema = z
   .record(editDocumentNodeTypeV2Schema, editDocumentNodeEnvelopeV2Schema)
   .superRefine((nodes, context) => {
@@ -174,6 +276,12 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'source_artifacts') {
+        const sourceArtifacts = editDocumentSourceArtifactsV2Schema.safeParse(node.params);
+        if (!sourceArtifacts.success) {
+          context.addIssue({ code: 'custom', message: "Node 'source_artifacts' contains invalid artifacts." });
+        }
+      }
     }
   });
 
@@ -195,11 +303,18 @@ export const editDocumentV2Schema = z
     layers: z.record(z.string(), z.unknown()),
     migration: editDocumentMigrationReceiptV2Schema.optional(),
     nodes: editDocumentNodesV2Schema,
-    provenance: z.record(z.string(), z.unknown()),
+    provenance: editDocumentProvenanceV2Schema,
     schemaVersion: z.literal(EDIT_DOCUMENT_V2_SCHEMA_VERSION),
-    sourceArtifacts: z.record(z.string(), z.unknown()),
+    sourceArtifacts: editDocumentSourceArtifactsV2Schema,
   })
-  .strict();
+  .strict()
+  .superRefine((document, context) => {
+    // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
+    const sourceNode = document.nodes['source_artifacts'];
+    if (sourceNode !== undefined && !sameJsonValue(sourceNode.params, document.sourceArtifacts)) {
+      context.addIssue({ code: 'custom', message: 'Source-artifact domain disagrees with its node params.' });
+    }
+  });
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
@@ -226,6 +341,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
+  if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
   return {
     enabled: envelope.enabled,
     implementationVersion: envelope.implementationVersion,

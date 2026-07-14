@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { prepareAdjustmentPayloadForBackend } from '../../../src/schemas/adjustmentPayloadSchemas.ts';
 import { PatchResidencyTracker, publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { prepareEditDocumentV2ForRender } from '../../../src/utils/editDocumentV2.ts';
 import { PreparedAdjustmentPayloadCache } from '../../../src/utils/preparedAdjustmentPayloadCache.ts';
 
 const adjustments = () => structuredClone(INITIAL_ADJUSTMENTS);
@@ -32,13 +33,48 @@ test('queued scheduler values retain their exact snapshot reference after a late
 test('payload preparation accepts frozen input without mutation', () => {
   const value = adjustments();
   value.aiPatches = [
-    { id: 'patch-1', isLoading: false, patchData: { pixels: 'large' }, subMasks: [] },
-  ] as typeof value.aiPatches;
+    {
+      id: 'patch-1',
+      invert: false,
+      isLoading: false,
+      name: 'Repair',
+      patchData: { pixels: 'large' },
+      prompt: 'remove object',
+      subMasks: [],
+      visible: true,
+    },
+  ];
   const snapshot = publishAdjustmentSnapshot(null, value);
   const prepared = prepareAdjustmentPayloadForBackend(snapshot.value, new Set(['patch-1']));
 
   expect(prepared.payload.aiPatches?.[0]?.patchData).toBeNull();
   expect(snapshot.value.aiPatches[0]?.patchData).toEqual({ pixels: 'large' });
+});
+
+test('render document preserves source authority while honoring patch residency', () => {
+  const value = adjustments();
+  value.aiPatches = [
+    {
+      id: 'patch-1',
+      invert: false,
+      isLoading: false,
+      name: 'Repair',
+      patchData: { pixels: 'large' },
+      prompt: 'remove object',
+      subMasks: [],
+      visible: true,
+    },
+  ];
+  const snapshot = publishAdjustmentSnapshot(null, value);
+  const prepared = prepareAdjustmentPayloadForBackend(snapshot.value, new Set(['patch-1']));
+  const renderDocument = prepareEditDocumentV2ForRender(prepared.payload, snapshot.editDocumentV2, [
+    'scene_global_color_tone',
+  ]);
+
+  expect(snapshot.editDocumentV2.sourceArtifacts.aiPatches[0]?.patchData).toEqual({ pixels: 'large' });
+  expect(renderDocument.sourceArtifacts.aiPatches[0]?.patchData).toBeNull();
+  expect(renderDocument.nodes.source_artifacts?.params).toEqual(renderDocument.sourceArtifacts);
+  expect(renderDocument.nodes.source_artifacts?.params).not.toHaveProperty('referenceMatchApplicationReceipt');
 });
 
 test('prepared payload cache is revision-keyed, ROI-independent, bounded, and session-safe', () => {

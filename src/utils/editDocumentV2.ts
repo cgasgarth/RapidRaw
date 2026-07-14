@@ -4,12 +4,14 @@ import {
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   editDocumentNodeEnvelopeV2Schema,
+  editDocumentSourceArtifactsV2Schema,
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
+const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
 
 const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
   const descriptor = EDIT_DOCUMENT_NODE_DESCRIPTORS.find((candidate) =>
@@ -41,7 +43,11 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       ];
     }),
   );
-  const legacyAdjustments = Object.fromEntries(entries.filter(([key]) => nodeTypeForField(key) === null));
+  const legacyAdjustments = Object.fromEntries(
+    entries.filter(([key]) => nodeTypeForField(key) === null && !PROVENANCE_FIELDS.has(key)),
+  );
+  // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
+  const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
   return editDocumentV2Schema.parse({
     extensions: { legacyAdjustments },
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
@@ -52,12 +58,15 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     migration: {
       defaulted: [],
       disabled: [],
-      mapped: mapped.map(({ key, nodeType }) => `${nodeType}.${key}`).sort(),
+      mapped: [
+        ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
+        ...(entries.some(([key]) => PROVENANCE_FIELDS.has(key)) ? ['provenance.referenceMatchApplicationReceipt'] : []),
+      ].sort(),
       quarantined: Object.keys(legacyAdjustments).sort(),
       sourceSchemaVersion: 1,
     },
     nodes,
-    provenance: {},
+    provenance,
     schemaVersion: 2,
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     sourceArtifacts: nodes['source_artifacts']?.params ?? {},
@@ -72,6 +81,7 @@ export const editDocumentV2ToLegacyAdjustments = (document: EditDocumentV2): Adj
   return Object.fromEntries([
     ...Object.entries(legacy && typeof legacy === 'object' ? legacy : {}),
     ...nodeValues,
+    ['referenceMatchApplicationReceipt', parsed.provenance.referenceMatchApplicationReceipt],
   ]) as Adjustments;
 };
 
@@ -107,6 +117,25 @@ export const prepareEditDocumentV2ForRender = (
     if (authoritativeNode !== undefined) nodes[nodeType] = authoritativeNode;
   }
   const next = { ...prepared, nodes };
+  editDocumentV2Schema.parse(next);
+  return next;
+};
+
+/** Publish source-owned AI artifacts atomically in the node and explicit domain. */
+export const replaceEditDocumentV2SourceArtifacts = (
+  document: EditDocumentV2,
+  sourceArtifacts: unknown,
+): EditDocumentV2 => {
+  const artifacts = editDocumentSourceArtifactsV2Schema.parse(sourceArtifacts);
+  // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
+  const node = document.nodes['source_artifacts'];
+  if (node === undefined) throw new Error('Missing source_artifacts edit node.');
+  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: artifacts });
+  const next: EditDocumentV2 = {
+    ...document,
+    nodes: { ...document.nodes, source_artifacts: nextNode },
+    sourceArtifacts: artifacts,
+  };
   editDocumentV2Schema.parse(next);
   return next;
 };

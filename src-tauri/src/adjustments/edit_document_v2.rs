@@ -96,6 +96,73 @@ struct EditDocumentMigrationReceiptV2 {
     source_schema_version: u8,
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum SourceArtifactMaskTypeV2 {
+    AiDepth,
+    AiForeground,
+    AiObject,
+    AiPerson,
+    AiSky,
+    AiSubject,
+    All,
+    Brush,
+    Color,
+    Flow,
+    Linear,
+    Luminance,
+    QuickEraser,
+    Radial,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum SourceArtifactSubMaskModeV2 {
+    Additive,
+    Intersect,
+    Subtractive,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceArtifactSubMaskV2 {
+    id: String,
+    invert: bool,
+    mode: SourceArtifactSubMaskModeV2,
+    name: Option<String>,
+    opacity: f64,
+    parameters: Option<BTreeMap<String, Value>>,
+    #[serde(rename = "type")]
+    mask_type: SourceArtifactMaskTypeV2,
+    visible: bool,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceArtifactAiPatchV2 {
+    id: String,
+    invert: bool,
+    is_loading: bool,
+    name: String,
+    patch_data: Value,
+    prompt: String,
+    sub_masks: Vec<SourceArtifactSubMaskV2>,
+    visible: bool,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceArtifactsV2 {
+    ai_patches: Vec<SourceArtifactAiPatchV2>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EditDocumentProvenanceV2 {
+    #[serde(default)]
+    reference_match_application_receipt: Option<Map<String, Value>>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct EditDocumentV2 {
@@ -105,9 +172,9 @@ pub(crate) struct EditDocumentV2 {
     layers: Map<String, Value>,
     migration: Option<EditDocumentMigrationReceiptV2>,
     nodes: BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    provenance: Map<String, Value>,
+    provenance: EditDocumentProvenanceV2,
     schema_version: u8,
-    source_artifacts: Map<String, Value>,
+    source_artifacts: SourceArtifactsV2,
 }
 
 impl EditDocumentV2 {
@@ -122,6 +189,13 @@ impl EditDocumentV2 {
             }
             None => Map::new(),
         };
+        if adjustments.contains_key("referenceMatchApplicationReceipt") {
+            return Err(
+                "EditDocumentV2 referenceMatchApplicationReceipt must be owned by provenance"
+                    .to_string(),
+            );
+        }
+        adjustments.remove("generatedProfile");
 
         for (node_key, node) in &self.nodes {
             if let Some(conflicting_key) = node
@@ -175,12 +249,17 @@ impl EditDocumentV2 {
         }
         validate_explicit_domain(&self.nodes, EditNodeTypeV2::Geometry, &self.geometry)?;
         validate_explicit_domain(&self.nodes, EditNodeTypeV2::Layers, &self.layers)?;
-        validate_explicit_domain(
-            &self.nodes,
-            EditNodeTypeV2::SourceArtifacts,
-            &self.source_artifacts,
-        )?;
-        let _ = &self.provenance;
+        validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
+        if self
+            .provenance
+            .reference_match_application_receipt
+            .as_ref()
+            .is_some_and(|receipt| receipt.get("schemaVersion") != Some(&Value::from(1)))
+        {
+            return Err(
+                "EditDocumentV2 reference-match provenance requires schemaVersion 1".to_string(),
+            );
+        }
         Ok(())
     }
 }
@@ -198,6 +277,10 @@ fn compile_node_params(
                 format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
             })?;
             params.compile()?;
+            Ok(node.params.clone())
+        }
+        EditNodeTypeV2::SourceArtifacts => {
+            parse_source_artifacts(&node.params)?;
             Ok(node.params.clone())
         }
         _ => Ok(node.params.clone()),
@@ -227,6 +310,44 @@ fn validate_node_contract(
         ));
     }
     Ok(())
+}
+
+fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifactsV2, String> {
+    let artifacts: SourceArtifactsV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 source artifacts are invalid: {error}"))?;
+    let mut patch_ids = std::collections::BTreeSet::new();
+    for patch in &artifacts.ai_patches {
+        if patch.id.trim().is_empty() || !patch_ids.insert(&patch.id) {
+            return Err("EditDocumentV2 AI patch IDs must be non-empty and unique".to_string());
+        }
+        let mut sub_mask_ids = std::collections::BTreeSet::new();
+        for sub_mask in &patch.sub_masks {
+            if sub_mask.id.trim().is_empty() || !sub_mask_ids.insert(&sub_mask.id) {
+                return Err(
+                    "EditDocumentV2 AI patch sub-mask IDs must be non-empty and unique".to_string(),
+                );
+            }
+            if !(0.0..=100.0).contains(&sub_mask.opacity) {
+                return Err(
+                    "EditDocumentV2 AI patch sub-mask opacity must be within 0..=100".to_string(),
+                );
+            }
+        }
+    }
+    Ok(artifacts)
+}
+
+fn validate_source_artifact_domain(
+    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    domain: &SourceArtifactsV2,
+) -> Result<(), String> {
+    let Some(node) = nodes.get(&EditNodeTypeV2::SourceArtifacts) else {
+        return Ok(());
+    };
+    if &parse_source_artifacts(&node.params)? == domain {
+        return Ok(());
+    }
+    Err("EditDocumentV2 source_artifacts domain disagrees with its node params".to_string())
 }
 
 fn validate_explicit_domain(
@@ -350,6 +471,27 @@ mod tests {
             "provenance": {},
             "schemaVersion": 2,
             "sourceArtifacts": { "aiPatches": [] }
+        })
+    }
+
+    fn source_patch() -> Value {
+        json!({
+            "id": "patch-1",
+            "invert": false,
+            "isLoading": false,
+            "name": "Repair",
+            "patchData": { "pixels": "resident-payload" },
+            "prompt": "remove distraction",
+            "subMasks": [{
+                "id": "mask-1",
+                "invert": false,
+                "mode": "additive",
+                "opacity": 80,
+                "parameters": { "mask_data_base64": "encoded-mask" },
+                "type": "brush",
+                "visible": true
+            }],
+            "visible": true
         })
     }
 
@@ -519,5 +661,64 @@ mod tests {
             .expect_err("out-of-range exposure must fail");
         assert!(error.contains("field 'exposure'"));
         assert!(error.contains("[-5, 5]"));
+    }
+
+    #[test]
+    fn compiles_strict_source_artifacts_and_excludes_quarantined_profile_state() {
+        let patch = source_patch();
+        let mut value = document_with_legacy(json!({
+            "generatedProfile": { "obsolete": true },
+            "vibrance": 12
+        }));
+        value["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch] });
+        value["sourceArtifacts"] = json!({ "aiPatches": [patch] });
+        let compiled = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("valid source document")
+            .into_render_adjustments()
+            .expect("compiled source document");
+
+        assert_eq!(compiled["aiPatches"][0]["id"], json!("patch-1"));
+        assert_eq!(compiled["vibrance"], json!(12));
+        assert!(compiled.get("generatedProfile").is_none());
+        assert!(compiled.get("referenceMatchApplicationReceipt").is_none());
+    }
+
+    #[test]
+    fn rejects_malformed_duplicate_ambiguous_and_legacy_owned_source_state() {
+        let patch = source_patch();
+        let mut malformed = document_with_legacy(json!({}));
+        malformed["nodes"]["source_artifacts"]["params"] =
+            json!({ "aiPatches": [{ "id": "patch-1", "unsupported": true }] });
+        let error = serde_json::from_value::<EditDocumentV2>(malformed)
+            .expect("top-level source domain remains valid")
+            .into_render_adjustments()
+            .expect_err("malformed source node must fail");
+        assert!(error.contains("source artifacts are invalid"));
+
+        let mut duplicate = document_with_legacy(json!({}));
+        duplicate["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch, patch] });
+        duplicate["sourceArtifacts"] = json!({ "aiPatches": [patch, patch] });
+        let error = serde_json::from_value::<EditDocumentV2>(duplicate)
+            .expect("duplicate IDs deserialize before semantic validation")
+            .into_render_adjustments()
+            .expect_err("duplicate source IDs must fail");
+        assert!(error.contains("non-empty and unique"));
+
+        let mut ambiguous = document_with_legacy(json!({}));
+        ambiguous["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch] });
+        let error = serde_json::from_value::<EditDocumentV2>(ambiguous)
+            .expect("mismatched domains deserialize before semantic validation")
+            .into_render_adjustments()
+            .expect_err("ambiguous source domains must fail");
+        assert!(error.contains("domain disagrees"));
+
+        let legacy_owned = document_with_legacy(json!({
+            "referenceMatchApplicationReceipt": { "schemaVersion": 1 }
+        }));
+        let error = serde_json::from_value::<EditDocumentV2>(legacy_owned)
+            .expect("legacy-owned provenance deserializes before semantic validation")
+            .into_render_adjustments()
+            .expect_err("legacy-owned provenance must fail");
+        assert!(error.contains("must be owned by provenance"));
     }
 }

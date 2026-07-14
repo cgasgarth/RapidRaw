@@ -147,7 +147,7 @@ function harness<T>({
 }
 
 describe('edited preview effect runner', () => {
-  test('rejects source, graph, geometry, and target mismatches before native execution', () => {
+  test('rejects source, graph, geometry, patch-residency, and target mismatches before native execution', () => {
     let executions = 0;
     const { runner } = harness<number>({
       execute: async () => {
@@ -166,6 +166,9 @@ describe('edited preview effect runner', () => {
       runner.request({ ...base, viewerScope: { ...base.viewerScope, graphIdentity: 'stale-graph' } }),
     ).toThrow('typed session identity');
     expect(() => runner.request({ ...base, viewerScope: { ...base.viewerScope, geometryIdentity: 99 } })).toThrow(
+      'typed session identity',
+    );
+    expect(() => runner.request({ ...base, viewerScope: { ...base.viewerScope, patchRevision: 99 } })).toThrow(
       'typed session identity',
     );
     expect(executions).toBe(0);
