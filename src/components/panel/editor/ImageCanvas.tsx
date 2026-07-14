@@ -102,6 +102,7 @@ import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { createViewerInputRouter, normalizeViewerPointerType } from './viewerInputRouter';
+import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
 declare global {
   interface Window {
@@ -398,19 +399,22 @@ const ImageCanvas = memo(
     const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
     const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
     const viewerInputRouter = useMemo(() => createViewerInputRouter(), []);
+    const viewerToolSessions = useMemo(() => createViewerToolSessionRegistry(), []);
     const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
       null,
     );
     useEffect(
       () => () => {
         viewerInputRouter.dispatch({ type: 'session-invalidated' });
+        viewerToolSessions.invalidate();
       },
-      [viewerInputRouter],
+      [viewerInputRouter, viewerToolSessions],
     );
     useEffect(() => {
       const transition = viewerInputRouter.dispatch({ type: 'session-invalidated' });
+      viewerToolSessions.invalidate();
       setViewerInputOwnerState(transition.state.owner);
-    }, [adjustmentGeometryRevision, selectedImage.path, viewerInputRouter]);
+    }, [adjustmentGeometryRevision, selectedImage.path, viewerInputRouter, viewerToolSessions]);
 
     const [cursorPreview, setCursorPreview] = useState<CursorPreview>({ x: 0, y: 0, visible: false });
     const [liveBrushLine, setLiveBrushLine] = useState<DrawnLine | null>(null);
@@ -2581,6 +2585,19 @@ const ImageCanvas = memo(
             },
           });
           setViewerInputOwnerState(transition.state.owner);
+          if (transition.resolution && transition.state.owner !== null && transition.state.owner !== 'blocked') {
+            viewerToolSessions.begin(
+              {
+                geometryEpoch: overlayGeometry.geometryEpoch,
+                imageSessionId: selectedImage.path,
+                operationGeneration: viewerInputRouter.getState().sessionGeneration,
+                sourceRevision: presentationDescriptor.graphRevision,
+                toolId: resolveViewerToolId(activeCanvasOverlayTool),
+              },
+              event.pointerId,
+              transition.state.owner,
+            );
+          }
           if (transition.resolution?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
           if (pointColorPickerActive) {
             event.preventDefault();
@@ -2600,6 +2617,7 @@ const ImageCanvas = memo(
         }}
         onPointerMove={(event) => {
           viewerInputRouter.dispatch({ type: 'pointermove', pointerId: event.pointerId });
+          viewerToolSessions.reduce({ kind: 'update', pointerId: event.pointerId });
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
             tonePickerDrag.currentClientY = event.clientY;
@@ -2611,6 +2629,7 @@ const ImageCanvas = memo(
         }}
         onPointerUp={(event) => {
           const transition = viewerInputRouter.dispatch({ type: 'pointerup', pointerId: event.pointerId });
+          viewerToolSessions.reduce({ kind: 'end', pointerId: event.pointerId });
           setViewerInputOwnerState(transition.state.owner);
           const tonePickerDrag = tonePickerDragRef.current;
           if (tonePickerDrag?.pointerId === event.pointerId) {
@@ -2628,6 +2647,7 @@ const ImageCanvas = memo(
         }}
         onPointerCancel={(event) => {
           const transition = viewerInputRouter.dispatch({ type: 'pointercancel', pointerId: event.pointerId });
+          viewerToolSessions.reduce({ kind: 'cancel', pointerId: event.pointerId });
           setViewerInputOwnerState(transition.state.owner);
           if (tonePickerDragRef.current?.pointerId === event.pointerId) tonePickerDragRef.current = null;
         }}

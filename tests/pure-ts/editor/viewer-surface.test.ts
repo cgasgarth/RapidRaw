@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { viewerSurfaceDataAttributes } from '../../../src/components/panel/editor/ViewerSurface';
+import {
+  viewerSurfaceA11yAttributes,
+  viewerSurfaceDataAttributes,
+} from '../../../src/components/panel/editor/ViewerSurface';
 import { createEditorOverlayGeometry } from '../../../src/utils/editorOverlayGeometry';
 import { createEditorPresentationDescriptor } from '../../../src/utils/editorPresentationDescriptor';
 
@@ -60,5 +63,13 @@ describe('ViewerSurface presentation boundary', () => {
       viewportSizeCssPixels: geometry.viewportSizeCssPixels,
     });
     expect(viewerSurfaceDataAttributes(presentation, successor)['data-geometry-epoch']).toBe('20');
+  });
+
+  test('is keyboard reachable with an explicit image-viewer role by default', () => {
+    expect(viewerSurfaceA11yAttributes({})).toEqual({
+      'aria-roledescription': 'image viewer',
+      role: 'application',
+      tabIndex: 0,
+    });
   });
 });
