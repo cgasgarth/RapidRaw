@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  compileEditDocumentNodeV2,
+  compileEditDocumentV2,
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
   parseEditDocumentV2WithQuarantine,
@@ -195,5 +197,32 @@ describe('EditDocumentV2 legacy adapter', () => {
       }),
     ).toEqual(document);
     expect(pasteEditDocumentV2Node(document, 'scene_global_color_tone', { invalid: true })).toEqual(document);
+  });
+
+  test('compiles graph nodes in descriptor order with render-stage authority', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const compiled = compileEditDocumentV2(document);
+    expect(compiled.map(({ nodeType }) => nodeType)).toEqual(editDocumentV2NodeInventory(document));
+    expect(compiled.find(({ nodeType }) => nodeType === 'geometry')).toMatchObject({
+      nodeType: 'geometry',
+      process: 'legacy_pipeline_v1',
+      renderStage: 'geometry',
+    });
+  });
+
+  test('rejects unsupported node process/version before render compilation', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    expect(() =>
+      compileEditDocumentNodeV2({
+        ...document.nodes.geometry,
+        process: 'scene_referred_v2',
+      }),
+    ).toThrow('incompatible process');
+    expect(() =>
+      compileEditDocumentNodeV2({
+        ...document.nodes.geometry,
+        implementationVersion: 2,
+      }),
+    ).toThrow('unsupported version');
   });
 });
