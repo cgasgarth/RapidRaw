@@ -10,9 +10,49 @@ use std::sync::Arc;
 use crate::edit_graph::{CompiledEditGraph, EditNodeKind, SpatialSupport, runtime_descriptor};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WgpuShaderSource {
+    SceneCurve,
+    OutputCurve,
+    FusedProduction,
+    External,
+}
+
+impl WgpuShaderSource {
+    #[cfg(feature = "tauri-test")]
+    #[allow(dead_code)]
+    fn wgsl(self) -> Option<String> {
+        match self {
+            Self::SceneCurve => Some(crate::tone::curves::SCENE_CURVE_WGSL.to_owned()),
+            Self::OutputCurve => Some(crate::tone::output_curves::OUTPUT_CURVE_WGSL.to_owned()),
+            Self::FusedProduction => Some(format!(
+                "{}\n{}",
+                include_str!("../shaders/generated_bindings.wgsl"),
+                include_str!("../shaders/shader.wgsl"),
+            )),
+            Self::External => None,
+        }
+    }
+}
+
+fn shader_source_for(implementation: &'static str) -> Result<WgpuShaderSource, &'static str> {
+    match implementation {
+        "scene_curve_wgsl_v1" => Ok(WgpuShaderSource::SceneCurve),
+        "output_curve_wgsl_v1" => Ok(WgpuShaderSource::OutputCurve),
+        "shader_wgsl_scene_phase_v2"
+        | "shader_wgsl_view_display_phase_v2"
+        | "shader_wgsl_legacy_scene_view_v1" => Ok(WgpuShaderSource::FusedProduction),
+        "film_emulation_wgsl_v1" | "clipping_overlay_wgsl_v1" | "shader_transport_dither_v1" => {
+            Ok(WgpuShaderSource::External)
+        }
+        _ => Err("edit_graph.wgpu_shader_source_unknown"),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct WgpuNodeModule {
     pub(crate) kind: EditNodeKind,
     pub(crate) implementation: &'static str,
+    pub(crate) shader_source: WgpuShaderSource,
     pub(crate) entry_point: &'static str,
     pub(crate) fused_phase: &'static str,
     pub(crate) resource_requirements: &'static [&'static str],
@@ -42,6 +82,7 @@ impl WgpuNodeRuntime {
             if descriptor.wgpu_implementation != Some(implementation) {
                 return Err("edit_graph.wgpu_runtime_ownership_mismatch");
             }
+            let shader_source = shader_source_for(implementation)?;
             let halo_pixels = descriptor.wgpu_halo_pixels();
             let declared_halo = match node.spatial_support {
                 SpatialSupport::Pointwise => 0,
@@ -50,9 +91,13 @@ impl WgpuNodeRuntime {
             if declared_halo != halo_pixels {
                 return Err("edit_graph.wgpu_halo_ownership_mismatch");
             }
+            if declared_halo != halo_pixels {
+                return Err("edit_graph.wgpu_halo_ownership_mismatch");
+            }
             let module = WgpuNodeModule {
                 kind: node.kind,
                 implementation,
+                shader_source,
                 entry_point: descriptor
                     .wgpu_entry_point()
                     .ok_or("edit_graph.wgpu_missing_entry_point")?,
@@ -130,6 +175,7 @@ impl WgpuNodeRuntime {
             "modules": self.modules.iter().map(|module| serde_json::json!({
                 "id": module.kind.stable_id(),
                 "implementation": module.implementation,
+                "shaderSource": format!("{:?}", module.shader_source),
                 "entryPoint": module.entry_point,
                 "fusedPhase": module.fused_phase,
                 "resourceRequirements": module.resource_requirements,
@@ -209,6 +255,26 @@ mod tests {
             has_lut: false,
             show_clipping: false,
         })
+    }
+
+    #[test]
+    fn shader_source_registry_fails_closed_for_unknown_implementation() {
+        assert_eq!(
+            shader_source_for("film_emulation_wgsl_v1"),
+            Ok(WgpuShaderSource::External)
+        );
+        assert_eq!(
+            shader_source_for("shader_wgsl_scene_phase_v2"),
+            Ok(WgpuShaderSource::FusedProduction)
+        );
+        assert_eq!(
+            shader_source_for("shader_wgsl_unregistered_v9"),
+            Err("edit_graph.wgpu_shader_source_unknown")
+        );
+        assert_eq!(
+            shader_source_for("unregistered_wgpu_implementation_v9"),
+            Err("edit_graph.wgpu_shader_source_unknown")
+        );
     }
 
     #[test]
@@ -292,6 +358,14 @@ mod tests {
             ) {
                 assert_eq!(module.entry_point, "main");
                 assert!(module.implementation.ends_with("_wgsl_v1"));
+                assert_eq!(
+                    module.shader_source,
+                    if module.kind == EditNodeKind::SceneCurve {
+                        WgpuShaderSource::SceneCurve
+                    } else {
+                        WgpuShaderSource::OutputCurve
+                    }
+                );
             }
         }
         assert!(crate::tone::curves::SCENE_CURVE_WGSL.contains("fn main"));
@@ -324,15 +398,8 @@ mod tests {
 
         let mut validated = 0;
         for module in runtime.modules() {
-            let source = match module.implementation {
-                "scene_curve_wgsl_v1" => crate::tone::curves::SCENE_CURVE_WGSL.to_string(),
-                "output_curve_wgsl_v1" => crate::tone::output_curves::OUTPUT_CURVE_WGSL.to_string(),
-                implementation if implementation.starts_with("shader_wgsl_") => format!(
-                    "{}\n{}",
-                    include_str!("../shaders/generated_bindings.wgsl"),
-                    include_str!("../shaders/shader.wgsl"),
-                ),
-                _ => continue,
+            let Some(source) = module.shader_source.wgsl() else {
+                continue;
             };
             let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some(module.implementation),
