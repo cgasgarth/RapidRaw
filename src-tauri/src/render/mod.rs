@@ -20,6 +20,7 @@ pub(crate) mod film_resource_cache;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;
 pub(crate) mod mask_generation;
+pub(crate) mod measured_color_negative;
 pub(crate) mod native_cache;
 pub(crate) mod preview_scheduler;
 pub(crate) mod preview_worker;
