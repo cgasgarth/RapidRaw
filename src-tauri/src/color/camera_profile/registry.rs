@@ -1,4 +1,5 @@
 use super::{CameraProfileSource, DcpParseLimits, DcpProfileV1, parse_dcp};
+use crate::color::calibration::{generated_profile_path, load_generated_profile};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -61,18 +62,60 @@ impl CameraProfileRegistry {
                 .max_depth(8)
                 .into_iter()
                 .filter_map(Result::ok)
-                .filter(|entry| {
-                    entry.file_type().is_file()
-                        && entry
-                            .path()
-                            .extension()
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("dcp"))
-                })
+                .filter(|entry| entry.file_type().is_file())
             {
-                self.ingest_path(entry.path(), *source, camera_model, limits);
+                let path = entry.path();
+                if path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("dcp"))
+                {
+                    self.ingest_path(path, *source, camera_model, limits);
+                } else if *source == CameraProfileSource::Generated
+                    && path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.ends_with(".rapidraw-profile.json"))
+                {
+                    self.ingest_generated_path(path, camera_model);
+                }
             }
         }
         Ok(())
+    }
+    fn ingest_generated_path(&mut self, path: &Path, camera_model: Option<&str>) {
+        match load_generated_profile(path) {
+            Ok(artifact) => {
+                let profile = artifact.profile;
+                let id = format!(
+                    "dcp:{}",
+                    profile.content_sha256.trim_start_matches("sha256:")
+                );
+                let compatible = match (&profile.camera_model, camera_model) {
+                    (Some(a), Some(b)) => normalize(a) == normalize(b),
+                    (Some(_), None) => false,
+                    (None, _) => true,
+                };
+                let entry = ProfileRegistryEntry {
+                    id: id.clone(),
+                    display_name: profile.name.clone(),
+                    camera_model: profile.camera_model.clone(),
+                    source: CameraProfileSource::Generated,
+                    content_sha256: profile.content_sha256.clone(),
+                    compatible,
+                    creative_amount_supported: profile.look_table.is_some(),
+                    favorite: false,
+                    last_used_epoch_ms: None,
+                };
+                self.profiles.entry(id).or_insert((profile, entry));
+            }
+            Err(error) => self.quarantine.push(QuarantinedProfile {
+                private_path_token: path.file_name().and_then(|name| name.to_str()).map_or_else(
+                    || "invalid-generated-profile".into(),
+                    |name| format!("name-hash:{}", blake3::hash(name.as_bytes()).to_hex()),
+                ),
+                reason_code: error.root_cause().to_string(),
+            }),
+        }
     }
     fn ingest_path(
         &mut self,
@@ -224,6 +267,14 @@ pub(crate) fn resolve_managed_profile(
             && profile.content_sha256 == expected_hash
         {
             return Some((profile, source));
+        }
+        if source == CameraProfileSource::Generated {
+            let path = generated_profile_path(&root.join(directory), digest);
+            if let Ok(artifact) = load_generated_profile(&path)
+                && artifact.profile.content_sha256 == expected_hash
+            {
+                return Some((artifact.profile, source));
+            }
         }
     }
     None
