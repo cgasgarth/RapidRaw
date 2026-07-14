@@ -583,8 +583,8 @@ function App() {
       <AppServices
         imageProcessing={{
           transformWrapperRef,
-          prevAdjustmentsRef,
         }}
+        persistence={{ prevAdjustmentsRef }}
       />
       <div
         className={cx(

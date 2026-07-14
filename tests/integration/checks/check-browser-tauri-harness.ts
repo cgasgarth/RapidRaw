@@ -302,6 +302,78 @@ try {
     },
     { timeout: 10_000 },
   );
+  const persistenceBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.metadataSaveResponses.push(
+      { delayMs: 700, sidecarRevision: `sha256:${'b'.repeat(64)}` },
+      { delayMs: 30, sidecarRevision: `sha256:${'c'.repeat(64)}` },
+    );
+  });
+  for (const [index, exposure] of ['0.80', '0.90'].entries()) {
+    await exposureValue.click();
+    const exposureInput = page.getByTestId('basic-control-exposure-input');
+    await exposureInput.fill(exposure);
+    await exposureInput.press('Enter');
+    await page.waitForFunction(
+      ({ expected, persistenceCommand }) =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === persistenceCommand)
+          .length ?? 0) >= expected,
+      {
+        expected: persistenceBaseline + index + 1,
+        persistenceCommand: 'save_metadata_and_update_thumbnail',
+      },
+      { timeout: 10_000 },
+    );
+  }
+  await page.waitForFunction(
+    ({ firstIndex, persistenceCommand, secondIndex }) => {
+      const saves =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === persistenceCommand) ?? [];
+      return saves[firstIndex]?.endedAtMs !== null && saves[secondIndex]?.endedAtMs !== null;
+    },
+    {
+      firstIndex: persistenceBaseline,
+      persistenceCommand: 'save_metadata_and_update_thumbnail',
+      secondIndex: persistenceBaseline + 1,
+    },
+    { timeout: 10_000 },
+  );
+  const reorderedPersistenceProof = await page.evaluate(
+    ({ firstIndex, persistenceCommand, secondIndex }) => {
+      const saves =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === persistenceCommand) ?? [];
+      return {
+        firstEndedAtMs: saves[firstIndex]?.endedAtMs ?? null,
+        secondEndedAtMs: saves[secondIndex]?.endedAtMs ?? null,
+        secondTransaction: saves[secondIndex]?.args?.['transaction'] ?? null,
+      };
+    },
+    {
+      firstIndex: persistenceBaseline,
+      persistenceCommand: 'save_metadata_and_update_thumbnail',
+      secondIndex: persistenceBaseline + 1,
+    },
+  );
+  if (
+    reorderedPersistenceProof.firstEndedAtMs === null ||
+    reorderedPersistenceProof.secondEndedAtMs === null ||
+    reorderedPersistenceProof.secondEndedAtMs >= reorderedPersistenceProof.firstEndedAtMs
+  ) {
+    throw new Error(
+      `Persistence completions did not reverse as injected: ${JSON.stringify(reorderedPersistenceProof)}`,
+    );
+  }
+  if (reorderedPersistenceProof.secondTransaction === null) {
+    throw new Error('Current persistence request did not carry committed edit transaction authority.');
+  }
+  if ((await exposureValue.textContent())?.trim() !== '0.90') {
+    throw new Error('A stale persistence completion displaced the current editor adjustment.');
+  }
   const editDocumentPreviewProof = await page.evaluate(() => {
     const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
       .filter((candidate) => candidate.command === 'apply_adjustments')
@@ -313,7 +385,7 @@ try {
     throw new Error('Editor preview did not retire the flat adjustments render payload.');
   }
   const previewEditDocument = editDocumentV2Schema.parse(editDocumentPreviewProof['editDocumentV2']);
-  if (previewEditDocument.nodes.scene_global_color_tone?.params.exposure !== 0.75) {
+  if (previewEditDocument.nodes.scene_global_color_tone?.params.exposure !== 0.9) {
     throw new Error('Exposure UI edit did not reach the scene_global_color_tone render node.');
   }
   await page.getByTestId('right-panel-switcher-button-color').click();

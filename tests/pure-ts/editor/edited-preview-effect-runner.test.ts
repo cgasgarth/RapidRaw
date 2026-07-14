@@ -8,6 +8,7 @@ import {
   type EditedPreviewRequest,
   type ExecutedEditedPreview,
 } from '../../../src/utils/editedPreviewEffectRunner';
+import { EditorPersistenceEffectRunner } from '../../../src/utils/editorPersistenceEffectRunner';
 import type { InteractivePreviewScope } from '../../../src/utils/interactivePreviewPatch';
 import { fingerprintPreviewGraphRevision, PreviewCoordinator } from '../../../src/utils/previewCoordinator';
 
@@ -346,5 +347,40 @@ describe('edited preview effect runner', () => {
 
     expect(calls).toEqual([1, 3]);
     expect(presented).toEqual([3]);
+  });
+
+  test('preview presentation remains independent from a concurrent persistence failure', async () => {
+    const persistenceFailures: string[] = [];
+    const persistence = new EditorPersistenceEffectRunner({
+      execute: async () => {
+        throw new Error('sidecar unavailable');
+      },
+      onAccepted: () => {},
+      onCurrentFailure: (error) => persistenceFailures.push(String(error)),
+      onSnapshot: () => {},
+      setTimer: (callback) => setTimeout(callback, 0),
+    });
+    const presented: number[] = [];
+    const preview = harness<number>({
+      execute: async () => execution(7),
+      onPresented: (value) => presented.push(value),
+    });
+
+    persistence.submit({
+      adjustmentRevision: 2,
+      adjustments: { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 },
+      baselineHint: { adjustments: structuredClone(INITIAL_ADJUSTMENTS), path: '/fixtures/a.raw' },
+      imageSessionId: 'session-a',
+      interactionActive: false,
+      multiSelection: null,
+      path: '/fixtures/a.raw',
+      receipt: null,
+      sessionGeneration: 1,
+    });
+    preview.runner.request(buildRequest());
+    await tick();
+
+    expect(persistenceFailures).toEqual(['Error: sidecar unavailable']);
+    expect(presented).toEqual([7]);
   });
 });

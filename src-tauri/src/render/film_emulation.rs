@@ -148,6 +148,9 @@ pub fn parse_node(value: &serde_json::Value) -> Result<Option<FilmEmulationParam
     let Some(node) = value.get("filmEmulation") else {
         return Ok(None);
     };
+    if node.is_null() {
+        return Ok(None);
+    }
     let parsed = serde_json::from_value::<FilmEmulationNodeV1>(node.clone())
         .map_err(|_| "film_emulation_invalid_node")?;
     Ok(Some(parsed.validate()?))
@@ -761,6 +764,7 @@ mod tests {
                 .is_some()
         );
         assert!(parse_node(&json!({"filmEmulation": {"mix": 1}})).is_err());
+        assert_eq!(parse_node(&json!({"filmEmulation": null})).unwrap(), None);
         assert_eq!(
             runtime_receipt(params(1.0), "sha256:post").input_domain,
             "acescg_linear_v1"
