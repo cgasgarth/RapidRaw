@@ -44,6 +44,8 @@ use negative_lab_hd_paper_curve::{
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NegativeConversionParams {
+    #[serde(default = "default_process_family")]
+    pub process_family: NegativeLabProcessFamily,
     pub red_weight: f32,
     pub green_weight: f32,
     pub blue_weight: f32,
@@ -151,6 +153,18 @@ pub enum NegativeConversionModel {
     /// must not enter the negative-density/base-fog inversion path.
     #[serde(rename = "e6_positive")]
     E6PositiveV1,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NegativeLabProcessFamily {
+    #[default]
+    C41ColorNegative,
+    BlackAndWhiteSilverNegative,
+}
+
+fn default_process_family() -> NegativeLabProcessFamily {
+    NegativeLabProcessFamily::C41ColorNegative
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1093,6 +1107,7 @@ impl NegativeConversionSaveOptions {
 impl Default for NegativeConversionParams {
     fn default() -> Self {
         Self {
+            process_family: NegativeLabProcessFamily::C41ColorNegative,
             red_weight: 1.0,
             green_weight: 1.0,
             blue_weight: 1.0,
@@ -2363,6 +2378,7 @@ impl NegativeConversionParams {
         let base_fog_sample = self.base_fog_sample.and_then(sanitize_sample_rect);
 
         Self {
+            process_family: self.process_family,
             red_weight: finite_or_default(self.red_weight, defaults.red_weight)
                 .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
             green_weight: finite_or_default(self.green_weight, defaults.green_weight)
@@ -3325,6 +3341,46 @@ fn run_e6_positive_pipeline(
     }
 }
 
+fn run_bw_silver_pipeline(
+    input: &DynamicImage,
+    params: &NegativeConversionParams,
+) -> NegativeLabPipelineRender {
+    let rgb = input.to_rgb32f();
+    let weights = [params.red_weight, params.green_weight, params.blue_weight];
+    let weight_sum = weights.iter().copied().sum::<f32>().max(1.0e-6);
+    let monochrome = Rgb32FImage::from_fn(rgb.width(), rgb.height(), |x, y| {
+        let pixel = rgb.get_pixel(x, y).0;
+        let density_signal = (pixel[0].max(0.0) * weights[0]
+            + pixel[1].max(0.0) * weights[1]
+            + pixel[2].max(0.0) * weights[2])
+            / weight_sum;
+        image::Rgb([density_signal; 3])
+    });
+    let mut bw_params = params.clone();
+    bw_params.process_family = NegativeLabProcessFamily::C41ColorNegative;
+    bw_params.red_weight = 1.0;
+    bw_params.green_weight = 1.0;
+    bw_params.blue_weight = 1.0;
+    bw_params.color_finish = NegativeLabScannerColorFinishParams::default();
+    let mut render = run_pipeline_with_metrics(
+        &DynamicImage::ImageRgb32F(monochrome),
+        &bw_params,
+        None,
+        None,
+    );
+    render
+        .density_normalization_metrics
+        .bounds_receipt
+        .warning_codes
+        .extend([
+            "bw_silver_monochrome_luminance_policy_v1".to_string(),
+            "bw_silver_disables_dye_unmix_crosstalk".to_string(),
+            "bw_silver_disables_color_timing".to_string(),
+            "bw_silver_disables_scanner_finish".to_string(),
+        ]);
+    render
+}
+
 fn run_pipeline_with_metrics(
     input: &DynamicImage,
     params: &NegativeConversionParams,
@@ -3334,6 +3390,9 @@ fn run_pipeline_with_metrics(
     let params = params.clone().sanitized();
     if params.conversion_model == NegativeConversionModel::E6PositiveV1 {
         return run_e6_positive_pipeline(input, &params);
+    }
+    if params.process_family == NegativeLabProcessFamily::BlackAndWhiteSilverNegative {
+        return run_bw_silver_pipeline(input, &params);
     }
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
@@ -8480,6 +8539,56 @@ mod tests {
                 NegativeConversionOutputFormat::JpegProof,
             )
             .is_ok()
+        );
+    }
+
+    #[test]
+    fn negative_lab_bw_process_constructs_one_neutral_density_signal() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                3,
+                1,
+                vec![0.04, 0.12, 0.3, 0.2, 0.45, 0.08, 0.72, 0.18, 0.36],
+            )
+            .unwrap(),
+        );
+        let params = NegativeConversionParams {
+            process_family: NegativeLabProcessFamily::BlackAndWhiteSilverNegative,
+            red_weight: 0.8,
+            green_weight: 1.2,
+            blue_weight: 0.9,
+            color_finish: NegativeLabScannerColorFinishParams {
+                enabled: true,
+                ..NegativeLabScannerColorFinishParams::default()
+            },
+            ..NegativeConversionParams::default()
+        };
+        let render = run_pipeline_with_metrics(&input, &params, None, None);
+        let scene = render.scene_linear_print_preview.to_rgb32f();
+        for pixel in scene.pixels() {
+            assert!((pixel[0] - pixel[1]).abs() <= 1.0e-6);
+            assert!((pixel[1] - pixel[2]).abs() <= 1.0e-6);
+            assert!(pixel.0.iter().all(|value| value.is_finite()));
+        }
+        let warnings = &render
+            .density_normalization_metrics
+            .bounds_receipt
+            .warning_codes;
+        assert!(
+            warnings
+                .iter()
+                .any(|code| code == "bw_silver_disables_color_timing")
+        );
+        assert!(
+            warnings
+                .iter()
+                .any(|code| code == "bw_silver_disables_scanner_finish")
+        );
+        let color =
+            run_pipeline_with_metrics(&input, &NegativeConversionParams::default(), None, None);
+        assert_ne!(
+            scene.as_raw(),
+            color.scene_linear_print_preview.to_rgb32f().as_raw()
         );
     }
 }

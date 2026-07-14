@@ -1144,6 +1144,7 @@ function NegativeLabSession({
       NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
+  const isBlackAndWhiteProcess = selectedPreset?.processFamily === 'black_and_white_silver_negative';
   const { profileFilterCounts, selectedProfile, selectedProfileStockReferences, visibleProfileRows } =
     useNegativeLabProfileBrowser({
       profileFilter,
@@ -3902,11 +3903,24 @@ function NegativeLabSession({
             </span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2" data-testid="negative-lab-v2-print-curve-controls">
+            {isBlackAndWhiteProcess && (
+              <div
+                className="col-span-2 rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-secondary"
+                data-process-family="black_and_white_silver_negative"
+                data-testid="negative-lab-bw-process-policy"
+              >
+                <span className="font-semibold text-text-primary">
+                  {t('modals.negativeConversion.profileFilterBlackAndWhite')}
+                </span>
+                <span className="mt-1 block">{t('modals.negativeConversion.profileMeasuredClaimPolicy')}</span>
+              </div>
+            )}
             <div
               className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
               data-testid="negative-lab-color-finish"
               data-enabled={String(colorFinish.enabled)}
               data-algorithm="negative_lab_scanner_color_finish_v1"
+              hidden={isBlackAndWhiteProcess}
             >
               <div className="flex items-center justify-between gap-2">
                 <UiText variant={TextVariants.small} className="font-semibold text-text-secondary">
