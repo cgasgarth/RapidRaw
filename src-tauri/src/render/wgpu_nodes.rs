@@ -252,4 +252,49 @@ mod tests {
         assert!(crate::tone::curves::SCENE_CURVE_WGSL.contains("fn main"));
         assert!(crate::tone::output_curves::OUTPUT_CURVE_WGSL.contains("fn main"));
     }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn curve_modules_create_real_wgpu_pipelines_from_registered_sources() {
+        let graph = graph_with_curves_and_local_resources();
+        let runtime = WgpuNodeRuntime::from_graph(&graph).unwrap();
+        let instance =
+            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: None,
+            ..Default::default()
+        }))
+        .expect("WGPU adapter is available for registered curve modules");
+        let (device, _queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+                label: Some("registered curve module validation device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: adapter.limits(),
+                experimental_features: wgpu::ExperimentalFeatures::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                trace: wgpu::Trace::Off,
+            }))
+            .expect("WGPU device is available for registered curve modules");
+
+        for module in runtime.modules() {
+            let source = match module.kind {
+                EditNodeKind::SceneCurve => crate::tone::curves::SCENE_CURVE_WGSL,
+                EditNodeKind::OutputCurve => crate::tone::output_curves::OUTPUT_CURVE_WGSL,
+                _ => continue,
+            };
+            let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(module.implementation),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            });
+            let _pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some(module.implementation),
+                layout: None,
+                module: &shader,
+                entry_point: Some(module.entry_point),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                cache: None,
+            });
+        }
+    }
 }
