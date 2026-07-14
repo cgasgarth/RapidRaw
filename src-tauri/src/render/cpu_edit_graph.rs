@@ -1915,6 +1915,8 @@ fn apply_hue_shift(color: Vec3, shift: f32) -> Vec3 {
     if shift.abs() < 0.01 {
         return color;
     }
+    // Anchor the nonlinear hue operation to the actual rgba16f transport domain.
+    let color = Vec3::new(round_f16(color.x), round_f16(color.y), round_f16(color.z));
     let mut hsv = rgb_to_hsv(linear_to_srgb_extended(color));
     hsv.x = (hsv.x + shift + 360.0) % 360.0;
     srgb_to_linear(hsv_to_rgb(hsv))

@@ -590,7 +590,8 @@ fn apply_hue_shift(color: vec3<f32>, shift_degrees: f32) -> vec3<f32> {
     if (abs(shift_degrees) < 0.01) {
         return color;
     }
-    let srgb_color = linear_to_srgb_extended(color);
+    // Anchor the nonlinear hue operation to the actual rgba16f transport domain.
+    let srgb_color = linear_to_srgb_extended(quantizeToF16(color));
     let hsv = rgb_to_hsv(srgb_color);
     var shifted_h = hsv.x + shift_degrees;
     shifted_h = (shifted_h + 360.0) % 360.0;

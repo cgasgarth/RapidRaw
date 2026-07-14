@@ -4066,6 +4066,38 @@ mod blur_pass_tests {
                 }),
             ),
             (
+                "basic_tone_temperature",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12
+                }),
+            ),
+            (
+                "basic_tone_temperature_tint",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7
+                }),
+            ),
+            (
+                "basic_tone_temperature_tint_saturation",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7, "saturation": 11
+                }),
+            ),
+            (
+                "basic_tone_temperature_tint_saturation_vibrance",
+                json!({
+                    "exposure": 18, "brightness": -8, "contrast": 9,
+                    "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
+                    "temperature": 12, "tint": -7, "saturation": 11, "vibrance": 7
+                }),
+            ),
+            (
                 "tone_color_stack",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
