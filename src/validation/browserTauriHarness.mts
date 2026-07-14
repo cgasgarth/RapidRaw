@@ -108,6 +108,7 @@ const commandNames: Record<
   | 'previewNegativeConversion'
   | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
+  | 'preflightNegativeLabSource'
   | 'readExifForPaths'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
@@ -156,6 +157,7 @@ const commandNames: Record<
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
   planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
+  preflightNegativeLabSource: Invokes.PreflightNegativeLabSource,
   readExifForPaths: Invokes.ReadExifForPaths,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
@@ -475,6 +477,27 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(Array.from(new Uint8Array(decodeHarnessApplyPreview())));
     case commandNames.previewNegativeConversion:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
+    case commandNames.preflightNegativeLabSource:
+      return Promise.resolve({
+        appliedLinearization: 'identity_declared_by_decoder',
+        bitDepth: 32,
+        blockReasons: [],
+        confidence: 0.9,
+        decoderBackend: 'browser_harness',
+        decoderVersion: 'browser_harness_v1',
+        dimensions: { height: 1, width: 1 },
+        embeddedIccProfile: false,
+        interpretationHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        nonFiniteFraction: 0,
+        orientation: 'unknown',
+        rawDemosaicMode: null,
+        sampleFormat: 'Rgb32F',
+        schemaVersion: 1,
+        sourceHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        sourceType: 'linear_tiff_candidate',
+        transferFunction: 'unproven',
+        warningCodes: ['linear_transfer_unproven'],
+      });
     case commandNames.renderNegativeLabDryRunPreviewArtifact:
       return Promise.resolve({
         artifactId: 'artifact_negative_lab_runtime_preview_browser_harness',

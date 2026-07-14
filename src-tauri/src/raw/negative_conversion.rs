@@ -1,11 +1,11 @@
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::jpeg_data_url;
-use crate::image_loader::load_base_image_from_bytes;
+use crate::image_loader::{load_base_image_from_bytes, load_base_image_from_bytes_with_report};
 use crate::image_processing::RawEngineArtifacts;
 use base64::{Engine as _, engine::general_purpose};
 use chrono::Utc;
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, Rgb32FImage};
+use image::{DynamicImage, ImageReader, Rgb32FImage};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -32,7 +32,7 @@ use crate::raw::negative_lab_color_finish::{
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NegativeConversionParams {
     pub red_weight: f32,
     pub green_weight: f32,
@@ -64,6 +64,9 @@ pub struct NegativeConversionParams {
     pub white_point: f32,
     #[serde(default)]
     pub conversion_model: NegativeConversionModel,
+    /// Hash of the loader-grounded source interpretation accepted by preview/apply.
+    #[serde(default)]
+    pub source_interpretation_hash: Option<String>,
     #[serde(default)]
     pub color_finish: NegativeLabScannerColorFinishParams,
     #[serde(default)]
@@ -104,7 +107,7 @@ pub struct NegativeBaseFogSampleRect {
     pub height: f32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NegativeLabPreviewArtifactDimensions {
     pub height: u32,
@@ -150,7 +153,32 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub preview_data_url: String,
     pub stage_artifacts: Vec<NegativeLabStagePreviewArtifact>,
     pub renderer: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_interpretation_hash: Option<String>,
     pub storage: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabSourceInterpretationV1 {
+    pub applied_linearization: String,
+    pub bit_depth: u8,
+    pub block_reasons: Vec<String>,
+    pub confidence: f32,
+    pub decoder_backend: String,
+    pub decoder_version: String,
+    pub dimensions: NegativeLabPreviewArtifactDimensions,
+    pub embedded_icc_profile: bool,
+    pub interpretation_hash: String,
+    pub non_finite_fraction: f32,
+    pub orientation: String,
+    pub raw_demosaic_mode: Option<String>,
+    pub sample_format: String,
+    pub schema_version: u8,
+    pub source_hash: String,
+    pub source_type: String,
+    pub transfer_function: String,
+    pub warning_codes: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -890,7 +918,7 @@ impl NegativeConversionSaveOptions {
         base_params: &NegativeConversionParams,
         source_path: &str,
     ) -> NegativeConversionParams {
-        let mut params = *base_params;
+        let mut params = base_params.clone();
         if let Some(override_entry) = self
             .frame_exposure_overrides
             .overrides
@@ -945,6 +973,7 @@ impl Default for NegativeConversionParams {
             white_point_offset: default_white_point_offset(),
             white_point: default_white_point(),
             conversion_model: NegativeConversionModel::DensityRgbV1,
+            source_interpretation_hash: None,
             color_finish: NegativeLabScannerColorFinishParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
@@ -1229,7 +1258,7 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
         (sanitized_params.exposure + current_offset).clamp(MIN_EXPOSURE, MAX_EXPOSURE);
     let current_effective_params = NegativeConversionParams {
         exposure: effective_current_exposure,
-        ..sanitized_params
+        ..sanitized_params.clone()
     };
     let current_render = run_pipeline(input, &current_effective_params, None);
     let current_metrics = negative_lab_highlight_patch_metrics(&current_render, sample_rect);
@@ -1271,7 +1300,7 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
             (sanitized_params.exposure + candidate_offset).clamp(MIN_EXPOSURE, MAX_EXPOSURE);
         let candidate_params = NegativeConversionParams {
             exposure: candidate_effective_exposure,
-            ..sanitized_params
+            ..sanitized_params.clone()
         };
         let candidate_render = run_pipeline(input, &candidate_params, None);
         let candidate_metrics =
@@ -1409,7 +1438,7 @@ fn build_negative_lab_shadow_patch_black_point_suggestion(
             .min(max_black_point);
         let candidate_params = NegativeConversionParams {
             black_point: candidate_black_point,
-            ..sanitized_params
+            ..sanitized_params.clone()
         };
         let candidate_render = run_pipeline(input, &candidate_params, None);
         let candidate_metrics = negative_lab_shadow_patch_metrics(&candidate_render, sample_rect);
@@ -2237,6 +2266,7 @@ impl NegativeConversionParams {
             white_point: finite_or_default(self.white_point, defaults.white_point)
                 .clamp(MIN_WHITE_POINT, MAX_WHITE_POINT),
             conversion_model: self.conversion_model,
+            source_interpretation_hash: self.source_interpretation_hash.clone(),
             color_finish: self.color_finish.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
             render_intent: self.render_intent,
@@ -3123,12 +3153,12 @@ fn run_e6_positive_pipeline(
     // receipt. Calling the shared operation with `applicable = false` keeps
     // pixels unchanged while preserving the same operation identity/hash
     // contract as the negative pipeline.
-    let color_finish_metrics =
-        apply_color_finish(&scene_image, &params.color_finish, false).metrics;
+    let color_finish = apply_color_finish(&scene_image, &params.color_finish, false);
+    let finished_scene_linear = color_finish.image;
     let rendered = Rgb32FImage::from_vec(
         width,
         height,
-        scene_image
+        finished_scene_linear
             .as_raw()
             .par_iter()
             .map(|value| value.clamp(0.0, 1.0).powf(1.0 / 2.2))
@@ -3138,11 +3168,11 @@ fn run_e6_positive_pipeline(
     NegativeLabPipelineRender {
         normalized_density_preview: DynamicImage::ImageRgb32F(normalized_image),
         rendered_preview: DynamicImage::ImageRgb32F(rendered),
-        scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_image),
+        scene_linear_print_preview: DynamicImage::ImageRgb32F(finished_scene_linear),
         density_normalization_metrics: density_metrics,
         density_scopes,
         detail_finish_metrics,
-        color_finish_metrics,
+        color_finish_metrics: color_finish.metrics,
     }
 }
 
@@ -3152,7 +3182,7 @@ fn run_pipeline_with_metrics(
     _override_bounds: Option<[ChannelBounds; 3]>,
     crosstalk_profile: Option<&serde_json::Value>,
 ) -> NegativeLabPipelineRender {
-    let params = params.sanitized();
+    let params = params.clone().sanitized();
     if params.conversion_model == NegativeConversionModel::E6PositiveV1 {
         return run_e6_positive_pipeline(input, &params);
     }
@@ -3338,6 +3368,202 @@ fn build_negative_lab_preview_cache_key(source_path: &str) -> u64 {
     source_path.hash(&mut hasher);
     "negative_preview_base".hash(&mut hasher);
     hasher.finish()
+}
+
+fn negative_lab_source_type_for_path(
+    path: &str,
+    format: Option<image::ImageFormat>,
+) -> &'static str {
+    if crate::formats::is_raw_file(path) {
+        "raw"
+    } else {
+        match format {
+            Some(image::ImageFormat::Jpeg) => "rendered_jpeg",
+            Some(image::ImageFormat::Tiff) => "linear_tiff_candidate",
+            _ => "unknown",
+        }
+    }
+}
+
+fn negative_lab_image_bit_depth(image: &DynamicImage) -> u8 {
+    match image.color() {
+        image::ColorType::L8
+        | image::ColorType::La8
+        | image::ColorType::Rgb8
+        | image::ColorType::Rgba8 => 8,
+        image::ColorType::L16
+        | image::ColorType::La16
+        | image::ColorType::Rgb16
+        | image::ColorType::Rgba16 => 16,
+        image::ColorType::Rgb32F | image::ColorType::Rgba32F => 32,
+        _ => 8,
+    }
+}
+
+fn build_negative_lab_source_interpretation(
+    path: &str,
+    bytes: &[u8],
+    image: &DynamicImage,
+    raw_report: Option<&crate::raw_processing::RawDevelopmentReport>,
+    format: Option<image::ImageFormat>,
+) -> NegativeLabSourceInterpretationV1 {
+    let source_type = negative_lab_source_type_for_path(path, format);
+    let (
+        decoder_backend,
+        decoder_version,
+        raw_demosaic_mode,
+        bit_depth,
+        transfer_function,
+        applied_linearization,
+        confidence,
+    ) = match source_type {
+        "raw" => (
+            "rawler".to_string(),
+            "rawengine_rawler_v1".to_string(),
+            raw_report.map(|report| format!("{:?}", report.demosaic_path)),
+            32,
+            "camera_rgb_profiled".to_string(),
+            "native_raw_to_scene_linear_v1".to_string(),
+            0.95,
+        ),
+        "linear_tiff_candidate" => (
+            "image".to_string(),
+            "image_crate_v1".to_string(),
+            None,
+            negative_lab_image_bit_depth(image),
+            "unproven".to_string(),
+            "identity_declared_by_source_metadata".to_string(),
+            0.55,
+        ),
+        "rendered_jpeg" => (
+            "image".to_string(),
+            "image_crate_v1".to_string(),
+            None,
+            negative_lab_image_bit_depth(image),
+            "srgb_or_embedded_icc".to_string(),
+            "none_review_only".to_string(),
+            0.35,
+        ),
+        _ => (
+            "image".to_string(),
+            "image_crate_v1".to_string(),
+            None,
+            negative_lab_image_bit_depth(image),
+            "unknown".to_string(),
+            "none".to_string(),
+            0.0,
+        ),
+    };
+    let rgb = image.to_rgb32f();
+    let total = rgb.as_raw().len().max(1) as f32;
+    let non_finite_count = rgb
+        .as_raw()
+        .iter()
+        .filter(|value| !value.is_finite())
+        .count() as f32;
+    let clipped_count = rgb
+        .as_raw()
+        .iter()
+        .filter(|value| value.is_finite() && (**value < 0.0 || **value > 1.0))
+        .count();
+    let mut warning_codes = Vec::new();
+    let mut block_reasons = Vec::new();
+    if source_type == "rendered_jpeg" {
+        warning_codes.push("rendered_jpeg_review_only".to_string());
+    }
+    if source_type == "linear_tiff_candidate" {
+        warning_codes.push("linear_transfer_unproven".to_string());
+    }
+    if source_type == "unknown" {
+        warning_codes.push("unsupported_negative_lab_source".to_string());
+        block_reasons.push("decoder_format_unknown".to_string());
+    }
+    if clipped_count > 0 {
+        warning_codes.push("source_samples_clipped".to_string());
+    }
+    if non_finite_count > 0.0 {
+        warning_codes.push("source_samples_non_finite".to_string());
+        block_reasons.push("non_finite_source_samples".to_string());
+    }
+    let mut interpretation = NegativeLabSourceInterpretationV1 {
+        applied_linearization,
+        bit_depth,
+        block_reasons,
+        confidence,
+        decoder_backend,
+        decoder_version,
+        dimensions: NegativeLabPreviewArtifactDimensions {
+            height: image.height(),
+            width: image.width(),
+        },
+        embedded_icc_profile: false,
+        interpretation_hash: String::new(),
+        non_finite_fraction: non_finite_count / total,
+        orientation: "unknown".to_string(),
+        raw_demosaic_mode,
+        sample_format: format!("{:?}", image.color()),
+        schema_version: 1,
+        source_hash: format!("sha256:{}", hex::encode(Sha256::digest(bytes))),
+        source_type: source_type.to_string(),
+        transfer_function,
+        warning_codes,
+    };
+    let canonical = serde_json::to_vec(&interpretation).unwrap_or_default();
+    interpretation.interpretation_hash =
+        format!("sha256:{}", hex::encode(Sha256::digest(canonical)));
+    interpretation
+}
+
+fn preflight_negative_lab_source_path(
+    source_path: &str,
+    app_handle: &AppHandle,
+) -> Result<NegativeLabSourceInterpretationV1, String> {
+    let bytes = fs::read(source_path).map_err(|error| error.to_string())?;
+    let settings = load_settings_or_default(app_handle);
+    let format = ImageReader::new(Cursor::new(&bytes))
+        .with_guessed_format()
+        .ok()
+        .and_then(|reader| reader.format());
+    let (image, raw_report) =
+        load_base_image_from_bytes_with_report(&bytes, source_path, false, &settings, None)
+            .map_err(|error| error.to_string())?;
+    Ok(build_negative_lab_source_interpretation(
+        source_path,
+        &bytes,
+        &image,
+        raw_report.as_ref(),
+        format,
+    ))
+}
+
+fn validate_negative_lab_source_interpretation(
+    params: &NegativeConversionParams,
+    interpretation: &NegativeLabSourceInterpretationV1,
+) -> Result<(), String> {
+    if let Some(expected_hash) = params.source_interpretation_hash.as_deref()
+        && expected_hash != interpretation.interpretation_hash
+    {
+        return Err(
+            "Negative Lab source interpretation changed; rerun preflight before preview or apply."
+                .to_string(),
+        );
+    }
+    if !interpretation.block_reasons.is_empty() {
+        return Err(format!(
+            "Negative Lab source preflight blocked this input: {}",
+            interpretation.block_reasons.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn preflight_negative_lab_source(
+    path: String,
+    app_handle: AppHandle,
+) -> Result<NegativeLabSourceInterpretationV1, String> {
+    let (source_path, _) = parse_virtual_path(&path);
+    preflight_negative_lab_source_path(&source_path.to_string_lossy(), &app_handle)
 }
 
 fn load_negative_lab_preview_processing_image(
@@ -3589,6 +3815,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         preview_data_url: jpeg_data_url(base64_str),
         stage_artifacts,
         renderer: NEGATIVE_LAB_RUNTIME_PREVIEW_RENDERER.to_string(),
+        source_interpretation_hash: params.source_interpretation_hash.clone(),
         storage: NEGATIVE_LAB_RUNTIME_PREVIEW_STORAGE.to_string(),
     })
 }
@@ -3597,7 +3824,7 @@ fn negative_lab_stage_recipe_hash(
     params: &NegativeConversionParams,
     crosstalk_receipt: Option<&NegativeLabCrosstalkReceipt>,
 ) -> Result<String, String> {
-    let bytes = serde_json::to_vec(&(params.sanitized(), crosstalk_receipt))
+    let bytes = serde_json::to_vec(&(params.clone().sanitized(), crosstalk_receipt))
         .map_err(|error| format!("Failed to hash Negative Lab stage recipe: {error}"))?;
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
 }
@@ -3661,6 +3888,8 @@ pub async fn preview_negative_conversion(
 ) -> Result<String, String> {
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
+    let interpretation = preflight_negative_lab_source_path(&source_path_str, &app_handle)?;
+    validate_negative_lab_source_interpretation(&params, &interpretation)?;
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
     resolve_negative_lab_crosstalk(crosstalk_profile.as_ref())?;
@@ -3698,6 +3927,8 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
+    let interpretation = preflight_negative_lab_source_path(&source_path_str, &app_handle)?;
+    validate_negative_lab_source_interpretation(&params, &interpretation)?;
     let base_image_for_processing =
         load_negative_lab_preview_processing_image(&source_path_str, &state, &app_handle)?;
     resolve_negative_lab_crosstalk(crosstalk_profile.as_ref())?;
@@ -3959,6 +4190,11 @@ pub async fn convert_negatives(
                 .cloned()
                 .ok_or_else(|| format!("Missing Negative Lab source path at index {}", i))?;
 
+            let interpretation = preflight_negative_lab_source_path(&real_path, &app_handle)?;
+            let effective_params =
+                save_options.effective_params_for_path(&sanitized_params, &real_path);
+            validate_negative_lab_source_interpretation(&effective_params, &interpretation)?;
+
             let settings = load_settings_or_default(&app_handle);
 
             let img = match read_file_mapped(Path::new(&real_path)) {
@@ -3970,8 +4206,6 @@ pub async fn convert_negatives(
             }
             .map_err(|e| e.to_string())?;
 
-            let effective_params =
-                save_options.effective_params_for_path(&sanitized_params, &real_path);
             let pipeline_render =
                 run_pipeline_with_metrics(&img, &effective_params, None, crosstalk_profile);
             let processed = pipeline_render.rendered_preview;
@@ -4105,7 +4339,7 @@ mod tests {
     use crate::app_settings::AppSettings;
     use crate::formats::is_raw_file;
     use crate::image_loader::load_base_image_from_bytes;
-    use image::{DynamicImage, Pixel, Rgb32FImage};
+    use image::{DynamicImage, ImageFormat, Pixel, Rgb32FImage};
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use std::path::PathBuf;
@@ -4135,6 +4369,59 @@ mod tests {
             None,
         )
         .density_normalization_metrics
+    }
+
+    #[test]
+    fn source_interpretation_hash_is_deterministic_and_flags_jpeg_review() {
+        let image =
+            DynamicImage::ImageRgb8(image::RgbImage::from_pixel(2, 1, image::Rgb([32, 64, 96])));
+        let mut bytes = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Jpeg)
+            .expect("jpeg fixture should encode");
+        let first = build_negative_lab_source_interpretation(
+            "fixture.jpg",
+            &bytes,
+            &image,
+            None,
+            Some(ImageFormat::Jpeg),
+        );
+        let second = build_negative_lab_source_interpretation(
+            "fixture.jpg",
+            &bytes,
+            &image,
+            None,
+            Some(ImageFormat::Jpeg),
+        );
+        assert_eq!(first.interpretation_hash, second.interpretation_hash);
+        assert_eq!(first.source_type, "rendered_jpeg");
+        assert!(
+            first
+                .warning_codes
+                .iter()
+                .any(|code| code == "rendered_jpeg_review_only")
+        );
+    }
+
+    #[test]
+    fn source_interpretation_hash_mismatch_invalidates_preview_params() {
+        let image =
+            DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(1, 1, vec![0.2, 0.3, 0.4]).unwrap());
+        let interpretation = build_negative_lab_source_interpretation(
+            "fixture.tiff",
+            &[1, 2, 3],
+            &image,
+            None,
+            Some(ImageFormat::Tiff),
+        );
+        let params = NegativeConversionParams {
+            source_interpretation_hash: Some(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+            ),
+            ..NegativeConversionParams::default()
+        };
+        assert!(validate_negative_lab_source_interpretation(&params, &interpretation).is_err());
     }
 
     #[test]
@@ -4996,7 +5283,7 @@ mod tests {
             0.22, 0.16, 0.10, //
             0.03, 0.02, 0.01,
         ];
-        let baseline_render = render_fixture(pixels.clone(), base_params, bounds);
+        let baseline_render = render_fixture(pixels.clone(), base_params.clone(), bounds);
         let override_render = render_fixture(pixels.clone(), frame_one_params, bounds);
         let reset_render = render_fixture(pixels, base_params, bounds);
 
@@ -5129,7 +5416,7 @@ mod tests {
                 measurement_profile_id: Some(
                     "negative_lab.measured.c41.process_family.v1".to_string(),
                 ),
-                params,
+                params: params.clone(),
                 preset_id: "negative_lab.measured.c41.process_family.v1".to_string(),
                 profile_provenance_hash: "fnv1a32:aaaaaaaa".to_string(),
                 profile_status: "fixture_measured".to_string(),
@@ -6062,7 +6349,7 @@ mod tests {
         };
         let neg_log_params = NegativeConversionParams {
             conversion_model: NegativeConversionModel::NegativeLogDensityV1,
-            ..legacy_params
+            ..legacy_params.clone()
         };
 
         let legacy_render = run_pipeline_with_metrics(&input, &legacy_params, None, None);
@@ -6216,7 +6503,7 @@ mod tests {
                 evidence_fixture_count: 0,
                 film_class: Some("color_negative".to_string()),
                 measurement_profile_id: None,
-                params,
+                params: params.clone(),
                 preset_id: applied_profile_id.to_string(),
                 profile_provenance_hash: "fnv1a32:e5855424".to_string(),
                 profile_status: "generic_unmeasured".to_string(),
@@ -6574,7 +6861,7 @@ mod tests {
                 evidence_fixture_count: 0,
                 film_class: Some("color_negative".to_string()),
                 measurement_profile_id: None,
-                params,
+                params: params.clone(),
                 preset_id: "negative_lab.generic.c41.portrait.v1".to_string(),
                 profile_provenance_hash: "fnv1a32:e5855424".to_string(),
                 profile_status: "generic_unmeasured".to_string(),
@@ -7341,7 +7628,7 @@ mod tests {
                 sharpening_amount: 0.65,
                 ..Default::default()
             },
-            ..disabled
+            ..disabled.clone()
         };
         let baseline = run_pipeline_with_metrics(&input, &disabled, None, None);
         let identity = run_pipeline_with_metrics(&input, &disabled, None, None);

@@ -15,6 +15,29 @@ import {
   NEGATIVE_LAB_AGENT_TOOL_MANIFEST,
 } from './app-server/negativeLabAgentAppServerToolDispatch';
 
+const negativeLabSourceInterpretationSchema = z
+  .object({
+    appliedLinearization: z.string().min(1),
+    bitDepth: z.number().int().positive(),
+    blockReasons: z.array(z.string().min(1)),
+    confidence: z.number().min(0).max(1),
+    decoderBackend: z.string().min(1),
+    decoderVersion: z.string().min(1),
+    dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    embeddedIccProfile: z.boolean(),
+    interpretationHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    nonFiniteFraction: z.number().min(0).max(1),
+    orientation: z.string().min(1),
+    rawDemosaicMode: z.string().min(1).nullable(),
+    sampleFormat: z.string().min(1),
+    schemaVersion: z.literal(1),
+    sourceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    sourceType: z.enum(['raw', 'linear_tiff_candidate', 'rendered_jpeg', 'unknown']),
+    transferFunction: z.string().min(1),
+    warningCodes: z.array(z.string().min(1)),
+  })
+  .strict();
+
 const nativeDensityAxisBoundsSchema = z.object({ max: z.number(), min: z.number() }).strict();
 const nativeDensityBoundsSetSchema = z
   .object({
@@ -218,6 +241,10 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       .array(negativeLabStagePreviewArtifactFieldsSchema.extend({ boundsReceipt: nativeDensityBoundsReceiptSchema }))
       .optional(),
     renderer: z.literal('rawengine_negative_lab_runtime_preview_v1'),
+    sourceInterpretationHash: z
+      .string()
+      .regex(/^sha256:[a-f0-9]{64}$/u)
+      .optional(),
     storage: z.literal('temp_cache'),
   })
   .strict();
@@ -347,6 +374,12 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       | undefined;
   };
 }): Promise<NegativeLabRuntimeDryRunAdapterResult> {
+  const sourceInterpretation = await invokeWithSchema(
+    Invokes.PreflightNegativeLabSource,
+    { path: params.path },
+    negativeLabSourceInterpretationSchema,
+    Invokes.PreflightNegativeLabSource,
+  );
   const conversionModel =
     params.command.parameters.conversionModel.algorithmId === 'negative_log_density_v1'
       ? 'negative_log_density_v1'
@@ -359,6 +392,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       params: {
         ...params.recipeParams,
         conversion_model: conversionModel,
+        source_interpretation_hash: sourceInterpretation.interpretationHash,
         color_finish: {
           algorithm_version: params.command.parameters.colorFinish.algorithmVersion,
           chroma_denoise_radius: params.command.parameters.colorFinish.chromaDenoiseRadius,

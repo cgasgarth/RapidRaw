@@ -2,11 +2,23 @@ import { z } from 'zod';
 import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
 import { brushMaskV1Schema } from './brushMaskV1.js';
+import type {
+  filmEmulationNodeV1Schema,
+  filmEmulationProfileRefV1Schema,
+  filmEmulationReceiptV1Schema,
+  filmSceneInputV1Schema,
+} from './film/filmEmulationSchemas.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panorama/panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
 export type { ArtifactHandleV1 } from './artifactSchemas.js';
 export { artifactHandleV1Schema, negativeLabPositiveArtifactHandleV1Schema } from './artifactSchemas.js';
+export {
+  filmEmulationNodeV1Schema,
+  filmEmulationProfileRefV1Schema,
+  filmEmulationReceiptV1Schema,
+  filmSceneInputV1Schema,
+} from './film/filmEmulationSchemas.js';
 
 export const RAW_ENGINE_SCHEMA_VERSION = 1;
 
@@ -1034,6 +1046,7 @@ export const editGraphNodeKindV1Schema = z.enum([
   'mask_operation',
   'negative_lab_operation',
   'agent_command',
+  'film_emulation',
 ]);
 
 export const editGraphCommandTypeV1Schema = z.enum([
@@ -8122,6 +8135,30 @@ export const negativeLabSourceAssetRefV1Schema = z
   })
   .strict();
 
+/** Loader-grounded source contract shared by Negative Lab preview and save. */
+export const negativeLabSourceInterpretationV1Schema = z
+  .object({
+    appliedLinearization: z.string().trim().min(1),
+    bitDepth: z.number().int().positive(),
+    blockReasons: z.array(z.string().trim().min(1)),
+    confidence: z.number().min(0).max(1),
+    decoderBackend: z.string().trim().min(1),
+    decoderVersion: z.string().trim().min(1),
+    dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
+    embeddedIccProfile: z.boolean(),
+    interpretationHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    nonFiniteFraction: z.number().min(0).max(1),
+    orientation: z.string().trim().min(1),
+    rawDemosaicMode: z.string().trim().min(1).nullable(),
+    sampleFormat: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+    sourceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    sourceType: z.enum(['raw', 'linear_tiff_candidate', 'rendered_jpeg', 'unknown']),
+    transferFunction: z.string().trim().min(1),
+    warningCodes: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const negativeLabFrameDetectionRequestV1Schema = z
   .object({
     borderPolicy: z.enum(['require_visible_border', 'prefer_visible_border', 'allow_cropped']),
@@ -11520,6 +11557,7 @@ export type NegativeLabSetConversionRecipeParametersV1 = z.infer<
 >;
 export type NegativeLabSetFrameQcStatusParametersV1 = z.infer<typeof negativeLabSetFrameQcStatusParametersV1Schema>;
 export type NegativeLabSourceAssetRefV1 = z.infer<typeof negativeLabSourceAssetRefV1Schema>;
+export type NegativeLabSourceInterpretationV1 = z.infer<typeof negativeLabSourceInterpretationV1Schema>;
 export type NegativeLabSupportedProcessFamilyV1 = z.infer<typeof negativeLabSupportedProcessFamilyV1Schema>;
 export type NegativeLabUpdateBaseSamplesParametersV1 = z.infer<typeof negativeLabUpdateBaseSamplesParametersV1Schema>;
 export type NegativeFrameRecordV1 = z.infer<typeof negativeFrameRecordV1Schema>;
@@ -11573,3 +11611,7 @@ export type ToneColorHslBandV1 = z.infer<typeof toneColorHslBandV1Schema>;
 export type ToneColorMutationResultV1 = z.infer<typeof toneColorMutationResultV1Schema>;
 export type ToneColorParameterDiffV1 = z.infer<typeof toneColorParameterDiffV1Schema>;
 export type ToneColorWheelV1 = z.infer<typeof toneColorWheelV1Schema>;
+export type FilmEmulationNodeV1 = z.infer<typeof filmEmulationNodeV1Schema>;
+export type FilmEmulationProfileRefV1 = z.infer<typeof filmEmulationProfileRefV1Schema>;
+export type FilmEmulationReceiptV1 = z.infer<typeof filmEmulationReceiptV1Schema>;
+export type FilmSceneInputV1 = z.infer<typeof filmSceneInputV1Schema>;
