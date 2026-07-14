@@ -230,6 +230,7 @@ function cancelActiveOperations(
   state: PreviewCoordinatorState,
   effects: PreviewCoordinatorEffect[],
   reason: string,
+  releaseVisibleArtifact = true,
 ): PreviewCoordinatorState {
   let next = state;
   for (const kind of previewOperationKindSchema.options) {
@@ -238,7 +239,7 @@ function cancelActiveOperations(
     effects.push({ type: 'cancel', identity: operation.identity, reason });
     next = updateOperation(next, kind, { ...operation, status: 'cancelled' });
   }
-  if (next.visibleArtifact !== null) {
+  if (releaseVisibleArtifact && next.visibleArtifact !== null) {
     effects.push({ type: 'release-url', url: next.visibleArtifact.url, reason });
     next = { ...next, visibleArtifact: null };
   }
@@ -349,7 +350,7 @@ export function reducePreviewCoordinator(
       state.viewport?.targetHeight === viewport.targetHeight &&
       state.viewport?.targetWidth === viewport.targetWidth;
     if (unchanged) return { effects, state: withReceipt(state, event, 'viewport-unchanged') };
-    state = cancelActiveOperations(state, effects, 'viewport-changed');
+    state = cancelActiveOperations(state, effects, 'viewport-changed', false);
     state = { ...state, desired: null, viewport };
     return { effects, state: withReceipt(state, event, 'viewport-changed') };
   }

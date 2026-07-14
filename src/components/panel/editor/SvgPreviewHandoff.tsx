@@ -371,6 +371,8 @@ export function SvgPreviewHandoff({
       {baseLayers.map((layer) => (
         <image
           data-preview-layer-id={layer.id}
+          data-preview-layer-role="base"
+          data-preview-source-identity={baseScopeKey}
           data-testid="svg-preview-base-layer"
           height="100%"
           href={layer.value.url}
@@ -388,7 +390,13 @@ export function SvgPreviewHandoff({
       ))}
       {patchLayers.map((layer) => (
         <image
+          data-preview-full-height={layer.value.fullHeight}
+          data-preview-full-width={layer.value.fullWidth}
           data-preview-layer-id={layer.id}
+          data-preview-layer-role="patch"
+          data-preview-pixel-height={layer.value.pixelHeight}
+          data-preview-pixel-width={layer.value.pixelWidth}
+          data-preview-source-identity={layer.value.sourceImagePath}
           data-testid="svg-preview-patch-layer"
           height={cssPercent(layer.value.normH * 100)}
           href={layer.value.url}

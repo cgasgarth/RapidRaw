@@ -8,6 +8,7 @@ export interface EditorZoomRenderSize extends EditorZoomDimensions {
 }
 
 export type EditorZoomMode = { kind: 'fit' } | { kind: 'fill' } | { devicePixelsPerImagePixel: number; kind: 'ratio' };
+export type EditorZoomRatioMode = Extract<EditorZoomMode, { kind: 'ratio' }>;
 
 export type EditorZoomCommand =
   | { kind: 'fit' }
@@ -70,6 +71,21 @@ export const getEditorZoomTransformScale = ({
 }): number =>
   normalizeEditorZoomRatio(devicePixelsPerImagePixel) /
   (getEditorZoomDpr(devicePixelRatio) * finitePositive(renderScale, 1));
+
+export const getEditorZoomModeForTransformScale = ({
+  devicePixelRatio,
+  renderScale,
+  transformScale,
+}: {
+  devicePixelRatio: number;
+  renderScale: number;
+  transformScale: number;
+}): EditorZoomRatioMode => ({
+  devicePixelsPerImagePixel: normalizeEditorZoomRatio(
+    getEditorZoomDpr(devicePixelRatio) * finitePositive(renderScale, 1) * finitePositive(transformScale, 1),
+  ),
+  kind: 'ratio',
+});
 
 export const getEditorZoomSourceSize = ({
   crop,

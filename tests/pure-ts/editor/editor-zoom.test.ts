@@ -4,6 +4,7 @@ import {
   type EditorZoomMode,
   formatEditorZoomLabel,
   getEditorZoomModeForCommand,
+  getEditorZoomModeForTransformScale,
   getEditorZoomResolutionState,
   getEditorZoomSourceSize,
   isEditorPixelInspectionZoom,
@@ -31,6 +32,32 @@ describe('editor zoom contract', () => {
       expect(resolved.imagePixelsPerDevicePixel).toBeCloseTo(1);
       expect(resolved.transformScale * 0.15 * devicePixelRatio).toBeCloseTo(1);
       expect(resolved.displayPercent).toBe(100);
+    }
+  });
+
+  test('promotes gesture transforms into semantic ratio modes without changing visible scale', () => {
+    for (const devicePixelRatio of [1, 1.5, 2]) {
+      for (const renderScale of [0.12, 0.5, 1]) {
+        for (const devicePixelsPerImagePixel of [0.1, 0.5, 2, 4]) {
+          const transformScale = devicePixelsPerImagePixel / (devicePixelRatio * renderScale);
+          const mode = getEditorZoomModeForTransformScale({
+            devicePixelRatio,
+            renderScale,
+            transformScale,
+          });
+          const resolved = resolveEditorZoom({
+            devicePixelRatio,
+            mode,
+            renderSize: { height: 4000 * renderScale, scale: renderScale, width: 6000 * renderScale },
+            sourceSize,
+            viewportSize: { height: 600, width: 1000 },
+          });
+
+          expect(mode.kind).toBe('ratio');
+          expect(resolved.transformScale).toBeCloseTo(transformScale, 8);
+          expect(resolved.devicePixelsPerImagePixel).toBeCloseTo(devicePixelsPerImagePixel, 8);
+        }
+      }
     }
   });
 
