@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
@@ -196,13 +195,6 @@ pub struct ThumbnailProgressTracker {
     pub completed: usize,
 }
 
-pub struct ExportJob {
-    pub job_id: String,
-    pub cancellation_token: Arc<AtomicBool>,
-    pub cancellation_notify: Arc<Notify>,
-    pub task_handle: Option<JoinHandle<()>>,
-}
-
 pub struct ImportJob {
     pub job_id: String,
     pub cancellation_token: Arc<AtomicBool>,
@@ -236,7 +228,7 @@ pub struct AppState {
     pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
     #[cfg(feature = "ai")]
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
-    pub export_job: Mutex<Option<ExportJob>>,
+    export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub import_job: Mutex<Option<ImportJob>>,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
@@ -284,6 +276,10 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub(crate) fn export_jobs(&self) -> &crate::export::job_registry::ExportJobRegistry {
+        &self.export_jobs
+    }
+
     pub fn new() -> Self {
         let mib = 1024 * 1024;
         let cache_budget = CacheBudgetCoordinator::new(768 * mib, 1024 * mib);
@@ -322,7 +318,7 @@ impl AppState {
                 policy("ai_depth_maps", 128, 192, Some(4)),
                 Arc::clone(&cache_budget),
             ),
-            export_job: Mutex::new(None),
+            export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             import_job: Mutex::new(None),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
