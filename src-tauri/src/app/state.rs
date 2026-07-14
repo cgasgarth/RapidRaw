@@ -114,7 +114,7 @@ pub struct AnalyticsConfig {
     pub frame_id: AnalyticsFrameId,
     pub products: AnalyticsProducts,
     pub active_waveform_channel: Option<String>,
-    pub scheduler: Arc<crate::analytics_scheduler::AnalyticsScheduler>,
+    pub(crate) service: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
 }
 
 pub struct WarpedImageCache {
@@ -153,7 +153,6 @@ pub struct AppState {
     pub initial_file_path: Mutex<Option<String>>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
-    pub analytics_scheduler: Mutex<Option<Arc<crate::analytics_scheduler::AnalyticsScheduler>>>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
@@ -230,7 +229,6 @@ impl AppState {
             initial_file_path: Mutex::new(None),
             preview_scheduler: Mutex::new(None),
             export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
-            analytics_scheduler: Mutex::new(None),
             mask_cache: MemoryLruCache::new(
                 policy("masks", 96, 128, Some(64)),
                 Arc::clone(&cache_budget),
