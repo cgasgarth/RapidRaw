@@ -24,6 +24,7 @@ import {
   buildBasicToneImageCommandContext,
   hasBasicToneAdjustmentChange,
 } from '../../utils/basicToneCommandBridge';
+import { buildCopyPasteEditTransaction, classifyCopyPasteNativeCompletion } from '../../utils/copyPasteEditTransaction';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import {
   awaitMatchingEditorPersistence,
@@ -39,6 +40,7 @@ import {
 } from '../../utils/editorZoom';
 import {
   buildAdjustmentMutationOperations,
+  buildEditTransactionPersistenceContext,
   type EditTransactionPersistenceContext,
   type EditTransactionRequest,
 } from '../../utils/editTransaction';
@@ -309,7 +311,7 @@ export function useEditorActions() {
 
   const handlePasteAdjustments = useCallback(
     (paths?: string[]) => {
-      const { copiedAdjustments, selectedImage, adjustments } = useEditorStore.getState();
+      const { copiedAdjustments, selectedImage } = useEditorStore.getState();
       const { multiSelectedPaths } = useLibraryStore.getState();
       const { appSettings } = useSettingsStore.getState();
       const { setProcess } = useProcessStore.getState();
@@ -348,12 +350,10 @@ export function useEditorActions() {
 
       const editorState = useEditorStore.getState();
       const transactionId = createOperationId();
-      const imageSessionId =
-        editorState.imageSession?.id ?? `editor-image-session:${String(editorState.imageSessionId)}`;
       const baseAdjustmentRevision = editorState.adjustmentRevision;
-      const transaction = {
+      let transaction: EditTransactionPersistenceContext = {
         transactionId,
-        imageSessionId,
+        imageSessionId: editorState.imageSession?.id ?? `editor-image-session:${String(editorState.imageSessionId)}`,
         baseAdjustmentRevision,
         nextAdjustmentRevision: baseAdjustmentRevision + 1,
       };
@@ -363,15 +363,14 @@ export function useEditorActions() {
       });
 
       if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-        applyEditTransaction({
-          baseAdjustmentRevision,
-          imageSessionId,
-          history: 'single-entry',
-          operations: [{ type: 'replace-adjustments', adjustments: { ...adjustments, ...adjustmentsToApply } }],
-          persistence: 'commit',
-          source: 'copy-paste',
+        const request = buildCopyPasteEditTransaction(
+          editorState,
+          selectedImage.path,
+          adjustmentsToApply,
           transactionId,
-        });
+        );
+        const result = applyEditTransaction(request);
+        transaction = buildEditTransactionPersistenceContext(request, result);
       }
 
       invoke<Array<{ adjustments?: Adjustments; path: string }>>(Invokes.ApplyAdjustmentsToPaths, {
@@ -382,10 +381,13 @@ export function useEditorActions() {
         .then((receipts) => {
           const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
           if (selectedReceipt?.adjustments && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-            useEditorStore.getState().setEditor({
-              adjustmentRevision: transaction.nextAdjustmentRevision,
-              adjustments: selectedReceipt.adjustments,
-            });
+            const completion = classifyCopyPasteNativeCompletion(
+              useEditorStore.getState(),
+              selectedImage.path,
+              transaction,
+            );
+            if (completion !== 'current') return;
+            // The native receipt confirms disk/catalog side effects; EditTransaction remains the canonical document.
           }
         })
         .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));

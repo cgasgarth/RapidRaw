@@ -62,6 +62,7 @@ declare global {
       enabled: boolean;
       emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
+      applyAdjustmentsToPathsDelayMs: number;
       applyPreviewResponses: Array<BrowserHarnessApplyPreviewResponse>;
       originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
       revokedObjectUrls: Array<string>;
@@ -295,6 +296,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    applyAdjustmentsToPathsDelayMs: 0,
     applyPreviewResponses: [],
     batchAutoAdjustCommitDelayMs: 0,
     batchAutoAdjustPrepareDelayMs: 0,
@@ -521,20 +523,26 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       const adjustments = args?.['adjustments'] ?? null;
       const paths = getStringArrayArg(args, 'paths');
       for (const path of paths) harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
-      return Promise.resolve(
-        paths.map((path) => ({
-          adjustments,
-          adjustmentRevision: null,
-          catalogRevision: null,
-          imageId: `path:${path}`,
-          imageSessionId: null,
-          path,
-          renderFingerprint: 1,
-          sidecarRevision: `sha256:${'e'.repeat(64)}`,
-          thumbnailRevision: `sha256:${'f'.repeat(64)}`,
-          transactionId: null,
-        })),
-      );
+      return new Promise((resolve) => {
+        window.setTimeout(
+          () =>
+            resolve(
+              paths.map((path) => ({
+                adjustments,
+                adjustmentRevision: null,
+                catalogRevision: null,
+                imageId: `path:${path}`,
+                imageSessionId: null,
+                path,
+                renderFingerprint: 1,
+                sidecarRevision: `sha256:${'e'.repeat(64)}`,
+                thumbnailRevision: `sha256:${'f'.repeat(64)}`,
+                transactionId: null,
+              })),
+            ),
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyAdjustmentsToPathsDelayMs ?? 0,
+        );
+      });
     }
     case commandNames.saveMetadataAndUpdateThumbnail: {
       const path = getStringArg(args, 'path') ?? `${browserHarnessRoot}/browser-harness.ARW`;
