@@ -36,6 +36,12 @@ use crate::raw::negative_lab_color_finish::{
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 
+#[path = "negative_lab_hd_paper_curve.rs"]
+mod negative_lab_hd_paper_curve;
+use negative_lab_hd_paper_curve::{
+    NegativeLabDensityPrintAlgorithm, NegativeLabHdPaperCurveParams, scene_linear_reflectance,
+};
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NegativeConversionParams {
     pub red_weight: f32,
@@ -81,6 +87,10 @@ pub struct NegativeConversionParams {
     pub render_intent: NegativeLabRenderIntent,
     #[serde(default)]
     pub flat_log_master: NegativeLabFlatLogMasterParams,
+    #[serde(default)]
+    pub print_curve_algorithm: NegativeLabDensityPrintAlgorithm,
+    #[serde(default)]
+    pub print_curve_v2: Option<NegativeLabHdPaperCurveParams>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -1106,6 +1116,8 @@ impl Default for NegativeConversionParams {
             optical_finish: NegativeLabOpticalFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
             flat_log_master: NegativeLabFlatLogMasterParams::default(),
+            print_curve_algorithm: NegativeLabDensityPrintAlgorithm::DensityRgbV1,
+            print_curve_v2: None,
         }
     }
 }
@@ -2400,6 +2412,10 @@ impl NegativeConversionParams {
             optical_finish: self.optical_finish.sanitized(),
             render_intent: self.render_intent,
             flat_log_master: self.flat_log_master.sanitized(),
+            print_curve_algorithm: self.print_curve_algorithm,
+            print_curve_v2: self
+                .print_curve_v2
+                .map(NegativeLabHdPaperCurveParams::sanitized),
         }
         .with_sanitized_endpoints()
     }
@@ -3357,6 +3373,9 @@ fn run_pipeline_with_metrics(
         |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
     let weights = [params.red_weight, params.green_weight, params.blue_weight];
     let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
+    let hd_curve = (params.print_curve_algorithm
+        == NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2)
+        .then(|| params.print_curve_v2.unwrap_or_default().sanitized());
 
     let mut density_metrics = out_buffer
         .par_chunks_mut(3)
@@ -3402,9 +3421,18 @@ fn run_pipeline_with_metrics(
                     s_norm.clamp(0.0, 1.0)
                 };
 
-                let mut r = apply_curve(weighted_density[0]);
-                let mut g = apply_curve(weighted_density[1]);
-                let mut b = apply_curve(weighted_density[2]);
+                let mut r = hd_curve
+                    .as_ref()
+                    .map(|curve| scene_linear_reflectance(weighted_density[0], curve))
+                    .unwrap_or_else(|| apply_curve(weighted_density[0]));
+                let mut g = hd_curve
+                    .as_ref()
+                    .map(|curve| scene_linear_reflectance(weighted_density[1], curve))
+                    .unwrap_or_else(|| apply_curve(weighted_density[1]));
+                let mut b = hd_curve
+                    .as_ref()
+                    .map(|curve| scene_linear_reflectance(weighted_density[2], curve))
+                    .unwrap_or_else(|| apply_curve(weighted_density[2]));
 
                 let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                 let max_ch = r.max(g).max(b);
@@ -3418,7 +3446,11 @@ fn run_pipeline_with_metrics(
                     b = b + (luma - b) * sat_reduction;
                 }
 
-                let scene_linear = [apply_endpoints(r), apply_endpoints(g), apply_endpoints(b)];
+                let scene_linear = if hd_curve.is_some() {
+                    [r, g, b]
+                } else {
+                    [apply_endpoints(r), apply_endpoints(g), apply_endpoints(b)]
+                };
                 scene_linear_print_pixel.copy_from_slice(&scene_linear);
                 out_pixel[0] = negative_lab_scene_linear_to_srgb(scene_linear[0]);
                 out_pixel[1] = negative_lab_scene_linear_to_srgb(scene_linear[1]);

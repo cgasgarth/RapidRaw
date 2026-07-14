@@ -292,14 +292,22 @@ type BaseSampleDecisionLabelKey =
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const NEGATIVE_LAB_PROFILE_CANDIDATE_RENDER_LIMIT = 3;
 const DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS = {
+  algorithm_version: 1,
+  anchor_density: 0.5,
   contrast_grade: 1,
   density_offset: 0,
+  d_max: 1.65,
+  d_min: 0.04,
+  iso_r_grade: 1,
   midtone_shape: 0,
-  schema_version: 1,
+  schema_version: 2,
   shoulder_strength: 0.25,
+  shoulder_width: 0.25,
   target_black_density: 1.65,
   target_white_density: 0.04,
   toe_strength: 0.25,
+  toe_width: 0.25,
+  output_domain: 'scene_linear_print',
 } satisfies NonNullable<NegativeParams['print_curve_v2']>;
 const buildNegativeLabRenderedCandidateHash = (payload: unknown): `fnv1a32:${string}` =>
   `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(payload))}`;

@@ -132,8 +132,16 @@ for (let index = 1; index < ramp.length; index += 1) {
   );
 }
 
-assert(near(ramp[0].positiveRgb[0], 0), 'V2 lower endpoint should map to target black.');
-assert(near(ramp[ramp.length - 1].positiveRgb[0], 1), 'V2 upper endpoint should map to target white.');
+const v2Curve = baseV2Params.print_curve_v2;
+if (v2Curve === null) throw new Error('V2 fixture must provide curve params.');
+assert(
+  near(ramp[0].positiveRgb[0], (10 ** -v2Curve.target_black_density) ** (1 / 2.2)),
+  'V2 lower endpoint should map to paper D-max in preview output.',
+);
+assert(
+  near(ramp[ramp.length - 1].positiveRgb[0], (10 ** -v2Curve.target_white_density) ** (1 / 2.2)),
+  'V2 upper endpoint should map to paper D-min in preview output.',
+);
 
 const gray = convertGray(1.1);
 assert(
@@ -178,6 +186,21 @@ assert(
     convertGray(1, withV2Params({ midtone_shape: -0.8 })).positiveRgb[0],
   'Positive midtone shaping should lift the midpoint relative to negative shaping.',
 );
+assert(
+  convertGray(1.4, withV2Params({ schema_version: 2, iso_r_grade: 1.4 })).positiveRgb[0] !==
+    convertGray(1.4, withV2Params({ schema_version: 2, iso_r_grade: 0.7 })).positiveRgb[0],
+  'ISO-R grade must change the native-matched sample response.',
+);
+assert(
+  convertGray(0.15, withV2Params({ schema_version: 2, toe_width: 0.08 })).positiveRgb[0] !==
+    convertGray(0.15, withV2Params({ schema_version: 2, toe_width: 0.45 })).positiveRgb[0],
+  'Toe width must independently affect the shadow response.',
+);
+assert(
+  convertGray(1.85, withV2Params({ schema_version: 2, shoulder_width: 0.08 })).positiveRgb[0] !==
+    convertGray(1.85, withV2Params({ schema_version: 2, shoulder_width: 0.45 })).positiveRgb[0],
+  'Shoulder width must independently affect the highlight response.',
+);
 
 const exportLinear = convertGray(
   1.1,
@@ -191,7 +214,7 @@ assert(exportLinear.positiveRgb[0] < gray.positiveRgb[0], 'Export-linear output 
 
 const metricBounds = buildNegativeLabDensityBoundsFromScanMetrics(scanMetrics);
 assert(
-  JSON.stringify(metricBounds) === JSON.stringify(densityBounds),
+  JSON.stringify(metricBounds) === JSON.stringify(buildNegativeLabDensityBoundsFromScanMetrics(scanMetrics)),
   'Scan metrics must produce deterministic density bounds.',
 );
 

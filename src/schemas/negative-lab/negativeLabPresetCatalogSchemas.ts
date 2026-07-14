@@ -62,14 +62,22 @@ export const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
 
 export const negativeLabDensityPrintV2ParamsSchema = z
   .object({
+    algorithm_version: z.literal(1).default(1),
+    anchor_density: z.number().min(0).max(1).default(0.5),
     contrast_grade: z.number().min(0.5).max(2).default(1),
     density_offset: z.number().min(-0.5).max(0.5).default(0),
+    d_max: z.number().min(1.1).max(3).default(1.65),
+    d_min: z.number().min(0).max(1).default(0.04),
+    iso_r_grade: z.number().min(0.5).max(3).default(1),
     midtone_shape: z.number().min(-1).max(1).default(0),
-    schema_version: z.literal(1).default(1),
+    schema_version: z.union([z.literal(1), z.literal(2)]).default(2),
     shoulder_strength: z.number().min(0).max(1).default(0.25),
+    shoulder_width: z.number().min(0.01).max(0.5).default(0.25),
     target_black_density: z.number().min(1.1).max(2.4).default(1.65),
     target_white_density: z.number().min(0).max(0.25).default(0.04),
     toe_strength: z.number().min(0).max(1).default(0.25),
+    toe_width: z.number().min(0.01).max(0.5).default(0.25),
+    output_domain: z.literal('scene_linear_print').default('scene_linear_print'),
   })
   .strict()
   .superRefine((params, context) => {
@@ -81,6 +89,22 @@ export const negativeLabDensityPrintV2ParamsSchema = z
       });
     }
   });
+
+/** Upgrades the original v1 density-print fields to the native H&D contract. */
+export const migrateNegativeLabDensityPrintV2Params = (
+  params: Partial<z.input<typeof negativeLabDensityPrintV2ParamsSchema>>,
+): NegativeLabDensityPrintV2Params => {
+  const parsed = negativeLabDensityPrintV2ParamsSchema.parse({
+    ...params,
+    d_min: params.d_min ?? params.target_white_density,
+    d_max: params.d_max ?? params.target_black_density,
+    iso_r_grade: params.iso_r_grade ?? params.contrast_grade,
+  });
+  return {
+    ...parsed,
+    schema_version: 2,
+  };
+};
 
 export const negativeLabPresetParamsSchema = z
   .object({
