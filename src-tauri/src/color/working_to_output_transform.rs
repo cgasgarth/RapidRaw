@@ -1,6 +1,10 @@
 use image::DynamicImage;
+use serde::Serialize;
 
 use crate::export::export_color_policy::{ExportColorProfile, ExportRenderingIntent};
+use crate::gamut_mapping::{
+    GamutPlanMode, GamutRenderingIntent, GamutTarget, fixed_gamut_plan_for_intent,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum WorkingColorState {
@@ -47,12 +51,38 @@ const XYZ_D50_TO_PROPHOTO: [[f64; 3]; 3] = [
     [0.000_000_000, 0.000_000_000, 1.211_812_800],
 ];
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OutputGamutMappingReceiptV1 {
+    pub(crate) compressed_pixel_count: u64,
+    pub(crate) hard_clipped_pixel_count: u64,
+    pub(crate) input_out_of_gamut_pixel_count: u64,
+    pub(crate) maximum_boundary_excess: f64,
+    pub(crate) pixel_count: u64,
+    pub(crate) plan_fingerprint: String,
+}
+
 pub(crate) fn transform_acescg_image_to_output_rgb16(
     image: &DynamicImage,
     profile: &ExportColorProfile,
     intent: &ExportRenderingIntent,
     black_point_compensation: bool,
 ) -> Result<(Vec<u16>, u32, u32), String> {
+    let (pixels, width, height, _) = transform_acescg_image_to_output_rgb16_with_gamut_receipt(
+        image,
+        profile,
+        intent,
+        black_point_compensation,
+    )?;
+    Ok((pixels, width, height))
+}
+
+pub(crate) fn transform_acescg_image_to_output_rgb16_with_gamut_receipt(
+    image: &DynamicImage,
+    profile: &ExportColorProfile,
+    intent: &ExportRenderingIntent,
+    black_point_compensation: bool,
+) -> Result<(Vec<u16>, u32, u32, OutputGamutMappingReceiptV1), String> {
     if black_point_compensation {
         return Err("working_output_bpc_unsupported_for_ap1_matrix_transform_v1".to_string());
     }
@@ -66,6 +96,37 @@ pub(crate) fn transform_acescg_image_to_output_rgb16(
     let (width, height) = rgba.dimensions();
     let d60_to_d65 = bradford(D60_XY, D65_XY);
     let d60_to_d50 = bradford(D60_XY, D50_XY);
+    let target = match profile {
+        ExportColorProfile::Srgb => GamutTarget::Srgb,
+        ExportColorProfile::DisplayP3 => GamutTarget::DisplayP3,
+        ExportColorProfile::AdobeRgb1998 => GamutTarget::AdobeRgb1998,
+        ExportColorProfile::ProPhotoRgb => GamutTarget::ProPhotoRgb,
+        ExportColorProfile::SourceEmbedded => {
+            return Err("working_output_source_embedded_requires_verified_source_domain".into());
+        }
+    };
+    let gamut_intent = match intent {
+        ExportRenderingIntent::Perceptual => GamutRenderingIntent::Perceptual,
+        ExportRenderingIntent::RelativeColorimetric => GamutRenderingIntent::RelativeColorimetric,
+        ExportRenderingIntent::AbsoluteColorimetric | ExportRenderingIntent::Saturation => {
+            return Err("working_output_intent_unsupported_for_shared_gamut_plan_v1".into());
+        }
+    };
+    let gamut_plan = fixed_gamut_plan_for_intent(
+        target,
+        GamutPlanMode::Output,
+        gamut_intent,
+        black_point_compensation,
+    )
+    .map_err(str::to_owned)?;
+    let mut receipt = OutputGamutMappingReceiptV1 {
+        compressed_pixel_count: 0,
+        hard_clipped_pixel_count: 0,
+        input_out_of_gamut_pixel_count: 0,
+        maximum_boundary_excess: 0.0,
+        pixel_count: u64::from(width) * u64::from(height),
+        plan_fingerprint: gamut_plan.fingerprint.clone(),
+    };
     let mut output = Vec::with_capacity(width as usize * height as usize * 3);
     for pixel in rgba.as_raw().chunks_exact(4) {
         if !pixel[..3].iter().all(|value| value.is_finite()) {
@@ -88,7 +149,14 @@ pub(crate) fn transform_acescg_image_to_output_rgb16(
                 );
             }
         };
-        for value in linear {
+        let mapped = gamut_plan.map_target_linear(linear);
+        receipt.input_out_of_gamut_pixel_count += u64::from(mapped.receipt.input_was_out_of_gamut);
+        receipt.compressed_pixel_count += u64::from(mapped.receipt.compressed);
+        receipt.hard_clipped_pixel_count += u64::from(mapped.receipt.hard_clipped);
+        receipt.maximum_boundary_excess = receipt
+            .maximum_boundary_excess
+            .max(mapped.receipt.maximum_boundary_excess);
+        for value in mapped.linear_rgb {
             let encoded = match profile {
                 ExportColorProfile::Srgb | ExportColorProfile::DisplayP3 => srgb_encode(value),
                 ExportColorProfile::AdobeRgb1998 => value.max(0.0).powf(1.0 / 2.199_218_75),
@@ -98,7 +166,7 @@ pub(crate) fn transform_acescg_image_to_output_rgb16(
             output.push((encoded.clamp(0.0, 1.0) * 65_535.0).round() as u16);
         }
     }
-    Ok((output, width, height))
+    Ok((output, width, height, receipt))
 }
 
 fn mul(matrix: [[f64; 3]; 3], value: [f64; 3]) -> [f64; 3] {
@@ -206,6 +274,41 @@ mod tests {
         let mislabeled = fixture([0.9, 0.1, 0.05]).to_rgb16().into_raw();
         assert_ne!(pixels, mislabeled);
         assert!(pixels[0] > pixels[1] && pixels[0] > pixels[2]);
+    }
+
+    #[test]
+    fn every_fixed_ap1_output_uses_shared_mapping_and_truthful_receipt() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(2, 1, |x, _| {
+            if x == 0 {
+                Rgba([1.35, -0.1, 0.02, 1.0])
+            } else {
+                Rgba([0.18, 0.18, 0.18, 1.0])
+            }
+        }));
+
+        for profile in [
+            ExportColorProfile::Srgb,
+            ExportColorProfile::DisplayP3,
+            ExportColorProfile::AdobeRgb1998,
+            ExportColorProfile::ProPhotoRgb,
+        ] {
+            let (pixels, width, height, receipt) =
+                transform_acescg_image_to_output_rgb16_with_gamut_receipt(
+                    &source,
+                    &profile,
+                    &ExportRenderingIntent::RelativeColorimetric,
+                    false,
+                )
+                .unwrap();
+
+            assert_eq!((width, height, pixels.len()), (2, 1, 6));
+            assert_eq!(receipt.pixel_count, 2);
+            assert!(receipt.input_out_of_gamut_pixel_count >= 1, "{profile:?}");
+            assert!(receipt.compressed_pixel_count >= 1, "{profile:?}");
+            assert_eq!(receipt.hard_clipped_pixel_count, 0, "{profile:?}");
+            assert!(receipt.maximum_boundary_excess > 0.0, "{profile:?}");
+            assert!(receipt.plan_fingerprint.starts_with("sha256:"));
+        }
     }
 
     #[test]
