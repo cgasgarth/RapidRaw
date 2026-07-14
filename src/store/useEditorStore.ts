@@ -16,6 +16,7 @@ import {
 } from '../utils/adjustmentSnapshots';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
+import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   BasicToneApprovalClass,
@@ -182,6 +183,7 @@ interface EditorState {
   referenceMatchReferences: ReferenceMatchReference[];
   lastReferenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
   referenceMatchPreview: ReferenceMatchPreview | null;
+  autoEditPreviewSession: AutoEditPreviewSession | null;
 
   // Analytics
   histogram: ChannelConfig | null;
@@ -310,6 +312,7 @@ const historyNavigationPreviewInvalidation = {
 const publishAdjustmentState = (state: EditorState, adjustments: Adjustments) => ({
   adjustments,
   adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments),
+  autoEditPreviewSession: null,
 });
 
 const resolveAiSelectionState = (
@@ -382,6 +385,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   referenceMatchReferences: [],
   lastReferenceMatchApplicationReceipt: null,
   referenceMatchPreview: null,
+  autoEditPreviewSession: null,
   histogram: null,
   referenceMatchSpatialAnalysis: null,
   waveform: null,
@@ -450,6 +454,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if ('adjustments' in update && update.adjustments !== undefined) {
         if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
         update.referenceMatchPreview = null;
+        update.autoEditPreviewSession = null;
         update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.adjustments);
         update.adjustments = update.adjustmentSnapshot.value as Adjustments;
         update.lastEditApplicationReceipt = null;
@@ -514,6 +519,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
         update.presetApplication = null;
+        update.autoEditPreviewSession = null;
       }
 
       if (!shouldRevalidateGamutWarningOverlay(update)) return update;

@@ -32,6 +32,7 @@ import {
   logAppOperationFailure,
   logAppOperationSuccess,
 } from '../../utils/appEventLogger';
+import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
@@ -159,6 +160,7 @@ export function useImageProcessing(
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const committedAdjustments = useEditorStore((state) => state.adjustments);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
+  const autoEditPreviewSession = useEditorStore((state) => state.autoEditPreviewSession);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);
   const displaySize = useEditorStore((state) => state.displaySize);
@@ -167,13 +169,23 @@ export function useImageProcessing(
   const zoomMode = useEditorStore((state) => state.zoomMode);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const canonicalAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const editorImageSession = useEditorStore((state) => state.imageSession);
   const lastEditApplicationReceipt = useEditorStore((state) => state.lastEditApplicationReceipt);
-  const adjustments = resolveReferenceMatchRenderAdjustments({
+  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
+    imageSessionId: editorImageSession?.id ?? null,
+    path: selectedImage?.path ?? null,
+  });
+  const referenceMatchAdjustments = resolveReferenceMatchRenderAdjustments({
     adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
     committed: committedAdjustments,
     preview: referenceMatchPreview,
     targetPath: selectedImage?.path ?? null,
   });
+  const adjustments =
+    renderAdjustmentSnapshot === adjustmentSnapshot
+      ? referenceMatchAdjustments
+      : (renderAdjustmentSnapshot.value as Adjustments);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const proofRevision = useEditorStore((state) => state.proofRevision);
   const hasRenderedFirstFrame = useEditorStore((state) => state.hasRenderedFirstFrame);
@@ -197,13 +209,16 @@ export function useImageProcessing(
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
   const viewerSampleGraphRevision = fingerprintPreviewGraphRevision({
-    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
-    geometryRevision: adjustmentSnapshot.geometryRevision,
+    adjustmentRevision: renderAdjustmentSnapshot.adjustmentRevision,
+    geometryRevision: renderAdjustmentSnapshot.geometryRevision,
     imageSessionId,
-    maskRevision: adjustmentSnapshot.maskRevision,
-    patchRevision: adjustmentSnapshot.patchRevision,
+    maskRevision: renderAdjustmentSnapshot.maskRevision,
+    patchRevision: renderAdjustmentSnapshot.patchRevision,
     proofRevision,
-    proposalFingerprint: referenceMatchPreview?.proposalFingerprint ?? 'committed',
+    proposalFingerprint:
+      renderAdjustmentSnapshot === adjustmentSnapshot
+        ? (referenceMatchPreview?.proposalFingerprint ?? 'committed')
+        : (autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview'),
   });
 
   const latestInteractiveRequestIdRef = useRef(0);
@@ -330,6 +345,12 @@ export function useImageProcessing(
     const selectedImage = editor.selectedImage;
     if (!selectedImage) return null;
     const sourceImagePath = selectedImage.path;
+    const scopeAdjustmentSnapshot = resolveAutoEditRenderSnapshot(
+      editor.adjustmentSnapshot,
+      editor.autoEditPreviewSession,
+      { imageSessionId: editor.imageSession?.id ?? null, path: sourceImagePath },
+    );
+    const autoEditPreviewActive = scopeAdjustmentSnapshot !== editor.adjustmentSnapshot;
 
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     const normalizedTargetRes = Math.max(1, Math.round(targetRes));
@@ -360,20 +381,22 @@ export function useImageProcessing(
           thumbnailUrl: selectedImage.thumbnailUrl,
         }),
         devicePixelRatio: dpr,
-        adjustmentRevision: editor.adjustmentSnapshot.adjustmentRevision,
-        geometryIdentity: editor.adjustmentSnapshot.geometryRevision,
+        adjustmentRevision: scopeAdjustmentSnapshot.adjustmentRevision,
+        geometryIdentity: scopeAdjustmentSnapshot.geometryRevision,
         graphIdentity: fingerprintPreviewGraphRevision({
-          adjustmentRevision: editor.adjustmentSnapshot.adjustmentRevision,
-          geometryRevision: editor.adjustmentSnapshot.geometryRevision,
+          adjustmentRevision: scopeAdjustmentSnapshot.adjustmentRevision,
+          geometryRevision: scopeAdjustmentSnapshot.geometryRevision,
           imageSessionId: editor.imageSessionId,
-          maskRevision: editor.adjustmentSnapshot.maskRevision,
-          patchRevision: editor.adjustmentSnapshot.patchRevision,
+          maskRevision: scopeAdjustmentSnapshot.maskRevision,
+          patchRevision: scopeAdjustmentSnapshot.patchRevision,
           proofRevision: editor.proofRevision,
-          proposalFingerprint: editor.referenceMatchPreview?.proposalFingerprint ?? 'committed',
+          proposalFingerprint: autoEditPreviewActive
+            ? (editor.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
+            : (editor.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
         }),
         imageSessionId: editor.imageSessionId,
-        maskRevision: editor.adjustmentSnapshot.maskRevision,
-        patchRevision: editor.adjustmentSnapshot.patchRevision,
+        maskRevision: scopeAdjustmentSnapshot.maskRevision,
+        patchRevision: scopeAdjustmentSnapshot.patchRevision,
         proofRevision: editor.proofRevision,
         roiX: quantizedRoi?.[0] ?? null,
         roiY: quantizedRoi?.[1] ?? null,
@@ -909,7 +932,7 @@ export function useImageProcessing(
         if (coordinatorIdentity === undefined || !previewCoordinator.bindRequest(requestId, coordinatorIdentity))
           return;
         interactiveSchedulerRef.current?.schedule({
-          snapshot: useEditorStore.getState().adjustmentSnapshot,
+          snapshot: renderAdjustmentSnapshot,
           createdAt,
           identity: synchronized.identity,
           quality,
@@ -930,7 +953,7 @@ export function useImageProcessing(
           return;
         interactiveSchedulerRef.current?.clear();
         void executeApplyAdjustments({
-          snapshot: useEditorStore.getState().adjustmentSnapshot,
+          snapshot: renderAdjustmentSnapshot,
           createdAt,
           dragging: false,
           identity: interactiveGenerationRef.current.supersede(synchronized.scope),
@@ -949,6 +972,7 @@ export function useImageProcessing(
       dispatchPreviewCoordinator,
       previewCoordinator,
       resolveQualityDecision,
+      renderAdjustmentSnapshot,
       previewSessionIdentity,
       selectedImage?.isReady,
       synchronizePreviewIdentity,
@@ -1063,7 +1087,7 @@ export function useImageProcessing(
   }, [
     baseRenderSize,
     calculateTargetRes,
-    adjustmentSnapshot.geometryRevision,
+    renderAdjustmentSnapshot.geometryRevision,
     hasRenderedFirstFrame,
     historyIndex,
     isExportSoftProofEnabled,
@@ -1225,7 +1249,12 @@ export function useImageProcessing(
   useEffect(() => {
     if (!selectedImage?.isReady) return;
     const previous = prevAdjustmentsRef.current;
-    const persistence = decideAdjustmentPersistence(previous, selectedImage.path, adjustments, areAdjustmentsEqual);
+    const persistence = decideAdjustmentPersistence(
+      previous,
+      selectedImage.path,
+      committedAdjustments,
+      areAdjustmentsEqual,
+    );
     if (persistence.action === 'prime') {
       // A newly selected image can become preview-ready before its metadata phase
       // hydrates the editor store. Prime the comparison snapshot without writing so
@@ -1244,10 +1273,10 @@ export function useImageProcessing(
           lastEditApplicationReceipt &&
           lastEditApplicationReceipt.imageSessionId ===
             (useEditorStore.getState().imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`) &&
-          lastEditApplicationReceipt.adjustmentRevision === adjustmentSnapshot.adjustmentRevision
+          lastEditApplicationReceipt.adjustmentRevision === canonicalAdjustmentRevision
             ? buildEditTransactionPersistenceContext(lastEditApplicationReceipt, lastEditApplicationReceipt)
             : undefined;
-        debouncedSave(selectedImage.path, adjustments, transaction);
+        debouncedSave(selectedImage.path, committedAdjustments, transaction);
         useProcessStore.getState().invalidateThumbnails([selectedImage.path]);
 
         const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
@@ -1256,9 +1285,9 @@ export function useImageProcessing(
           if (prev && prev.path === selectedImage.path) {
             const delta: Record<string, unknown> = {};
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
-            for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
+            for (const key of Object.keys(committedAdjustments) as Array<keyof Adjustments>) {
               if (includedKeys.includes(key as string)) {
-                const adjustmentValue: unknown = adjustments[key];
+                const adjustmentValue: unknown = committedAdjustments[key];
                 const previousAdjustmentValue: unknown = prev.adjustments[key];
                 if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
                   delta[key] = adjustmentValue;
@@ -1284,7 +1313,7 @@ export function useImageProcessing(
             }
           }
         }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
+        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments: committedAdjustments };
       },
     );
 
@@ -1292,7 +1321,7 @@ export function useImageProcessing(
       if (persistIdleTimer.current) clearTimeout(persistIdleTimer.current);
     };
   }, [
-    adjustments,
+    committedAdjustments,
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
@@ -1300,7 +1329,7 @@ export function useImageProcessing(
     prevAdjustmentsRef,
     appSettings?.copyPasteSettings?.includedAdjustments,
     imageSessionId,
-    adjustmentSnapshot.adjustmentRevision,
+    canonicalAdjustmentRevision,
     lastEditApplicationReceipt,
   ]);
 

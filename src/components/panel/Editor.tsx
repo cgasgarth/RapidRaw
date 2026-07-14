@@ -29,6 +29,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import {
   activeCropDraft,
   type CropInteraction,
@@ -179,16 +180,26 @@ export default function Editor({
   const isLoading = useLibraryStore((s) => s.isViewLoading);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
+  const editorImageSession = useEditorStore((s) => s.imageSession);
   const adjustments = useEditorStore((s) => s.adjustments);
-  const adjustmentGeometryRevision = useEditorStore((s) => s.adjustmentSnapshot.geometryRevision);
-  const adjustmentRevision = useEditorStore((s) => s.adjustmentSnapshot.adjustmentRevision);
-  const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
-  const renderAdjustments = resolveReferenceMatchRenderAdjustments({
-    adjustmentRevision,
-    committed: adjustments,
-    preview: referenceMatchPreview,
-    targetPath: selectedImage?.path ?? null,
+  const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
+  const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
+  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
+    imageSessionId: editorImageSession?.id ?? null,
+    path: selectedImage?.path ?? null,
   });
+  const adjustmentGeometryRevision = autoEditRenderSnapshot.geometryRevision;
+  const adjustmentRevision = autoEditRenderSnapshot.adjustmentRevision;
+  const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
+  const renderAdjustments =
+    autoEditRenderSnapshot === adjustmentSnapshot
+      ? resolveReferenceMatchRenderAdjustments({
+          adjustmentRevision,
+          committed: adjustments,
+          preview: referenceMatchPreview,
+          targetPath: selectedImage?.path ?? null,
+        })
+      : (autoEditRenderSnapshot.value as Adjustments);
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -205,6 +216,7 @@ export default function Editor({
     exportSoftProofRecipeId,
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
+    autoEditPreviewIdentity: autoEditPreviewSession?.previewIdentity ?? null,
     referenceMatchPreview: referenceMatchPreview
       ? {
           impact: referenceMatchPreview.impact,

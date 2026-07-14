@@ -178,6 +178,7 @@ try {
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
+  await verifyAutoEditTransactionBoundary(page);
   const exposureValue = page.getByTestId('basic-control-exposure-value');
   await exposureValue.click();
   const exposureInput = page.getByTestId('basic-control-exposure-input');
@@ -411,6 +412,75 @@ async function expectEnabled(locator: Locator, label: string): Promise<void> {
   while (await locator.isDisabled()) {
     if (Date.now() >= deadline) throw new Error(`${label} did not become enabled.`);
     await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function verifyAutoEditTransactionBoundary(page: Page): Promise<void> {
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  await undo.waitFor({ timeout: 10_000 });
+  if (!(await undo.isDisabled())) throw new Error('Auto Edit proof did not begin at the initial history boundary.');
+
+  const saveCount = async () =>
+    page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'save_metadata_and_update_thumbnail',
+        ).length ?? 0,
+    );
+  const baselineSaves = await saveCount();
+  const autoAdjust = page.getByRole('button', { name: 'Auto Adjust Image' });
+
+  await autoAdjust.click();
+  const review = page.getByTestId('auto-edit-review');
+  await review.waitFor({ timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.some(
+        ({ command }) => command === 'preview_auto_edit_proposal',
+      ) === true,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(450);
+  if (!(await undo.isDisabled()) || (await saveCount()) !== baselineSaves) {
+    throw new Error('Auto Edit preview mutated canonical history or persistence.');
+  }
+
+  await review.getByRole('button', { name: 'Cancel Auto Adjust' }).click();
+  await review.waitFor({ state: 'detached', timeout: 10_000 });
+  await page.waitForTimeout(450);
+  if (!(await undo.isDisabled()) || (await saveCount()) !== baselineSaves) {
+    throw new Error('Auto Edit cancel mutated canonical history or persistence.');
+  }
+
+  await autoAdjust.click();
+  await review.waitFor({ timeout: 10_000 });
+  await review.getByRole('button', { exact: true, name: 'Apply' }).click();
+  await review.waitFor({ state: 'detached', timeout: 10_000 });
+  await expectEnabled(undo, 'Undo after Auto Edit acceptance');
+  await page.waitForFunction(
+    (expectedCount) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expectedCount,
+    baselineSaves + 1,
+    { timeout: 10_000 },
+  );
+
+  const persisted = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+      .at(-1);
+    return call?.args ?? null;
+  });
+  if (
+    persisted?.['adjustments']?.['exposure'] !== 0.5 ||
+    persisted?.['transaction']?.['transactionId'] !== 'blake3:browser-harness-auto-edit-transaction' ||
+    typeof persisted?.['transaction']?.['baseAdjustmentRevision'] !== 'number' ||
+    persisted['transaction']['nextAdjustmentRevision'] !== persisted['transaction']['baseAdjustmentRevision'] + 1
+  ) {
+    throw new Error(
+      `Auto Edit acceptance did not persist one revision-scoped transaction: ${JSON.stringify(persisted)}`,
+    );
   }
 }
 
