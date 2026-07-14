@@ -659,14 +659,6 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
     Ok(arc_lut)
 }
 
-#[tauri::command]
-fn get_image_dimensions(path: String) -> Result<ImageDimensions, String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    image::image_dimensions(&source_path)
-        .map(|(width, height)| ImageDimensions { width, height })
-        .map_err(|e| e.to_string())
-}
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PerspectiveAnalysisResult {
@@ -707,20 +699,6 @@ fn analyze_perspective_correction(
     let receipt =
         crate::geometry::perspective::compile_perspective_plan_with_analysis(&settings, &analysis)?;
     Ok(PerspectiveAnalysisResult { analysis, receipt })
-}
-
-#[tauri::command]
-fn is_original_file_available(path: String) -> bool {
-    let (source_path, _) = parse_virtual_path(&path);
-    source_path.exists()
-}
-
-#[tauri::command]
-fn resolve_original_source_identity(
-    path: String,
-) -> Result<crate::io::reference_source_identity::ReferenceSourceIdentity, String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    crate::io::reference_source_identity::resolve_reference_source_identity(&source_path)
 }
 
 #[tauri::command]
@@ -4294,10 +4272,10 @@ pub fn run() {
             fetch_community_presets,
             generate_all_community_previews,
             save_temp_file,
-            get_image_dimensions,
+            app::commands::source::get_image_dimensions,
             analyze_perspective_correction,
-            is_original_file_available,
-            resolve_original_source_identity,
+            app::commands::source::is_original_file_available,
+            app::commands::source::resolve_original_source_identity,
             frontend_ready,
             get_startup_trace,
             record_frontend_startup_phase,
