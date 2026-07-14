@@ -7,14 +7,17 @@ import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
 } from '../../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+import { rawOpenEditExportRunReportSchema } from '../../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
-const [wrapperSource, commandsSource, rustSource, rustLibSource, proofRequestFixtureSource] = await Promise.all([
-  readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
-  readFile('src/tauri/commands.ts', 'utf8'),
-  readFile('src-tauri/src/raw/raw_open_edit_export_proof.rs', 'utf8'),
-  readFile('src-tauri/src/lib.rs', 'utf8'),
-  readFile('fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json', 'utf8'),
-]);
+const [wrapperSource, captureNativeSmokeSource, commandsSource, rustSource, rustLibSource, proofRequestFixtureSource] =
+  await Promise.all([
+    readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
+    readFile('scripts/proofs/capture-native-raw-edit-smoke.ts', 'utf8'),
+    readFile('src/tauri/commands.ts', 'utf8'),
+    readFile('src-tauri/src/raw/raw_open_edit_export_proof.rs', 'utf8'),
+    readFile('src-tauri/src/lib.rs', 'utf8'),
+    readFile('fixtures/validation/raw-open-edit-export/raw-open-edit-export-proof-request.json', 'utf8'),
+  ]);
 
 const failures: string[] = [];
 
@@ -26,6 +29,14 @@ if (!wrapperSource.includes('rawOpenEditExportProofRequestSchema.parse(request)'
 }
 if (!wrapperSource.includes('rawOpenEditExportProofReportSchema')) {
   failures.push('RAW proof wrapper must validate command responses with Zod.');
+}
+if (
+  !captureNativeSmokeSource.includes(
+    "rawOpenEditExportRunReportSchema } from '../../src/schemas/rawOpenEditExportRunReportSchemas.ts'",
+  ) ||
+  !captureNativeSmokeSource.includes('rawOpenEditExportRunReportSchema.parse(')
+) {
+  failures.push('Native RAW smoke collector must parse workflow reports with the strict run-report schema.');
 }
 if (!wrapperSource.includes("const RAW_OPEN_EDIT_EXPORT_PROOF_COMMAND = 'run_raw_open_edit_export_proof'")) {
   failures.push('RAW proof wrapper must keep the validation command string private to the wrapper.');
@@ -57,7 +68,7 @@ const sampleAsset = {
   publicRepoAllowed: false,
 };
 
-rawOpenEditExportProofReportSchema.parse({
+const sampleReport = {
   artifacts: [
     { ...sampleAsset, kind: 'source_raw_private', path: sampleRequest.sourceRelativePath },
     { ...sampleAsset, kind: 'preview_before_private' },
@@ -164,6 +175,13 @@ rawOpenEditExportProofReportSchema.parse({
     { name: 'finalFileSoftProofRgb8MaxAbsDelta', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
     { name: 'finalFileSoftProofRgb8MeanAbsDelta', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
     { name: 'finalFileTransformApplied', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },
+    { name: 'gamutMapperChangedPixelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
+    { name: 'gamutMapperInputPixelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
+    { name: 'gamutPostMapOutOfGamutPixelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
+    { name: 'gamutPreMapMaxLinearRgb', passed: true, source: 'private_raw_report', threshold: 0, value: 1 },
+    { name: 'gamutPreMapMinLinearRgb', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
+    { name: 'gamutPreMapOutOfGamutChannelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
+    { name: 'gamutPreMapOutOfGamutPixelRatio', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
     { name: 'previewExportMeanAbsDelta', passed: true, source: 'private_raw_report', threshold: 0.015, value: 0.01 },
     { name: 'softProofExportRgb8MeanAbsDelta', passed: true, source: 'private_raw_report', threshold: 0, value: 0 },
     { name: 'sidecarReloadRevisionMatch', passed: true, source: 'private_raw_report', threshold: 1, value: 1 },
@@ -184,7 +202,10 @@ rawOpenEditExportProofReportSchema.parse({
   sidecarAfter: sampleAsset,
   sourceRaw: { ...sampleAsset, path: sampleRequest.sourceRelativePath },
   trackingIssue: 1376,
-});
+};
+
+rawOpenEditExportProofReportSchema.parse(sampleReport);
+rawOpenEditExportRunReportSchema.parse(sampleReport);
 
 if (failures.length > 0) {
   console.error('RAW open/edit/export command wrapper failed.');
