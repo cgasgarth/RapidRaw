@@ -1389,6 +1389,7 @@ export function MasksPanel() {
     activeWaveformChannel,
     waveformHeight,
     setEditor,
+    applyEditTransaction,
   } = useEditorStore(
     useShallow((state) => ({
       activeMaskContainerId: state.activeMaskContainerId,
@@ -1406,6 +1407,7 @@ export function MasksPanel() {
       activeWaveformChannel: state.activeWaveformChannel,
       waveformHeight: state.waveformHeight,
       setEditor: state.setEditor,
+      applyEditTransaction: state.applyEditTransaction,
     })),
   );
 
@@ -1519,29 +1521,32 @@ export function MasksPanel() {
 
   const commitMaskGraphCommand = useCallback(
     (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
-      let committed: MaskGraphCommandResult | null = null;
-      let nextAdjustments: Adjustments | null = null;
-      setEditor((state) => {
-        const result = command(state.adjustments.masks);
-        if (result === null) return {};
-        committed = validateMaskGraphCommand(result);
-        nextAdjustments = { ...state.adjustments, masks: committed.masks };
-        return {
-          activeMaskContainerId: committed.selection.containerId,
-          activeMaskId: committed.selection.subMaskId,
-          adjustments: nextAdjustments,
-          ...(committed.selectBrushTool
-            ? {
-                brushSettings: {
-                  ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-                  tool: ToolType.Brush,
-                },
-              }
-            : {}),
-        };
+      const state = useEditorStore.getState();
+      const result = command(state.adjustments.masks);
+      if (result === null) return null;
+      const committed = validateMaskGraphCommand(result);
+      applyEditTransaction({
+        transactionId: crypto.randomUUID(),
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        baseAdjustmentRevision: state.adjustmentRevision,
+        source: 'layer-command',
+        operations: [{ type: 'replace-adjustments', adjustments: { ...state.adjustments, masks: committed.masks } }],
+        history: 'single-entry',
+        persistence: 'commit',
       });
-      if (nextAdjustments !== null) useEditorStore.getState().pushHistory(nextAdjustments);
-      const committedResult = committed as MaskGraphCommandResult | null;
+      setEditor({
+        activeMaskContainerId: committed.selection.containerId,
+        activeMaskId: committed.selection.subMaskId,
+        ...(committed.selectBrushTool
+          ? {
+              brushSettings: {
+                ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+                tool: ToolType.Brush,
+              },
+            }
+          : {}),
+      });
+      const committedResult = committed;
       if (committedResult !== null) {
         const validIds = new Set(committedResult.masks.map((mask) => mask.id));
         setExpandedContainers((previous) => {
@@ -1552,7 +1557,7 @@ export function MasksPanel() {
       }
       return committed;
     },
-    [setEditor],
+    [applyEditTransaction, setEditor],
   );
 
   const { showContextMenu } = useContextMenu();

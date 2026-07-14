@@ -6,6 +6,7 @@ export type EditMutationSource =
   | 'auto-edit'
   | 'preset'
   | 'copy-paste'
+  | 'layer-command'
   | 'reset'
   | 'history'
   | 'hydration'
