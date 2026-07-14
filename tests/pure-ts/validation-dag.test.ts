@@ -12,6 +12,7 @@ import {
   readCacheRecord,
   runValidation,
   validateManifest,
+  validationOutputResource,
 } from '../../scripts/validation/engine';
 import { type ValidationNode, validationManifest } from '../../scripts/validation/manifest';
 import { classesForPath } from '../../scripts/validation/ownership';
@@ -366,6 +367,60 @@ await lease.release();`;
     const second = runValidation([suite], options(secondWorktree));
     expect(await Promise.all([first, second])).toEqual([0, 0]);
     expect(validationManifest.find((node) => node.id === 'unit')?.resourceClass).toBe('suite-exclusive');
+  });
+
+  test('producer outputs are worktree-scoped and serialized only for the same worktree', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-producer-ownership-'));
+    const sameWorktree = join(root, 'same');
+    const parallelWorktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];
+    const coordinator = join(root, 'locks');
+    await mkdir(sameWorktree);
+    await Promise.all(parallelWorktrees.map((worktree) => mkdir(worktree)));
+    await Promise.all(
+      [sameWorktree, ...parallelWorktrees].map(async (worktree) => {
+        await writeFile(join(worktree, 'input.ts'), 'export const input = true;\n');
+        await initFixtureRepository(worktree);
+      }),
+    );
+    const producer: ValidationNode = {
+      id: 'producer-output',
+      command: [
+        'bun',
+        '-e',
+        "import {mkdir} from 'node:fs/promises';const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.sleep(120);await Bun.file(path).delete()",
+      ],
+      dependencies: [],
+      inputs: ['frontend'],
+      resourceClass: 'light',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      timeoutMs: 2_000,
+      outputs: ['dist'],
+    };
+    const options = (worktree: string) => ({
+      mode: 'commit' as const,
+      changedPaths: ['input.ts'],
+      noCache: true,
+      verifyCache: false,
+      explainCache: false,
+      root: worktree,
+      resourceCoordinatorRoot: coordinator,
+    });
+
+    expect(
+      await Promise.all([
+        runValidation([producer], options(sameWorktree)),
+        runValidation([producer], options(sameWorktree)),
+      ]),
+    ).toEqual([0, 0]);
+    const startedAt = performance.now();
+    expect(
+      await Promise.all(parallelWorktrees.map((worktree) => runValidation([producer], options(worktree)))),
+    ).toEqual([0, 0, 0]);
+    expect(validationOutputResource(parallelWorktrees[0], 'dist')).not.toBe(
+      validationOutputResource(parallelWorktrees[1], 'dist'),
+    );
+    expect(performance.now() - startedAt).toBeLessThan(1_200);
   });
 
   test('commit failure preserves an independent active node disposition and returns deterministic nonzero', async () => {

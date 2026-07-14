@@ -105,6 +105,9 @@ const digest = (parts: readonly (string | Uint8Array)[]): string => {
   return hasher.digest('hex');
 };
 
+export const validationOutputResource = (root: string, output: string): string =>
+  `validation-output-${digest([resolve(root), output]).slice(0, 20)}`;
+
 export interface ValidationSnapshot {
   files: readonly string[];
   digests: ReadonlyMap<string, string>;
@@ -385,7 +388,10 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         outputLeases.push(
           await acquireResourceLease({
             label: `validation-output:${node.id}:${output}`,
-            resource: `validation-output-${digest([output]).slice(0, 20)}`,
+            // A linked worktree has its own output directory. Scope the lease
+            // by absolute root so independent precommits overlap, while two
+            // runners targeting the same worktree still serialize producers.
+            resource: validationOutputResource(options.root, output),
             root: options.resourceCoordinatorRoot,
           }),
         );
