@@ -1,6 +1,8 @@
 name: Performance Regression
 
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - '.github/workflows/performance.yml'
@@ -39,10 +41,12 @@ permissions:
 jobs:
   performance-lab:
     name: performance lab / ${{ matrix.scenario }}
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         scenario:
           - editor.preview-scheduling
