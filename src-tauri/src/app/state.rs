@@ -235,10 +235,6 @@ pub struct AppState {
     pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
     pub hdr_plan_generation: Arc<AtomicUsize>,
     pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
-    pub focus_stack_plan_generation: Arc<AtomicUsize>,
-    pub focus_stack_runtime_plan: Arc<Mutex<Option<(String, String)>>>,
-    pub focus_stack_accepted_runtime:
-        Arc<Mutex<Option<crate::merge::focus_stack::job::AcceptedFocusRuntime>>>,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
     pub burst_sr_accepted_runtime:
         Arc<Mutex<Option<crate::merge::super_resolution::job::AcceptedBurstSrRuntime>>>,
@@ -326,9 +322,6 @@ impl AppState {
             hdr_runtime_plan: Arc::new(Mutex::new(None)),
             hdr_plan_generation: Arc::new(AtomicUsize::new(0)),
             hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
-            focus_stack_plan_generation: Arc::new(AtomicUsize::new(0)),
-            focus_stack_runtime_plan: Arc::new(Mutex::new(None)),
-            focus_stack_accepted_runtime: Arc::new(Mutex::new(None)),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
             burst_sr_accepted_runtime: Arc::new(Mutex::new(None)),
