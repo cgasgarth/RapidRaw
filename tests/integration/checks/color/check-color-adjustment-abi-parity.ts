@@ -18,6 +18,7 @@ const STRUCTS = [
   'BlackWhiteMixerSettings',
   'LevelsSettings',
   'ColorBalanceRgbSettings',
+  'ToneEqualizerGpuSettings',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',

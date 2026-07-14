@@ -46,7 +46,29 @@
       "shadowRolloff": "섀도 롤오프",
       "toneMapper": "톤 매퍼",
       "viewContrast": "보기 대비",
-      "whites": "화이트"
+      "whites": "화이트",
+      "toneEqualizer": {
+        "analysisUnavailable": "Scene analysis unavailable",
+        "analyzing": "Analyzing scene…",
+        "autoPlace": "Auto Place",
+        "detailPreservation": "Detail preservation",
+        "edgeRefinement": "Edge refinement",
+        "enable": "Enable",
+        "histogram": "Scene exposure histogram",
+        "on": "On",
+        "pickerReceipt": "Zone {{band}} · {{ev}} EV",
+        "pickZone": "Pick zone",
+        "preview": {
+          "band": "Band",
+          "clip": "Clip",
+          "filter": "Filter",
+          "image": "Image",
+          "zones": "Zones"
+        },
+        "resetZones": "Reset zones",
+        "smoothingRadius": "Smoothing radius",
+        "title": "Tone Equalizer"
+      }
     },
     "color": {
       "advanced": {

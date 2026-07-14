@@ -657,11 +657,7 @@ fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
     let global = &adjustments.global;
     let mut needs = BlurPassNeeds {
         sharpness: global.sharpness != 0.0,
-        tonal: global.contrast != 0.0
-            || global.highlights != 0.0
-            || global.shadows != 0.0
-            || global.whites != 0.0
-            || global.blacks != 0.0,
+        tonal: tonal_blur_base_radius(adjustments).is_some(),
         clarity: global.clarity != 0.0 || global.centré != 0.0 || global.halation_amount > 0.0,
         structure: global.structure != 0.0 || global.dehaze != 0.0 || global.glow_amount > 0.0,
     };
@@ -669,15 +665,47 @@ fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
     let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
     for mask in &adjustments.mask_adjustments[..mask_count] {
         needs.sharpness |= mask.sharpness.abs() > 0.001;
-        needs.tonal |= mask.contrast != 0.0
-            || mask.highlights != 0.0
-            || mask.shadows != 0.0
-            || mask.whites != 0.0
-            || mask.blacks != 0.0;
         needs.clarity |= mask.clarity != 0.0 || mask.halation_amount > 0.0;
         needs.structure |= mask.structure != 0.0 || mask.dehaze != 0.0 || mask.glow_amount > 0.0;
     }
     needs
+}
+
+fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
+    let global = &adjustments.global;
+    let graph_v2 = global.edit_graph_version >= 2.0;
+    let global_guided_active = global.contrast != 0.0
+        || global.highlights != 0.0
+        || global.shadows != 0.0
+        || global.whites != 0.0
+        || global.blacks != 0.0;
+    let global_v2_only_active =
+        graph_v2 && (global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5);
+    let mut radius = (global_guided_active || global_v2_only_active).then_some(if graph_v2 {
+        global.tone_equalizer.params1[1].clamp(4.0, 64.0)
+    } else {
+        3.5
+    });
+
+    let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
+    for mask in &adjustments.mask_adjustments[..mask_count] {
+        let local_guided_active = mask.contrast != 0.0
+            || mask.highlights != 0.0
+            || mask.shadows != 0.0
+            || mask.whites != 0.0
+            || mask.blacks != 0.0;
+        let local_v2_only_active =
+            graph_v2 && (mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5);
+        if local_guided_active || local_v2_only_active {
+            let local_radius = if graph_v2 {
+                mask.tone_equalizer.params1[1].clamp(4.0, 64.0)
+            } else {
+                3.5
+            };
+            radius = Some(radius.map_or(local_radius, |current| current.max(local_radius)));
+        }
+    }
+    radius
 }
 
 pub fn compile_gpu_render_graph(
@@ -702,7 +730,7 @@ pub fn compile_gpu_render_graph(
         (
             needs.tonal,
             BlurSemantic::Tonal,
-            3.5,
+            tonal_blur_base_radius(adjustments).unwrap_or(3.5),
             GpuStageFlags::BLUR_TONAL,
         ),
         (
@@ -2181,7 +2209,11 @@ impl GpuProcessor {
                 let did_create_sharpness_blur = blur_pass_needs.sharpness
                     && run_blur(BlurFamily::Sharpness, 1.0, &self.sharpness_blur_view);
                 let did_create_tonal_blur = blur_pass_needs.tonal
-                    && run_blur(BlurFamily::Tonal, 3.5, &self.tonal_blur_view);
+                    && run_blur(
+                        BlurFamily::Tonal,
+                        tonal_blur_base_radius(&adjustments).unwrap_or(3.5),
+                        &self.tonal_blur_view,
+                    );
                 let did_create_clarity_blur = blur_pass_needs.clarity
                     && run_blur(BlurFamily::Clarity, 8.0, &self.clarity_blur_view);
                 let did_create_structure_blur = blur_pass_needs.structure
@@ -3152,6 +3184,47 @@ mod blur_pass_tests {
     }
 
     #[test]
+    fn graph_v2_tone_equalizer_radius_drives_blur_identity_and_tile_halo() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.edit_graph_version = 2.0;
+        adjustments.global.tone_equalizer.params0[0] = 1.0;
+        adjustments.global.tone_equalizer.params1[1] = 48.0;
+        assert_eq!(tonal_blur_base_radius(&adjustments), Some(48.0));
+        assert!(needs(adjustments).tonal);
+
+        let graph = compile_gpu_render_graph(&adjustments, false, 0, 1920, 1080);
+        assert_eq!(graph.tile_halo, 48);
+        let tonal = graph
+            .blur_products
+            .iter()
+            .find(|product| product.semantic == BlurSemantic::Tonal)
+            .expect("tone equalizer must request a tonal guidance surface");
+        assert_eq!(tonal.base_radius(), 48.0);
+
+        adjustments.global.tone_equalizer.bands0 = [1.5, -0.5, 0.25, 0.0];
+        let band_only_update = compile_gpu_render_graph(&adjustments, false, 0, 1920, 1080);
+        assert_eq!(
+            band_only_update.fingerprint, graph.fingerprint,
+            "band-only edits must reuse the cached guidance graph"
+        );
+
+        adjustments.mask_count = 1;
+        adjustments.mask_adjustments[0].tone_equalizer.params0[0] = 1.0;
+        adjustments.mask_adjustments[0].tone_equalizer.params1[1] = 200.0;
+        assert_eq!(tonal_blur_base_radius(&adjustments), Some(64.0));
+    }
+
+    #[test]
+    fn graph_v2_brightness_uses_default_guidance_but_v1_brightness_does_not() {
+        let mut adjustments = AllAdjustments::default();
+        adjustments.global.brightness = 0.5;
+        assert_eq!(tonal_blur_base_radius(&adjustments), None);
+        adjustments.global.edit_graph_version = 2.0;
+        adjustments.global.tone_equalizer.params1[1] = 32.0;
+        assert_eq!(tonal_blur_base_radius(&adjustments), Some(32.0));
+    }
+
+    #[test]
     fn mask_consumers_activate_only_within_mask_count() {
         let mut adjustments = AllAdjustments::default();
         adjustments.mask_count = 4;
@@ -3727,6 +3800,20 @@ mod blur_pass_tests {
                 "subMasks":[]
             }]
         });
+        raw["toneEqualizer"] = json!({
+            "enabled": true,
+            "bandEv": [-0.4, -0.3, -0.2, -0.1, 0.2, 0.35, 0.1, -0.1, -0.25],
+            "pivotEv": 0, "rangeEv": 16, "detailPreservation": 0.7,
+            "edgeRefinement": 2.5, "smoothingRadius": 16,
+            "maskExposureCompensation": 0, "selectedBand": 4, "previewMode": 0
+        });
+        raw["masks"][0]["adjustments"]["toneEqualizer"] = json!({
+            "enabled": true,
+            "bandEv": [0.2, 0.1, 0, -0.1, -0.2, -0.1, 0, 0.1, 0.2],
+            "pivotEv": 0.5, "rangeEv": 14, "detailPreservation": 0.8,
+            "edgeRefinement": 3, "smoothingRadius": 24,
+            "maskExposureCompensation": 0.15, "selectedBand": 5, "previewMode": 0
+        });
         raw.as_object_mut().unwrap().extend(
             json!({
                 "sharpness": 14, "sharpnessThreshold": 8,
@@ -3861,6 +3948,23 @@ mod blur_pass_tests {
                         "contrast": 1.35, "latitude": 0.6,
                         "toe": 0.45, "shoulder": 0.7,
                         "chromaCompression": 0.3
+                    }
+                }),
+            ),
+            (
+                "tone_equalizer",
+                json!({
+                    "toneEqualizer": {
+                        "enabled": true,
+                        "bandEv": [-0.8, -0.5, -0.2, 0.1, 0.45, 0.2, -0.15, -0.35, -0.6],
+                        "pivotEv": -0.25,
+                        "rangeEv": 14,
+                        "detailPreservation": 0.7,
+                        "edgeRefinement": 3.0,
+                        "smoothingRadius": 24,
+                        "maskExposureCompensation": 0,
+                        "selectedBand": 4,
+                        "previewMode": 0
                     }
                 }),
             ),
