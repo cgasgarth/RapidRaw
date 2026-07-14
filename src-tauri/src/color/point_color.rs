@@ -4,7 +4,11 @@
 //! sRGB (D65) chromatic adaptation. The scalar evaluator is the contract oracle
 //! for GPU, visualization, and color-range mask implementations.
 
+use crate::adjustments::abi::{PointColorGpuPoint, PointColorGpuSettings};
+
+#[cfg(test)]
 pub const MAX_POINT_COLOR_ADJUSTMENTS: usize = 16;
+#[cfg(test)]
 pub const MAX_POINT_COLOR_SAMPLES: usize = 8;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -36,6 +40,7 @@ pub struct PointColorAdjustmentV1 {
     pub enabled: bool,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct SkinUniformityV1 {
     pub samples: Vec<PointColorSampleV1>,
@@ -84,6 +89,7 @@ fn sample_membership(
 }
 
 /// Deterministic probabilistic union: duplicate samples never reduce membership.
+#[cfg(test)]
 pub fn membership_weight(color: PerceptualColorCoordinate, point: &PointColorAdjustmentV1) -> f32 {
     if !point.enabled || point.samples.is_empty() {
         return 0.0;
@@ -164,6 +170,7 @@ pub fn oklch_to_ap1(color: PerceptualColorCoordinate) -> [f32; 3] {
     )
 }
 
+#[cfg(test)]
 pub fn apply_point(
     color: PerceptualColorCoordinate,
     point: &PointColorAdjustmentV1,
@@ -182,6 +189,7 @@ pub fn apply_point(
     }
 }
 
+#[cfg(test)]
 pub fn apply_plan_ap1(rgb: [f32; 3], points: &[PointColorAdjustmentV1]) -> [f32; 3] {
     let mut color = ap1_to_oklch(rgb);
     for point in points.iter().take(MAX_POINT_COLOR_ADJUSTMENTS) {
@@ -190,6 +198,77 @@ pub fn apply_plan_ap1(rgb: [f32; 3], points: &[PointColorAdjustmentV1]) -> [f32;
     oklch_to_ap1(color)
 }
 
+fn packed_membership(color: PerceptualColorCoordinate, point: &PointColorGpuPoint) -> f32 {
+    if point.control[3] < 0.5 {
+        return 0.0;
+    }
+    let mut union = 0.0;
+    for sample in point
+        .samples
+        .iter()
+        .take(point.control[2].max(0.0) as usize)
+    {
+        let sample = PointColorSampleV1 {
+            color: PerceptualColorCoordinate {
+                lightness: sample[0],
+                chroma: sample[1],
+                hue_degrees: sample[2],
+            },
+            confidence: sample[3],
+        };
+        let proxy = PointColorAdjustmentV1 {
+            samples: Vec::new(),
+            hue_radius_degrees: point.range[0],
+            chroma_radius: point.range[1],
+            lightness_radius: point.range[2],
+            variance: point.range[3],
+            feather: point.edit[0],
+            hue_shift_degrees: point.edit[1],
+            chroma_shift: point.edit[2],
+            saturation_shift: point.control[0],
+            lightness_shift: point.edit[3],
+            opacity: point.control[1],
+            enabled: true,
+        };
+        let weight = sample_membership(color, sample, &proxy);
+        union = 1.0 - (1.0 - union) * (1.0 - weight);
+    }
+    union * point.control[1].clamp(0.0, 1.0)
+}
+
+/// Allocation-free packed evaluator shared by CPU fallback and WGPU parity tests.
+pub fn apply_gpu_plan_ap1(rgb: [f32; 3], settings: &PointColorGpuSettings) -> [f32; 3] {
+    let mut color = ap1_to_oklch(rgb);
+    let mut visualization_weight: f32 = 0.0;
+    for point in settings.points.iter().take(settings.control[0] as usize) {
+        let weight = packed_membership(color, point);
+        visualization_weight = visualization_weight.max(weight);
+        if weight <= 0.0 {
+            continue;
+        }
+        let saturation = color.chroma / color.lightness.max(0.01);
+        color = PerceptualColorCoordinate {
+            lightness: color.lightness + point.edit[3] * weight,
+            chroma: (color.chroma + point.edit[2] * weight).max(
+                (saturation * (1.0 + point.control[0] * weight)).max(0.0)
+                    * color.lightness.max(0.01),
+            ),
+            hue_degrees: (color.hue_degrees + point.edit[1] * weight).rem_euclid(360.0),
+        };
+    }
+    let edited = oklch_to_ap1(color);
+    match settings.control[1] {
+        1 => [visualization_weight; 3],
+        2 => {
+            let luma =
+                0.272_228_72 * edited[0] + 0.674_081_74 * edited[1] + 0.053_689_52 * edited[2];
+            edited.map(|channel| luma + (channel - luma) * visualization_weight)
+        }
+        _ => edited,
+    }
+}
+
+#[cfg(test)]
 pub fn apply_skin_uniformity(
     color: PerceptualColorCoordinate,
     skin: &SkinUniformityV1,
@@ -331,6 +410,39 @@ mod tests {
                 .all(|(a, b)| (a - b).abs() < 2e-5)
         );
         assert_eq!(membership_weight(center, &p), 1.0);
+    }
+
+    #[test]
+    fn packed_cpu_execution_matches_reference_plan() {
+        let rgb = [0.7, 0.2, 0.1];
+        let center = ap1_to_oklch(rgb);
+        let p = point(center);
+        let mut packed = PointColorGpuSettings {
+            control: [1, 0, 1, 0],
+            ..Default::default()
+        };
+        packed.points[0].samples[0] = [center.lightness, center.chroma, center.hue_degrees, 1.0];
+        packed.points[0].range = [
+            p.hue_radius_degrees,
+            p.chroma_radius,
+            p.lightness_radius,
+            p.variance,
+        ];
+        packed.points[0].edit = [
+            p.feather,
+            p.hue_shift_degrees,
+            p.chroma_shift,
+            p.lightness_shift,
+        ];
+        packed.points[0].control = [p.saturation_shift, p.opacity, 1.0, 1.0];
+        let expected = apply_plan_ap1(rgb, &[p]);
+        let actual = apply_gpu_plan_ap1(rgb, &packed);
+        assert!(
+            expected
+                .into_iter()
+                .zip(actual)
+                .all(|(left, right)| (left - right).abs() < 2e-5)
+        );
     }
 
     #[test]

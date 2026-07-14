@@ -8,9 +8,10 @@ use image::{DynamicImage, ImageBuffer, Luma, Rgba};
 
 use crate::adjustments::abi::{
     AllAdjustments, ColorCalibrationSettings, ColorGradeSettings, HslColor, LevelsSettings, Point,
-    ToneEqualizerGpuSettings,
+    PointColorGpuSettings, ToneEqualizerGpuSettings,
 };
 use crate::color::dehaze::prepare_cpu_dehaze;
+use crate::color::point_color::apply_gpu_plan_ap1;
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
 };
@@ -57,6 +58,7 @@ struct EffectiveAdjustments {
     halation: f32,
     flare: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
+    point_color: PointColorGpuSettings,
     hsl: [HslColor; 8],
 }
 
@@ -323,6 +325,7 @@ pub(crate) fn execute_cpu_edit_graph(
         }
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
+        color = Vec3::from_array(apply_gpu_plan_ap1(color.to_array(), &effective.point_color));
         color = apply_hue_shift(color, effective.hue);
         color = apply_creative_color(color, effective.saturation, effective.vibrance);
         color = Vec3::from_array(apply_color_balance_rgb(
@@ -517,6 +520,7 @@ fn effective_adjustments(
         halation: global.halation_amount,
         flare: global.flare_amount,
         tone_equalizer: global.tone_equalizer,
+        point_color: global.point_color,
         hsl: global.hsl,
     };
     let count = (adjustments.mask_count as usize)
