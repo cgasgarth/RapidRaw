@@ -504,6 +504,25 @@ const nativeDiagnosticsSchema = z.object({
       queueSubmitCount: z.number().nonnegative(),
       renderPassCount: z.number().nonnegative(),
       stageBits: z.number().nonnegative(),
+      dehaze: z
+        .object({
+          analysisCacheHit: z.boolean(),
+          analysisFingerprint: z.number().nonnegative(),
+          atmosphericLight: z.tuple([z.number(), z.number(), z.number()]),
+          atmosphericLightConfidence: z.number().min(0).max(1),
+          guidanceMode: z.enum(['image_derived_edge_aware', 'hybrid_depth_image', 'depth_guided']),
+          hazeFraction: z.number().min(0).max(1),
+          implementationVersion: z.number().int().positive(),
+          minimumTransmissionFraction: z.number().min(0).max(1),
+          outputFinite: z.boolean(),
+          protectedSampleFraction: z.number().min(0).max(1),
+          quality: z.enum(['interactive', 'refined', 'export']),
+          renderFingerprint: z.number().nonnegative(),
+          transmissionPercentiles: z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()]),
+        })
+        .strict()
+        .nullable()
+        .optional(),
     })
     .nullable(),
 });
