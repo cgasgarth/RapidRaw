@@ -102,6 +102,7 @@ impl JobCoordinator {
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
+    pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
@@ -125,6 +126,7 @@ impl AppServices {
         Self {
             editor: Arc::default(),
             denoise: Arc::default(),
+            lens_database: Arc::default(),
             focus_stack: Arc::default(),
             hdr: Arc::default(),
             burst_sr: Arc::default(),

@@ -138,6 +138,11 @@ pub fn request_lens_initialization(app: tauri::AppHandle, priority: Initializati
     {
         return;
     }
+    let load_token = app
+        .state::<crate::AppState>()
+        .services
+        .lens_database
+        .begin_load();
     let completion_app = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = tauri::async_runtime::spawn_blocking(move || {
@@ -146,8 +151,12 @@ pub fn request_lens_initialization(app: tauri::AppHandle, priority: Initializati
                 return Err("injected lensfun startup failure".to_string());
             }
             let lens_db = crate::lens_correction::load_lensfun_db(&app);
-            *app.state::<crate::AppState>().lens_db.lock().unwrap() = Some(Arc::new(lens_db));
-            Ok(())
+            app.state::<crate::AppState>()
+                .services
+                .lens_database
+                .publish(load_token, lens_db)
+                .then_some(())
+                .ok_or_else(|| "lens database load superseded".to_string())
         })
         .await
         .unwrap_or_else(|error| Err(error.to_string()));
