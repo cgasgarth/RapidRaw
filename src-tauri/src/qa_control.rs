@@ -278,6 +278,7 @@ fn gpu_execution_receipt(app_state: &AppState) -> Value {
                 "queueSubmitCount": receipt.queue_submit_count,
                 "estimatedPeakResourceBytes": receipt.estimated_peak_resource_bytes,
                 "cpuEncodeMicros": receipt.cpu_encode_time.as_micros().min(u64::MAX as u128) as u64,
+                "dehaze": serde_json::to_value(&receipt.dehaze).unwrap_or(Value::Null),
             })
         })
         .unwrap_or(Value::Null)
