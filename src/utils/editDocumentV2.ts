@@ -94,6 +94,19 @@ export const updateEditDocumentV2Node = (
 export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>
   descriptorFor(nodeType)?.capabilities;
 
+/** Apply one focused node update across documents only when its descriptor allows batch edits. */
+export const batchUpdateEditDocumentV2Nodes = (
+  documents: readonly EditDocumentV2[],
+  nodeType: EditDocumentNodeTypeV2,
+  update: (params: Readonly<Record<string, unknown>>, index: number) => Record<string, unknown>,
+): readonly EditDocumentV2[] | null => {
+  const descriptor = descriptorFor(nodeType);
+  if (descriptor === undefined || !descriptor.capabilities.batch) return null;
+  return documents.map((document, index) =>
+    updateEditDocumentV2Node(document, nodeType, (params) => update(params, index)),
+  );
+};
+
 /** Reset one node using its descriptor-owned defaults without touching other domains. */
 export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2): EditDocumentV2 => {
   const parsed = editDocumentV2Schema.parse(document);

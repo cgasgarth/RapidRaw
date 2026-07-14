@@ -6,13 +6,14 @@ import {
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
+  batchUpdateEditDocumentV2Nodes,
   copyEditDocumentV2Node,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
-  resetEditDocumentV2Node,
   pasteEditDocumentV2Node,
+  resetEditDocumentV2Node,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
@@ -124,6 +125,21 @@ describe('EditDocumentV2 legacy adapter', () => {
         },
       }),
     ).toThrow('non-finite');
+  });
+
+  test('batch edits honor descriptor capability and preserve each document domain', () => {
+    const documents = [
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.1 }),
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.2 }),
+    ];
+    const updated = batchUpdateEditDocumentV2Nodes(documents, 'scene_global_color_tone', (params, index) => ({
+      ...params,
+      exposure: index + 1,
+    }));
+    expect(updated?.map((document) => document.nodes.scene_global_color_tone?.params.exposure)).toEqual([1, 2]);
+    expect(updated?.[0]?.nodes.geometry).toEqual(documents[0]?.nodes.geometry);
+    expect(batchUpdateEditDocumentV2Nodes(documents, 'layers', () => ({}))).toBeNull();
+    expect(batchUpdateEditDocumentV2Nodes(documents, 'source_artifacts', () => ({}))).toBeNull();
   });
 
   test('reset uses descriptor defaults and preserves unrelated domains', () => {
