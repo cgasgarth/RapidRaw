@@ -14,7 +14,7 @@ import {
 
 export type { FilmEmulationTargetStateV1 } from '../../../packages/rawengine-schema/src/index.js';
 
-const PROFILE_REF = {
+export const REFERENCE_FILM_PROFILE_REF = {
   id: 'rapidraw.reference_film.v1',
   version: '1',
   contentSha256: 'sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef',
@@ -62,7 +62,7 @@ const defaultNode = (): FilmEmulationNodeV1 =>
     enabled: true,
     mix: 1,
     nodeType: 'film_emulation',
-    profileRef: PROFILE_REF,
+    profileRef: REFERENCE_FILM_PROFILE_REF,
     seedPolicy: 'source_stable_v1',
     workingSpace: 'acescg_linear_v1',
   });

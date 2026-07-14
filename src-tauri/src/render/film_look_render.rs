@@ -116,6 +116,16 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
 ];
 
 pub(crate) fn normalize_film_look_adjustments_for_render(adjustments: &Value) -> Cow<'_, Value> {
+    // A canonical renderer-owned Film node supersedes the legacy adjustment
+    // patch path. Keeping the old look fields untouched avoids double applying
+    // contrast/grain/halation when a Film workspace node is present.
+    if adjustments
+        .get("filmEmulation")
+        .and_then(Value::as_object)
+        .is_some()
+    {
+        return Cow::Borrowed(adjustments);
+    }
     let Some(look_id) = adjustments.get("filmLookId").and_then(Value::as_str) else {
         return Cow::Borrowed(adjustments);
     };
@@ -194,6 +204,34 @@ mod tests {
             normalize_film_look_adjustments_for_render(&unknown),
             Cow::Borrowed(_)
         ));
+    }
+
+    #[test]
+    fn canonical_film_node_bypasses_legacy_look_patch() {
+        let adjustments = json!({
+            "filmLookId": "film_look.generic.bold_mono_grain.v1",
+            "filmLookStrength": 100,
+            "filmEmulation": {
+                "nodeType": "film_emulation",
+                "contractVersion": 1,
+                "enabled": true
+            }
+        });
+        assert!(matches!(
+            normalize_film_look_adjustments_for_render(&adjustments),
+            Cow::Borrowed(_)
+        ));
+    }
+
+    #[test]
+    fn null_film_node_does_not_disable_legacy_look_patch() {
+        let adjustments = json!({
+            "filmLookId": "film_look.generic.warm_print.v1",
+            "filmLookStrength": 100,
+            "filmEmulation": null
+        });
+        let normalized = normalize_film_look_adjustments_for_render(&adjustments).into_owned();
+        assert_eq!(normalized["contrast"], 10);
     }
 
     #[test]
