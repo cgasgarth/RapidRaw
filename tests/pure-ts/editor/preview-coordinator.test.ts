@@ -1,5 +1,6 @@
 import {
   createPreviewCoordinatorState,
+  createPreviewQualityPolicy,
   fingerprintPreviewOperationIdentity,
   fingerprintPreviewRoi,
   fingerprintPreviewSessionIdentity,
@@ -244,4 +245,25 @@ test('quality decisions are translated once and ROI fingerprints are resolution-
   });
   expect(transition.state.quality).toEqual(quality);
   expect(transition.state.lastTransition?.reason).toBe('quality-decision-changed');
+});
+
+test('quality policy construction stays coordinator-owned and preserves adaptive state', () => {
+  const policy = createPreviewQualityPolicy();
+  policy.noteInput(100);
+  policy.noteInput(116);
+  const decision = policy.decide({
+    backend: 'wgpu',
+    devicePixelRatio: 2,
+    interacting: false,
+    operationClass: 'standard',
+    requestedTargetResolution: 1600,
+    semanticZoom: 'viewport',
+    sourceHeight: 2400,
+    sourceWidth: 3600,
+    visibleRoi: null,
+  });
+  expect(decision.tier).toBe('viewport_full');
+  expect(decision.effectiveTargetResolution).toBeGreaterThan(0);
+  policy.reset();
+  expect(policy.metrics()).toEqual([]);
 });

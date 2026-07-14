@@ -12,7 +12,6 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import {
-  AdaptivePreviewQualityController,
   getPreviewReadyPhase,
   type PreviewOperationClass,
   type PreviewQualityDecision,
@@ -45,6 +44,7 @@ import {
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
 import {
   createPreviewCoordinatorState,
+  createPreviewQualityPolicy,
   fingerprintPreviewRoi,
   type PreviewCoordinatorEvent,
   type PreviewCoordinatorState,
@@ -210,7 +210,7 @@ export function useImageProcessing(
   const interactiveScopeRef = useRef<
     (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
   >(() => null);
-  const previewQualityControllerRef = useRef(new AdaptivePreviewQualityController());
+  const previewQualityControllerRef = useRef(createPreviewQualityPolicy());
   const previewCoordinatorStateRef = useRef<PreviewCoordinatorState>(createPreviewCoordinatorState());
   const previewCoordinatorOperationsRef = useRef(new Map<number, PreviewOperationIdentity>());
   const displayResourceGenerationRef = useRef(1);
