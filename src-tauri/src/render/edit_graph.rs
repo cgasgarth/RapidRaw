@@ -127,6 +127,7 @@ impl EditNodeKind {
 pub enum WgpuBindGroupLayoutKind {
     CurveStorageV1,
     FusedSceneSpatialV2,
+    FusedSceneSpatialMaskV2,
     FusedViewLutV2,
     FusedDisplayLutMaskV2,
     FusedLegacySceneViewV1,
@@ -138,6 +139,7 @@ impl WgpuBindGroupLayoutKind {
         match self {
             Self::CurveStorageV1 => "curve_storage_v1",
             Self::FusedSceneSpatialV2 => "fused_scene_spatial_v2",
+            Self::FusedSceneSpatialMaskV2 => "fused_scene_spatial_mask_v2",
             Self::FusedViewLutV2 => "fused_view_lut_v2",
             Self::FusedDisplayLutMaskV2 => "fused_display_lut_mask_v2",
             Self::FusedLegacySceneViewV1 => "fused_legacy_scene_view_v1",
@@ -149,6 +151,7 @@ impl WgpuBindGroupLayoutKind {
         match self {
             Self::CurveStorageV1 | Self::ExternalPointwiseV1 => resources.is_empty(),
             Self::FusedSceneSpatialV2 => resources == ["scene_guidance_v1"],
+            Self::FusedSceneSpatialMaskV2 => resources == ["scene_guidance_v1", "mask_layers_v1"],
             Self::FusedViewLutV2 => resources == ["view_transform_lut_v1"],
             Self::FusedDisplayLutMaskV2 => resources == ["display_lut_v1", "mask_layers_v1"],
             Self::FusedLegacySceneViewV1 => resources == ["legacy_scene_blur_v1", "mask_layers_v1"],
@@ -215,6 +218,7 @@ macro_rules! runtime_descriptor {
 
 const NO_RESOURCES: &[&str] = &[];
 const SCENE_SPATIAL_RESOURCES: &[&str] = &["scene_guidance_v1"];
+const LOCAL_SCENE_RESOURCES: &[&str] = &["scene_guidance_v1", "mask_layers_v1"];
 const VIEW_RESOURCES: &[&str] = &["view_transform_lut_v1"];
 const DISPLAY_RESOURCES: &[&str] = &["display_lut_v1", "mask_layers_v1"];
 
@@ -282,9 +286,9 @@ static LOCAL_SCENE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     LocalSceneComposition,
     Some("edit_graph_cpu_reference_v2"),
     Some("shader_wgsl_scene_phase_v2"),
-    Some(WgpuBindGroupLayoutKind::FusedSceneSpatialV2),
+    Some(WgpuBindGroupLayoutKind::FusedSceneSpatialMaskV2),
     Some("scene"),
-    SCENE_SPATIAL_RESOURCES,
+    LOCAL_SCENE_RESOURCES,
     true,
     false
 );

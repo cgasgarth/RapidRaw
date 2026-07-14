@@ -386,6 +386,11 @@ pub struct GpuRenderGraphPlan {
     pub tile_halo: u32,
     pub fingerprint: u64,
     pub estimated_peak_resource_bytes: u64,
+    pub execution_phase_count: u32,
+    pub registered_wgpu_module_count: u32,
+    pub registered_wgpu_phase_count: u32,
+    pub registered_wgpu_resource_count: u32,
+    pub wgpu_execution_fingerprint: u64,
     #[cfg(debug_assertions)]
     pub reasons: Vec<&'static str>,
 }
@@ -406,6 +411,10 @@ pub struct GpuExecutionReceipt {
     pub cpu_encode_time: Duration,
     pub wall_time: Duration,
     pub phase_dispatch_count: u32,
+    pub registered_wgpu_module_count: u32,
+    pub registered_wgpu_phase_count: u32,
+    pub registered_wgpu_resource_count: u32,
+    pub wgpu_execution_fingerprint: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
     pub domain_conversions: &'static [&'static str],
@@ -736,12 +745,13 @@ fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
     radius
 }
 
-pub fn compile_gpu_render_graph(
+fn compile_gpu_render_graph_with_runtime(
     adjustments: &AllAdjustments,
     has_lut: bool,
     mask_layer_count: usize,
     width: u32,
     height: u32,
+    runtime: Option<&crate::render::wgpu_nodes::WgpuNodeRuntime>,
 ) -> GpuRenderGraphPlan {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -811,11 +821,22 @@ pub fn compile_gpu_render_graph(
         .unwrap_or(0);
     let tile_edge = 2048_u64 + u64::from(tile_halo) * 2;
     let live_blur_surfaces = blur_products.len() as u64 + u64::from(!blur_products.is_empty());
-    let execution_phase_count = if adjustments.global.edit_graph_version >= 2.0 {
-        3
-    } else {
-        1
-    };
+    let execution_phase_count = runtime.map_or_else(
+        || {
+            if adjustments.global.edit_graph_version >= 2.0 {
+                3
+            } else {
+                1
+            }
+        },
+        |runtime| runtime.dispatch_groups().len() as u32,
+    );
+    let registered_wgpu_module_count = runtime.map_or(0, |runtime| runtime.modules().len() as u32);
+    let registered_wgpu_phase_count =
+        runtime.map_or(0, |runtime| runtime.dispatch_groups().len() as u32);
+    let registered_wgpu_resource_count =
+        runtime.map_or(0, |runtime| runtime.active_resources().len() as u32);
+    let wgpu_execution_fingerprint = runtime.map_or(0, |runtime| runtime.execution_fingerprint());
     let estimated_peak_resource_bytes = tile_edge * tile_edge * 8 * (2 + live_blur_surfaces);
     let mut hasher = DefaultHasher::new();
     GPU_RENDER_GRAPH_VERSION.hash(&mut hasher);
@@ -825,6 +846,10 @@ pub fn compile_gpu_render_graph(
     active_masks.hash(&mut hasher);
     tile_halo.hash(&mut hasher);
     execution_phase_count.hash(&mut hasher);
+    registered_wgpu_module_count.hash(&mut hasher);
+    registered_wgpu_phase_count.hash(&mut hasher);
+    registered_wgpu_resource_count.hash(&mut hasher);
+    wgpu_execution_fingerprint.hash(&mut hasher);
     let fingerprint = hasher.finish();
 
     GpuRenderGraphPlan {
@@ -835,9 +860,32 @@ pub fn compile_gpu_render_graph(
         tile_halo,
         fingerprint,
         estimated_peak_resource_bytes,
+        execution_phase_count,
+        registered_wgpu_module_count,
+        registered_wgpu_phase_count,
+        registered_wgpu_resource_count,
+        wgpu_execution_fingerprint,
         #[cfg(debug_assertions)]
         reasons: graph_reasons(adjustments, has_lut, active_masks),
     }
+}
+
+#[cfg(any(test, feature = "validation-harness"))]
+pub fn compile_gpu_render_graph(
+    adjustments: &AllAdjustments,
+    has_lut: bool,
+    mask_layer_count: usize,
+    width: u32,
+    height: u32,
+) -> GpuRenderGraphPlan {
+    compile_gpu_render_graph_with_runtime(
+        adjustments,
+        has_lut,
+        mask_layer_count,
+        width,
+        height,
+        None,
+    )
 }
 
 #[cfg(debug_assertions)]
@@ -1003,6 +1051,9 @@ fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String
                 )
                 .map_err(str::to_owned)?;
             let runtime = crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
+                .map_err(str::to_owned)?;
+            runtime
+                .validates_bound_resources(request.lut.is_some(), request.mask_bitmaps.len())
                 .map_err(str::to_owned)?;
             let grouped_modules = runtime
                 .fused_groups()
@@ -1960,13 +2011,48 @@ impl GpuProcessor {
             #[cfg(all(test, feature = "tauri-test"))]
             EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
         };
-        let graph = compile_gpu_render_graph(
+        let wgpu_runtime = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => Some(
+                crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
+                    .map_err(str::to_owned)?,
+            ),
+            #[cfg(all(test, feature = "tauri-test"))]
+            EditGraphExecutionAuthority::TestOnlyLegacy => None,
+        };
+        let graph = compile_gpu_render_graph_with_runtime(
             &adjustments,
             request.lut.is_some(),
             request.mask_bitmaps.len(),
             width,
             height,
+            wgpu_runtime.as_ref(),
         );
+        let split_scene_view_display = wgpu_runtime.as_ref().map_or(
+            adjustments.global.edit_graph_version >= 2.0,
+            |runtime| {
+                matches!(
+                    runtime.dispatch_groups(),
+                    [scene, view, display]
+                        if scene.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::Scene
+                            && view.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::View
+                            && display.phase
+                                == crate::render::wgpu_nodes::WgpuDispatchPhase::DisplayTransport
+                )
+            },
+        );
+        let shader_execution_phases = if split_scene_view_display {
+            let groups = wgpu_runtime
+                .as_ref()
+                .expect("split WGPU execution requires a typed runtime")
+                .dispatch_groups();
+            [
+                groups[0].phase.shader_execution_phase(),
+                groups[1].phase.shader_execution_phase(),
+                groups[2].phase.shader_execution_phase(),
+            ]
+        } else {
+            [0, 0, 0]
+        };
         let blur_pass_needs = resolve_blur_pass_needs(&adjustments);
         #[cfg(test)]
         let blur_pass_needs = if FORCE_ALL_BLUR_PASSES.load(Ordering::Relaxed) {
@@ -2308,8 +2394,7 @@ impl GpuProcessor {
                 tile_adjustments.tile_offset_y = input_y_start;
                 tile_adjustments.source_width = width;
                 tile_adjustments.source_height = height;
-                let split_scene_view_display = adjustments.global.edit_graph_version >= 2.0;
-                tile_adjustments.execution_phase = u32::from(split_scene_view_display);
+                tile_adjustments.execution_phase = shader_execution_phases[0];
                 queue.write_buffer(
                     &self.adjustments_buffer,
                     0,
@@ -2444,7 +2529,7 @@ impl GpuProcessor {
 
                 let view_bind_group = if split_scene_view_display {
                     let mut view_adjustments = tile_adjustments;
-                    view_adjustments.execution_phase = 2;
+                    view_adjustments.execution_phase = shader_execution_phases[1];
                     queue.write_buffer(
                         &self.view_adjustments_buffer,
                         0,
@@ -2497,7 +2582,7 @@ impl GpuProcessor {
                 };
                 let display_bind_group = if split_scene_view_display {
                     let mut display_adjustments = tile_adjustments;
-                    display_adjustments.execution_phase = 3;
+                    display_adjustments.execution_phase = shader_execution_phases[2];
                     queue.write_buffer(
                         &self.display_adjustments_buffer,
                         0,
@@ -2653,7 +2738,7 @@ impl GpuProcessor {
                 queue.submit(std::iter::once(tile_command_buffer));
                 blur_counters.record_command_buffer();
                 command_buffer_count += 1;
-                phase_dispatch_count += if split_scene_view_display { 3 } else { 1 };
+                phase_dispatch_count += graph.execution_phase_count;
                 cpu_encode_time += encode_started.elapsed();
 
                 if !skip_cpu_readback {
@@ -2699,7 +2784,6 @@ impl GpuProcessor {
             cache.totals.cache_misses += blur_counters.cache_misses;
         }
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
-        let split_scene_view_display = adjustments.global.edit_graph_version >= 2.0;
         let cache_after = self.resource_cache_counters();
         let execution_sequence = self.execution_sequence.fetch_add(1, Ordering::Release) + 1;
         let receipt = GpuExecutionReceipt {
@@ -2719,6 +2803,10 @@ impl GpuProcessor {
             cpu_encode_time,
             wall_time: execution_started.elapsed(),
             phase_dispatch_count,
+            registered_wgpu_module_count: graph.registered_wgpu_module_count,
+            registered_wgpu_phase_count: graph.registered_wgpu_phase_count,
+            registered_wgpu_resource_count: graph.registered_wgpu_resource_count,
+            wgpu_execution_fingerprint: graph.wgpu_execution_fingerprint,
             cache_hits: (cache_after.mask_hits - cache_before.mask_hits)
                 + (cache_after.lut_hits - cache_before.lut_hits)
                 + (cache_after.bind_group_hits - cache_before.bind_group_hits),
@@ -3847,6 +3935,10 @@ mod blur_pass_tests {
             .last_execution_receipt()
             .expect("v2 GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
+        assert_eq!(receipt.registered_wgpu_phase_count, 3);
+        assert!(receipt.registered_wgpu_module_count >= 3, "{receipt:?}");
+        assert!(receipt.registered_wgpu_resource_count >= 2, "{receipt:?}");
+        assert_ne!(receipt.wgpu_execution_fingerprint, 0);
         assert_eq!(receipt.command_buffer_count, 1);
         assert_eq!(receipt.queue_submit_count, 1);
         assert!(receipt.cache_hits >= 3, "receipt={receipt:?}");
