@@ -80,14 +80,14 @@ export const createFilmAnalyticFixture = (): FilmValidationFixtureV1 =>
     proofLevel: 'analytic_numeric',
     source: {
       logicalId: 'rapidraw.generated.film.reference-analytic.v1',
-      pathOrPrivateRef: 'generated:film/reference-analytic.v1',
-      sha256: `sha256:${'a'.repeat(64)}`,
+      pathOrPrivateRef: 'fixtures/film/validation/reference-film-analytic-v1.json',
+      sha256: 'sha256:61b76551a57e867ebdd8b5e32a20238fed84072ea36a20595627b53ee239deac',
       mediaType: 'application/json',
-      licenseSpdx: ['MIT'],
-      noticePaths: ['LICENSE'],
+      licenseSpdx: ['AGPL-3.0-or-later'],
+      noticePaths: ['LICENSE', 'AGPL_COMPLIANCE.md'],
       publicRepoAllowed: true,
     },
-    input: { domain: 'acescg_linear_v1', exposureOffsetEv: 0 },
+    input: { domain: 'acescg_linear_v1', exposureOffsetEv: 0, inputTransformId: 'generated_ap1_identity_v1' },
     regions: [{ id: 'neutral-gray', kind: 'neutral', bounds: [0, 0, 1, 1], referenceRgb: [0.18, 0.18, 0.18] }],
     render: {
       profileRefs: [
@@ -106,6 +106,8 @@ export const createFilmAnalyticFixture = (): FilmValidationFixtureV1 =>
       maxAbs: 0.0002,
       rmse: 0.00005,
       neutralAxisDrift: 0.0001,
+      identityDeltaE00: 0.0001,
+      monotonicTolerance: 0.000001,
       grainRepeatTolerance: 0,
       opticalLeakage: 0.001,
     },
