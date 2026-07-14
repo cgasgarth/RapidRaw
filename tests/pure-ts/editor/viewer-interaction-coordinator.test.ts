@@ -83,6 +83,17 @@ describe('viewer interaction coordinator', () => {
     }
   });
 
+  test('does not forward the stale capture-loss event emitted after pointer release', () => {
+    const coordinator = createViewerInteractionCoordinator();
+    const pickerContext = context({ activeTool: 'point-color', toolId: 'point-color' });
+    coordinator.dispatch(pointer('pointerdown'), pickerContext);
+    expect(coordinator.dispatch(pointer('pointerup'), pickerContext).forwardToTool).toBe(true);
+    const staleCaptureLoss = coordinator.dispatch(pointer('lostpointercapture'), pickerContext);
+    expect(staleCaptureLoss.input.ignored).toBe(true);
+    expect(staleCaptureLoss.forwardToTool).toBe(false);
+    expect(staleCaptureLoss.toolCommand).toBeNull();
+  });
+
   test('uses the same deterministic cleanup path for blur, Escape, and unmount', () => {
     for (const reason of ['blur', 'escape', 'dispose'] as const) {
       const coordinator = createViewerInteractionCoordinator();

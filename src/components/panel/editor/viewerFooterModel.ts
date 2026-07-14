@@ -81,6 +81,7 @@ export const resolveViewerFooterRenderStatus = ({
 const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint> = {
   brush: { cancelHint: 'Esc', label: 'Paint the active mask', tool: 'brush' },
   crop: { cancelHint: 'Esc', label: 'Drag to crop; Enter applies', tool: 'crop' },
+  'focus-retouch': { cancelHint: 'Esc', label: 'Paint the focus source override', tool: 'focus-retouch' },
   mask: { cancelHint: 'Esc', label: 'Draw on the image to define the mask', tool: 'mask' },
   'object-prompt': { cancelHint: 'Esc', label: 'Click the subject or drag a prompt box', tool: 'object-prompt' },
   'point-color': { cancelHint: 'Esc', label: 'Click a color to create a Point Color sample', tool: 'point-color' },

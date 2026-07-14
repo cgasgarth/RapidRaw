@@ -3,6 +3,7 @@ export const VIEWER_DRAG_THRESHOLD_PX = 5;
 export type ViewerActiveTool =
   | 'brush'
   | 'crop'
+  | 'focus-retouch'
   | 'mask'
   | 'none'
   | 'object-prompt'
@@ -51,7 +52,7 @@ const cursorForTool = (activeTool: ViewerActiveTool): ViewerCursor => {
   if (activeTool === 'brush' || activeTool === 'crop' || activeTool === 'mask' || activeTool === 'object-prompt') {
     return 'crosshair';
   }
-  if (activeTool === 'retouch') return 'crosshair';
+  if (activeTool === 'focus-retouch' || activeTool === 'retouch') return 'crosshair';
   return 'default';
 };
 
@@ -101,7 +102,8 @@ export const resolveViewerInput = ({
       cursor: cursorForTool(activeTool),
       owner: 'active-tool',
       reason: 'active-tool',
-      shouldCapturePointer: activeTool === 'point-color' || activeTool === 'tone-equalizer',
+      shouldCapturePointer:
+        activeTool === 'focus-retouch' || activeTool === 'point-color' || activeTool === 'tone-equalizer',
     };
   }
 
