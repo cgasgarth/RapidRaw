@@ -31,10 +31,12 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
+import { buildEditTransactionPersistenceContext } from '../../../../utils/editTransaction';
 import {
   applyBrushLocalAdjustmentLayerFlow,
   createBrushLocalAdjustmentLayerDraft,
 } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
+import { buildLayerEditTransactionRequest } from '../../../../utils/layers/layerEditTransaction';
 import {
   deriveLayerMaskProvenanceView,
   type LayerMaskProvenanceView,
@@ -478,7 +480,7 @@ export function LayerStackPanel({
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const setEditor = useEditorStore((state) => state.setEditor);
-  const pushHistory = useEditorStore((state) => state.pushHistory);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const orientationSteps = useEditorStore((state) => state.adjustments.orientationSteps);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
@@ -639,13 +641,17 @@ export function LayerStackPanel({
       currentState.adjustments,
       persistLayerStackSidecarInAdjustments({ ...currentState.adjustments, masks: nextMasks }, result.sidecar),
     );
+    const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
+    const transactionResult = applyEditTransaction(transactionRequest);
     setLayerGraphRevision(result.graphRevision);
     setLastCommandType(result.command.commandType);
     setLastChangedLayerCount(result.commandResult.changedLayerIds.length);
-    setEditor({ adjustments: nextAdjustments });
-    pushHistory(nextAdjustments);
     if (selectedImage?.path) {
-      debouncedSave(selectedImage.path, nextAdjustments);
+      debouncedSave(
+        selectedImage.path,
+        transactionResult.after,
+        buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
+      );
     }
     setLocalSelectedLayerId(nextSelectedLayerId);
     onSelectMaskContainer(
@@ -884,15 +890,19 @@ export function LayerStackPanel({
       appliedCommandId: result.brushApplyResult.commandId,
       masks: result.masks,
     });
+    const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
+    const transactionResult = applyEditTransaction(transactionRequest);
     setEditor({
       activeMaskContainerId: layerId,
       activeMaskId: maskId,
-      adjustments: nextAdjustments,
       brushSettings: { feather: 48, size: 96, tool: ToolType.Brush },
     });
-    pushHistory(nextAdjustments);
     if (selectedImage?.path) {
-      debouncedSave(selectedImage.path, nextAdjustments);
+      debouncedSave(
+        selectedImage.path,
+        transactionResult.after,
+        buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
+      );
     }
     setLocalSelectedLayerId(layerId);
     onSelectMaskContainer(layerId);
