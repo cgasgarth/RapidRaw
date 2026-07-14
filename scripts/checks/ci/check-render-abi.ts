@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import { parseManifest, renderRustBindings, renderWgslBindings } from '../../render-abi/generate';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 const manifestPath = 'src-tauri/render-abi/render-abi.toml';
@@ -11,6 +12,7 @@ const rustGpu = read('src-tauri/src/gpu/gpu_processing.rs');
 const shader = read('src-tauri/src/shaders/shader.wgsl');
 const rustAbi = read('src-tauri/src/adjustments/abi.rs');
 const wgslAbi = shader;
+const parsedManifest = parseManifest(manifest);
 
 const number = (key: string) => {
   const match = manifest.match(new RegExp(`^${key}\\s*=\\s*(\\d+)\\s*$`, 'mu'));
@@ -53,6 +55,15 @@ const expect = (condition: boolean, message: string) => {
   if (!condition) failures.push(message);
 };
 
+expect(
+  rustBindings === renderRustBindings(parsedManifest),
+  'Rust render ABI bindings are not reproducible from the manifest',
+);
+expect(
+  wgslBindings === renderWgslBindings(parsedManifest),
+  'WGSL render ABI bindings are not reproducible from the manifest',
+);
+
 expect(number('schema_version') === 1, 'unsupported render ABI schema version');
 expect(
   number('layout_version') === Number(rustBindings.match(/RENDER_ABI_LAYOUT_VERSION: u32 = (\d+)/)?.[1]),
@@ -72,30 +83,33 @@ for (let index = 0; index < bindingKeys.length; index += 1) {
   expect(rustGpu.includes(rustNames[index]), `Rust GPU path does not use generated ${rustNames[index]}`);
 }
 
-const fields = manifest
-  .match(/fields\s*=\s*\[([^\]]+)\]/)?.[1]
-  ?.split(',')
-  .map((field) => field.trim().replace(/^"|"$/gu, ''))
-  .filter(Boolean);
-expect(fields !== undefined && fields.length > 0, 'AllAdjustments field order is missing from manifest');
 const structBody = (source: string, name: string) =>
   source.match(new RegExp(`(?:pub )?struct ${name} \\{([\\s\\S]*?)\\n\\}`, 'u'))?.[1] ?? '';
 const sourceFields = (body: string) =>
   body
     .split(/\r?\n/u)
-    .map((line) => line.trim().match(/(?:pub(?:\([^)]*\))? )?([A-Za-z0-9_]+):/)?.[1])
+    .map((line) => line.trim().match(/(?:pub(?:\([^)]*\))? )?([\p{L}\p{N}_]+):/u)?.[1])
     .filter((field): field is string => field !== undefined);
-const expectedFields = fields ?? [];
-expect(
-  JSON.stringify(sourceFields(structBody(rustAbi, 'AllAdjustments')).slice(0, expectedFields.length)) ===
-    JSON.stringify(expectedFields),
-  'Rust AllAdjustments field order differs from manifest',
-);
-expect(
-  JSON.stringify(sourceFields(structBody(wgslAbi, 'AllAdjustments')).slice(0, expectedFields.length)) ===
-    JSON.stringify(expectedFields),
-  'WGSL AllAdjustments field order differs from manifest',
-);
+const normalizeField = (field: string): string => (field === 'centré' ? 'centre' : field);
+for (const [section, rustName, wgslName] of [
+  ['all_adjustments', 'AllAdjustments', 'AllAdjustments'],
+  ['global_adjustments', 'GlobalAdjustments', 'GlobalAdjustments'],
+  ['mask_adjustments', 'MaskAdjustments', 'MaskAdjustments'],
+] as const) {
+  const expectedFields = parsedManifest.structFields[section];
+  const expectedRustFields = parsedManifest.rustStructFields[section];
+  expect(
+    JSON.stringify(
+      sourceFields(structBody(rustAbi, rustName)).slice(0, expectedRustFields.length).map(normalizeField),
+    ) === JSON.stringify(expectedRustFields),
+    `Rust ${rustName} field order differs from manifest`,
+  );
+  expect(
+    JSON.stringify(sourceFields(structBody(wgslAbi, wgslName)).slice(0, expectedFields.length).map(normalizeField)) ===
+      JSON.stringify(expectedFields),
+    `WGSL ${wgslName} field order differs from manifest`,
+  );
+}
 
 if (failures.length > 0) {
   console.error('Render ABI manifest check failed:');
@@ -103,5 +117,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Render ABI manifest passed (${bindingKeys.length} main bindings, ${expectedFields.length} AllAdjustments fields).`,
+  `Render ABI manifest passed (${bindingKeys.length} main bindings, ${parsedManifest.structFields.all_adjustments.length} AllAdjustments fields).`,
 );
