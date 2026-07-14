@@ -74,6 +74,28 @@ export interface PreviewViewportSnapshot {
   targetWidth: number;
 }
 
+export type PreviewRoi = readonly [number, number, number, number] | null;
+
+export function quantizePreviewRoi(roi: PreviewRoi, targetResolution: number): PreviewRoi {
+  if (roi === null) return null;
+  const resolution = Math.max(1, Math.round(targetResolution));
+  return roi.map((value) => Math.round(value * resolution) / resolution) as [number, number, number, number];
+}
+
+export function fingerprintPreviewRoi(roi: PreviewRoi): string {
+  return JSON.stringify(roi ?? [0, 0, 1, 1]);
+}
+
+export interface PreviewQualitySnapshot {
+  effectiveTargetResolution: number;
+  interacting: boolean;
+  reason: string;
+  requestedTargetResolution: number;
+  roiFingerprint: string;
+  sufficientForSemanticZoom: boolean;
+  tier: string;
+}
+
 export interface PreviewTransitionReceipt {
   event: PreviewCoordinatorEvent['type'];
   operationId?: number;
@@ -92,6 +114,7 @@ export interface PreviewCoordinatorState {
   nextOperationId: number;
   original: PreviewOperationState;
   persistence: PreviewOperationState;
+  quality: PreviewQualitySnapshot | null;
   settled: PreviewOperationState;
   session: PreviewSessionIdentity | null;
   staleCompletionCount: number;
@@ -113,6 +136,7 @@ export type PreviewCoordinatorEvent =
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
   | { type: 'operation-failed'; error: string; identity: PreviewOperationIdentity }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
+  | { type: 'quality-decision-changed'; quality: PreviewQualitySnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
   | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
 
@@ -135,6 +159,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     nextOperationId: 1,
     original: idleOperation(),
     persistence: idleOperation(),
+    quality: null,
     settled: idleOperation(),
     session: null,
     staleCompletionCount: 0,
@@ -303,6 +328,7 @@ export function reducePreviewCoordinator(
       displayGeneration: positiveRevisionSchema.parse(event.generation),
       interactive: idleOperation(),
       original: idleOperation(),
+      quality: null,
       settled: idleOperation(),
       viewport: null,
     };
@@ -320,6 +346,10 @@ export function reducePreviewCoordinator(
     state = cancelActiveOperations(state, effects, 'viewport-changed');
     state = { ...state, desired: null, viewport };
     return { effects, state: withReceipt(state, event, 'viewport-changed') };
+  }
+
+  if (event.type === 'quality-decision-changed') {
+    return { effects, state: withReceipt({ ...state, quality: event.quality }, event, 'quality-decision-changed') };
   }
 
   if (event.type === 'render-inputs-changed') {
