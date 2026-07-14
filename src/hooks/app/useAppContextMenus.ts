@@ -727,6 +727,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: SquaresUnite,
               label: stitchLabel,
               onClick: () => {
+                useOperationLaunchStore.getState().launch('panorama', finalSelection, Date.now());
                 setUI({
                   panoramaModalState: {
                     activeOperationId: null,
