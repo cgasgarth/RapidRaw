@@ -121,13 +121,22 @@ export const evaluateFilmProfileClaim = (
 };
 
 export const canonicalFilmProfileManifestJson = (manifest: FilmProfileManifestV1): string => JSON.stringify(manifest);
+export const canonicalFilmProfileManifestHashInput = (manifest: FilmProfileManifestV1): string =>
+  JSON.stringify({
+    ...manifest,
+    profile: { ...manifest.profile, contentSha256: '' },
+    model: {
+      ...manifest.model,
+      profileRef: { ...manifest.model.profileRef, contentSha256: '' },
+    },
+  });
 export const verifyFilmProfileManifestHash = async (
   manifest: FilmProfileManifestV1,
   expectedHash = manifest.profile.contentSha256,
 ): Promise<boolean> => {
   const digest = await globalThis.crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode(canonicalFilmProfileManifestJson(manifest)),
+    new TextEncoder().encode(canonicalFilmProfileManifestHashInput(manifest)),
   );
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   return `sha256:${hex}` === expectedHash;

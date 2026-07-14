@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { filmCharacteristicCurveV1Schema } from './filmCharacteristicCurveSchemas.js';
 
 export const filmEmulationProfileRefV1Schema = z
   .object({
-    id: z.literal('rapidraw.reference_film.v1'),
-    version: z.literal('1'),
-    contentSha256: z.literal('sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef'),
+    id: z.string().regex(/^rapidraw\.[a-z0-9_]+\.v\d+$/u),
+    version: z.string().regex(/^\d+(?:\.\d+){0,2}$/u),
+    contentSha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   })
   .strict();
 
@@ -52,6 +53,7 @@ export const filmEmulationNodeV1Schema = z
       .strict()
       .optional(),
     residualLut: filmResidualLutManifestV1Schema.optional(),
+    characteristicCurve: filmCharacteristicCurveV1Schema.optional(),
     mix: z.number().finite().min(0).max(1),
     workingSpace: z.literal('acescg_linear_v1'),
     seedPolicy: z.literal('source_stable_v1'),
@@ -74,8 +76,8 @@ export const filmEmulationReceiptV1Schema = z
     inputDomain: z.literal('acescg_linear_v1'),
     outputDomain: z.literal('acescg_linear_v1'),
     nodeType: z.literal('film_emulation'),
-    profileId: z.literal('rapidraw.reference_film.v1'),
-    profileVersion: z.literal('1'),
+    profileId: z.string().regex(/^rapidraw\.[a-z0-9_]+\.v\d+$/u),
+    profileVersion: z.string().regex(/^\d+(?:\.\d+){0,2}$/u),
     profileContentSha256: z.string().trim().min(1),
     mix: z.number().finite().min(0).max(1),
     enabled: z.boolean(),

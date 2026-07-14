@@ -27,7 +27,6 @@ export * from './film/filmEmulationSchemas.js';
 export * from './film/filmMonochromeSchemas.js';
 export * from './film/filmOpticalScatterSchemas.js';
 export * from './film/filmPrintScanSchemas.js';
-export * from './film/filmMonochromeSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';

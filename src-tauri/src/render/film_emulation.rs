@@ -9,7 +9,9 @@ use glam::Vec3;
 use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
 
-use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
+use super::film_characteristic_curve::{
+    FilmCharacteristicCurveV1, apply_direct_positive, reference_curve,
+};
 use super::film_color_coupler::{
     apply as apply_color_coupler, reference as reference_color_coupler,
 };
@@ -45,6 +47,8 @@ pub struct FilmEmulationNodeV1 {
     pub profile_ref: FilmEmulationProfileRef,
     #[serde(default)]
     pub stage_params: Option<FilmEmulationStageParamsV1>,
+    #[serde(default)]
+    pub characteristic_curve: Option<FilmCharacteristicCurveV1>,
     pub mix: f32,
     pub working_space: String,
     pub seed_policy: String,
@@ -125,6 +129,9 @@ impl FilmEmulationNodeV1 {
             });
         if !shaper_p.is_finite() || !(0.0001..=4.0).contains(&shaper_p) {
             return Err("film_emulation_invalid_stage_params");
+        }
+        if let Some(curve) = &self.characteristic_curve {
+            curve.validate()?;
         }
         Ok(FilmEmulationParams {
             enabled: self.enabled && self.mix > 0.0,
@@ -342,6 +349,7 @@ fn reference_node() -> FilmEmulationNodeV1 {
             content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
         },
         stage_params: None,
+        characteristic_curve: None,
         mix: 1.0,
         working_space: "acescg_linear_v1".to_string(),
         seed_policy: "source_stable_v1".to_string(),
