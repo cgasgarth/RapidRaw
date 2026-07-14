@@ -101,6 +101,7 @@ pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
+    pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
     pub jobs: Arc<JobCoordinator>,
 }
 

@@ -1099,9 +1099,7 @@ pub(crate) async fn load_image_prepared(
         RenderCaches::new(state).clear_active_image_render_state();
 
         *state.active_denoise_artifact.lock().unwrap() = None;
-        *state.hdr_result.lock().unwrap() = None;
-        *state.hdr_runtime_plan.lock().unwrap() = None;
-        state.hdr_source_refs.lock().unwrap().clear();
+        state.services.hdr.cancel();
         *state.panorama_result.lock().unwrap() = None;
     }
 

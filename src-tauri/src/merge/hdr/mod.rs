@@ -1,7 +1,9 @@
 pub(crate) mod alignment;
+pub(crate) mod commands;
 pub(crate) mod deghost;
 pub(crate) mod full_resolution;
 pub(crate) mod motion;
+pub(crate) mod planning_service;
 pub(crate) mod radiance;
 pub(crate) mod runtime;
 pub(crate) mod source_frame;
