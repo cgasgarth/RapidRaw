@@ -201,7 +201,7 @@ export function useEditorActions() {
   const handleResetAdjustments = useCallback(
     async (paths?: string[]) => {
       const { multiSelectedPaths, libraryActivePath, setLibrary } = useLibraryStore.getState();
-      const { selectedImage, resetHistory } = useEditorStore.getState();
+      const { selectedImage } = useEditorStore.getState();
       const pathsToReset = resolveResetTargetPaths(
         paths,
         selectedImage?.path,
@@ -230,14 +230,24 @@ export function useEditorActions() {
             selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
           const backend = results.find((result) => result.path === selectedImage.path)?.adjustments;
           const resetData = { ...INITIAL_ADJUSTMENTS, ...backend, aspectRatio: aspect, aiPatches: [] };
-          resetHistory(resetData);
-          setEditor({ adjustments: resetData });
+          const current = useEditorStore.getState();
+          const imageSessionId = current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`;
+          if (current.selectedImage?.path !== selectedImage.path) return;
+          applyEditTransaction({
+            transactionId: createOperationId(),
+            imageSessionId,
+            baseAdjustmentRevision: current.adjustmentRevision,
+            source: 'reset',
+            operations: [{ type: 'replace-adjustments', adjustments: resetData }],
+            history: 'reset',
+            persistence: 'commit',
+          });
         }
       } catch (err) {
         toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`);
       }
     },
-    [setEditor],
+    [applyEditTransaction, setEditor],
   );
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {

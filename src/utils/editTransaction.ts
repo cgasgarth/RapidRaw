@@ -12,7 +12,7 @@ export type EditMutationSource =
   | 'hydration'
   | 'migration';
 
-export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'none';
+export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'none' | 'reset';
 export type EditTransactionPersistence = 'commit' | 'preview-only';
 
 /**
