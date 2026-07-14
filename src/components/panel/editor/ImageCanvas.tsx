@@ -21,7 +21,7 @@ import type {
   RetouchCloneSource,
   RetouchRemoveSource,
 } from '../../../utils/adjustments';
-import { isPointColorPickerResultCurrent, pointColorPickerResponseSchema } from '../../../utils/color/pointColorPicker';
+import { isPointColorPickerResultCurrent } from '../../../utils/color/pointColorPicker';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -52,13 +52,11 @@ import {
   type BrushMaskCommandReceipt,
   buildBrushMaskCommandReceiptFromParameters,
 } from '../../../utils/mask/brushMaskCommandBridge';
-import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import {
   applyToneEqualizerPickerSelection,
   applyToneEqualizerTargetedDelta,
   isToneEqualizerPickerResultCurrent,
   type ToneEqualizerPickerResponse,
-  toneEqualizerPickerResponseSchema,
 } from '../../../utils/toneEqualizerPicker';
 import {
   buildViewerSamplerIdentity,
@@ -99,13 +97,13 @@ import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
-import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   createViewerInputRouter,
   normalizeViewerPointerType,
   type ViewerSurfacePointerEvent,
 } from './viewerInputRouter';
+import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
 
@@ -1071,6 +1069,7 @@ const ImageCanvas = memo(
     const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
 
     const tonePickerGraphRevisionRef = useRef(viewerSampleGraphRevision);
+    const viewerPickerCommandServices = useMemo(() => createViewerPickerCommandServices(), []);
     tonePickerGraphRevisionRef.current = viewerSampleGraphRevision;
     const tonePickerSourceIdentityRef = useRef(selectedImage.path);
     tonePickerSourceIdentityRef.current = selectedImage.path;
@@ -1129,18 +1128,12 @@ const ImageCanvas = memo(
         }
         const graphRevision = viewerSampleGraphRevision;
         try {
-          const result = await invokeWithSchema(
-            Invokes.SampleToneEqualizerPicker,
-            {
-              request: {
-                graphRevision,
-                jsAdjustments: adjustments,
-                normalizedImagePoint: mapped.normalizedImagePoint,
-                sourceIdentity: selectedImage.path,
-              },
-            },
-            toneEqualizerPickerResponseSchema,
-          );
+          const result = await viewerPickerCommandServices.sampleToneEqualizer({
+            graphRevision,
+            jsAdjustments: adjustments,
+            normalizedImagePoint: mapped.normalizedImagePoint,
+            sourceIdentity: selectedImage.path,
+          });
           if (
             !isToneEqualizerPickerResultCurrent(result, {
               active: useUIStore.getState().toneEqualizerPickerActive,
@@ -1175,6 +1168,7 @@ const ImageCanvas = memo(
         selectedImage.path,
         setUI,
         viewerSampleGraphRevision,
+        viewerPickerCommandServices,
       ],
     );
 
@@ -1197,18 +1191,12 @@ const ImageCanvas = memo(
         if (!mapped) return;
         const graphRevision = viewerSampleGraphRevision;
         try {
-          const result = await invokeWithSchema(
-            Invokes.SamplePointColorPicker,
-            {
-              request: {
-                graphRevision,
-                jsAdjustments: adjustments,
-                normalizedImagePoint: mapped.normalizedImagePoint,
-                sourceIdentity: selectedImage.path,
-              },
-            },
-            pointColorPickerResponseSchema,
-          );
+          const result = await viewerPickerCommandServices.samplePointColor({
+            graphRevision,
+            jsAdjustments: adjustments,
+            normalizedImagePoint: mapped.normalizedImagePoint,
+            sourceIdentity: selectedImage.path,
+          });
           if (
             !isPointColorPickerResultCurrent(result, {
               active: useUIStore.getState().pointColorPickerActive,
@@ -1265,7 +1253,15 @@ const ImageCanvas = memo(
           setUI({ pointColorPickerReceipt: null });
         }
       },
-      [adjustments, overlayGeometry, selectedImage.path, setAdjustments, setUI, viewerSampleGraphRevision],
+      [
+        adjustments,
+        overlayGeometry,
+        selectedImage.path,
+        setAdjustments,
+        setUI,
+        viewerPickerCommandServices,
+        viewerSampleGraphRevision,
+      ],
     );
 
     const finishCanvasToolInteraction = useCallback((_reason: string) => {
