@@ -14,6 +14,8 @@ pub(crate) mod film_emulation;
 pub(crate) mod film_execution_plan;
 pub(crate) mod film_look_render;
 pub(crate) mod film_measured_monochrome;
+pub(crate) mod full_warp_cache_service;
+pub(crate) use full_warp_cache_service::get_cached_full_warped_image;
 pub(crate) mod film_monochrome;
 pub(crate) mod film_optical_scatter;
 pub(crate) mod film_print_scan;
