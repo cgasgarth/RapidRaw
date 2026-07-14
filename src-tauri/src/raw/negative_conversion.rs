@@ -71,6 +71,10 @@ pub enum NegativeConversionModel {
     #[default]
     DensityRgbV1,
     NegativeLogDensityV1,
+    /// Loader-grounded E-6/reversal scans are already positive film; they
+    /// must not enter the negative-density/base-fog inversion path.
+    #[serde(rename = "e6_positive")]
+    E6PositiveV1,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -2909,6 +2913,123 @@ fn estimate_base_fog_from_image(
     }
 }
 
+fn run_e6_positive_pipeline(
+    input: &DynamicImage,
+    params: &NegativeConversionParams,
+) -> NegativeLabPipelineRender {
+    let rgb = input.to_rgb32f();
+    let (width, height) = rgb.dimensions();
+    let raw_pixels = rgb.as_raw();
+    let mut channel_min = [f32::INFINITY; 3];
+    let mut channel_max = [f32::NEG_INFINITY; 3];
+    for pixel in raw_pixels.chunks_exact(3) {
+        for channel in 0..3 {
+            let value = if pixel[channel].is_finite() {
+                pixel[channel].max(0.0)
+            } else {
+                0.0
+            };
+            channel_min[channel] = channel_min[channel].min(value);
+            channel_max[channel] = channel_max[channel].max(value);
+        }
+    }
+    let channel_bounds: [ChannelBounds; 3] = std::array::from_fn(|channel| ChannelBounds {
+        min: if channel_min[channel].is_finite() {
+            channel_min[channel]
+        } else {
+            0.0
+        },
+        max: if channel_max[channel].is_finite() {
+            channel_max[channel]
+        } else {
+            1.0
+        },
+    });
+    let normalize = |value: f32, bounds: ChannelBounds| {
+        ((value.max(0.0) - bounds.min) / (bounds.max - bounds.min).max(1.0e-6)).clamp(0.0, 1.0)
+    };
+    let mut normalized = Vec::with_capacity(raw_pixels.len());
+    let mut scene_linear = Vec::with_capacity(raw_pixels.len());
+    let mut metrics = NegativeLabDensityMetricsAccumulator::default();
+    for pixel in raw_pixels.chunks_exact(3) {
+        let values = [
+            normalize(pixel[0], channel_bounds[0]),
+            normalize(pixel[1], channel_bounds[1]),
+            normalize(pixel[2], channel_bounds[2]),
+        ];
+        metrics.observe(values);
+        normalized.extend_from_slice(&values);
+        scene_linear.extend_from_slice(&values);
+    }
+    let axis_bounds = NegativeLabDensityNormalizationAxisBounds {
+        color: NegativeLabDensityAxisBoundsSummary { min: 0.0, max: 1.0 },
+        luma: NegativeLabDensityAxisBoundsSummary { min: 0.0, max: 1.0 },
+    };
+    let bounds_set = NegativeLabDensityBoundsSet {
+        axis_bounds,
+        channel_bounds: NegativeLabDensityNormalizationChannelBounds {
+            r: NegativeLabDensityChannelBoundsSummary {
+                min: channel_bounds[0].min,
+                max: channel_bounds[0].max,
+            },
+            g: NegativeLabDensityChannelBoundsSummary {
+                min: channel_bounds[1].min,
+                max: channel_bounds[1].max,
+            },
+            b: NegativeLabDensityChannelBoundsSummary {
+                min: channel_bounds[2].min,
+                max: channel_bounds[2].max,
+            },
+        },
+    };
+    let bounds_receipt = NegativeLabDensityBoundsReceipt {
+        algorithm_id: "native_negative_lab_e6_positive_normalization_v1".to_string(),
+        analysis_buffer: 0.0,
+        analysis_rect: NegativeBaseFogSampleRect {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        },
+        base_bounds: bounds_set,
+        base_fog_provenance: NegativeLabBaseFogBoundsProvenance::AutomaticAnalysis,
+        color_range_clip: params.color_range_clip,
+        final_bounds: bounds_set,
+        luma_range_clip: params.luma_range_clip,
+        schema_version: default_bounds_schema_version(),
+        warning_codes: vec![
+            "e6_positive_bypasses_negative_density".to_string(),
+            "e6_positive_bypasses_base_fog".to_string(),
+            "e6_positive_bypasses_crosstalk".to_string(),
+        ],
+    };
+    let mut density_metrics = metrics.into_metrics(0, 0, bounds_receipt);
+    density_metrics.density_range_unclamped = 1.0;
+    let density_scopes = build_negative_lab_density_scopes(&normalized, &normalized, 0);
+    let normalized_image = Rgb32FImage::from_vec(width, height, normalized).unwrap();
+    let mut scene_image = Rgb32FImage::from_vec(width, height, scene_linear).unwrap();
+    let detail_finish_metrics =
+        apply_negative_lab_detail_finish(&mut scene_image, &params.detail_finish);
+    let rendered = Rgb32FImage::from_vec(
+        width,
+        height,
+        scene_image
+            .as_raw()
+            .par_iter()
+            .map(|value| value.clamp(0.0, 1.0).powf(1.0 / 2.2))
+            .collect(),
+    )
+    .unwrap();
+    NegativeLabPipelineRender {
+        normalized_density_preview: DynamicImage::ImageRgb32F(normalized_image),
+        rendered_preview: DynamicImage::ImageRgb32F(rendered),
+        scene_linear_print_preview: DynamicImage::ImageRgb32F(scene_image),
+        density_normalization_metrics: density_metrics,
+        density_scopes,
+        detail_finish_metrics,
+    }
+}
+
 fn run_pipeline_with_metrics(
     input: &DynamicImage,
     params: &NegativeConversionParams,
@@ -2916,6 +3037,9 @@ fn run_pipeline_with_metrics(
     crosstalk_profile: Option<&serde_json::Value>,
 ) -> NegativeLabPipelineRender {
     let params = params.sanitized();
+    if params.conversion_model == NegativeConversionModel::E6PositiveV1 {
+        return run_e6_positive_pipeline(input, &params);
+    }
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
     let raw_pixels = rgb.as_raw();
@@ -3254,6 +3378,7 @@ fn build_negative_lab_runtime_base_fog_sample_summary(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_negative_lab_dry_run_preview_artifact(
     rendered_preview: &DynamicImage,
     normalized_density_preview: &DynamicImage,
@@ -3840,6 +3965,47 @@ mod tests {
             None,
         )
         .density_normalization_metrics
+    }
+
+    #[test]
+    fn e6_positive_normalization_preserves_polarity_and_bypasses_negative_stages() {
+        let params = NegativeConversionParams {
+            conversion_model: NegativeConversionModel::E6PositiveV1,
+            ..NegativeConversionParams::default()
+        };
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                3,
+                1,
+                vec![0.05, 0.05, 0.05, 0.5, 0.5, 0.5, 0.95, 0.95, 0.95],
+            )
+            .unwrap(),
+        );
+        let render = run_pipeline_with_metrics(&input, &params, None, None);
+        let output = render.rendered_preview.to_rgb32f();
+        assert!(output.get_pixel(0, 0)[0] < output.get_pixel(1, 0)[0]);
+        assert!(output.get_pixel(1, 0)[0] < output.get_pixel(2, 0)[0]);
+        assert_eq!(
+            render
+                .density_normalization_metrics
+                .bounds_receipt
+                .algorithm_id,
+            "native_negative_lab_e6_positive_normalization_v1"
+        );
+        assert!(
+            render
+                .density_normalization_metrics
+                .crosstalk_receipt
+                .is_none()
+        );
+        assert!(
+            render
+                .density_normalization_metrics
+                .bounds_receipt
+                .warning_codes
+                .iter()
+                .any(|code| code == "e6_positive_bypasses_base_fog")
+        );
     }
 
     fn luminance(pixel: image::Rgb<f32>) -> f32 {

@@ -6212,6 +6212,7 @@ export const negativeProcessFamilySchema = z.enum([
   'chromogenic_black_and_white_negative',
   'ecn2_color_negative',
   'e6_slide_helper',
+  'e6_positive',
   'redscale_or_creative_negative',
   'unknown',
 ]);
@@ -6219,6 +6220,7 @@ export const negativeProcessFamilySchema = z.enum([
 export const negativeLabSupportedProcessFamilyV1Schema = z.enum([
   'c41_color_negative',
   'black_and_white_silver_negative',
+  'e6_positive',
 ]);
 
 export const negativeWarningV1Schema = z
@@ -8911,7 +8913,12 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       .strict(),
     conversionModel: z
       .object({
-        algorithmId: z.enum(['density_rgb_v1', 'negative_log_density_v1', 'negative_density_print_v2']),
+        algorithmId: z.enum([
+          'density_rgb_v1',
+          'negative_log_density_v1',
+          'negative_density_print_v2',
+          'e6_positive_v1',
+        ]),
         algorithmVersion: z.union([z.literal(1), z.literal(2)]),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
@@ -9036,6 +9043,14 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       context.addIssue({
         code: 'custom',
         message: 'negative_density_print_v2 recipes must declare algorithmVersion 2.',
+        path: ['conversionModel', 'algorithmVersion'],
+      });
+    }
+
+    if (recipe.conversionModel.algorithmId === 'e6_positive_v1' && recipe.conversionModel.algorithmVersion !== 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'e6_positive_v1 recipes must declare algorithmVersion 1.',
         path: ['conversionModel', 'algorithmVersion'],
       });
     }
@@ -9388,7 +9403,12 @@ export const negativeLabRuntimeProofV1Schema = z
       .strict(),
     algorithm: z
       .object({
-        algorithmId: z.enum(['density_rgb_v1', 'negative_log_density_v1', 'negative_density_print_v2']),
+        algorithmId: z.enum([
+          'density_rgb_v1',
+          'negative_log_density_v1',
+          'negative_density_print_v2',
+          'e6_positive_v1',
+        ]),
         algorithmVersion: z.union([z.literal(1), z.literal(2)]),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
