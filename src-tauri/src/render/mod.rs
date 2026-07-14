@@ -16,6 +16,7 @@ pub(crate) mod film_optical_scatter;
 pub(crate) mod film_print_scan;
 pub(crate) mod film_profile_compiler;
 pub(crate) mod film_profile_registry;
+pub(crate) mod film_render_scheduler;
 pub(crate) mod film_residual_lut;
 pub(crate) mod film_resource_cache;
 pub(crate) mod image_analytics;
