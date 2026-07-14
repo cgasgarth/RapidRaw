@@ -683,6 +683,30 @@ fn color_fingerprint(
     color_hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
     crate::render::color_node_registry::update_contract_hash(&mut color_hasher);
     color_hasher.update(bytes_of(adjustments));
+    // Keep the monochrome process contract in the plan identity. This also
+    // makes the native receipt version observable to preview/export caches
+    // without rebuilding a receipt for every rendered pixel.
+    let monochrome = adjustments.global.black_white_mixer;
+    let monochrome_receipt = crate::monochrome::receipt_for_settings(
+        monochrome.process,
+        monochrome.source_class,
+        [
+            monochrome.reds,
+            monochrome.oranges,
+            monochrome.yellows,
+            monochrome.greens,
+            monochrome.aquas,
+            monochrome.blues,
+            monochrome.purples,
+            monochrome.magentas,
+        ],
+        [0.0; 3],
+        [0.0; 3],
+    );
+    color_hasher.update(&monochrome_receipt.process.to_le_bytes());
+    color_hasher.update(&monochrome_receipt.source_class.to_le_bytes());
+    color_hasher.update(&monochrome_receipt.implementation_version.to_le_bytes());
+    color_hasher.update(crate::monochrome::source_class_name(monochrome.source_class).as_bytes());
     color_hasher.update(&hash_json(camera_profile_amount).to_le_bytes());
     if let Some(lut) = lut {
         color_hasher.update(&(lut.size as u64).to_le_bytes());

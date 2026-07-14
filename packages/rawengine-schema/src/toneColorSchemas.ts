@@ -85,6 +85,24 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
     })
     .strict();
 
+  const toneColorMonochromeProcessV1Schema = z
+    .enum(['legacy_fixed_band_v1', 'neutral_panchromatic_v1', 'continuous_sensitivity_v1'])
+    .default('legacy_fixed_band_v1');
+  const toneColorMonochromeSourceClassV1Schema = z
+    .enum(['color_source', 'monochrome_sensor', 'encoded_grayscale', 'already_monochrome_working'])
+    .default('color_source');
+  const toneColorMonochromePresetIdV1Schema = z
+    .enum([
+      'manual',
+      'neutral_panchromatic',
+      'yellow_filter',
+      'orange_filter',
+      'red_filter',
+      'green_filter',
+      'blue_filter',
+    ])
+    .default('manual');
+
   const toneColorCommandBaseV1Schema = z.object({
     actor: dependencies.rawEngineActorSchema,
     approval: dependencies.approvalRequirementSchema,
@@ -318,6 +336,9 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
           parameters: z
             .object({
               enabled: z.boolean(),
+              presetId: toneColorMonochromePresetIdV1Schema,
+              process: toneColorMonochromeProcessV1Schema,
+              sourceClass: toneColorMonochromeSourceClassV1Schema,
               weights: toneColorBlackWhiteMixerWeightsV1Schema,
             })
             .strict()
@@ -441,6 +462,9 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
   return {
     toneColorBalanceRgbRangeV1Schema,
     toneColorBlackWhiteMixerWeightsV1Schema,
+    toneColorMonochromePresetIdV1Schema,
+    toneColorMonochromeProcessV1Schema,
+    toneColorMonochromeSourceClassV1Schema,
     toneColorChannelMixerRowV1Schema,
     toneColorChannelV1Schema,
     toneColorCommandEnvelopeV1Schema,

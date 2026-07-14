@@ -80,7 +80,7 @@ struct BlackWhiteMixerSettings {
     enabled: u32,
     process: u32,
     implementation_version: u32,
-    _pad3: u32,
+    source_class: u32,
 }
 
 struct ToneEqualizerGpuSettings {
@@ -1143,7 +1143,11 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, 
         let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
         return vec3<f32>(dot(storage_safe, ACESCG_LUMINANCE_COEFF));
     }
-    if (settings.process == 2u && settings.implementation_version == 2u) {
+    if (settings.process == 2u && settings.implementation_version == 2u && settings.source_class != 0u) {
+        let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
+        return vec3<f32>(dot(storage_safe, ACESCG_LUMINANCE_COEFF));
+    }
+    if (settings.process == 2u && settings.implementation_version == 2u && settings.source_class == 0u) {
         let storage_safe = clamp(color, vec3<f32>(-65504.0), vec3<f32>(65504.0));
         let lab = monochrome_oklab_from_ap1(storage_safe);
         let chroma = length(lab.yz);

@@ -133,7 +133,9 @@ pub struct BlackWhiteMixerSettings {
     pub enabled: u32,
     pub(crate) process: u32,
     pub(crate) implementation_version: u32,
-    pub(crate) _pad3: u32,
+    /// Declares whether the source carries chroma that can legally drive
+    /// sensitivity. Kept in the existing ABI padding slot for compatibility.
+    pub(crate) source_class: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]

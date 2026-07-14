@@ -62,6 +62,15 @@
         "contribution": "{{name}} Beitrag",
         "disabled": "Aus",
         "enabled": "Ein",
+        "filterPreset": "",
+        "filterPresetAria": "",
+        "manualResponse": "",
+        "sourceClass": "",
+        "sourceClassAria": "",
+        "sourceColor": "",
+        "sourceEncodedGrayscale": "",
+        "sourceMonochromeSensor": "",
+        "sourceWorkingMonochrome": "",
         "title": "Schwarzweiß-Mischer"
       },
       "calibration": {
