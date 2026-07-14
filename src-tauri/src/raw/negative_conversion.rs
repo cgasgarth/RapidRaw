@@ -23,6 +23,10 @@ use uuid::Uuid;
 use super::negative_lab_detail_finish::{
     NegativeLabDetailFinishMetrics, NegativeLabDetailFinishParams, apply_negative_lab_detail_finish,
 };
+use super::negative_lab_optical_finish::{
+    NegativeLabOpticalFinishMetrics, NegativeLabOpticalFinishParams,
+    apply_negative_lab_optical_finish,
+};
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
 use crate::load_settings_or_default;
@@ -71,6 +75,8 @@ pub struct NegativeConversionParams {
     pub color_finish: NegativeLabScannerColorFinishParams,
     #[serde(default)]
     pub detail_finish: NegativeLabDetailFinishParams,
+    #[serde(default)]
+    pub optical_finish: NegativeLabOpticalFinishParams,
     #[serde(default)]
     pub render_intent: NegativeLabRenderIntent,
     #[serde(default)]
@@ -215,6 +221,7 @@ pub struct NegativeLabDryRunPreviewArtifact {
     pub density_scopes: NegativeLabDensityScopes,
     pub detail_finish_metrics: NegativeLabDetailFinishMetrics,
     pub color_finish_metrics: NegativeLabColorFinishMetrics,
+    pub optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     pub dimensions: NegativeLabPreviewArtifactDimensions,
     pub flat_log_master: NegativeLabFlatLogMasterParams,
     pub render_intent: NegativeLabRenderIntent,
@@ -1096,6 +1103,7 @@ impl Default for NegativeConversionParams {
             source_interpretation_hash: None,
             color_finish: NegativeLabScannerColorFinishParams::default(),
             detail_finish: NegativeLabDetailFinishParams::default(),
+            optical_finish: NegativeLabOpticalFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
             flat_log_master: NegativeLabFlatLogMasterParams::default(),
         }
@@ -2389,6 +2397,7 @@ impl NegativeConversionParams {
             source_interpretation_hash: self.source_interpretation_hash.clone(),
             color_finish: self.color_finish.sanitized(),
             detail_finish: self.detail_finish.sanitized(),
+            optical_finish: self.optical_finish.sanitized(),
             render_intent: self.render_intent,
             flat_log_master: self.flat_log_master.sanitized(),
         }
@@ -2515,6 +2524,7 @@ struct NegativeLabPipelineRender {
     density_scopes: NegativeLabDensityScopes,
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
     color_finish_metrics: NegativeLabColorFinishMetrics,
+    optical_finish_metrics: NegativeLabOpticalFinishMetrics,
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
@@ -3274,7 +3284,9 @@ fn run_e6_positive_pipeline(
     // pixels unchanged while preserving the same operation identity/hash
     // contract as the negative pipeline.
     let color_finish = apply_color_finish(&scene_image, &params.color_finish, false);
-    let finished_scene_linear = color_finish.image;
+    let optical_finish =
+        apply_negative_lab_optical_finish(&color_finish.image, &params.optical_finish, false);
+    let finished_scene_linear = optical_finish.image;
     let rendered = Rgb32FImage::from_vec(
         width,
         height,
@@ -3293,6 +3305,7 @@ fn run_e6_positive_pipeline(
         density_scopes,
         detail_finish_metrics,
         color_finish_metrics: color_finish.metrics,
+        optical_finish_metrics: optical_finish.metrics,
     }
 }
 
@@ -3457,7 +3470,16 @@ fn run_pipeline_with_metrics(
             params.conversion_model != NegativeConversionModel::NegativeLogDensityV1,
         )
     };
-    let finished_scene_linear = color_finish.image;
+    let optical_finish = if is_flat_log_master {
+        apply_negative_lab_optical_finish(
+            &color_finish.image,
+            &NegativeLabOpticalFinishParams::default(),
+            false,
+        )
+    } else {
+        apply_negative_lab_optical_finish(&color_finish.image, &params.optical_finish, true)
+    };
+    let finished_scene_linear = optical_finish.image;
     let out_img = Rgb32FImage::from_fn(width, height, |x, y| {
         let pixel = finished_scene_linear.get_pixel(x, y).0;
         image::Rgb(pixel.map(negative_lab_scene_linear_to_srgb))
@@ -3471,6 +3493,7 @@ fn run_pipeline_with_metrics(
         density_scopes,
         detail_finish_metrics,
         color_finish_metrics: color_finish.metrics,
+        optical_finish_metrics: optical_finish.metrics,
     }
 }
 
@@ -4155,6 +4178,7 @@ fn build_negative_lab_dry_run_preview_artifact(
     density_normalization_metrics: NegativeLabDensityNormalizationMetrics,
     detail_finish_metrics: NegativeLabDetailFinishMetrics,
     color_finish_metrics: NegativeLabColorFinishMetrics,
+    optical_finish_metrics: NegativeLabOpticalFinishMetrics,
     params: &NegativeConversionParams,
     density_scopes: NegativeLabDensityScopes,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
@@ -4208,6 +4232,7 @@ fn build_negative_lab_dry_run_preview_artifact(
         density_scopes,
         detail_finish_metrics,
         color_finish_metrics,
+        optical_finish_metrics,
         dimensions,
         flat_log_master: params.flat_log_master,
         render_intent: params.render_intent,
@@ -4356,6 +4381,7 @@ pub async fn preview_negative_conversion(
         rendered_preview.density_normalization_metrics,
         rendered_preview.detail_finish_metrics,
         rendered_preview.color_finish_metrics,
+        rendered_preview.optical_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )?
@@ -4395,6 +4421,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
         rendered_preview.density_normalization_metrics,
         rendered_preview.detail_finish_metrics,
         rendered_preview.color_finish_metrics,
+        rendered_preview.optical_finish_metrics,
         &params,
         rendered_preview.density_scopes,
     )
@@ -7776,6 +7803,7 @@ mod tests {
                 true,
             )
             .metrics,
+            NegativeLabOpticalFinishMetrics::default(),
             &NegativeConversionParams::default(),
             build_negative_lab_density_scopes(&[0.2, 0.3, 0.4], &[0.1, 0.2, 0.3], 0),
         )
@@ -7859,6 +7887,7 @@ mod tests {
             pipeline.density_normalization_metrics,
             pipeline.detail_finish_metrics,
             pipeline.color_finish_metrics,
+            pipeline.optical_finish_metrics,
             &params,
             pipeline.density_scopes,
         )

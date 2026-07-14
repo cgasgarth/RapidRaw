@@ -8,6 +8,7 @@ import {
   negativeLabAcquisitionWarningCodeSchema,
 } from './negativeLabFrameHealthSchemas';
 import { negativeLabFrameRgbBalanceOverridePayloadSchema } from './negativeLabFrameRgbBalanceOverrideSchemas';
+import { negativeLabOpticalFinishMetricsSchema } from './negativeLabOpticalFinishSchemas';
 import { negativeLabPatchSamplerCorrectionPayloadSchema } from './negativeLabPatchSamplerCorrectionSchemas';
 import { negativeLabColorFinishMetricsSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 import { negativeLabSelectedProfileSnapshotSchema } from './negativeLabProfileComparisonSchemas';
@@ -61,6 +62,7 @@ export const negativeLabConversionBundleSchema = z
           .regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u)
           .nullable(),
         colorFinishMetrics: negativeLabColorFinishMetricsSchema.optional(),
+        opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
         frameExposureOverrides: negativeLabFrameExposureOverridePayloadSchema.default({
           overrides: [],
           schemaVersion: 1,

@@ -109,6 +109,23 @@ export const negativeLabPresetParamsSchema = z
     contrast: z.number().min(0.5).max(2.5),
     conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
     detail_finish: negativeLabDetailFinishParamsSchema.optional(),
+    optical_finish: z
+      .object({
+        algorithm_version: z.literal(1),
+        enabled: z.boolean(),
+        glow_amount: z.number().min(0).max(1),
+        glow_radius: z.number().min(0.0005).max(0.25),
+        glow_threshold: z.number().min(0).max(1),
+        halation_amount: z.number().min(0).max(1),
+        halation_radius: z.number().min(0.0005).max(0.25),
+        halation_threshold: z.number().min(0).max(1),
+        orange_weight: z.number().min(0).max(1),
+        red_weight: z.number().min(0).max(1),
+        scale_basis: z.literal('full_resolution_short_edge_v1'),
+        working_space: z.literal('scene_linear_srgb_d65_v1'),
+      })
+      .strict()
+      .optional(),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
     luma_range_clip: z.number().min(0.01).max(0.3).default(0.08),

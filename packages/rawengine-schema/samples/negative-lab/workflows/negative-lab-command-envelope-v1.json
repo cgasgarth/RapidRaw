@@ -38,6 +38,20 @@
       "vibrance": 0,
       "workingSpace": "linear_srgb_d65"
     },
+    "opticalFinish": {
+      "algorithmVersion": 1,
+      "enabled": false,
+      "glowAmount": 0,
+      "glowRadius": 0.02,
+      "glowThreshold": 0.35,
+      "halationAmount": 0,
+      "halationRadius": 0.02,
+      "halationThreshold": 0.35,
+      "orangeWeight": 0.35,
+      "redWeight": 0.75,
+      "scaleBasis": "full_resolution_short_edge_v1",
+      "workingSpace": "scene_linear_srgb_d65_v1"
+    },
     "densityBounds": {
       "analysisBuffer": 0.04,
       "baseFogProvenance": "automatic_analysis",
