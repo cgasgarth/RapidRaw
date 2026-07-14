@@ -90,4 +90,15 @@ describe('viewer input router', () => {
     router.dispatch({ type: 'pointerup', pointerId: 11 });
     expect(router.getState().lastPointerSample).toBeNull();
   });
+
+  test('semantic Escape cancellation clears the active tool session', () => {
+    const active = reduceViewerInputRouter(initialViewerInputRouterState(), {
+      type: 'pointerdown',
+      pointerId: 3,
+      input: input({ activeTool: 'brush' }),
+    }).state;
+    const cancelled = reduceViewerInputRouter(active, { type: 'escape' });
+    expect(cancelled.state).toEqual(initialViewerInputRouterState());
+    expect(cancelled.ignored).toBe(false);
+  });
 });

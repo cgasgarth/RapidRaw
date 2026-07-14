@@ -95,11 +95,7 @@ import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import {
-  createViewerInputRouter,
-  normalizeViewerPointerType,
-  type ViewerSurfacePointerEvent,
-} from './viewerInputRouter';
+import { createViewerInputRouter, normalizeViewerPointerType, type ViewerSurfaceInputEvent } from './viewerInputRouter';
 import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { createViewerToolSessionRegistry, resolveViewerToolId } from './viewerToolControllers';
@@ -2510,7 +2506,15 @@ const ImageCanvas = memo(
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-testid="image-canvas"
-        onInputEvent={(event: ViewerSurfacePointerEvent) => {
+        onInputEvent={(event: ViewerSurfaceInputEvent) => {
+          if (event.type === 'blur' || event.type === 'escape') {
+            const transition = viewerInputRouter.dispatch({ type: event.type });
+            viewerInputTransitionRef.current = transition;
+            setViewerInputOwnerState(transition.state.owner);
+            viewerToolSessions.invalidate();
+            return;
+          }
+          if (!('pointerId' in event)) return;
           const transition =
             event.type === 'pointerdown'
               ? viewerInputRouter.dispatch({
