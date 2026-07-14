@@ -90,6 +90,14 @@ impl CpuNodeRuntime {
     }
 
     pub(crate) fn diagnostic_receipt(&self) -> serde_json::Value {
+        let mut active_resources = Vec::new();
+        for binding in &self.bindings {
+            for resource in binding.resource_requirements {
+                if !active_resources.contains(resource) {
+                    active_resources.push(*resource);
+                }
+            }
+        }
         serde_json::json!({
             "bindings": self.bindings.iter().map(|binding| serde_json::json!({
                 "id": binding.kind.stable_id(),
@@ -97,6 +105,7 @@ impl CpuNodeRuntime {
                 "resourceRequirements": binding.resource_requirements,
                 "typedExecutor": binding.executor.is_some(),
             })).collect::<Vec<_>>(),
+            "activeResources": active_resources,
         })
     }
 
@@ -197,6 +206,46 @@ mod tests {
         assert_eq!(
             runtime.output_curve().unwrap().apply(input).to_array(),
             output_curve.evaluate_rgb(input.to_array())
+        );
+    }
+
+    #[test]
+    fn cpu_resource_receipts_follow_active_graph_node_descriptors() {
+        let adjustments = crate::adjustments::abi::AllAdjustments::default();
+        let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
+            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
+            version_was_explicit: true,
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &adjustments,
+            neutral_adjustments: &adjustments,
+            scene_curve: None,
+            film_emulation: None,
+            output_curve: None,
+            has_geometry_or_retouch: true,
+            has_detail: true,
+            has_masks: false,
+            has_lut: false,
+            show_clipping: false,
+        });
+        let runtime = CpuNodeRuntime::from_graph(&graph).unwrap();
+        let receipt = runtime.diagnostic_receipt();
+        let resources = receipt["activeResources"]
+            .as_array()
+            .expect("CPU resource receipt is an array");
+        assert!(
+            resources
+                .iter()
+                .any(|resource| resource == "geometry_tiles_v1")
+        );
+        assert!(
+            resources
+                .iter()
+                .any(|resource| resource == "detail_guidance_v1")
         );
     }
 }
