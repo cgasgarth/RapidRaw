@@ -326,8 +326,6 @@ pub use crate::gpu_context::get_or_init_gpu_context;
 
 const GPU_OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const GPU_OUTPUT_BYTES_PER_PIXEL: u32 = RGBA16_FLOAT_BYTES_PER_PIXEL;
-const MAX_MASK_BINDINGS: u32 = 1;
-
 const BLUR_FLAG_SHARPNESS: u32 = 1 << 0;
 const BLUR_FLAG_TONAL: u32 = 1 << 1;
 const BLUR_FLAG_CLARITY: u32 = 1 << 2;
@@ -937,20 +935,7 @@ impl BlurPassCounters {
     }
 }
 
-// Keep these Rust bindings in sync with src-tauri/src/shaders/shader.wgsl.
-const MAIN_BINDING_INPUT_TEXTURE: u32 = 0;
-const MAIN_BINDING_OUTPUT_TEXTURE: u32 = 1;
-const MAIN_BINDING_ADJUSTMENTS: u32 = 2;
-const MAIN_BINDING_MASK_TEXTURES: u32 = 3;
-const MAIN_BINDING_LUT_TEXTURE: u32 = MAIN_BINDING_MASK_TEXTURES + MAX_MASK_BINDINGS;
-const MAIN_BINDING_LUT_SAMPLER: u32 = MAIN_BINDING_LUT_TEXTURE + 1;
-const MAIN_BINDING_SHARPNESS_BLUR: u32 = MAIN_BINDING_LUT_SAMPLER + 1;
-const MAIN_BINDING_TONAL_BLUR: u32 = MAIN_BINDING_SHARPNESS_BLUR + 1;
-const MAIN_BINDING_CLARITY_BLUR: u32 = MAIN_BINDING_TONAL_BLUR + 1;
-const MAIN_BINDING_STRUCTURE_BLUR: u32 = MAIN_BINDING_CLARITY_BLUR + 1;
-const MAIN_BINDING_DEHAZE_BLUR: u32 = MAIN_BINDING_STRUCTURE_BLUR + 1;
-const MAIN_BINDING_FLARE_TEXTURE: u32 = MAIN_BINDING_DEHAZE_BLUR + 1;
-const MAIN_BINDING_FLARE_SAMPLER: u32 = MAIN_BINDING_FLARE_TEXTURE + 1;
+include!("generated_bindings.rs");
 
 // Keep these Rust bindings in sync with blur.wgsl and flare.wgsl.
 const BLUR_BINDING_INPUT_TEXTURE: u32 = 0;
@@ -1363,7 +1348,13 @@ impl GpuProcessor {
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Image Processing Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(
+                    include_str!("../shaders/generated_bindings.wgsl"),
+                    include_str!("../shaders/shader.wgsl")
+                )
+                .into(),
+            ),
         });
 
         let mut bind_group_layout_entries = vec![
