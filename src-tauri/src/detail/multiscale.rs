@@ -75,6 +75,15 @@ pub struct MultiscaleDetailReceiptV1 {
     pub target_dimensions: [u32; 2],
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiscaleDetailExecutionReceiptV1 {
+    pub estimated_noise_floor_by_band: [f32; MULTISCALE_DETAIL_BAND_COUNT],
+    pub plan_fingerprint: String,
+    pub stage_class: DetailStageClassV1,
+    pub target_dimensions: [u32; 2],
+}
+
 impl MultiscaleDetailSettingsV1 {
     pub fn validate(&self) -> Result<(), MultiscaleDetailValidationError> {
         if !self.overall_amount.is_finite()
@@ -165,15 +174,24 @@ impl MultiscaleDetailPlanV1 {
     }
 }
 
-pub fn apply_multiscale_detail(image: &mut DynamicImage, plan: &MultiscaleDetailPlanV1) {
+pub fn apply_multiscale_detail(
+    image: &mut DynamicImage,
+    plan: &MultiscaleDetailPlanV1,
+) -> MultiscaleDetailExecutionReceiptV1 {
+    let mut receipt = MultiscaleDetailExecutionReceiptV1 {
+        estimated_noise_floor_by_band: [0.0; MULTISCALE_DETAIL_BAND_COUNT],
+        plan_fingerprint: format!("{:016x}", plan.fingerprint),
+        stage_class: plan.stage_class,
+        target_dimensions: plan.target_dimensions,
+    };
     if plan.is_identity() {
-        return;
+        return receipt;
     }
     let mut output = image.to_rgb32f();
     let width = output.width() as usize;
     let height = output.height() as usize;
     if width == 0 || height == 0 {
-        return;
+        return receipt;
     }
     let source = output.as_raw();
     let luma = source
@@ -193,6 +211,8 @@ pub fn apply_multiscale_detail(image: &mut DynamicImage, plan: &MultiscaleDetail
         );
         previous = base;
     }
+    let noise_floors = estimate_noise_floors(&bands, &luma);
+    receipt.estimated_noise_floor_by_band = noise_floors;
 
     for (index, pixel) in output.as_mut().chunks_exact_mut(3).enumerate() {
         let source_luma = luma[index];
@@ -205,7 +225,13 @@ pub fn apply_multiscale_detail(image: &mut DynamicImage, plan: &MultiscaleDetail
         for (band_index, band) in bands.iter().enumerate() {
             let value = band[index];
             let settings = plan.settings.bands[band_index];
-            let confidence = smoothstep(settings.threshold, settings.threshold + 0.04, value.abs());
+            let noise_floor = noise_floors[band_index];
+            let confidence_floor = settings.threshold.max(noise_floor * 1.5);
+            let confidence = smoothstep(
+                confidence_floor,
+                confidence_floor + 0.004_f32.max(noise_floor * 2.0),
+                value.abs(),
+            );
             let noise_guard = 1.0
                 - settings.noise_protection
                     * plan.settings.shadow_noise_protection
@@ -236,6 +262,34 @@ pub fn apply_multiscale_detail(image: &mut DynamicImage, plan: &MultiscaleDetail
         }
     }
     *image = DynamicImage::ImageRgb32F(output);
+    receipt
+}
+
+fn estimate_noise_floors(bands: &[Vec<f32>], luma: &[f32]) -> [f32; MULTISCALE_DETAIL_BAND_COUNT] {
+    std::array::from_fn(|band_index| {
+        let mut samples = bands[band_index]
+            .iter()
+            .zip(luma)
+            .filter(|(_, luma)| **luma > 1.0e-5 && **luma < 0.35)
+            .map(|(detail, _)| detail.abs())
+            .filter(|detail| detail.is_finite())
+            .collect::<Vec<_>>();
+        if samples.len() < 16 {
+            samples = bands[band_index]
+                .iter()
+                .map(|detail| detail.abs())
+                .filter(|detail| detail.is_finite())
+                .collect();
+        }
+        if samples.is_empty() {
+            return 0.0;
+        }
+        samples.sort_by(f32::total_cmp);
+        // The lower-half median rejects real edges/texture while remaining a
+        // deterministic robust estimate of the band noise amplitude.
+        let lower_half_median = samples[samples.len() / 4];
+        (lower_half_median * 1.4826).clamp(0.0, 0.25)
+    })
 }
 
 fn unit(value: f32) -> bool {
@@ -430,9 +484,21 @@ mod tests {
             DetailStageClassV1::OutputSharpening,
         )
         .unwrap();
-        apply_multiscale_detail(&mut output_pixels, &plan);
+        let receipt = apply_multiscale_detail(&mut output_pixels, &plan);
 
         assert!(max_delta(&before, &output_pixels) > 0.0001);
+        assert_eq!(receipt.stage_class, DetailStageClassV1::OutputSharpening);
+        assert_eq!(receipt.target_dimensions, [64, 48]);
+        assert_eq!(
+            receipt.plan_fingerprint,
+            format!("{:016x}", plan.fingerprint)
+        );
+        assert!(
+            receipt
+                .estimated_noise_floor_by_band
+                .iter()
+                .all(|floor| floor.is_finite() && *floor >= 0.0)
+        );
         assert_eq!(plan.receipt().target_dimensions, [64, 48]);
         assert!(
             output_pixels
@@ -440,6 +506,55 @@ mod tests {
                 .as_raw()
                 .iter()
                 .all(|value| value.is_finite())
+        );
+    }
+
+    #[test]
+    fn estimated_noise_floor_is_deterministic_and_suppresses_shadow_noise() {
+        let input = DynamicImage::ImageRgb32F(ImageBuffer::from_fn(64, 48, |x, y| {
+            let base = if x >= 40 { 0.22 } else { 0.055 };
+            let noise = (((x * 37 + y * 19) % 17) as f32 - 8.0) * 0.0015;
+            let value = base + noise;
+            Rgb([value, value * 0.9, value * 0.75])
+        }));
+        let mut unprotected_settings = settings(1.0);
+        unprotected_settings.shadow_noise_protection = 0.0;
+        for band in &mut unprotected_settings.bands {
+            band.noise_protection = 0.0;
+            band.threshold = 0.0;
+        }
+        let unprotected_plan =
+            MultiscaleDetailPlanV1::compile(unprotected_settings, 64, 48).unwrap();
+        let mut protected_settings = settings(1.0);
+        protected_settings.shadow_noise_protection = 1.0;
+        for band in &mut protected_settings.bands {
+            band.noise_protection = 1.0;
+            band.threshold = 0.0;
+        }
+        let protected_plan = MultiscaleDetailPlanV1::compile(protected_settings, 64, 48).unwrap();
+
+        let mut unprotected = input.clone();
+        apply_multiscale_detail(&mut unprotected, &unprotected_plan);
+        let mut protected = input.clone();
+        let receipt = apply_multiscale_detail(&mut protected, &protected_plan);
+        let mut repeated = input.clone();
+        let repeated_receipt = apply_multiscale_detail(&mut repeated, &protected_plan);
+
+        let shadow_delta = |output: &DynamicImage| {
+            let input = input.to_rgb32f();
+            let output = output.to_rgb32f();
+            input
+                .enumerate_pixels()
+                .filter(|(x, _, _)| *x < 40)
+                .map(|(x, y, before)| (output.get_pixel(x, y)[0] - before[0]).abs())
+                .sum::<f32>()
+        };
+        assert!(receipt.estimated_noise_floor_by_band[0] > 0.0);
+        assert_eq!(receipt, repeated_receipt);
+        assert_eq!(max_delta(&protected, &repeated), 0.0);
+        assert!(
+            shadow_delta(&protected) < shadow_delta(&unprotected),
+            "noise-aware protection should reduce detail amplification in noisy shadows"
         );
     }
 
