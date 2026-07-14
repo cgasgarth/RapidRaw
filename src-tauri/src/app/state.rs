@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GenericImageView, GrayImage};
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
 #[cfg(feature = "ai")]
@@ -183,7 +182,6 @@ pub struct AppState {
     export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
-    pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
@@ -255,7 +253,6 @@ impl AppState {
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
             ),
-            indexing_task_handle: Mutex::new(None),
             cache_budget: Arc::clone(&cache_budget),
             lut_cache: MemoryLruCache::new(
                 policy("lut_paths", 1, 2, Some(64)),
