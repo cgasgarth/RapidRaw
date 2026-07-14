@@ -100,8 +100,8 @@ export const buildDustCandidateHealLayer = ({
   layerId,
   targetSubMaskId,
 }: DustCandidateHealLayerInput): MaskContainer => {
-  if (candidate.kind !== 'dust_spot') {
-    throw new Error('Only dust spot candidates can be converted into heal layers.');
+  if (candidate.kind !== 'dust_spot' && candidate.kind !== 'emulsion_scratch') {
+    throw new Error('Unsupported Negative Lab candidate kind for heal layer generation.');
   }
 
   const targetX = clamp01(candidate.geometry.x + candidate.geometry.width / 2);
@@ -204,6 +204,40 @@ export const buildDustCandidateHealLayer = ({
   };
 };
 
+export const buildNegativeLabScratchHealLayers = ({
+  candidate,
+  frameId,
+  imageHeight,
+  imageWidth,
+}: DustCandidateHealLayerInput): MaskContainer[] => {
+  if (candidate.kind !== 'emulsion_scratch' || candidate.geometry.kind !== 'polyline') return [];
+  const geometry = candidate.geometry;
+  return geometry.points.slice(0, -1).map((point, index) => {
+    const nextPoint = geometry.points[index + 1] ?? point;
+    const segmentWidth = Math.max(geometry.width, Math.abs(nextPoint.x - point.x));
+    const segmentHeight = Math.max(geometry.height, Math.abs(nextPoint.y - point.y));
+    const segmentCandidate: DustScratchCandidate = {
+      ...candidate,
+      candidateId: `${candidate.candidateId}_segment_${index + 1}`,
+      geometry: {
+        coordinateSpace: 'normalized_frame',
+        height: segmentHeight,
+        kind: 'rect',
+        width: segmentWidth,
+        x: Math.max(0, Math.min(1 - segmentWidth, (point.x + nextPoint.x) / 2 - segmentWidth / 2)),
+        y: Math.max(0, Math.min(1 - segmentHeight, (point.y + nextPoint.y) / 2 - segmentHeight / 2)),
+      },
+    };
+    return buildDustCandidateHealLayer({
+      candidate: segmentCandidate,
+      frameId,
+      imageHeight,
+      imageWidth,
+      layerId: `${candidate.candidateId}_heal_layer_${index + 1}`,
+    });
+  });
+};
+
 export const applyDustCandidateDecisionTransition = ({
   candidate,
   decision,
@@ -227,6 +261,20 @@ export const applyDustCandidateDecisionTransition = ({
       healLayerByCandidateId: {
         ...state.healLayerByCandidateId,
         [candidate.candidateId]: healLayer,
+      },
+    };
+  }
+
+  if (decision === 'accepted' && candidate.kind === 'emulsion_scratch') {
+    const scratchLayers = buildNegativeLabScratchHealLayers({ candidate, frameId, imageHeight, imageWidth });
+    return {
+      decisionByCandidateId: {
+        ...state.decisionByCandidateId,
+        [candidate.candidateId]: 'accepted',
+      },
+      healLayerByCandidateId: {
+        ...state.healLayerByCandidateId,
+        ...Object.fromEntries(scratchLayers.map((layer) => [layer.id, layer])),
       },
     };
   }

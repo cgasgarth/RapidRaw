@@ -23,22 +23,42 @@ const negativeLabDustScratchFindingCodeSchema = z.enum([
   'preview_required',
 ]);
 
+const negativeLabScratchPointSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).strict();
+const negativeLabDustScratchGeometrySchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      coordinateSpace: z.literal('normalized_frame'),
+      height: z.number().positive().max(1),
+      kind: z.literal('rect'),
+      width: z.number().positive().max(1),
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+    })
+    .strict(),
+  z
+    .object({
+      coordinateSpace: z.literal('normalized_frame'),
+      height: z.number().positive().max(1),
+      kind: z.literal('polyline'),
+      points: z.array(negativeLabScratchPointSchema).min(2).max(128),
+      width: z.number().positive().max(1),
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+    })
+    .strict(),
+]);
+
 const negativeLabDustScratchCandidateSchema = z
   .object({
     candidateId: z.string().trim().min(1),
     confidence: z.number().min(0).max(1),
-    geometry: z
-      .object({
-        coordinateSpace: z.literal('normalized_frame'),
-        height: z.number().positive().max(1),
-        kind: z.literal('rect'),
-        width: z.number().positive().max(1),
-        x: z.number().min(0).max(1),
-        y: z.number().min(0).max(1),
-      })
-      .strict(),
+    detectorVersion: z.string().trim().min(1).optional(),
+    geometry: negativeLabDustScratchGeometrySchema,
     kind: z.enum(['dust_spot', 'emulsion_scratch']),
+    polarity: z.enum(['dark', 'light', 'mixed']).optional(),
     status: z.enum(['acknowledged', 'ignored', 'pending']),
+    supportCount: z.number().int().nonnegative().optional(),
+    warningCodes: z.array(z.string().trim().min(1)).max(8).optional(),
   })
   .strict()
   .superRefine((candidate, context) => {
