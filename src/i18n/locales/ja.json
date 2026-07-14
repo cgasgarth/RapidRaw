@@ -471,6 +471,8 @@
     }
   },
   "common": {
+    "enable": "",
+    "enabled": "",
     "reset": ""
   },
   "contextMenus": {
@@ -2269,6 +2271,41 @@
       "scale": "倍率",
       "spacing": "間隔",
       "watermarkImage": "ウォーターマーク画像"
+    }
+  },
+  "film": {
+    "workspace": {
+      "abBypass": "",
+      "abOn": "",
+      "addFavorite": "",
+      "applyNamedProfile": "",
+      "applyProfile": "",
+      "browserLabel": "",
+      "compatiblePrint": "",
+      "enable": "",
+      "filtersLabel": "",
+      "localAb": "",
+      "mix": "",
+      "mixLabel": "",
+      "mixValue": "",
+      "none": "",
+      "noProfile": "",
+      "noProfiles": "",
+      "noVerifiedProfile": "",
+      "printSummary": "",
+      "profileAria": "",
+      "projectPrint": "",
+      "provenance": "",
+      "provenanceLabel": "",
+      "removeFavorite": "",
+      "rendererBacked": "",
+      "reset": "",
+      "searchLabel": "",
+      "searchPlaceholder": "",
+      "selectedReplace": "",
+      "separateBoundary": "",
+      "subtitle": "",
+      "title": ""
     }
   },
   "library": {

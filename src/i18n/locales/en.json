@@ -504,6 +504,8 @@
     }
   },
   "common": {
+    "enable": "Enable",
+    "enabled": "Enabled",
     "reset": "Reset"
   },
   "contextMenus": {
@@ -2431,6 +2433,41 @@
       "scale": "Scale",
       "spacing": "Spacing",
       "watermarkImage": "Watermark Image"
+    }
+  },
+  "film": {
+    "workspace": {
+      "abBypass": "A/B: Film bypass",
+      "abOn": "A/B: Film on",
+      "addFavorite": "film.workspace.addFavorite",
+      "applyNamedProfile": "film.workspace.applyNamedProfile",
+      "applyProfile": "Apply profile",
+      "browserLabel": "Verified film profile browser",
+      "compatiblePrint": "Compatible print",
+      "enable": "Enable film emulation",
+      "filtersLabel": "Profile filters",
+      "localAb": "Local A/B",
+      "mix": "Mix",
+      "mixLabel": "Film mix",
+      "mixValue": "Film mix value",
+      "none": "None",
+      "noProfile": "No profile selected",
+      "noProfiles": "No profiles match.",
+      "noVerifiedProfile": "No verified profile selected",
+      "printSummary": "Print: {{print}}. A/B is local and does not create history.",
+      "profileAria": "film.workspace.profileAria",
+      "projectPrint": "Project print · verified",
+      "provenance": "Profile provenance",
+      "provenanceLabel": "Film profile provenance",
+      "removeFavorite": "film.workspace.removeFavorite",
+      "rendererBacked": "renderer-backed selection",
+      "reset": "Reset film emulation",
+      "searchLabel": "Search film profiles",
+      "searchPlaceholder": "Search profiles",
+      "selectedReplace": "Selected · Apply again to replace",
+      "separateBoundary": "Film remains separate from Negative Lab.",
+      "subtitle": "Positive scene-referred creative workspace",
+      "title": "Film Emulation"
     }
   },
   "library": {

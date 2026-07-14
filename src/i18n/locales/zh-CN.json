@@ -500,6 +500,8 @@
     }
   },
   "common": {
+    "enable": "",
+    "enabled": "",
     "reset": ""
   },
   "contextMenus": {
@@ -2340,6 +2342,41 @@
       "scale": "缩放",
       "spacing": "间距",
       "watermarkImage": "水印图像"
+    }
+  },
+  "film": {
+    "workspace": {
+      "abBypass": "",
+      "abOn": "",
+      "addFavorite": "",
+      "applyNamedProfile": "",
+      "applyProfile": "",
+      "browserLabel": "",
+      "compatiblePrint": "",
+      "enable": "",
+      "filtersLabel": "",
+      "localAb": "",
+      "mix": "",
+      "mixLabel": "",
+      "mixValue": "",
+      "none": "",
+      "noProfile": "",
+      "noProfiles": "",
+      "noVerifiedProfile": "",
+      "printSummary": "",
+      "profileAria": "",
+      "projectPrint": "",
+      "provenance": "",
+      "provenanceLabel": "",
+      "removeFavorite": "",
+      "rendererBacked": "",
+      "reset": "",
+      "searchLabel": "",
+      "searchPlaceholder": "",
+      "selectedReplace": "",
+      "separateBoundary": "",
+      "subtitle": "",
+      "title": ""
     }
   },
   "library": {
