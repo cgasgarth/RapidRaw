@@ -15,6 +15,17 @@ export const nativeQaControlRecordSchema = z.object({
 
 export type NativeQaControlRecord = z.infer<typeof nativeQaControlRecordSchema>;
 
+export type NativeQaReadinessStatus = 'ready' | 'waiting' | 'exited';
+
+/** Classify the launcher handshake so an exited bundle cannot be reported as healthy. */
+export function nativeQaReadinessStatus(
+  health: { readonly ready: boolean } | undefined,
+  processAlive: boolean,
+): NativeQaReadinessStatus {
+  if (!processAlive) return 'exited';
+  return health?.ready === true ? 'ready' : 'waiting';
+}
+
 export const NATIVE_QA_BINARY_MARKERS = [
   'RAWENGINE_QA_CONTROL_SOCKET',
   'rawengine-qa-control',
