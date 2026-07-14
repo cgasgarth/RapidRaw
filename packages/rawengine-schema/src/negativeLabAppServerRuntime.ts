@@ -459,6 +459,7 @@ function buildNegativeLabRuntimePositiveOutputReceiptsV1({
       sidecarPath: `${outputPath}.rawengine-negative-lab.json`,
       sourceImageRef: sourcePath,
       sourcePath,
+      state: 'planned',
     };
   });
 }

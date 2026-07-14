@@ -199,6 +199,7 @@ describe('Negative Lab before/after preview proof', () => {
       },
       dimensions: { height: 720, width: 1080 },
       sourcePath: '/roll-01/frame-001-negative.dng',
+      state: 'planned',
     });
     expect(apply.proof?.runtimePreview.beforeAfterPreviewProof.acceptedDryRunPlanRequirement).toEqual(
       beforeAfterProof?.acceptedDryRunPlanRequirement,

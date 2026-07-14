@@ -94,6 +94,7 @@ describe('negative lab export handoff', () => {
       );
       expect(receipt.acceptedDryRunPlanHash).toBe(fixture.acceptedPlanIdentity.acceptedDryRunPlanHash);
       expect(receipt.profileProvenanceHash).toBe(fixture.conversionPlan.profileProvenanceHash);
+      expect(receipt.state).toBe('planned');
     }
   });
 

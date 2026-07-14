@@ -493,6 +493,7 @@ export const negativeLabPositiveOutputReceiptSchema = z
     sidecarPath: z.string().trim().min(1),
     sourceContentHash: z.string().trim().min(1),
     sourcePath: z.string().trim().min(1),
+    state: z.enum(['planned', 'saved']).default('planned'),
   })
   .strict()
   .superRefine((receipt, context) => {
