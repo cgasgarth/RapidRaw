@@ -452,6 +452,9 @@
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
+      "filmStages": {
+        "title": ""
+      },
       "glow": "Glühen",
       "grain": "Körnung",
       "grainChromaPlanned": "Chroma-Körnung ist geplant; der aktuelle Renderer nutzt Luma-Körnung.",

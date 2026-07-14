@@ -32,6 +32,7 @@ export * from './film/filmPrintScanSchemas.js';
 export * from './film/filmProfileRegistrySchemas.js';
 export * from './film/filmResourceCacheSchemas.js';
 export * from './film/measuredMonochromeProfileSchemas.js';
+export * from './film/filmStageControlSchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';
 export * from './filmHalationRuntime.js';
