@@ -98,6 +98,27 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     warningCodes: string[];
   };
   paperProfile?: NegativeLabSetConversionRecipeCommandV1['parameters']['paperProfile'];
+  autoMeter?: {
+    algorithmId: 'native_negative_lab_auto_meter_v1';
+    algorithmVersion: 1;
+    sampleCount: number;
+    lumaDensityP10: number;
+    lumaDensityP50: number;
+    lumaDensityP90: number;
+    texturalDensityRangeP10P90: number;
+    boundedDensityRange: number;
+    confidence: number;
+    confidenceThreshold: number;
+    requestedAutoDensityEnabled: boolean;
+    requestedAutoDensityStrength: number;
+    requestedAutoGradeEnabled: boolean;
+    requestedAutoGradeStrength: number;
+    appliedDensityOffset: number;
+    effectiveIsoRGrade: number;
+    densityApplied: boolean;
+    gradeApplied: boolean;
+    warningCodes: string[];
+  };
   detailFinishMetrics?: {
     changedPixelRatio: number;
     chromaDriftMax: number;
@@ -747,6 +768,7 @@ function buildNegativeLabRuntimeProofV1({
       ...(renderedPreview.neutralAxisAnalysis === undefined
         ? {}
         : { neutralAxisAnalysis: renderedPreview.neutralAxisAnalysis }),
+      ...(renderedPreview.autoMeter === undefined ? {} : { autoMeter: renderedPreview.autoMeter }),
       ...(renderedPreview.paperProfile === undefined ? {} : { paperProfile: renderedPreview.paperProfile }),
       dryRunMode: 'runtime_preview_non_mutating',
       planHash,

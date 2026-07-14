@@ -95,6 +95,27 @@ const invokeMock = mock((command: string) => {
       sampleCount: 400,
       schemaVersion: 1,
     },
+    autoMeter: {
+      algorithmId: 'native_negative_lab_auto_meter_v1',
+      algorithmVersion: 1,
+      sampleCount: 400,
+      lumaDensityP10: 0.18,
+      lumaDensityP50: 0.42,
+      lumaDensityP90: 0.76,
+      texturalDensityRangeP10P90: 0.58,
+      boundedDensityRange: 0.58,
+      confidence: 0.91,
+      confidenceThreshold: 0.58,
+      requestedAutoDensityEnabled: false,
+      requestedAutoDensityStrength: 1,
+      requestedAutoGradeEnabled: false,
+      requestedAutoGradeStrength: 1,
+      appliedDensityOffset: 0,
+      effectiveIsoRGrade: 1,
+      densityApplied: false,
+      gradeApplied: false,
+      warningCodes: [],
+    },
     dimensions: {
       height: 480,
       width: 720,
@@ -253,6 +274,14 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
     expect(invokeMock).toHaveBeenCalledWith(Invokes.RenderNegativeLabDryRunPreviewArtifact, {
       params: {
         analysis_buffer: 0.04,
+        auto_meter: {
+          auto_density_enabled: false,
+          auto_density_strength: 1,
+          auto_density_anchor: 0.5,
+          auto_grade_enabled: false,
+          auto_grade_strength: 1,
+          confidence_threshold: 0.58,
+        },
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
@@ -447,6 +476,14 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
     expect(invokeMock).toHaveBeenLastCalledWith(Invokes.RenderNegativeLabDryRunPreviewArtifact, {
       params: {
         analysis_buffer: 0.04,
+        auto_meter: {
+          auto_density_enabled: false,
+          auto_density_strength: 1,
+          auto_density_anchor: 0.5,
+          auto_grade_enabled: false,
+          auto_grade_strength: 1,
+          confidence_threshold: 0.58,
+        },
         base_fog_sample: null,
         base_fog_strength: 1,
         black_point: 0,
