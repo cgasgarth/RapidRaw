@@ -55,6 +55,8 @@ export enum Invokes {
   FrontendReady = 'frontend_ready',
   FitAndPublishChartCalibration = 'fit_and_publish_chart_calibration',
   FitChartCalibrationReport = 'fit_chart_calibration_report',
+  ListSupportedChartDefinitions = 'list_supported_chart_definitions',
+  ValidateChartCaptureGeometry = 'validate_chart_capture_geometry',
   GetStartupTrace = 'get_startup_trace',
   RecordFrontendStartupPhase = 'record_frontend_startup_phase',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
