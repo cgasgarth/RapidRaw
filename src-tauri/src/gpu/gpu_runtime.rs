@@ -33,6 +33,14 @@ pub struct GpuExecutionLease {
 }
 
 impl GpuExecutionLease {
+    pub fn runtime(self) -> GpuRuntimeIdentity {
+        self.runtime
+    }
+
+    pub fn frame(self) -> GpuFrameIdentity {
+        self.frame
+    }
+
     pub fn is_current(self, runtime: GpuRuntimeIdentity, frame: GpuFrameIdentity) -> bool {
         self.runtime == runtime && self.frame == frame
     }
