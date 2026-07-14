@@ -339,6 +339,36 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onInterrupt);
 
+  // Keep producer outputs leased until every node in this validation run has
+  // finished consuming them. Releasing a producer lease immediately after its
+  // command exits allows a concurrent run in the same worktree to overwrite
+  // (or remove) the output while this run's downstream nodes are still using
+  // it. Worktree-scoped resources still allow independent worktrees to run in
+  // parallel.
+  const runOutputLeases: ResourceLease[] = [];
+  const releaseRunOutputLeases = async (): Promise<void> => {
+    for (const lease of runOutputLeases.splice(0).reverse()) await lease.release();
+  };
+  try {
+    const outputs = [
+      ...new Set(plan.filter((entry) => entry.selected).flatMap((entry) => entry.node.outputs ?? [])),
+    ].sort();
+    for (const output of outputs) {
+      runOutputLeases.push(
+        await acquireResourceLease({
+          label: `validation-output-run:${output}`,
+          resource: validationOutputResource(options.root, output),
+          root: options.resourceCoordinatorRoot,
+        }),
+      );
+    }
+  } catch (error) {
+    await releaseRunOutputLeases();
+    process.off('SIGINT', onInterrupt);
+    process.off('SIGTERM', onInterrupt);
+    throw error;
+  }
+
   const artifactDigests = async (node: ValidationNode): Promise<Record<string, string>> => {
     const artifacts: Record<string, string> = {};
     for (const output of node.outputs ?? []) {
@@ -379,23 +409,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         })
       : undefined;
     let cacheLease: ResourceLease | undefined;
-    const outputLeases: ResourceLease[] = [];
     try {
-      // Producers that write shared paths (dist, bundle reports, native outputs)
-      // must own those paths for the whole producer/readback transaction. This
-      // keeps lightweight checks parallel while preventing stale/colliding output.
-      for (const output of [...(node.outputs ?? [])].sort()) {
-        outputLeases.push(
-          await acquireResourceLease({
-            label: `validation-output:${node.id}:${output}`,
-            // A linked worktree has its own output directory. Scope the lease
-            // by absolute root so independent precommits overlap, while two
-            // runners targeting the same worktree still serialize producers.
-            resource: validationOutputResource(options.root, output),
-            root: options.resourceCoordinatorRoot,
-          }),
-        );
-      }
       cacheLease =
         node.cachePolicy === 'none'
           ? undefined
@@ -491,55 +505,66 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       completed.set(node.id, { ok, key });
     } finally {
       await cacheLease?.release();
-      for (const lease of outputLeases.reverse()) await lease.release();
       await classLease?.release();
     }
   };
 
-  while (pending.size > 0 || active.size > 0) {
-    let launched = false;
-    for (const [id, node] of pending) {
-      if (interrupted || (failed && (options.mode === 'commit' || options.mode === 'push'))) break;
-      if (!node.dependencies.every((dependency) => completed.get(dependency)?.ok)) continue;
-      const count = activeResources.get(node.resourceClass) ?? 0;
-      if (count >= capacities[node.resourceClass]) continue;
-      pending.delete(id);
-      activeResources.set(node.resourceClass, count + 1);
-      const promise = start(node)
-        .catch((error) => {
-          console.error(`FAIL ${id} (runner error: ${error instanceof Error ? error.message : String(error)})`);
-          failed = true;
-          completed.set(id, { ok: false, key: 'runner-error' });
-        })
-        .finally(() => {
-          active.delete(id);
-          activeResources.set(node.resourceClass, (activeResources.get(node.resourceClass) ?? 1) - 1);
-        });
-      active.set(id, promise);
-      launched = true;
-    }
-    if (active.size > 0) await Promise.race(active.values());
-    else if (!launched && pending.size > 0) {
+  try {
+    while (pending.size > 0 || active.size > 0) {
+      let launched = false;
       for (const [id, node] of pending) {
-        if (failed || interrupted || node.dependencies.some((dependency) => completed.get(dependency)?.ok === false)) {
-          console.error(`BLOCKED ${id} (failed dependency)`);
-          completed.set(id, { ok: false, key: 'blocked' });
-          pending.delete(id);
-        }
+        if (interrupted || (failed && (options.mode === 'commit' || options.mode === 'push'))) break;
+        if (!node.dependencies.every((dependency) => completed.get(dependency)?.ok)) continue;
+        const count = activeResources.get(node.resourceClass) ?? 0;
+        if (count >= capacities[node.resourceClass]) continue;
+        pending.delete(id);
+        activeResources.set(node.resourceClass, count + 1);
+        const promise = start(node)
+          .catch((error) => {
+            console.error(`FAIL ${id} (runner error: ${error instanceof Error ? error.message : String(error)})`);
+            failed = true;
+            completed.set(id, { ok: false, key: 'runner-error' });
+          })
+          .finally(() => {
+            active.delete(id);
+            activeResources.set(node.resourceClass, (activeResources.get(node.resourceClass) ?? 1) - 1);
+          });
+        active.set(id, promise);
+        launched = true;
       }
-      if (pending.size > 0) throw new Error(`validation DAG stalled: ${[...pending.keys()].join(', ')}`);
+      if (active.size > 0) await Promise.race(active.values());
+      else if (!launched && pending.size > 0) {
+        for (const [id, node] of pending) {
+          if (
+            failed ||
+            interrupted ||
+            node.dependencies.some((dependency) => completed.get(dependency)?.ok === false)
+          ) {
+            console.error(`BLOCKED ${id} (failed dependency)`);
+            completed.set(id, { ok: false, key: 'blocked' });
+            pending.delete(id);
+          }
+        }
+        if (pending.size > 0) throw new Error(`validation DAG stalled: ${[...pending.keys()].join(', ')}`);
+      }
     }
+    // The frozen-input check must not observe the coordinator's own lock
+    // bookkeeping. All nodes have completed here, so releasing output
+    // ownership is safe before taking the final snapshot.
+    await releaseRunOutputLeases();
+    const finalSnapshot = await freezeValidationSnapshot(options.root);
+    if (finalSnapshot.identity !== snapshot.identity) {
+      const changed = [...new Set([...snapshot.files, ...finalSnapshot.files])]
+        .filter((path) => snapshot.digests.get(path) !== finalSnapshot.digests.get(path))
+        .slice(0, 20);
+      console.error(`FAIL frozen-snapshot (inputs changed during validation: ${changed.join(', ')})`);
+      return 1;
+    }
+    if (interrupted) return 130;
+    return !failed && [...completed.values()].every((result) => result.ok) ? 0 : 1;
+  } finally {
+    process.off('SIGINT', onInterrupt);
+    process.off('SIGTERM', onInterrupt);
+    await releaseRunOutputLeases();
   }
-  process.off('SIGINT', onInterrupt);
-  process.off('SIGTERM', onInterrupt);
-  const finalSnapshot = await freezeValidationSnapshot(options.root);
-  if (finalSnapshot.identity !== snapshot.identity) {
-    const changed = [...new Set([...snapshot.files, ...finalSnapshot.files])]
-      .filter((path) => snapshot.digests.get(path) !== finalSnapshot.digests.get(path))
-      .slice(0, 20);
-    console.error(`FAIL frozen-snapshot (inputs changed during validation: ${changed.join(', ')})`);
-    return 1;
-  }
-  if (interrupted) return 130;
-  return !failed && [...completed.values()].every((result) => result.ok) ? 0 : 1;
 };

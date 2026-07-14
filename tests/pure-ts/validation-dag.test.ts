@@ -423,6 +423,58 @@ await lease.release();`;
     expect(performance.now() - startedAt).toBeLessThan(1_200);
   });
 
+  test('holds producer output ownership through downstream consumers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-output-lifetime-'));
+    const worktree = join(root, 'worktree');
+    const coordinator = join(root, 'locks');
+    await mkdir(worktree);
+    await writeFile(join(worktree, 'input.ts'), 'export const input = true;\n');
+    await initFixtureRepository(worktree);
+    const producer = (token: string): ValidationNode => ({
+      id: `producer-${token}`,
+      command: [
+        'bun',
+        '-e',
+        `import {mkdir} from 'node:fs/promises';await mkdir('dist',{recursive:true});await Bun.write('dist/artifact',${JSON.stringify(token)})`,
+      ],
+      dependencies: [],
+      inputs: ['frontend'],
+      resourceClass: 'light',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      timeoutMs: 2_000,
+      outputs: ['dist'],
+    });
+    const consumer = (token: string): ValidationNode => ({
+      id: `consumer-${token}`,
+      command: [
+        'bun',
+        '-e',
+        `await Bun.sleep(500);if((await Bun.file('dist/artifact').text())!==${JSON.stringify(token)})process.exit(9)`,
+      ],
+      dependencies: [`producer-${token}`],
+      inputs: ['frontend'],
+      resourceClass: 'light',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      timeoutMs: 2_000,
+    });
+    const options = {
+      mode: 'commit' as const,
+      changedPaths: ['input.ts'],
+      noCache: true,
+      verifyCache: false,
+      explainCache: false,
+      root: worktree,
+      resourceCoordinatorRoot: coordinator,
+    };
+
+    const first = runValidation([producer('one'), consumer('one')], options);
+    await Bun.sleep(10);
+    const second = runValidation([producer('two'), consumer('two')], options);
+    expect(await Promise.all([first, second])).toEqual([0, 0]);
+  });
+
   test('commit failure preserves an independent active node disposition and returns deterministic nonzero', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-fail-fast-'));
     initFixtureRepository(root);

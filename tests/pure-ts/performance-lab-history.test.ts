@@ -225,8 +225,9 @@ describe('performance regression diagnosis and routing', () => {
     };
     try {
       git('init', '--quiet');
-      git('config', 'user.email', 'performance-lab@example.invalid');
-      git('config', 'user.name', 'Performance Lab');
+      // Keep the cleanliness probe honest when Git's fsmonitor emits a benign
+      // diagnostic on stderr: porcelain stdout must remain the source of truth.
+      git('config', 'core.fsmonitor', 'true');
       await writeFile(
         resolve(directory, 'evaluate.sh'),
         `#!/bin/sh
@@ -241,7 +242,16 @@ exit 1
       for (let value = 0; value < 5; value += 1) {
         await writeFile(resolve(directory, 'value'), `${value}\n`);
         git('add', '.');
-        git('commit', '--quiet', '-m', `value ${value}`);
+        git(
+          '-c',
+          'user.email=performance-lab@example.invalid',
+          '-c',
+          'user.name=Performance Lab',
+          'commit',
+          '--quiet',
+          '-m',
+          `value ${value}`,
+        );
         commits.push(git('rev-parse', 'HEAD'));
       }
       const good = commits[0];
