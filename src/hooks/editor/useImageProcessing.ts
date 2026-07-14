@@ -1030,10 +1030,44 @@ export function useImageProcessing(
     [applyAdjustments, currentResRef],
   );
 
+  const startOriginalPreviewOperation = useCallback(
+    (targetRes: number): PreviewOperationIdentity | null => {
+      const scopeSnapshot = interactiveScopeRef.current(targetRes, null);
+      if (scopeSnapshot === null) return null;
+      const session = previewSessionIdentity(scopeSnapshot.scope, targetRes, null);
+      const transition = dispatchPreviewCoordinator({
+        identity: session,
+        kind: 'original',
+        reason: 'original-preview-requested',
+        type: 'render-inputs-changed',
+      });
+      const identity = transition.state.original.identity;
+      if (identity !== undefined) {
+        dispatchPreviewCoordinator({ identity, type: 'operation-started' });
+      }
+      return identity ?? null;
+    },
+    [dispatchPreviewCoordinator, previewSessionIdentity],
+  );
+
+  const completeOriginalPreviewOperation = useCallback(
+    (identity: PreviewOperationIdentity, base64Data: string): boolean => {
+      const transition = dispatchPreviewCoordinator({
+        artifact: { identity, url: base64Data },
+        identity,
+        type: 'operation-completed',
+      });
+      return transition.state.lastTransition?.staleCompletion !== true;
+    },
+    [dispatchPreviewCoordinator],
+  );
+
   const requestHiFiOriginalZoom = useMemo(
     () =>
       debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
         if (targetRes > currentOriginalResRef.current) {
+          const operationIdentity = startOriginalPreviewOperation(targetRes);
+          if (operationIdentity === null) return;
           try {
             const base64Data = await invokeWithSchema(
               Invokes.GenerateOriginalTransformedPreview,
@@ -1044,14 +1078,25 @@ export function useImageProcessing(
               },
               previewDataUrlResponseSchema,
             );
-            currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
+            if (completeOriginalPreviewOperation(operationIdentity, base64Data)) {
+              currentOriginalResRef.current = targetRes;
+              setEditor({ transformedOriginalUrl: base64Data });
+            } else if (base64Data.startsWith('blob:')) {
+              URL.revokeObjectURL(base64Data);
+            }
           } catch (e) {
+            dispatchPreviewCoordinator({ error: String(e), identity: operationIdentity, type: 'operation-failed' });
             console.error('Failed to generate hi-fi original preview:', e);
           }
         }
       }, 200),
-    [setEditor, viewerSampleGraphRevision],
+    [
+      completeOriginalPreviewOperation,
+      dispatchPreviewCoordinator,
+      setEditor,
+      startOriginalPreviewOperation,
+      viewerSampleGraphRevision,
+    ],
   );
 
   useEffect(() => {
@@ -1239,8 +1284,11 @@ export function useImageProcessing(
     const requestImageSessionId = imageSessionId;
     const generate = async () => {
       if (isCompareActive && selectedImage?.path && !transformedOriginalUrl) {
+        let operationIdentity: PreviewOperationIdentity | null = null;
         try {
           const targetRes = calculateTargetRes();
+          operationIdentity = startOriginalPreviewOperation(targetRes);
+          if (operationIdentity === null) return;
           const base64Data = await invokeWithSchema(
             Invokes.GenerateOriginalTransformedPreview,
             {
@@ -1250,13 +1298,20 @@ export function useImageProcessing(
             },
             previewDataUrlResponseSchema,
           );
-          if (isEffectActive && useEditorStore.getState().imageSessionId === requestImageSessionId) {
+          if (
+            isEffectActive &&
+            useEditorStore.getState().imageSessionId === requestImageSessionId &&
+            completeOriginalPreviewOperation(operationIdentity, base64Data)
+          ) {
             currentOriginalResRef.current = targetRes;
             setEditor({ transformedOriginalUrl: base64Data });
           } else if (base64Data.startsWith('blob:')) {
             URL.revokeObjectURL(base64Data);
           }
         } catch (e) {
+          if (operationIdentity !== null) {
+            dispatchPreviewCoordinator({ error: String(e), identity: operationIdentity, type: 'operation-failed' });
+          }
           if (isEffectActive && useEditorStore.getState().imageSessionId === requestImageSessionId) {
             console.error('Failed to generate original preview:', e);
             dispatchCompare({ type: 'exit' });
@@ -1275,7 +1330,10 @@ export function useImageProcessing(
     transformedOriginalUrl,
     calculateTargetRes,
     dispatchCompare,
+    dispatchPreviewCoordinator,
+    completeOriginalPreviewOperation,
     setEditor,
+    startOriginalPreviewOperation,
     viewerSampleGraphRevision,
     imageSessionId,
   ]);
