@@ -8941,6 +8941,35 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       })
       .strict()
       .optional(),
+    detailFinish: z
+      .object({
+        algorithmVersion: z.literal(1).default(1),
+        enabled: z.boolean().default(false),
+        localContrastAmount: z.number().min(0).max(1).default(0),
+        localContrastClipLimit: z.number().min(0).max(1).default(0.25),
+        localContrastRadius: z.number().min(0.0005).max(0.25).default(0.02),
+        scaleBasis: z.literal('full_resolution_short_edge_v1').default('full_resolution_short_edge_v1'),
+        sharpeningAmount: z.number().min(0).max(1).default(0),
+        sharpeningRadius: z.number().min(0.0005).max(0.25).default(0.005),
+        sharpeningThreshold: z.number().min(0).max(1).default(0.01),
+        workingSpace: z.literal('scene_linear_luminance_v1').default('scene_linear_luminance_v1'),
+      })
+      .strict()
+      .default(
+        () =>
+          ({
+            algorithmVersion: 1,
+            enabled: false,
+            localContrastAmount: 0,
+            localContrastClipLimit: 0.25,
+            localContrastRadius: 0.02,
+            scaleBasis: 'full_resolution_short_edge_v1',
+            sharpeningAmount: 0,
+            sharpeningRadius: 0.005,
+            sharpeningThreshold: 0.01,
+            workingSpace: 'scene_linear_luminance_v1',
+          }) as const,
+      ),
     curveModel: z
       .object({
         curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),

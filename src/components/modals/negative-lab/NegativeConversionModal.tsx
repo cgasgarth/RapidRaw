@@ -2424,6 +2424,31 @@ function NegativeLabSession({
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
+  const handleDetailFinishChange = (
+    key: keyof NonNullable<NegativeParams['detail_finish']>,
+    value: number | boolean,
+  ) => {
+    const currentDetailFinish = params.detail_finish ?? {
+      algorithm_version: 1 as const,
+      enabled: false,
+      local_contrast_amount: 0,
+      local_contrast_clip_limit: 0.25,
+      local_contrast_radius: 0.02,
+      scale_basis: 'full_resolution_short_edge_v1' as const,
+      sharpening_amount: 0,
+      sharpening_radius: 0.005,
+      sharpening_threshold: 0.01,
+      working_space: 'scene_linear_luminance_v1' as const,
+    };
+    const newParams: NegativeParams = {
+      ...params,
+      detail_finish: { ...currentDetailFinish, [key]: value },
+    };
+    setSelectedPresetId('');
+    setParams(newParams);
+    updatePreview(buildParamsWithFrameOverrides(newParams));
+  };
+
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
     if (!preset.isSelectable) return;
 
@@ -3614,6 +3639,19 @@ function NegativeLabSession({
   const renderBatchReadiness = () => {
     const printCurveV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS;
     const isPrintCurveV2 = params.print_curve_algorithm === 'negative_density_print_v2';
+    const detailFinishParams = params.detail_finish ?? {
+      algorithm_version: 1 as const,
+      enabled: false,
+      local_contrast_amount: 0,
+      local_contrast_clip_limit: 0.25,
+      local_contrast_radius: 0.02,
+      scale_basis: 'full_resolution_short_edge_v1' as const,
+      sharpening_amount: 0,
+      sharpening_radius: 0.005,
+      sharpening_threshold: 0.01,
+      working_space: 'scene_linear_luminance_v1' as const,
+    };
+    const isDetailFinishEnabled = detailFinishParams.enabled;
     const crosstalkProfile = selectedProfileSnapshot?.crosstalkProfile ?? null;
     const crosstalkState =
       selectedProfile?.filmClass === 'black_and_white_silver'
@@ -3789,6 +3827,77 @@ function NegativeLabSession({
               }}
               step={0.05}
               value={printCurveV2Params.density_offset}
+            />
+          </div>
+        </div>
+        <div
+          className="rounded-md border border-surface bg-bg-secondary p-2"
+          aria-label={t('modals.negativeConversion.detailFinish')}
+          data-detail-finish-enabled={String(isDetailFinishEnabled)}
+          data-testid="negative-lab-detail-finish"
+          role="region"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+              {t('modals.negativeConversion.detailFinish')}
+            </UiText>
+            <button
+              aria-pressed={isDetailFinishEnabled}
+              className={cx(
+                'rounded border px-2 py-1 text-[11px] transition-colors',
+                isDetailFinishEnabled
+                  ? 'border-accent bg-accent/10 text-text-primary'
+                  : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+              )}
+              data-testid="negative-lab-detail-finish-toggle"
+              onClick={() => handleDetailFinishChange('enabled', !isDetailFinishEnabled)}
+              type="button"
+            >
+              {isDetailFinishEnabled
+                ? t('modals.negativeConversion.detailFinishEnabled')
+                : t('modals.negativeConversion.detailFinishOff')}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-detail-finish-controls">
+            <Slider
+              defaultValue={0}
+              disabled={!isDetailFinishEnabled || isSaving}
+              label={t('modals.negativeConversion.detailFinishLocalContrast')}
+              max={1}
+              min={0}
+              onChange={(event) => handleDetailFinishChange('local_contrast_amount', Number(event.target.value))}
+              step={0.05}
+              value={detailFinishParams.local_contrast_amount}
+            />
+            <Slider
+              defaultValue={0}
+              disabled={!isDetailFinishEnabled || isSaving}
+              label={t('modals.negativeConversion.detailFinishSharpening')}
+              max={1}
+              min={0}
+              onChange={(event) => handleDetailFinishChange('sharpening_amount', Number(event.target.value))}
+              step={0.05}
+              value={detailFinishParams.sharpening_amount}
+            />
+            <Slider
+              defaultValue={0.02}
+              disabled={!isDetailFinishEnabled || isSaving}
+              label={t('modals.negativeConversion.detailFinishContrastRadius')}
+              max={0.12}
+              min={0.0005}
+              onChange={(event) => handleDetailFinishChange('local_contrast_radius', Number(event.target.value))}
+              step={0.0005}
+              value={detailFinishParams.local_contrast_radius}
+            />
+            <Slider
+              defaultValue={0.005}
+              disabled={!isDetailFinishEnabled || isSaving}
+              label={t('modals.negativeConversion.detailFinishSharpenRadius')}
+              max={0.05}
+              min={0.0005}
+              onChange={(event) => handleDetailFinishChange('sharpening_radius', Number(event.target.value))}
+              step={0.0005}
+              value={detailFinishParams.sharpening_radius}
             />
           </div>
         </div>
