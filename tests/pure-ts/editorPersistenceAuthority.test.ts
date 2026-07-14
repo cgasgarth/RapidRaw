@@ -13,6 +13,28 @@ const deferred = <T>() => {
 };
 
 describe('editor persistence authority ledger', () => {
+  test('holds a batch coordinator until the exact dirty document has a durable receipt', async () => {
+    const ledger = new EditorPersistenceAuthorityLedger();
+    const pending = deferred<unknown>();
+    const document = { exposure: 0.55 };
+    const tracked = ledger.track('/fixtures/selected.raw', document, pending.promise);
+    let barrierResolved = false;
+    const barrier = ledger.receiptFor('/fixtures/selected.raw', document).then((value) => {
+      barrierResolved = true;
+      return value;
+    });
+
+    await Promise.resolve();
+    expect(barrierResolved).toBe(false);
+
+    pending.resolve({ path: '/fixtures/selected.raw', sidecarRevision: `sha256:${'a'.repeat(64)}` });
+    await tracked;
+    await expect(barrier).resolves.toEqual({
+      path: '/fixtures/selected.raw',
+      sidecarRevision: `sha256:${'a'.repeat(64)}`,
+    });
+  });
+
   test('retains exact per-path receipts across reverse completion order', async () => {
     const ledger = new EditorPersistenceAuthorityLedger();
     const selected = deferred<unknown>();

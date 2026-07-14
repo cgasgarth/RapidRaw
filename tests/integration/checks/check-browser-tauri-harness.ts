@@ -860,6 +860,7 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     { timeout: 10_000 },
   );
   await page.waitForTimeout(500);
+  const baseline = await counts();
   const exposure = page.getByTestId('basic-control-exposure-value');
   await exposure.click();
   const exposureInput = page.getByTestId('basic-control-exposure-input');
@@ -872,7 +873,6 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 1_000;
     }
   });
-  const baseline = await counts();
   await invokeFromContextMenu();
   await waitForSingleAutoAdjustInvocation(baseline.autoAdjust);
   await page.waitForTimeout(500);
@@ -892,7 +892,17 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(450);
+  await page.waitForFunction(
+    (expectedSaveCount) => {
+      const saves =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'save_metadata_and_update_thumbnail',
+        ) ?? [];
+      return saves.length >= expectedSaveCount && saves[expectedSaveCount - 1]?.endedAtMs !== null;
+    },
+    baseline.metadataSave + 1,
+    { timeout: 10_000 },
+  );
   const afterApply = await counts();
   if (
     afterApply.metadataLoad !== baseline.metadataLoad ||
@@ -912,16 +922,22 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   }
   const batchCalls = await page.evaluate((baselineSaveCount) => {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const apply = calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').at(-1) ?? null;
+    const barrier =
+      calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(baselineSaveCount) ?? null;
     return {
-      apply: calls.filter(({ command }) => command === 'apply_auto_adjustments_to_paths').at(-1)?.args ?? null,
-      barrier:
-        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(baselineSaveCount)?.args ??
-        null,
+      applyArgs: apply?.args ?? null,
+      applyStartedAtMs: apply?.startedAtMs ?? null,
+      barrierArgs: barrier?.args ?? null,
+      barrierEndedAtMs: barrier?.endedAtMs ?? null,
     };
   }, baseline.metadataSave);
   if (
-    batchCalls.barrier?.['adjustments']?.['exposure'] !== 0.55 ||
-    batchCalls.apply?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}`
+    batchCalls.barrierArgs?.['adjustments']?.['exposure'] !== 0.55 ||
+    batchCalls.applyArgs?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}` ||
+    typeof batchCalls.barrierEndedAtMs !== 'number' ||
+    typeof batchCalls.applyStartedAtMs !== 'number' ||
+    batchCalls.applyStartedAtMs < batchCalls.barrierEndedAtMs
   ) {
     throw new Error(`Batch Auto Adjust did not prepare from the flushed dirty document: ${JSON.stringify(batchCalls)}`);
   }
