@@ -3,9 +3,22 @@ name: PR Fast Validation
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: Pull request receiving this required check
+        required: false
+        type: string
+      base_sha:
+        description: Immutable base commit used to plan affected lanes
+        required: false
+        type: string
+      expected_head_sha:
+        description: Immutable PR head that requested this run
+        required: false
+        type: string
 
 concurrency:
-  group: pr-fast-${{ github.event.pull_request.number || github.ref }}
+  group: pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -38,10 +51,15 @@ jobs:
 
       - name: Collect changed paths
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
+          if [[ -n "$EXPECTED_HEAD_SHA" && "$HEAD_SHA" != "$EXPECTED_HEAD_SHA" ]]; then
+            echo "Expected PR head $EXPECTED_HEAD_SHA, got $HEAD_SHA." >&2
+            exit 1
+          fi
           if [[ -n "$BASE_SHA" ]]; then
             git diff --name-only --diff-filter=ACMR "$BASE_SHA...$HEAD_SHA" > .pr-paths
           else
@@ -233,7 +251,7 @@ jobs:
       - fast-rust
       - fast-workflow
       - fast-docs
-    if: always() && github.event_name == 'pull_request'
+    if: always() && (github.event_name == 'pull_request' || inputs.pull_request_number != '')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

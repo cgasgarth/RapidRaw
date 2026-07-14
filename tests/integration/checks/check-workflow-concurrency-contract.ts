@@ -22,7 +22,7 @@ if (main['cancel-in-progress'] !== false) {
 
 const pr = readWorkflow('lint.yml').concurrency;
 if (!pr) throw new Error('PR Fast workflow is missing concurrency policy');
-if (pr.group !== 'pr-fast-${{ github.event.pull_request.number || github.ref }}') {
+if (pr.group !== 'pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}') {
   throw new Error('PR Fast concurrency must remain isolated per pull request/ref');
 }
 if (pr['cancel-in-progress'] !== "${{ github.event_name == 'pull_request' }}") {
