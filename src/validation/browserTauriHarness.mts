@@ -627,6 +627,12 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
     case commandNames.generateUncroppedPreview:
+      window.setTimeout(() => {
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(
+          'preview-update-uncropped',
+          `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
+        );
+      }, 0);
       return Promise.resolve(null);
     case commandNames.generatePreviewForPath:
       return Promise.resolve(Array.from(new Uint8Array(decodeHarnessApplyPreview())));

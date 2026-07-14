@@ -49,6 +49,7 @@ import {
   usesPositionedPreviewPatch,
 } from '../../utils/interactivePreviewPatch';
 import { PreparedAdjustmentPayloadCache } from '../../utils/preparedAdjustmentPayloadCache';
+import { presentedPreviewReleaseCoordinator } from '../../utils/presentedPreviewReleaseCoordinator';
 import {
   createPreviewQualityPolicy,
   fingerprintPreviewGraphRevision,
@@ -251,6 +252,7 @@ export function useImageProcessing(
 
   const dispatchPreviewCoordinator = useCallback(
     (event: PreviewCoordinatorEvent) => {
+      const previous = previewCoordinator.snapshot();
       const transition = previewCoordinator.dispatch(event);
       for (const effect of transition.effects) {
         if (effect.type !== 'publish') continue;
@@ -261,7 +263,21 @@ export function useImageProcessing(
         }
       }
       for (const effect of transition.effects) {
-        if (effect.type === 'release-url' && effect.url.startsWith('blob:')) URL.revokeObjectURL(effect.url);
+        if (effect.type !== 'release-url' || !effect.url.startsWith('blob:')) continue;
+        const channel =
+          previous.originalArtifact?.url === effect.url && previous.visibleArtifact?.url !== effect.url
+            ? 'original'
+            : 'base';
+        const successor =
+          channel === 'original' ? transition.state.originalArtifact?.url : transition.state.visibleArtifact?.url;
+        const surfaceCancelled =
+          effect.reason === 'editor-unmounted' ||
+          effect.reason === 'compare-disabled' ||
+          (channel === 'original' && effect.reason === 'image-session-replaced');
+        const neverPresented =
+          effect.reason === 'artifact-not-presented' || effect.reason === 'stale-original-artifact';
+        if (surfaceCancelled || neverPresented) URL.revokeObjectURL(effect.url);
+        else presentedPreviewReleaseCoordinator.defer(effect.url, channel, successor ?? null);
       }
       return transition;
     },
