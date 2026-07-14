@@ -124,6 +124,7 @@ export interface PreviewCoordinatorState {
 
 export type PreviewCoordinatorEffect =
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
+  | { type: 'publish'; artifact: PreviewArtifact; identity: PreviewOperationIdentity; reason: string }
   | { type: 'release-url'; url: string; reason: string }
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
 
@@ -428,6 +429,7 @@ export function reducePreviewCoordinator(
       if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
         effects.push({ type: 'release-url', url: previousUrl, reason: 'artifact-replaced' });
       }
+      effects.push({ type: 'publish', artifact: event.artifact, identity, reason: 'operation-presented' });
       state = { ...state, visibleArtifact: event.artifact };
     }
     return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
