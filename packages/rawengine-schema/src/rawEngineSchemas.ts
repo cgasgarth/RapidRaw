@@ -2,11 +2,23 @@ import { z } from 'zod';
 import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
 import { brushMaskV1Schema } from './brushMaskV1.js';
+import type {
+  filmEmulationNodeV1Schema,
+  filmEmulationProfileRefV1Schema,
+  filmEmulationReceiptV1Schema,
+  filmSceneInputV1Schema,
+} from './film/filmEmulationSchemas.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panorama/panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
 
 export type { ArtifactHandleV1 } from './artifactSchemas.js';
 export { artifactHandleV1Schema, negativeLabPositiveArtifactHandleV1Schema } from './artifactSchemas.js';
+export {
+  filmEmulationNodeV1Schema,
+  filmEmulationProfileRefV1Schema,
+  filmEmulationReceiptV1Schema,
+  filmSceneInputV1Schema,
+} from './film/filmEmulationSchemas.js';
 
 export const RAW_ENGINE_SCHEMA_VERSION = 1;
 
@@ -1034,6 +1046,7 @@ export const editGraphNodeKindV1Schema = z.enum([
   'mask_operation',
   'negative_lab_operation',
   'agent_command',
+  'film_emulation',
 ]);
 
 export const editGraphCommandTypeV1Schema = z.enum([
@@ -11598,3 +11611,7 @@ export type ToneColorHslBandV1 = z.infer<typeof toneColorHslBandV1Schema>;
 export type ToneColorMutationResultV1 = z.infer<typeof toneColorMutationResultV1Schema>;
 export type ToneColorParameterDiffV1 = z.infer<typeof toneColorParameterDiffV1Schema>;
 export type ToneColorWheelV1 = z.infer<typeof toneColorWheelV1Schema>;
+export type FilmEmulationNodeV1 = z.infer<typeof filmEmulationNodeV1Schema>;
+export type FilmEmulationProfileRefV1 = z.infer<typeof filmEmulationProfileRefV1Schema>;
+export type FilmEmulationReceiptV1 = z.infer<typeof filmEmulationReceiptV1Schema>;
+export type FilmSceneInputV1 = z.infer<typeof filmSceneInputV1Schema>;

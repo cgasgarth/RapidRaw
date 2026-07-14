@@ -401,6 +401,9 @@ pub(crate) fn execute_cpu_edit_graph(
         if let Some(curve) = graph.scene_curve() {
             color = Vec3::from_array(curve.evaluate_rgb(color.to_array()));
         }
+        if let Some(film) = graph.film_emulation() {
+            color = crate::render::film_emulation::apply_pixel(color, film);
+        }
         if preserve_extended {
             // V2 crosses a real RGBA16F scene intermediate before the view
             // dispatch. Mirror its finite storage range in the CPU reference.
