@@ -255,7 +255,7 @@ mod tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn curve_modules_create_real_wgpu_pipelines_from_registered_sources() {
+    fn executable_modules_create_real_wgpu_pipelines_from_registered_sources() {
         let graph = graph_with_curves_and_local_resources();
         let runtime = WgpuNodeRuntime::from_graph(&graph).unwrap();
         let instance =
@@ -277,10 +277,16 @@ mod tests {
             }))
             .expect("WGPU device is available for registered curve modules");
 
+        let mut validated = 0;
         for module in runtime.modules() {
-            let source = match module.kind {
-                EditNodeKind::SceneCurve => crate::tone::curves::SCENE_CURVE_WGSL,
-                EditNodeKind::OutputCurve => crate::tone::output_curves::OUTPUT_CURVE_WGSL,
+            let source = match module.implementation {
+                "scene_curve_wgsl_v1" => crate::tone::curves::SCENE_CURVE_WGSL.to_string(),
+                "output_curve_wgsl_v1" => crate::tone::output_curves::OUTPUT_CURVE_WGSL.to_string(),
+                implementation if implementation.starts_with("shader_wgsl_") => format!(
+                    "{}\n{}",
+                    include_str!("../shaders/generated_bindings.wgsl"),
+                    include_str!("../shaders/shader.wgsl"),
+                ),
                 _ => continue,
             };
             let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -295,6 +301,8 @@ mod tests {
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 cache: None,
             });
+            validated += 1;
         }
+        assert!(validated >= 4, "validated={validated}");
     }
 }
