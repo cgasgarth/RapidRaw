@@ -49,10 +49,9 @@ impl WgpuNodeRuntime {
             let module = WgpuNodeModule {
                 kind: node.kind,
                 implementation,
-                // The current production shader keeps compatible nodes fused
-                // behind one entry point.  Curve modules have standalone WGSL
-                // test pipelines, whose entry point is also `main`.
-                entry_point: "main",
+                entry_point: descriptor
+                    .wgpu_entry_point()
+                    .ok_or("edit_graph.wgpu_missing_entry_point")?,
                 fused_phase: descriptor
                     .fused_phase
                     .ok_or("edit_graph.wgpu_missing_fused_phase")?,
@@ -241,6 +240,10 @@ mod tests {
         let graph = graph_with_curves_and_local_resources();
         let runtime = WgpuNodeRuntime::from_graph(&graph).unwrap();
         for module in runtime.modules() {
+            assert_eq!(
+                runtime_descriptor(module.kind).wgpu_entry_point(),
+                Some(module.entry_point)
+            );
             if matches!(
                 module.kind,
                 EditNodeKind::SceneCurve | EditNodeKind::OutputCurve
