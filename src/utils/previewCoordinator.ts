@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { AdaptivePreviewQualityController } from './adaptivePreviewQuality';
+
+/** Creates the stateful quality policy owned by preview coordination. */
+export const createPreviewQualityPolicy = (): AdaptivePreviewQualityController =>
+  new AdaptivePreviewQualityController();
 
 const revisionSchema = z.number().int().nonnegative().safe();
 const positiveRevisionSchema = z.number().int().positive().safe();
