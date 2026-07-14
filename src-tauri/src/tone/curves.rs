@@ -627,9 +627,19 @@ mod tests {
             label: Some("scene curve shader"),
             source: wgpu::ShaderSource::Wgsl(SCENE_CURVE_WGSL.into()),
         });
+        let bind_group_layout = crate::render::wgpu_nodes::create_curve_bind_group_layout(
+            &device,
+            crate::edit_graph::EditNodeKind::SceneCurve,
+        )
+        .map_err(str::to_owned)?;
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("scene curve descriptor-owned layout"),
+            bind_group_layouts: &[Some(&bind_group_layout)],
+            immediate_size: 0,
+        });
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("scene curve pipeline"),
-            layout: None,
+            layout: Some(&pipeline_layout),
             module: &shader,
             entry_point: Some("main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -637,7 +647,7 @@ mod tests {
         });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene curve bindings"),
-            layout: &pipeline.get_bind_group_layout(0),
+            layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,

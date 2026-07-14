@@ -118,6 +118,44 @@ impl EditNodeKind {
     }
 }
 
+/// Typed bind-group specialization owned by an executable node descriptor.
+///
+/// Curve modules have an executable storage-buffer layout. Fused production
+/// modules retain phase-specific logical resource contracts even though the
+/// current shader shares one physical bind group across its dispatches.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WgpuBindGroupLayoutKind {
+    CurveStorageV1,
+    FusedSceneSpatialV2,
+    FusedViewLutV2,
+    FusedDisplayLutMaskV2,
+    FusedLegacySceneViewV1,
+    ExternalPointwiseV1,
+}
+
+impl WgpuBindGroupLayoutKind {
+    pub const fn stable_id(self) -> &'static str {
+        match self {
+            Self::CurveStorageV1 => "curve_storage_v1",
+            Self::FusedSceneSpatialV2 => "fused_scene_spatial_v2",
+            Self::FusedViewLutV2 => "fused_view_lut_v2",
+            Self::FusedDisplayLutMaskV2 => "fused_display_lut_mask_v2",
+            Self::FusedLegacySceneViewV1 => "fused_legacy_scene_view_v1",
+            Self::ExternalPointwiseV1 => "external_pointwise_v1",
+        }
+    }
+
+    pub fn accepts_resources(self, resources: &[&str]) -> bool {
+        match self {
+            Self::CurveStorageV1 | Self::ExternalPointwiseV1 => resources.is_empty(),
+            Self::FusedSceneSpatialV2 => resources == ["scene_guidance_v1"],
+            Self::FusedViewLutV2 => resources == ["view_transform_lut_v1"],
+            Self::FusedDisplayLutMaskV2 => resources == ["display_lut_v1", "mask_layers_v1"],
+            Self::FusedLegacySceneViewV1 => resources == ["legacy_scene_blur_v1", "mask_layers_v1"],
+        }
+    }
+}
+
 /// Backend ownership and resource requirements for one executable graph node.
 /// The descriptor is deliberately backend-neutral: the current WGPU runtime
 /// may fuse several descriptors into one dispatch, but the graph still has one
@@ -129,6 +167,7 @@ pub struct EditNodeRuntimeDescriptor {
     pub implementation_version: u32,
     pub cpu_implementation: Option<&'static str>,
     pub wgpu_implementation: Option<&'static str>,
+    pub wgpu_bind_group_layout: Option<WgpuBindGroupLayoutKind>,
     pub fused_phase: Option<&'static str>,
     pub resource_requirements: &'static [&'static str],
     pub supports_local: bool,
@@ -158,13 +197,14 @@ impl EditNodeRuntimeDescriptor {
 }
 
 macro_rules! runtime_descriptor {
-    ($kind:ident, $cpu:expr, $wgpu:expr, $phase:expr, $resources:expr, $local:expr, $legacy:expr) => {
+    ($kind:ident, $cpu:expr, $wgpu:expr, $layout:expr, $phase:expr, $resources:expr, $local:expr, $legacy:expr) => {
         EditNodeRuntimeDescriptor {
             kind: EditNodeKind::$kind,
             schema_version: 1,
             implementation_version: 1,
             cpu_implementation: $cpu,
             wgpu_implementation: $wgpu,
+            wgpu_bind_group_layout: $layout,
             fused_phase: $phase,
             resource_requirements: $resources,
             supports_local: $local,
@@ -183,6 +223,7 @@ static CAMERA_INPUT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     Some("camera_input_transform_v1"),
     None,
     None,
+    None,
     NO_RESOURCES,
     false,
     false
@@ -190,6 +231,7 @@ static CAMERA_INPUT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
 static GEOMETRY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     GeometryRetouch,
     Some("geometry_retouch_cpu_v2"),
+    None,
     None,
     None,
     &["geometry_tiles_v1"],
@@ -201,6 +243,7 @@ static PRE_GPU_DETAIL_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     Some("pre_gpu_detail_cpu_v1"),
     None,
     None,
+    None,
     &["detail_guidance_v1"],
     false,
     false
@@ -209,6 +252,7 @@ static SCENE_GLOBAL_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     SceneGlobalColorTone,
     Some("edit_graph_cpu_reference_v2"),
     Some("shader_wgsl_scene_phase_v2"),
+    Some(WgpuBindGroupLayoutKind::FusedSceneSpatialV2),
     Some("scene"),
     SCENE_SPATIAL_RESOURCES,
     false,
@@ -218,6 +262,7 @@ static SCENE_CURVE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     SceneCurve,
     Some("scene_curve_cpu_v1"),
     Some("scene_curve_wgsl_v1"),
+    Some(WgpuBindGroupLayoutKind::CurveStorageV1),
     Some("scene"),
     NO_RESOURCES,
     false,
@@ -227,6 +272,7 @@ static FILM_EMULATION_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     FilmEmulation,
     Some("film_emulation_cpu_v1"),
     Some("film_emulation_wgsl_v1"),
+    Some(WgpuBindGroupLayoutKind::ExternalPointwiseV1),
     Some("scene"),
     NO_RESOURCES,
     false,
@@ -236,6 +282,7 @@ static LOCAL_SCENE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     LocalSceneComposition,
     Some("edit_graph_cpu_reference_v2"),
     Some("shader_wgsl_scene_phase_v2"),
+    Some(WgpuBindGroupLayoutKind::FusedSceneSpatialV2),
     Some("scene"),
     SCENE_SPATIAL_RESOURCES,
     true,
@@ -245,6 +292,7 @@ static VIEW_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     SceneToViewTransform,
     Some("edit_graph_cpu_reference_v2"),
     Some("shader_wgsl_view_display_phase_v2"),
+    Some(WgpuBindGroupLayoutKind::FusedViewLutV2),
     Some("view"),
     VIEW_RESOURCES,
     false,
@@ -254,6 +302,7 @@ static DISPLAY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     DisplayCreative,
     Some("edit_graph_cpu_reference_v2"),
     Some("shader_wgsl_view_display_phase_v2"),
+    Some(WgpuBindGroupLayoutKind::FusedDisplayLutMaskV2),
     Some("display"),
     DISPLAY_RESOURCES,
     true,
@@ -263,6 +312,7 @@ static OUTPUT_CURVE_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     OutputCurve,
     Some("output_curve_cpu_v1"),
     Some("output_curve_wgsl_v1"),
+    Some(WgpuBindGroupLayoutKind::CurveStorageV1),
     Some("display"),
     NO_RESOURCES,
     false,
@@ -272,6 +322,7 @@ static LEGACY_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     LegacyGpuSceneViewPass,
     Some("native_color_mixer_post_wgpu_v1"),
     Some("shader_wgsl_legacy_scene_view_v1"),
+    Some(WgpuBindGroupLayoutKind::FusedLegacySceneViewV1),
     Some("legacy"),
     &["legacy_scene_blur_v1", "mask_layers_v1"],
     true,
@@ -281,6 +332,7 @@ static CLIPPING_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     ClippingOverlay,
     None,
     Some("clipping_overlay_wgsl_v1"),
+    Some(WgpuBindGroupLayoutKind::ExternalPointwiseV1),
     Some("display"),
     NO_RESOURCES,
     false,
@@ -290,6 +342,7 @@ static TRANSPORT_RUNTIME: EditNodeRuntimeDescriptor = runtime_descriptor!(
     RenderTransport,
     None,
     Some("shader_transport_dither_v1"),
+    Some(WgpuBindGroupLayoutKind::ExternalPointwiseV1),
     Some("transport"),
     NO_RESOURCES,
     false,
@@ -352,6 +405,15 @@ fn validate_runtime_registry(registry: &[&EditNodeRuntimeDescriptor]) -> Result<
         }
         if descriptor.cpu_implementation.is_none() && descriptor.wgpu_implementation.is_none() {
             return Err("edit_graph.missing_runtime_backend_owner");
+        }
+        if descriptor.wgpu_implementation.is_some() != descriptor.wgpu_bind_group_layout.is_some() {
+            return Err("edit_graph.wgpu_bind_group_layout_ownership_mismatch");
+        }
+        if descriptor
+            .wgpu_bind_group_layout
+            .is_some_and(|layout| !layout.accepts_resources(descriptor.resource_requirements))
+        {
+            return Err("edit_graph.wgpu_bind_group_layout_resource_mismatch");
         }
         if registry[..index]
             .iter()
@@ -1274,7 +1336,7 @@ impl CompiledEditGraph {
     }
 
     pub fn validate_contract(&self) -> Result<(), &'static str> {
-        debug_assert!(validate_runtime_registry(EDIT_NODE_RUNTIME_REGISTRY).is_ok());
+        validate_runtime_registry(EDIT_NODE_RUNTIME_REGISTRY)?;
         debug_assert_eq!(EDIT_NODE_RUNTIME_REGISTRY.len(), ALL_EDIT_NODE_KINDS.len());
         debug_assert!(
             ALL_EDIT_NODE_KINDS
@@ -1679,6 +1741,7 @@ mod runtime_registry_tests {
             implementation_version: 1,
             cpu_implementation: Some("test_only_cpu_node_v1"),
             wgpu_implementation: None,
+            wgpu_bind_group_layout: None,
             fused_phase: None,
             resource_requirements: &[],
             supports_local: false,
@@ -1687,6 +1750,23 @@ mod runtime_registry_tests {
         let test_registry = [&TEST_NODE];
         validate_runtime_registry(&test_registry)
             .expect("test node can be registered in isolation");
+    }
+
+    #[test]
+    fn registry_rejects_wgpu_layout_ownership_and_resource_drift() {
+        let mut missing_layout = *runtime_descriptor(EditNodeKind::SceneCurve);
+        missing_layout.wgpu_bind_group_layout = None;
+        assert_eq!(
+            validate_runtime_registry(&[&missing_layout]),
+            Err("edit_graph.wgpu_bind_group_layout_ownership_mismatch")
+        );
+
+        let mut wrong_resources = *runtime_descriptor(EditNodeKind::SceneCurve);
+        wrong_resources.resource_requirements = &["scene_guidance_v1"];
+        assert_eq!(
+            validate_runtime_registry(&[&wrong_resources]),
+            Err("edit_graph.wgpu_bind_group_layout_resource_mismatch")
+        );
     }
 
     #[test]

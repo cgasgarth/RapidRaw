@@ -7,7 +7,9 @@
 
 use std::sync::Arc;
 
-use crate::edit_graph::{CompiledEditGraph, EditNodeKind, SpatialSupport, runtime_descriptor};
+use crate::edit_graph::{
+    CompiledEditGraph, EditNodeKind, SpatialSupport, WgpuBindGroupLayoutKind, runtime_descriptor,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum WgpuShaderSource {
@@ -48,11 +50,100 @@ fn shader_source_for(implementation: &'static str) -> Result<WgpuShaderSource, &
     }
 }
 
+fn shader_accepts_layout(shader_source: WgpuShaderSource, layout: WgpuBindGroupLayoutKind) -> bool {
+    match shader_source {
+        WgpuShaderSource::SceneCurve | WgpuShaderSource::OutputCurve => {
+            layout == WgpuBindGroupLayoutKind::CurveStorageV1
+        }
+        WgpuShaderSource::FusedProduction => matches!(
+            layout,
+            WgpuBindGroupLayoutKind::FusedSceneSpatialV2
+                | WgpuBindGroupLayoutKind::FusedViewLutV2
+                | WgpuBindGroupLayoutKind::FusedDisplayLutMaskV2
+                | WgpuBindGroupLayoutKind::FusedLegacySceneViewV1
+        ),
+        WgpuShaderSource::External => layout == WgpuBindGroupLayoutKind::ExternalPointwiseV1,
+    }
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+pub(crate) fn create_curve_bind_group_layout(
+    device: &wgpu::Device,
+    kind: EditNodeKind,
+) -> Result<wgpu::BindGroupLayout, &'static str> {
+    let descriptor = runtime_descriptor(kind);
+    let implementation = descriptor
+        .wgpu_implementation
+        .ok_or("edit_graph.wgpu_missing_implementation")?;
+    let shader_source = shader_source_for(implementation)?;
+    let layout = descriptor
+        .wgpu_bind_group_layout
+        .ok_or("edit_graph.wgpu_missing_bind_group_layout")?;
+    if !layout.accepts_resources(descriptor.resource_requirements) {
+        return Err("edit_graph.wgpu_bind_group_layout_resource_mismatch");
+    }
+    if !shader_accepts_layout(shader_source, layout) {
+        return Err("edit_graph.wgpu_shader_layout_mismatch");
+    }
+    if layout != WgpuBindGroupLayoutKind::CurveStorageV1 {
+        return Err("edit_graph.wgpu_curve_layout_required");
+    }
+
+    Ok(
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(layout.stable_id()),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        }),
+    )
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct WgpuNodeModule {
     pub(crate) kind: EditNodeKind,
     pub(crate) implementation: &'static str,
     pub(crate) shader_source: WgpuShaderSource,
+    pub(crate) bind_group_layout: WgpuBindGroupLayoutKind,
     pub(crate) entry_point: &'static str,
     pub(crate) fused_phase: &'static str,
     pub(crate) resource_requirements: &'static [&'static str],
@@ -83,6 +174,15 @@ impl WgpuNodeRuntime {
                 return Err("edit_graph.wgpu_runtime_ownership_mismatch");
             }
             let shader_source = shader_source_for(implementation)?;
+            let bind_group_layout = descriptor
+                .wgpu_bind_group_layout
+                .ok_or("edit_graph.wgpu_missing_bind_group_layout")?;
+            if !bind_group_layout.accepts_resources(descriptor.resource_requirements) {
+                return Err("edit_graph.wgpu_bind_group_layout_resource_mismatch");
+            }
+            if !shader_accepts_layout(shader_source, bind_group_layout) {
+                return Err("edit_graph.wgpu_shader_layout_mismatch");
+            }
             let halo_pixels = descriptor.wgpu_halo_pixels();
             let declared_halo = match node.spatial_support {
                 SpatialSupport::Pointwise => 0,
@@ -91,13 +191,11 @@ impl WgpuNodeRuntime {
             if declared_halo != halo_pixels {
                 return Err("edit_graph.wgpu_halo_ownership_mismatch");
             }
-            if declared_halo != halo_pixels {
-                return Err("edit_graph.wgpu_halo_ownership_mismatch");
-            }
             let module = WgpuNodeModule {
                 kind: node.kind,
                 implementation,
                 shader_source,
+                bind_group_layout,
                 entry_point: descriptor
                     .wgpu_entry_point()
                     .ok_or("edit_graph.wgpu_missing_entry_point")?,
@@ -176,6 +274,7 @@ impl WgpuNodeRuntime {
                 "id": module.kind.stable_id(),
                 "implementation": module.implementation,
                 "shaderSource": format!("{:?}", module.shader_source),
+                "bindGroupLayout": module.bind_group_layout.stable_id(),
                 "entryPoint": module.entry_point,
                 "fusedPhase": module.fused_phase,
                 "resourceRequirements": module.resource_requirements,
@@ -303,6 +402,31 @@ mod tests {
                 .sum::<usize>(),
             runtime.modules().len()
         );
+        let scene_curve = runtime
+            .modules()
+            .iter()
+            .find(|module| module.kind == EditNodeKind::SceneCurve)
+            .expect("scene curve module is present");
+        assert_eq!(
+            scene_curve.bind_group_layout,
+            WgpuBindGroupLayoutKind::CurveStorageV1
+        );
+    }
+
+    #[test]
+    fn shader_and_bind_group_layout_contract_fails_closed_on_drift() {
+        assert!(shader_accepts_layout(
+            WgpuShaderSource::FusedProduction,
+            WgpuBindGroupLayoutKind::FusedSceneSpatialV2
+        ));
+        assert!(!shader_accepts_layout(
+            WgpuShaderSource::SceneCurve,
+            WgpuBindGroupLayoutKind::FusedSceneSpatialV2
+        ));
+        assert!(
+            WgpuBindGroupLayoutKind::FusedSceneSpatialV2.accepts_resources(&["scene_guidance_v1"])
+        );
+        assert!(!WgpuBindGroupLayoutKind::CurveStorageV1.accepts_resources(&["scene_guidance_v1"]));
     }
 
     #[test]
@@ -405,9 +529,19 @@ mod tests {
                 label: Some(module.implementation),
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             });
+            let bind_group_layout = (module.bind_group_layout
+                == WgpuBindGroupLayoutKind::CurveStorageV1)
+                .then(|| create_curve_bind_group_layout(&device, module.kind).unwrap());
+            let pipeline_layout = bind_group_layout.as_ref().map(|layout| {
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some(module.bind_group_layout.stable_id()),
+                    bind_group_layouts: &[Some(layout)],
+                    immediate_size: 0,
+                })
+            });
             let _pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some(module.implementation),
-                layout: None,
+                layout: pipeline_layout.as_ref(),
                 module: &shader,
                 entry_point: Some(module.entry_point),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),

@@ -446,9 +446,19 @@ mod tests {
             label: Some("output curve shader"),
             source: wgpu::ShaderSource::Wgsl(OUTPUT_CURVE_WGSL.into()),
         });
+        let bind_group_layout = crate::render::wgpu_nodes::create_curve_bind_group_layout(
+            &device,
+            crate::edit_graph::EditNodeKind::OutputCurve,
+        )
+        .map_err(str::to_owned)?;
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("output curve descriptor-owned layout"),
+            bind_group_layouts: &[Some(&bind_group_layout)],
+            immediate_size: 0,
+        });
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("output curve pipeline"),
-            layout: None,
+            layout: Some(&pipeline_layout),
             module: &shader,
             entry_point: Some("main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -456,7 +466,7 @@ mod tests {
         });
         let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("output curve bindings"),
-            layout: &pipeline.get_bind_group_layout(0),
+            layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
