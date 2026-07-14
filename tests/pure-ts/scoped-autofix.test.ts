@@ -30,6 +30,7 @@ describe('scoped precommit autofix', () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-'));
     roots.push(root);
     expect(git(root, 'init', '-q').status).toBe(0);
+    expect(git(root, 'config', 'core.fsmonitor', 'false').status).toBe(0);
     await writeFile(
       join(root, 'biome.json'),
       JSON.stringify({
@@ -56,12 +57,15 @@ describe('scoped precommit autofix', () => {
       0,
     );
 
-    expect(readStagedAutofixPaths(root)).toEqual(['src/intended.ts']);
+    const gitEnvironment = isolatedGitEnvironment(process.env);
+    expect(readStagedAutofixPaths(root, gitEnvironment)).toEqual(['src/intended.ts']);
     expect(
-      runScopedAutofix(root, readStagedAutofixPaths(root), [
-        'bun',
-        join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome'),
-      ]),
+      runScopedAutofix(
+        root,
+        readStagedAutofixPaths(root, gitEnvironment),
+        ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')],
+        gitEnvironment,
+      ),
     ).toBe(0);
     expect(git(root, 'diff', '--cached', '--name-only').stdout.trim()).toBe('src/intended.ts');
     expect(git(root, 'diff', '--name-only').stdout.trim().split('\n').sort()).toEqual([
@@ -70,5 +74,50 @@ describe('scoped precommit autofix', () => {
     ]);
     expect(await readFile(join(root, 'src/intended.ts'), 'utf8')).toBe(workingIntended);
     expect(git(root, 'show', ':src/intended.ts').stdout).toContain('intended = { value: 2 };');
+  });
+
+  test('updates only the fixture index when the parent process exports a hook index', async () => {
+    const parentRoot = await mkdtemp(join(tmpdir(), 'rapidraw-parent-index-'));
+    const fixtureRoot = await mkdtemp(join(tmpdir(), 'rapidraw-fixture-index-'));
+    roots.push(parentRoot, fixtureRoot);
+
+    expect(git(parentRoot, 'init', '-q').status).toBe(0);
+    expect(git(parentRoot, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(join(parentRoot, 'parent.ts'), 'export const parent = 1;\n');
+    expect(git(parentRoot, 'add', 'parent.ts').status).toBe(0);
+    const parentIndexPath = join(parentRoot, '.git/index');
+    const parentIndexBefore = await readFile(parentIndexPath);
+    const parentEntriesBefore = git(parentRoot, 'ls-files', '-s').stdout;
+
+    const hookEnvironment = { ...process.env, GIT_INDEX_FILE: parentIndexPath };
+    const gitEnvironment = isolatedGitEnvironment(hookEnvironment);
+    expect(gitEnvironment.GIT_INDEX_FILE).toBeUndefined();
+    expect(git(fixtureRoot, 'init', '-q').status).toBe(0);
+    expect(git(fixtureRoot, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(
+      join(fixtureRoot, 'biome.json'),
+      JSON.stringify({
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
+        formatter: { enabled: true },
+        linter: { enabled: false },
+      }),
+    );
+    await writeFile(join(fixtureRoot, 'fixture.ts'), 'export const fixture={value:1}\n');
+    expect(git(fixtureRoot, 'add', '.').status).toBe(0);
+
+    expect(readStagedAutofixPaths(fixtureRoot, gitEnvironment)).toEqual(['biome.json', 'fixture.ts']);
+    expect(
+      runScopedAutofix(
+        fixtureRoot,
+        ['fixture.ts'],
+        ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')],
+        gitEnvironment,
+      ),
+    ).toBe(0);
+
+    expect(git(fixtureRoot, 'show', ':fixture.ts').stdout).toContain('fixture = { value: 1 };');
+    expect(git(fixtureRoot, 'ls-files', '-s').stdout).toContain('fixture.ts');
+    expect(await readFile(parentIndexPath)).toEqual(parentIndexBefore);
+    expect(git(parentRoot, 'ls-files', '-s').stdout).toBe(parentEntriesBefore);
   });
 });
