@@ -20,7 +20,8 @@ use crate::gpu_readback::{
     rgba16float_readback_to_dynamic_image, rgba16float_readback_to_unclamped_dynamic_image,
 };
 use crate::gpu_runtime::{
-    GpuExecutionOrchestrator, GpuFrameIdentity, GpuRuntimeCapabilities, GpuRuntimeIdentity,
+    GpuExecutionLease, GpuExecutionOrchestrator, GpuFrameIdentity, GpuRuntimeCapabilities,
+    GpuRuntimeIdentity,
 };
 use crate::gpu_textures::{
     create_dummy_lut_texture_view, create_dummy_rgba16f_texture_view,
@@ -391,6 +392,9 @@ pub struct GpuRenderGraphPlan {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GpuExecutionReceipt {
+    pub runtime_identity: Option<GpuRuntimeIdentity>,
+    pub frame_identity: Option<GpuFrameIdentity>,
+    pub execution_sequence: u64,
     pub graph_fingerprint: u64,
     pub stages: GpuStageFlags,
     pub blur_dispatch_count: u32,
@@ -1025,6 +1029,7 @@ struct InputTextureRef<'a> {
     view: &'a wgpu::TextureView,
     identity: PreGpuImageIdentity,
     device_generation: u64,
+    execution_lease: GpuExecutionLease,
 }
 
 fn to_rgba_f16(img: &DynamicImage) -> Vec<f16> {
@@ -1752,6 +1757,18 @@ impl GpuProcessor {
         output_to_display: bool,
     ) -> Result<(Vec<u8>, u32, u32, u32, u32), String> {
         let execution_started = Instant::now();
+        let frame_identity = GpuFrameIdentity {
+            source_revision: input.identity.pixels.source_revision,
+            stage_revision: input.identity.pixels.stage_revision,
+            width,
+            height,
+        };
+        if !input
+            .execution_lease
+            .is_current(self.runtime_identity(), frame_identity)
+        {
+            return Err("GPU execution lease is stale before preparation".to_string());
+        }
         let cache_before = self.resource_cache_counters();
         let device = &self.context.device;
         let queue = &self.context.queue;
@@ -2709,7 +2726,11 @@ impl GpuProcessor {
         log::debug!("blur passes: needs={blur_pass_needs:?} counters={blur_counters:?}");
         let split_scene_view_display = adjustments.global.edit_graph_version >= 2.0;
         let cache_after = self.resource_cache_counters();
+        let execution_sequence = self.execution_sequence.fetch_add(1, Ordering::Release) + 1;
         let receipt = GpuExecutionReceipt {
+            runtime_identity: Some(input.execution_lease.runtime()),
+            frame_identity: Some(input.execution_lease.frame()),
+            execution_sequence,
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
@@ -2750,7 +2771,6 @@ impl GpuProcessor {
             dehaze: *self.last_dehaze_receipt.lock().unwrap(),
         };
         self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
-        self.execution_sequence.fetch_add(1, Ordering::Release);
         log::debug!("GPU execution receipt: {receipt:?}");
         self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
 
@@ -3501,6 +3521,7 @@ mod blur_pass_tests {
             .expect("compute-only GPU context initializes");
         let adjustments = json!({"rawEngineEditGraphVersion": 1, "exposure": 35});
         let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
+        let input_identity = PreGpuImageIdentity::for_source(&source, "compiled_edit_graph_gpu");
         let plan = crate::render_plan::compile_render_plan(
             &adjustments,
             crate::render_plan::CompileRenderPlanContext {
@@ -3516,7 +3537,7 @@ mod blur_pass_tests {
             &context,
             &state,
             &source,
-            PreGpuImageIdentity::for_source(&source, "compiled_edit_graph_gpu"),
+            input_identity,
             RenderRequest {
                 adjustments: plan.adjustments,
                 mask_bitmaps: &[],
@@ -3539,6 +3560,20 @@ mod blur_pass_tests {
             context.generation
         );
         assert!(processor.execution_sequence() > 0);
+        let receipt = processor
+            .last_execution_receipt()
+            .expect("compiled GPU render publishes a lease receipt");
+        assert_eq!(receipt.execution_sequence, processor.execution_sequence());
+        assert_eq!(receipt.runtime_identity, Some(processor.runtime_identity()));
+        assert_eq!(
+            receipt.frame_identity,
+            Some(GpuFrameIdentity {
+                source_revision: input_identity.pixels.source_revision,
+                stage_revision: input_identity.pixels.stage_revision,
+                width: source.width(),
+                height: source.height(),
+            })
+        );
         assert_ne!(
             rendered.to_rgba16().into_raw(),
             source.to_rgba16().into_raw()
@@ -5480,6 +5515,7 @@ fn process_and_get_dynamic_image_inner(
             view: &cache.texture_view,
             identity: cache.pre_gpu_identity,
             device_generation: cache.device_generation,
+            execution_lease,
         },
         cache.width,
         cache.height,
