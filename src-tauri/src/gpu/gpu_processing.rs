@@ -2783,6 +2783,16 @@ impl GpuProcessor {
 mod blur_pass_tests {
     use super::*;
 
+    #[test]
+    fn generated_render_abi_field_metadata_is_compiled_into_the_gpu_contract() {
+        assert_eq!(RENDER_ABI_ALL_ADJUSTMENTS_FIELDS.len(), 10);
+        assert_eq!(RENDER_ABI_GLOBAL_ADJUSTMENTS_FIELDS.len(), 95);
+        assert_eq!(RENDER_ABI_MASK_ADJUSTMENTS_FIELDS.len(), 48);
+        assert_eq!(RENDER_ABI_ALL_ADJUSTMENTS_FIELDS[0], "global");
+        assert_eq!(RENDER_ABI_ALL_ADJUSTMENTS_FIELDS[1], "mask_adjustments");
+        assert_eq!(RENDER_ABI_ALL_ADJUSTMENTS_FIELDS[9], "source_height");
+    }
+
     fn surface_key() -> BlurSurfaceKey {
         BlurSurfaceKey {
             processor_generation: 1,
