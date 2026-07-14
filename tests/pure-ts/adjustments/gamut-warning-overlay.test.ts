@@ -82,6 +82,8 @@ const currentOverlay: GamutWarningOverlayPayload = {
   effective_color_profile: transform.effectiveColorProfile,
   effective_rendering_intent: transform.effectiveRenderingIntent,
   export_soft_proof_recipe_id: recipeId,
+  gamut_compressed_pixel_count: 0,
+  gamut_hard_clipped_pixel_count: 0,
   height: 180,
   mask_data_url: 'data:image/png;base64,AAAA',
   max_channel_value: 255,
@@ -118,6 +120,9 @@ describe('gamut warning overlay defaults', () => {
     expect(gamutWarningOverlayPayloadSchema.parse(currentOverlay).transform_policy_fingerprint).toBe(
       transform.transformPolicyFingerprint,
     );
+    const parsed = gamutWarningOverlayPayloadSchema.parse(currentOverlay);
+    expect(parsed.gamut_compressed_pixel_count).toBe(0);
+    expect(parsed.gamut_hard_clipped_pixel_count).toBe(0);
     expect(
       gamutWarningOverlayPayloadSchema.safeParse({
         coverage_ratio: 0.125,
