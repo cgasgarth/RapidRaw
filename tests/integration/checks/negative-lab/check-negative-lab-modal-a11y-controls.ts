@@ -41,8 +41,68 @@ mock.module('@tauri-apps/api/core', () => ({
           warningCodes: [],
         },
         contentHash: 'sha256:8a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+        densityNormalizationMetrics: {
+          axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.02, min: -0.03 } },
+          boundsReceipt: {
+            algorithmId: 'fixed_grid_block_median_luma_color_v1',
+            analysisBuffer: 0.04,
+            analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
+            baseBounds: {
+              axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
+              channelBounds: {
+                b: { max: 0.2, min: 0.04 },
+                g: { max: 0.16, min: 0.02 },
+                r: { max: 0.14, min: 0.01 },
+              },
+            },
+            baseFogProvenance: 'automatic_analysis',
+            colorRangeClip: 0.12,
+            finalBounds: {
+              axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
+              channelBounds: {
+                b: { max: 1.08, min: -0.03 },
+                g: { max: 1.02, min: -0.02 },
+                r: { max: 0.98, min: -0.01 },
+              },
+            },
+            lumaRangeClip: 0.08,
+            schemaVersion: 1,
+            warningCodes: ['missing_visible_base'],
+          },
+          channelBounds: {
+            b: { max: 1.06, min: -0.03 },
+            g: { max: 1.01, min: -0.02 },
+            r: { max: 0.97, min: -0.01 },
+          },
+          clippedPixelCount: 0,
+          densityRangeUnclamped: 1.09,
+          epsilonClampedPixelCount: 0,
+          rendererVersion: 1,
+        },
         dimensions: { height: 1, width: 1 },
         previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
+        stageArtifacts: [
+          {
+            colorDomain: 'normalized_density',
+            contentHash: 'sha256:1a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+            dimensions: { height: 1, width: 1 },
+            displayTransform: 'normalized_density_clamp_v1',
+            previewDataUrl: 'data:image/jpeg;base64,normalized-density',
+            recipeHash: 'sha256:2a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+            stageId: 'normalized_density',
+            stageVersion: 1,
+          },
+          {
+            colorDomain: 'scene_linear_print',
+            contentHash: 'sha256:3a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+            dimensions: { height: 1, width: 1 },
+            displayTransform: 'scene_linear_to_srgb_gamma_v1',
+            previewDataUrl: 'data:image/jpeg;base64,scene-linear-print',
+            recipeHash: 'sha256:2a5edab282632443219e051e301c8f382f0f0f8b80636cae5f0204f20795d880',
+            stageId: 'scene_linear_print',
+            stageVersion: 1,
+          },
+        ],
         renderer: 'rawengine_negative_lab_runtime_preview_v1',
         storage: 'temp_cache',
       });
@@ -107,6 +167,16 @@ assertRoleName('status', locale.modals.negativeConversion.acquisitionHealth);
 assertRoleName('status', locale.modals.negativeConversion.walkthroughClosureTitle);
 assertRoleName('status', locale.modals.negativeConversion.agentActivity);
 assertRoleName('region', locale.modals.negativeConversion.dustScratchReview);
+
+if (document.querySelector('[data-testid="negative-lab-stage-preview-strip"]') === null) {
+  failures.push('Negative Lab stage preview strip did not render named native stages.');
+}
+if (document.querySelector('[data-testid="negative-lab-stage-normalized_density"]') === null) {
+  failures.push('Negative Lab normalized-density stage control is missing.');
+}
+if (document.querySelector('[data-testid="negative-lab-stage-scene_linear_print"]') === null) {
+  failures.push('Negative Lab scene-linear-print stage control is missing.');
+}
 
 if (failures.length > 0) {
   console.error('negative lab modal a11y controls failed');
