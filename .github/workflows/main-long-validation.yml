@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: main-long-${{ github.run_id }}
+  group: main-long-validation
   cancel-in-progress: false
 
 permissions:
