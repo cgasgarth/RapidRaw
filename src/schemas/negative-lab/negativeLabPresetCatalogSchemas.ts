@@ -110,6 +110,19 @@ export const migrateNegativeLabDensityPrintV2Params = (
 export const negativeLabPresetParamsSchema = z
   .object({
     analysis_buffer: z.number().min(0).max(0.25).default(0.04),
+    auto_density: z
+      .object({
+        enabled: z.boolean(),
+        strength: z.number().min(0).max(1),
+        anchor_density: z.number().min(0.2).max(0.8),
+        confidence_threshold: z.number().min(0.3).max(0.95),
+      })
+      .strict()
+      .optional(),
+    auto_grade: z
+      .object({ enabled: z.boolean(), strength: z.number().min(0).max(1) })
+      .strict()
+      .optional(),
     base_fog_bounds_provenance: negativeLabBaseFogBoundsProvenanceSchema.default('automatic_analysis'),
     black_point: z.number().min(0).max(0.95).default(0),
     black_point_offset: z.number().min(-0.25).max(0.25).default(0),

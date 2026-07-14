@@ -719,6 +719,8 @@ function NegativeLabSession({
     processFamily: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [autoDensityEnabled, setAutoDensityEnabled] = useState(false);
+  const [autoGradeEnabled, setAutoGradeEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImportingConversionBundle, setIsImportingConversionBundle] = useState(false);
   const [conversionBundleReplayError, setConversionBundleReplayError] = useState<string | null>(null);
@@ -1675,6 +1677,7 @@ function NegativeLabSession({
   const runtimePreviewBaseFogStatus = baseFogEstimate === null ? 'pending_base_fog' : 'base_fog_estimated';
   const runtimePreviewDensityStatus =
     selectedProfile?.params.print_curve_algorithm === undefined ? 'density_curve_pending' : 'density_curve_selected';
+  const runtimePreviewAutoMeter = runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.autoMeter;
   const beforeAfterReview = buildNegativeLabBeforeAfterReviewModel({
     acceptedDryRunPlanHash: runtimePreviewDryRunResult?.acceptedDryRunPlanHash ?? null,
     acceptedDryRunPlanId: runtimePreviewDryRunResult?.dryRun.dryRunPlanId ?? null,
@@ -2052,6 +2055,14 @@ function NegativeLabSession({
           },
           paperProfile:
             previewProfile?.filmClass === 'black_and_white_silver' ? null : neutralNegativeLabPaperProfile(),
+          autoMeter: {
+            autoDensityEnabled,
+            autoDensityStrength: 1,
+            autoDensityAnchor: 0.5,
+            autoGradeEnabled,
+            autoGradeStrength: 1,
+            confidenceThreshold: 0.58,
+          },
           ...(usingPrintCurveV2 && currentParams.print_curve_v2 !== null
             ? {
                 densityPrintCurve: {
@@ -2114,6 +2125,8 @@ function NegativeLabSession({
       });
     },
     [
+      autoDensityEnabled,
+      autoGradeEnabled,
       baseFogEstimate,
       baseFogScope,
       effectiveActivePathIndex,
@@ -4873,6 +4886,38 @@ function NegativeLabSession({
       </nav>
 
       <div className="grow space-y-5 overflow-y-auto scroll-smooth p-3 sm:p-4">
+        <section
+          className="rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-secondary"
+          data-testid="negative-lab-auto-meter-readout"
+        >
+          <div className="mb-1 font-medium text-text-primary">{t('modals.negativeConversion.autoMeterTitle')}</div>
+          {runtimePreviewAutoMeter === undefined ? (
+            <span data-testid="negative-lab-auto-meter-status">{t('modals.negativeConversion.autoMeterPending')}</span>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <span>
+                {t('modals.negativeConversion.autoMeterP50')} {runtimePreviewAutoMeter.lumaDensityP50.toFixed(3)}
+              </span>
+              <span>
+                {t('modals.negativeConversion.autoMeterP10P90')}{' '}
+                {runtimePreviewAutoMeter.texturalDensityRangeP10P90.toFixed(3)}
+              </span>
+              <span>
+                {t('modals.negativeConversion.autoMeterConfidence')} {runtimePreviewAutoMeter.confidence.toFixed(2)}
+              </span>
+              <span>
+                {t('modals.negativeConversion.autoMeterDensityOffset')}{' '}
+                {runtimePreviewAutoMeter.appliedDensityOffset.toFixed(3)}
+              </span>
+              <span>
+                {t('modals.negativeConversion.autoMeterIsoR')} {runtimePreviewAutoMeter.effectiveIsoRGrade.toFixed(3)}
+              </span>
+              <span>
+                {runtimePreviewAutoMeter.warningCodes.join(', ') || t('modals.negativeConversion.autoMeterApplied')}
+              </span>
+            </div>
+          )}
+        </section>
         <NegativeLabDensityScopesPanel scopes={runtimePreviewDensityScopes} />
         <section
           className={cx(
@@ -5413,6 +5458,26 @@ function NegativeLabSession({
                 >
                   {selectedPresetFilmClass}
                 </span>
+              </div>
+              <div className="mb-2 flex flex-wrap gap-2" data-testid="negative-lab-auto-controls">
+                <button
+                  type="button"
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  aria-pressed={autoDensityEnabled}
+                  data-testid="negative-lab-auto-density-toggle"
+                  onClick={() => setAutoDensityEnabled((enabled) => !enabled)}
+                >
+                  {t('modals.negativeConversion.autoDensityToggle')}: {autoDensityEnabled ? 'On' : 'Off'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  aria-pressed={autoGradeEnabled}
+                  data-testid="negative-lab-auto-grade-toggle"
+                  onClick={() => setAutoGradeEnabled((enabled) => !enabled)}
+                >
+                  {t('modals.negativeConversion.autoGradeToggle')}: {autoGradeEnabled ? 'On' : 'Off'}
+                </button>
               </div>
               <div className="mb-2 flex flex-wrap gap-2">
                 <span

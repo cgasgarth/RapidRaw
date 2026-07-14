@@ -235,6 +235,29 @@ export const negativeLabDryRunPreviewArtifactSchema = z
     opticalFinishMetrics: negativeLabOpticalFinishMetricsSchema.optional(),
     cmyTimingMetrics: negativeLabCmyTimingMetricsSchema.optional(),
     neutralAxisAnalysis: negativeLabNeutralAxisAnalysisSchema.optional(),
+    autoMeter: z
+      .object({
+        algorithmId: z.literal('native_negative_lab_auto_meter_v1'),
+        algorithmVersion: z.literal(1),
+        sampleCount: z.number().int().nonnegative(),
+        lumaDensityP10: z.number(),
+        lumaDensityP50: z.number(),
+        lumaDensityP90: z.number(),
+        texturalDensityRangeP10P90: z.number().nonnegative(),
+        boundedDensityRange: z.number().nonnegative(),
+        confidence: z.number().min(0).max(1),
+        confidenceThreshold: z.number().min(0).max(1),
+        requestedAutoDensityEnabled: z.boolean(),
+        requestedAutoDensityStrength: z.number().min(0).max(1),
+        requestedAutoGradeEnabled: z.boolean(),
+        requestedAutoGradeStrength: z.number().min(0).max(1),
+        appliedDensityOffset: z.number(),
+        effectiveIsoRGrade: z.number().positive(),
+        densityApplied: z.boolean(),
+        gradeApplied: z.boolean(),
+        warningCodes: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
     paperProfile: negativeLabPaperProfileSchema.nullable().optional(),
     flatLogMaster: z
       .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
@@ -328,6 +351,7 @@ const toRuntimePreviewRenderResult = (
     ...(artifact.opticalFinishMetrics === undefined ? {} : { opticalFinishMetrics: artifact.opticalFinishMetrics }),
     ...(artifact.cmyTimingMetrics === undefined ? {} : { cmyTimingMetrics: artifact.cmyTimingMetrics }),
     ...(artifact.neutralAxisAnalysis === undefined ? {} : { neutralAxisAnalysis: artifact.neutralAxisAnalysis }),
+    autoMeter: artifact.autoMeter,
     ...(artifact.paperProfile === undefined ? {} : { paperProfile: artifact.paperProfile }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
@@ -438,6 +462,14 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       source_references: string[];
       content_hash: string;
     } | null;
+    auto_meter?: {
+      auto_density_enabled?: boolean;
+      auto_density_strength?: number;
+      auto_density_anchor?: number;
+      auto_grade_enabled?: boolean;
+      auto_grade_strength?: number;
+      confidence_threshold?: number;
+    };
     color_finish?:
       | {
           algorithm_version: 1;
@@ -514,6 +546,14 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
                 content_hash: params.command.parameters.paperProfile.contentHash,
               },
             }),
+        auto_meter: {
+          auto_density_enabled: params.command.parameters.autoMeter.autoDensityEnabled,
+          auto_density_strength: params.command.parameters.autoMeter.autoDensityStrength,
+          auto_density_anchor: params.command.parameters.autoMeter.autoDensityAnchor,
+          auto_grade_enabled: params.command.parameters.autoMeter.autoGradeEnabled,
+          auto_grade_strength: params.command.parameters.autoMeter.autoGradeStrength,
+          confidence_threshold: params.command.parameters.autoMeter.confidenceThreshold,
+        },
         ...(params.command.parameters.cmyTiming.enabled
           ? {
               cmy_timing: {
