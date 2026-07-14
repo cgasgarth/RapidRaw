@@ -75,6 +75,16 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     | 'rawengine_density_preview_runtime'
     | 'rawengine_negative_lab_runtime_preview_v1'
     | 'tauri_preview_negative_conversion';
+  stageArtifacts?: Array<{
+    colorDomain: 'normalized_density' | 'scene_linear_print';
+    contentHash: string;
+    dimensions: { height: number; width: number };
+    displayTransform: 'normalized_density_clamp_v1' | 'scene_linear_to_srgb_gamma_v1';
+    previewDataUrl: string;
+    recipeHash: string;
+    stageId: 'normalized_density' | 'scene_linear_print';
+    stageVersion: 1;
+  }>;
   storage: 'temp_cache';
 }
 
