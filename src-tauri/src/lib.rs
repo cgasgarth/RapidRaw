@@ -3526,17 +3526,6 @@ fn analyze_negative_lab_dust_spots(
     ))
 }
 
-#[tauri::command]
-async fn load_and_parse_lut(
-    path: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<LutParseResult, String> {
-    let lut = get_or_load_lut(&state, &path)?;
-    let lut_size = lut.size;
-
-    Ok(LutParseResult { size: lut_size })
-}
-
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -4258,7 +4247,7 @@ pub fn run() {
             merge::focus_stack::retouch::open_focus_stack_retouch,
             merge::focus_stack::retouch::navigate_focus_stack_retouch,
             save_hdr,
-            load_and_parse_lut,
+            app::commands::lut::load_and_parse_lut,
             fetch_community_presets,
             generate_all_community_previews,
             app::commands::temporary_artifacts::save_temp_file,
