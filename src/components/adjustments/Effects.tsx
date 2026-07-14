@@ -6,7 +6,6 @@ import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
 import {
-  buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   type FilmLookBrowserItem,
   formatFilmLookPresetName,
@@ -31,6 +30,9 @@ interface EffectsPanelProps {
   handleLutSelect: (path: string) => void;
   appSettings: AppSettings | null;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  onFilmEmulationOperation?:
+    | ((operation: { kind: 'set_profile'; profileId: string; mix: number }) => Promise<void>)
+    | undefined;
 }
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
@@ -75,6 +77,7 @@ export default function EffectsPanel({
   handleLutSelect,
   appSettings,
   onDragStateChange,
+  onFilmEmulationOperation,
 }: EffectsPanelProps) {
   const { t } = useTranslation();
   const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
@@ -102,13 +105,12 @@ export default function EffectsPanel({
     }));
   };
 
-  const handleFilmLookApply = (look: FilmLookBrowserItem, strength: number) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      ...buildFilmLookAppliedAdjustmentPatch(look, strength),
-      filmLookId: look.id,
-      filmLookStrength: strength,
-    }));
+  const handleFilmLookApply = async (look: FilmLookBrowserItem, strength: number) => {
+    if (onFilmEmulationOperation === undefined) {
+      setFilmLookPresetStatus('Film operation adapter unavailable; no legacy patch was applied.');
+      return;
+    }
+    await onFilmEmulationOperation({ kind: 'set_profile', profileId: look.id, mix: strength / 100 });
   };
 
   const handleFilmGrainPresetApply = (preset: (typeof FILM_GRAIN_UI_PRESETS)[number]) => {

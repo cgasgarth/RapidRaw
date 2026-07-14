@@ -10,6 +10,7 @@ const rawEngineAppServerInputSchemaNamesV1 = [
   'DetailDenoiseCommandEnvelopeV1',
   'DetailEffectsCommandEnvelopeV1',
   'EditGraphCommandEnvelopeV1',
+  'FilmEmulationOperationV1',
   'EditGraphSnapshotQueryV1',
   'ExportCommandEnvelopeV1',
   'LayerMaskCommandEnvelopeV1',
