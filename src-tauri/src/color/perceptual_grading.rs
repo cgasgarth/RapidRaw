@@ -2,6 +2,8 @@ use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
+use crate::adjustments::abi::{PerceptualGradingGpuRange, PerceptualGradingGpuSettings};
+
 pub const PERCEPTUAL_GRADING_IMPLEMENTATION_VERSION: u32 = 1;
 const MIDDLE_GREY: f32 = 0.18;
 const AP1_LUMA: [f32; 3] = [0.272_228_72, 0.674_081_74, 0.053_689_52];
@@ -77,33 +79,105 @@ impl PerceptualGradingPlanV1 {
         .all(range_is_identity)
     }
 
+    pub fn gpu_settings(&self) -> PerceptualGradingGpuSettings {
+        PerceptualGradingGpuSettings {
+            shadows: gpu_range(self.settings.shadows),
+            midtones: gpu_range(self.settings.midtones),
+            highlights: gpu_range(self.settings.highlights),
+            global: gpu_range(self.settings.global),
+            range: [
+                self.settings.shadow_fulcrum_ev,
+                self.settings.highlight_fulcrum_ev,
+                self.settings.falloff,
+                self.settings.balance,
+            ],
+            policy: [
+                self.settings.blending,
+                self.settings.neutral_protection,
+                self.settings.skin_protection,
+                1.0,
+            ],
+        }
+    }
+
+    #[cfg(test)]
     pub fn apply_rgb(&self, rgb: [f32; 3]) -> [f32; 3] {
-        if self.is_identity() || !rgb.iter().all(|value| value.is_finite()) {
-            return rgb;
+        if self.is_identity() {
+            rgb
+        } else {
+            apply_settings(rgb, &self.settings)
         }
-        let ev = scene_exposure_ev(rgb);
-        let weights = range_weights(ev, &self.settings);
-        if has_only_luminance_controls(&self.settings) {
-            let luminance_ev = self.settings.shadows.luminance_ev * weights[0]
-                + self.settings.midtones.luminance_ev * weights[1]
-                + self.settings.highlights.luminance_ev * weights[2]
-                + self.settings.global.luminance_ev;
-            let gain = 2.0_f32.powf(luminance_ev);
-            return rgb.map(|channel| channel * gain);
-        }
-        let mut lab = linear_srgb_to_oklab(mul3(AP1_TO_LINEAR_SRGB_D65, rgb));
-        for (settings, weight) in [
-            self.settings.shadows,
-            self.settings.midtones,
-            self.settings.highlights,
-        ]
+    }
+}
+
+pub fn apply_gpu_settings(rgb: [f32; 3], gpu: &PerceptualGradingGpuSettings) -> [f32; 3] {
+    if gpu.policy[3] <= 0.5 || !rgb.iter().all(|value| value.is_finite()) {
+        return rgb;
+    }
+    let settings = settings_from_gpu(gpu);
+    apply_settings(rgb, &settings)
+}
+
+fn apply_settings(rgb: [f32; 3], settings: &PerceptualGradingSettingsV1) -> [f32; 3] {
+    if !rgb.iter().all(|value| value.is_finite()) {
+        return rgb;
+    }
+    let ev = scene_exposure_ev(rgb);
+    let weights = range_weights(ev, settings);
+    if has_only_luminance_controls(settings) {
+        let luminance_ev = settings.shadows.luminance_ev * weights[0]
+            + settings.midtones.luminance_ev * weights[1]
+            + settings.highlights.luminance_ev * weights[2]
+            + settings.global.luminance_ev;
+        return rgb.map(|channel| channel * 2.0_f32.powf(luminance_ev));
+    }
+    let mut lab = linear_srgb_to_oklab(mul3(AP1_TO_LINEAR_SRGB_D65, rgb));
+    for (range, weight) in [settings.shadows, settings.midtones, settings.highlights]
         .into_iter()
         .zip(weights)
-        {
-            lab = apply_range(lab, settings, weight, &self.settings);
-        }
-        lab = apply_range(lab, self.settings.global, 1.0, &self.settings);
-        mul3(LINEAR_SRGB_D65_TO_AP1, oklab_to_linear_srgb(lab))
+    {
+        lab = apply_range(lab, range, weight, settings);
+    }
+    lab = apply_range(lab, settings.global, 1.0, settings);
+    mul3(LINEAR_SRGB_D65_TO_AP1, oklab_to_linear_srgb(lab))
+}
+
+fn gpu_range(settings: GradingRangeSettingsV1) -> PerceptualGradingGpuRange {
+    PerceptualGradingGpuRange {
+        color: [
+            settings.hue_degrees,
+            settings.chroma,
+            settings.saturation,
+            settings.brilliance,
+        ],
+        tone: [settings.luminance_ev, 0.0, 0.0, 0.0],
+    }
+}
+
+fn range_from_gpu(range: PerceptualGradingGpuRange) -> GradingRangeSettingsV1 {
+    GradingRangeSettingsV1 {
+        hue_degrees: range.color[0],
+        chroma: range.color[1],
+        saturation: range.color[2],
+        brilliance: range.color[3],
+        luminance_ev: range.tone[0],
+    }
+}
+
+fn settings_from_gpu(gpu: &PerceptualGradingGpuSettings) -> PerceptualGradingSettingsV1 {
+    PerceptualGradingSettingsV1 {
+        shadows: range_from_gpu(gpu.shadows),
+        midtones: range_from_gpu(gpu.midtones),
+        highlights: range_from_gpu(gpu.highlights),
+        global: range_from_gpu(gpu.global),
+        shadow_fulcrum_ev: gpu.range[0],
+        highlight_fulcrum_ev: gpu.range[1],
+        falloff: gpu.range[2],
+        balance: gpu.range[3],
+        blending: gpu.policy[0],
+        neutral_protection: gpu.policy[1],
+        skin_protection: gpu.policy[2],
+        perceptual_model: PerceptualColorModelV1::OklabD65FromAcescgV1,
     }
 }
 
@@ -392,6 +466,150 @@ mod tests {
         );
         assert!(
             serde_json::from_value::<PerceptualGradingSettingsV1>(serde_json::json!({})).is_err()
+        );
+    }
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+mod gpu_runtime_tests {
+    use std::sync::Arc;
+
+    use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Rgba};
+    use serde_json::json;
+    use tauri::Manager;
+
+    use crate::AppState;
+    use crate::gpu_processing::{
+        RenderRequest, acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
+        process_and_get_unclamped_dynamic_image,
+    };
+
+    fn grading_settings(hue: f32, chroma: f32, brilliance: f32) -> serde_json::Value {
+        json!({
+            "shadows": {"hueDegrees": hue + 160.0, "chroma": chroma, "saturation": 0.1, "brilliance": 0.0, "luminanceEv": -0.1},
+            "midtones": {"hueDegrees": hue, "chroma": chroma * 0.5, "saturation": 0.25, "brilliance": brilliance, "luminanceEv": 0.0},
+            "highlights": {"hueDegrees": hue - 35.0, "chroma": chroma * 0.7, "saturation": 0.0, "brilliance": brilliance * 0.5, "luminanceEv": 0.15},
+            "global": {"hueDegrees": 8.0, "chroma": 0.02, "saturation": 0.05, "brilliance": 0.05, "luminanceEv": 0.0},
+            "shadowFulcrumEv": -2.0,
+            "highlightFulcrumEv": 2.0,
+            "falloff": 1.1,
+            "balance": 0.1,
+            "blending": 0.65,
+            "perceptualModel": "oklab_d65_from_acescg_v1",
+            "neutralProtection": 0.55,
+            "skinProtection": 0.25
+        })
+    }
+
+    fn max_rgb_delta(left: &DynamicImage, right: &DynamicImage) -> f32 {
+        left.to_rgba32f()
+            .into_raw()
+            .chunks_exact(4)
+            .zip(right.to_rgba32f().into_raw().chunks_exact(4))
+            .map(|(left, right)| {
+                (0..3)
+                    .map(|channel| (left[channel] - right[channel]).abs())
+                    .fold(0.0_f32, f32::max)
+            })
+            .fold(0.0_f32, f32::max)
+    }
+
+    #[test]
+    fn production_grading_matches_cpu_wgpu_preview_export_batch_and_local_mask() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(6, 4, |x, y| {
+            let exposure = 2.0_f32.powf((x as f32 - 2.0) * 0.8 + y as f32 * 0.25);
+            Rgba([0.42 * exposure, 0.19 * exposure, 0.08 * exposure, 0.76])
+        }));
+        let raw = json!({
+            "rawEngineEditGraphVersion": 2,
+            "perceptualGradingV1": grading_settings(38.0, 0.16, 0.25),
+            "masks": [{
+                "id": "local-grade",
+                "name": "Local grade",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "blendMode": "normal",
+                "adjustments": {"perceptualGradingV1": grading_settings(160.0, 0.22, -0.15)},
+                "subMasks": []
+            }]
+        });
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 31, 32, 33),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("perceptual grading plan compiles");
+        assert!(plan.adjustments.global.perceptual_grading.policy[3] > 0.5);
+        assert_eq!(plan.adjustments.mask_count, 1);
+        assert!(
+            plan.adjustments.mask_adjustments[0]
+                .perceptual_grading
+                .policy[3]
+                > 0.5
+        );
+
+        let mask: GrayImage = ImageBuffer::from_fn(6, 4, |x, _| Luma([u8::from(x < 3) * 255]));
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            std::slice::from_ref(&mask),
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU perceptual grading render succeeds");
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let render = |consumer: &str| {
+            process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                &source,
+                crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, consumer),
+                RenderRequest {
+                    adjustments: plan.adjustments,
+                    mask_bitmaps: std::slice::from_ref(&mask),
+                    lut: None,
+                    roi: None,
+                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                        Arc::clone(&plan.edit_graph),
+                    ),
+                },
+                consumer,
+            )
+            .expect("WGPU perceptual grading render succeeds")
+        };
+        let preview = render("perceptual_grading_preview");
+        let export = render("perceptual_grading_export");
+        let batch = render("perceptual_grading_batch");
+
+        let parity_delta = max_rgb_delta(&cpu, &preview);
+        assert!(
+            parity_delta <= 0.012,
+            "CPU/WGPU grading delta {parity_delta}"
+        );
+        assert!(max_rgb_delta(&preview, &export) <= 0.001);
+        assert!(max_rgb_delta(&export, &batch) <= 0.001);
+        assert!(preview.to_rgba32f().pixels().all(|pixel| {
+            pixel.0.iter().all(|channel| channel.is_finite()) && (pixel[3] - 0.76).abs() <= 0.002
+        }));
+        assert!(
+            preview
+                .to_rgba32f()
+                .pixels()
+                .any(|pixel| pixel.0[..3].iter().any(|channel| *channel > 1.0)),
+            "unclamped export path must preserve scene headroom"
         );
     }
 }

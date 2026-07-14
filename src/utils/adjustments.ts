@@ -1,5 +1,9 @@
 import type { Crop } from 'react-image-crop';
 import {
+  type PerceptualGradingSettingsV1,
+  perceptualGradingSettingsV1Schema,
+} from '../../packages/rawengine-schema/src/color/perceptualGradingSchemas';
+import {
   POINT_COLOR_PROCESS_V1,
   type PointColorPlanV1,
   pointColorPlanV1Schema,
@@ -280,6 +284,7 @@ export interface Adjustments {
   curveMode?: 'point' | 'parametric';
   sceneCurveV1?: SceneCurveSettingsV1;
   outputCurveV1?: OutputCurveSettingsV1;
+  perceptualGradingV1?: PerceptualGradingSettingsV1;
   rawProcessingModeOverride: RawProcessingModeOverride;
   /** Persisted native edit-graph process version; legacy sidecars default to v1. */
   rawEngineEditGraphVersion: number;
@@ -556,6 +561,7 @@ export interface MaskAdjustments {
   pointCurves?: Curves;
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
+  perceptualGradingV1?: PerceptualGradingSettingsV1;
   dehaze: number;
   exposure: number;
   flareAmount: number;
@@ -1121,6 +1127,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
         glowAmount: containerAdjustments.glowAmount,
         halationAmount: containerAdjustments.halationAmount,
         colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...containerAdjustments.colorGrading },
+        ...(perceptualGradingSettingsV1Schema.safeParse(containerAdjustments.perceptualGradingV1).success
+          ? { perceptualGradingV1: perceptualGradingSettingsV1Schema.parse(containerAdjustments.perceptualGradingV1) }
+          : {}),
         hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...containerAdjustments.hsl },
         curves: deepCloneCurves(containerAdjustments.curves),
         pointCurves: containerAdjustments.pointCurves
@@ -1255,6 +1264,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     },
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
+    ...(perceptualGradingSettingsV1Schema.safeParse(loadedAdjustments.perceptualGradingV1).success
+      ? { perceptualGradingV1: perceptualGradingSettingsV1Schema.parse(loadedAdjustments.perceptualGradingV1) }
+      : {}),
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
     selectiveColorRangeControls: {
       ...INITIAL_ADJUSTMENTS.selectiveColorRangeControls,

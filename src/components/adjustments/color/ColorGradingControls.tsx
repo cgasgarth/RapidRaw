@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextVariants } from '../../../types/typography';
 import { ColorGrading, type HueSatLum, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { perceptualGradingFromWheelSurface } from '../../../utils/color/perceptualGrading';
 import { COLOR_GRADING_PRESETS } from '../../../utils/colorGradingPresets';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
@@ -89,53 +90,73 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
   const getRangeLabel = (range: ColorGradingRange) => t(`adjustments.color.grading.${range}`);
 
   const handleApplyPreset = (preset: ColorGradingPreset) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      colorGrading: {
+    setAdjustments((prev) => {
+      const colorGrading = {
         balance: preset.balance,
         blending: preset.blending,
         global: preset.global,
         highlights: preset.highlights,
         midtones: preset.midtones,
         shadows: preset.shadows,
-      },
-    }));
+      };
+      return {
+        ...prev,
+        colorGrading,
+        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+        rawEngineEditGraphVersion: 2,
+      };
+    });
     setIsPresetMenuOpen(false);
     presetTriggerRef.current?.focus();
   };
 
   const handleRangeChange = (range: ColorGradingRange, newValue: HueSatLum) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      colorGrading: {
+    setAdjustments((prev) => {
+      const colorGrading = {
         ...prev.colorGrading,
         [getColorGradingRangeEnum(range)]: newValue,
-      },
-    }));
+      };
+      return {
+        ...prev,
+        colorGrading,
+        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+        rawEngineEditGraphVersion: 2,
+      };
+    });
   };
 
   const handleGlobalChange = (grading: ColorGrading, value: number) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      colorGrading: {
+    setAdjustments((prev) => {
+      const colorGrading = {
         ...prev.colorGrading,
         [grading]: value,
-      },
-    }));
+      };
+      return {
+        ...prev,
+        colorGrading,
+        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+        rawEngineEditGraphVersion: 2,
+      };
+    });
   };
 
   const handleResetAll = () => {
-    setAdjustments((prev) => ({
-      ...prev,
-      colorGrading: {
+    setAdjustments((prev) => {
+      const colorGrading = {
         balance: INITIAL_ADJUSTMENTS.colorGrading.balance,
         blending: INITIAL_ADJUSTMENTS.colorGrading.blending,
         global: { ...INITIAL_ADJUSTMENTS.colorGrading.global },
         highlights: { ...INITIAL_ADJUSTMENTS.colorGrading.highlights },
         midtones: { ...INITIAL_ADJUSTMENTS.colorGrading.midtones },
         shadows: { ...INITIAL_ADJUSTMENTS.colorGrading.shadows },
-      },
-    }));
+      };
+      return {
+        ...prev,
+        colorGrading,
+        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+        rawEngineEditGraphVersion: 2,
+      };
+    });
   };
 
   const handlePresetMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
