@@ -32,11 +32,7 @@ import {
   getEditorZoomSourceSize,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
-import {
-  buildEditTransactionPersistenceContext,
-  type EditTransactionPersistenceContext,
-  type EditTransactionRequest,
-} from '../../utils/editTransaction';
+import type { EditTransactionPersistenceContext, EditTransactionRequest } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
@@ -317,48 +313,53 @@ export function useEditorActions() {
         paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []);
       if (pathsToUpdate.length === 0) return;
 
+      const editorState = useEditorStore.getState();
+      const transactionId = createOperationId();
+      const imageSessionId =
+        editorState.imageSession?.id ?? `editor-image-session:${String(editorState.imageSessionId)}`;
+      const baseAdjustmentRevision = editorState.adjustmentRevision;
+      const transaction = {
+        transactionId,
+        imageSessionId,
+        baseAdjustmentRevision,
+        nextAdjustmentRevision: baseAdjustmentRevision + 1,
+      };
+
       pathsToUpdate.forEach((p) => {
         globalImageCache.delete(p);
       });
 
       if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-        setAdjustments({ ...adjustments, ...adjustmentsToApply });
+        applyEditTransaction({
+          baseAdjustmentRevision,
+          imageSessionId,
+          history: 'single-entry',
+          operations: [{ type: 'replace-adjustments', adjustments: { ...adjustments, ...adjustmentsToApply } }],
+          persistence: 'commit',
+          source: 'copy-paste',
+          transactionId,
+        });
       }
 
-      const selectedTransaction = useEditorStore.getState().lastEditApplicationReceipt;
-      const transaction =
-        selectedImage &&
-        pathsToUpdate.includes(selectedImage.path) &&
-        selectedTransaction &&
-        buildEditTransactionPersistenceContext(selectedTransaction, selectedTransaction);
-
-      invoke(Invokes.ApplyAdjustmentsToPaths, {
-        paths: pathsToUpdate,
+      invoke<Array<{ adjustments?: Adjustments; path: string }>>(Invokes.ApplyAdjustmentsToPaths, {
         adjustments: adjustmentsToApply,
-        transaction: transaction || undefined,
+        paths: pathsToUpdate,
+        transaction,
       })
-        .then(() => {
-          if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-            void invoke<MetadataResponse>(Invokes.LoadMetadata, { path: selectedImage.path })
-              .then((meta) => {
-                const loadedAdjustments = meta.adjustments;
-                if (loadedAdjustments) {
-                  setAdjustments((prev: Adjustments) => ({
-                    ...prev,
-                    lensMaker: loadedAdjustments.lensMaker,
-                    lensModel: loadedAdjustments.lensModel,
-                    lensDistortionParams: loadedAdjustments.lensDistortionParams,
-                  }));
-                }
-              })
-              .catch((err: unknown) => toast.error(`Failed to reload metadata: ${formatUnknownError(err)}`));
+        .then((receipts) => {
+          const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
+          if (selectedReceipt?.adjustments && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+            useEditorStore.getState().setEditor({
+              adjustmentRevision: transaction.nextAdjustmentRevision,
+              adjustments: selectedReceipt.adjustments,
+            });
           }
         })
         .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
 
       setProcess({ isPasted: true });
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleZoomChange = useCallback((command: EditorZoomCommand) => {
