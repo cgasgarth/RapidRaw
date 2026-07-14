@@ -1,10 +1,14 @@
 import type { ViewerGestureOwner } from './viewerInputResolver';
 
 export interface ViewerToolPointerSample {
+  readonly altKey?: boolean;
   readonly clientX: number;
   readonly clientY: number;
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
   readonly pointerType: 'mouse' | 'pen' | 'touch';
   readonly pressure: number;
+  readonly shiftKey?: boolean;
 }
 
 export type ViewerToolId =
