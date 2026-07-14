@@ -1,5 +1,6 @@
 pub(crate) mod analytics_resources;
 pub(crate) mod analytics_scheduler;
+pub(crate) mod analytics_service;
 pub(crate) mod artifact_identity;
 pub(crate) mod color_node_registry;
 pub(crate) mod cpu_edit_graph;
