@@ -107,6 +107,73 @@ export const batchUpdateEditDocumentV2Nodes = (
   );
 };
 
+export interface EditDocumentV2NodeDiagnostic {
+  readonly enabled: boolean;
+  readonly implementationVersion: number;
+  readonly nodeType: EditDocumentNodeTypeV2;
+  readonly parameterKeys: readonly string[];
+  readonly process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  readonly renderStage: string;
+  readonly status: 'active' | 'disabled';
+}
+
+export interface EditDocumentV2Diagnostics {
+  readonly activeNodeTypes: readonly EditDocumentNodeTypeV2[];
+  readonly graphProcess: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  readonly legacyNodeTypes: readonly EditDocumentNodeTypeV2[];
+  readonly migration: EditDocumentV2['migration'] | null;
+  readonly nodeDiagnostics: readonly EditDocumentV2NodeDiagnostic[];
+  readonly quarantinedNodeTypes: readonly string[];
+  readonly renderStageFingerprints: readonly {
+    readonly nodeType: EditDocumentNodeTypeV2;
+    readonly fingerprint: string;
+  }[];
+  readonly schemaVersion: number;
+}
+
+/** Build a deterministic, path-free diagnostics view from the versioned edit document. */
+export const buildEditDocumentV2Diagnostics = (document: EditDocumentV2): EditDocumentV2Diagnostics => {
+  const parsed = editDocumentV2Schema.parse(document);
+  const activeNodeTypes = EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap(({ nodeType }) =>
+    parsed.nodes[nodeType] === undefined ? [] : [nodeType],
+  );
+  const nodeDiagnostics = activeNodeTypes.map((nodeType) => {
+    const node = parsed.nodes[nodeType];
+    const descriptor = descriptorFor(nodeType);
+    if (node === undefined || descriptor === undefined) throw new Error(`Missing edit node descriptor: ${nodeType}`);
+    return {
+      enabled: node.enabled,
+      implementationVersion: node.implementationVersion,
+      nodeType,
+      parameterKeys: Object.keys(node.params).sort(),
+      process: node.process,
+      renderStage: descriptor.renderStage,
+      status: node.enabled ? 'active' : 'disabled',
+    } satisfies EditDocumentV2NodeDiagnostic;
+  });
+  // biome-ignore lint/complexity/useLiteralKeys: extensions intentionally carries quarantined future nodes.
+  const quarantined = parsed.extensions['quarantinedNodes'];
+  const quarantinedNodeTypes =
+    quarantined && typeof quarantined === 'object' && !Array.isArray(quarantined)
+      ? Object.keys(quarantined).sort()
+      : [];
+  return {
+    activeNodeTypes,
+    graphProcess: parsed.graphProcess,
+    legacyNodeTypes: nodeDiagnostics
+      .filter(({ process }) => process === 'legacy_pipeline_v1')
+      .map(({ nodeType }) => nodeType),
+    migration: parsed.migration ?? null,
+    nodeDiagnostics,
+    quarantinedNodeTypes,
+    renderStageFingerprints: nodeDiagnostics.map(({ nodeType }) => ({
+      nodeType,
+      fingerprint: JSON.stringify([nodeType, parsed.nodes[nodeType]?.params]),
+    })),
+    schemaVersion: parsed.schemaVersion,
+  };
+};
+
 /** Reset one node using its descriptor-owned defaults without touching other domains. */
 export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2): EditDocumentV2 => {
   const parsed = editDocumentV2Schema.parse(document);
