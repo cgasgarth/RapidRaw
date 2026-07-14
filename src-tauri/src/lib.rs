@@ -86,7 +86,6 @@ use crate::ai::ai_commands as build_ai_commands;
 #[cfg(not(feature = "ai"))]
 use crate::app::disabled_commands as build_ai_commands;
 use crate::formats::PNG_DATA_URL_PREFIX;
-use crate::gpu_display::{DisplayTransformState, PresentationSchedulerReport};
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 use crate::merge::atomic_derived_output::{AtomicDerivedOutputTransaction, DerivedOutputManifest};
@@ -791,71 +790,6 @@ pub fn get_cached_full_warped_image(
     }
 
     Ok(warped_arc)
-}
-
-#[tauri::command]
-fn update_wgpu_transform(
-    payload: WgpuTransformPayload,
-    state: tauri::State<'_, AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<u64, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
-    context
-        .presentation
-        .submit_transform(DisplayTransformState {
-            rect: [payload.x, payload.y, payload.width, payload.height],
-            clip: [
-                payload.clip_x,
-                payload.clip_y,
-                payload.clip_width,
-                payload.clip_height,
-            ],
-            window: [payload.window_width, payload.window_height],
-            bg_primary: payload.bg_primary,
-            bg_secondary: payload.bg_secondary,
-            pixelated: payload.pixelated,
-        })
-}
-
-#[tauri::command]
-async fn flush_wgpu_presentation(
-    sequence: u64,
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    let presentation = state
-        .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
-        .map(|context| Arc::clone(&context.presentation));
-    match presentation {
-        Some(presentation) => presentation.flush(sequence).await,
-        None => Ok(()),
-    }
-}
-
-#[tauri::command]
-fn get_wgpu_presentation_report(
-    state: tauri::State<'_, AppState>,
-) -> Option<PresentationSchedulerReport> {
-    state
-        .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
-        .map(|context| context.presentation.report())
-}
-
-#[tauri::command]
-fn get_gpu_pipeline_report(
-    state: tauri::State<'_, AppState>,
-) -> Option<gpu::pipeline_registry::GpuPipelineReport> {
-    state
-        .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
-        .map(|context| context.pipeline_registry.report())
 }
 
 #[derive(Serialize)]
@@ -4377,14 +4311,14 @@ pub fn run() {
             library::catalog::get_library_catalog_report,
             library::catalog::get_library_folder_aggregates,
             cancel_thumbnail_generation,
-            update_wgpu_transform,
-            flush_wgpu_presentation,
-            get_wgpu_presentation_report,
+            app::commands::wgpu_presentation::update_wgpu_transform,
+            app::commands::wgpu_presentation::flush_wgpu_presentation,
+            app::commands::wgpu_presentation::get_wgpu_presentation_report,
             analyze_tone_equalizer_placement,
             sample_tone_equalizer_picker,
             sample_point_color_picker,
             app::display_target::get_display_target_report,
-            get_gpu_pipeline_report,
+            app::commands::wgpu_presentation::get_gpu_pipeline_report,
             android_integration::resolve_android_content_uri_name,
             cache_utils::clear_session_caches,
             cache_utils::clear_image_caches,
