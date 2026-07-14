@@ -11,12 +11,27 @@ const positiveRevisionSchema = z.number().int().positive().safe();
 export const previewOperationKindSchema = z.enum(['interactive', 'settled', 'original', 'analytics']);
 export type PreviewOperationKind = z.infer<typeof previewOperationKindSchema>;
 
+export const previewGraphRevisionSchema = z
+  .object({
+    adjustmentRevision: positiveRevisionSchema,
+    geometryRevision: revisionSchema,
+    imageSessionId: positiveRevisionSchema,
+    maskRevision: revisionSchema,
+    patchRevision: revisionSchema,
+    proofRevision: revisionSchema,
+    proposalFingerprint: z.string().trim().min(1),
+  })
+  .strict();
+
+export type PreviewGraphRevision = z.infer<typeof previewGraphRevisionSchema>;
+
 export const previewSessionIdentitySchema = z
   .object({
     adjustmentRevision: positiveRevisionSchema,
     backend: z.enum(['cpu', 'wgpu']),
     displayGeneration: positiveRevisionSchema,
     geometryRevision: revisionSchema,
+    graphRevision: z.string().trim().min(1),
     imageSessionId: positiveRevisionSchema,
     maskRevision: revisionSchema,
     patchRevision: revisionSchema,
@@ -176,6 +191,10 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
 
 export function fingerprintPreviewSessionIdentity(value: PreviewSessionIdentity): string {
   return JSON.stringify(previewSessionIdentitySchema.parse(value));
+}
+
+export function fingerprintPreviewGraphRevision(value: PreviewGraphRevision): string {
+  return JSON.stringify(previewGraphRevisionSchema.parse(value));
 }
 
 export function fingerprintPreviewOperationIdentity(value: PreviewOperationIdentity): string {
@@ -445,4 +464,51 @@ export function reducePreviewCoordinator(
   }
 
   return { effects, state };
+}
+
+/**
+ * Session-owned façade for the pure reducer and external request bindings.
+ * React adapters report events; this object alone owns coordinator state and
+ * decides whether a native request still maps to the current typed operation.
+ */
+export class PreviewCoordinator {
+  private requestOperations = new Map<number, PreviewOperationIdentity>();
+  private state = createPreviewCoordinatorState();
+
+  dispatch(event: PreviewCoordinatorEvent): PreviewCoordinatorTransition {
+    const transition = reducePreviewCoordinator(this.state, event);
+    this.state = transition.state;
+    const cancelledOperationIds = new Set(
+      transition.effects.filter((effect) => effect.type === 'cancel').map((effect) => effect.identity.operationId),
+    );
+    if (cancelledOperationIds.size > 0) {
+      for (const [requestId, identity] of this.requestOperations) {
+        if (cancelledOperationIds.has(identity.operationId)) this.requestOperations.delete(requestId);
+      }
+    }
+    return transition;
+  }
+
+  bindRequest(requestId: number, identity: PreviewOperationIdentity): boolean {
+    const parsedRequestId = positiveRevisionSchema.parse(requestId);
+    const parsedIdentity = previewOperationIdentitySchema.parse(identity);
+    const operation = operationForKind(this.state, parsedIdentity.kind);
+    if (!sameOperation(operation.identity, parsedIdentity) || !['queued', 'running'].includes(operation.status)) {
+      return false;
+    }
+    this.requestOperations.set(parsedRequestId, parsedIdentity);
+    return true;
+  }
+
+  forgetRequest(requestId: number): void {
+    this.requestOperations.delete(requestId);
+  }
+
+  operationForRequest(requestId: number): PreviewOperationIdentity | undefined {
+    return this.requestOperations.get(requestId);
+  }
+
+  snapshot(): Readonly<PreviewCoordinatorState> {
+    return this.state;
+  }
 }

@@ -155,8 +155,6 @@ function App() {
   const viewportSize = useEditorWorkspaceViewportSubscription();
 
   const isBackendReadyRef = useRef(true);
-  const previewJobIdRef = useRef<number>(0);
-  const latestRenderedJobIdRef = useRef<number>(0);
   const currentResRef = useRef<number>(1280);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
@@ -281,8 +279,6 @@ function App() {
     transformWrapperRef,
     preloadedDataRef,
     isBackendReadyRef,
-    latestRenderedJobIdRef,
-    previewJobIdRef,
     currentResRef,
     prevAdjustmentsRef,
   };
@@ -587,8 +583,6 @@ function App() {
         imageProcessing={{
           transformWrapperRef,
           prevAdjustmentsRef,
-          previewJobIdRef,
-          latestRenderedJobIdRef,
           currentResRef,
         }}
       />

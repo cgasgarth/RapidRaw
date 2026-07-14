@@ -1,32 +1,50 @@
 import {
   createPreviewCoordinatorState,
   createPreviewQualityPolicy,
+  fingerprintPreviewGraphRevision,
   fingerprintPreviewOperationIdentity,
   fingerprintPreviewRoi,
   fingerprintPreviewSessionIdentity,
   type PreviewArtifact,
+  PreviewCoordinator,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
   reducePreviewCoordinator,
 } from '../../../src/utils/previewCoordinator';
 
-const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessionIdentity => ({
-  adjustmentRevision: 1,
-  backend: 'wgpu',
-  displayGeneration: 1,
-  geometryRevision: 1,
-  imageSessionId: 1,
-  maskRevision: 1,
-  patchRevision: 1,
-  proofRevision: 1,
-  roiFingerprint: 'full',
-  sourceImagePath: 'private-fixtures/landscape.arw',
-  sourceRevision: 1,
-  targetHeight: 1000,
-  targetWidth: 1600,
-  viewportRevision: 1,
-  ...overrides,
-});
+const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessionIdentity => {
+  const values = {
+    adjustmentRevision: 1,
+    backend: 'wgpu' as const,
+    displayGeneration: 1,
+    geometryRevision: 1,
+    imageSessionId: 1,
+    maskRevision: 1,
+    patchRevision: 1,
+    proofRevision: 1,
+    roiFingerprint: 'full',
+    sourceImagePath: 'fixtures/landscape.arw',
+    sourceRevision: 1,
+    targetHeight: 1000,
+    targetWidth: 1600,
+    viewportRevision: 1,
+    ...overrides,
+  };
+  return {
+    ...values,
+    graphRevision:
+      overrides.graphRevision ??
+      fingerprintPreviewGraphRevision({
+        adjustmentRevision: values.adjustmentRevision,
+        geometryRevision: values.geometryRevision,
+        imageSessionId: values.imageSessionId,
+        maskRevision: values.maskRevision,
+        patchRevision: values.patchRevision,
+        proofRevision: values.proofRevision,
+        proposalFingerprint: 'committed',
+      }),
+  };
+};
 
 const artifact = (identity: PreviewArtifact['identity'], url: string): PreviewArtifact => ({ identity, url });
 
@@ -37,10 +55,34 @@ function transition(
   return reducePreviewCoordinator(state, event);
 }
 
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('expected coordinator operation identity');
+  return value;
+}
+
 test('fingerprints are canonical and distinguish typed source identity changes', () => {
   expect(fingerprintPreviewSessionIdentity(session())).toBe(fingerprintPreviewSessionIdentity(session()));
   expect(fingerprintPreviewSessionIdentity(session())).not.toBe(
     fingerprintPreviewSessionIdentity(session({ sourceRevision: 2 })),
+  );
+});
+
+test('graph revisions canonically distinguish proposal and render-authoritative revisions', () => {
+  const committed = {
+    adjustmentRevision: 7,
+    geometryRevision: 2,
+    imageSessionId: 11,
+    maskRevision: 3,
+    patchRevision: 4,
+    proofRevision: 5,
+    proposalFingerprint: 'committed',
+  };
+  expect(fingerprintPreviewGraphRevision(committed)).toBe(fingerprintPreviewGraphRevision({ ...committed }));
+  expect(fingerprintPreviewGraphRevision(committed)).not.toBe(
+    fingerprintPreviewGraphRevision({ ...committed, proposalFingerprint: 'reference-match:proposal-2' }),
+  );
+  expect(fingerprintPreviewGraphRevision(committed)).not.toBe(
+    fingerprintPreviewGraphRevision({ ...committed, maskRevision: committed.maskRevision + 1 }),
   );
 });
 
@@ -64,6 +106,55 @@ test('new render inputs cancel the previous operation and start newest work', ()
     { type: 'start', identity: second.state.interactive.identity, reason: 'slider-updated' },
   ]);
   expect(second.state.interactive.status).toBe('queued');
+});
+
+test('session coordinator drops bound work across A to B to A and same-session revision supersession', () => {
+  const coordinator = new PreviewCoordinator();
+  const firstA = session({ imageSessionId: 1, sourceImagePath: 'fixtures/a.arw', sourceRevision: 1 });
+  const b = session({ imageSessionId: 2, sourceImagePath: 'fixtures/b.arw', sourceRevision: 2 });
+  const secondA = session({ imageSessionId: 3, sourceImagePath: 'fixtures/a.arw', sourceRevision: 3 });
+
+  const first = coordinator.dispatch({ identity: firstA, kind: 'settled', type: 'render-inputs-changed' });
+  const firstIdentity = required(first.state.settled.identity);
+  expect(coordinator.bindRequest(41, firstIdentity)).toBe(true);
+  coordinator.dispatch({ identity: firstIdentity, type: 'operation-started' });
+  coordinator.dispatch({ session: b, type: 'image-session-installed' });
+  expect(coordinator.operationForRequest(41)).toBeUndefined();
+
+  const returned = coordinator.dispatch({ identity: secondA, kind: 'settled', type: 'render-inputs-changed' });
+  const returnedIdentity = required(returned.state.settled.identity);
+  expect(returnedIdentity.operationId).toBeGreaterThan(firstIdentity.operationId);
+  expect(coordinator.bindRequest(42, returnedIdentity)).toBe(true);
+  coordinator.dispatch({ identity: returnedIdentity, type: 'operation-started' });
+
+  const proposedGraphRevision = fingerprintPreviewGraphRevision({
+    adjustmentRevision: secondA.adjustmentRevision,
+    geometryRevision: secondA.geometryRevision,
+    imageSessionId: secondA.imageSessionId,
+    maskRevision: secondA.maskRevision,
+    patchRevision: secondA.patchRevision,
+    proofRevision: secondA.proofRevision,
+    proposalFingerprint: 'reference-match:proposal-2',
+  });
+  const proposal = coordinator.dispatch({
+    identity: { ...secondA, graphRevision: proposedGraphRevision },
+    kind: 'settled',
+    reason: 'proposal-replaced',
+    type: 'render-inputs-changed',
+  });
+  const proposalIdentity = required(proposal.state.settled.identity);
+  expect(coordinator.operationForRequest(42)).toBeUndefined();
+  expect(coordinator.bindRequest(43, proposalIdentity)).toBe(true);
+
+  const stale = coordinator.dispatch({
+    artifact: artifact(returnedIdentity, 'blob:stale-returned-a'),
+    identity: returnedIdentity,
+    type: 'operation-completed',
+  });
+  expect(stale.state.staleCompletionCount).toBe(1);
+  expect(stale.state.visibleArtifact).toBeNull();
+  expect(coordinator.operationForRequest(43)).toEqual(proposalIdentity);
+  expect(coordinator.snapshot().session?.graphRevision).toBe(proposedGraphRevision);
 });
 
 test('late completion is rejected after A to B to A navigation', () => {
