@@ -8,6 +8,8 @@ import {
   type PointColorPlanV1,
   pointColorPlanV1Schema,
 } from '../../packages/rawengine-schema/src/color/pointColorSchemas';
+import { filmEmulationNodeV1Schema } from '../../packages/rawengine-schema/src/film/filmEmulationSchemas';
+import type { FilmEmulationNodeV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
   type MatchLookApplicationReceiptV1,
   matchLookApplicationReceiptV1Schema,
@@ -305,6 +307,8 @@ export interface Adjustments {
   flipHorizontal: boolean;
   flipVertical: boolean;
   flareAmount: number;
+  /** Canonical renderer-owned Film node; null keeps the legacy Film look path disabled. */
+  filmEmulation: FilmEmulationNodeV1 | null;
   filmLookId: string | null;
   filmLookStrength: number;
   glowAmount: number;
@@ -967,6 +971,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   flipHorizontal: false,
   flipVertical: false,
   flareAmount: 0,
+  filmEmulation: null,
   filmLookId: null,
   filmLookStrength: 100,
   glowAmount: 0,
@@ -1183,6 +1188,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
   const parsedReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
     loadedAdjustments.referenceMatchApplicationReceipt,
   );
+  const parsedFilmEmulation = filmEmulationNodeV1Schema.nullable().safeParse(loadedAdjustments.filmEmulation);
   const isLegacyWhiteBalance = !parsedTechnicalWhiteBalance.success;
   const loadedCameraProfileAmount = loadedAdjustments.cameraProfileAmount;
   const cameraProfileAmount =
@@ -1194,6 +1200,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
+    filmEmulation: parsedFilmEmulation.success ? parsedFilmEmulation.data : INITIAL_ADJUSTMENTS.filmEmulation,
     filmLookId: loadedAdjustments.filmLookId ?? INITIAL_ADJUSTMENTS.filmLookId,
     filmLookStrength: loadedAdjustments.filmLookStrength ?? INITIAL_ADJUSTMENTS.filmLookStrength,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,

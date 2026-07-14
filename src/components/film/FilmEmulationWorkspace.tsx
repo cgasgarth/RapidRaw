@@ -1,11 +1,23 @@
 import { RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { FilmEmulationOperationV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import {
+  applyFilmEmulationOperation,
+  createFilmEmulationTargetState,
+  REFERENCE_FILM_PROFILE_REF,
+} from '../../utils/film-look/filmEmulationOperation';
 import { buildFilmLookAppliedAdjustmentPatch, type FilmLookBrowserItem } from '../../utils/film-look/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
+import {
+  buildFilmStageOperation,
+  FILM_REFERENCE_STAGE_DEFAULT_P,
+  getFilmStageControlDescriptors,
+} from '../../utils/film-look/filmStageControls';
 import { FilmProfileBrowser } from './FilmProfileBrowser';
+import { FilmStageControls } from './FilmStageControls';
 
 const FAVORITES_STORAGE_KEY = 'rapidraw.film.workspace.favorites.v1';
 const readFavorites = (): Set<string> => {
@@ -26,6 +38,8 @@ export function FilmEmulationWorkspace() {
   const [favorites, setFavorites] = useState(readFavorites);
   const [compare, setCompare] = useState(false);
   const [printVariant, setPrintVariant] = useState('None');
+  const filmStateRef = useRef(createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' }));
+  const operationCounterRef = useRef(0);
   const activeProfile = useMemo(
     () =>
       getFilmLookBrowserGroups()
@@ -35,18 +49,56 @@ export function FilmEmulationWorkspace() {
   );
   const updateAdjustments = (update: (previous: Adjustments) => Adjustments) =>
     setEditor((state) => ({ adjustments: update(state.adjustments) }));
-  const applyProfile = (look: FilmLookBrowserItem) =>
+  const applyFilmOperation = (operation: FilmEmulationOperationV1) => {
+    operationCounterRef.current += 1;
+    const source = filmStateRef.current;
+    const command = {
+      actor: { id: 'film-workspace', kind: 'ui' as const, sessionId: 'film-workspace' },
+      approval: { approvalClass: 'edit_apply' as const, reason: 'Film workspace control', state: 'approved' as const },
+      commandId: `film-workspace-${operationCounterRef.current}`,
+      commandType: 'edit.apply_film_emulation_operation' as const,
+      contractVersion: 1 as const,
+      correlationId: `film-workspace-${operationCounterRef.current}`,
+      dryRun: false,
+      expectedGraphRevision: source.graphRevision,
+      operation,
+      schemaVersion: 1 as const,
+      target: source.target,
+    };
+    const applied = applyFilmEmulationOperation(command, source);
+    filmStateRef.current = applied.state;
+    updateAdjustments((previous) => ({ ...previous, filmEmulation: applied.state.node }));
+  };
+  const nativeFilmEnabled = adjustments.filmEmulation !== null;
+  const stageDescriptors = nativeFilmEnabled
+    ? getFilmStageControlDescriptors(
+        adjustments.filmEmulation?.stageParams?.referenceLuminanceShaperP ?? FILM_REFERENCE_STAGE_DEFAULT_P,
+      )
+    : [];
+  const applyProfile = (look: FilmLookBrowserItem) => {
+    filmStateRef.current = createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' });
     updateAdjustments((previous) => ({
       ...previous,
       ...buildFilmLookAppliedAdjustmentPatch(
         look,
         previous.filmLookId === look.id ? previous.filmLookStrength : look.strengthDefault,
       ),
+      filmEmulation: null,
       filmLookId: look.id,
       filmLookStrength: previous.filmLookId === look.id ? previous.filmLookStrength : look.strengthDefault,
     }));
-  const resetFilm = () =>
-    updateAdjustments((previous) => ({ ...previous, ...INITIAL_ADJUSTMENTS, filmLookId: null, filmLookStrength: 100 }));
+  };
+  const resetFilm = () => {
+    applyFilmOperation({ kind: 'remove_node' });
+    filmStateRef.current = createFilmEmulationTargetState({ kind: 'image', variantId: 'editor' });
+    updateAdjustments((previous) => ({
+      ...previous,
+      ...INITIAL_ADJUSTMENTS,
+      filmEmulation: null,
+      filmLookId: null,
+      filmLookStrength: 100,
+    }));
+  };
   const toggleFavorite = (id: string) =>
     setFavorites((previous) => {
       const next = new Set(previous);
@@ -70,18 +122,13 @@ export function FilmEmulationWorkspace() {
           </div>
           <div className="flex items-center gap-1">
             <button
-              aria-pressed={adjustments.filmLookId !== null}
+              aria-pressed={nativeFilmEnabled}
               aria-label={t('film.workspace.enable', { defaultValue: 'Enable film emulation' })}
               className="rounded border border-editor-border px-2 py-1 text-[10px]"
-              onClick={() =>
-                updateAdjustments((previous) => ({
-                  ...previous,
-                  filmLookId: previous.filmLookId ?? 'film_look.generic.mono_silver.v1',
-                }))
-              }
+              onClick={() => applyFilmOperation({ kind: 'set_profile', profileRef: REFERENCE_FILM_PROFILE_REF })}
               type="button"
             >
-              {adjustments.filmLookId === null
+              {!nativeFilmEnabled
                 ? t('common.enable', { defaultValue: 'Enable' })
                 : t('common.enabled', { defaultValue: 'Enabled' })}
             </button>
@@ -149,6 +196,20 @@ export function FilmEmulationWorkspace() {
             </select>
           </div>
         </section>
+        {nativeFilmEnabled && (
+          <section
+            aria-label={t('film.workspace.stageControls', { defaultValue: 'Film stage controls' })}
+            className="rounded border border-editor-border bg-editor-panel-well p-2"
+          >
+            <FilmStageControls
+              descriptors={stageDescriptors}
+              onChange={(descriptor, value) => applyFilmOperation(buildFilmStageOperation(descriptor, value))}
+              onReset={(descriptor) =>
+                applyFilmOperation(buildFilmStageOperation(descriptor, descriptor.defaultValue as number))
+              }
+            />
+          </section>
+        )}
         <section
           aria-label={t('film.workspace.provenanceLabel', { defaultValue: 'Film profile provenance' })}
           className="rounded border border-editor-border bg-editor-panel-well p-2 text-[10px] text-text-secondary"
