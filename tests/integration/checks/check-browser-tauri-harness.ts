@@ -391,6 +391,7 @@ try {
   await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await verifyViewerPickerControllers(page);
+  await verifyColorRangeLocalAdjustmentTransaction(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
   if (await viewerFooterOverflow.isVisible()) {
     await viewerFooterOverflow.locator('summary').click();
@@ -1159,6 +1160,62 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await page.getByTestId('point-color-selected-controls').waitFor({ state: 'visible', timeout: 10_000 });
   if ((await pointPicker.getAttribute('aria-pressed')) !== 'false') {
     throw new Error('Point Color picker did not deactivate after committing its one-shot sample.');
+  }
+}
+
+async function verifyColorRangeLocalAdjustmentTransaction(page: Page): Promise<void> {
+  await page.waitForTimeout(500);
+  const baselineSaves = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  await page.getByTestId('selective-color-range-oranges').click();
+  const disclosure = page.getByTestId('local-color-range-adjustment-disclosure');
+  if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
+  const createLocalAdjustment = page.getByTestId('selective-color-create-local-adjustment');
+  await createLocalAdjustment.scrollIntoViewIfNeeded();
+  await createLocalAdjustment.click();
+
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    baselineSaves + 1,
+    { timeout: 10_000 },
+  );
+  const persisted = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+      .at(-1);
+    return call?.args ?? null;
+  });
+  const transaction = persisted?.['transaction'];
+  const adjustments = persisted?.['adjustments'];
+  const masks = Array.isArray(adjustments?.['masks']) ? adjustments['masks'] : [];
+  const sidecars = Array.isArray(adjustments?.['rawEngineArtifacts']?.['layerStackSidecars'])
+    ? adjustments['rawEngineArtifacts']['layerStackSidecars']
+    : [];
+  const colorMask = masks
+    .flatMap((mask) => (Array.isArray(mask?.['subMasks']) ? mask['subMasks'] : []))
+    .find((mask) => mask?.['type'] === 'color');
+  const sidecar = sidecars.find(
+    (candidate) => candidate?.['sourceImagePath'] === '/tmp/rawengine-browser-harness/browser-harness.ARW',
+  );
+  if (
+    colorMask === undefined ||
+    sidecar === undefined ||
+    typeof transaction?.['transactionId'] !== 'string' ||
+    typeof transaction?.['baseAdjustmentRevision'] !== 'number' ||
+    transaction['nextAdjustmentRevision'] !== transaction['baseAdjustmentRevision'] + 1 ||
+    typeof sidecar?.['graphRevision'] !== 'string' ||
+    !sidecar['graphRevision'].includes(transaction['transactionId'])
+  ) {
+    throw new Error(
+      `Color-range local adjustment did not persist one revision-scoped layer artifact: ${JSON.stringify({ colorMask, sidecar, transaction })}`,
+    );
   }
 }
 

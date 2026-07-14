@@ -3,7 +3,6 @@ import cx from 'clsx';
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { debouncedSave } from '../../hooks/editor/useEditorActions';
 import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
@@ -22,6 +21,7 @@ import {
   buildColorRangeProposalSourcePixels,
   createColorRangeLocalAdjustmentLayerDraft,
 } from '../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
+import { buildLayerEditTransactionRequest } from '../../utils/layers/layerEditTransaction';
 import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerStackSidecarAdjustments';
 import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
 import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
@@ -126,7 +126,7 @@ export default function ColorPanel({
   const exportSoftProofTransform = useEditorStore((state) => state.exportSoftProofTransform);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
-  const pushHistory = useEditorStore((state) => state.pushHistory);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const setEditor = useEditorStore((state) => state.setEditor);
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
@@ -169,11 +169,12 @@ export default function ColorPanel({
     levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
   ].filter((warning): warning is string => warning !== null);
   const createLocalAdjustmentFromActiveColorRange = () => {
-    if (isForMask || selectedImage === null) return;
-
     const currentState = useEditorStore.getState();
-    const rangeControl = adjustments.selectiveColorRangeControls[activeColor];
-    const currentHsl = adjustments.hsl[activeColor];
+    const currentImage = currentState.selectedImage;
+    if (isForMask || currentImage === null) return;
+
+    const rangeControl = currentState.adjustments.selectiveColorRangeControls[activeColor];
+    const currentHsl = currentState.adjustments.hsl[activeColor];
     const rangeLabel = t(getSelectiveColorRange(activeColor).labelKey);
     const layerId = crypto.randomUUID();
     const maskId = `${layerId}_color_range_mask`;
@@ -211,7 +212,7 @@ export default function ColorPanel({
       colorRangeParameters,
       context: {
         graphRevision: `history_${currentState.historyIndex}`,
-        imagePath: selectedImage.path,
+        imagePath: currentImage.path,
         operationId,
         sessionId: 'rapidraw-color-workspace',
       },
@@ -225,15 +226,14 @@ export default function ColorPanel({
       { ...currentState.adjustments, masks: result.masks },
       result.toneResult.sidecar,
     );
+    const transaction = buildLayerEditTransactionRequest(currentState, nextAdjustments, operationId);
+    const committed = applyEditTransaction(transaction);
+    if (committed.noOp) return;
 
     setEditor({
       activeMaskContainerId: layerId,
       activeMaskId: maskId,
-      adjustments: nextAdjustments,
-      uncroppedAdjustedPreviewUrl: null,
     });
-    pushHistory(nextAdjustments);
-    debouncedSave(selectedImage.path, nextAdjustments);
   };
 
   const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
