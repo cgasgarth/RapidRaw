@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use chrono::{SecondsFormat, Utc};
@@ -20,8 +20,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
-use tokio::sync::Notify;
 
+use crate::AppState;
 use crate::color::hdr_editing::{
     HdrExportCapabilityCatalogV1, HdrExportReceiptV1, HdrExportWorkflowSettingsV1,
     SdrRenditionPlanV1, hdr_export_capabilities,
@@ -43,6 +43,8 @@ pub use crate::export::export_postprocess::{
     OutputSharpeningSettings, ResizeOptions, WatermarkSettings,
 };
 use crate::export::export_postprocess::{apply_export_postprocess, calculate_resize_target};
+pub use crate::export::job_registry::ExportCancellationAck;
+use crate::export::job_registry::{ExportJobHandle, ExportJobRegistry};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
@@ -72,7 +74,6 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::raw_processing::RawDevelopmentReport;
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::source_revision::SourceRevision;
-use crate::{AppState, ExportJob};
 
 #[cfg(test)]
 pub(crate) use crate::export::export_color_policy::{
@@ -165,31 +166,6 @@ enum ExportMasksResult {
 enum AuxiliaryOutputPolicy {
     None,
     ReportPartialOnCancellation,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportCancellationAck {
-    active_job_id: String,
-    cancellation_requested: bool,
-    task_attached: bool,
-    token_observed: bool,
-}
-
-#[derive(Clone, Debug)]
-struct ExportJobIdentity {
-    job_id: String,
-    cancellation_token: Arc<AtomicBool>,
-    cancellation_notify: Arc<Notify>,
-}
-
-impl ExportJobIdentity {
-    fn pipeline_cancellation(&self) -> PipelineCancellation {
-        PipelineCancellation::from_parts(
-            Arc::clone(&self.cancellation_token),
-            Arc::clone(&self.cancellation_notify),
-        )
-    }
 }
 
 #[derive(Clone)]
@@ -670,75 +646,6 @@ fn verified_source_digest(
     }))
 }
 
-fn claim_export_job(registry: &Mutex<Option<ExportJob>>) -> Result<ExportJobIdentity, String> {
-    let mut job = registry.lock().unwrap();
-    if job.is_some() {
-        return Err("An export is already in progress.".to_string());
-    }
-
-    let cancellation_token = Arc::new(AtomicBool::new(false));
-    let cancellation_notify = Arc::new(Notify::new());
-    let job_id = format!("export-job:{}", uuid::Uuid::new_v4());
-    *job = Some(ExportJob {
-        job_id: job_id.clone(),
-        cancellation_token: Arc::clone(&cancellation_token),
-        cancellation_notify: Arc::clone(&cancellation_notify),
-        task_handle: None,
-    });
-    Ok(ExportJobIdentity {
-        job_id,
-        cancellation_token,
-        cancellation_notify,
-    })
-}
-
-fn request_export_cancellation(
-    registry: &Mutex<Option<ExportJob>>,
-) -> Result<ExportCancellationAck, String> {
-    // Keep the registry guard through the token swap and acknowledgement read. This
-    // makes the request linearize against task completion/next-job admission: an
-    // acknowledgement can never describe a job that has already been replaced.
-    let job = registry.lock().unwrap();
-    let Some(job) = job.as_ref() else {
-        return Err("No export task is currently running.".to_string());
-    };
-
-    if job.cancellation_token.swap(true, Ordering::SeqCst) {
-        return Err("Export cancellation is already in progress.".to_string());
-    }
-    job.cancellation_notify.notify_waiters();
-    Ok(ExportCancellationAck {
-        active_job_id: job.job_id.clone(),
-        cancellation_requested: true,
-        task_attached: job.task_handle.is_some(),
-        token_observed: job.cancellation_token.load(Ordering::SeqCst),
-    })
-}
-
-fn attach_export_task(
-    registry: &Mutex<Option<ExportJob>>,
-    identity: &ExportJobIdentity,
-    task: tokio::task::JoinHandle<()>,
-) {
-    let mut job = registry.lock().unwrap();
-    if let Some(job) = job.as_mut()
-        && job.job_id == identity.job_id
-        && Arc::ptr_eq(&job.cancellation_token, &identity.cancellation_token)
-    {
-        job.task_handle = Some(task);
-    }
-}
-
-fn finish_export_job(registry: &Mutex<Option<ExportJob>>, identity: &ExportJobIdentity) {
-    let mut job = registry.lock().unwrap();
-    if job.as_ref().is_some_and(|job| {
-        job.job_id == identity.job_id
-            && Arc::ptr_eq(&job.cancellation_token, &identity.cancellation_token)
-    }) {
-        *job = None;
-    }
-}
-
 fn export_terminal_receipt(
     terminal_status: ExportTerminalStatus,
     outputs: Vec<ExportReceiptOutput>,
@@ -754,21 +661,21 @@ fn export_terminal_receipt(
 
 async fn admit_export_job<R: tauri::Runtime>(
     total_paths: usize,
-    registry: &Mutex<Option<ExportJob>>,
+    registry: &ExportJobRegistry,
     app_handle: &tauri::AppHandle<R>,
-) -> Result<Option<ExportJobIdentity>, String> {
-    let job_identity = claim_export_job(registry)?;
-    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
+) -> Result<Option<ExportJobHandle>, String> {
+    let job_identity = registry.admit()?;
+    let cancellation = job_identity.cancellation();
 
     // Keep a small asynchronous admission window so the cancel command can
     // linearize before GPU initialization or worker scheduling begins.
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    if cancellation_token.load(Ordering::SeqCst) {
+    if cancellation.is_cancelled() {
         let _ = app_handle.emit(
             crate::events::EXPORT_CANCELLED,
             export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
         );
-        finish_export_job(registry, &job_identity);
+        registry.complete(&job_identity);
         return Ok(None);
     }
 
@@ -784,12 +691,13 @@ async fn export_images_cancellation_boundary(
     app_handle: tauri::AppHandle<tauri::test::MockRuntime>,
 ) -> Result<(), String> {
     let _output_folder_or_file = output_folder_or_file;
-    let Some(job_identity) = admit_export_job(paths.len(), &state.export_job, &app_handle).await?
+    let Some(job_identity) =
+        admit_export_job(paths.len(), state.export_jobs(), &app_handle).await?
     else {
         return Ok(());
     };
 
-    finish_export_job(&state.export_job, &job_identity);
+    state.export_jobs().complete(&job_identity);
     Err("cancellation boundary test reached runnable export work".to_string())
 }
 
@@ -2479,15 +2387,16 @@ pub async fn export_images(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let total_paths = paths.len();
-    let Some(job_identity) = admit_export_job(total_paths, &state.export_job, &app_handle).await?
+    let Some(job_identity) =
+        admit_export_job(total_paths, state.export_jobs(), &app_handle).await?
     else {
         return Ok(());
     };
-    let cancellation = job_identity.pipeline_cancellation();
+    let cancellation = job_identity.cancellation();
     let context = match get_or_init_gpu_context(&state, &app_handle) {
         Ok(context) => Arc::new(context),
         Err(error) => {
-            finish_export_job(&state.export_job, &job_identity);
+            state.export_jobs().complete(&job_identity);
             return Err(error);
         }
     };
@@ -2508,7 +2417,7 @@ pub async fn export_images(
     let task = tokio::spawn(async move {
         let started = Instant::now();
         let (results, mut report) = run_batch_export_pipeline(
-            task_identity.job_id.clone(),
+            task_identity.job_id().to_string(),
             std::collections::HashSet::new(),
             Vec::new(),
             None,
@@ -2574,12 +2483,12 @@ pub async fn export_images(
             "batch export pipeline report: {:?}",
             serde_json::to_value(&report)
         );
-        finish_export_job(
-            &task_app_handle.state::<AppState>().export_job,
-            &task_identity,
-        );
+        task_app_handle
+            .state::<AppState>()
+            .export_jobs()
+            .complete(&task_identity);
     });
-    attach_export_task(&state.export_job, &job_identity, task);
+    state.export_jobs().attach_task(&job_identity, task);
     Ok(())
 }
 
@@ -2603,11 +2512,11 @@ pub async fn resume_export(
         .iter()
         .map(|artifact| artifact.output_path.clone())
         .collect::<std::collections::HashSet<_>>();
-    let job_identity = claim_export_job(&state.export_job)?;
-    let cancellation = job_identity.pipeline_cancellation();
+    let job_identity = state.export_jobs().admit()?;
+    let cancellation = job_identity.cancellation();
     let context = Arc::new(
         get_or_init_gpu_context(&state, &app_handle).inspect_err(|_| {
-            finish_export_job(&state.export_job, &job_identity);
+            state.export_jobs().complete(&job_identity);
         })?,
     );
     let available_cores = std::thread::available_parallelism()
@@ -2626,7 +2535,7 @@ pub async fn resume_export(
     let task_cancellation = cancellation;
     let task = tokio::spawn(async move {
         let (results, report) = run_batch_export_pipeline(
-            task_identity.job_id.clone(),
+            task_identity.job_id().to_string(),
             committed_paths.clone(),
             validated.committed_artifacts,
             Some(manifest.planned.clone()),
@@ -2680,12 +2589,12 @@ pub async fn resume_export(
                 export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
             );
         }
-        finish_export_job(
-            &task_app_handle.state::<AppState>().export_job,
-            &task_identity,
-        );
+        task_app_handle
+            .state::<AppState>()
+            .export_jobs()
+            .complete(&task_identity);
     });
-    attach_export_task(&state.export_job, &job_identity, task);
+    state.export_jobs().attach_task(&job_identity, task);
     Ok(())
 }
 
@@ -2704,18 +2613,19 @@ async fn export_images_legacy(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let total_paths = paths.len();
-    let job_identity = claim_export_job(&state.export_job)?;
-    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
+    let job_identity = state.export_jobs().admit()?;
+    let cancellation = job_identity.cancellation();
+    let cancellation_token = Arc::clone(cancellation.token());
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     if cancellation_token.load(Ordering::SeqCst) {
         let _ = app_handle.emit(
             crate::events::EXPORT_CANCELLED,
             export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
         );
-        finish_export_job(&state.export_job, &job_identity);
+        state.export_jobs().complete(&job_identity);
         return Ok(());
     };
-    let cancellation_token = Arc::clone(&job_identity.cancellation_token);
+    let cancellation_token = Arc::clone(cancellation.token());
 
     let context = match get_or_init_gpu_context(&state, &app_handle) {
         Ok(context) => context,
@@ -2729,10 +2639,10 @@ async fn export_images_legacy(
                         total_paths,
                     ),
                 );
-                finish_export_job(&state.export_job, &job_identity);
+                state.export_jobs().complete(&job_identity);
                 return Ok(());
             }
-            finish_export_job(&state.export_job, &job_identity);
+            state.export_jobs().complete(&job_identity);
             return Err(error);
         }
     };
@@ -2741,7 +2651,7 @@ async fn export_images_legacy(
             crate::events::EXPORT_CANCELLED,
             export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
         );
-        finish_export_job(&state.export_job, &job_identity);
+        state.export_jobs().complete(&job_identity);
         return Ok(());
     }
     let context = Arc::new(context);
@@ -3222,10 +3132,13 @@ async fn export_images_legacy(
             );
         }
 
-        finish_export_job(&app_handle.state::<AppState>().export_job, &job_identity);
+        app_handle
+            .state::<AppState>()
+            .export_jobs()
+            .complete(&job_identity);
     });
 
-    attach_export_task(&state.export_job, &job_identity, task);
+    state.export_jobs().attach_task(&job_identity, task);
     Ok(())
 }
 
@@ -3412,9 +3325,14 @@ fn write_raw_export_provenance_sidecar(
 pub async fn cancel_export(
     state: tauri::State<'_, AppState>,
 ) -> Result<ExportCancellationAck, String> {
-    let acknowledgement = request_export_cancellation(&state.export_job)?;
+    let acknowledgement = state.export_jobs().request_cancellation()?;
+    let active_generation = state
+        .export_jobs()
+        .snapshot()
+        .filter(|snapshot| snapshot.job_id == acknowledgement.active_job_id)
+        .map(|snapshot| snapshot.generation);
     log::info!(
-        "Export cancellation acknowledged: job={}, attached={}, token_observed={}",
+        "Export cancellation acknowledged: job={}, generation={active_generation:?}, attached={}, token_observed={}",
         acknowledgement.active_job_id,
         acknowledgement.task_attached,
         acknowledgement.token_observed
@@ -3722,8 +3640,8 @@ mod tests {
         ExportReceiptContext, ExportRenderingIntent, ExportSettings, ExportTerminalStatus,
         FinalArtifactDigest, OutputCommitReceipt, OutputSharpeningSettings,
         VerifiedSourceDigestReceipt, applied_export_color_policy,
-        apply_export_resize_and_watermark, claim_export_job, commit_export_output,
-        encode_icc_profile, encode_image_to_bytes, encode_image_with_working_color_state,
+        apply_export_resize_and_watermark, commit_export_output, encode_icc_profile,
+        encode_image_to_bytes, encode_image_with_working_color_state,
         export_color_profile_receipt_label, export_jpeg_rgb_pixels_and_profile,
         export_manifest_path, export_manifest_plan_fingerprint, export_receipt_metadata,
         export_receipt_output, export_rgb_pixels_and_profile, export_rgb16_pixels_and_profile,
@@ -3731,17 +3649,16 @@ mod tests {
         export_soft_proof_rgb_pixels_and_profile_with_policy,
         export_soft_proof_rgb_pixels_with_working_color_state,
         export_source_precision_receipt_label, export_terminal_receipt, export_transform_options,
-        finish_export_job, load_export_manifest, mox_rendering_intent, quantize_rgb16_to_rgb8,
-        request_export_cancellation, resolve_export_color_capabilities,
-        resolve_export_color_transform_plan, save_image_with_metadata_commit, send_or_cancel,
-        sha256_file_for_resume, should_apply_srgb_perceptual_gamut_mapping,
-        validate_export_manifest_for_resume, write_export_manifest,
-        write_final_output_bytes_observed,
+        load_export_manifest, mox_rendering_intent, quantize_rgb16_to_rgb8,
+        resolve_export_color_capabilities, resolve_export_color_transform_plan,
+        save_image_with_metadata_commit, send_or_cancel, sha256_file_for_resume,
+        should_apply_srgb_perceptual_gamut_mapping, validate_export_manifest_for_resume,
+        write_export_manifest, write_final_output_bytes_observed,
     };
     #[cfg(feature = "tauri-test")]
     use super::{
-        ExportCancellationAck, attach_export_task, cancel_export,
-        export_images_cancellation_boundary, prepare_export_render_inputs,
+        ExportCancellationAck, cancel_export, export_images_cancellation_boundary,
+        prepare_export_render_inputs,
     };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
@@ -3753,6 +3670,7 @@ mod tests {
     };
     use crate::export::export_postprocess::OutputSharpeningTarget;
     use crate::export::export_processing::save_image_with_metadata;
+    use crate::export::job_registry::ExportJobRegistry;
     use crate::gamut_mapping::ACTIVE_SRGB_OKLAB_CHROMA_REDUCE;
     use crate::raw_processing::{RawCameraProfileReport, RawDemosaicPath, RawDevelopmentReport};
     use crate::source_revision::SourceRevision;
@@ -3961,16 +3879,17 @@ mod tests {
 
     #[test]
     fn cancellation_claimed_before_gpu_initialization_prevents_runnable_export_work() {
-        let registry = Arc::new(Mutex::new(None));
-        let job_identity =
-            claim_export_job(&registry).expect("export admission should claim job ownership");
+        let registry = Arc::new(ExportJobRegistry::default());
+        let job_identity = registry
+            .admit()
+            .expect("export admission should claim job ownership");
         let initialization_started = Arc::new(Barrier::new(2));
         let release_initialization = Arc::new(Barrier::new(2));
         let runnable_work = Arc::new(AtomicUsize::new(0));
         let event_order = Arc::new(Mutex::new(Vec::new()));
 
         let initialization_thread = {
-            let cancellation_token = Arc::clone(&job_identity.cancellation_token);
+            let cancellation_token = Arc::clone(job_identity.cancellation().token());
             let initialization_started = Arc::clone(&initialization_started);
             let release_initialization = Arc::clone(&release_initialization);
             let runnable_work = Arc::clone(&runnable_work);
@@ -3992,7 +3911,8 @@ mod tests {
         };
 
         initialization_started.wait();
-        request_export_cancellation(&registry)
+        registry
+            .request_cancellation()
             .expect("cancel must be accepted while initialization is gated");
         event_order.lock().unwrap().push("cancel-accepted");
         release_initialization.wait();
@@ -4014,9 +3934,9 @@ mod tests {
             ],
             "cancellation must linearize before any runnable export work"
         );
-        finish_export_job(&registry, &job_identity);
+        registry.complete(&job_identity);
         assert!(
-            registry.lock().unwrap().is_none(),
+            registry.snapshot().is_none(),
             "terminal cancellation must release job ownership"
         );
     }
@@ -4025,15 +3945,15 @@ mod tests {
     fn command_cancellation_before_atomic_commit_publishes_no_admitted_item() {
         let admitted_workers = 16;
         let total_items = 24;
-        let registry = Arc::new(Mutex::new(None));
-        let cancellation = claim_export_job(&registry).unwrap();
+        let registry = Arc::new(ExportJobRegistry::default());
+        let cancellation = registry.admit().unwrap();
         let encoded = Arc::new(Barrier::new(admitted_workers + 1));
         let release_commit = Arc::new(Barrier::new(admitted_workers + 1));
         let committed = Arc::new(AtomicUsize::new(0));
         let mut workers = Vec::new();
 
         for _ in 0..admitted_workers {
-            let cancellation = Arc::clone(&cancellation.cancellation_token);
+            let cancellation = Arc::clone(cancellation.cancellation().token());
             let encoded = Arc::clone(&encoded);
             let release_commit = Arc::clone(&release_commit);
             let committed = Arc::clone(&committed);
@@ -4050,7 +3970,7 @@ mod tests {
         }
 
         encoded.wait();
-        request_export_cancellation(&registry).unwrap();
+        registry.request_cancellation().unwrap();
         release_commit.wait();
         for worker in workers {
             worker.join().unwrap();
@@ -4061,27 +3981,9 @@ mod tests {
         assert_eq!(receipt.terminal_status, ExportTerminalStatus::Cancelled);
         assert_eq!(receipt.outputs.len(), 0);
         assert_eq!(receipt.total, total_items);
-        finish_export_job(&registry, &cancellation);
-        assert!(registry.lock().unwrap().is_none());
+        registry.complete(&cancellation);
+        assert!(registry.snapshot().is_none());
         assert!(total_items > admitted_workers);
-    }
-
-    #[test]
-    fn stale_export_job_identity_cannot_finish_a_newer_job() {
-        let registry = Arc::new(Mutex::new(None));
-        let first = claim_export_job(&registry).unwrap();
-        finish_export_job(&registry, &first);
-        let second = claim_export_job(&registry).unwrap();
-
-        finish_export_job(&registry, &first);
-
-        let active = registry
-            .lock()
-            .unwrap()
-            .as_ref()
-            .map(|job| job.job_id.clone());
-        assert_eq!(active.as_deref(), Some(second.job_id.as_str()));
-        finish_export_job(&registry, &second);
     }
 
     #[cfg(feature = "tauri-test")]
@@ -4096,8 +3998,8 @@ mod tests {
             .build()
             .unwrap();
         let state = app.state::<crate::app_state::AppState>();
-        let identity = claim_export_job(&state.export_job).unwrap();
-        let task_token = Arc::clone(&identity.cancellation_token);
+        let identity = state.export_jobs().admit().unwrap();
+        let task_token = Arc::clone(identity.cancellation().token());
         let (observed_tx, observed_rx) = std::sync::mpsc::sync_channel(1);
         let task_runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -4113,7 +4015,7 @@ mod tests {
                 tokio::task::yield_now().await;
             }
         });
-        attach_export_task(&state.export_job, &identity, task);
+        assert!(state.export_jobs().attach_task(&identity, task));
 
         let response = tauri::test::get_ipc_response(
             &webview,
@@ -4134,11 +4036,11 @@ mod tests {
         assert!(acknowledgement.task_attached);
         assert!(acknowledgement.token_observed);
         assert!(acknowledgement.active_job_id.starts_with("export-job:"));
-        assert!(identity.cancellation_token.load(Ordering::SeqCst));
+        assert!(identity.cancellation().is_cancelled());
         observed_rx
             .recv_timeout(std::time::Duration::from_secs(1))
             .expect("the concurrently running task must observe cancellation");
-        finish_export_job(&state.export_job, &identity);
+        assert!(state.export_jobs().complete(&identity));
     }
 
     #[cfg(feature = "tauri-test")]
@@ -4189,11 +4091,9 @@ mod tests {
             .find_map(|_| {
                 let active_job_id = app
                     .state::<crate::app_state::AppState>()
-                    .export_job
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .map(|job| job.job_id.clone());
+                    .export_jobs()
+                    .snapshot()
+                    .map(|job| job.job_id);
                 if active_job_id.is_none() {
                     thread::sleep(std::time::Duration::from_millis(1));
                 }
@@ -4236,9 +4136,8 @@ mod tests {
         assert!(fs::read_dir(output_dir.path()).unwrap().next().is_none());
         assert!(
             app.state::<crate::app_state::AppState>()
-                .export_job
-                .lock()
-                .unwrap()
+                .export_jobs()
+                .snapshot()
                 .is_none(),
             "terminal receipt must release the exact acknowledged job"
         );
