@@ -79,6 +79,7 @@ export enum Invokes {
   RenderNegativeLabDryRunPreviewArtifact = 'render_negative_lab_dry_run_preview_artifact',
   PreflightNegativeLabSource = 'preflight_negative_lab_source',
   FitNegativeLabMeasuredProfile = 'fit_negative_lab_measured_profile',
+  LockNegativeLabRollBounds = 'lock_negative_lab_roll_bounds',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
   PreviewAutoEditProposal = 'preview_auto_edit_proposal',
