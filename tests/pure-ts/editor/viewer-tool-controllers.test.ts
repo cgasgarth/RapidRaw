@@ -17,6 +17,7 @@ const key = (geometryEpoch = 4) => ({
 describe('viewer tool controllers', () => {
   test('enforces one owner and one cleanup path across brush and pan gestures', () => {
     const registry = createViewerToolSessionRegistry();
+    expect(registry.begin(key(), 6, 'blocked')).toBeNull();
     const begin = registry.begin(key(), 7, 'active-tool');
     expect(begin?.kind).toBe('begin');
     expect(registry.begin({ ...key(), toolId: 'pan' }, 8, 'viewer-pan')).toBeNull();
@@ -35,6 +36,19 @@ describe('viewer tool controllers', () => {
     expect(registry.active()).toBeNull();
     expect(isViewerToolSessionCurrent(key(), key())).toBe(true);
     expect(isViewerToolSessionCurrent(key(), key(5))).toBe(false);
+  });
+
+  test('rejects late async results from every successor session identity dimension', () => {
+    const current = key();
+    const successors = [
+      { imageSessionId: '/private/image-b.arw' },
+      { sourceRevision: 'graph:10' },
+      { operationGeneration: 3 },
+      { toolId: 'mask' as const },
+    ];
+    for (const change of successors) {
+      expect(isViewerToolSessionCurrent(current, { ...current, ...change })).toBe(false);
+    }
   });
 
   test('normalizes pointer payloads and maps legacy tool names', () => {
