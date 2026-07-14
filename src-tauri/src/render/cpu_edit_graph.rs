@@ -326,6 +326,14 @@ pub(crate) fn execute_cpu_edit_graph(
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
         color = Vec3::from_array(apply_gpu_plan_ap1(color.to_array(), &effective.point_color));
+        for (mask_index, mask) in mask_bitmaps.iter().take(active_masks.len()).enumerate() {
+            let influence = f32::from(mask.get_pixel(x, y).0[0]) / 255.0;
+            if influence <= 0.001 {
+                continue;
+            }
+            let local = apply_gpu_plan_ap1(color.to_array(), &active_masks[mask_index].point_color);
+            color = color.lerp(Vec3::from_array(local), influence);
+        }
         color = apply_hue_shift(color, effective.hue);
         color = apply_creative_color(color, effective.saturation, effective.vibrance);
         color = Vec3::from_array(apply_color_balance_rgb(

@@ -2385,6 +2385,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_point_color(composite_rgb_linear, adjustments.global.point_color);
+    for (var i = 0u; i < adjustments.mask_count; i += 1u) {
+        let influence = get_mask_influence(i, absolute_coord);
+        if (influence > 0.001) {
+            let local_point_color = apply_point_color(composite_rgb_linear, adjustments.mask_adjustments[i].point_color);
+            composite_rgb_linear = mix(composite_rgb_linear, local_point_color, influence);
+        }
+    }
     composite_rgb_linear = apply_hue_shift(composite_rgb_linear, t_hue);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
     composite_rgb_linear = apply_color_balance_rgb(composite_rgb_linear, adjustments.global.color_balance_rgb, preserve_scene_extended);
