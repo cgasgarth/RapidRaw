@@ -10,7 +10,12 @@ import {
   pickAdjustmentValues,
 } from '../../../src/utils/adjustments';
 import {
+  applyLayerStackCommandBridgeOperation,
+  buildLayerStackSidecarFromMasks,
+} from '../../../src/utils/layers/layerStackCommandBridge';
+import {
   acceptReferenceMatchAdjustmentTransfer,
+  buildReceiptSafePresetApplication,
   reconcileReferenceMatchReceiptsAfterEdit,
 } from '../../../src/utils/referenceMatchTransfer';
 
@@ -119,5 +124,38 @@ describe('reference-match copy and batch acceptance', () => {
       masks: [{ ...layer, adjustments: { ...layer.adjustments, exposure: 1 } }, unrelatedLayer],
     });
     expect(nodeEdited.masks[0]?.referenceMatchApplicationReceipt).toBeUndefined();
+
+    const commandContext = {
+      graphRevision: 'history_1',
+      imagePath: '/photos/target.ARW',
+      operationId: 'reference-match-layer-opacity',
+      sessionId: 'reference-match-transfer-test',
+    };
+    const sidecar = buildLayerStackSidecarFromMasks([layer], commandContext);
+    const commandResult = applyLayerStackCommandBridgeOperation(
+      [layer],
+      { layerId: layer.id, opacity: 60, type: 'setOpacity' },
+      {
+        ...commandContext,
+        persistedSidecar: sidecar,
+      },
+    );
+    const commandAdjusted = reconcileReferenceMatchReceiptsAfterEdit(applied, {
+      ...applied,
+      masks: commandResult.masks,
+    });
+    expect(commandAdjusted.masks[0]?.opacity).toBe(60);
+    expect(commandAdjusted.masks[0]?.referenceMatchApplicationReceipt).toBeUndefined();
+  });
+
+  test('preset application records reconciled provenance while unrelated presets preserve it', () => {
+    const before = { ...INITIAL_ADJUSTMENTS, exposure: 0.75, referenceMatchApplicationReceipt: receipt };
+    expect(buildReceiptSafePresetApplication(before, { exposure: 1, sharpness: 25 })).toMatchObject({
+      exposure: 1,
+      referenceMatchApplicationReceipt: null,
+      sharpness: 25,
+    });
+    expect(buildReceiptSafePresetApplication(before, { sharpness: 25 }).referenceMatchApplicationReceipt).toBe(receipt);
+    expect(structuredClone(before)).toEqual(before);
   });
 });

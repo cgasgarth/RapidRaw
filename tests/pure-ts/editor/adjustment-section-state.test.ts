@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { DEFAULT_COLLAPSIBLE_SECTIONS_STATE } from '../../../src/store/useUIStore';
 import {
   ADJUSTMENT_SECTIONS,
+  COPYABLE_ADJUSTMENT_KEYS,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
@@ -48,5 +49,12 @@ describe('adjustment section state', () => {
       effects: false,
       transformLens: false,
     });
+  });
+
+  test('includes typed curve domains in copy, paste, and section reset workflows', () => {
+    expect(COPYABLE_ADJUSTMENT_KEYS).toContain('sceneCurveV1');
+    expect(COPYABLE_ADJUSTMENT_KEYS).toContain('outputCurveV1');
+    expect(ADJUSTMENT_SECTIONS.curves).toContain('sceneCurveV1');
+    expect(ADJUSTMENT_SECTIONS.curves).toContain('outputCurveV1');
   });
 });

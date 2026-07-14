@@ -306,7 +306,20 @@
       "resetAllParametric": "Restablecer todas las curvas paramétricas",
       "resetAllPoint": "Restablecer todas las curvas de puntos",
       "resetParametric": "Restablecer curva paramétrica de {{channel}}",
-      "resetPoint": "Restablecer curva de puntos de {{channel}}"
+      "resetPoint": "Restablecer curva de puntos de {{channel}}",
+      "typed": {
+        "addPoint": "",
+        "channelMode": "",
+        "legacyTab": "",
+        "linkedRgb": "",
+        "luminancePreserving": "",
+        "outputAxis": "",
+        "outputTab": "",
+        "outputTitle": "",
+        "sceneAxis": "",
+        "sceneTab": "",
+        "sceneTitle": ""
+      }
     },
     "details": {
       "amount": "",
@@ -442,6 +455,9 @@
       "resetSolved": "Reset solved correction",
       "retainedArea": "Retained area"
     }
+  },
+  "common": {
+    "reset": ""
   },
   "contextMenus": {
     "album": {

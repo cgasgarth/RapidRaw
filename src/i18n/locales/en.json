@@ -328,7 +328,20 @@
       "resetAllParametric": "Reset All Parametric Curves",
       "resetAllPoint": "Reset All Point Curves",
       "resetParametric": "Reset {{channel}} Parametric Curve",
-      "resetPoint": "Reset {{channel}} Point Curve"
+      "resetPoint": "Reset {{channel}} Point Curve",
+      "typed": {
+        "addPoint": "Add point",
+        "channelMode": "Channel mode",
+        "legacyTab": "Legacy",
+        "linkedRgb": "Linked RGB",
+        "luminancePreserving": "Luminance preserving",
+        "outputAxis": "Encoded value relative to SDR white",
+        "outputTab": "Output",
+        "outputTitle": "Output Curve",
+        "sceneAxis": "EV relative to middle grey",
+        "sceneTab": "Scene",
+        "sceneTitle": "Scene Curve"
+      }
     },
     "details": {
       "amount": "Amount",
@@ -467,6 +480,9 @@
       "resetSolved": "Reset solved correction",
       "retainedArea": "Retained area"
     }
+  },
+  "common": {
+    "reset": "Reset"
   },
   "contextMenus": {
     "album": {
