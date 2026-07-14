@@ -37,6 +37,18 @@
       "schemaVersion": 1,
       "whitePointOffset": 0
     },
+    "detailFinish": {
+      "algorithmVersion": 1,
+      "enabled": false,
+      "localContrastAmount": 0,
+      "localContrastClipLimit": 0.25,
+      "localContrastRadius": 0.02,
+      "scaleBasis": "full_resolution_short_edge_v1",
+      "sharpeningAmount": 0,
+      "sharpeningRadius": 0.005,
+      "sharpeningThreshold": 0.01,
+      "workingSpace": "scene_linear_luminance_v1"
+    },
     "curveModel": {
       "curveFamily": "process_profile_monotonic_v1",
       "inversionCurveSet": {

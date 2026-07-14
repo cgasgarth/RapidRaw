@@ -3646,6 +3646,13 @@
         "outputLumaHistogram": "Output luma histogram",
         "title": "H&D / density scopes"
       },
+      "detailFinish": "",
+      "detailFinishContrastRadius": "",
+      "detailFinishEnabled": "",
+      "detailFinishLocalContrast": "",
+      "detailFinishOff": "",
+      "detailFinishSharpening": "",
+      "detailFinishSharpenRadius": "",
       "dustCandidate": {
         "dustSpot": "Dust candidate",
         "emulsionScratch": "Scratch candidate"

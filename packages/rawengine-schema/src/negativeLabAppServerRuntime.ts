@@ -80,6 +80,14 @@ export interface NegativeLabRuntimePreviewRenderResultV1 {
     sampleCount: number;
     schemaVersion: 1;
   };
+  detailFinishMetrics?: {
+    changedPixelRatio: number;
+    chromaDriftMax: number;
+    edgeOvershoot: number;
+    edgeUndershoot: number;
+    effectiveLocalContrastRadius: number;
+    effectiveSharpeningRadius: number;
+  };
   dimensions: { height: number; width: number };
   renderer:
     | 'rawengine_density_preview_runtime'

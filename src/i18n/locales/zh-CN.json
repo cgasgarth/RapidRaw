@@ -3486,6 +3486,13 @@
         "outputLumaHistogram": "",
         "title": ""
       },
+      "detailFinish": "",
+      "detailFinishContrastRadius": "",
+      "detailFinishEnabled": "",
+      "detailFinishLocalContrast": "",
+      "detailFinishOff": "",
+      "detailFinishSharpening": "",
+      "detailFinishSharpenRadius": "",
       "dustCandidate": {
         "dustSpot": "灰尘候选",
         "emulsionScratch": "划痕候选"

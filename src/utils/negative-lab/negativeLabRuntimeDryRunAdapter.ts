@@ -173,6 +173,17 @@ export const negativeLabDryRunPreviewArtifactSchema = z
       })
       .strict(),
     densityScopes: nativeDensityScopesSchema.optional(),
+    detailFinishMetrics: z
+      .object({
+        changedPixelRatio: z.number().min(0).max(1),
+        chromaDriftMax: z.number().nonnegative(),
+        edgeOvershoot: z.number().nonnegative(),
+        edgeUndershoot: z.number().nonnegative(),
+        effectiveLocalContrastRadius: z.number().positive(),
+        effectiveSharpeningRadius: z.number().positive(),
+      })
+      .strict()
+      .optional(),
     dimensions: z
       .object({
         height: z.number().int().positive(),
@@ -249,6 +260,7 @@ const toRuntimePreviewRenderResult = (
       rendererVersion: artifact.densityNormalizationMetrics.rendererVersion,
     },
     ...(artifact.densityScopes === undefined ? {} : { densityScopes: artifact.densityScopes }),
+    ...(artifact.detailFinishMetrics === undefined ? {} : { detailFinishMetrics: artifact.detailFinishMetrics }),
     dimensions: artifact.dimensions,
     renderer: artifact.renderer,
     ...(stageArtifacts === undefined ? {} : { stageArtifacts }),
@@ -278,6 +290,20 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     red_weight: number;
     white_point_offset: number;
     white_point: number;
+    detail_finish?:
+      | {
+          algorithm_version?: 1;
+          enabled?: boolean;
+          local_contrast_amount?: number;
+          local_contrast_clip_limit?: number;
+          local_contrast_radius?: number;
+          scale_basis?: 'full_resolution_short_edge_v1';
+          sharpening_amount?: number;
+          sharpening_radius?: number;
+          sharpening_threshold?: number;
+          working_space?: 'scene_linear_luminance_v1';
+        }
+      | undefined;
   };
 }): Promise<NegativeLabRuntimeDryRunAdapterResult> {
   const conversionModel =
