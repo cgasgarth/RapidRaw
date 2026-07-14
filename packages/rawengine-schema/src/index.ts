@@ -27,6 +27,7 @@ export * from './film/filmColorCouplerSchemas.js';
 export * from './film/filmDensityGrainSchemas.js';
 export * from './film/filmEmulationOperationSchemas.js';
 export * from './film/filmEmulationSchemas.js';
+export * from './film/filmEmulationTransferSchemas.js';
 export * from './film/filmExecutionSchemas.js';
 export * from './film/filmMeasuredReversalCalibrationSchemas.js';
 export * from './film/filmMonochromeSchemas.js';
