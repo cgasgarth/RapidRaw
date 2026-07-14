@@ -144,6 +144,17 @@ impl EditNodeRuntimeDescriptor {
             None => None,
         }
     }
+
+    /// Halo ownership follows the descriptor's spatial resource contract.
+    /// Pointwise LUT/display modules intentionally retain a zero halo.
+    pub const fn wgpu_halo_pixels(self) -> u16 {
+        match self.kind {
+            EditNodeKind::SceneGlobalColorTone
+            | EditNodeKind::LocalSceneComposition
+            | EditNodeKind::LegacyGpuSceneViewPass => 64,
+            _ => 0,
+        }
+    }
 }
 
 macro_rules! runtime_descriptor {
