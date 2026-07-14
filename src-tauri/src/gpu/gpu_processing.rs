@@ -19,6 +19,9 @@ use crate::gpu_readback::{
     RGBA16_FLOAT_BYTES_PER_PIXEL, read_texture_data_roi_with_bytes_per_pixel,
     rgba16float_readback_to_dynamic_image, rgba16float_readback_to_unclamped_dynamic_image,
 };
+use crate::gpu_runtime::{
+    GpuExecutionOrchestrator, GpuFrameIdentity, GpuRuntimeCapabilities, GpuRuntimeIdentity,
+};
 use crate::gpu_textures::{
     create_dummy_lut_texture_view, create_dummy_rgba16f_texture_view,
     create_rgba16f_texture_with_view,
@@ -1274,6 +1277,13 @@ impl GpuProcessor {
 
     pub fn execution_sequence(&self) -> u64 {
         self.execution_sequence.load(Ordering::Acquire)
+    }
+
+    pub fn runtime_identity(&self) -> GpuRuntimeIdentity {
+        GpuRuntimeIdentity {
+            device_generation: self.context.generation,
+            processor_generation: self.generation,
+        }
     }
 
     pub fn new(context: GpuContext, max_width: u32, max_height: u32) -> Result<Self, String> {
@@ -3519,6 +3529,16 @@ mod blur_pass_tests {
         .expect("real GPU executor accepts the compiled graph contract");
 
         assert_eq!(rendered.dimensions(), source.dimensions());
+        let processor_guard = state.gpu_processor.lock().unwrap();
+        let processor = &processor_guard
+            .as_ref()
+            .expect("GPU processor is initialized")
+            .processor;
+        assert_eq!(
+            processor.runtime_identity().device_generation,
+            context.generation
+        );
+        assert!(processor.execution_sequence() > 0);
         assert_ne!(
             rendered.to_rgba16().into_raw(),
             source.to_rgba16().into_raw()
@@ -5439,6 +5459,21 @@ fn process_and_get_dynamic_image_inner(
     let cache = cache_lock.as_ref().unwrap();
 
     let skip_readback = output_to_display;
+    let frame_identity = GpuFrameIdentity {
+        source_revision: cache.pre_gpu_identity.pixels.source_revision,
+        stage_revision: cache.pre_gpu_identity.pixels.stage_revision,
+        width: cache.width,
+        height: cache.height,
+    };
+    let mut execution_orchestrator = GpuExecutionOrchestrator::new(
+        processor.runtime_identity(),
+        GpuRuntimeCapabilities {
+            max_texture_dimension_2d: context.limits.max_texture_dimension_2d,
+        },
+    );
+    let execution_lease = execution_orchestrator
+        .begin(frame_identity)
+        .map_err(|error| error.to_string())?;
 
     let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
         InputTextureRef {
@@ -5452,6 +5487,9 @@ fn process_and_get_dynamic_image_inner(
         skip_readback,
         output_to_display,
     )?;
+    if !execution_lease.is_current(execution_orchestrator.runtime(), frame_identity) {
+        return Err("GPU execution lease became stale before publication".to_string());
+    }
 
     let mut final_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Final Passes Encoder"),
