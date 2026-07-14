@@ -9,7 +9,7 @@ pub(crate) mod film_characteristic_curve;
 pub(crate) mod film_color_coupler;
 pub(crate) mod film_emulation;
 pub(crate) mod film_look_render;
-pub(crate) mod film_profile_registry;
+pub(crate) mod film_print_scan;
 pub(crate) mod film_residual_lut;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;
