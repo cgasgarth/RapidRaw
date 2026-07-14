@@ -99,6 +99,8 @@ impl JobCoordinator {
 #[derive(Clone, Default)]
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
+    pub(crate) focus_stack:
+        Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
     pub jobs: Arc<JobCoordinator>,
 }
 

@@ -60,10 +60,10 @@ pub fn apply_focus_stack_candidate(
 ) -> Result<FocusStackApplyReceipt, String> {
     validate_request(&request)?;
     let accepted = state
-        .focus_stack_accepted_runtime
-        .lock()
+        .services
+        .focus_stack
+        .accepted_runtime()
         .map_err(|_| "invalid_candidate_runtime_unavailable")?
-        .clone()
         .ok_or("stale_candidate_runtime")?;
     let cache_root = app_handle
         .path()

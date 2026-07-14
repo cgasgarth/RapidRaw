@@ -69,8 +69,6 @@ impl FocusStackJobResults {
     }
 }
 
-pub(crate) use super::candidate::AcceptedFocusRuntime;
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusStackCandidateJobHandle {
@@ -87,10 +85,9 @@ pub fn prepare_focus_stack_candidate(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<FocusStackCandidateJobHandle, String> {
     let accepted = state
-        .focus_stack_accepted_runtime
-        .lock()
-        .map_err(|_| "focus_runtime_unavailable")?
-        .clone()
+        .services
+        .focus_stack
+        .accepted_runtime()?
         .ok_or("focus_candidate_requires_accepted_preview")?;
     if accepted.identity.plan_id != accepted_preview_id {
         return Err("focus_candidate_accepted_preview_mismatch".into());
