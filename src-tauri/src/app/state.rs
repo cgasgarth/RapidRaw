@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
-use image::{DynamicImage, GenericImageView, GrayImage};
+use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
 use wgpu::{Texture, TextureView};
 
@@ -46,40 +46,6 @@ pub struct CachedPreview {
     pub unscaled_crop_offset: (f32, f32),
     pub preview_dim: u32,
     pub interactive_divisor: f32,
-}
-
-#[derive(Clone)]
-pub enum SampleablePixels {
-    Native(Arc<DynamicImage>),
-}
-
-impl SampleablePixels {
-    pub fn native(image: Arc<DynamicImage>) -> Self {
-        Self::Native(image)
-    }
-
-    pub fn image(&self) -> &Arc<DynamicImage> {
-        match self {
-            Self::Native(image) => image,
-        }
-    }
-
-    pub fn dimensions(&self) -> (u32, u32) {
-        self.image().dimensions()
-    }
-
-    pub fn retained_bytes(&self) -> u64 {
-        self.image().as_bytes().len() as u64
-    }
-}
-
-#[derive(Clone)]
-pub struct CachedViewerSampleFrame {
-    pub artifact_identity: crate::render::artifact_identity::RenderArtifactIdentity,
-    pub graph_revision: String,
-    pub pixels: SampleablePixels,
-    pub image_identity: String,
-    pub space_label: String,
 }
 
 pub struct GpuImageCache {
@@ -188,7 +154,6 @@ pub struct AppState {
     pub initial_file_path: Mutex<Option<String>>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
-    pub viewer_sample_frames: MemoryLruCache<String, CachedViewerSampleFrame>,
     pub analytics_scheduler: Mutex<Option<Arc<crate::analytics_scheduler::AnalyticsScheduler>>>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
@@ -221,7 +186,9 @@ impl AppState {
             max_entries,
         };
         Self {
-            services: Arc::new(crate::app::services::AppServices::default()),
+            services: Arc::new(crate::app::services::AppServices::new(Arc::clone(
+                &cache_budget,
+            ))),
             startup_trace: StartupTrace::new(),
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
@@ -265,10 +232,6 @@ impl AppState {
             initial_file_path: Mutex::new(None),
             preview_scheduler: Mutex::new(None),
             export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
-            viewer_sample_frames: MemoryLruCache::new(
-                policy("viewer_samples", 96, 128, Some(8)),
-                Arc::clone(&cache_budget),
-            ),
             analytics_scheduler: Mutex::new(None),
             mask_cache: MemoryLruCache::new(
                 policy("masks", 96, 128, Some(64)),

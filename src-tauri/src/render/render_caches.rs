@@ -26,7 +26,7 @@ impl<'a> RenderCaches<'a> {
             self.state.geometry_cache.stats(),
             self.state.thumbnail_geometry_cache.stats(),
             self.state.mask_cache.stats(),
-            self.state.viewer_sample_frames.stats(),
+            self.state.services.viewer_sampling.stats(),
             self.state.lut_cache.stats(),
             self.state.lut_content_cache.stats(),
             self.state.decoded_image_cache.stats(),
@@ -61,7 +61,7 @@ impl<'a> RenderCaches<'a> {
 
     /// Drops display/view-output frames without invalidating decoded or scene-linear inputs.
     pub fn clear_display_encoded_artifacts(&self) {
-        self.state.viewer_sample_frames.clear();
+        self.state.services.viewer_sampling.clear_frames();
         self.clear_gpu_image_cache();
     }
 
@@ -112,7 +112,7 @@ impl<'a> RenderCaches<'a> {
         }
         self.state.mask_cache.clear();
         self.state.geometry_cache.clear();
-        self.state.viewer_sample_frames.clear();
+        self.state.services.viewer_sampling.clear_frames();
         if let Ok(report) = serde_json::to_string(&self.native_cache_report()) {
             log::debug!("native_cache_report={report}");
         }
@@ -122,6 +122,7 @@ impl<'a> RenderCaches<'a> {
         if let Ok(mut original_image) = self.state.original_image.lock() {
             *original_image = None;
         }
+        self.state.services.viewer_sampling.clear_session();
         self.clear_gpu_dependent_preview();
         self.clear_session_caches();
     }

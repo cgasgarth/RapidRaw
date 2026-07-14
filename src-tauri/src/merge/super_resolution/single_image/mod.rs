@@ -163,10 +163,11 @@ pub fn cancel_single_image_x2_preview(state: tauri::State<'_, AppState>) -> Resu
 pub(crate) fn current_frame(
     state: &AppState,
     request: &SingleImageX2PreviewRequest,
-) -> Result<crate::app_state::CachedViewerSampleFrame, String> {
+) -> Result<crate::editor::viewer_sampling_service::CachedViewerSampleFrame, String> {
     let frame = state
-        .viewer_sample_frames
-        .get(&request.graph_revision)
+        .services
+        .viewer_sampling
+        .frame_for_key(&request.graph_revision)
         .ok_or_else(|| "single_image_x2_stale_graph_revision".to_string())?;
     if frame.image_identity != request.source_path || frame.graph_revision != request.graph_revision
     {
