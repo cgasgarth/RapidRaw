@@ -1,10 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  editDocumentV2Schema,
+  getEditDocumentNodeDescriptor,
+  parseEditDocumentV2WithQuarantine,
+} from '../../packages/rawengine-schema/src/editDocumentV2';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
+  getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
+  updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
 describe('EditDocumentV2 legacy adapter', () => {
@@ -28,6 +34,8 @@ describe('EditDocumentV2 legacy adapter', () => {
     ]);
     expect(document.nodes.scene_global_color_tone?.params.exposure).toBe(0.75);
     expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
+    expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
+    expect(document.migration?.quarantined).toContain('sectionVisibility');
   });
 
   test('legacy adapter is deterministic and preserves unmigrated fields in extensions', () => {
@@ -65,5 +73,53 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(next.nodes.geometry).toEqual(document.nodes.geometry);
     expect(next.provenance).toEqual({ source: 'test' });
     expect(next.nodes.scene_global_color_tone?.params.exposure).toBe(1);
+  });
+
+  test('descriptor capabilities and focused updates come from the shared registry', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const next = updateEditDocumentV2Node(document, 'scene_global_color_tone', (params) => ({
+      ...params,
+      exposure: 0.25,
+    }));
+
+    expect(getEditDocumentNodeDescriptor('scene_global_color_tone')?.renderStage).toBe('scene_global_color_tone');
+    expect(getEditDocumentV2NodeCapabilities('source_artifacts')).toEqual({
+      batch: false,
+      copy: false,
+      paste: false,
+      provenance: 'regenerate',
+      reset: false,
+    });
+    expect(next.nodes.geometry).toBe(document.nodes.geometry);
+    expect(next.nodes.scene_global_color_tone?.params.exposure).toBe(0.25);
+  });
+
+  test('future node types are quarantined and non-finite node values are rejected', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const future = parseEditDocumentV2WithQuarantine({
+      ...document,
+      nodes: {
+        ...document.nodes,
+        future_color_v9: { enabled: true, params: { exposure: 2 }, process: 'future_v9', type: 'future_color_v9' },
+      },
+    });
+
+    expect(future.quarantinedNodeTypes).toEqual(['future_color_v9']);
+    expect('future_color_v9' in future.document.nodes).toBe(false);
+    expect(future.document.extensions.quarantinedNodes).toEqual({
+      future_color_v9: { enabled: true, params: { exposure: 2 }, process: 'future_v9', type: 'future_color_v9' },
+    });
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_global_color_tone: {
+            ...document.nodes.scene_global_color_tone,
+            params: { exposure: Number.NaN },
+          },
+        },
+      }),
+    ).toThrow('non-finite');
   });
 });
