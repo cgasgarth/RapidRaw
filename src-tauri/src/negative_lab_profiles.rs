@@ -93,7 +93,11 @@ fn write_library(path: &Path, json: &str) -> Result<(), String> {
         .ok_or_else(|| "negative_lab_profile_library_parent_missing".to_string())?;
     fs::create_dir_all(parent)
         .map_err(|error| format!("negative_lab_profile_library_directory_failed:{error}"))?;
-    let temp = path.with_extension("json.tmp");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let temp = path.with_extension(format!("json.tmp-{}-{nonce}", std::process::id()));
     fs::write(&temp, json.as_bytes())
         .map_err(|error| format!("negative_lab_profile_library_temp_write_failed:{error}"))?;
     if let Err(error) = fs::rename(&temp, path) {
