@@ -91,6 +91,34 @@ struct ToneEqualizerGpuSettings {
     params1: vec4<f32>,
 }
 
+struct GpuCurveKnot {
+    x: f32,
+    y: f32,
+    tangent: f32,
+    padding: f32,
+}
+
+struct GpuCurveParameters {
+    point_count: u32,
+    channel_mode: u32,
+    middle_grey: f32,
+    padding: u32,
+}
+
+struct GpuOutputCurveKnot {
+    input: f32,
+    output: f32,
+    tangent: f32,
+    padding: f32,
+}
+
+struct GpuOutputCurveParameters {
+    point_count: u32,
+    padding0: u32,
+    padding1: u32,
+    padding2: u32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -186,6 +214,10 @@ struct GlobalAdjustments {
     flare_amount: f32,
     sharpness_threshold: f32,
     tone_equalizer: ToneEqualizerGpuSettings,
+    scene_curve_knots: array<GpuCurveKnot, 32>,
+    scene_curve_parameters: GpuCurveParameters,
+    output_curve_knots: array<GpuOutputCurveKnot, 32>,
+    output_curve_parameters: GpuOutputCurveParameters,
 }
 
 struct MaskAdjustments {
@@ -643,6 +675,89 @@ fn apply_curve(val: f32, points: array<Point, 16>, count: u32, preserve_extended
         }
     }
     return local_points[count - 1u].y / 255.0;
+}
+
+fn evaluate_scene_typed_curve(input: f32, knots: array<GpuCurveKnot, 32>, count: u32) -> f32 {
+    if (count < 2u) { return input; }
+    let first = knots[0];
+    if (input <= first.x) { return first.y + (input - first.x) * first.tangent; }
+    let last = knots[count - 1u];
+    if (input >= last.x) { return last.y + (input - last.x) * last.tangent; }
+    for (var index = 0u; index + 1u < count; index += 1u) {
+        let lower = knots[index];
+        let upper = knots[index + 1u];
+        if (input <= upper.x) {
+            let width = upper.x - lower.x;
+            let t = (input - lower.x) / width;
+            let t2 = t * t;
+            let t3 = t2 * t;
+            return (2.0 * t3 - 3.0 * t2 + 1.0) * lower.y
+                + (t3 - 2.0 * t2 + t) * lower.tangent * width
+                + (-2.0 * t3 + 3.0 * t2) * upper.y
+                + (t3 - t2) * upper.tangent * width;
+        }
+    }
+    return input;
+}
+
+fn evaluate_scene_curve_positive(value: f32) -> f32 {
+    let parameters = adjustments.global.scene_curve_parameters;
+    let maximum_output_ev = 127.0 - log2(parameters.middle_grey);
+    let input_ev = log2(value / parameters.middle_grey);
+    let output_ev = clamp(
+        evaluate_scene_typed_curve(input_ev, adjustments.global.scene_curve_knots, parameters.point_count),
+        -126.0,
+        maximum_output_ev,
+    );
+    return parameters.middle_grey * exp2(output_ev);
+}
+
+fn apply_scene_curve(rgb: vec3<f32>) -> vec3<f32> {
+    let parameters = adjustments.global.scene_curve_parameters;
+    if (parameters.point_count < 2u) { return rgb; }
+    if (parameters.channel_mode == 0u) {
+        let luminance = scene_luminance(rgb);
+        if (luminance <= 1e-8) { return rgb; }
+        return rgb * (evaluate_scene_curve_positive(luminance) / luminance);
+    }
+    var output = rgb;
+    if (rgb.r > 1e-8) { output.r = evaluate_scene_curve_positive(rgb.r); }
+    if (rgb.g > 1e-8) { output.g = evaluate_scene_curve_positive(rgb.g); }
+    if (rgb.b > 1e-8) { output.b = evaluate_scene_curve_positive(rgb.b); }
+    return output;
+}
+
+fn evaluate_output_typed_curve(input: f32, count: u32) -> f32 {
+    let knots = adjustments.global.output_curve_knots;
+    let first = knots[0];
+    if (input <= first.input) { return first.output + (input - first.input) * first.tangent; }
+    let last = knots[count - 1u];
+    if (input >= last.input) { return last.output + (input - last.input) * last.tangent; }
+    for (var index = 0u; index + 1u < count; index += 1u) {
+        let lower = knots[index];
+        let upper = knots[index + 1u];
+        if (input <= upper.input) {
+            let width = upper.input - lower.input;
+            let t = (input - lower.input) / width;
+            let t2 = t * t;
+            let t3 = t2 * t;
+            return (2.0 * t3 - 3.0 * t2 + 1.0) * lower.output
+                + (t3 - 2.0 * t2 + t) * lower.tangent * width
+                + (-2.0 * t3 + 3.0 * t2) * upper.output
+                + (t3 - t2) * upper.tangent * width;
+        }
+    }
+    return input;
+}
+
+fn apply_output_curve(rgb: vec3<f32>) -> vec3<f32> {
+    let count = adjustments.global.output_curve_parameters.point_count;
+    if (count < 2u) { return rgb; }
+    return vec3<f32>(
+        evaluate_output_typed_curve(rgb.r, count),
+        evaluate_output_typed_curve(rgb.g, count),
+        evaluate_output_typed_curve(rgb.b, count),
+    );
 }
 
 fn get_shadow_mult(luma: f32, sh: f32, bl: f32) -> f32 {
@@ -2398,6 +2513,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         composite_rgb_linear = tone_preview_rgb;
     }
 
+    if (scene_input_phase) {
+        composite_rgb_linear = apply_scene_curve(composite_rgb_linear);
+    }
+
     if (adjustments.execution_phase == 1u) {
         textureStore(output_texture, id.xy, vec4<f32>(composite_rgb_linear, original_alpha));
         return;
@@ -2474,6 +2593,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let noise_val = mix(noise_base, noise_rough, roughness);
         final_rgb += vec3<f32>(noise_val) * amount * luma_mask;
     }
+
+    final_rgb = apply_output_curve(final_rgb);
 
     if (adjustments.global.show_clipping == 1u) {
         let HIGHLIGHT_WARNING_COLOR = vec3<f32>(1.0, 0.0, 0.0);

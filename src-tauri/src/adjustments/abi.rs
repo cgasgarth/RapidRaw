@@ -1,6 +1,9 @@
 use bytemuck::{Pod, Zeroable};
 use serde::{Deserialize, Serialize};
 
+use crate::tone::curves::{GpuCurveKnot, GpuCurveParameters};
+use crate::tone::output_curves::{GpuOutputCurveKnot, GpuOutputCurveParameters};
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
 pub struct Point {
@@ -266,6 +269,10 @@ pub struct GlobalAdjustments {
     pub flare_amount: f32,
     pub sharpness_threshold: f32,
     pub tone_equalizer: ToneEqualizerGpuSettings,
+    pub scene_curve_knots: [GpuCurveKnot; 32],
+    pub scene_curve_parameters: GpuCurveParameters,
+    pub output_curve_knots: [GpuOutputCurveKnot; 32],
+    pub output_curve_parameters: GpuOutputCurveParameters,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]

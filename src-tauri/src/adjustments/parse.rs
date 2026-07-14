@@ -679,6 +679,10 @@ fn get_global_adjustments_from_json(
             Some(15.0),
         ),
         tone_equalizer: parse_tone_equalizer(js_adjustments),
+        scene_curve_knots: [Default::default(); 32],
+        scene_curve_parameters: Default::default(),
+        output_curve_knots: [Default::default(); 32],
+        output_curve_parameters: Default::default(),
     }
 }
 
