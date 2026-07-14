@@ -2218,6 +2218,25 @@ fn apply_film_density_grain(color_in: vec3<f32>, coord: vec2<u32>) -> vec3<f32> 
     return select(output, -output, color_in < vec3<f32>(0.0));
 }
 
+fn film_optical_threshold(luma: f32, low_ev: f32, high_ev: f32) -> f32 {
+    let ev = log2(max(luma, 1.0e-6) / 0.18);
+    let t = clamp((ev - low_ev) / (high_ev - low_ev), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn apply_film_optical_scatter(source: vec3<f32>, halation_blur: vec3<f32>, bloom_blur: vec3<f32>) -> vec3<f32> {
+    let source_luma = dot(vec3<f32>(0.27222872, 0.67408177, 0.05368952), max(source, vec3<f32>(0.0)));
+    let halation_gate = film_optical_threshold(source_luma, 1.0, 3.0);
+    let blur_luma = dot(vec3<f32>(0.27222872, 0.67408177, 0.05368952), max(halation_blur, vec3<f32>(0.0)));
+    let halo = max(blur_luma - source_luma * 0.2, 0.0);
+    let halo_energy = halation_gate * pow(halo, 1.2) * 0.18;
+    let halation = vec3<f32>(halo_energy, halo_energy * 0.82, halo_energy * 0.48);
+    let bloom_gate = film_optical_threshold(source_luma, 2.0, 4.0);
+    let bloom_luma = dot(vec3<f32>(0.27222872, 0.67408177, 0.05368952), max(bloom_blur, vec3<f32>(0.0)));
+    let bloom = vec3<f32>(bloom_luma * 0.92, bloom_luma * 0.90, bloom_luma * 0.86) * bloom_gate * 0.06;
+    return source + halation + bloom;
+}
+
 fn apply_film_emulation(color_in: vec3<f32>, coord: vec2<u32>) -> vec3<f32> {
     let mix_amount = clamp(adjustments.global._pad_cg1, 0.0, 1.0);
     let shaper_p = max(adjustments.global._pad_cg2, 1.0e-6);
@@ -2765,13 +2784,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var processed_rgb = apply_linear_exposure(locally_contrasted_rgb, t_exposure);
 
-    if (t_glow > 0.0) {
+    if (t_glow > 0.0 && adjustments.global._pad_cg3 < 0.5) {
         processed_rgb = apply_glow_bloom(
             processed_rgb, structure_blurred, t_glow, is_raw,
             t_exposure, t_brightness, t_contrast, t_whites
         );
     }
-    if (t_halation > 0.0) {
+    if (t_halation > 0.0 && adjustments.global._pad_cg3 < 0.5) {
         processed_rgb = apply_halation(
             processed_rgb, clarity_blurred, t_halation, is_raw,
             t_exposure, t_brightness, t_contrast, t_whites
@@ -2976,6 +2995,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     if (scene_input_phase) {
         composite_rgb_linear = apply_scene_curve(composite_rgb_linear);
+        if (adjustments.global._pad_cg3 > 0.5) {
+            composite_rgb_linear = apply_film_optical_scatter(composite_rgb_linear, clarity_blurred, structure_blurred);
+        }
         composite_rgb_linear = apply_film_emulation(composite_rgb_linear, absolute_coord);
     }
 
