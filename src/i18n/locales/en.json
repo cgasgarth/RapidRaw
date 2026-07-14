@@ -3610,6 +3610,14 @@
       "conversionBundleDisabled": "Off",
       "conversionBundleEnabled": "On",
       "conversionBundleHint": "Write a JSON bundle with replay metadata, source refs, output hashes, sidecars, and profile provenance.",
+      "conversionBundleImport": "Import bundle",
+      "conversionBundleImporting": "Importing…",
+      "conversionBundleReplay": "Bundle replay",
+      "conversionBundleReplayStatus": {
+        "blocked": "Replay blocked; review source identity",
+        "compatible": "Replay compatible",
+        "review_required": "Replay imported; review limitations"
+      },
       "convertAndSave": "Convert & Save",
       "convertAndSaveActive": "Convert & Save Active",
       "convertAndSaveAll": "Convert & Save All ({{count}})",

@@ -7,6 +7,7 @@ import {
   parseNegativeLabSessionState,
 } from '../../schemas/negative-lab/negativeLabSessionStateSchemas';
 import type { NegativeLabBatchApplyReceipt } from './negativeLabBatchApplyReceipt';
+import type { NegativeLabConversionBundleReplayReport } from './negativeLabConversionBundle';
 import type {
   NegativeLabRollNormalizationApplyReceipt,
   NegativeLabRollNormalizationRestoreReceipt,
@@ -14,6 +15,7 @@ import type {
 
 export interface NegativeLabSessionProofState {
   batchApplyReceipt: NegativeLabBatchApplyReceipt | null;
+  conversionBundleReplay: NegativeLabConversionBundleReplayReport | null;
   rollNormalizationApplyReceipt: NegativeLabRollNormalizationApplyReceipt | null;
   rollNormalizationRestoreReceipt: NegativeLabRollNormalizationRestoreReceipt | null;
 }
@@ -156,6 +158,7 @@ export const createNegativeLabSessionState = (
     planState: session.planState,
     proofState: {
       batchApplyReceipt: null,
+      conversionBundleReplay: null,
       rollNormalizationApplyReceipt: null,
       rollNormalizationRestoreReceipt: null,
     },

@@ -1,17 +1,22 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
-
-import { parseNegativeLabConversionBundle } from '../../../../src/schemas/negative-lab/negativeLabConversionBundleSchemas.ts';
-import { validateNegativeLabConversionBundleReplay } from '../../../../src/utils/negative-lab/negativeLabConversionBundle.ts';
-
-const bundlePath =
-  'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json';
-
-const result = Bun.spawnSync(['bun', 'run', 'check:negative-lab-public-export-proof'], {
-  stderr: 'pipe',
-  stdout: 'pipe',
-});
+const result = Bun.spawnSync(
+  [
+    'cargo',
+    'test',
+    '--locked',
+    '--no-default-features',
+    '--features',
+    'required-ci',
+    '--lib',
+    'negative_lab_conversion_bundle_records_runtime_outputs',
+  ],
+  {
+    cwd: 'src-tauri',
+    stderr: 'pipe',
+    stdout: 'pipe',
+  },
+);
 
 if (!result.success) {
   const output = [new TextDecoder().decode(result.stdout), new TextDecoder().decode(result.stderr)]
@@ -20,14 +25,7 @@ if (!result.success) {
     .filter(Boolean)
     .slice(-30)
     .join('\n');
-  throw new Error(`Negative Lab public export proof failed before bundle validation:\n${output}`);
+  throw new Error(`Native Negative Lab conversion bundle proof failed:\n${output}`);
 }
 
-const bundle = parseNegativeLabConversionBundle(JSON.parse(await readFile(bundlePath, 'utf8')));
-const replay = validateNegativeLabConversionBundleReplay(bundle);
-
-if (bundle.outputs[0]?.sidecarFilename !== '110-format-ericht-negative-cc0-320-Positive.jpg.rrdata') {
-  throw new Error('Negative Lab conversion bundle did not reference the generated sidecar.');
-}
-
-console.log(`negative lab conversion bundle ok (${replay.outputCount} ${replay.outputFormat})`);
+console.log('native Negative Lab conversion bundle runtime proof passed');
