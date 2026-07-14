@@ -186,6 +186,22 @@ export const gamutWarningOverlayPayloadSchema = z
     max_channel_value: z.number().int().min(0).max(255),
     min_channel_value: z.number().int().min(0).max(255),
     pixel_count: z.number().int().nonnegative(),
+    gamut_mapping_implementation: z.string().trim().min(1).optional().nullable(),
+    gamut_mapping_version: z.number().int().positive().optional().nullable(),
+    gamut_target: z.string().trim().min(1).optional().nullable(),
+    gamut_boundary_fingerprint: z
+      .string()
+      .trim()
+      .regex(/^sha256:/u)
+      .optional()
+      .nullable(),
+    gamut_warning_plan_fingerprint: z
+      .string()
+      .trim()
+      .regex(/^sha256:/u)
+      .optional()
+      .nullable(),
+    maximum_boundary_excess: z.number().nonnegative().optional().nullable(),
     policy_status: z.string().trim().min(1),
     policy_version: z.string().trim().min(1),
     preview_basis: z.literal('export_preview'),
@@ -258,6 +274,24 @@ export const exportReceiptPayloadSchema = z
           sourcePrecisionPath: z.string().trim().min(1).optional().nullable(),
           transformPolicyFingerprint: z.string().trim().min(1).optional().nullable(),
           transformApplied: z.boolean().optional().nullable(),
+          gamutMapping: z
+            .object({
+              implementationId: z.string().trim().min(1),
+              implementationVersion: z.number().int().positive(),
+              target: z.string().trim().min(1),
+              mode: z.literal('Output'),
+              renderingIntent: z.string().trim().min(1),
+              boundaryFingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+              compressedPixelCount: z.number().int().nonnegative(),
+              hardClippedPixelCount: z.number().int().nonnegative(),
+              inputOutOfGamutPixelCount: z.number().int().nonnegative(),
+              maximumBoundaryExcess: z.number().nonnegative(),
+              pixelCount: z.number().int().nonnegative(),
+              planFingerprint: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+            })
+            .strict()
+            .optional()
+            .nullable(),
         })
         .strict(),
     ),

@@ -1843,6 +1843,7 @@ mod tests {
                     "sha256:0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
                 transform_applied: true,
+                gamut_mapping: None,
             },
         );
 
@@ -2033,6 +2034,7 @@ mod tests {
                         "sha256:0000000000000000000000000000000000000000000000000000000000000000"
                             .to_string(),
                     transform_applied: true,
+                    gamut_mapping: None,
                 },
             ),
             edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
