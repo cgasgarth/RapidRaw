@@ -12,6 +12,46 @@ export type ViewerInputEvent =
   | { type: 'pointerup' | 'pointercancel'; pointerId: number }
   | { type: 'blur' | 'escape' | 'session-invalidated' };
 
+export interface ViewerSurfacePointerEvent {
+  readonly altKey: boolean;
+  readonly button: number;
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly pointerId: number;
+  readonly pointerType: ViewerPointerType;
+  readonly pressure: number;
+  readonly shiftKey: boolean;
+  readonly type: 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
+}
+
+export const normalizeViewerSurfacePointerEvent = (event: {
+  altKey?: boolean;
+  button?: number;
+  clientX: number;
+  clientY: number;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  pointerId: number;
+  pointerType?: string;
+  pressure?: number;
+  shiftKey?: boolean;
+  type: ViewerSurfacePointerEvent['type'];
+}): ViewerSurfacePointerEvent => ({
+  altKey: event.altKey ?? false,
+  button: event.button ?? 0,
+  clientX: event.clientX,
+  clientY: event.clientY,
+  ctrlKey: event.ctrlKey ?? false,
+  metaKey: event.metaKey ?? false,
+  pointerId: event.pointerId,
+  pointerType: normalizeViewerPointerType(event.pointerType ?? 'mouse'),
+  pressure: Math.min(1, Math.max(0, event.pressure ?? 0)),
+  shiftKey: event.shiftKey ?? false,
+  type: event.type,
+});
+
 export interface ViewerInputRouterState {
   activePointerId: number | null;
   owner: ViewerGestureOwner | null;
