@@ -221,7 +221,7 @@ describe('affected validation DAG', () => {
     expect(performance.now() - startedAt).toBeLessThan(500);
   });
 
-  test('shared producer artifact is generated once and reused by its consumer', async () => {
+  test('shared producer artifact is generated once, reused, and regenerated from a corrupt output root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-artifact-'));
     initFixtureRepository(root);
     await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
@@ -259,21 +259,28 @@ describe('affected validation DAG', () => {
     expect(await runValidation([producer, consumer], options)).toBe(0);
     expect(await runValidation([producer, consumer], options)).toBe(0);
     await writeFile(join(root, 'dist', 'artifact'), 'croof');
-    expect(await runValidation([producer, consumer], options)).toBe(1);
+    expect(await runValidation([producer, consumer], options)).toBe(0);
+    expect(await readFile(join(root, 'dist', 'artifact'), 'utf8')).toBe('proof');
   });
 
   test('timeout kills grandchildren and releases the shared resource-class lease', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-cancel-'));
+    const grandchildPidPath = join(tmpdir(), `rapidraw-validation-grandchild-${crypto.randomUUID()}.pid`);
     initFixtureRepository(root);
     await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
     const timeoutNode: ValidationNode = {
       id: 'timeout-native',
-      command: ['/bin/sh', '-c', 'mkdir -p dist; sleep 30 & echo $! > dist/grandchild.pid; wait'],
+      command: [
+        '/bin/sh',
+        '-c',
+        `mkdir -p dist; touch dist/partial; sleep 30 & echo $! > ${JSON.stringify(grandchildPidPath)}; wait`,
+      ],
       dependencies: [],
       inputs: ['rust'],
       resourceClass: 'native-heavy',
       cachePolicy: 'none',
       modes: ['commit'],
+      outputs: ['dist'],
       timeoutMs: 100,
     };
     const options = {
@@ -286,9 +293,11 @@ describe('affected validation DAG', () => {
       resourceCoordinatorRoot: join(root, 'locks'),
     };
     expect(await runValidation([timeoutNode], options)).toBe(1);
-    const grandchild = Number((await readFile(join(root, 'dist', 'grandchild.pid'), 'utf8')).trim());
+    const grandchild = Number((await readFile(grandchildPidPath, 'utf8')).trim());
     await Bun.sleep(100);
     expect(() => process.kill(grandchild, 0)).toThrow();
+    expect(await Bun.file(join(root, 'dist')).exists()).toBeFalse();
+    await rm(grandchildPidPath, { force: true });
     expect(
       await runValidation(
         [{ ...timeoutNode, id: 'next-native', command: ['/usr/bin/true'], timeoutMs: 1000 }],
@@ -369,7 +378,7 @@ await lease.release();`;
     expect(validationManifest.find((node) => node.id === 'unit')?.resourceClass).toBe('suite-exclusive');
   });
 
-  test('producer outputs are worktree-scoped and serialized only for the same worktree', async () => {
+  test('producer outputs are worktree-scoped, stale-safe, and serialized only for the same worktree', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-producer-ownership-'));
     const sameWorktree = join(root, 'same');
     const parallelWorktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];
@@ -380,6 +389,8 @@ await lease.release();`;
       [sameWorktree, ...parallelWorktrees].map(async (worktree) => {
         await writeFile(join(worktree, 'input.ts'), 'export const input = true;\n');
         await initFixtureRepository(worktree);
+        await mkdir(join(worktree, 'dist'));
+        await writeFile(join(worktree, 'dist', 'artifact'), 'stale');
       }),
     );
     const producer: ValidationNode = {

@@ -200,7 +200,13 @@ function installRuntime() {
       await act(async () =>
         root.render(createElement(CollageModal, { isOpen, onClose: () => {}, onSave, sourceImages: images })),
       );
-      if (settle) await act(async () => new Promise((resolve) => window.setTimeout(resolve, 20)));
+      if (settle) {
+        for (let attempt = 0; attempt < 25; attempt += 1) {
+          await act(async () => new Promise((resolve) => window.setTimeout(resolve, 2)));
+          if (container.querySelector('input[type="range"]') !== null) return;
+        }
+        throw new Error('Collage modal did not reach its visible frame.');
+      }
     },
     unmount: async () => {
       if (!mounted) return;
