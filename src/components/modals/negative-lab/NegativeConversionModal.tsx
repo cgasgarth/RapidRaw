@@ -188,7 +188,10 @@ import {
   restoreNegativeLabRollNormalizationOverrides,
 } from '../../../utils/negative-lab/negativeLabRollNormalizationApply';
 import { buildNegativeLabRollNormalizationPlan } from '../../../utils/negative-lab/negativeLabRollNormalizationPlan';
-import { renderNegativeLabRuntimeDryRunPreview } from '../../../utils/negative-lab/negativeLabRuntimeDryRunAdapter';
+import {
+  type NegativeLabStagePreviewArtifact,
+  renderNegativeLabRuntimeDryRunPreview,
+} from '../../../utils/negative-lab/negativeLabRuntimeDryRunAdapter';
 import {
   acceptNegativeLabSessionPlan,
   buildNegativeLabSessionFrameViewState,
@@ -236,6 +239,7 @@ import {
   type NegativeLabQcDecision,
 } from './NegativeLabRollHealthModel';
 import { NegativeLabRollHealthPanel } from './NegativeLabRollHealthPanel';
+import { NegativeLabStagePreviewStrip } from './NegativeLabStagePreviewStrip';
 import { NegativeLabWorkspaceShell } from './NegativeLabWorkspaceShell';
 
 type NegativeParams = NegativeLabPresetParams;
@@ -661,6 +665,12 @@ function NegativeLabSession({
     [updateSessionSnapshot],
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [runtimePreviewStageArtifacts, setRuntimePreviewStageArtifacts] = useState<NegativeLabStagePreviewArtifact[]>(
+    [],
+  );
+  const [selectedPreviewStageId, setSelectedPreviewStageId] = useState<
+    NegativeLabStagePreviewArtifact['stageId'] | 'final_display'
+  >('final_display');
   const [runtimePreviewDryRunResult, setRuntimePreviewDryRunResult] =
     useState<NegativeLabAppServerRuntimeDryRunToolResultV1 | null>(null);
   const [runtimePreviewRecipeIdentity, setRuntimePreviewRecipeIdentity] = useState<{
@@ -966,7 +976,10 @@ function NegativeLabSession({
   const previewRequestSequenceRef = useRef(0);
   const latestPreviewRequestIdentityRef = useRef<string | null>(null);
   const sourcePreviewRequestSequenceRef = useRef(0);
-  const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : previewUrl;
+  const selectedPreviewStage = runtimePreviewStageArtifacts.find((stage) => stage.stageId === selectedPreviewStageId);
+  const stagePreviewUrl =
+    selectedPreviewStageId === 'final_display' ? previewUrl : (selectedPreviewStage?.previewDataUrl ?? previewUrl);
+  const previewImageUrl = isCompareActive && originalUrl !== null ? originalUrl : stagePreviewUrl;
   const runtimePreviewDensityNormalizationMetrics =
     runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.densityNormalizationMetrics ?? null;
   const activePatchProbe = patchProbeByRole[patchRole] ?? null;
@@ -2027,6 +2040,8 @@ function NegativeLabSession({
           latestPreviewRequestIdentityRef.current = previewRequestIdentity;
           if (runtimePreviewCommand === null) {
             setPreviewUrl(null);
+            setRuntimePreviewStageArtifacts([]);
+            setSelectedPreviewStageId('final_display');
             setRuntimePreviewDryRunResult(null);
             setRuntimePreviewRecipeIdentity(null);
             if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
@@ -2036,6 +2051,8 @@ function NegativeLabSession({
 
           setIsLoading(true);
           setPreviewUrl(null);
+          setRuntimePreviewStageArtifacts([]);
+          setSelectedPreviewStageId('final_display');
           setRuntimePreviewDryRunResult(null);
           setRuntimePreviewRecipeIdentity(null);
           if (baseSampleProofContext === null) setBaseFogPreviewProof(null);
@@ -2055,6 +2072,8 @@ function NegativeLabSession({
 
             const runtimeBaseFogSummary = result.runtimeDryRun.dryRun.proof?.runtimePreview.baseFogSampleSummary;
             setPreviewUrl(result.displayPreviewUrl);
+            setRuntimePreviewStageArtifacts(result.nativeArtifact.stageArtifacts ?? []);
+            setSelectedPreviewStageId('final_display');
             setRuntimePreviewDryRunResult(result.runtimeDryRun);
             setRuntimePreviewRecipeIdentity({
               channelBasis: runtimePreviewCommand.parameters.inputCharacterization.channelBasis,
@@ -2093,6 +2112,8 @@ function NegativeLabSession({
               return;
             console.error('Negative preview failed', e);
             setPreviewUrl(null);
+            setRuntimePreviewStageArtifacts([]);
+            setSelectedPreviewStageId('final_display');
             setRuntimePreviewDryRunResult(null);
             setRuntimePreviewRecipeIdentity(null);
             setIsLoading(false);
@@ -6386,6 +6407,12 @@ function NegativeLabSession({
               </div>
             </div>
           )}
+
+          <NegativeLabStagePreviewStrip
+            onSelect={setSelectedPreviewStageId}
+            selectedStageId={selectedPreviewStageId}
+            stages={runtimePreviewStageArtifacts}
+          />
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
