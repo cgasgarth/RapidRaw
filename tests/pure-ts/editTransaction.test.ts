@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
-import { type EditTransactionRequest, reduceEditTransaction } from '../../src/utils/editTransaction';
+import {
+  buildEditTransactionPersistenceContext,
+  type EditTransactionRequest,
+  reduceEditTransaction,
+} from '../../src/utils/editTransaction';
 
 const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransactionRequest => ({
   transactionId: 'tx-1',
@@ -34,6 +38,19 @@ describe('reduceEditTransaction', () => {
     expect(result.changedKeys).toEqual(['exposure']);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBe(false);
+    expect(result.applicationReceipt).toMatchObject({
+      transactionId: 'tx-1',
+      imageSessionId: 'session-1',
+      adjustmentRevision: 5,
+    });
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
+    expect(result.invalidatedProvenance).toEqual(['reference-match', 'auto-edit', 'derived-render']);
+    expect(buildEditTransactionPersistenceContext(request(), result)).toEqual({
+      transactionId: 'tx-1',
+      imageSessionId: 'session-1',
+      baseAdjustmentRevision: 4,
+      nextAdjustmentRevision: 5,
+    });
   });
 
   test('exact no-ops do not advance revision or create a changed-key set', () => {
@@ -54,6 +71,12 @@ describe('reduceEditTransaction', () => {
     expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 5, request())).toThrow('edit_transaction.stale_base:4:5');
   });
 
+  test('rejects proposals from an older image session before reducing operations', () => {
+    expect(() => reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request(), 'session-2')).toThrow(
+      'edit_transaction.stale_session:session-1:session-2',
+    );
+  });
+
   test('rejects non-finite numeric values at the transaction boundary', () => {
     expect(() =>
       reduceEditTransaction(
@@ -65,7 +88,9 @@ describe('reduceEditTransaction', () => {
   });
 
   test('store commit publishes one canonical state and one history boundary', () => {
-    const result = useEditorStore.getState().applyEditTransaction(request({ baseAdjustmentRevision: 0 }));
+    const result = useEditorStore
+      .getState()
+      .applyEditTransaction(request({ baseAdjustmentRevision: 0, imageSessionId: 'editor-image-session:1' }));
     const state = useEditorStore.getState();
 
     expect(result.changedKeys).toEqual(['exposure']);
