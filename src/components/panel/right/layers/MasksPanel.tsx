@@ -93,6 +93,7 @@ import {
   reorderMaskListContainers,
   splitSubMaskToContainer,
 } from '../../../../utils/mask/maskClipboard';
+import { applyMaskContainerAdjustmentCandidate } from '../../../../utils/mask/maskContainerAdjustmentTransaction';
 import {
   nextMaskOverlayHotkeySettings,
   saveMaskOverlaySettingsPreference,
@@ -1830,21 +1831,25 @@ export function MasksPanel() {
   };
 
   const updateContainer = (id: string, data: MaskContainerPatch) => {
+    if (data.adjustments !== undefined) {
+      const current = useEditorStore.getState().adjustments;
+      const next = applyMaskContainerAdjustmentCandidate(current, id, data.adjustments);
+      if (next === current) return;
+      markMaskPanelProvenanceStale('source_state_changed', [id]);
+      setAdjustments(() => next);
+      return;
+    }
     if (
       data.opacity !== undefined ||
       data.blendMode !== undefined ||
       data.invert !== undefined ||
-      data.visible !== undefined ||
-      data.adjustments !== undefined
+      data.visible !== undefined
     ) {
-      markMaskPanelProvenanceStale(
-        data.adjustments === undefined && data.blendMode === undefined ? 'mask_alpha_changed' : 'source_state_changed',
-        [id],
-      );
+      markMaskPanelProvenanceStale(data.blendMode === undefined ? 'mask_alpha_changed' : 'source_state_changed', [id]);
     }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks.map((m) => (m.id === id ? { ...m, ...data } : m)),
+      masks: prev.masks.map((mask) => (mask.id === id ? { ...mask, ...data } : mask)),
     }));
   };
   const updateSubMask = (id: string, data: SubMaskPatch) => {
@@ -3862,20 +3867,7 @@ function SettingsPanel({
 
     switch (sectionName) {
       case 'basic':
-        return (
-          <BasicAdjustments
-            {...sharedProps}
-            appSettings={appSettings}
-            onRequireEditGraphV2={() => {
-              const editor = useEditorStore.getState();
-              if (editor.adjustments.rawEngineEditGraphVersion < 2) {
-                editor.setEditor((state) => ({
-                  adjustments: { ...state.adjustments, rawEngineEditGraphVersion: 2 },
-                }));
-              }
-            }}
-          />
-        );
+        return <BasicAdjustments {...sharedProps} appSettings={appSettings} />;
       case 'curves':
         return (
           <CurveGraph
