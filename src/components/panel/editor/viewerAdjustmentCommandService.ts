@@ -1,4 +1,5 @@
 import type { Adjustments, RetouchCloneSource, RetouchRemoveSource } from '../../../utils/adjustments';
+import type { PointColorPickerResponse } from '../../../utils/color/pointColorPicker';
 import {
   applyToneEqualizerPickerSelection,
   applyToneEqualizerTargetedDelta,
@@ -14,9 +15,40 @@ export interface RetouchPoint {
   y: number;
 }
 
+export const buildPointColorPickerPoint = (
+  result: PointColorPickerResponse,
+  ordinal: number,
+  createId: () => string,
+): Adjustments['pointColor']['points'][number] => ({
+  chromaRadius: 0.08,
+  chromaShift: 0,
+  enabled: true,
+  feather: 0.4,
+  hueRadiusDegrees: 25,
+  hueShiftDegrees: 0,
+  id: createId(),
+  lightnessRadius: 0.2,
+  lightnessShift: 0,
+  name: `Point ${String(ordinal)}`,
+  opacity: 1,
+  samples: [
+    {
+      confidence: result.confidence,
+      graphRevision: result.graphFingerprint,
+      id: createId(),
+      sampleRadiusPx: result.sampleRadiusPx,
+      sourceColor: { chroma: result.chroma, hueDegrees: result.hueDegrees, lightness: result.lightness },
+      sourceSceneRevision: result.sourceFingerprint,
+    },
+  ],
+  saturationShift: 0,
+  variance: 1,
+});
+
 export interface ViewerAdjustmentCommandServices {
   updateSubMask(id: string | null, patch: Partial<SubMask>): void;
   commitToneEqualizerPicker(baseline: Adjustments, result: ToneEqualizerPickerResponse, deltaEv: number): void;
+  commitPointColorPicker(result: PointColorPickerResponse, ordinal: number): void;
   appendPointColorSample(point: Adjustments['pointColor']['points'][number]): void;
   updateRetouchCloneHandle(
     layerId: string,
@@ -115,6 +147,7 @@ export const updateRetouchRemoveInAdjustments = (
 /** Single adjustment authority used by ImageCanvas tool controllers. */
 export const createViewerAdjustmentCommandServices = (
   dispatch: AdjustmentDispatcher,
+  createId: () => string = () => crypto.randomUUID(),
 ): ViewerAdjustmentCommandServices => ({
   updateSubMask: (id, patch) => dispatch((previous) => updateSubMaskInAdjustments(previous, id, patch)),
   commitToneEqualizerPicker: (baseline, result, deltaEv) =>
@@ -123,6 +156,18 @@ export const createViewerAdjustmentCommandServices = (
         ? applyToneEqualizerPickerSelection(baseline, result)
         : applyToneEqualizerTargetedDelta(baseline, result, deltaEv),
     ),
+  commitPointColorPicker: (result, ordinal) => {
+    const point = buildPointColorPickerPoint(result, ordinal, createId);
+    dispatch((previous) => ({
+      ...previous,
+      pointColor: {
+        ...previous.pointColor,
+        enabled: true,
+        points: [...previous.pointColor.points, point],
+        selectedPointId: point.id,
+      },
+    }));
+  },
   appendPointColorSample: (point) =>
     dispatch((previous) => ({
       ...previous,

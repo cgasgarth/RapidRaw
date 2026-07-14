@@ -175,6 +175,7 @@ try {
   }
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
+  await verifyViewerPickerControllers(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
   if (await viewerFooterOverflow.isVisible()) {
     await viewerFooterOverflow.locator('summary').click();
@@ -399,8 +400,7 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   samples.push(await collectBoundsSample(page, 'keyboard-zoom-out'));
   await assertLatestBoundsSample(samples);
 
-  const canonicalBaseHref = await page.getByTestId('svg-preview-base-layer').getAttribute('href');
-  if (canonicalBaseHref === null) throw new Error('Zoom proof could not identify the canonical base preview.');
+  const canonicalBaseHref = await readCommittedBaseHref(page, sourceIdentity);
   await zoomSelector.selectOption('2');
   await assertRenderedImageGeometry(page, { height: 1536, label: 'selector-zoom-200', width: 2048 });
   await assertPositionedZoomOutput(page, { canonicalBaseHref, sourceIdentity });
@@ -442,8 +442,7 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
       `Wheel zoom split visible transform ${String(gestureScale)} from semantic transform ${String(resolvedGestureScale)}.`,
     );
   }
-  const gestureBaseHref = await page.getByTestId('svg-preview-base-layer').getAttribute('href');
-  if (gestureBaseHref === null) throw new Error('Wheel zoom removed the canonical base before its ROI successor.');
+  const gestureBaseHref = await readCommittedBaseHref(page, sourceIdentity);
   await assertPositionedZoomOutput(page, { canonicalBaseHref: gestureBaseHref, sourceIdentity });
   await zoomSelector.selectOption('fit');
   await assertRenderedImageGeometry(page, { height: 397, label: 'wheel-reset-to-fit', width: 529.33 });
@@ -460,11 +459,17 @@ async function assertPositionedZoomOutput(
     ({ canonicalBaseHref, sourceIdentity }) => {
       const bases = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]'));
       const patches = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-patch-layer"]'));
-      if (bases.length !== 1 || patches.length !== 1) return false;
-      const base = bases[0];
+      if (bases.length < 1 || bases.length > 2 || patches.length !== 1) return false;
+      const committedBases = bases.filter((base) => Number.parseFloat(base.style.opacity) === 1);
+      const base = committedBases[0];
       const patch = patches[0];
-      if (!base || !patch) return false;
+      if (committedBases.length !== 1 || !base || !patch) return false;
       return (
+        bases.every(
+          (candidate) =>
+            candidate.dataset.previewSourceIdentity === sourceIdentity &&
+            (candidate === base || Number.parseFloat(candidate.style.opacity) === 0),
+        ) &&
         base.getAttribute('href') === canonicalBaseHref &&
         base.dataset.previewSourceIdentity === sourceIdentity &&
         patch.dataset.previewSourceIdentity === sourceIdentity &&
@@ -480,6 +485,32 @@ async function assertPositionedZoomOutput(
     expected,
     { timeout: 10_000 },
   );
+}
+
+async function readCommittedBaseHref(page: Page, sourceIdentity: string): Promise<string> {
+  await page.waitForFunction(
+    (expectedSourceIdentity) => {
+      const bases = Array.from(document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]'));
+      const committed = bases.filter(
+        (base) =>
+          base.dataset.previewSourceIdentity === expectedSourceIdentity && Number.parseFloat(base.style.opacity) === 1,
+      );
+      return committed.length === 1 && committed[0]?.getAttribute('href') !== null;
+    },
+    sourceIdentity,
+    { timeout: 10_000 },
+  );
+  const href = await page.locator('[data-testid="svg-preview-base-layer"]').evaluateAll((bases, expectedIdentity) => {
+    const committed = bases.find(
+      (base) =>
+        base instanceof SVGImageElement &&
+        base.dataset.previewSourceIdentity === expectedIdentity &&
+        Number.parseFloat(base.style.opacity) === 1,
+    );
+    return committed?.getAttribute('href') ?? null;
+  }, sourceIdentity);
+  if (href === null) throw new Error('Zoom proof could not identify the committed canonical base preview.');
+  return href;
 }
 
 async function assertSingleFullFrameOutput(page: Page, sourceIdentity: string): Promise<void> {
@@ -529,6 +560,95 @@ async function assertRenderedImageGeometry(
 async function waitForStablePreview(page: Page): Promise<void> {
   await page.waitForTimeout(250);
   await page.getByTestId('image-canvas').waitFor({ timeout: 10_000 });
+}
+
+async function verifyViewerPickerControllers(page: Page): Promise<void> {
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.getByTestId('adjustments-inspector').waitFor({ state: 'visible', timeout: 10_000 });
+  const toneAdvanced = page.getByTestId('tone-equalizer-advanced');
+  if (!(await toneAdvanced.isVisible())) await page.getByTestId('tone-equalizer-advanced-toggle').click();
+  const tonePicker = page.getByTestId('tone-equalizer-picker');
+  await tonePicker.scrollIntoViewIfNeeded();
+  await waitForStablePreview(page);
+  await tonePicker.click();
+  await page.getByTestId('image-canvas').focus();
+  await waitForStableGeometryEpoch(page);
+  const toneSamplePoint = await displayedImageCenter(page);
+  await page.mouse.move(toneSamplePoint.x, toneSamplePoint.y);
+  await page.mouse.down();
+  const toneOverlay = page.getByTestId('viewer-picker-overlay');
+  await toneOverlay.waitFor({ state: 'visible', timeout: 10_000 });
+  if ((await toneOverlay.getAttribute('data-picker-tool')) !== 'tone-equalizer') {
+    throw new Error('Tone Equalizer did not publish its declarative picker overlay.');
+  }
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="viewer-picker-overlay"]')?.getAttribute('data-picker-status') === 'ready',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.mouse.up();
+  await toneOverlay.waitFor({ state: 'detached', timeout: 10_000 });
+  const toneReceipt = page.getByTestId('tone-equalizer-picker-receipt');
+  await toneReceipt.waitFor({ state: 'attached', timeout: 10_000 });
+  await toneReceipt.scrollIntoViewIfNeeded();
+  await tonePicker.click();
+
+  await page.getByTestId('right-panel-switcher-button-color').click();
+  await page.getByTestId('color-workspace-tab-mixer').click();
+  const pointControls = page.getByTestId('point-color-controls');
+  await pointControls.waitFor({ state: 'visible', timeout: 10_000 });
+  const pointPicker = page.getByTestId('point-color-picker');
+  await pointPicker.scrollIntoViewIfNeeded();
+  await waitForStablePreview(page);
+  await pointPicker.click();
+  await page.getByTestId('image-canvas').focus();
+  await waitForStableGeometryEpoch(page);
+  const pointSamplePoint = await displayedImageCenter(page);
+  await page.mouse.move(pointSamplePoint.x, pointSamplePoint.y);
+  await page.mouse.down();
+  const pointOverlay = page.getByTestId('viewer-picker-overlay');
+  await pointOverlay.waitFor({ state: 'visible', timeout: 10_000 });
+  const pointOverlayProof = await pointOverlay.evaluate((element) => ({
+    normalizedX: element.dataset.normalizedX,
+    normalizedY: element.dataset.normalizedY,
+    tool: element.dataset.pickerTool,
+  }));
+  if (
+    pointOverlayProof.tool !== 'point-color' ||
+    pointOverlayProof.normalizedX === undefined ||
+    pointOverlayProof.normalizedY === undefined
+  ) {
+    throw new Error(`Point Color overlay proof was incomplete: ${JSON.stringify(pointOverlayProof)}`);
+  }
+  await page.mouse.up();
+  await page.getByTestId('point-color-selected-controls').waitFor({ state: 'visible', timeout: 10_000 });
+  if ((await pointPicker.getAttribute('aria-pressed')) !== 'false') {
+    throw new Error('Point Color picker did not deactivate after committing its one-shot sample.');
+  }
+}
+
+async function waitForStableGeometryEpoch(page: Page): Promise<void> {
+  const canvas = page.getByTestId('image-canvas');
+  let previous = await canvas.getAttribute('data-geometry-epoch');
+  let stableSamples = 0;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await page.waitForTimeout(50);
+    const current = await canvas.getAttribute('data-geometry-epoch');
+    stableSamples = current === previous ? stableSamples + 1 : 0;
+    if (stableSamples >= 3) return;
+    previous = current;
+  }
+  throw new Error('Picker proof geometry epoch did not stabilize.');
+}
+
+async function displayedImageCenter(page: Page): Promise<{ x: number; y: number }> {
+  const bounds = await page.locator('[data-editor-image-frame="edited"]').first().boundingBox();
+  if (bounds === null) throw new Error('Picker proof could not resolve displayed image bounds.');
+  const visibleTop = Math.max(0, bounds.y);
+  const visibleBottom = Math.min(viewport.height, bounds.y + bounds.height);
+  if (visibleBottom - visibleTop < 20) throw new Error('Picker proof image is not visibly interactable.');
+  return { x: bounds.x + bounds.width * 0.5, y: (visibleTop + visibleBottom) * 0.5 };
 }
 
 async function collectBoundsSample(page: Page, label: string): Promise<BoundsSample> {

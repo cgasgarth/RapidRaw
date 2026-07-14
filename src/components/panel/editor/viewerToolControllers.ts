@@ -13,7 +13,9 @@ export type ViewerToolId =
   | 'focus-retouch'
   | 'mask'
   | 'pan'
+  | 'point-color'
   | 'retouch'
+  | 'tone-equalizer'
   | 'viewer-sampler'
   | 'white-balance';
 
@@ -96,13 +98,23 @@ export const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolCont
   'focus-retouch': createController('focus-retouch'),
   mask: createController('mask'),
   pan: createController('pan'),
+  'point-color': createController('point-color'),
   retouch: createController('retouch'),
+  'tone-equalizer': createController('tone-equalizer'),
   'viewer-sampler': createController('viewer-sampler'),
   'white-balance': createController('white-balance'),
 };
 
 export const resolveViewerToolId = (tool: string): ViewerToolId => {
-  if (tool === 'brush' || tool === 'crop' || tool === 'mask' || tool === 'retouch' || tool === 'white-balance')
+  if (
+    tool === 'brush' ||
+    tool === 'crop' ||
+    tool === 'mask' ||
+    tool === 'point-color' ||
+    tool === 'retouch' ||
+    tool === 'tone-equalizer' ||
+    tool === 'white-balance'
+  )
     return tool;
   if (tool === 'object-prompt' || tool === 'parametric-mask' || tool === 'remove') return 'mask';
   if (tool === 'focus-retouch') return 'focus-retouch';

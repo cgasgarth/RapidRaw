@@ -1,6 +1,15 @@
 export const VIEWER_DRAG_THRESHOLD_PX = 5;
 
-export type ViewerActiveTool = 'brush' | 'crop' | 'mask' | 'none' | 'object-prompt' | 'retouch' | 'white-balance';
+export type ViewerActiveTool =
+  | 'brush'
+  | 'crop'
+  | 'mask'
+  | 'none'
+  | 'object-prompt'
+  | 'point-color'
+  | 'retouch'
+  | 'tone-equalizer'
+  | 'white-balance';
 export type ViewerCursor =
   | 'crosshair'
   | 'default'
@@ -37,7 +46,8 @@ export const isViewerDrag = (start: { x: number; y: number }, current: { x: numb
   Math.hypot(current.x - start.x, current.y - start.y) > VIEWER_DRAG_THRESHOLD_PX;
 
 const cursorForTool = (activeTool: ViewerActiveTool): ViewerCursor => {
-  if (activeTool === 'white-balance') return 'crosshair';
+  if (activeTool === 'point-color' || activeTool === 'tone-equalizer' || activeTool === 'white-balance')
+    return 'crosshair';
   if (activeTool === 'brush' || activeTool === 'crop' || activeTool === 'mask' || activeTool === 'object-prompt') {
     return 'crosshair';
   }
@@ -91,7 +101,7 @@ export const resolveViewerInput = ({
       cursor: cursorForTool(activeTool),
       owner: 'active-tool',
       reason: 'active-tool',
-      shouldCapturePointer: false,
+      shouldCapturePointer: activeTool === 'point-color' || activeTool === 'tone-equalizer',
     };
   }
 
