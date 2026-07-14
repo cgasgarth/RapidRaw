@@ -132,7 +132,7 @@ export const createViewerToolSessionRegistry = (): ViewerToolSessionRegistry => 
   return {
     active: () => session,
     begin: (key, pointerId, owner, sample) => {
-      if (session !== null) return null;
+      if (session !== null || owner === 'blocked') return null;
       const command = viewerToolControllers[key.toolId].begin(key, pointerId, owner, sample);
       session = command.session;
       return command;
