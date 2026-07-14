@@ -9,12 +9,14 @@ use glam::Vec3;
 use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
 
-use super::film_characteristic_curve::{apply_direct_positive, reference_curve};
+use super::film_characteristic_curve::{
+    FilmCharacteristicCurveV1, apply_direct_positive, reference_curve,
+};
 use super::film_color_coupler::{
     apply as apply_color_coupler, reference as reference_color_coupler,
 };
 use super::film_density_grain::{
-    apply as apply_density_grain, reference as reference_density_grain,
+    FilmDensityGrainV1, apply as apply_density_grain, reference as reference_density_grain,
 };
 use super::film_print_scan::{apply as apply_print_scan, reference as reference_print_scan};
 
@@ -45,6 +47,8 @@ pub struct FilmEmulationNodeV1 {
     pub profile_ref: FilmEmulationProfileRef,
     #[serde(default)]
     pub stage_params: Option<FilmEmulationStageParamsV1>,
+    #[serde(default)]
+    pub characteristic_curve: Option<FilmCharacteristicCurveV1>,
     pub mix: f32,
     pub working_space: String,
     pub seed_policy: String,
@@ -61,6 +65,8 @@ pub struct FilmEmulationParams {
     pub enabled: bool,
     pub mix: f32,
     pub shaper_p: f32,
+    /// Grain is opt-in; the governed reference profile is grain-off by default.
+    pub grain_amount: f32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -126,10 +132,14 @@ impl FilmEmulationNodeV1 {
         if !shaper_p.is_finite() || !(0.0001..=4.0).contains(&shaper_p) {
             return Err("film_emulation_invalid_stage_params");
         }
+        if let Some(curve) = &self.characteristic_curve {
+            curve.validate()?;
+        }
         Ok(FilmEmulationParams {
             enabled: self.enabled && self.mix > 0.0,
             mix: self.mix,
             shaper_p,
+            grain_amount: 0.0,
         })
     }
 }
@@ -164,8 +174,28 @@ pub fn apply_pixel_at(rgb: Vec3, params: FilmEmulationParams, x: u32, y: u32) ->
     } else {
         0.0
     };
-    let coupled = apply_color_coupler(shaped, exposure_ev, &reference_color_coupler());
-    let grained = apply_density_grain(coupled, x, y, &reference_density_grain());
+    // Optional color/print stages are defined for normalized positive scene values.
+    // Preserve signed and extended-range components through the shared film curve;
+    // this keeps out-of-domain values finite and avoids hidden clipping or abs().
+    let extended_scene = rgb.min_element() < 0.0 || rgb.max_element() > 1.0;
+    let coupled = if extended_scene {
+        shaped
+    } else {
+        apply_color_coupler(shaped, exposure_ev, &reference_color_coupler())
+    };
+    let grained = if !extended_scene && params.grain_amount > 0.0 {
+        apply_density_grain(
+            coupled,
+            x,
+            y,
+            &FilmDensityGrainV1 {
+                amount_default: params.grain_amount,
+                ..reference_density_grain()
+            },
+        )
+    } else {
+        coupled
+    };
     let printed = apply_print_scan(grained, &reference_print_scan());
     rgb + params.mix * (printed - rgb)
 }
@@ -342,6 +372,7 @@ fn reference_node() -> FilmEmulationNodeV1 {
             content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
         },
         stage_params: None,
+        characteristic_curve: None,
         mix: 1.0,
         working_space: "acescg_linear_v1".to_string(),
         seed_policy: "source_stable_v1".to_string(),
@@ -530,6 +561,7 @@ mod tests {
             enabled: true,
             mix,
             shaper_p: REFERENCE_SHAPER_P,
+            grain_amount: 0.0,
         }
     }
 
