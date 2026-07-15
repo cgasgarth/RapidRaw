@@ -175,6 +175,58 @@ fn validate_scene_tone_parameter(
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DetailDenoiseDehazeV2 {
+    clarity: f64,
+    color_noise_reduction: f64,
+    dehaze: f64,
+    denoise_contrast_protection: f64,
+    denoise_detail: f64,
+    denoise_natural_grain: f64,
+    denoise_shadow_bias: f64,
+    luma_noise_reduction: f64,
+    sharpness: f64,
+}
+
+impl DetailDenoiseDehazeV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("clarity", self.clarity, -100.0, 100.0),
+            (
+                "colorNoiseReduction",
+                self.color_noise_reduction,
+                0.0,
+                100.0,
+            ),
+            ("dehaze", self.dehaze, -100.0, 100.0),
+            (
+                "denoiseContrastProtection",
+                self.denoise_contrast_protection,
+                0.0,
+                100.0,
+            ),
+            ("denoiseDetail", self.denoise_detail, 0.0, 100.0),
+            (
+                "denoiseNaturalGrain",
+                self.denoise_natural_grain,
+                0.0,
+                100.0,
+            ),
+            ("denoiseShadowBias", self.denoise_shadow_bias, -100.0, 100.0),
+            ("lumaNoiseReduction", self.luma_noise_reduction, 0.0, 100.0),
+            ("sharpness", self.sharpness, -100.0, 100.0),
+        ] {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 detail_denoise_dehaze field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum SceneCurveModeV2 {
     Point,
@@ -866,6 +918,10 @@ fn compile_node_params(
             parse_scene_curve(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::DetailDenoiseDehaze => {
+            parse_detail_denoise_dehaze(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::Geometry => {
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
@@ -894,6 +950,15 @@ fn parse_scene_curve(params: &Map<String, Value>) -> Result<SceneCurveV2, String
         .map_err(|error| format!("EditDocumentV2 scene_curve is invalid: {error}"))?;
     scene_curve.validate()?;
     Ok(scene_curve)
+}
+
+fn parse_detail_denoise_dehaze(
+    params: &Map<String, Value>,
+) -> Result<DetailDenoiseDehazeV2, String> {
+    let detail: DetailDenoiseDehazeV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 detail_denoise_dehaze is invalid: {error}"))?;
+    detail.validate()?;
+    Ok(detail)
 }
 
 fn validate_node_contract(
@@ -1102,6 +1167,20 @@ mod tests {
         })
     }
 
+    fn detail_params() -> Value {
+        json!({
+            "clarity": 16,
+            "colorNoiseReduction": 0,
+            "dehaze": 8,
+            "denoiseContrastProtection": 50,
+            "denoiseDetail": 50,
+            "denoiseNaturalGrain": 0,
+            "denoiseShadowBias": 0,
+            "lumaNoiseReduction": 5,
+            "sharpness": 24
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1156,7 +1235,7 @@ mod tests {
                 "detail_denoise_dehaze": {
                     "enabled": true,
                     "implementationVersion": 1,
-                    "params": { "clarity": 16, "dehaze": 8, "lumaNoiseReduction": 5, "sharpness": 24 },
+                    "params": detail_params(),
                     "process": "scene_referred_v2",
                     "type": "detail_denoise_dehaze"
                 },
@@ -1289,9 +1368,14 @@ mod tests {
             "brightness": 0.1,
             "cameraProfile": "camera_standard",
             "clarity": 16,
+            "colorNoiseReduction": 0,
             "contrast": 18,
             "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
             "dehaze": 8,
+            "denoiseContrastProtection": 50,
+            "denoiseDetail": 50,
+            "denoiseNaturalGrain": 0,
+            "denoiseShadowBias": 0,
             "exposure": 0.75,
             "flipHorizontal": false,
             "flipVertical": true,
@@ -1534,6 +1618,36 @@ mod tests {
             .into_render_adjustments()
             .expect_err("output curve below reference white must fail");
         assert!(error.contains("InvalidTargetLuminance"));
+    }
+
+    #[test]
+    fn detail_compiler_rejects_unowned_missing_and_out_of_range_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["detail_denoise_dehaze"]["params"]["futureDetail"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned detail field must fail");
+        assert!(error.contains("unknown field `futureDetail`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["detail_denoise_dehaze"]["params"]
+            .as_object_mut()
+            .expect("detail params object")
+            .remove("sharpness");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing detail field must fail");
+        assert!(error.contains("missing field `sharpness`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["detail_denoise_dehaze"]["params"]["lumaNoiseReduction"] = json!(-1);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range detail field must fail");
+        assert!(error.contains("lumaNoiseReduction"));
     }
 
     #[test]

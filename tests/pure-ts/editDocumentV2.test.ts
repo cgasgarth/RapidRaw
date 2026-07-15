@@ -273,6 +273,63 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('detail defaults legacy state and rejects malformed render authority', () => {
+    const {
+      clarity: _clarity,
+      colorNoiseReduction: _colorNoiseReduction,
+      dehaze: _dehaze,
+      denoiseContrastProtection: _denoiseContrastProtection,
+      denoiseDetail: _denoiseDetail,
+      denoiseNaturalGrain: _denoiseNaturalGrain,
+      denoiseShadowBias: _denoiseShadowBias,
+      lumaNoiseReduction: _lumaNoiseReduction,
+      ...legacyDetail
+    } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2({ ...legacyDetail, sharpness: 24 });
+    expect(defaulted.nodes.detail_denoise_dehaze?.params).toEqual({
+      clarity: 0,
+      colorNoiseReduction: 0,
+      dehaze: 0,
+      denoiseContrastProtection: 50,
+      denoiseDetail: 50,
+      denoiseNaturalGrain: 0,
+      denoiseShadowBias: 0,
+      lumaNoiseReduction: 0,
+      sharpness: 24,
+    });
+    expect(defaulted.migration?.defaulted).toEqual(
+      expect.arrayContaining([
+        'detail_denoise_dehaze.clarity',
+        'detail_denoise_dehaze.denoiseContrastProtection',
+        'detail_denoise_dehaze.denoiseDetail',
+      ]),
+    );
+    expect(compileEditDocumentNodeV2(defaulted.nodes.detail_denoise_dehaze).params.sharpness).toBe(24);
+
+    const detailNode = defaulted.nodes.detail_denoise_dehaze;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          detail_denoise_dehaze: { ...detailNode, params: { ...detailNode?.params, futureDetail: true } },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          detail_denoise_dehaze: {
+            ...detailNode,
+            params: { ...detailNode?.params, lumaNoiseReduction: -1 },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -533,6 +590,27 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(renderDocument.nodes.camera_input).toEqual(preparedDocument.nodes.camera_input);
     expect(renderDocument.nodes.geometry).toEqual(preparedDocument.nodes.geometry);
+  });
+
+  test('render preparation overlays the authoritative detail envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      clarity: 26,
+      denoiseShadowBias: -18,
+      sharpness: 42,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['detail_denoise_dehaze']);
+
+    expect(renderDocument.nodes.detail_denoise_dehaze).toBe(authoritative.nodes.detail_denoise_dehaze);
+    expect(renderDocument.nodes.detail_denoise_dehaze?.params).toMatchObject({
+      clarity: 26,
+      denoiseShadowBias: -18,
+      sharpness: 42,
+    });
+    expect(renderDocument.nodes.camera_input).toEqual(preparedDocument.nodes.camera_input);
+    expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
   });
 
   test('render preparation transfers the layers envelope and explicit domain together', () => {
