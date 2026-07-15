@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { AdaptivePreviewQualityController } from './adaptivePreviewQuality';
+import type { OriginalPreviewRequest } from './originalPreviewEffectRunner';
+import type { PreparedPreviewRequestIntent } from './previewRequestIntentAdapter';
 
 /** Creates the stateful quality policy owned by preview coordination. */
 export const createPreviewQualityPolicy = (): AdaptivePreviewQualityController =>
@@ -169,6 +171,23 @@ export interface PreviewQualitySnapshot {
   tier: string;
 }
 
+export interface PreviewSchedulingOriginalRequest {
+  readonly request: OriginalPreviewRequest;
+  readonly session: PreviewSessionIdentity;
+  readonly viewport: PreviewViewportSnapshot;
+}
+
+export interface PreviewSchedulingInputSnapshot {
+  readonly compareActive: boolean;
+  readonly devicePixelRatio: number;
+  readonly displayHeight: number;
+  readonly displayWidth: number;
+  readonly edited: PreparedPreviewRequestIntent | null;
+  readonly enableLivePreviews: boolean;
+  readonly original: PreviewSchedulingOriginalRequest | null;
+  readonly ready: boolean;
+}
+
 export interface PreviewTransitionReceipt {
   event: PreviewCoordinatorEvent['type'];
   operationId?: number;
@@ -189,6 +208,7 @@ export interface PreviewCoordinatorState {
   originalArtifact: PreviewArtifact | null;
   persistence: PreviewOperationState;
   quality: PreviewQualitySnapshot | null;
+  schedulingInputs: PreviewSchedulingInputSnapshot | null;
   settled: PreviewOperationState;
   session: PreviewSessionIdentity | null;
   staleCompletionCount: number;
@@ -198,9 +218,12 @@ export interface PreviewCoordinatorState {
 
 export type PreviewCoordinatorEffect =
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
+  | { type: 'clear-original'; reason: string }
   | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'publish'; artifact: PreviewArtifact; identity: PreviewOperationIdentity; reason: string }
   | { type: 'release-url'; url: string; reason: string }
+  | { type: 'schedule-edited'; delayMs: number; prepared: PreparedPreviewRequestIntent; reason: string }
+  | { type: 'schedule-original'; delayMs: number; prepared: PreviewSchedulingOriginalRequest; reason: string }
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
 
 export type PreviewCoordinatorEvent =
@@ -214,6 +237,7 @@ export type PreviewCoordinatorEvent =
   | { type: 'original-preview-cleared'; reason: string }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
   | { type: 'quality-decision-changed'; quality: PreviewQualitySnapshot }
+  | { type: 'scheduling-inputs-changed'; inputs: PreviewSchedulingInputSnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
   | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
 
@@ -238,6 +262,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     originalArtifact: null,
     persistence: idleOperation(),
     quality: null,
+    schedulingInputs: null,
     settled: idleOperation(),
     session: null,
     staleCompletionCount: 0,
@@ -343,12 +368,199 @@ function makeOperationIdentity(
   });
 }
 
+const editedSchedulingFingerprint = (inputs: PreviewSchedulingInputSnapshot | null): string | null => {
+  if (inputs === null || inputs.edited === null) return null;
+  const request = inputs.edited.request;
+  return JSON.stringify({
+    activeWaveformChannel: request.activeWaveformChannel,
+    computeWaveform: request.computeWaveform,
+    devicePixelRatio: inputs.devicePixelRatio,
+    kind: request.kind,
+    proof: request.proof,
+    quality: request.quality,
+    roi: request.roi,
+    scopeRecovery: request.scopeRecovery,
+    session: fingerprintPreviewSessionIdentity(request.session),
+    targetResolution: request.targetResolution,
+  });
+};
+
+const originalSchedulingFingerprint = (inputs: PreviewSchedulingInputSnapshot | null): string | null => {
+  if (inputs === null || inputs.original === null) return null;
+  const session = inputs.original.session;
+  return JSON.stringify({
+    devicePixelRatio: inputs.devicePixelRatio,
+    displayHeight: inputs.displayHeight,
+    displayWidth: inputs.displayWidth,
+    geometryRevision: session.geometryRevision,
+    imageSessionId: session.imageSessionId,
+    sourceImagePath: session.sourceImagePath,
+    sourceRevision: session.sourceRevision,
+    targetHeight: session.targetHeight,
+    targetWidth: session.targetWidth,
+  });
+};
+
+const schedulingSession = (inputs: PreviewSchedulingInputSnapshot | null): PreviewSessionIdentity | null =>
+  inputs?.edited?.request.session ?? inputs?.original?.session ?? null;
+
+const sameSchedulingSource = (a: PreviewSessionIdentity, b: PreviewSessionIdentity): boolean =>
+  a.imageSessionId === b.imageSessionId &&
+  a.sourceImagePath === b.sourceImagePath &&
+  a.sourceRevision === b.sourceRevision;
+
+const clearScheduledOriginal = (
+  state: PreviewCoordinatorState,
+  effects: PreviewCoordinatorEffect[],
+  reason: string,
+): PreviewCoordinatorState => {
+  const original = state.original;
+  if (
+    original.identity !== undefined &&
+    ['queued', 'running'].includes(original.status) &&
+    !effects.some(
+      (effect) => effect.type === 'cancel' && effect.identity.operationId === original.identity?.operationId,
+    )
+  ) {
+    effects.push({ type: 'cancel', identity: original.identity, reason });
+  }
+  if (state.originalArtifact !== null && state.originalArtifact.url !== state.visibleArtifact?.url) {
+    effects.push({ type: 'release-url', url: state.originalArtifact.url, reason });
+  }
+  effects.push({ type: 'clear-original', reason });
+  return { ...state, original: idleOperation(), originalArtifact: null };
+};
+
 export function reducePreviewCoordinator(
   input: PreviewCoordinatorState,
   event: PreviewCoordinatorEvent,
 ): PreviewCoordinatorTransition {
   let state = input;
   const effects: PreviewCoordinatorEffect[] = [];
+
+  if (event.type === 'scheduling-inputs-changed') {
+    const inputs = event.inputs;
+    if (
+      !Number.isFinite(inputs.devicePixelRatio) ||
+      inputs.devicePixelRatio <= 0 ||
+      !Number.isFinite(inputs.displayHeight) ||
+      inputs.displayHeight < 0 ||
+      !Number.isFinite(inputs.displayWidth) ||
+      inputs.displayWidth < 0
+    ) {
+      throw new Error('preview_coordinator.invalid_scheduling_inputs');
+    }
+    const previous = state.schedulingInputs;
+    const previousSession = schedulingSession(previous);
+    const nextSession = schedulingSession(inputs);
+    const sourceChanged =
+      previousSession !== null && (nextSession === null || !sameSchedulingSource(previousSession, nextSession));
+    const geometryChanged =
+      previousSession !== null &&
+      nextSession !== null &&
+      previousSession.geometryRevision !== nextSession.geometryRevision;
+    const previousInteraction = previous?.edited?.request.kind === 'interactive';
+    const nextInteraction = inputs.edited?.request.kind === 'interactive';
+    const interactionStarted = !previousInteraction && nextInteraction;
+    const interactionEnded = previousInteraction && !nextInteraction;
+
+    if (!inputs.ready || inputs.edited === null || nextSession === null) {
+      const shouldClearOriginal =
+        previous?.compareActive === true || state.original.identity !== undefined || state.originalArtifact !== null;
+      state = cancelActiveOperations(state, effects, 'preview-inputs-not-ready');
+      if (shouldClearOriginal) state = clearScheduledOriginal(state, effects, 'preview-inputs-not-ready');
+      state = {
+        ...state,
+        desired: null,
+        interactionActive: false,
+        interactive: idleOperation(),
+        original: idleOperation(),
+        schedulingInputs: inputs,
+        session: null,
+        settled: idleOperation(),
+        viewport: null,
+      };
+      return { effects, state: withReceipt(state, event, 'preview-inputs-not-ready') };
+    }
+
+    if (sourceChanged) {
+      state = cancelActiveOperations(state, effects, 'scheduling-source-changed');
+      state = clearScheduledOriginal(state, effects, 'scheduling-source-changed');
+      state = {
+        ...state,
+        desired: null,
+        interactive: idleOperation(),
+        original: idleOperation(),
+        session: null,
+        settled: idleOperation(),
+        viewport: null,
+      };
+    } else if (geometryChanged || (previous?.compareActive === true && !inputs.compareActive)) {
+      state = clearScheduledOriginal(
+        state,
+        effects,
+        geometryChanged ? 'original-geometry-changed' : 'compare-disabled',
+      );
+    }
+
+    if (interactionStarted || interactionEnded) {
+      state = {
+        ...state,
+        interactionActive: nextInteraction,
+        interactionGeneration: state.interactionGeneration + 1,
+      };
+    }
+
+    const editedChanged =
+      sourceChanged ||
+      editedSchedulingFingerprint(previous) !== editedSchedulingFingerprint(inputs) ||
+      previous?.enableLivePreviews !== inputs.enableLivePreviews;
+    if (editedChanged && (!nextInteraction || inputs.enableLivePreviews)) {
+      effects.push({
+        delayMs: nextInteraction ? 0 : 50,
+        prepared: inputs.edited,
+        reason: interactionEnded
+          ? 'interaction-settled-successor'
+          : nextInteraction
+            ? 'interactive-inputs-changed'
+            : 'settled-inputs-changed',
+        type: 'schedule-edited',
+      });
+    }
+
+    const originalReady =
+      inputs.compareActive &&
+      !nextInteraction &&
+      inputs.displayWidth > 0 &&
+      inputs.displayHeight > 0 &&
+      inputs.original !== null;
+    const originalChanged =
+      sourceChanged ||
+      geometryChanged ||
+      interactionEnded ||
+      previous?.compareActive !== inputs.compareActive ||
+      originalSchedulingFingerprint(previous) !== originalSchedulingFingerprint(inputs);
+    if (originalReady && originalChanged && inputs.original !== null) {
+      effects.push({
+        delayMs: state.originalArtifact === null ? 0 : 200,
+        prepared: inputs.original,
+        reason: 'compare-original-inputs-changed',
+        type: 'schedule-original',
+      });
+    }
+
+    state = { ...state, schedulingInputs: inputs };
+    return {
+      effects,
+      state: withReceipt(
+        state,
+        event,
+        editedChanged || (originalReady && originalChanged)
+          ? 'scheduling-inputs-applied'
+          : 'scheduling-inputs-unchanged',
+      ),
+    };
+  }
 
   if (event.type === 'image-session-installed') {
     const sessionChanged = state.session !== null && !sameSession(state.session, event.session);
@@ -375,6 +587,7 @@ export function reducePreviewCoordinator(
       desired: null,
       interactive: idleOperation(),
       original: idleOperation(),
+      schedulingInputs: null,
       settled: idleOperation(),
       session: null,
       viewport: null,
@@ -436,6 +649,7 @@ export function reducePreviewCoordinator(
       interactive: idleOperation(),
       original: idleOperation(),
       quality: null,
+      schedulingInputs: null,
       settled: idleOperation(),
       viewport: null,
     };

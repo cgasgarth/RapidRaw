@@ -35,6 +35,13 @@ export interface PreviewRequestPendingUpdate {
   requestedPreviewResolution?: number;
 }
 
+export interface PreparedPreviewRequestIntent {
+  readonly delayMs: number;
+  readonly qualitySnapshot: PreviewQualitySnapshot;
+  readonly request: EditedPreviewRequest;
+  readonly scope: PreviewRequestScopeSnapshot;
+}
+
 export interface PreviewRequestIntentAdapterOptions {
   captureScope: (
     targetResolution: number,
@@ -56,7 +63,7 @@ export class PreviewRequestIntentAdapter {
     this.now = options.now ?? (() => globalThis.performance?.now() ?? Date.now());
   }
 
-  request(intent: PreviewRequestIntent): PreviewOperationIdentity | null {
+  prepare(intent: PreviewRequestIntent): PreparedPreviewRequestIntent | null {
     const requestedTargetResolution = Math.max(1, Math.round(intent.requestedTargetResolution));
     const quality = this.options.decideQuality(requestedTargetResolution, intent.dragging);
     const qualitySnapshot: PreviewQualitySnapshot = {
@@ -68,12 +75,12 @@ export class PreviewRequestIntentAdapter {
       sufficientForSemanticZoom: quality.sufficientForSemanticZoom,
       tier: quality.tier,
     };
-    this.options.dispatch({ quality: qualitySnapshot, type: 'quality-decision-changed' });
     const scope = this.options.captureScope(quality.effectiveTargetResolution, quality.effectiveRoi);
     if (scope === null) return null;
-    this.options.installSession(scope);
-    const identity = this.options.schedule(
-      {
+    return {
+      delayMs: Math.max(0, intent.delayMs),
+      qualitySnapshot,
+      request: {
         activeWaveformChannel: intent.activeWaveformChannel,
         computeWaveform: intent.isWaveformVisible || intent.scopeRecovery,
         createdAt: this.now(),
@@ -96,17 +103,30 @@ export class PreviewRequestIntentAdapter {
         viewerScope: scope.scope,
         viewportAuthority: scope.viewport,
       },
-      Math.max(0, intent.delayMs),
-    );
+      scope,
+    };
+  }
+
+  schedulePrepared(prepared: PreparedPreviewRequestIntent, delayMs = prepared.delayMs): PreviewOperationIdentity {
+    this.options.dispatch({ quality: prepared.qualitySnapshot, type: 'quality-decision-changed' });
+    this.options.installSession(prepared.scope);
+    const identity = this.options.schedule(prepared.request, Math.max(0, delayMs));
     this.options.publish({
-      ...(!intent.dragging ? { requestedPreviewResolution: quality.requestedTargetResolution } : {}),
+      ...(prepared.request.kind === 'settled'
+        ? { requestedPreviewResolution: prepared.request.quality.requestedTargetResolution }
+        : {}),
       previewQualityStatus: {
-        ...quality,
+        ...prepared.request.quality,
         generation: identity.generation,
-        phase: intent.dragging ? 'rendering_interaction' : 'refining_current_view',
+        phase: prepared.request.kind === 'interactive' ? 'rendering_interaction' : 'refining_current_view',
         requestId: identity.operationId,
       },
     });
     return identity;
+  }
+
+  request(intent: PreviewRequestIntent): PreviewOperationIdentity | null {
+    const prepared = this.prepare(intent);
+    return prepared === null ? null : this.schedulePrepared(prepared);
   }
 }

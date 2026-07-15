@@ -161,6 +161,30 @@ describe('original preview effect runner', () => {
     expect(coordinator.snapshot().original.status).toBe('idle');
   });
 
+  test('coordinator clear effect cancels queued native work and invalidates the presented cache', async () => {
+    const coordinator = new PreviewCoordinator();
+    let executions = 0;
+    const runner = new OriginalPreviewEffectRunner({
+      dispatch: (event) => coordinator.dispatch(event),
+      execute: async () => {
+        executions += 1;
+        return `data:image/jpeg;base64,original-${String(executions)}`;
+      },
+    });
+    const identity = session();
+
+    runner.request(identity, request(identity));
+    await tick();
+    expect(runner.needsRequest(identity, identity.targetWidth)).toBe(false);
+
+    runner.request(identity, request(identity), 25);
+    runner.consume([{ reason: 'compare-disabled', type: 'clear-original' }]);
+    await new Promise((resolve) => setTimeout(resolve, 35));
+
+    expect(executions).toBe(1);
+    expect(runner.needsRequest(identity, identity.targetWidth)).toBe(true);
+  });
+
   test('unmount while native work is running rejects its late completion', async () => {
     const coordinator = new PreviewCoordinator();
     const native = deferred<string>();
