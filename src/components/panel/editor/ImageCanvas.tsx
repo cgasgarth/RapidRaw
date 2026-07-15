@@ -34,7 +34,10 @@ import {
 import { PreviewUrlReleaseAuthority } from '../../../utils/previewUrlReleaseAuthority';
 import type { SubMaskInteractionIdentity } from '../../../utils/subMaskInteractionEditTransaction';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
-import type { WhiteBalancePickerRuntimeReceipt } from '../../../utils/whiteBalancePicker';
+import type {
+  WhiteBalancePickerAdjustmentCommand,
+  WhiteBalancePickerRuntimeReceipt,
+} from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, ToolType } from '../right/layers/Masks';
@@ -80,6 +83,7 @@ import type {
 } from './viewerInitialMaskDrawInteractionController';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { type ViewerInteractionContext, viewerInteractionToolId } from './viewerInteractionCoordinator';
+import type { ViewerMaskOverlayDescriptor } from './viewerMaskOverlayController';
 import type { ViewerMaskShapeCurrentContext } from './viewerMaskShapeInteractionController';
 import type {
   ViewerParametricMaskTargetCommand,
@@ -130,6 +134,18 @@ const canvasOverlayShadowProps = {
   shadowColor: canvasOverlayTokens.shadow.color,
   shadowOpacity: canvasOverlayTokens.shadow.opacity,
 } as const;
+export interface ViewerWhiteBalanceRuntimeDescriptor {
+  readonly active: boolean;
+  readonly baseWhiteBalance: { readonly temperature: number; readonly tint: number };
+  readonly commands: {
+    readonly cancelPreview?: () => void;
+    readonly commit?: (command: WhiteBalancePickerAdjustmentCommand) => void;
+    readonly preview?: (command: WhiteBalancePickerAdjustmentCommand) => void;
+  };
+  readonly imageSessionId: string;
+  readonly lastReceipt: WhiteBalancePickerRuntimeReceipt | null;
+}
+
 interface ImageCanvasProps {
   adjustmentRevision: number;
   appSettings: AppSettings | null;
@@ -162,8 +178,7 @@ interface ImageCanvasProps {
   isGamutWarningOverlayVisible: boolean;
   isStraightenActive: boolean;
   isRotationActive?: boolean;
-  maskOverlayUrl: string | null;
-  maskOverlayRuntimeState?: { identity: string | null; status: 'current' | 'none' | 'stale-ignored' };
+  maskOverlay: ViewerMaskOverlayDescriptor;
   onAiMaskBoxCommit: (command: ViewerAiMaskBoxCommand) => void;
   onBrushCommit: (command: ViewerBrushCommitResult) => void;
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
@@ -190,13 +205,7 @@ interface ImageCanvasProps {
   uncroppedAdjustedPreviewUrl: string | null;
   updateSubMask: (id: string | null, subMask: Partial<SubMask>, identity: SubMaskInteractionIdentity) => void;
   interactivePatch?: InteractivePatch | null;
-  isWbPickerActive?: boolean;
-  lastWhiteBalancePickerReceipt?: WhiteBalancePickerRuntimeReceipt | null;
-  onWbPicked?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
-  onWbPreview?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
-  onWbPreviewCancel?: () => void;
-  wbPickerBaseAdjustments?: Adjustments;
-  pickerImageSessionId?: string;
+  whiteBalanceRuntime?: ViewerWhiteBalanceRuntimeDescriptor;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
   cursorStyle: string;
@@ -248,8 +257,7 @@ export const ImageCanvas = memo(
     isGamutWarningOverlayVisible,
     isStraightenActive,
     isRotationActive,
-    maskOverlayUrl,
-    maskOverlayRuntimeState,
+    maskOverlay,
     onAiMaskBoxCommit,
     onBrushCommit,
     onInitialMaskDrawCommit,
@@ -275,13 +283,7 @@ export const ImageCanvas = memo(
     comparisonLabel = null,
     uncroppedAdjustedPreviewUrl,
     updateSubMask,
-    isWbPickerActive = false,
-    lastWhiteBalancePickerReceipt,
-    onWbPicked,
-    onWbPreview,
-    onWbPreviewCancel,
-    wbPickerBaseAdjustments = adjustments,
-    pickerImageSessionId = imageSessionId ?? `viewer-source:${selectedImage.path}`,
+    whiteBalanceRuntime,
     overlayRotation,
     overlayMode,
     cursorStyle,
@@ -297,6 +299,10 @@ export const ImageCanvas = memo(
     onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
+    const isWbPickerActive = whiteBalanceRuntime?.active ?? false;
+    const lastWhiteBalancePickerReceipt = whiteBalanceRuntime?.lastReceipt ?? null;
+    const pickerImageSessionId =
+      whiteBalanceRuntime?.imageSessionId ?? imageSessionId ?? `viewer-source:${selectedImage.path}`;
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalPresentation, setOriginalPresentation] = useState<{
@@ -357,7 +363,7 @@ export const ImageCanvas = memo(
           compareIdentity: JSON.stringify({ compareDividerPosition, compareMode, compareOrientation, showOriginal }),
           geometry: overlayGeometry,
           graphRevision: viewerSampleGraphRevision,
-          overlayIdentity: JSON.stringify({ mask: maskOverlayRuntimeState?.identity ?? null, overlayMode }),
+          overlayIdentity: JSON.stringify({ mask: maskOverlay.identity, overlayMode }),
           proofTransformIdentity: JSON.stringify({
             enabled: isExportSoftProofEnabled,
             recipeId: exportSoftProofRecipeId,
@@ -375,7 +381,7 @@ export const ImageCanvas = memo(
         imageRenderSize.width,
         isExportSoftProofEnabled,
         isSliderDragging,
-        maskOverlayRuntimeState?.identity,
+        maskOverlay.identity,
         overlayGeometry,
         overlayMode,
         providedPresentationDescriptor,
@@ -422,12 +428,19 @@ export const ImageCanvas = memo(
     });
     const whiteBalanceController = useViewerWhiteBalanceController({
       active: isWbPickerActive,
-      baseAdjustments: wbPickerBaseAdjustments,
+      baseWhiteBalance: whiteBalanceRuntime?.baseWhiteBalance ?? {
+        temperature: adjustments.temperature,
+        tint: adjustments.tint,
+      },
       geometry: overlayGeometry,
-      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
-      ...(onWbPicked === undefined ? {} : { onCommit: onWbPicked }),
-      ...(onWbPreview === undefined ? {} : { onPreview: onWbPreview }),
-      ...(onWbPreviewCancel === undefined ? {} : { onPreviewCancel: onWbPreviewCancel }),
+      imageSessionId: pickerImageSessionId,
+      ...(whiteBalanceRuntime?.commands.commit === undefined ? {} : { onCommit: whiteBalanceRuntime.commands.commit }),
+      ...(whiteBalanceRuntime?.commands.preview === undefined
+        ? {}
+        : { onPreview: whiteBalanceRuntime.commands.preview }),
+      ...(whiteBalanceRuntime?.commands.cancelPreview === undefined
+        ? {}
+        : { onPreviewCancel: whiteBalanceRuntime.commands.cancelPreview }),
       presentation: presentationDescriptor,
       previewUrl: finalPreviewUrl,
       selectedImagePath: selectedImage.path,
@@ -888,7 +901,7 @@ export const ImageCanvas = memo(
       suppressed: samplerSuppressed,
     });
 
-    const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
+    const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl: maskOverlay.url });
 
     const sortedSubMasks = useMemo(() => {
       if (!activeContainer) {
@@ -1242,8 +1255,9 @@ export const ImageCanvas = memo(
         data-editor-gamut-overlay-visible={String(showGamutWarningOverlay)}
         data-editor-mask-overlay-visible={String(overlayVisibility.showMaskOverlay)}
         data-editor-overlay-blocker={overlayBlocker}
-        data-mask-overlay-identity={maskOverlayRuntimeState?.identity ?? ''}
-        data-mask-overlay-status={maskOverlayRuntimeState?.status ?? 'none'}
+        data-mask-overlay-identity={maskOverlay.identity}
+        data-mask-overlay-operation={maskOverlay.key?.operationGeneration ?? ''}
+        data-mask-overlay-status={maskOverlay.status}
         data-mask-overlay-url-present={String(displayedMaskUrl !== null)}
         data-preview-backend={wgpuPreviewVisibility.previewBackend}
         data-presentation-fingerprint={presentationDescriptor.fingerprint}
