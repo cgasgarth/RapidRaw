@@ -3007,7 +3007,11 @@ try {
   }
   await page.getByTestId('viewer-footer-zoom-select').selectOption('fit');
   await waitForStablePreview(page);
-  await assertVisibleNonEmptyPreviewPixels(page, 'fit-after-image-select', sourceIdentity);
+  await assertVisibleNonEmptyPreviewPixels(
+    page,
+    'fit-after-image-select',
+    '/tmp/rawengine-browser-harness/browser-harness.ARW',
+  );
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
