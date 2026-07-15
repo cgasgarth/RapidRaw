@@ -31,7 +31,6 @@ import {
   parseInteractivePreviewPatchPayload,
 } from '../../utils/interactivePreviewPatch';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
-import { presentedPreviewReleaseCoordinator } from '../../utils/presentedPreviewReleaseCoordinator';
 import {
   createPreviewQualityPolicy,
   fingerprintPreviewGraphRevision,
@@ -42,6 +41,7 @@ import {
   type PreviewSessionIdentity,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import {
   type PreviewViewportAuthoritySnapshot,
   PreviewViewportSnapshotController,
@@ -122,6 +122,11 @@ export function useImageProcessing() {
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
+  const previewUrlReleaseAuthorityRef = useRef<PreviewUrlReleaseAuthority | null>(null);
+  const previewUrlReleaseAuthority =
+    previewUrlReleaseAuthorityRef.current ??
+    new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) });
+  previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<MaterializedEditedPreviewValue> | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
 
@@ -141,26 +146,10 @@ export function useImageProcessing() {
           setEditor({ transformedOriginalUrl: effect.artifact.url });
         }
       }
-      for (const effect of transition.effects) {
-        if (effect.type !== 'release-url' || !effect.url.startsWith('blob:')) continue;
-        const channel =
-          previous.originalArtifact?.url === effect.url && previous.visibleArtifact?.url !== effect.url
-            ? 'original'
-            : 'base';
-        const successor =
-          channel === 'original' ? transition.state.originalArtifact?.url : transition.state.visibleArtifact?.url;
-        const surfaceCancelled =
-          effect.reason === 'editor-unmounted' ||
-          effect.reason === 'compare-disabled' ||
-          (channel === 'original' && effect.reason === 'image-session-replaced');
-        const neverPresented =
-          effect.reason === 'artifact-not-presented' || effect.reason === 'stale-original-artifact';
-        if (surfaceCancelled || neverPresented) URL.revokeObjectURL(effect.url);
-        else presentedPreviewReleaseCoordinator.defer(effect.url, channel, successor ?? null);
-      }
+      previewUrlReleaseAuthority.consume(previous, transition);
       return transition;
     },
-    [previewCoordinator, setEditor],
+    [previewCoordinator, previewUrlReleaseAuthority, setEditor],
   );
 
   const originalPreviewRunner =
@@ -194,7 +183,7 @@ export function useImageProcessing() {
       try {
         await decodeInteractivePreviewUrl(url);
       } catch (error) {
-        URL.revokeObjectURL(url);
+        previewUrlReleaseAuthority.release(url);
         throw error;
       }
       const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
@@ -202,7 +191,7 @@ export function useImageProcessing() {
         ? { decodeMs, value: { kind: 'patch', patch, url } }
         : { artifactUrl: url, decodeMs, value: { kind: 'full', transform, url } };
     },
-    [],
+    [previewUrlReleaseAuthority],
   );
 
   const onEditedPreviewPresented = useCallback(
@@ -350,7 +339,9 @@ export function useImageProcessing() {
       },
       onPresented: onEditedPreviewPresented,
       releaseMaterialized: (result) => {
-        if (result.value.kind === 'patch' || result.value.kind === 'full') URL.revokeObjectURL(result.value.url);
+        if (result.value.kind === 'patch' || result.value.kind === 'full') {
+          previewUrlReleaseAuthority.release(result.value.url);
+        }
       },
     });
   editedPreviewRunnerRef.current = editedPreviewRunner;
@@ -500,9 +491,6 @@ export function useImageProcessing() {
       dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
       editedPreviewRunner.cancel();
       originalPreviewRunner.dispose();
-      presentedPreviewReleaseCoordinator.cancel((url) => {
-        if (!globalImageCache.isProtected(url)) URL.revokeObjectURL(url);
-      });
     },
     [dispatchPreviewCoordinator, editedPreviewRunner, originalPreviewRunner],
   );

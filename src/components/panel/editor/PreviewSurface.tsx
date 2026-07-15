@@ -7,6 +7,7 @@ import {
   resolveCompareDividerGeometry,
 } from '../../../utils/editorCompare';
 import { imageCanvasLayerZIndex } from './imageCanvasContracts';
+import { type PreviewLayerReleaseReason, SvgPreviewHandoff } from './SvgPreviewHandoff';
 
 interface PreviewSurfaceProps {
   children: ReactNode;
@@ -17,9 +18,12 @@ interface PreviewSurfaceProps {
   isCropViewVisible: boolean;
   isMaxZoom: boolean | undefined;
   originalImageRenderSize: RenderSize;
-  originalLoaded: boolean;
+  originalScopeKey: string;
   originalSrc: string | null;
+  onOriginalFailed: (url: string) => void;
   onOriginalPresented: (url: string) => void;
+  releasePreviewUrl: (owner: string, url: string, reason: PreviewLayerReleaseReason) => void;
+  retainPreviewUrl: (owner: string, url: string) => void;
   showOriginalCompare: boolean;
   showSideBySideCompare: boolean;
   showSplitCompare: boolean;
@@ -45,9 +49,12 @@ export function PreviewSurface({
   isCropViewVisible,
   isMaxZoom,
   originalImageRenderSize,
-  originalLoaded,
+  originalScopeKey,
   originalSrc,
+  onOriginalFailed,
   onOriginalPresented,
+  releasePreviewUrl,
+  retainPreviewUrl,
   showOriginalCompare,
   showSideBySideCompare,
   showSplitCompare,
@@ -67,8 +74,8 @@ export function PreviewSurface({
     ...renderRectStyle(originalRect),
     clipPath: showSplitCompare ? divider.clipPath : undefined,
     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
-    opacity: (showOriginalCompare || showSplitCompare || isPaired) && originalLoaded ? 1 : 0,
-    transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
+    opacity: showOriginalCompare || showSplitCompare || isPaired ? 1 : 0,
+    transition: 'opacity 150ms ease-in-out',
     zIndex: imageCanvasLayerZIndex(isPaired ? 'preview' : 'comparisonReveal'),
   };
 
@@ -105,13 +112,26 @@ export function PreviewSurface({
             {svgPreview}
           </svg>
           {originalSrc && (
-            <img
-              alt={t('editor.canvas.originalAlt')}
+            <svg
+              aria-label={t('editor.canvas.originalAlt')}
               className={hasSizedImage ? 'pointer-events-none' : 'absolute inset-0 h-full w-full object-contain'}
-              onLoad={() => onOriginalPresented(originalSrc)}
-              src={originalSrc}
+              preserveAspectRatio="none"
+              role="img"
               style={hasSizedImage ? originalStyle : { ...originalStyle, inset: '0px', objectFit: 'contain' }}
-            />
+            >
+              <SvgPreviewHandoff
+                baseScopeKey={`original:${originalScopeKey}`}
+                baseSource={originalSrc}
+                incomingPatch={null}
+                isCpuPreviewVisible
+                isMaxZoom={isMaxZoom}
+                onBaseFailed={onOriginalFailed}
+                onBasePresented={onOriginalPresented}
+                patchScopeKey={`original-patch:${originalScopeKey}`}
+                releaseUrl={releasePreviewUrl}
+                retainUrl={retainPreviewUrl}
+              />
+            </svg>
           )}
           {children}
         </div>

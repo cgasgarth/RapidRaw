@@ -49,6 +49,93 @@ interface BoundsReport {
 
 const boundsSamples: BoundsSample[] = [];
 
+async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
+  const exposureValue = page.getByTestId('basic-control-exposure-value');
+  const applyBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [200, 40, 40], delayMs: 20 },
+      { color: [40, 40, 200], delayMs: 20 },
+      { color: [40, 200, 40], delayMs: 20 },
+    );
+  });
+  for (const [index, exposure] of ['0.15', '0.35', '0.55'].entries()) {
+    await exposureValue.click();
+    const input = page.getByTestId('basic-control-exposure-input');
+    await input.fill(exposure);
+    await input.press('Enter');
+    await page.waitForFunction(
+      (expected) =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+          .length ?? 0) >= expected,
+      applyBaseline + index + 1,
+      { timeout: 10_000 },
+    );
+  }
+  await page.waitForTimeout(800);
+
+  const overflow = page.getByTestId('editor-command-overflow-trigger');
+  await overflow.click();
+  const splitCompare = page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u });
+  await splitCompare.click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length > 0,
+    { timeout: 10_000 },
+  );
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('1');
+  await page.waitForTimeout(500);
+
+  const proof = await page.evaluate(async () => {
+    const audit = Reflect.get(window, '__RAWENGINE_PREVIEW_URL_AUDIT__') as
+      | { created: string[]; imageErrors: string[]; revoked: string[] }
+      | undefined;
+    if (!audit) throw new Error('Preview URL audit was not installed.');
+    const visibleHrefs = [...document.querySelectorAll<SVGImageElement>('[data-preview-layer-id]')]
+      .filter((layer) => Number.parseFloat(getComputedStyle(layer).opacity) > 0.99)
+      .map((layer) => layer.getAttribute('href'))
+      .filter((href): href is string => href !== null);
+    const decodeFailures: string[] = [];
+    for (const href of visibleHrefs) {
+      const image = new Image();
+      image.src = href;
+      try {
+        await image.decode();
+      } catch {
+        decodeFailures.push(href);
+      }
+    }
+    return { ...audit, decodeFailures, visibleHrefs };
+  });
+  if (proof.created.length < 3) {
+    throw new Error(`Preview URL proof created too few edited artifacts: ${JSON.stringify(proof)}.`);
+  }
+  if (proof.revoked.length === 0) {
+    throw new Error(`Preview URL proof did not retire any replaced artifacts: ${JSON.stringify(proof)}.`);
+  }
+  const revokeCounts = Map.groupBy(proof.revoked, (url) => url);
+  const duplicateRevokes = [...revokeCounts].filter(([, urls]) => urls.length > 1).map(([url]) => url);
+  if (duplicateRevokes.length > 0) {
+    throw new Error(`Preview URLs were revoked more than once: ${duplicateRevokes.join(', ')}.`);
+  }
+  const revokedVisible = proof.visibleHrefs.filter((url) => proof.revoked.includes(url));
+  if (revokedVisible.length > 0 || proof.decodeFailures.length > 0 || proof.imageErrors.length > 0) {
+    throw new Error(`Visible preview ownership broke: ${JSON.stringify(proof)}.`);
+  }
+
+  await overflow.click();
+  await splitCompare.click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length === 0,
+    { timeout: 10_000 },
+  );
+}
+
 async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
   await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
   const recover = page.locator('[data-testid$="-analytics-header-recover-scopes"]').first();
@@ -1608,6 +1695,35 @@ try {
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
   });
+  if (browserScenario === 'preview-url-lifetime') {
+    await page.addInitScript(() => {
+      const created: string[] = [];
+      const imageErrors: string[] = [];
+      const revoked: string[] = [];
+      const createObjectURL = URL.createObjectURL.bind(URL);
+      const revokeObjectURL = URL.revokeObjectURL.bind(URL);
+      URL.createObjectURL = (blob: Blob): string => {
+        const url = createObjectURL(blob);
+        created.push(url);
+        return url;
+      };
+      URL.revokeObjectURL = (url: string): void => {
+        revoked.push(url);
+        revokeObjectURL(url);
+      };
+      window.addEventListener(
+        'error',
+        (event) => {
+          const target = event.target;
+          if (target instanceof HTMLImageElement || target instanceof SVGImageElement) {
+            imageErrors.push(target.getAttribute('src') ?? target.getAttribute('href') ?? 'unknown-image');
+          }
+        },
+        true,
+      );
+      Reflect.set(window, '__RAWENGINE_PREVIEW_URL_AUDIT__', { created, imageErrors, revoked });
+    });
+  }
   await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -1641,6 +1757,17 @@ try {
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
+  if (browserScenario === 'preview-url-lifetime') {
+    await verifyPreviewUrlLifetime(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected preview URL lifetime browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('preview URL lifetime browser proof passed');
+    process.exit(0);
+  }
   if (browserScenario === 'analytics-artifact-authority') {
     await verifyPreviewAnalyticsArtifactAuthority(page);
     if (consoleErrors.length > 0) {

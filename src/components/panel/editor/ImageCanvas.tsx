@@ -39,7 +39,7 @@ import {
   InteractivePreviewUrlRegistry,
   isInteractivePreviewPatchCoherent,
 } from '../../../utils/interactivePreviewPatch';
-import { presentedPreviewReleaseCoordinator } from '../../../utils/presentedPreviewReleaseCoordinator';
+import { PreviewUrlReleaseAuthority } from '../../../utils/previewUrlReleaseAuthority';
 import {
   captureSubMaskInteractionIdentity,
   type SubMaskInteractionIdentity,
@@ -126,6 +126,8 @@ import type { ViewerPickerCommitResult } from './viewerPickerInteractionControll
 import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
+
+const acknowledgeSurfacePaint = (): void => undefined;
 
 declare global {
   interface Window {
@@ -372,8 +374,10 @@ export const ImageCanvas = memo(
     const { t } = useTranslation();
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
-    const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
-    const [originalLoadFailed, setOriginalLoadFailed] = useState(false);
+    const [originalPresentation, setOriginalPresentation] = useState<{
+      status: 'error' | 'ready';
+      url: string;
+    } | null>(null);
     const [isMaskInteractionActive, setIsMaskInteractionActive] = useState(false);
     const maskInteractionIdentityRef = useRef<SubMaskInteractionIdentity | null>(null);
     const isDrawing = useRef(false);
@@ -539,22 +543,8 @@ export const ImageCanvas = memo(
     });
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
-    const releasePresentedPreviewUrl = useCallback((url: string) => {
-      // The cache may retain an outgoing surface for instant A -> B -> A reuse.
-      // Its eviction path owns revocation until get() transfers ownership back.
-      if (!globalImageCache.isProtected(url)) URL.revokeObjectURL(url);
-    }, []);
-    const acknowledgeBasePreviewUrl = useCallback(
-      (url: string) => {
-        presentedPreviewReleaseCoordinator.acknowledge('base', url, releasePresentedPreviewUrl);
-      },
-      [releasePresentedPreviewUrl],
-    );
-    const acknowledgeOriginalPreviewUrl = useCallback(
-      (url: string) => {
-        presentedPreviewReleaseCoordinator.acknowledge('original', url, releasePresentedPreviewUrl);
-      },
-      [releasePresentedPreviewUrl],
+    const [surfacePreviewUrlReleaseAuthority] = useState(
+      () => new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) }),
     );
     const retainPreviewLayerUrl = useCallback(
       (owner: string, url: string) => {
@@ -564,20 +554,25 @@ export const ImageCanvas = memo(
     );
 
     const releasePreviewLayerUrl = useCallback(
-      (owner: string, url: string) => {
+      (owner: string, url: string, reason: 'retired' | 'unmounted') => {
         if (!interactivePreviewUrlRegistry.release(owner, url)) return;
         if (
-          url === finalPreviewUrl ||
-          url === interactivePatch?.url ||
           url === selectedImage.thumbnailUrl ||
-          presentedPreviewReleaseCoordinator.hasPendingRelease(url) ||
-          globalImageCache.isProtected(url)
+          (reason === 'retired' &&
+            (url === finalPreviewUrl || url === interactivePatch?.url || url === transformedOriginalUrl))
         ) {
           return;
         }
-        URL.revokeObjectURL(url);
+        surfacePreviewUrlReleaseAuthority.release(url);
       },
-      [finalPreviewUrl, interactivePatch?.url, interactivePreviewUrlRegistry, selectedImage.thumbnailUrl],
+      [
+        finalPreviewUrl,
+        interactivePatch?.url,
+        interactivePreviewUrlRegistry,
+        selectedImage.thumbnailUrl,
+        surfacePreviewUrlReleaseAuthority,
+        transformedOriginalUrl,
+      ],
     );
 
     const canonicalBrushTool = brushSettings?.tool ?? ToolType.Brush;
@@ -1703,7 +1698,25 @@ export const ImageCanvas = memo(
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const isCropViewVisible = resolveCropPreviewVisibility({ cropPreviewUrl, isCropping, loadedCropPreviewUrl });
     const originalSrc = transformedOriginalUrl;
-    const canShowOriginalCompare = !!originalSrc && originalLoaded;
+    const originalLoaded =
+      originalSrc !== null && originalPresentation?.url === originalSrc && originalPresentation.status === 'ready';
+    const originalLoadFailed =
+      originalSrc !== null && originalPresentation?.url === originalSrc && originalPresentation.status === 'error';
+    const canShowOriginalCompare = originalLoaded;
+    const handleOriginalPresented = useCallback(
+      (url: string) => {
+        if (url !== transformedOriginalUrl) return;
+        setOriginalPresentation({ status: 'ready', url });
+      },
+      [transformedOriginalUrl],
+    );
+    const handleOriginalFailed = useCallback(
+      (url: string) => {
+        if (url !== transformedOriginalUrl) return;
+        setOriginalPresentation({ status: 'error', url });
+      },
+      [transformedOriginalUrl],
+    );
     const renderedPreviewWarningStatus = getRenderedPreviewWarningStatus(gamutWarningOverlay, {
       exportSoftProofRecipeId,
       exportSoftProofTransform,
@@ -1765,38 +1778,6 @@ export const ImageCanvas = memo(
       retouchHandlesController.activeMode === null &&
       !isCompareModeActive &&
       !showGamutWarningOverlay;
-
-    useEffect(() => {
-      if (!originalSrc) {
-        setOriginalLoaded(false);
-        setOriginalLoadFailed(false);
-        return;
-      }
-
-      const img = new Image();
-      img.src = originalSrc;
-
-      if (img.complete) {
-        setOriginalLoaded(img.naturalWidth > 0);
-        setOriginalLoadFailed(img.naturalWidth === 0);
-      } else {
-        setOriginalLoaded(false);
-        setOriginalLoadFailed(false);
-        img.onload = () => {
-          setOriginalLoaded(true);
-          setOriginalLoadFailed(false);
-        };
-        img.onerror = () => {
-          setOriginalLoaded(false);
-          setOriginalLoadFailed(true);
-        };
-      }
-
-      return () => {
-        img.onload = null;
-        img.onerror = null;
-      };
-    }, [originalSrc]);
 
     const patchGeometryIdentity = adjustmentGeometryRevision;
     const patchScopeKey = [
@@ -2129,10 +2110,13 @@ export const ImageCanvas = memo(
             imageRenderSize={imageRenderSize}
             isCropViewVisible={isCropViewVisible}
             isMaxZoom={isMaxZoom}
-            originalLoaded={originalLoaded}
             originalImageRenderSize={originalImageRenderSize}
+            originalScopeKey={selectedImage.path}
             originalSrc={originalSrc}
-            onOriginalPresented={acknowledgeOriginalPreviewUrl}
+            onOriginalFailed={handleOriginalFailed}
+            onOriginalPresented={handleOriginalPresented}
+            releasePreviewUrl={releasePreviewLayerUrl}
+            retainPreviewUrl={retainPreviewLayerUrl}
             showOriginalCompare={showOriginalCompare}
             showSideBySideCompare={isSideBySideCompare}
             showSplitCompare={showSplitCompare}
@@ -2144,7 +2128,7 @@ export const ImageCanvas = memo(
                 incomingPatch={coherentInteractivePatch}
                 isCpuPreviewVisible={!isWgpuActive}
                 isMaxZoom={isMaxZoom}
-                onBasePresented={acknowledgeBasePreviewUrl}
+                onBasePresented={acknowledgeSurfacePaint}
                 patchScopeKey={patchScopeKey}
                 releaseUrl={releasePreviewLayerUrl}
                 retainUrl={retainPreviewLayerUrl}
