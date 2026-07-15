@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
-import { runPureTsUnitShards, selectPureTsFailureContext } from '../../../scripts/ci/run-pure-ts-unit';
+import {
+  formatPureTsShardFailure,
+  runPureTsUnitShards,
+  selectPureTsFailureContext,
+} from '../../../scripts/ci/run-pure-ts-unit';
 
 const temporaryRoots: string[] = [];
 
@@ -71,6 +75,43 @@ describe('pure TypeScript unit runner', () => {
     expect(context).toContain('(fail) example contract');
     expect(context).not.toContain('leading noise 0');
     expect(context).not.toContain('trailing noise 39');
+    expect(context.split('\n').length).toBeLessThanOrEqual(16);
+  });
+
+  test('keeps the assertion and file through the outer compact-command budget', async () => {
+    const root = await temporaryRoot('unit-nested-diagnostics');
+    const error = [
+      ...Array.from({ length: 40 }, (_, index) => `leading noise ${String(index)}`),
+      'error: QA daemon socket was not ready',
+      '      at <anonymous> (/repo/tests/pure-ts/qa-daemon.test.ts:358:17)',
+      '(fail) QA daemon lifecycle > removes ownership state and socket on SIGTERM',
+      ...Array.from({ length: 40 }, (_, index) => `trailing noise ${String(index)}`),
+    ].join('\n');
+    const inner = formatPureTsShardFailure(
+      {
+        command: ['bun', 'test', '--shard=4/8', 'tests/pure-ts'],
+        durationMs: 125,
+        exitCode: 1,
+        pid: process.pid,
+        shard: 4,
+        stderr: error,
+        stdout: '',
+        timedOut: false,
+      },
+      8,
+    );
+    expect(inner.split('\n').length).toBeLessThanOrEqual(19);
+    const emitter = join(root, 'emit-failure.ts');
+    await writeFile(emitter, `process.stderr.write(${JSON.stringify(inner)}); process.exit(1);\n`);
+    const outer = Bun.spawn(['bun', 'scripts/ci/run-compact-command.ts', '--label', 'unit', '--', 'bun', emitter], {
+      cwd: resolve(import.meta.dir, '../../..'),
+      stderr: 'pipe',
+      stdout: 'pipe',
+    });
+    const [exitCode, stderr] = await Promise.all([outer.exited, new Response(outer.stderr).text()]);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('qa-daemon.test.ts:358');
+    expect(stderr).toContain('(fail) QA daemon lifecycle');
   });
 
   test('shards file-process accumulation without reducing total worker concurrency', async () => {

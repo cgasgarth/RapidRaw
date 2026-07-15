@@ -79,6 +79,7 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
     const socket = connect(socketPath);
     let response = '';
     socket.setEncoding('utf8');
+    socket.setTimeout(1_000, () => socket.destroy(new Error('QA daemon test socket response timed out.')));
     socket.once('connect', () => socket.write(`${JSON.stringify(value)}\n`));
     socket.on('data', (chunk) => (response += chunk));
     socket.once('end', () => {
@@ -108,7 +109,14 @@ const waitForDaemonState = async (
 ): Promise<QaDaemonStateRecord> => {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const state = await readLiveDaemonState(worktree);
-    if (state !== undefined) return state;
+    if (state !== undefined) {
+      try {
+        const health = await socketRequest(state.socketPath, { id: `startup-${String(attempt)}`, method: 'health' });
+        if (health.ok) return state;
+      } catch {
+        // State publication precedes socket readiness; keep polling the bounded startup contract.
+      }
+    }
     if (child.exitCode !== null) break;
     await Bun.sleep(25);
   }
@@ -353,9 +361,6 @@ describe('QA daemon lifecycle', () => {
     const repository = resolve(import.meta.dir, '../..');
     const child = spawnQaDaemon(repository, worktree);
     const state = await waitForDaemonState(child, worktree);
-    await expect(
-      socketRequest(state.socketPath, { id: 'health-before-signal', method: 'health' }),
-    ).resolves.toMatchObject({ id: 'health-before-signal', ok: true });
     child.kill('SIGTERM');
     await Promise.race([
       child.exited,

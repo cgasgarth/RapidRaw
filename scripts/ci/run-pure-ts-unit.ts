@@ -2,7 +2,7 @@
 
 import { performance } from 'node:perf_hooks';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
+import { formatCommandForLog, readBoundedStream } from '../lib/ci/compact-output.ts';
 
 const DEFAULT_SHARD_COUNT = 8;
 const DEFAULT_WORKERS_PER_SHARD = 2;
@@ -32,17 +32,28 @@ const FAILURE_ANCHOR = /(?:^error:|^\(fail\)|\.test\.[cm]?[jt]sx?:\d+|panic)/u;
 
 export const selectPureTsFailureContext = (output: string): string => {
   const lines = output.split(/\r?\n/u);
-  const selected = new Set<number>();
-  for (const [index, line] of lines.entries()) {
-    if (!FAILURE_ANCHOR.test(line)) continue;
-    for (let context = Math.max(0, index - 8); context <= Math.min(lines.length - 1, index + 12); context += 1)
-      selected.add(context);
+  const anchor = lines.findIndex((line) => /^error:/u.test(line));
+  const fallbackAnchor = anchor >= 0 ? anchor : lines.findIndex((line) => FAILURE_ANCHOR.test(line));
+  if (fallbackAnchor < 0) {
+    if (lines.length <= 16) return output;
+    return [...lines.slice(0, 6), '[...]', ...lines.slice(-9)].join('\n');
   }
-  if (selected.size === 0) return output;
-  return [...selected]
-    .sort((left, right) => left - right)
-    .map((index) => lines[index])
-    .join('\n');
+  return lines.slice(Math.max(0, fallbackAnchor - 6), Math.min(lines.length, fallbackAnchor + 10)).join('\n');
+};
+
+export const formatPureTsShardFailure = (result: PureTsUnitShardResult, shardCount: number): string => {
+  const disposition = result.timedOut
+    ? `timed out after ${String(result.durationMs)}ms`
+    : `failed exit=${result.exitCode}`;
+  const output = result.stderr.trim() === '' ? result.stdout : result.stderr;
+  return [
+    `pure-ts shard ${String(result.shard)}/${String(shardCount)} ${disposition}`,
+    `$ ${formatCommandForLog(result.command[0], result.command.slice(1))}`,
+    selectPureTsFailureContext(output).trimEnd(),
+  ]
+    .filter((line) => line !== '')
+    .join('\n')
+    .concat('\n');
 };
 
 const positiveInteger = (value: number, name: string): number => {
@@ -147,22 +158,7 @@ if (import.meta.main) {
     process.exit(0);
   }
   for (const result of failed) {
-    const disposition = result.timedOut
-      ? `timed out after ${String(result.durationMs)}ms`
-      : `failed exit=${result.exitCode}`;
-    console.error(`pure-ts shard ${String(result.shard)}/${String(results.length)} ${disposition}`);
-    console.error(`$ ${formatCommandForLog(result.command[0], result.command.slice(1))}`);
-    const diagnosticOptions = { headLines: 30, maxChars: 8_000, maxLines: 80, tailLines: 40 };
-    writeBoundedOutput(
-      `shard ${String(result.shard)} stdout`,
-      selectPureTsFailureContext(result.stdout),
-      diagnosticOptions,
-    );
-    writeBoundedOutput(
-      `shard ${String(result.shard)} stderr`,
-      selectPureTsFailureContext(result.stderr),
-      diagnosticOptions,
-    );
+    process.stderr.write(formatPureTsShardFailure(result, results.length));
   }
   process.exit(1);
 }
