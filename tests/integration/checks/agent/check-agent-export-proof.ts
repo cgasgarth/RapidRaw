@@ -192,7 +192,9 @@ if (pngProof.exportHash === proof.exportHash) {
 
 const presetSettings = buildAgentExportPresetSettings({
   presets: [
+    { id: 'invalid-incomplete-recipe', name: 'Needs review' },
     {
+      blackPointCompensation: false,
       colorProfile: 'displayP3',
       dontEnlarge: true,
       enableResize: true,
@@ -204,6 +206,7 @@ const presetSettings = buildAgentExportPresetSettings({
       jpegQuality: 91,
       keepMetadata: true,
       name: 'last used',
+      outputSharpening: null,
       preserveFolders: false,
       preserveTimestamps: false,
       renderingIntent: 'perceptual',

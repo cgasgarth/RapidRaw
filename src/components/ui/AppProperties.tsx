@@ -3,7 +3,6 @@ import type { EditDocumentV2CopyPayload } from '../../../packages/rawengine-sche
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import type { ToolType } from '../panel/right/layers/Masks';
-import type { ExportPreset } from './ExportImportProperties';
 
 export const GLOBAL_KEYS = [
   ' ',
@@ -120,7 +119,7 @@ export interface AppSettings {
   rawProcessingMode?: string;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
-  exportPresets?: ExportPreset[];
+  exportPresets?: Array<unknown>;
   myLenses?: MyLens[];
   thumbnailResolution?: number;
   thumbnailWorkerThreads?: number;

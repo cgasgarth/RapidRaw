@@ -167,12 +167,16 @@ const parsedRecipe = exportRecipeSchema.parse({
   dontEnlarge: true,
   enableResize: false,
   enableWatermark: false,
+  exportMasks: false,
   fileFormat: 'jpeg',
   filenameTemplate: '{original_filename}_intent',
   id: 'display-p3-relative-intent',
   jpegQuality: 92,
   keepMetadata: true,
   name: 'Display P3 Relative Intent',
+  outputSharpening: null,
+  preserveFolders: false,
+  preserveTimestamps: false,
   renderingIntent: 'relativeColorimetric',
   resizeMode: 'longEdge',
   resizeValue: 2048,
@@ -217,6 +221,7 @@ for (const invalidRecipe of [
 }
 
 const packageSourceEmbeddedRecipe = {
+  blackPointCompensation: false,
   colorProfile: 'sourceEmbedded',
   dontEnlarge: true,
   enableResize: false,
@@ -228,6 +233,7 @@ const packageSourceEmbeddedRecipe = {
   jpegQuality: 100,
   keepMetadata: true,
   name: 'Package Source Embedded Relative Intent',
+  outputSharpening: null,
   preserveFolders: false,
   preserveTimestamps: false,
   renderingIntent: 'relativeColorimetric',

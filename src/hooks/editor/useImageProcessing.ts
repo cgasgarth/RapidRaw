@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Panel } from '../../components/ui/AppProperties';
+import { findCurrentExportRecipe } from '../../schemas/export/exportRecipeSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -78,8 +79,8 @@ export function useImageProcessing() {
   const selectedProofRecipe = useMemo(
     () =>
       isExportSoftProofEnabled
-        ? (appSettings?.exportPresets ?? []).find((preset) => preset.id === exportSoftProofRecipeId)
-        : undefined,
+        ? findCurrentExportRecipe(appSettings?.exportPresets ?? [], exportSoftProofRecipeId ?? '')
+        : null,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
   const previewQualityControllerRef = useRef<PreviewViewportQualityController | null>(null);

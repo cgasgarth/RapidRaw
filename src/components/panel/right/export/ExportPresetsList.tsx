@@ -3,7 +3,11 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
-import { exportRecipeSchema } from '../../../../schemas/export/exportRecipeSchemas';
+import {
+  buildCurrentExportRecipe,
+  type ExportRecipeSettings,
+  exportRecipeSchema,
+} from '../../../../schemas/export/exportRecipeSchemas';
 import { buildExportRecipeUiRows } from '../../../../schemas/export/exportRecipeUiSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { TextVariants } from '../../../../types/typography';
@@ -16,7 +20,7 @@ import UiText from '../../../ui/primitives/Text';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;
-  currentSettings: Omit<ExportPreset, 'id' | 'name'>;
+  currentSettings: ExportRecipeSettings;
   onApplyPreset: (preset: ExportPreset) => void;
   onSettingsChange: (settings: AppSettings) => void;
 }
@@ -30,21 +34,22 @@ export default function ExportPresetsList({
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
+  const [activePresetId, setActivePresetId] = useState<string>('');
+  const [selectedRecordId, setSelectedRecordId] = useState<string>('');
   const [isSaved, setIsSaved] = useState(false);
   const newPresetInputRef = useRef<HTMLInputElement>(null);
   const presets = useMemo(() => appSettings?.exportPresets ?? [], [appSettings?.exportPresets]);
   const recipeRows = useMemo(() => buildExportRecipeUiRows(presets), [presets]);
   const validRecipeCount = recipeRows.filter((row) => row.isValidRecipe).length;
   const builtInRecipeCount = recipeRows.filter((row) => row.isBuiltIn).length;
-  const selectedPreset = useMemo(
-    () => presets.find((preset) => preset.id === selectedPresetId),
-    [presets, selectedPresetId],
+  const selectedRow = useMemo(
+    () => recipeRows.find((recipe) => recipe.id === selectedRecordId),
+    [recipeRows, selectedRecordId],
   );
   const normalizedSelectedPreset = useMemo(() => {
-    const parsed = exportRecipeSchema.safeParse(selectedPreset);
+    const parsed = exportRecipeSchema.safeParse(selectedRow?.settings);
     return parsed.success ? parsed.data : null;
-  }, [selectedPreset]);
+  }, [selectedRow]);
   const isSelectedPresetEdited =
     normalizedSelectedPreset !== null &&
     Object.entries(currentSettings).some(
@@ -68,49 +73,53 @@ export default function ExportPresetsList({
   };
 
   const handleSelect = (id: string) => {
-    setSelectedPresetId(id);
-    const preset = presets.find((p) => p.id === id);
-    if (preset) {
-      onApplyPreset(preset);
+    setSelectedRecordId(id);
+    const row = recipeRows.find((recipe) => recipe.id === id);
+    const parsed = exportRecipeSchema.safeParse(row?.settings);
+    if (parsed.success) {
+      setActivePresetId(id);
+      onApplyPreset(parsed.data);
     }
   };
 
   const handleSavePreset = () => {
     if (!newPresetName.trim() || !appSettings) return;
 
-    const newPreset: ExportPreset = {
+    const newPreset = buildCurrentExportRecipe({
       id: crypto.randomUUID(),
       name: newPresetName.trim(),
-      ...currentSettings,
-    };
+      settings: currentSettings,
+    });
 
     const updatedPresets = [...presets, newPreset];
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
 
     commitPresets(updatedSettings);
 
-    setSelectedPresetId(newPreset.id);
+    setActivePresetId(newPreset.id);
+    setSelectedRecordId(newPreset.id);
     setIsCreating(false);
     setNewPresetName('');
   };
 
-  const isDefault = selectedPresetId.startsWith('default-');
+  const canOverwriteSelected = selectedRow !== undefined && (!selectedRow.isBuiltIn || !selectedRow.isValidRecipe);
 
   const handleOverwritePreset = () => {
-    if (!selectedPresetId || isDefault || !appSettings) return;
+    if (!canOverwriteSelected || !appSettings || selectedRow === undefined) return;
+
+    const replacement = buildCurrentExportRecipe({
+      id: selectedRow.id,
+      name: selectedRow.label,
+      settings: currentSettings,
+    });
 
     const updatedPresets = presets.map((p) => {
-      if (p.id === selectedPresetId) {
-        return {
-          ...p,
-          ...currentSettings,
-        };
-      }
-      return p;
+      return p === selectedRow.settings ? replacement : p;
     });
 
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
     commitPresets(updatedSettings);
+    setActivePresetId(replacement.id);
 
     setIsSaved(true);
     setTimeout(() => {
@@ -119,27 +128,33 @@ export default function ExportPresetsList({
   };
 
   const handleDeletePreset = () => {
-    if (!selectedPresetId || !appSettings) return;
+    if (!selectedRecordId || !appSettings || selectedRow === undefined || selectedRow.isBuiltIn) return;
 
-    const updatedPresets = presets.filter((p) => p.id !== selectedPresetId);
+    const updatedPresets = presets.filter((preset) => preset !== selectedRow.settings);
     const updatedSettings = { ...appSettings, exportPresets: updatedPresets };
 
     commitPresets(updatedSettings);
-    setSelectedPresetId('');
+    if (activePresetId === selectedRecordId) setActivePresetId('');
+    setSelectedRecordId('');
   };
 
-  const dropdownOptions = presets
-    .filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID && preset.id !== EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID)
-    .map((preset) => ({
-      label: preset.name,
-      value: preset.id,
+  const dropdownOptions = recipeRows
+    .filter(
+      (recipe) =>
+        recipe.isValidRecipe &&
+        recipe.id !== EXPORT_LAST_USED_PRESET_ID &&
+        recipe.id !== EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
+    )
+    .map((recipe) => ({
+      label: recipe.label,
+      value: recipe.id,
     }));
 
   return (
     <section className="border-b border-surface pb-3" data-testid="export-recipe-picker">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <UiText variant={TextVariants.heading}>{t('ui.exportPresets.heading')}</UiText>
-        {selectedPreset ? (
+        {selectedRow?.isValidRecipe ? (
           <span className="truncate text-xs text-text-secondary" data-testid="export-selected-recipe-status">
             {isSelectedPresetEdited ? t('ui.exportPresets.edited') : t('ui.exportPresets.current')}
           </span>
@@ -149,7 +164,7 @@ export default function ExportPresetsList({
       {!isCreating ? (
         <div className="flex min-w-0 gap-1.5">
           <Dropdown
-            value={selectedPresetId}
+            value={activePresetId}
             onChange={handleSelect}
             options={dropdownOptions}
             placeholder={t('ui.exportPresets.placeholder')}
@@ -168,7 +183,7 @@ export default function ExportPresetsList({
             <Plus size={18} />
           </button>
 
-          {selectedPresetId && !isDefault && (
+          {selectedRecordId && canOverwriteSelected && (
             <>
               <button
                 onClick={handleOverwritePreset}
@@ -184,8 +199,9 @@ export default function ExportPresetsList({
               </button>
               <button
                 onClick={handleDeletePreset}
+                disabled={selectedRow?.isBuiltIn}
                 aria-label={t('ui.exportPresets.deleteTooltip')}
-                className="p-2 bg-surface hover:bg-red-500/20 hover:text-red-500 rounded-md text-text-secondary transition-colors"
+                className="p-2 bg-surface hover:bg-red-500/20 hover:text-red-500 rounded-md text-text-secondary transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 data-tooltip={t('ui.exportPresets.deleteTooltip')}
                 type="button"
               >
@@ -258,14 +274,19 @@ export default function ExportPresetsList({
           <div aria-label={t('ui.exportPresets.recipeListLabel')} className="max-h-44 overflow-y-auto" role="list">
             {recipeRows.map((row) => (
               <button
-                aria-pressed={selectedPresetId === row.id}
+                aria-pressed={activePresetId === row.id}
                 className={`flex w-full min-w-0 items-center gap-2 border-b border-surface px-1.5 py-2 text-left transition-colors last:border-b-0 ${
-                  selectedPresetId === row.id ? 'bg-accent/10' : 'hover:bg-card-active'
+                  activePresetId === row.id
+                    ? 'bg-accent/10'
+                    : selectedRecordId === row.id
+                      ? 'bg-yellow-500/10'
+                      : 'hover:bg-card-active'
                 }`}
+                data-repair-target={selectedRecordId === row.id}
                 data-recipe-state={
                   !row.isValidRecipe
                     ? 'invalid'
-                    : selectedPresetId === row.id && isSelectedPresetEdited
+                    : activePresetId === row.id && isSelectedPresetEdited
                       ? 'edited'
                       : 'ready'
                 }
@@ -292,7 +313,7 @@ export default function ExportPresetsList({
                 <span className="shrink-0 text-xs text-text-secondary">
                   {!row.isValidRecipe
                     ? t('ui.exportPresets.invalid')
-                    : selectedPresetId === row.id && isSelectedPresetEdited
+                    : activePresetId === row.id && isSelectedPresetEdited
                       ? t('ui.exportPresets.edited')
                       : row.isBuiltIn
                         ? t('ui.exportPresets.builtIn')

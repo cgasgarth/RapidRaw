@@ -7,6 +7,7 @@ await runExportUiCheck({
   settings: {
     exportPresets: [
       {
+        blackPointCompensation: false,
         colorProfile: 'srgb',
         dontEnlarge: true,
         enableResize: false,
@@ -17,9 +18,11 @@ await runExportUiCheck({
         id: 'default-hq',
         jpegQuality: 95,
         keepMetadata: true,
-        lastExportPath: null,
         name: 'High Quality',
-        preserveFolders: null,
+        outputSharpening: null,
+        preserveFolders: false,
+        preserveTimestamps: false,
+        renderingIntent: 'relativeColorimetric',
         resizeMode: 'longEdge',
         resizeValue: 2048,
         stripGps: false,
@@ -30,6 +33,7 @@ await runExportUiCheck({
         watermarkSpacing: 5,
       },
       {
+        blackPointCompensation: false,
         colorProfile: 'srgb',
         dontEnlarge: true,
         enableResize: true,
@@ -40,9 +44,11 @@ await runExportUiCheck({
         id: 'default-fast',
         jpegQuality: 80,
         keepMetadata: false,
-        lastExportPath: null,
         name: 'Fast (Web)',
-        preserveFolders: null,
+        outputSharpening: null,
+        preserveFolders: false,
+        preserveTimestamps: false,
+        renderingIntent: 'relativeColorimetric',
         resizeMode: 'width',
         resizeValue: 2048,
         stripGps: true,

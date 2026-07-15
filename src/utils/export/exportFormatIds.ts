@@ -11,7 +11,10 @@ export const ExportFileFormatId = {
 export type ExportFileFormatId = (typeof ExportFileFormatId)[keyof typeof ExportFileFormatId];
 
 export const EXPORT_RECIPE_FILE_FORMAT_IDS = [
+  ExportFileFormatId.Avif,
+  ExportFileFormatId.Cube,
   ExportFileFormatId.Jpeg,
+  ExportFileFormatId.Jxl,
   ExportFileFormatId.Png,
   ExportFileFormatId.Tiff,
   ExportFileFormatId.Webp,

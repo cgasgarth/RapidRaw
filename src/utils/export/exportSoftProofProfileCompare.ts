@@ -6,11 +6,13 @@ import {
   ExportRenderingIntent,
   type FileFormats,
 } from '../../components/ui/ExportImportProperties';
+import { buildCurrentExportRecipe, type ExportRecipeSettings } from '../../schemas/export/exportRecipeSchemas';
 import type { ExportSoftProofTransformState } from '../../store/useEditorStore';
 import { getSupportedRenderingIntents, isSupportedColorProfileForFormat } from './exportColorCapabilityContracts';
 
 export const EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION = 1024;
 export const EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID = 'internal-soft-proof-export-resolver';
+const exportRecipeIdentitySchema = z.object({ id: z.string().trim().min(1) }).loose();
 
 export type ExportSoftProofProfileCompareSideId = 'srgb' | 'displayP3';
 
@@ -252,25 +254,29 @@ const buildExportSoftProofResolverPreset = ({
   currentSettings,
   name,
 }: {
-  currentSettings: Omit<ExportPreset, 'id' | 'name'>;
+  currentSettings: ExportRecipeSettings;
   name: string;
-}): ExportPreset => ({
-  ...currentSettings,
-  id: EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
-  name,
-});
+}): ExportPreset =>
+  buildCurrentExportRecipe({
+    id: EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID,
+    name,
+    settings: currentSettings,
+  });
 
 export const upsertExportSoftProofResolverPreset = ({
   currentSettings,
   name,
   presets,
 }: {
-  currentSettings: Omit<ExportPreset, 'id' | 'name'>;
+  currentSettings: ExportRecipeSettings;
   name: string;
-  presets: ExportPreset[];
-}): ExportPreset[] => {
+  presets: Array<unknown>;
+}): Array<unknown> => {
   const resolverPreset = buildExportSoftProofResolverPreset({ currentSettings, name });
-  const existingIndex = presets.findIndex((preset) => preset.id === EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID);
+  const existingIndex = presets.findIndex((preset) => {
+    const identity = exportRecipeIdentitySchema.safeParse(preset);
+    return identity.success && identity.data.id === EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID;
+  });
   if (existingIndex === -1) return [...presets, resolverPreset];
   return presets.map((preset, index) => (index === existingIndex ? resolverPreset : preset));
 };

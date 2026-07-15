@@ -10,7 +10,7 @@ const exportRenderingIntentSchema = z.enum([
   'relativeColorimetric',
   'saturation',
 ]);
-const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
+export const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
 const watermarkAnchorSchema = z.enum([
   'topLeft',
   'topCenter',
@@ -25,12 +25,12 @@ const watermarkAnchorSchema = z.enum([
 
 export const exportRecipeSchema = z
   .object({
-    blackPointCompensation: z.boolean().default(false),
-    colorProfile: exportColorProfileSchema.default('srgb'),
+    blackPointCompensation: z.boolean(),
+    colorProfile: exportColorProfileSchema,
     dontEnlarge: z.boolean(),
     enableResize: z.boolean(),
     enableWatermark: z.boolean(),
-    exportMasks: z.boolean().default(false),
+    exportMasks: z.boolean(),
     fileFormat: exportFileFormatSchema,
     filenameTemplate: z.string().trim().min(1),
     id: z.string().trim().min(1),
@@ -38,10 +38,10 @@ export const exportRecipeSchema = z
     keepMetadata: z.boolean(),
     lastExportPath: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1),
-    outputSharpening: outputSharpeningSettingsSchema.nullable().default(null),
-    preserveFolders: z.boolean().default(false),
-    preserveTimestamps: z.boolean().default(false),
-    renderingIntent: exportRenderingIntentSchema.default('relativeColorimetric'),
+    outputSharpening: outputSharpeningSettingsSchema.nullable(),
+    preserveFolders: z.boolean(),
+    preserveTimestamps: z.boolean(),
+    renderingIntent: exportRenderingIntentSchema,
     resizeMode: exportResizeModeSchema,
     resizeValue: z.number().int().min(1).max(100_000),
     stripGps: z.boolean(),
@@ -102,6 +102,42 @@ const exportRecipeListSchema = z.array(exportRecipeSchema);
 
 export type ExportRecipe = z.infer<typeof exportRecipeSchema>;
 export type ExportRecipeList = z.infer<typeof exportRecipeListSchema>;
+export type ExportRecipeSettings = Omit<ExportRecipe, 'id' | 'lastExportPath' | 'name'>;
 
 export const parseExportRecipe = (value: unknown): ExportRecipe => exportRecipeSchema.parse(value);
 export const parseExportRecipes = (value: unknown): ExportRecipeList => exportRecipeListSchema.parse(value);
+
+export const buildCurrentExportRecipe = ({
+  id,
+  lastExportPath,
+  name,
+  settings,
+}: {
+  id: string;
+  lastExportPath?: string;
+  name: string;
+  settings: ExportRecipeSettings;
+}): ExportRecipe =>
+  exportRecipeSchema.parse({
+    ...settings,
+    id,
+    jpegQuality: settings.fileFormat === ExportFileFormatId.Jpeg ? settings.jpegQuality : 100,
+    ...(lastExportPath === undefined ? {} : { lastExportPath }),
+    name,
+  });
+
+export const findCurrentExportRecipe = (values: readonly unknown[], id: string): ExportRecipe | null => {
+  for (const value of values) {
+    const parsed = exportRecipeSchema.safeParse(value);
+    if (parsed.success && parsed.data.id === id) return parsed.data;
+  }
+  return null;
+};
+
+const exportRecipeIdentitySchema = z.object({ id: z.string().trim().min(1) }).loose();
+
+export const withoutExportRecipeId = (values: readonly unknown[], id: string): Array<unknown> =>
+  values.filter((value) => {
+    const identity = exportRecipeIdentitySchema.safeParse(value);
+    return !identity.success || identity.data.id !== id;
+  });
