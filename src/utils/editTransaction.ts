@@ -16,6 +16,7 @@ export type EditMutationSource =
   | 'copy-paste'
   | 'film-workspace'
   | 'layer-command'
+  | 'ai-edit'
   | 'reset'
   | 'history'
   | 'hydration'

@@ -258,12 +258,15 @@ export function useAiMasking() {
 
   const handleToggleAiPatchVisibility = useCallback(
     (patchId: string) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, visible: !p.visible } : p)),
-      }));
+      applyAiEditCommand(({ aiPatches, selection }) => {
+        if (!aiPatches.some((patch) => patch.id === patchId)) return null;
+        return {
+          aiPatches: aiPatches.map((patch) => (patch.id === patchId ? { ...patch, visible: !patch.visible } : patch)),
+          selection,
+        };
+      });
     },
-    [setAdjustments],
+    [applyAiEditCommand],
   );
 
   const handleGenerateAiMask = async (subMaskId: string, startPoint: Coord, endPoint: Coord) => {
