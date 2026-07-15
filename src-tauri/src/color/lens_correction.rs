@@ -602,11 +602,7 @@ pub fn load_lensfun_db(app_handle: &tauri::AppHandle) -> LensDatabase {
 
 #[tauri::command]
 pub fn get_lensfun_makers(state: State<AppState>) -> Result<Vec<String>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
+    if let Some(db) = state.services.lens_database.snapshot() {
         let mut makers: Vec<String> = db.lenses.iter().map(|lens| lens.get_maker()).collect();
         makers.sort_unstable();
         makers.dedup();
@@ -621,12 +617,8 @@ pub fn get_lensfun_lenses_for_maker(
     maker: String,
     state: State<AppState>,
 ) -> Result<Vec<String>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        let maker_lenses = lenses_for_maker(db, &maker);
+    if let Some(db) = state.services.lens_database.snapshot() {
+        let maker_lenses = lenses_for_maker(&db, &maker);
 
         let mut models: Vec<String> = maker_lenses
             .iter()
@@ -728,12 +720,8 @@ pub fn autodetect_lens(
     model: String,
     state: tauri::State<AppState>,
 ) -> Result<Option<(String, String)>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        Ok(find_best_lens_match(db, &maker, &model))
+    if let Some(db) = state.services.lens_database.snapshot() {
+        Ok(find_best_lens_match(&db, &maker, &model))
     } else {
         Ok(None)
     }
@@ -748,12 +736,8 @@ pub fn get_lens_distortion_params(
     distance: Option<f32>,
     state: State<AppState>,
 ) -> Result<Option<LensDistortionParams>, String> {
-    let db_guard = state
-        .lens_db
-        .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(db) = &*db_guard {
-        let maker_lenses = lenses_for_maker(db, &maker);
+    if let Some(db) = state.services.lens_database.snapshot() {
+        let maker_lenses = lenses_for_maker(&db, &maker);
 
         if let Some(lens) = maker_lenses
             .iter()

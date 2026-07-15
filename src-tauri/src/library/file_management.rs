@@ -2332,19 +2332,17 @@ pub fn save_metadata_and_update_thumbnail(
     if let Some(transaction) = transaction.as_ref() {
         transaction.validate()?;
     }
+    let lens_database = state.services.lens_database.snapshot();
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let metadata = {
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
         let mut final_adjustments = adjustments;
-        {
-            let lens_db_guard = state.lens_db.lock().unwrap();
-            resolve_lens_params_in_adjustments(
-                &mut final_adjustments,
-                &metadata.exif,
-                lens_db_guard.as_deref(),
-            );
-        }
+        resolve_lens_params_in_adjustments(
+            &mut final_adjustments,
+            &metadata.exif,
+            lens_database.as_deref(),
+        );
 
         if let Some(adjustments_map) = final_adjustments.as_object_mut()
             && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
@@ -2392,10 +2390,9 @@ pub async fn apply_adjustments_to_paths(
 
         let lens_db = app_handle
             .state::<AppState>()
-            .lens_db
-            .lock()
-            .unwrap()
-            .clone();
+            .services
+            .lens_database
+            .snapshot();
 
         let mut backups = Vec::with_capacity(paths.len());
         let mut receipts = Vec::with_capacity(paths.len());

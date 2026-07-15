@@ -13,7 +13,6 @@ use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
-use crate::lens_correction::LensDatabase;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
@@ -145,14 +144,12 @@ pub struct AppState {
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
-    pub initial_file_path: Mutex<Option<String>>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
-    pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
     pub decoded_image_cache: DecodedImageCache,
@@ -220,7 +217,6 @@ impl AppState {
                 policy("lut_cpu", 64, 96, Some(32)),
                 Arc::clone(&cache_budget),
             ),
-            initial_file_path: Mutex::new(None),
             preview_scheduler: Mutex::new(None),
             export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
             mask_cache: MemoryLruCache::new(
@@ -236,7 +232,6 @@ impl AppState {
                 policy("thumbnail_geometry", 192, 256, Some(96)),
                 Arc::clone(&cache_budget),
             ),
-            lens_db: Mutex::new(None),
             load_image_generation: Arc::new(AtomicUsize::new(0)),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),

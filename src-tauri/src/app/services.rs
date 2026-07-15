@@ -101,7 +101,9 @@ impl JobCoordinator {
 #[derive(Clone)]
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
+    pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
+    pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
@@ -124,7 +126,9 @@ impl AppServices {
     pub(crate) fn new(cache_budget: Arc<CacheBudgetCoordinator>) -> Self {
         Self {
             editor: Arc::default(),
+            startup_files: Arc::default(),
             denoise: Arc::default(),
+            lens_database: Arc::default(),
             focus_stack: Arc::default(),
             hdr: Arc::default(),
             burst_sr: Arc::default(),
