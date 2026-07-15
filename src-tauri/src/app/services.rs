@@ -152,6 +152,8 @@ pub struct AppServices {
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
+    pub(crate) interactive_gpu_pressure:
+        Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
     pub(crate) smart_previews: Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
     pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
@@ -192,6 +194,7 @@ impl AppServices {
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
             native_caches,
+            interactive_gpu_pressure: Arc::default(),
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             smart_previews: crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
             image_open: Arc::default(),

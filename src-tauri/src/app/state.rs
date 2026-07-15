@@ -72,8 +72,6 @@ pub struct AppState {
     pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
     #[cfg(feature = "ai")]
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
-    pub(crate) interactive_gpu_pressure:
-        Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
 }
 
 impl AppState {
@@ -105,7 +103,6 @@ impl AppState {
                 policy("ai_depth_maps", 128, 192, Some(4)),
                 Arc::clone(&cache_budget),
             ),
-            interactive_gpu_pressure: Arc::default(),
         }
     }
 }

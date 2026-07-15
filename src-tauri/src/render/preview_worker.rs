@@ -839,7 +839,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
         PreviewSchedulingPolicy::default(),
-        Some(Arc::clone(&state.interactive_gpu_pressure)),
+        Some(Arc::clone(&state.services.interactive_gpu_pressure)),
     );
     let worker_token = state
         .services
