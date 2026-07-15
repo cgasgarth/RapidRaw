@@ -7,6 +7,7 @@ import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocume
 import {
   buildLensCorrectionEditTransaction,
   buildLensProfileEditTransaction,
+  captureLensCorrectionCommitIdentity,
   isCurrentLensProfileRequest,
   isManualLensCorrectionAdjustment,
   type LensCorrectionCommitIdentity,
@@ -217,5 +218,90 @@ describe('lens correction edit transaction', () => {
         4,
       ),
     ).toBe(false);
+  });
+
+  test('routes fallback profile and manual edits while rejecting delayed A to B to A results', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-lens-before',
+      imageSession: null,
+      imageSessionId: 61,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: LensCorrectionCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:61',
+      sourceIdentity: sourcePath,
+    };
+    expect(captureLensCorrectionCommitIdentity(state)).toEqual(fallbackIdentity);
+
+    const profileResult = state.applyEditTransaction(
+      buildLensProfileEditTransaction(
+        state,
+        fallbackIdentity,
+        { lensCorrectionMode: 'manual', lensMaker: 'Fallback Optics', lensModel: null },
+        'fallback-profile',
+      ),
+    );
+    expect(profileResult).toMatchObject({ changedKeys: ['lensMaker'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-profile',
+      },
+    });
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.lensMaker).toBeNull();
+
+    useEditorStore.setState({ finalPreviewUrl: 'blob:fallback-manual-before' });
+    const restored = useEditorStore.getState();
+    const restoredIdentity = captureLensCorrectionCommitIdentity(restored);
+    if (restoredIdentity === null) throw new Error('missing fallback lens identity after Undo');
+    const receiptBeforeNoOp = restored.lastEditApplicationReceipt;
+    const noOp = restored.applyEditTransaction(
+      buildLensCorrectionEditTransaction(
+        restored,
+        restoredIdentity,
+        'lensVignetteAmount',
+        100,
+        'fallback-manual-no-op',
+      ),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: 'blob:fallback-manual-before',
+      historyIndex: 0,
+    });
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toEqual(receiptBeforeNoOp);
+    const manualResult = restored.applyEditTransaction(
+      buildLensCorrectionEditTransaction(restored, restoredIdentity, 'lensVignetteAmount', 145, 'fallback-manual'),
+    );
+    expect(manualResult).toMatchObject({ changedKeys: ['lensVignetteAmount'], noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({ finalPreviewUrl: null, historyIndex: 1 });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.lensVignetteAmount).toBe(100);
+
+    expect(isCurrentLensProfileRequest(state, fallbackIdentity, 7, 7)).toBeTrue();
+    expect(isCurrentLensProfileRequest(state, fallbackIdentity, 6, 7)).toBeFalse();
+    expect(
+      isCurrentLensProfileRequest(
+        { ...state, imageSessionId: 62, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+        7,
+        7,
+      ),
+    ).toBeFalse();
+    expect(isCurrentLensProfileRequest({ ...state, imageSessionId: 63 }, fallbackIdentity, 7, 7)).toBeFalse();
+    expect(isCurrentLensProfileRequest({ ...state, adjustmentRevision: 1 }, fallbackIdentity, 7, 7)).toBeFalse();
+    expect(() =>
+      buildLensProfileEditTransaction(
+        { ...state, imageSessionId: 63 },
+        fallbackIdentity,
+        { lensCorrectionMode: 'auto' },
+        'stale-reopened-a',
+      ),
+    ).toThrow('lens_correction_transaction.stale_session');
   });
 });

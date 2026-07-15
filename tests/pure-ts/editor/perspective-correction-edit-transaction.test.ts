@@ -140,4 +140,76 @@ describe('perspective correction edit transaction', () => {
     expect(isCurrentPerspectiveAnalysisRequest(state, identity({ imageSessionId: 'successor' }), 2, 2)).toBe(false);
     expect(isCurrentPerspectiveAnalysisRequest(state, identity({ adjustmentRevision: 1 }), 2, 2)).toBe(false);
   });
+
+  test('routes fallback manual edits while rejecting delayed A to B to A analyses', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-perspective-before',
+      imageSession: null,
+      imageSessionId: 67,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: PerspectiveCorrectionCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:67',
+      sourceIdentity: sourcePath,
+    };
+    expect(capturePerspectiveCorrectionCommitIdentity(state)).toEqual(fallbackIdentity);
+
+    const noOp = state.applyEditTransaction(
+      buildPerspectiveCorrectionEditTransaction(
+        state,
+        fallbackIdentity,
+        { amount: state.adjustments.perspectiveCorrection.amount },
+        'fallback-perspective-no-op',
+      ),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-perspective-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const result = state.applyEditTransaction(
+      buildPerspectiveCorrectionEditTransaction(state, fallbackIdentity, { amount: 72 }, 'fallback-perspective'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['perspectiveCorrection'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-perspective',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.perspectiveCorrection.amount).toBe(
+      INITIAL_ADJUSTMENTS.perspectiveCorrection.amount,
+    );
+
+    expect(isCurrentPerspectiveAnalysisRequest(state, fallbackIdentity, 9, 9)).toBeTrue();
+    expect(isCurrentPerspectiveAnalysisRequest(state, fallbackIdentity, 8, 9)).toBeFalse();
+    expect(
+      isCurrentPerspectiveAnalysisRequest(
+        { ...state, imageSessionId: 68, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+        9,
+        9,
+      ),
+    ).toBeFalse();
+    expect(isCurrentPerspectiveAnalysisRequest({ ...state, imageSessionId: 69 }, fallbackIdentity, 9, 9)).toBeFalse();
+    expect(
+      isCurrentPerspectiveAnalysisRequest({ ...state, adjustmentRevision: 1 }, fallbackIdentity, 9, 9),
+    ).toBeFalse();
+    expect(() =>
+      buildPerspectiveCorrectionEditTransaction(
+        { ...state, imageSessionId: 69 },
+        fallbackIdentity,
+        { resolvedPlan },
+        'stale-reopened-a',
+      ),
+    ).toThrow('perspective_correction_transaction.stale_session');
+  });
 });

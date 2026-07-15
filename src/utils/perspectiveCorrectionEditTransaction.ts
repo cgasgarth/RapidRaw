@@ -12,16 +12,20 @@ export interface PerspectiveCorrectionEditTransactionState {
   adjustmentRevision: number;
   adjustments: Pick<Adjustments, 'perspectiveCorrection'>;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: PerspectiveCorrectionEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const capturePerspectiveCorrectionCommitIdentity = (
   state: PerspectiveCorrectionEditTransactionState,
 ): PerspectiveCorrectionCommitIdentity | null =>
-  state.selectedImage !== null && state.imageSession !== null
+  state.selectedImage !== null
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       }
     : null;
@@ -31,7 +35,7 @@ export const isCurrentPerspectiveCorrectionIdentity = (
   identity: PerspectiveCorrectionCommitIdentity,
 ): boolean =>
   state.adjustmentRevision === identity.adjustmentRevision &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.selectedImage?.path === identity.sourceIdentity;
 
 export const isCurrentPerspectiveAnalysisRequest = (
@@ -50,9 +54,9 @@ const assertCurrentPerspectiveCorrectionIdentity = (
       `perspective_correction_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `perspective_correction_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `perspective_correction_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
