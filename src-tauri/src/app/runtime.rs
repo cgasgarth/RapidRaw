@@ -63,8 +63,8 @@ fn start_background_services(app: &tauri::App, window: &tauri::WebviewWindow) {
         }
         BackgroundServiceAction::AnalyticsWorker => {
             app.state::<AppState>()
-                .services
-                .analytics
+                .render()
+                .analytics()
                 .start_worker(app.handle().clone());
         }
         BackgroundServiceAction::ThumbnailWorkers => {

@@ -201,6 +201,10 @@ impl AppState {
     pub(crate) fn gpu(&self) -> &crate::gpu::runtime_services::GpuRuntimeServices {
         self.services.gpu()
     }
+
+    pub(crate) fn render(&self) -> &crate::render::runtime_services::RenderRuntimeServices {
+        self.services.render()
+    }
 }
 
 impl Default for AppState {

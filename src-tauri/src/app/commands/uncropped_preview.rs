@@ -35,8 +35,8 @@ pub(crate) fn generate_uncropped_preview(
         .image_snapshot()
         .ok_or("No original image loaded")?;
     let request = state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .begin_request(loaded_image.path.clone())
         .ok_or("uncropped_preview.image_session_transition")?;
 
@@ -116,7 +116,7 @@ pub(crate) fn generate_uncropped_preview(
         let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
         let lut = render_adjustments["lutPath"]
             .as_str()
-            .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+            .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
         let render_plan = match compile_consumer_render_plan(
             render_adjustments.as_ref(),
             &loaded_image.path,
@@ -165,7 +165,7 @@ pub(crate) fn generate_uncropped_preview(
         ) {
             match encode_jpeg_data_url(&processed_image, 80) {
                 Ok(data_url) => {
-                    if !state.services.preview_session.publish_if_current(
+                    if !state.render().preview_session().publish_if_current(
                         &request,
                         || {
                             state

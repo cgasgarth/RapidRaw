@@ -132,18 +132,10 @@ pub struct AppServices {
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     export: crate::export::runtime_services::ExportRuntimeServices,
     film: crate::render::film_runtime_services::FilmRuntimeServices,
-    pub(crate) preview_runtime: Arc<crate::render::preview_runtime_service::PreviewRuntimeService>,
-    pub(crate) preview_frames:
-        Arc<crate::render::preview_frame_cache_service::PreviewFrameCacheService>,
+    render: crate::render::runtime_services::RenderRuntimeServices,
     library: crate::library::runtime_services::LibraryRuntimeServices,
-    pub(crate) preview_session: Arc<crate::app::preview_session_service::PreviewSessionService>,
-    pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
-    pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
-    pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
     #[cfg(feature = "ai")]
     pub(crate) ai: Arc<crate::ai::runtime_service::AiRuntimeService>,
-    pub(crate) interactive_gpu_pressure:
-        Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
     pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
@@ -152,9 +144,8 @@ pub struct AppServices {
 
 impl AppServices {
     pub(crate) fn new() -> Self {
-        let native_caches =
-            Arc::new(crate::render::native_cache_service::NativeCacheService::default());
-        let cache_budget = native_caches.budget();
+        let render = crate::render::runtime_services::RenderRuntimeServices::default();
+        let cache_budget = render.native_caches().budget();
         #[cfg(feature = "ai")]
         let ai = Arc::new(crate::ai::runtime_service::AiRuntimeService::new(
             Arc::clone(&cache_budget),
@@ -171,16 +162,10 @@ impl AppServices {
             lens_database: Arc::default(),
             export: Default::default(),
             film: Default::default(),
-            preview_runtime: Arc::default(),
-            preview_frames: Arc::default(),
+            render,
             library: Default::default(),
-            preview_session: Arc::default(),
-            analytics: Arc::default(),
-            full_warp_cache: Arc::default(),
-            native_caches,
             #[cfg(feature = "ai")]
             ai,
-            interactive_gpu_pressure: Arc::default(),
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             image_open: Arc::default(),
             viewer_sampling: Arc::new(
@@ -210,6 +195,10 @@ impl AppServices {
 
     pub(crate) fn gpu(&self) -> &crate::gpu::runtime_services::GpuRuntimeServices {
         &self.gpu
+    }
+
+    pub(crate) fn render(&self) -> &crate::render::runtime_services::RenderRuntimeServices {
+        &self.render
     }
 }
 

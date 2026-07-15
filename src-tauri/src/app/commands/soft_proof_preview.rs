@@ -93,7 +93,7 @@ pub(crate) fn generate_export_soft_proof_preview(
         )
         .map_err(str::to_string)?;
     let session = SoftProofPreviewSession {
-        generation: state.services.preview_session.current_generation(),
+        generation: state.render().preview_session().current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -150,10 +150,10 @@ pub(crate) fn generate_export_soft_proof_preview(
     .map_err(|error| format!("Failed to encode export soft proof preview: {error}"))?;
 
     state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.services.preview_session.current_generation();
+            let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .services
                 .editor
@@ -293,7 +293,7 @@ pub(crate) fn generate_export_soft_proof_preview(
     }
 
     if let Some(proof_image) = proof_image {
-        let _ = state.services.analytics.submit(AnalyticsJob {
+        let _ = state.render().analytics().submit(AnalyticsJob {
             path: loaded_image.path,
             frame_id: AnalyticsFrameId::default(),
             preview_operation_identity: Box::new(request.preview_operation_identity),
@@ -334,7 +334,7 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         .image_snapshot()
         .ok_or("No original image loaded")?;
     let session = SoftProofPreviewSession {
-        generation: state.services.preview_session.current_generation(),
+        generation: state.render().preview_session().current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -355,10 +355,10 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         black_point_compensation,
     )?;
     state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.services.preview_session.current_generation();
+            let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .services
                 .editor
@@ -430,7 +430,7 @@ fn render_processed_export_soft_proof_preview(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
     let lut: Option<Arc<Lut>> = adjustments["lutPath"]
         .as_str()
-        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+        .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         adjustments,
         &loaded_image.path,

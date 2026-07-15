@@ -1070,7 +1070,7 @@ fn generate_thumbnail_data_with_target(
         let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
         let lut = meta.adjustments["lutPath"]
             .as_str()
-            .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+            .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
         let revision = content_revision(
             &meta.adjustments,
             0,
@@ -1093,7 +1093,7 @@ fn generate_thumbnail_data_with_target(
         let crop_data = render_plan.crop;
 
         let cached_base: Option<(DynamicImage, f32)> = {
-            if let Some(entry) = state.services.native_caches.thumbnail_geometry(path_str) {
+            if let Some(entry) = state.render().native_caches().thumbnail_geometry(path_str) {
                 let (cached_hash, img, scale) = entry.as_ref();
                 let mut sufficient_resolution = true;
                 if let Some(c) = &crop_data
@@ -1208,7 +1208,7 @@ fn generate_thumbnail_data_with_target(
 
             let total_scale = gpu_scale * raw_scale_factor;
 
-            state.services.native_caches.insert_thumbnail_geometry(
+            state.render().native_caches().insert_thumbnail_geometry(
                 path_str.to_string(),
                 Arc::new((geometry_cache_hash, Arc::new(base.clone()), total_scale)),
             );
@@ -2541,8 +2541,8 @@ pub async fn reset_adjustments_for_paths(
 
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
-        state.services.native_caches.clear_decoded();
-        let render_generation = state.services.preview_runtime.invalidate_current();
+        state.render().native_caches().clear_decoded();
+        let render_generation = state.render().preview_runtime().invalidate_current();
         for result in &mut results {
             result.render_generation = render_generation;
         }
@@ -3182,8 +3182,8 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         );
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
-        state.services.native_caches.clear_decoded();
-        state.services.preview_runtime.invalidate_current();
+        state.render().native_caches().clear_decoded();
+        state.render().preview_runtime().invalidate_current();
     }
     let mut metadata = persisted.metadata;
     let mut should_save_sidecar = false;
