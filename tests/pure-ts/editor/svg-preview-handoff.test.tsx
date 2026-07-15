@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { SvgPreviewHandoff } from '../../../src/components/panel/editor/SvgPreviewHandoff.tsx';
 import type { InteractivePatch } from '../../../src/store/useEditorStore.ts';
+import { PresentedPreviewReleaseCoordinator } from '../../../src/utils/presentedPreviewReleaseCoordinator.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -41,6 +42,23 @@ test('keeps rendered predecessor and successor SVG base layers until successor o
   expect(baseSources(rendered.container)).toEqual(['blob:base-b']);
   expect(rendered.presented).toContain('blob:base-b');
   expect(rendered.released).toContain('base:/photo.ARW:blob:base-a:blob:base-a');
+});
+
+test('acknowledges a remounted delayed base only after its image load fence', async () => {
+  const coordinator = new PresentedPreviewReleaseCoordinator();
+  const released: string[] = [];
+  coordinator.defer('blob:base-old', 'base', 'blob:base-remounted');
+  const rendered = renderHandoff({
+    baseSource: 'blob:base-remounted',
+    incomingPatch: null,
+    onBasePresented: (url) => coordinator.acknowledge('base', url, (releasedUrl) => released.push(releasedUrl)),
+  });
+
+  expect(baseSources(rendered.container)).toEqual(['blob:base-remounted']);
+  expect(released).toEqual([]);
+  await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:base-remounted');
+  expect(rendered.presented).toContain('blob:base-remounted');
+  expect(released).toEqual(['blob:base-old']);
 });
 
 test('discards stale and failed SVG successors while preserving the painted predecessor', async () => {
@@ -129,8 +147,13 @@ function renderHandoff({
   baseSource,
   incomingPatch,
   isCpuPreviewVisible = true,
+  onBasePresented,
   reducedMotion = false,
-}: HandoffRenderInput & { isCpuPreviewVisible?: boolean; reducedMotion?: boolean }) {
+}: HandoffRenderInput & {
+  isCpuPreviewVisible?: boolean;
+  onBasePresented?: (url: string) => void;
+  reducedMotion?: boolean;
+}) {
   installDom();
   const container = document.createElement('div');
   document.body.append(container);
@@ -156,7 +179,10 @@ function renderHandoff({
               incomingPatch: nextIncomingPatch,
               isCpuPreviewVisible: nextIsCpuPreviewVisible,
               isMaxZoom: false,
-              onBasePresented: (url: string) => presented.push(url),
+              onBasePresented: (url: string) => {
+                presented.push(url);
+                onBasePresented?.(url);
+              },
               patchScopeKey: '/photo.ARW:geometry',
               reducedMotion: nextReducedMotion,
               releaseUrl: (owner: string, url: string) => released.push(`${owner}:${url}`),

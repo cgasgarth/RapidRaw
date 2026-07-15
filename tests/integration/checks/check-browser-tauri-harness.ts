@@ -132,6 +132,498 @@ async function verifyCompareDividerController(page: Page): Promise<void> {
   await page.setViewportSize(viewport);
 }
 
+async function verifyInitialMaskDrawController(page: Page): Promise<void> {
+  const imageCanvas = page.getByTestId('image-canvas');
+  const toolStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const readCallCount = (command: string) =>
+    page.evaluate(
+      (expectedCommand) =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expectedCommand).length ??
+        0,
+      command,
+    );
+  const waitForStableGeometry = async (successorOf: string | null): Promise<void> => {
+    await page.waitForFunction((previous) => {
+      const current = document
+        .querySelector('[data-testid="image-canvas"]')
+        ?.getAttribute('data-initial-mask-draw-context-geometry');
+      return current !== null && current !== previous;
+    }, successorOf);
+    await page.evaluate(async () => {
+      const readGeometry = () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-initial-mask-draw-context-geometry') ?? null;
+      let previous = readGeometry();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 12 && stableFrames < 2; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = readGeometry();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      if (stableFrames < 2) throw new Error('Initial mask geometry did not stabilize after viewport replacement.');
+    });
+  };
+  const waitForGeometryIdle = async (): Promise<void> => {
+    await page.evaluate(async () => {
+      const readGeometry = () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-initial-mask-draw-context-geometry') ?? null;
+      let previous = readGeometry();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 120 && stableFrames < 30; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = readGeometry();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      if (stableFrames < 30) throw new Error('Initial mask geometry did not become idle before pointer input.');
+    });
+  };
+  const waitForPersistedMask = async (type: 'linear' | 'radial', initial: boolean, label: string): Promise<void> => {
+    try {
+      await page.waitForFunction(
+        ({ expectedInitial, expectedType }) => {
+          const saves =
+            window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+              ({ command }) => command === 'save_metadata_and_update_thumbnail',
+            ) ?? [];
+          const call = saves.at(-1);
+          const adjustments = call?.args?.['adjustments'];
+          if (typeof adjustments !== 'object' || adjustments === null || !('masks' in adjustments)) return false;
+          const masks = adjustments.masks;
+          if (!Array.isArray(masks)) return false;
+          const subMask = masks
+            .flatMap((mask) =>
+              typeof mask === 'object' && mask !== null && 'subMasks' in mask && Array.isArray(mask.subMasks)
+                ? mask.subMasks
+                : [],
+            )
+            .find(
+              (candidate) => typeof candidate === 'object' && candidate !== null && candidate['type'] === expectedType,
+            );
+          if (typeof subMask !== 'object' || subMask === null || !('parameters' in subMask)) return false;
+          const parameters = subMask.parameters;
+          if (typeof parameters !== 'object' || parameters === null) return false;
+          return (
+            call?.endedAtMs !== null &&
+            'isInitialDraw' in parameters === expectedInitial &&
+            (expectedInitial ||
+              (expectedType === 'radial'
+                ? typeof parameters['radiusX'] === 'number' && parameters['radiusX'] > 10
+                : typeof parameters['range'] === 'number' && parameters['range'] > 10))
+          );
+        },
+        { expectedInitial: initial, expectedType: type },
+        { timeout: 10_000 },
+      );
+    } catch {
+      const latest = await page.evaluate(() => {
+        const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1);
+        const adjustments = call?.args?.['adjustments'];
+        const masks =
+          typeof adjustments === 'object' &&
+          adjustments !== null &&
+          'masks' in adjustments &&
+          Array.isArray(adjustments.masks)
+            ? adjustments.masks
+            : [];
+        return {
+          ended: call?.endedAtMs !== null,
+          masks: masks.flatMap((mask) =>
+            typeof mask === 'object' && mask !== null && 'subMasks' in mask && Array.isArray(mask.subMasks)
+              ? mask.subMasks.map((subMask) => ({
+                  initial:
+                    typeof subMask === 'object' &&
+                    subMask !== null &&
+                    'parameters' in subMask &&
+                    typeof subMask.parameters === 'object' &&
+                    subMask.parameters !== null
+                      ? 'isInitialDraw' in subMask.parameters
+                      : null,
+                  type: typeof subMask === 'object' && subMask !== null && 'type' in subMask ? subMask.type : 'unknown',
+                }))
+              : [],
+          ),
+        };
+      });
+      throw new Error(`Timed out waiting for ${label} persistence: ${JSON.stringify(latest)}.`);
+    }
+  };
+
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  const createMask = async (type: 'linear' | 'radial'): Promise<void> => {
+    const contextual = page.getByTestId(`mask-contextual-create-${type}`);
+    if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
+      await contextual.click();
+      return;
+    }
+    const grid = page.getByTestId(`mask-creation-${type}`);
+    await grid.scrollIntoViewIfNeeded();
+    await grid.click();
+  };
+  await createMask('radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-tool') ===
+      'radial',
+  );
+  await waitForPersistedMask('radial', true, 'initial radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+
+  const box = await toolStage.boundingBox();
+  if (box === null) throw new Error('Initial mask proof could not resolve the Konva input surface.');
+  const start = {
+    x: box.x + box.width * 0.42,
+    y: Math.min(box.y + box.height * 0.42, viewport.height - 48),
+  };
+  const end = { x: start.x + 110, y: start.y + 80 };
+
+  const saveBeforeCancel = await readCallCount('save_metadata_and_update_thumbnail');
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    throw new Error('Radial mouse gesture did not begin its declarative draft.');
+  }
+  const readContext = () =>
+    page.evaluate(() => {
+      const element = document.querySelector('[data-testid="image-canvas"]');
+      const viewer = document.querySelector('[data-testid="editor-image-preview-panel"]');
+      return {
+        active: element?.getAttribute('data-initial-mask-draw-context-active'),
+        controllerActive: element?.getAttribute('data-initial-mask-draw-controller-active'),
+        geometry: element?.getAttribute('data-initial-mask-draw-context-geometry'),
+        mask: element?.getAttribute('data-initial-mask-draw-context-mask'),
+        revision: element?.getAttribute('data-initial-mask-draw-context-revision'),
+        scale: viewer?.getAttribute('data-editor-transform-scale'),
+        tool: element?.getAttribute('data-initial-mask-draw-context-tool'),
+        transition: element?.getAttribute('data-initial-mask-draw-transition'),
+        viewerInputOwner: element?.getAttribute('data-viewer-input-owner'),
+        x: viewer?.getAttribute('data-editor-transform-position-x'),
+        y: viewer?.getAttribute('data-editor-transform-position-y'),
+      };
+    });
+  const contextBeforeMove = await readContext();
+  await page.mouse.move(end.x, end.y);
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    const current = await readContext();
+    throw new Error(
+      `Radial mouse gesture did not retain its declarative draft: ${JSON.stringify(contextBeforeMove)} -> ${JSON.stringify(current)}.`,
+    );
+  }
+  await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true })));
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-active') === 'false',
+  );
+  await page.mouse.up();
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeCancel) {
+    throw new Error('A cancelled initial-mask pointer persisted a mask commit.');
+  }
+
+  const saveBeforeGeometry = await readCallCount('save_metadata_and_update_thumbnail');
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  await page.setViewportSize({ height: viewport.height, width: viewport.width - 20 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-active') === 'false',
+  );
+  await page.mouse.up();
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeGeometry) {
+    throw new Error('A geometry-successor initial-mask pointer persisted a mask commit.');
+  }
+  const narrowGeometry = await imageCanvas.getAttribute('data-initial-mask-draw-context-geometry');
+  await page.setViewportSize(viewport);
+  await waitForStableGeometry(narrowGeometry);
+
+  const radialBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    renders: await readCallCount('apply_adjustments'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  await page.waitForFunction(
+    (baseline) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const overlay = calls.filter(({ command }) => command === 'generate_mask_overlay').at(-1);
+      const maskDef = overlay?.args?.['maskDef'];
+      if (
+        typeof maskDef !== 'object' ||
+        maskDef === null ||
+        !('subMasks' in maskDef) ||
+        !Array.isArray(maskDef.subMasks)
+      )
+        return false;
+      const radial = maskDef.subMasks.find(
+        (candidate) => typeof candidate === 'object' && candidate !== null && candidate['type'] === 'radial',
+      );
+      const parameters =
+        typeof radial === 'object' && radial !== null && 'parameters' in radial ? radial.parameters : null;
+      return (
+        calls.filter(({ command }) => command === 'generate_mask_overlay').length > baseline.overlays &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === baseline.saves &&
+        typeof parameters === 'object' &&
+        parameters !== null &&
+        typeof parameters['radiusX'] === 'number' &&
+        parameters['radiusX'] > 10
+      );
+    },
+    radialBaseline,
+    { timeout: 10_000 },
+  );
+  await page.mouse.move(end.x, box.y - 12);
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    throw new Error('Moving a radial-mask pointer outside the Konva stage cancelled its owned gesture.');
+  }
+  await page.mouse.up();
+  await waitForPersistedMask('radial', false, 'committed radial');
+  await page.waitForFunction(
+    ({ renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return (
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders
+      );
+    },
+    radialBaseline,
+    { timeout: 10_000 },
+  );
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  await undo.click();
+  await waitForPersistedMask('radial', true, 'undone radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+
+  const saveBeforeLinearCreation = await readCallCount('save_metadata_and_update_thumbnail');
+  await createMask('linear');
+  await waitForPersistedMask('linear', true, 'initial linear');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-tool') ===
+      'linear',
+  );
+  await waitForGeometryIdle();
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeLinearCreation + 1) {
+    throw new Error('Creating the linear initial-mask tool did not persist exactly once.');
+  }
+
+  const linearBox = await toolStage.boundingBox();
+  if (linearBox === null) throw new Error('Linear mask proof could not resolve the Konva input surface.');
+  const linearStart = {
+    x: linearBox.x + linearBox.width * 0.28,
+    y: Math.min(linearBox.y + linearBox.height * 0.32, viewport.height - 48),
+  };
+  const linearBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    renders: await readCallCount('apply_adjustments'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  const cdp = await page.context().newCDPSession(page);
+  const dispatchTouch = async (
+    type: 'touchEnd' | 'touchMove' | 'touchStart',
+    points: ReadonlyArray<{ id: number; x: number; y: number }>,
+  ): Promise<void> => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: points.map((point) => ({ ...point, force: 1, radiusX: 1, radiusY: 1 })),
+      type,
+    });
+  };
+  const contextBeforeTouchStart = await readContext();
+  await dispatchTouch('touchStart', [{ id: 21, ...linearStart }]);
+  const touchPointerId = Number(await imageCanvas.getAttribute('data-initial-mask-draw-pointer-id'));
+  if (!Number.isInteger(touchPointerId) || touchPointerId < 1) {
+    throw new Error(
+      `Linear mask gesture did not retain touch identity: ${String(touchPointerId)} ${JSON.stringify(contextBeforeTouchStart)} -> ${JSON.stringify(await readContext())}.`,
+    );
+  }
+  await page.evaluate(({ x, y }) => {
+    const unrelated = new Touch({ clientX: x, clientY: y, identifier: 999, target: document.body });
+    window.dispatchEvent(
+      new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [unrelated], touches: [] }),
+    );
+  }, linearStart);
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    throw new Error('An unrelated touchend stole the linear-mask gesture.');
+  }
+  await page.evaluate(
+    ({ pointerId, x, y }) => {
+      const owned = new Touch({ clientX: x, clientY: y, identifier: pointerId - 1, target: document.body });
+      window.dispatchEvent(
+        new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [owned], touches: [] }),
+      );
+    },
+    { pointerId: touchPointerId, ...linearStart },
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-active') === 'false',
+  );
+  await waitForPersistedMask('linear', false, 'committed linear');
+  await dispatchTouch('touchEnd', []);
+  await page.waitForFunction(
+    ({ overlays, renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return (
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders &&
+        calls.filter(({ command }) => command === 'generate_mask_overlay').length > overlays
+      );
+    },
+    linearBaseline,
+    { timeout: 10_000 },
+  );
+  await page.evaluate(
+    ({ pointerId, x, y }) => {
+      const duplicate = new Touch({ clientX: x, clientY: y, identifier: pointerId - 1, target: document.body });
+      window.dispatchEvent(
+        new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [duplicate], touches: [] }),
+      );
+      return new Promise<void>((resolveFrames) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolveFrames())),
+      );
+    },
+    { pointerId: touchPointerId, ...linearStart },
+  );
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== linearBaseline.saves + 1) {
+    throw new Error('Konva and global touchend handlers duplicated the linear-mask commit.');
+  }
+
+  const editReceipt = await page.getByTestId('editor-image-preview-panel').evaluate((element) => ({
+    source: element.getAttribute('data-last-edit-source'),
+    transactionId: element.getAttribute('data-last-edit-transaction-id'),
+  }));
+  if (editReceipt.source !== 'layer-command' || !editReceipt.transactionId?.startsWith('initial-mask-draw:')) {
+    throw new Error(`Initial mask draw bypassed the semantic edit command: ${JSON.stringify(editReceipt)}.`);
+  }
+
+  const outputProof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      overlay: latest('generate_mask_overlay'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persistedAdjustments = outputProof.persistence?.['adjustments'];
+  const overlayMask = outputProof.overlay?.['maskDef'];
+  const renderRequest = outputProof.render?.['request'];
+  if (
+    typeof persistedAdjustments !== 'object' ||
+    persistedAdjustments === null ||
+    typeof overlayMask !== 'object' ||
+    overlayMask === null ||
+    typeof renderRequest !== 'object' ||
+    renderRequest === null
+  ) {
+    throw new Error(
+      `Initial mask output proof was incomplete: persistence=${String(persistedAdjustments !== null)} overlay=${String(overlayMask !== null)} render=${String(renderRequest !== null)}.`,
+    );
+  }
+  const editDocument = editDocumentV2Schema.parse(renderRequest['editDocumentV2']);
+  const persistedLinear = persistedAdjustments.masks
+    .flatMap((mask) => mask.subMasks)
+    .find((subMask) => subMask.type === 'linear');
+  const overlayLinear = overlayMask.subMasks.find((subMask) => subMask.type === 'linear');
+  const renderedLinear = editDocument.layers.masks
+    .flatMap((mask) => mask.subMasks)
+    .find((subMask) => subMask.type === 'linear');
+  if (
+    persistedLinear === undefined ||
+    overlayLinear === undefined ||
+    renderedLinear === undefined ||
+    JSON.stringify(persistedLinear.parameters) !== JSON.stringify(overlayLinear.parameters) ||
+    JSON.stringify(persistedLinear.parameters) !== JSON.stringify(renderedLinear.parameters)
+  ) {
+    throw new Error(
+      `Linear mask persistence, render, and native overlay output diverged: ${JSON.stringify({ overlayLinear, persistedLinear, renderedLinear })}.`,
+    );
+  }
+
+  await undo.click();
+  await waitForPersistedMask('linear', true, 'undone linear');
+
+  await createMask('radial');
+  await waitForPersistedMask('radial', true, 'tool-replacement radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-tool') ===
+      'radial',
+  );
+  await waitForGeometryIdle();
+  const replacementBox = await toolStage.boundingBox();
+  if (replacementBox === null) throw new Error('Tool-replacement proof could not resolve the Konva input surface.');
+  const replacementStart = {
+    x: replacementBox.x + replacementBox.width * 0.42,
+    y: Math.min(replacementBox.y + replacementBox.height * 0.42, viewport.height - 48),
+  };
+  const replacementEnd = { x: replacementStart.x + 110, y: replacementStart.y + 80 };
+  await page.mouse.move(replacementStart.x, replacementStart.y);
+  await page.mouse.down();
+  await page.mouse.move(replacementEnd.x, replacementEnd.y);
+  const saveBeforeToolReplacement = await readCallCount('save_metadata_and_update_thumbnail');
+  await page.evaluate(() => {
+    const linear = document.querySelector<HTMLButtonElement>(
+      '[data-testid="mask-contextual-create-linear"], [data-testid="mask-creation-linear"]',
+    );
+    if (linear === null) throw new Error('Linear mask tool replacement control was unavailable.');
+    linear.click();
+  });
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('[data-testid="image-canvas"]');
+    return (
+      canvas?.getAttribute('data-initial-mask-draw-active') === 'false' &&
+      canvas.getAttribute('data-initial-mask-draw-context-tool') === 'linear'
+    );
+  });
+  await page.mouse.up();
+  await waitForPersistedMask('linear', true, 'tool-replacement linear');
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    saveBeforeToolReplacement + 1,
+    { timeout: 10_000 },
+  );
+  const toolReplacementProof = await page.evaluate(() => {
+    const saves =
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ) ?? [];
+    const adjustments = saves.at(-1)?.args?.['adjustments'];
+    if (typeof adjustments !== 'object' || adjustments === null || !('masks' in adjustments)) return false;
+    return adjustments.masks
+      .flatMap((mask) => mask.subMasks)
+      .filter((subMask) => subMask.type === 'radial')
+      .every((subMask) => subMask.parameters.isInitialDraw === true);
+  });
+  const savesAfterToolReplacement = await readCallCount('save_metadata_and_update_thumbnail');
+  if (savesAfterToolReplacement !== saveBeforeToolReplacement + 1 || !toolReplacementProof) {
+    throw new Error(
+      `Tool replacement persisted the stale radial draft or did not persist the new linear mask once: ${JSON.stringify({ saveBeforeToolReplacement, savesAfterToolReplacement, toolReplacementProof })}.`,
+    );
+  }
+}
+
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 45_000) {
@@ -193,12 +685,18 @@ let page: Page | undefined;
 try {
   await waitForDevServer(server);
   browser = await chromium.launch({ headless: true });
-  page = await browser.newPage({ viewport });
+  page = await browser.newPage({
+    hasTouch: browserScenario === 'initial-mask-draw-controller',
+    viewport,
+  });
   const consoleErrors: string[] = [];
+  const consoleWarnings: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') {
       const location = message.location().url;
       consoleErrors.push(location ? `${message.text()} (${location})` : message.text());
+    } else if (message.type() === 'warning' && !message.text().startsWith('Clerk:')) {
+      consoleWarnings.push(message.text());
     }
   });
   page.on('pageerror', (error) => {
@@ -237,6 +735,20 @@ try {
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
+  if (browserScenario === 'initial-mask-draw-controller') {
+    await verifyInitialMaskDrawController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected initial-mask browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected initial-mask browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('initial mask draw browser controller proof passed');
+    process.exit(0);
+  }
   await verifyPreviewBoundsScenario(page, boundsSamples);
   const commandOverflowButton = page.getByTestId('editor-command-overflow-trigger');
   await commandOverflowButton.click();

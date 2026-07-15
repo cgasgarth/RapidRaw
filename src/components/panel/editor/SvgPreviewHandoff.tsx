@@ -173,10 +173,15 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
     setState((current) => settleSvgPreviewSuccessor(current, successorId));
   }, []);
 
-  const handleSuccessorLoad = useCallback((successorId: string) => {
+  const handleLayerLoad = useCallback((layerId: string) => {
     setState((current) => {
-      if (current.successor?.id !== successorId || current.successor.status !== 'loading') return current;
-      return { ...current, successor: { ...current.successor, status: 'loaded' } };
+      if (current.successor?.id === layerId && current.successor.status === 'loading') {
+        return { ...current, successor: { ...current.successor, status: 'loaded' } };
+      }
+      if (current.active?.id === layerId && current.active.status === 'loading') {
+        return { ...current, active: { ...current.active, status: 'visible' } };
+      }
+      return current;
     });
   }, []);
 
@@ -272,7 +277,7 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
     });
   }, []);
 
-  return { beginActiveRetirement, handleSuccessorError, handleSuccessorLoad, handleTransitionEnd, state };
+  return { beginActiveRetirement, handleLayerLoad, handleSuccessorError, handleTransitionEnd, state };
 }
 
 const useReducedMotion = () => {
@@ -385,7 +390,7 @@ export function SvgPreviewHandoff({
           href={layer.value.url}
           key={`base:${layer.owner}`}
           onError={() => baseHandoff.handleSuccessorError(layer.id)}
-          onLoad={() => baseHandoff.handleSuccessorLoad(layer.id)}
+          onLoad={() => baseHandoff.handleLayerLoad(layer.id)}
           onTransitionEnd={(event) => {
             if (event.propertyName === 'opacity') baseHandoff.handleTransitionEnd(layer.id);
           }}
@@ -409,7 +414,7 @@ export function SvgPreviewHandoff({
           href={layer.value.url}
           key={`patch:${layer.owner}`}
           onError={() => patchHandoff.handleSuccessorError(layer.id)}
-          onLoad={() => patchHandoff.handleSuccessorLoad(layer.id)}
+          onLoad={() => patchHandoff.handleLayerLoad(layer.id)}
           onTransitionEnd={(event) => {
             if (event.propertyName === 'opacity') patchHandoff.handleTransitionEnd(layer.id);
           }}
