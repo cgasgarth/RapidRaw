@@ -5,6 +5,11 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
+import {
   buildLensCorrectionEditTransaction,
   buildLensProfileEditTransaction,
   captureLensCorrectionCommitIdentity,
@@ -92,7 +97,7 @@ describe('lens correction edit transaction', () => {
     expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(true);
   });
 
-  test('owns all six manual controls, exact no-ops, and stale source/session/revision rejection', () => {
+  test('owns all manual controls, exact no-ops, and stale source/session/revision rejection', () => {
     const state = useEditorStore.getState();
     for (const field of MANUAL_LENS_CORRECTION_ADJUSTMENTS) {
       expect(isManualLensCorrectionAdjustment(field)).toBeTrue();
@@ -134,6 +139,80 @@ describe('lens correction edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('lens_correction_transaction.stale_revision');
+  });
+
+  test('commits manual chromatic aberration through lens node authority and Undo', () => {
+    const state = useEditorStore.getState();
+    const beforeLens = state.editDocumentV2.nodes.lens_correction;
+    const beforeTone = state.editDocumentV2.nodes.scene_global_color_tone;
+    const result = state.applyEditTransaction(
+      buildLensCorrectionEditTransaction(state, identity(), 'chromaticAberrationRedCyan', 22, 'manual-ca-red-cyan'),
+    );
+
+    expect(result.changedKeys).toEqual(['chromaticAberrationRedCyan']);
+    expect(result.afterEditDocumentV2.nodes.lens_correction.params.chromaticAberrationRedCyan).toBe(22);
+    expect(result.afterEditDocumentV2.nodes.lens_correction).not.toBe(beforeLens);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(useEditorStore.getState().adjustments.chromaticAberrationRedCyan).toBe(22);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.chromaticAberrationRedCyan).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes.lens_correction.params.chromaticAberrationRedCyan).toBe(0);
+  });
+
+  test('carries manual chromatic aberration node authority through save execution and reopen', async () => {
+    const before = useEditorStore.getState();
+    const beforeDocument = before.editDocumentV2;
+    before.applyEditTransaction(
+      buildLensCorrectionEditTransaction(before, identity(), 'chromaticAberrationBlueYellow', -14, 'save-manual-ca'),
+    );
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'a'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.submit({
+      adjustmentRevision: 0,
+      adjustments: { ...committed.adjustments, chromaticAberrationBlueYellow: 0 },
+      editDocumentV2: beforeDocument,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: null,
+      sessionGeneration: session.generation,
+    });
+    runner.submit({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: session.generation,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(executions).toHaveLength(1);
+    expect(executions[0]?.editDocumentV2.nodes.lens_correction.params.chromaticAberrationBlueYellow).toBe(-14);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.lens_correction.params.chromaticAberrationBlueYellow).toBe(-14);
+    expect(reopened).toEqual(committed.editDocumentV2);
   });
 
   test('commits complete profile identity atomically and rejects orphan or stale profile results', () => {

@@ -208,6 +208,9 @@ struct LensDistortionParamsV2 {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LensCorrectionV2 {
+    // Optional only for v2 documents persisted before manual CA ownership.
+    chromatic_aberration_blue_yellow: Option<f64>,
+    chromatic_aberration_red_cyan: Option<f64>,
     lens_correction_mode: String,
     lens_distortion_amount: u16,
     lens_distortion_enabled: bool,
@@ -233,6 +236,22 @@ impl LensCorrectionV2 {
             if value > 200 {
                 return Err(format!(
                     "EditDocumentV2 lens_correction field '{field}' must be finite and within [0, 200]"
+                ));
+            }
+        }
+        for (field, value) in [
+            (
+                "chromaticAberrationBlueYellow",
+                self.chromatic_aberration_blue_yellow,
+            ),
+            (
+                "chromaticAberrationRedCyan",
+                self.chromatic_aberration_red_cyan,
+            ),
+        ] {
+            if value.is_some_and(|value| !value.is_finite() || !(-100.0..=100.0).contains(&value)) {
+                return Err(format!(
+                    "EditDocumentV2 lens_correction field '{field}' must be finite and within [-100, 100]"
                 ));
             }
         }
@@ -2496,6 +2515,8 @@ mod tests {
                     "enabled": true,
                     "implementationVersion": 1,
                     "params": {
+                        "chromaticAberrationBlueYellow": -8,
+                        "chromaticAberrationRedCyan": 12,
                         "lensCorrectionMode": "manual",
                         "lensDistortionAmount": 100,
                         "lensDistortionEnabled": true,
@@ -2641,6 +2662,8 @@ mod tests {
         expected["sectionVisibility"] =
             json!({ "basic": true, "color": true, "curves": true, "details": true });
         expected["channelMixer"] = channel_mixer_params()["channelMixer"].clone();
+        expected["chromaticAberrationBlueYellow"] = json!(-8);
+        expected["chromaticAberrationRedCyan"] = json!(12);
         expected["lensCorrectionMode"] = json!("manual");
         expected["lensDistortionAmount"] = json!(100);
         expected["lensDistortionEnabled"] = json!(true);
@@ -3304,6 +3327,17 @@ mod tests {
 
     #[test]
     fn lens_correction_compiler_rejects_unowned_malformed_and_out_of_range_params() {
+        let mut pre_manual_ca = document_with_legacy(json!({}));
+        let params = pre_manual_ca["nodes"]["lens_correction"]["params"]
+            .as_object_mut()
+            .expect("lens params object");
+        params.remove("chromaticAberrationBlueYellow");
+        params.remove("chromaticAberrationRedCyan");
+        serde_json::from_value::<EditDocumentV2>(pre_manual_ca)
+            .expect("pre-manual-CA v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-manual-CA v2 document remains compilable");
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["lens_correction"]["params"]["futureOptic"] = json!(1);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)
@@ -3335,6 +3369,19 @@ mod tests {
                     .expect_err("non-integer or out-of-range lens amount must fail");
                 assert!(error.contains(field) || error.contains("lens_correction is invalid"));
             }
+        }
+
+        for (field, invalid) in [
+            ("chromaticAberrationBlueYellow", json!(-101)),
+            ("chromaticAberrationRedCyan", json!(101)),
+        ] {
+            let mut out_of_range = document_with_legacy(json!({}));
+            out_of_range["nodes"]["lens_correction"]["params"][field] = invalid;
+            let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("out-of-range manual CA must fail");
+            assert!(error.contains(field));
         }
 
         for field in [

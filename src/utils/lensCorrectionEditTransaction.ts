@@ -2,6 +2,8 @@ import type { Adjustments } from './adjustments';
 import type { EditTransactionRequest } from './editTransaction';
 
 export const MANUAL_LENS_CORRECTION_ADJUSTMENTS = [
+  'chromaticAberrationBlueYellow',
+  'chromaticAberrationRedCyan',
   'lensDistortionAmount',
   'lensDistortionEnabled',
   'lensTcaAmount',
