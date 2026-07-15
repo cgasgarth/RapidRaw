@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GrayImage};
@@ -145,7 +145,6 @@ pub struct AppState {
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
-    pub load_image_generation: Arc<AtomicUsize>,
     image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
@@ -226,7 +225,6 @@ impl AppState {
                 policy("thumbnail_geometry", 192, 256, Some(96)),
                 Arc::clone(&cache_budget),
             ),
-            load_image_generation: Arc::new(AtomicUsize::new(0)),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
             decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),

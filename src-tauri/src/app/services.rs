@@ -120,7 +120,7 @@ pub struct AppServices {
         Arc<crate::library::catalog_indexing_service::CatalogIndexingService>,
     pub(crate) thumbnails:
         Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
-    pub(crate) preview_session: Arc<crate::app::commands::uncropped_preview::PreviewSessionService>,
+    pub(crate) preview_session: Arc<crate::app::preview_session_service::PreviewSessionService>,
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,

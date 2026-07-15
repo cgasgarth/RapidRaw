@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use image::{GenericImageView, ImageBuffer, Luma};
@@ -23,127 +21,6 @@ use crate::{
     hydrate_adjustments, render_pipeline,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct UncroppedPreviewRequest {
-    epoch: u64,
-    image_generation: u64,
-    source_identity: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ActiveImageSession {
-    image_generation: u64,
-    source_identity: String,
-}
-
-#[derive(Default)]
-struct UncroppedPreviewAuthority {
-    epoch: u64,
-    active_image: Option<ActiveImageSession>,
-}
-
-/// Owns the active image-session gate and publication authority for preview work.
-///
-/// Rendering may finish out of order, so a worker must still be the newest
-/// request for the same active image session before it can update the viewer.
-#[derive(Default)]
-pub(crate) struct PreviewSessionService {
-    authority: Mutex<UncroppedPreviewAuthority>,
-}
-
-impl PreviewSessionService {
-    pub(crate) fn begin_image_load(&self, generation: &AtomicUsize) -> usize {
-        let mut authority = self
-            .authority
-            .lock()
-            .expect("uncropped-preview authority poisoned");
-        authority.epoch = authority.epoch.wrapping_add(1);
-        authority.active_image = None;
-        generation.fetch_add(1, Ordering::SeqCst) + 1
-    }
-
-    pub(crate) fn install_image_session(&self, image_generation: u64, source_identity: &str) {
-        let mut authority = self
-            .authority
-            .lock()
-            .expect("uncropped-preview authority poisoned");
-        authority.active_image = Some(ActiveImageSession {
-            image_generation,
-            source_identity: source_identity.to_string(),
-        });
-    }
-
-    pub(crate) fn with_active_image_session<T>(
-        &self,
-        image_generation: u64,
-        source_identity: &str,
-        work: impl FnOnce() -> T,
-    ) -> Option<T> {
-        let authority = self
-            .authority
-            .lock()
-            .expect("uncropped-preview authority poisoned");
-        let expected = ActiveImageSession {
-            image_generation,
-            source_identity: source_identity.to_string(),
-        };
-        (authority.active_image.as_ref() == Some(&expected)).then(work)
-    }
-
-    fn begin_request(
-        &self,
-        image_generation: u64,
-        source_identity: String,
-    ) -> Option<UncroppedPreviewRequest> {
-        let mut authority = self
-            .authority
-            .lock()
-            .expect("uncropped-preview authority poisoned");
-        let requested_image = ActiveImageSession {
-            image_generation,
-            source_identity: source_identity.clone(),
-        };
-        if authority.active_image.as_ref() != Some(&requested_image) {
-            return None;
-        }
-        authority.epoch = authority.epoch.wrapping_add(1);
-        Some(UncroppedPreviewRequest {
-            epoch: authority.epoch,
-            image_generation,
-            source_identity,
-        })
-    }
-
-    fn publish_if_current<Current, Publish>(
-        &self,
-        request: &UncroppedPreviewRequest,
-        current_image: Current,
-        publish: Publish,
-    ) -> bool
-    where
-        Current: FnOnce() -> (u64, Option<String>),
-        Publish: FnOnce(),
-    {
-        let authority = self
-            .authority
-            .lock()
-            .expect("uncropped-preview authority poisoned");
-        let (current_image_generation, current_source_identity) = current_image();
-        let request_image = ActiveImageSession {
-            image_generation: request.image_generation,
-            source_identity: request.source_identity.clone(),
-        };
-        let is_current = authority.epoch == request.epoch
-            && authority.active_image.as_ref() == Some(&request_image)
-            && request.image_generation == current_image_generation
-            && current_source_identity.as_deref() == Some(request.source_identity.as_str());
-        if is_current {
-            publish();
-        }
-        is_current
-    }
-}
-
 #[tauri::command]
 pub(crate) fn generate_uncropped_preview(
     js_adjustments: serde_json::Value,
@@ -163,10 +40,7 @@ pub(crate) fn generate_uncropped_preview(
     let request = state
         .services
         .preview_session
-        .begin_request(
-            state.load_image_generation.load(Ordering::SeqCst) as u64,
-            loaded_image.path.clone(),
-        )
+        .begin_request(loaded_image.path.clone())
         .ok_or("uncropped_preview.image_session_transition")?;
 
     thread::spawn(move || {
@@ -297,15 +171,12 @@ pub(crate) fn generate_uncropped_preview(
                     if !state.services.preview_session.publish_if_current(
                         &request,
                         || {
-                            let current_generation =
-                                state.load_image_generation.load(Ordering::SeqCst) as u64;
-                            let current_source = state
+                            state
                                 .original_image
                                 .lock()
                                 .unwrap()
                                 .as_ref()
-                                .map(|image| image.path.clone());
-                            (current_generation, current_source)
+                                .map(|image| image.path.clone())
                         },
                         || {
                             let _ =
@@ -323,88 +194,4 @@ pub(crate) fn generate_uncropped_preview(
     });
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn later_request_supersedes_earlier_request() {
-        let service = PreviewSessionService::default();
-        service.install_image_session(11, "/image-a.raw");
-        let first = service
-            .begin_request(11, "/image-a.raw".to_string())
-            .unwrap();
-        let second = service
-            .begin_request(11, "/image-a.raw".to_string())
-            .unwrap();
-        let mut published = Vec::new();
-
-        assert!(!service.publish_if_current(
-            &first,
-            || (11, Some("/image-a.raw".to_string())),
-            || published.push("first"),
-        ));
-        assert!(service.publish_if_current(
-            &second,
-            || (11, Some("/image-a.raw".to_string())),
-            || published.push("second"),
-        ));
-        assert_eq!(published, ["second"]);
-    }
-
-    #[test]
-    fn publication_requires_the_same_image_session_and_source() {
-        let service = PreviewSessionService::default();
-        service.install_image_session(7, "/image-a.raw");
-        let request = service
-            .begin_request(7, "/image-a.raw".to_string())
-            .unwrap();
-
-        assert!(!service.publish_if_current(
-            &request,
-            || (8, Some("/image-a.raw".to_string())),
-            || panic!("generation-mismatched result published"),
-        ));
-        assert!(!service.publish_if_current(
-            &request,
-            || (7, Some("/image-b.raw".to_string())),
-            || panic!("source-mismatched result published"),
-        ));
-        assert!(!service.publish_if_current(
-            &request,
-            || (7, None),
-            || panic!("result published without an active source"),
-        ));
-    }
-
-    #[test]
-    fn image_load_transition_invalidates_work_and_blocks_new_requests() {
-        let service = PreviewSessionService::default();
-        let generation = AtomicUsize::new(3);
-        service.install_image_session(3, "/image-a.raw");
-        let stale_request = service
-            .begin_request(3, "/image-a.raw".to_string())
-            .unwrap();
-
-        assert_eq!(service.begin_image_load(&generation), 4);
-        assert!(
-            service
-                .begin_request(4, "/image-a.raw".to_string())
-                .is_none()
-        );
-        assert!(!service.publish_if_current(
-            &stale_request,
-            || (4, Some("/image-a.raw".to_string())),
-            || panic!("pre-load result published during a source transition"),
-        ));
-
-        service.install_image_session(4, "/image-a.raw");
-        assert!(
-            service
-                .begin_request(4, "/image-a.raw".to_string())
-                .is_some()
-        );
-    }
 }
