@@ -75,6 +75,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-geometry-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentGeometryApplyRequestSchema.safeParse({
@@ -143,6 +144,25 @@ if (
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.geometry.apply must create undo history and invalidate stale preview output.');
 }
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'agent_geometry_3165_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.geometry.apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.geometry?.params.rotation !== 1.25 ||
+  (state.editDocumentV2.nodes.geometry.params.crop as { x?: unknown } | undefined)?.x !== 8
+) {
+  throw new Error(
+    `agent.geometry.apply did not update the canonical geometry node: ${JSON.stringify(
+      state.editDocumentV2.nodes.geometry?.params,
+    )}`,
+  );
+}
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.geometry.apply did not update the preview recipe/render identity.');
 }
@@ -170,6 +190,27 @@ const dispatched = dispatchResponseSchema.parse(
   }),
 );
 if (dispatched.dispatchStatus !== 'completed') throw new Error('agent.geometry.apply did not dispatch via app-server.');
+
+const beforeNoOp = useEditorStore.getState();
+const beforeNoOpSnapshot = buildAgentImageContextSnapshot();
+const noOp = await applyAgentGeometry({
+  expectedRecipeHash: beforeNoOpSnapshot.initialPreview.recipeHash,
+  geometry: { flipVertical: true, orientationSteps: 1 },
+  operationId: 'agent_geometry_no_op_3165',
+  requestId: 'agent-geometry-no-op-3165',
+  sessionId: 'agent-geometry-3165',
+});
+const afterNoOp = useEditorStore.getState();
+if (
+  noOp.changedPixelCount !== 0 ||
+  noOp.adjustedFields.length !== 0 ||
+  noOp.beforePreviewHash !== noOp.afterPreviewHash ||
+  afterNoOp.adjustmentRevision !== beforeNoOp.adjustmentRevision ||
+  afterNoOp.historyIndex !== beforeNoOp.historyIndex ||
+  afterNoOp.lastEditApplicationReceipt !== beforeNoOp.lastEditApplicationReceipt
+) {
+  throw new Error('Exact-repeat agent.geometry.apply created edit, history, persistence, or pixel work.');
+}
 
 const route = buildRawEngineAppServerRouteCatalog().find(
   (candidate) => candidate.commandName === AGENT_GEOMETRY_APPLY_TOOL_NAME,
