@@ -330,6 +330,79 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('display creative owns current Effects state and quarantines stale fields', () => {
+    const {
+      flareAmount: _flareAmount,
+      glowAmount: _glowAmount,
+      grainAmount: _grainAmount,
+      grainRoughness: _grainRoughness,
+      grainSize: _grainSize,
+      halationAmount: _halationAmount,
+      lutData: _lutData,
+      lutIntensity: _lutIntensity,
+      lutName: _lutName,
+      lutPath: _lutPath,
+      lutSize: _lutSize,
+      vignetteAmount: _vignetteAmount,
+      vignetteFeather: _vignetteFeather,
+      vignetteMidpoint: _vignetteMidpoint,
+      vignetteRoundness: _vignetteRoundness,
+      ...legacyDisplay
+    } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2({
+      ...legacyDisplay,
+      filmCurve: { obsolete: true },
+      vignetteAmount: -32,
+    });
+    expect(defaulted.nodes.display_creative?.params).toEqual({
+      flareAmount: 0,
+      glowAmount: 0,
+      grainAmount: 0,
+      grainRoughness: 50,
+      grainSize: 25,
+      halationAmount: 0,
+      lutData: null,
+      lutIntensity: 100,
+      lutName: null,
+      lutPath: null,
+      lutSize: 0,
+      vignetteAmount: -32,
+      vignetteFeather: 50,
+      vignetteMidpoint: 50,
+      vignetteRoundness: 0,
+    });
+    expect(defaulted.extensions.legacyAdjustments).toMatchObject({ filmCurve: { obsolete: true } });
+    expect(defaulted.migration?.quarantined).toContain('filmCurve');
+    expect(defaulted.migration?.defaulted).toEqual(
+      expect.arrayContaining([
+        'display_creative.grainAmount',
+        'display_creative.lutIntensity',
+        'display_creative.vignetteFeather',
+      ]),
+    );
+    expect(compileEditDocumentNodeV2(defaulted.nodes.display_creative).params.vignetteAmount).toBe(-32);
+
+    const displayNode = defaulted.nodes.display_creative;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          display_creative: { ...displayNode, params: { ...displayNode?.params, futureDisplay: true } },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          display_creative: { ...displayNode, params: { ...displayNode?.params, vignetteAmount: 101 } },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -610,6 +683,27 @@ describe('EditDocumentV2 legacy adapter', () => {
       sharpness: 42,
     });
     expect(renderDocument.nodes.camera_input).toEqual(preparedDocument.nodes.camera_input);
+    expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays the authoritative display-creative envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      glowAmount: 12,
+      grainAmount: 28,
+      vignetteAmount: -32,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['display_creative']);
+
+    expect(renderDocument.nodes.display_creative).toBe(authoritative.nodes.display_creative);
+    expect(renderDocument.nodes.display_creative?.params).toMatchObject({
+      glowAmount: 12,
+      grainAmount: 28,
+      vignetteAmount: -32,
+    });
+    expect(renderDocument.nodes.detail_denoise_dehaze).toEqual(preparedDocument.nodes.detail_denoise_dehaze);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
   });
 

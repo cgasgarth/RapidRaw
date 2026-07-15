@@ -30,6 +30,26 @@ export const editDocumentDetailDenoiseDehazeV2Schema = z
   })
   .strict();
 
+export const editDocumentDisplayCreativeV2Schema = z
+  .object({
+    flareAmount: z.number().finite().min(0).max(100),
+    glowAmount: z.number().finite().min(0).max(100),
+    grainAmount: z.number().finite().min(0).max(100),
+    grainRoughness: z.number().finite().min(0).max(100),
+    grainSize: z.number().finite().min(0).max(100),
+    halationAmount: z.number().finite().min(0).max(100),
+    lutData: z.string().nullable(),
+    lutIntensity: z.number().finite().min(0).max(100),
+    lutName: z.string().nullable(),
+    lutPath: z.string().nullable(),
+    lutSize: z.number().int().min(0).max(4_294_967_295),
+    vignetteAmount: z.number().finite().min(-100).max(100),
+    vignetteFeather: z.number().finite().min(0).max(100),
+    vignetteMidpoint: z.number().finite().min(0).max(100),
+    vignetteRoundness: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
   .strict();
@@ -310,8 +330,40 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
-    legacyFields: ['filmCurve', 'grainAmount', 'halationAmount', 'lutIntensity', 'vignetteAmount'],
+    defaultParams: {
+      flareAmount: 0,
+      glowAmount: 0,
+      grainAmount: 0,
+      grainRoughness: 50,
+      grainSize: 25,
+      halationAmount: 0,
+      lutData: null,
+      lutIntensity: 100,
+      lutName: null,
+      lutPath: null,
+      lutSize: 0,
+      vignetteAmount: 0,
+      vignetteFeather: 50,
+      vignetteMidpoint: 50,
+      vignetteRoundness: 0,
+    },
+    legacyFields: [
+      'flareAmount',
+      'glowAmount',
+      'grainAmount',
+      'grainRoughness',
+      'grainSize',
+      'halationAmount',
+      'lutData',
+      'lutIntensity',
+      'lutName',
+      'lutPath',
+      'lutSize',
+      'vignetteAmount',
+      'vignetteFeather',
+      'vignetteMidpoint',
+      'vignetteRoundness',
+    ],
     nodeType: 'display_creative',
     process: 'scene_referred_v2',
     renderStage: 'display_creative',
@@ -686,6 +738,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'display_creative') {
+        const displayCreative = editDocumentDisplayCreativeV2Schema.safeParse(node.params);
+        if (!displayCreative.success) {
+          for (const issue of displayCreative.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -766,6 +826,7 @@ export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
+export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
@@ -791,6 +852,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
+  if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
