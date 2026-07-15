@@ -9,7 +9,7 @@ import CropPanel from '../../../src/components/panel/right/color/CropPanel.tsx';
 import { Panel, type SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
-import { useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
@@ -124,12 +124,16 @@ describe('crop panel workflow', () => {
   });
 
   test('binds the compact groups to crop state and keyboard overlay cycling', async () => {
+    const adjustments = { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 };
     useEditorStore.getState().setEditor({
-      adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 },
-      history: [{ ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 }],
+      adjustmentRevision: 0,
+      adjustments,
+      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
+      imageSession: createEditorImageSession({ generation: 1, path: selectedImage.path, source: 'cache' }),
       isStraightenActive: false,
+      lastEditApplicationReceipt: null,
       overlayMode: 'goldenSpiral',
       overlayRotation: 0,
       selectedImage,

@@ -24,6 +24,11 @@ import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import { resolveCropForGeometryTransaction } from '../../../../utils/cropUtils';
+import {
+  buildOrientationFlipEditTransaction,
+  type OrientationFlipAxis,
+  type OrientationFlipCommitIdentity,
+} from '../../../../utils/orientationFlipEditTransaction';
 import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
 import TransformModal from '../../../modals/editing/TransformModal';
 import { Orientation, Panel } from '../../../ui/AppProperties';
@@ -139,6 +144,9 @@ export function CropEditSession() {
   const activeOverlay = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
   const compare = useEditorStore((s) => s.compare);
+  const adjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
+  const imageSessionId = useEditorStore((s) => s.imageSession?.id ?? null);
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const setEditor = useEditorStore((s) => s.setEditor);
@@ -234,6 +242,28 @@ export function CropEditSession() {
   );
 
   const { aspectRatio, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
+  const flipCommitIdentity = useMemo<OrientationFlipCommitIdentity | null>(
+    () =>
+      selectedImage !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImage.path }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImage],
+  );
+  const commitOrientationFlip = useCallback(
+    (axis: OrientationFlipAxis, enabled: boolean) => {
+      if (flipCommitIdentity === null) return;
+      applyEditTransaction(
+        buildOrientationFlipEditTransaction(
+          useEditorStore.getState(),
+          flipCommitIdentity,
+          axis,
+          enabled,
+          crypto.randomUUID(),
+        ),
+      );
+    },
+    [applyEditTransaction, flipCommitIdentity],
+  );
 
   const setGeometryAdjustments = useCallback(
     (update: (previous: Adjustments) => Adjustments) => {
@@ -888,11 +918,12 @@ export function CropEditSession() {
                   aria-label={t('editor.crop.tooltips.flipHoriz')}
                   aria-pressed={flipHorizontal}
                   className={cx(iconButtonClassName, flipHorizontal && selectedControlClassName)}
+                  data-commit-adjustment-revision={flipCommitIdentity?.adjustmentRevision}
+                  data-commit-image-session={flipCommitIdentity?.imageSessionId}
+                  data-commit-source-identity={flipCommitIdentity?.sourceIdentity}
                   data-tooltip={t('editor.crop.tooltips.flipHoriz')}
                   data-testid="crop-panel-flip-horizontal"
-                  onClick={() => {
-                    setAdjustments((prev: Adjustments) => ({ ...prev, flipHorizontal: !prev.flipHorizontal }));
-                  }}
+                  onClick={() => commitOrientationFlip('horizontal', !flipHorizontal)}
                   type="button"
                 >
                   <FlipHorizontal size={16} />
@@ -901,11 +932,12 @@ export function CropEditSession() {
                   aria-label={t('editor.crop.tooltips.flipVert')}
                   aria-pressed={flipVertical}
                   className={cx(iconButtonClassName, flipVertical && selectedControlClassName)}
+                  data-commit-adjustment-revision={flipCommitIdentity?.adjustmentRevision}
+                  data-commit-image-session={flipCommitIdentity?.imageSessionId}
+                  data-commit-source-identity={flipCommitIdentity?.sourceIdentity}
                   data-tooltip={t('editor.crop.tooltips.flipVert')}
                   data-testid="crop-panel-flip-vertical"
-                  onClick={() => {
-                    setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }));
-                  }}
+                  onClick={() => commitOrientationFlip('vertical', !flipVertical)}
                   type="button"
                 >
                   <FlipVertical size={16} />
