@@ -1,3 +1,4 @@
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
@@ -5,13 +6,13 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { pushEditHistoryEntry } from '../../editHistory';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
@@ -31,6 +32,7 @@ export type AgentCoreEditCommandBundleStep =
   | { kind: 'selective_color'; payload: SelectiveColorAdjustmentPayload };
 
 export interface AgentCoreEditCommandBundleOptions {
+  bridge?: RawEngineLocalAppServerBridge;
   operationId: string;
   sessionId: string;
   steps: readonly AgentCoreEditCommandBundleStep[];
@@ -73,6 +75,7 @@ const AGENT_COLOR_PIPELINE = {
 } as const satisfies SelectiveColorCommandColorPipeline;
 
 export const runAgentCoreEditCommandBundle = async ({
+  bridge = createLiveEditorAppServerBridge(),
   operationId,
   sessionId,
   steps,
@@ -80,9 +83,10 @@ export const runAgentCoreEditCommandBundle = async ({
   const initialState = useEditorStore.getState();
   const imagePath = initialState.selectedImage?.path;
   if (imagePath === undefined) throw new Error('Cannot run agent command bundle without a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(initialState);
+  if (commitIdentity === null) throw new Error('Cannot run agent command bundle without a selected image session.');
   if (steps.length === 0) throw new Error('Agent command bundle requires at least one command step.');
 
-  const bridge = createLiveEditorAppServerBridge();
   const dryRuns: ToneColorDryRunResultV1[] = [];
   const mutations: ToneColorMutationResultV1[] = [];
   let nextAdjustments = initialState.adjustments;
@@ -165,15 +169,10 @@ export const runAgentCoreEditCommandBundle = async ({
     throw new Error('Agent command bundle did not visibly affect rendered output.');
   }
 
-  useEditorStore.setState((state) => {
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-    return {
-      adjustments: nextAdjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${operationId}_apply`),
+  );
 
   return {
     appliedGraphRevision: currentGraphRevision,
