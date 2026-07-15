@@ -152,6 +152,7 @@ pub struct AppServices {
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
+    pub(crate) smart_previews: Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
@@ -189,6 +190,7 @@ impl AppServices {
             full_warp_cache: Arc::default(),
             native_caches,
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
+            smart_previews: crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),
@@ -201,6 +203,7 @@ impl AppServices {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::library::smart_preview_scheduler::SmartPreviewDemandClass;
     use crate::merge::computational_job::{
         ComputationalMergeFamily, ComputationalMergeJobId, ComputationalMergeJobStatus,
     };
@@ -375,5 +378,58 @@ mod tests {
                 .verified_sha256(&second_revision),
             Some(second.sha256)
         );
+    }
+
+    #[test]
+    fn smart_preview_service_coalesces_concurrent_revision_replacement() {
+        let services = Arc::new(AppServices::new());
+        let old_generation = services.smart_previews.enqueue(
+            "/roll/image.raw".to_string(),
+            "revision-1".to_string(),
+            Vec::new(),
+            SmartPreviewDemandClass::VisibleIdle,
+        );
+        let old_job = services.smart_previews.claim();
+        assert_eq!(old_job.generation, old_generation);
+
+        let barrier = Arc::new(Barrier::new(9));
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let services = Arc::clone(&services);
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    services.smart_previews.enqueue(
+                        "/roll/image.raw".to_string(),
+                        "revision-2".to_string(),
+                        vec![1, 2, 3],
+                        SmartPreviewDemandClass::ExplicitBuild,
+                    )
+                })
+            })
+            .collect();
+        barrier.wait();
+        let generations: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        assert!(
+            generations
+                .iter()
+                .all(|generation| *generation == generations[0])
+        );
+        assert_ne!(generations[0], old_generation);
+        assert!(!services.smart_previews.is_publishable(&old_job));
+        let cancelled = services.smart_previews.finish(&old_job, false);
+        assert_eq!(cancelled.cancelled, 1);
+
+        let replacement = services.smart_previews.claim();
+        assert_eq!(replacement.generation, generations[0]);
+        assert!(services.smart_previews.is_publishable(&replacement));
+        let progress = services.smart_previews.finish(&replacement, true);
+        assert_eq!(progress.pending, 0);
+        assert_eq!(progress.in_flight, 0);
+        assert_eq!(progress.completed, 1);
+        assert_eq!(progress.cancelled, 1);
     }
 }
