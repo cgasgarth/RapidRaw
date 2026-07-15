@@ -153,6 +153,7 @@ pub struct AppServices {
     pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
     pub(crate) smart_previews: Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
+    pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
@@ -191,6 +192,7 @@ impl AppServices {
             native_caches,
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             smart_previews: crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
+            image_open: Arc::default(),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),

@@ -149,7 +149,6 @@ struct ScheduledPrefetch {
     identity: PrefetchOperationIdentity,
 }
 
-#[derive(Clone)]
 pub(crate) struct ImageOpenCoordinator {
     inner: Arc<Mutex<CoordinatorInner>>,
     prefetch_generation: Arc<AtomicUsize>,
@@ -449,13 +448,15 @@ pub async fn begin_image_open(
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     promote_editor_initialization(&app);
     let joined = state
-        .image_open()
+        .services
+        .image_open
         .begin_foreground(&request.session_id, &request.path)?;
     if let Some(notify) = &joined {
         let _ = tokio::time::timeout(Duration::from_secs(30), notify.notified()).await;
     }
     if !state
-        .image_open()
+        .services
+        .image_open
         .is_current(&request.session_id, &request.path)
     {
         let _ = app.emit(
@@ -493,7 +494,7 @@ pub async fn begin_image_open(
         None
     };
     if crate::formats::is_raw_file(&request.path) {
-        let preview_coordinator = state.image_open().clone();
+        let preview_coordinator = Arc::clone(&state.services.image_open);
         preview_coordinator.record_embedded_attempt();
         let preview_source_path = source_path.clone();
         let preview_session = request.session_id.clone();
@@ -610,7 +611,8 @@ pub async fn begin_image_open(
         });
     }
     if !state
-        .image_open()
+        .services
+        .image_open
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
@@ -626,14 +628,16 @@ pub async fn begin_image_open(
     )
     .await?;
     if !state
-        .image_open()
+        .services
+        .image_open
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
     }
     let decode_ready_millis = started.elapsed().as_millis() as u64;
     let frame_generation = state
-        .image_open()
+        .services
+        .image_open
         .claim_frame(
             &request.session_id,
             &request.path,
@@ -689,14 +693,14 @@ pub fn schedule_image_prefetch(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> ImageOpenDiagnostics {
-    for scheduled in state.image_open().schedule(&request) {
+    for scheduled in state.services.image_open.schedule(&request) {
         let ScheduledPrefetch {
             path,
             notify,
             identity,
         } = scheduled;
         let task_app = app.clone();
-        let cancellation = Arc::clone(&state.image_open().prefetch_generation);
+        let cancellation = Arc::clone(&state.services.image_open.prefetch_generation);
         let cancellation_generation = identity.cancellation_generation;
         tauri::async_runtime::spawn(async move {
             let task_state = task_app.state::<AppState>();
@@ -709,22 +713,24 @@ pub fn schedule_image_prefetch(
             .await
             .is_ok();
             task_state
-                .image_open()
+                .services
+                .image_open
                 .finish_prefetch(&path, identity, completed);
             notify.notify_one();
         });
     }
-    state.image_open().report()
+    state.services.image_open.report()
 }
 
 #[tauri::command]
 pub fn get_image_open_diagnostics(state: State<'_, AppState>) -> ImageOpenDiagnostics {
-    state.image_open().report()
+    state.services.image_open.report()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Barrier;
 
     #[test]
     fn scheduler_bounds_deduplicates_and_shrinks_under_pressure() {
@@ -769,6 +775,76 @@ mod tests {
         );
         assert_eq!(scheduled.len(), 1);
         assert_eq!(coordinator.report().prefetch_promotions, 1);
+    }
+
+    #[test]
+    fn app_service_keeps_only_newest_concurrent_open_publishable() {
+        let services = Arc::new(crate::app::services::AppServices::new());
+        let scheduled = services.image_open.schedule(&ScheduleImagePrefetchRequest {
+            collection_generation: 1,
+            candidates: vec!["target.raw".into(), "neighbor.raw".into()],
+            memory_pressure: false,
+            workload_busy: false,
+        });
+        assert_eq!(scheduled.len(), 2);
+        let sessions: Vec<_> = (1..=8)
+            .map(|generation| ImageOpenSessionId {
+                selection_generation: generation,
+                image_session: generation,
+            })
+            .collect();
+        let barrier = Arc::new(Barrier::new(sessions.len() + 1));
+        let handles: Vec<_> = sessions
+            .iter()
+            .cloned()
+            .map(|session| {
+                let services = Arc::clone(&services);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    services.image_open.begin_foreground(&session, "target.raw")
+                })
+            })
+            .collect();
+        barrier.wait();
+        for handle in handles {
+            let result = handle.join().unwrap();
+            assert!(
+                result.is_ok() || matches!(&result, Err(error) if error == "image_open_superseded"),
+                "unexpected image-open result: {result:?}"
+            );
+        }
+
+        let newest = sessions.last().unwrap();
+        assert!(services.image_open.is_current(newest, "target.raw"));
+        for stale in &sessions[..sessions.len() - 1] {
+            assert!(!services.image_open.is_current(stale, "target.raw"));
+        }
+        assert_eq!(
+            services.image_open.claim_frame(
+                newest,
+                "target.raw",
+                ImageFrameQuality::EmbeddedProvisional,
+            ),
+            Some(1)
+        );
+        assert_eq!(
+            services.image_open.claim_frame(
+                newest,
+                "target.raw",
+                ImageFrameQuality::SettledDeveloped,
+            ),
+            Some(2)
+        );
+        assert_eq!(
+            services.image_open.claim_frame(
+                newest,
+                "target.raw",
+                ImageFrameQuality::EmbeddedProvisional,
+            ),
+            None
+        );
+        assert!(services.image_open.report().prefetch_promotions >= 1);
     }
 
     #[test]
@@ -983,13 +1059,13 @@ mod tests {
 
     #[test]
     fn injected_slow_provisional_cannot_publish_after_fast_settled() {
-        let coordinator = ImageOpenCoordinator::default();
+        let coordinator = Arc::new(ImageOpenCoordinator::default());
         let session = ImageOpenSessionId {
             selection_generation: 9,
             image_session: 9,
         };
         coordinator.begin_foreground(&session, "race.raw").unwrap();
-        let worker = coordinator.clone();
+        let worker = Arc::clone(&coordinator);
         let worker_session = session.clone();
         let (release_tx, release_rx) = std::sync::mpsc::channel();
         let provisional = std::thread::spawn(move || {
@@ -1010,7 +1086,7 @@ mod tests {
 
     #[test]
     fn injected_fast_provisional_is_followed_by_newer_slow_settled() {
-        let coordinator = ImageOpenCoordinator::default();
+        let coordinator = Arc::new(ImageOpenCoordinator::default());
         let session = ImageOpenSessionId {
             selection_generation: 10,
             image_session: 10,
@@ -1020,7 +1096,7 @@ mod tests {
             coordinator.claim_frame(&session, "race.raw", ImageFrameQuality::EmbeddedProvisional,),
             Some(1)
         );
-        let worker = coordinator;
+        let worker = Arc::clone(&coordinator);
         let worker_session = session;
         let (release_tx, release_rx) = std::sync::mpsc::channel();
         let settled = std::thread::spawn(move || {
