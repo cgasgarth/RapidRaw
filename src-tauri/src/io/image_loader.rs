@@ -1406,19 +1406,19 @@ pub(crate) async fn load_image_prepared(
             .preview_session()
             .complete_image_load(operation, &path, || {
                 state
-                    .services
-                    .viewer_sampling
-                    .install_session(operation.generation(), &path);
-                state
                     .render()
                     .full_warp_cache()
                     .install_session(operation.generation(), &artifact_source);
-                state.services.editor.install_image(LoadedImage {
-                    path: path.clone(),
-                    image: pristine_arc,
-                    is_raw: loaded_is_raw,
-                    artifact_source,
-                });
+                state.editor().install_active_image(
+                    operation.generation(),
+                    &path,
+                    LoadedImage {
+                        path: path.clone(),
+                        image: pristine_arc,
+                        is_raw: loaded_is_raw,
+                        artifact_source,
+                    },
+                );
             })
             .is_none()
         {

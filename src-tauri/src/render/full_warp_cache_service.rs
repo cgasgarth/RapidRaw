@@ -105,8 +105,7 @@ pub(crate) fn get_cached_full_warped_image(
 ) -> Result<Arc<DynamicImage>, String> {
     let geometry_hash = crate::cache_utils::calculate_geometry_hash(adjustments);
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     let identity = RenderArtifactIdentity::source_geometry(
@@ -123,7 +122,7 @@ pub(crate) fn get_cached_full_warped_image(
         WarpLookup::Miss(token) => *token,
     };
 
-    let (mut full_image, is_raw) = state.services.editor.clone_image_pixels()?;
+    let (mut full_image, is_raw) = state.editor().clone_image_pixels()?;
     if is_raw {
         crate::image_processing::apply_cpu_default_raw_processing(&mut full_image);
     }

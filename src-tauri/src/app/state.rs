@@ -184,6 +184,10 @@ impl AppState {
         self.services.library()
     }
 
+    pub(crate) fn editor(&self) -> &std::sync::Arc<crate::app::services::EditorRuntimeService> {
+        self.services.editor()
+    }
+
     pub(crate) fn computational(
         &self,
     ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {

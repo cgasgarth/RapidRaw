@@ -279,7 +279,7 @@ fn run_mask_refinement_full_image_output_proof(
     let state = app.state::<AppState>();
     let context = get_or_init_compute_gpu_context_for_tests(&state)?;
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    state.services.editor.install_image(LoadedImage {
+    state.editor().install_image(LoadedImage {
         image: Arc::new(base_image.clone()),
         is_raw,
         path: source_path.to_string(),

@@ -548,7 +548,7 @@ fn decode_export_item(
         Some(plan.source_revision.clone())
     };
     let (base_image, raw_development_report) = if plan.is_current_edit {
-        match state.services.editor.clone_image_pixels() {
+        match state.editor().clone_image_pixels() {
             Ok((orig_data, _)) => (
                 composite_patches_on_image(&orig_data, &adjustments)
                     .map_err(|error| format!("Failed to composite AI patches: {error}"))?
@@ -2885,8 +2885,7 @@ pub async fn estimate_export_sizes(
         (is_current_edit, current_edit_adjustments)
     {
         let loaded_image = state
-            .services
-            .editor
+            .editor()
             .image_snapshot()
             .ok_or("No original image loaded")?;
         hydrate_adjustments(&state, &mut adjustments_clone);

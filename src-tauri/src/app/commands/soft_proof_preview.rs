@@ -76,8 +76,7 @@ pub(crate) fn generate_export_soft_proof_preview(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     if let Some(expected_image_path) = request.expected_image_path.as_deref() {
@@ -155,8 +154,7 @@ pub(crate) fn generate_export_soft_proof_preview(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .services
-                .editor
+                .editor()
                 .image_snapshot()
                 .map(|image| {
                     (
@@ -202,9 +200,8 @@ pub(crate) fn generate_export_soft_proof_preview(
             space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
         };
         state
-            .services
-            .viewer_sampling
-            .publish(ViewerSampleCacheSlot::SoftProof, frame);
+            .editor()
+            .publish_viewer_sample(ViewerSampleCacheSlot::SoftProof, frame);
     }
 
     let proof_image =
@@ -329,8 +326,7 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     let session = SoftProofPreviewSession {
@@ -360,8 +356,7 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .services
-                .editor
+                .editor()
                 .image_snapshot()
                 .map(|image| {
                     (

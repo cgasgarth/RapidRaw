@@ -147,7 +147,7 @@ fn run_private_layer_mask_real_raw_proof(
     let context = get_or_init_compute_gpu_context_for_tests(&state)?;
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    state.services.editor.install_image(LoadedImage {
+    state.editor().install_image(LoadedImage {
         image: Arc::new(base_image.clone()),
         is_raw,
         path: source_path_string.clone(),
