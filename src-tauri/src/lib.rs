@@ -56,15 +56,13 @@ pub use render::resample::{
 };
 pub(crate) use render::*;
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::thread;
-
-use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -106,9 +104,8 @@ use crate::formats::is_raw_file;
 use crate::image_loader::{composite_patches_on_image, load_base_image_from_bytes};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_flip, apply_geometry_warp, apply_srgb_to_linear, downscale_f32_image,
-    get_or_init_gpu_context, process_and_get_dynamic_image,
-    resolve_tonemapper_override_from_handle, warp_image_geometry,
+    apply_flip, apply_srgb_to_linear, downscale_f32_image, get_or_init_gpu_context,
+    process_and_get_dynamic_image, resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{
@@ -695,162 +692,6 @@ fn compile_consumer_render_plan(
         lut,
     )
     .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn generate_uncropped_preview(
-    js_adjustments: serde_json::Value,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<(), String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let mut adjustments_clone = js_adjustments;
-    hydrate_adjustments(&state, &mut adjustments_clone);
-
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded")?;
-
-    thread::spawn(move || {
-        let state = app_handle.state::<AppState>();
-        let is_raw = loaded_image.is_raw;
-        let has_patches = adjustments_clone
-            .get("aiPatches")
-            .and_then(|v| v.as_array())
-            .is_some_and(|a| !a.is_empty());
-        let patched_image = if has_patches {
-            composite_patches_on_image(&loaded_image.image, &adjustments_clone).unwrap_or_else(
-                |e| {
-                    eprintln!("Failed to composite patches for uncropped preview: {}", e);
-                    Cow::Borrowed(loaded_image.image.as_ref())
-                },
-            )
-        } else {
-            Cow::Borrowed(loaded_image.image.as_ref())
-        };
-
-        let warped_image = apply_geometry_warp(patched_image, &adjustments_clone);
-
-        let orientation_steps = adjustments_clone[adjustment_fields::ORIENTATION_STEPS]
-            .as_u64()
-            .unwrap_or(0) as u8;
-        let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
-
-        let flip_horizontal = adjustments_clone[adjustment_fields::FLIP_HORIZONTAL]
-            .as_bool()
-            .unwrap_or(false);
-        let flip_vertical = adjustments_clone[adjustment_fields::FLIP_VERTICAL]
-            .as_bool()
-            .unwrap_or(false);
-
-        let flipped_image =
-            apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical).into_owned();
-
-        let settings = load_settings_or_default(&app_handle);
-        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-
-        let (rotated_w, rotated_h) = flipped_image.dimensions();
-
-        let (processing_base, scale_for_gpu) = if rotated_w > preview_dim || rotated_h > preview_dim
-        {
-            let base = downscale_f32_image(&flipped_image, preview_dim, preview_dim);
-            let scale = if rotated_w > 0 {
-                base.width() as f32 / rotated_w as f32
-            } else {
-                1.0
-            };
-            (base, scale)
-        } else {
-            (flipped_image, 1.0)
-        };
-
-        let (preview_width, preview_height) = processing_base.dimensions();
-
-        let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-            .get("masks")
-            .and_then(|m| serde_json::from_value(m.clone()).ok())
-            .unwrap_or_default();
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-            .iter()
-            .filter_map(|def| {
-                get_cached_or_generate_mask(
-                    &state,
-                    def,
-                    preview_width,
-                    preview_height,
-                    scale_for_gpu,
-                    (0.0, 0.0),
-                    &adjustments_clone,
-                )
-            })
-            .collect();
-
-        let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
-        let lut_path = render_adjustments["lutPath"].as_str();
-        let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-        let render_plan = match compile_consumer_render_plan(
-            render_adjustments.as_ref(),
-            &loaded_image.path,
-            is_raw,
-            tm_override,
-            lut,
-        ) {
-            Ok(plan) => plan,
-            Err(error) => {
-                log::error!("uncropped preview edit graph compilation failed: {error}");
-                return;
-            }
-        };
-        let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
-            &processing_base,
-            calculate_transform_hash(render_adjustments.as_ref()),
-            render_adjustments.as_ref(),
-            is_raw,
-        );
-        let mut gpu_adjustments = render_plan.adjustments;
-        render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-        render_pipeline::suppress_legacy_global_detail(
-            &mut gpu_adjustments,
-            detail_stage.owns_legacy_global_detail,
-        );
-        if let Ok(processed_image) = process_and_get_dynamic_image(
-            &context,
-            &state,
-            detail_stage.image.as_ref(),
-            crate::gpu_processing::PreGpuImageIdentity::for_stage(
-                detail_stage.image.as_ref(),
-                loaded_image.artifact_source.source_fingerprint(),
-                detail_stage.render_hash,
-                detail_stage.render_hash,
-            ),
-            RenderRequest {
-                adjustments: gpu_adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut: render_plan.lut.clone(),
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    Arc::clone(&render_plan.edit_graph),
-                ),
-            },
-            "generate_uncropped_preview",
-        ) {
-            match encode_jpeg_data_url(&processed_image, 80) {
-                Ok(data_url) => {
-                    let _ = app_handle.emit(crate::events::PREVIEW_UPDATE_UNCROPPED, data_url);
-                }
-                Err(e) => {
-                    log::error!("Failed to encode uncropped preview: {}", e);
-                }
-            }
-        }
-    });
-
-    Ok(())
 }
 
 fn validate_original_preview_source(expected: &str, loaded: &str) -> Result<(), String> {
@@ -2384,7 +2225,7 @@ pub fn run() {
             generate_original_transformed_preview,
             app::commands::viewer_sampling::sample_viewer_pixel,
             generate_preset_preview,
-            generate_uncropped_preview,
+            app::commands::uncropped_preview::generate_uncropped_preview,
             preview_geometry_transform,
             app::commands::logging::get_log_file_path,
             app::commands::logging::frontend_log,

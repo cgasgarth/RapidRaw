@@ -1087,7 +1087,10 @@ pub(crate) async fn load_image_prepared(
     let (generation_tracker, my_generation) = if let Some(cancellation) = cancellation {
         cancellation
     } else if install_active {
-        let generation = state.load_image_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let generation = state
+            .services
+            .uncropped_preview
+            .begin_image_load(&state.load_image_generation);
         (Arc::clone(&state.load_image_generation), generation)
     } else {
         let generation = state.load_image_generation.load(Ordering::SeqCst);
@@ -1394,11 +1397,15 @@ pub(crate) async fn load_image_prepared(
             .full_warp_cache
             .install_session(my_generation as u64, &artifact_source);
         *state.original_image.lock().unwrap() = Some(LoadedImage {
-            path,
+            path: path.clone(),
             image: pristine_arc,
             is_raw: loaded_is_raw,
             artifact_source,
         });
+        state
+            .services
+            .uncropped_preview
+            .install_image_session(my_generation as u64, &path);
     }
 
     Ok(LoadImageResult {
