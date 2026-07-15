@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { EditDocumentV2CopyPayload } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import type { ToolType } from '../panel/right/layers/Masks';
@@ -241,6 +242,7 @@ export enum Orientation {
 
 export interface Preset {
   adjustments: Partial<Adjustments>;
+  editDocumentV2?: EditDocumentV2CopyPayload | undefined;
   colorStyleProvenance?:
     | {
         createdAt: string;

@@ -377,7 +377,7 @@ export const editDocumentLensCorrectionV2Schema = z
 
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       blacks: 0,
       brightness: 0,
@@ -396,7 +396,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       curveMode: 'point',
       curves: DEFAULT_EDIT_DOCUMENT_CURVES_V2,
@@ -420,7 +420,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       toneEqualizer: {
         autoPlacement: false,
@@ -444,7 +444,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       flareAmount: 0,
       glowAmount: 0,
@@ -486,7 +486,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       clarity: 0,
       colorNoiseReduction: 0,
@@ -522,7 +522,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       pointColor: {
         enabled: false,
@@ -549,7 +549,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       blackWhiteMixer: {
         enabled: false,
@@ -576,7 +576,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       channelMixer: {
         blue: { blue: 100, constant: 0, green: 0, red: 0 },
@@ -594,7 +594,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       colorGrading: {
         balance: 0,
@@ -627,7 +627,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
@@ -670,7 +670,14 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: {
+      batch: true,
+      copy: true,
+      paste: true,
+      preset: 'optional_geometry',
+      provenance: 'strip',
+      reset: true,
+    },
     defaultParams: {
       lensCorrectionMode: 'manual',
       lensDistortionAmount: 100,
@@ -702,7 +709,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       colorCalibration: {
         blueHue: 0,
@@ -722,7 +729,14 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    capabilities: {
+      batch: true,
+      copy: true,
+      paste: true,
+      preset: 'optional_geometry',
+      provenance: 'strip',
+      reset: true,
+    },
     defaultParams: {
       aspectRatio: null,
       crop: null,
@@ -762,7 +776,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: false, copy: false, paste: false, provenance: 'preserve', reset: false },
+    capabilities: { batch: false, copy: false, paste: false, preset: 'exclude', provenance: 'preserve', reset: false },
     defaultParams: { masks: [] },
     editorSection: null,
     legacyFields: ['masks'],
@@ -772,7 +786,14 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     implementationVersion: 1,
   },
   {
-    capabilities: { batch: false, copy: false, paste: false, provenance: 'regenerate', reset: false },
+    capabilities: {
+      batch: false,
+      copy: false,
+      paste: false,
+      preset: 'exclude',
+      provenance: 'regenerate',
+      reset: false,
+    },
     defaultParams: { aiPatches: [] },
     editorSection: null,
     legacyFields: ['aiPatches'],
@@ -787,6 +808,7 @@ export const editDocumentNodeCapabilitySchema = z.object({
   batch: z.boolean(),
   copy: z.boolean(),
   paste: z.boolean(),
+  preset: z.enum(['creative', 'exclude', 'optional_geometry']),
   provenance: z.enum(['preserve', 'regenerate', 'strip']),
   reset: z.boolean(),
 });
@@ -815,6 +837,31 @@ export const editDocumentNodeEnvelopeV2Schema = z
     type: editDocumentNodeTypeV2Schema,
   })
   .strict();
+
+export const editDocumentV2CopyPayloadSchema = z
+  .object({
+    nodes: z.partialRecord(editDocumentNodeTypeV2Schema, editDocumentNodeEnvelopeV2Schema),
+    schemaVersion: z.literal(2),
+  })
+  .strict()
+  .superRefine(({ nodes }, context) => {
+    for (const [nodeType, node] of Object.entries(nodes)) {
+      const descriptor = EDIT_DOCUMENT_NODE_DESCRIPTORS.find((candidate) => candidate.nodeType === nodeType);
+      if (
+        descriptor === undefined ||
+        !descriptor.capabilities.copy ||
+        !descriptor.capabilities.paste ||
+        descriptor.capabilities.provenance !== 'strip' ||
+        node?.type !== nodeType
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: `Node '${nodeType}' is not transferable.`,
+          path: ['nodes', nodeType],
+        });
+      }
+    }
+  });
 
 export type EditDocumentJsonValue =
   | boolean
@@ -1268,6 +1315,7 @@ export const editDocumentV2Schema = z.preprocess((value) => {
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
+export type EditDocumentV2CopyPayload = z.infer<typeof editDocumentV2CopyPayloadSchema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;

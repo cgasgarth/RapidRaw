@@ -1,14 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { Folder, Preset } from '../../components/ui/AppProperties';
 import { Invokes } from '../../tauri/commands';
+import type { Adjustments } from '../../utils/adjustments';
 import {
-  ADJUSTMENT_GROUPS,
-  type Adjustments,
-  COPYABLE_ADJUSTMENT_KEYS,
-  INITIAL_ADJUSTMENTS,
-  pickAdjustmentValues,
-} from '../../utils/adjustments';
+  configureEditDocumentPresetPayload,
+  createEditDocumentPresetPayload,
+  lowerEditDocumentPresetPayload,
+  parsePresetLibrary,
+} from '../../utils/editDocumentPreset';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { debounce } from '../../utils/timing';
 
 export enum PresetListType {
@@ -39,14 +41,6 @@ const buildUserColorStyleProvenance = (existing?: Preset['colorStyleProvenance']
   };
 };
 
-const withoutAdjustmentKeys = (adjustments: PresetAdjustments, keys: ReadonlySet<string>): PresetAdjustments =>
-  Object.entries(adjustments).reduce<PresetAdjustments>((filteredAdjustments, [key, value]) => {
-    if (!keys.has(key)) {
-      filteredAdjustments[key] = value;
-    }
-    return filteredAdjustments;
-  }, {});
-
 const clonePresetAdjustments = (adjustments: Partial<Adjustments>): PresetAdjustments => structuredClone(adjustments);
 
 function getFolderChildren(folder: Folder): Preset[] {
@@ -62,7 +56,10 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray;
 }
 
-export function usePresets(currentAdjustments: Adjustments) {
+export function usePresets(
+  currentAdjustments: Adjustments,
+  currentEditDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(currentAdjustments),
+) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -72,8 +69,11 @@ export function usePresets(currentAdjustments: Adjustments) {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const loadedPresets = await invoke<UserPreset[]>(Invokes.LoadPresets);
-      setPresets(loadedPresets);
+      const loadedPresets = parsePresetLibrary(await invoke<unknown>(Invokes.LoadPresets));
+      setPresets(loadedPresets.items);
+      if (loadedPresets.quarantinedCount > 0) {
+        setLoadError(`Quarantined ${String(loadedPresets.quarantinedCount)} invalid preset entries.`);
+      }
     } catch (error) {
       console.error('Failed to load presets:', error);
       setPresets([]);
@@ -118,24 +118,19 @@ export function usePresets(currentAdjustments: Adjustments) {
   const addPreset = (
     name: string,
     folderId: string | null = null,
-    includeMasks: boolean = false,
+    _includeMasks: boolean = false,
     includeCropTransform: boolean = false,
     presetType: 'tool' | 'style' = 'style',
   ): Preset => {
-    const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
-    const MASK_KEYS = (ADJUSTMENT_GROUPS['masks'] ?? []).flatMap((group) => group.keys);
-
-    const presetAdjustments = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, currentAdjustments, {
-      excludedKeys: [...(!includeMasks ? MASK_KEYS : []), ...(!includeCropTransform ? GEOMETRY_KEYS : [])],
-      requireExistingKey: true,
-      skipDefaultValues: presetType === 'tool',
-    });
+    const editDocumentV2 = createEditDocumentPresetPayload(currentEditDocumentV2, includeCropTransform, presetType);
+    const presetAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
 
     const newPresetData: Preset = {
       adjustments: presetAdjustments,
+      editDocumentV2,
       id: crypto.randomUUID(),
       name,
-      includeMasks,
+      includeMasks: false,
       includeCropTransform,
       presetType,
       ...(presetType === 'style' ? { colorStyleProvenance: buildUserColorStyleProvenance() } : {}),
@@ -231,7 +226,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   const configurePreset = (
     id: string | null,
     name: string,
-    includeMasks: boolean,
+    _includeMasks: boolean,
     includeCropTransform: boolean,
     presetType: 'tool' | 'style',
   ): Preset | null => {
@@ -253,38 +248,12 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    let newAdjustments = clonePresetAdjustments(existingPreset.adjustments);
-    const oldType = existingPreset.presetType || 'style';
-
-    const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
-    const MASK_KEYS = (ADJUSTMENT_GROUPS['masks'] ?? []).flatMap((group) => group.keys);
-
-    if (oldType !== presetType) {
-      if (presetType === 'tool') {
-        const defaultAdjustmentKeys = new Set(
-          Object.keys(newAdjustments).filter(
-            (key) =>
-              JSON.stringify(newAdjustments[key]) === JSON.stringify(INITIAL_ADJUSTMENTS[key as keyof Adjustments]),
-          ),
-        );
-        newAdjustments = withoutAdjustmentKeys(newAdjustments, defaultAdjustmentKeys);
-      } else {
-        for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-          if (!includeMasks && MASK_KEYS.includes(key)) continue;
-          if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
-          if (newAdjustments[key] === undefined) {
-            newAdjustments[key] = INITIAL_ADJUSTMENTS[key];
-          }
-        }
-      }
+    const editDocumentV2 = configureEditDocumentPresetPayload(existingPreset, includeCropTransform, presetType);
+    if (editDocumentV2 === null) {
+      setStorageError('Preset configuration rejected corrupt editDocumentV2 authority.');
+      return null;
     }
-
-    if (!includeMasks) {
-      newAdjustments = withoutAdjustmentKeys(newAdjustments, new Set(MASK_KEYS));
-    }
-    if (!includeCropTransform) {
-      newAdjustments = withoutAdjustmentKeys(newAdjustments, new Set(GEOMETRY_KEYS));
-    }
+    const newAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
 
     let updatedPreset: Preset | null = null;
     const updatedPresets = presets.map((item: UserPreset) => {
@@ -293,7 +262,8 @@ export function usePresets(currentAdjustments: Adjustments) {
           ...item.preset,
           name,
           adjustments: newAdjustments,
-          includeMasks,
+          editDocumentV2,
+          includeMasks: false,
           includeCropTransform,
           presetType,
           colorStyleProvenance:
@@ -309,7 +279,8 @@ export function usePresets(currentAdjustments: Adjustments) {
             ...child,
             name,
             adjustments: newAdjustments,
-            includeMasks,
+            editDocumentV2,
+            includeMasks: false,
             includeCropTransform,
             presetType,
             colorStyleProvenance:
@@ -347,20 +318,10 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
-    const MASK_KEYS = (ADJUSTMENT_GROUPS['masks'] ?? []).flatMap((group) => group.keys);
-
-    const existingMasks = existingPreset.adjustments['masks'];
-    const includeMasks = existingPreset.includeMasks ?? (Array.isArray(existingMasks) && existingMasks.length > 0);
-    const includeCropTransform =
-      existingPreset.includeCropTransform ?? GEOMETRY_KEYS.some((key) => existingPreset.adjustments[key] !== undefined);
+    const includeCropTransform = existingPreset.includeCropTransform === true;
     const presetType = existingPreset.presetType || 'style';
-
-    const presetAdjustments = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, currentAdjustments, {
-      excludedKeys: [...(!includeMasks ? MASK_KEYS : []), ...(!includeCropTransform ? GEOMETRY_KEYS : [])],
-      requireExistingKey: true,
-      skipDefaultValues: presetType === 'tool',
-    });
+    const editDocumentV2 = createEditDocumentPresetPayload(currentEditDocumentV2, includeCropTransform, presetType);
+    const presetAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
 
     let updatedPreset: Preset | null = null;
     const updatedPresets = presets.map((item: UserPreset) => {
@@ -368,7 +329,8 @@ export function usePresets(currentAdjustments: Adjustments) {
         updatedPreset = {
           ...item.preset,
           adjustments: presetAdjustments,
-          includeMasks,
+          editDocumentV2,
+          includeMasks: false,
           includeCropTransform,
           presetType,
           colorStyleProvenance:
@@ -383,7 +345,8 @@ export function usePresets(currentAdjustments: Adjustments) {
           updatedPreset = {
             ...child,
             adjustments: presetAdjustments,
-            includeMasks,
+            editDocumentV2,
+            includeMasks: false,
             includeCropTransform,
             presetType,
             colorStyleProvenance:
@@ -428,6 +391,10 @@ export function usePresets(currentAdjustments: Adjustments) {
 
       const newPreset: Preset = {
         adjustments: clonePresetAdjustments(presetToDuplicate.adjustments),
+        editDocumentV2:
+          presetToDuplicate.editDocumentV2 === undefined
+            ? undefined
+            : structuredClone(presetToDuplicate.editDocumentV2),
         id: crypto.randomUUID(),
         name: `${presetToDuplicate.name} Copy`,
         includeMasks: presetToDuplicate.includeMasks,
@@ -609,9 +576,12 @@ export function usePresets(currentAdjustments: Adjustments) {
     async (filePath: string) => {
       setIsLoading(true);
       try {
-        const updatedPresetList = await invoke<UserPreset[]>(Invokes.HandleImportPresetsFromFile, { filePath });
-        setPresets(updatedPresetList);
-        return updatedPresetList;
+        const parsed = parsePresetLibrary(await invoke<unknown>(Invokes.HandleImportPresetsFromFile, { filePath }));
+        setPresets(parsed.items);
+        if (parsed.quarantinedCount > 0) {
+          setLoadError(`Quarantined ${String(parsed.quarantinedCount)} invalid imported preset entries.`);
+        }
+        return parsed.items;
       } catch (error) {
         console.error('Failed to import presets from file:', error);
         throw error;
@@ -626,11 +596,14 @@ export function usePresets(currentAdjustments: Adjustments) {
     async (filePath: string) => {
       setIsLoading(true);
       try {
-        const updatedPresetList: Array<UserPreset> = await invoke(Invokes.HandleImportLegacyPresetsFromFile, {
-          filePath,
-        });
-        setPresets(updatedPresetList);
-        return updatedPresetList;
+        const parsed = parsePresetLibrary(
+          await invoke<unknown>(Invokes.HandleImportLegacyPresetsFromFile, { filePath }),
+        );
+        setPresets(parsed.items);
+        if (parsed.quarantinedCount > 0) {
+          setLoadError(`Quarantined ${String(parsed.quarantinedCount)} invalid imported preset entries.`);
+        }
+        return parsed.items;
       } catch (error) {
         console.error('Failed to import legacy presets from file:', error);
         throw error;

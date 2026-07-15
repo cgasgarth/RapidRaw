@@ -1,10 +1,10 @@
 import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { EDIT_DOCUMENT_NODE_DESCRIPTORS } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useManagedFocus } from '../../../hooks/ui/useManagedFocus';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
-import { ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import type { Preset } from '../../ui/AppProperties';
 import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedControl';
 import Switch from '../../ui/primitives/Switch';
@@ -27,16 +27,17 @@ interface ConfigurePresetDraftProps extends Omit<ConfigurePresetModalProps, 'isO
 }
 
 const getConfigurePresetState = (initialPreset: Preset | null | undefined) => {
-  const geometryKeys = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
-  const hasGeometry =
-    initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => geometryKeys.includes(key));
+  const optionalGeometry = EDIT_DOCUMENT_NODE_DESCRIPTORS.filter(
+    ({ capabilities }) => capabilities.preset === 'optional_geometry',
+  );
+  const hasGeometry = optionalGeometry.some(
+    ({ legacyFields, nodeType }) =>
+      initialPreset?.editDocumentV2?.nodes[nodeType] !== undefined ||
+      legacyFields.some((field) => Object.hasOwn(initialPreset?.adjustments ?? {}, field)),
+  );
 
   return {
     name: initialPreset?.name || '',
-    includeMasks:
-      initialPreset?.includeMasks ??
-      (initialPreset?.adjustments['masks'] && initialPreset.adjustments['masks'].length > 0) ??
-      false,
     includeCropTransform: initialPreset?.includeCropTransform ?? hasGeometry ?? false,
     presetType: initialPreset?.presetType || 'style',
   };
@@ -106,7 +107,6 @@ export function ConfigurePresetDraft({ onClose, onSave, initialPreset, show }: C
   const { t } = useTranslation();
   const initialDraft = useMemo(() => getConfigurePresetState(initialPreset), [initialPreset]);
   const [name, setName] = useState(() => initialDraft.name);
-  const [includeMasks, setIncludeMasks] = useState(() => initialDraft.includeMasks);
   const [includeCropTransform, setIncludeCropTransform] = useState(() => initialDraft.includeCropTransform);
   const [presetType, setPresetType] = useState<'tool' | 'style'>(() => initialDraft.presetType);
   const [didAttemptSave, setDidAttemptSave] = useState(false);
@@ -119,9 +119,9 @@ export function ConfigurePresetDraft({ onClose, onSave, initialPreset, show }: C
       setDidAttemptSave(true);
       return;
     }
-    onSave(name.trim(), includeMasks, includeCropTransform, presetType);
+    onSave(name.trim(), false, includeCropTransform, presetType);
     onClose();
-  }, [name, includeMasks, includeCropTransform, presetType, onSave, onClose]);
+  }, [name, includeCropTransform, presetType, onSave, onClose]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -198,7 +198,6 @@ export function ConfigurePresetDraft({ onClose, onSave, initialPreset, show }: C
         ) : null}
 
         <div className="mt-5 mb-4 p-1 space-y-4">
-          <Switch label={t('modals.configurePreset.includeMasks')} checked={includeMasks} onChange={setIncludeMasks} />
           <Switch
             label={t('modals.configurePreset.includeCropTransform')}
             checked={includeCropTransform}

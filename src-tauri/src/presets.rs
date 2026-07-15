@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::path::Path;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,8 @@ pub struct Preset {
     pub id: String,
     pub name: String,
     pub adjustments: Value,
+    #[serde(rename = "editDocumentV2", skip_serializing_if = "Option::is_none")]
+    pub edit_document_v2: Option<Value>,
     #[serde(rename = "includeMasks", skip_serializing_if = "Option::is_none")]
     pub include_masks: Option<bool>,
     #[serde(
@@ -143,21 +146,37 @@ fn find_or_create_community_folder(items: &mut Vec<PresetItem>) -> String {
     new_folder_id
 }
 
+fn decode_presets(content: &str) -> Result<Vec<PresetItem>, String> {
+    serde_json::from_str(content).map_err(|error| error.to_string())
+}
+
+fn encode_presets(presets: &[PresetItem]) -> Result<String, String> {
+    serde_json::to_string_pretty(presets).map_err(|error| error.to_string())
+}
+
+fn read_presets_from_path(path: &Path) -> Result<Vec<PresetItem>, String> {
+    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    decode_presets(&content)
+}
+
+fn write_presets_to_path(path: &Path, presets: &[PresetItem]) -> Result<(), String> {
+    let content = encode_presets(presets)?;
+    fs::write(path, content).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn load_presets(app_handle: AppHandle) -> Result<Vec<PresetItem>, String> {
     let path = get_presets_path(&app_handle)?;
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&content).map_err(|e| e.to_string())
+    read_presets_from_path(&path)
 }
 
 #[tauri::command]
 pub fn save_presets(presets: Vec<PresetItem>, app_handle: AppHandle) -> Result<(), String> {
     let path = get_presets_path(&app_handle)?;
-    let json_string = serde_json::to_string_pretty(&presets).map_err(|e| e.to_string())?;
-    fs::write(path, json_string).map_err(|e| e.to_string())
+    write_presets_to_path(&path, &presets)
 }
 
 #[tauri::command]
@@ -248,6 +267,7 @@ pub fn save_community_preset(
 
     let new_preset = Preset {
         adjustments,
+        edit_document_v2: None,
         id: Uuid::new_v4().to_string(),
         include_crop_transform,
         include_masks,
@@ -270,4 +290,63 @@ pub fn save_community_preset(
     }
 
     save_presets(current_presets, app_handle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Preset, PresetItem, read_presets_from_path, write_presets_to_path};
+    use serde_json::json;
+    use std::fs;
+
+    #[test]
+    fn preset_edit_document_v2_survives_native_save_and_reload() {
+        let edit_document_v2 = json!({
+            "nodes": {
+                "scene_global_color_tone": {
+                    "enabled": false,
+                    "implementationVersion": 1,
+                    "params": { "exposure": 1.25 },
+                    "process": "scene_referred_v2",
+                    "type": "scene_global_color_tone",
+                }
+            },
+            "schemaVersion": 2
+        });
+        let directory = tempfile::tempdir().expect("temporary preset directory");
+        let path = directory.path().join("presets.json");
+        write_presets_to_path(
+            &path,
+            &[PresetItem::Preset(Preset {
+                adjustments: json!({ "exposure": 1.25 }),
+                color_style_provenance: None,
+                edit_document_v2: Some(edit_document_v2.clone()),
+                id: "preset-v2".to_string(),
+                include_crop_transform: Some(false),
+                include_masks: Some(false),
+                name: "V2 roundtrip".to_string(),
+                preset_type: Some("style".to_string()),
+            })],
+        )
+        .expect("production preset writer must persist V2 authority");
+        let persisted_bytes = fs::read(&path).expect("persisted preset bytes");
+        assert!(String::from_utf8_lossy(&persisted_bytes).contains("editDocumentV2"));
+        let decoded = read_presets_from_path(&path)
+            .expect("production preset reader must reopen saved authority");
+        let PresetItem::Preset(reopened) = &decoded[0] else {
+            panic!("expected preset item");
+        };
+        assert_eq!(reopened.edit_document_v2.as_ref(), Some(&edit_document_v2));
+
+        fs::write(
+            &path,
+            r#"[{"preset":{"id":"legacy","name":"Legacy","adjustments":{"exposure":0.5}}}]"#,
+        )
+        .expect("legacy fixture must write");
+        let legacy = read_presets_from_path(&path)
+            .expect("legacy file must remain readable through production helper");
+        let PresetItem::Preset(legacy_preset) = &legacy[0] else {
+            panic!("expected legacy preset item");
+        };
+        assert!(legacy_preset.edit_document_v2.is_none());
+    }
 }
