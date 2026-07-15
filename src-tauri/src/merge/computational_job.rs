@@ -336,7 +336,8 @@ pub fn cancel_computational_merge_job(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<bool, String> {
     state
-        .computational_merge_jobs
+        .services
+        .computational_jobs
         .cancel(&ComputationalMergeJobId(job_id))
 }
 

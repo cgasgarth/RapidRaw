@@ -79,7 +79,7 @@ pub fn prepare_burst_sr_candidate(
         requested_tile_size.unwrap_or(super::tiles::DEFAULT_CORE),
     )?;
     let total_units = plan.stage_work_units.iter().map(|stage| stage.units).sum();
-    let job = state.computational_merge_jobs.begin(
+    let job = state.services.computational_jobs.begin(
         crate::merge::computational_job::ComputationalMergeFamily::SuperResolution,
         STAGES[0],
         total_units,
@@ -88,7 +88,7 @@ pub fn prepare_burst_sr_candidate(
     let id = job.job_id.to_string();
     let result_id = id.clone();
     if let Err(error) = state.services.burst_sr.register_job(&accepted, id.clone()) {
-        let _ = state.computational_merge_jobs.cancel(&job.job_id);
+        let _ = state.services.computational_jobs.cancel(&job.job_id);
         return Err(error.to_string());
     }
     std::thread::Builder::new()
@@ -109,14 +109,15 @@ pub fn prepare_burst_sr_candidate(
                     &plan,
                     &job.job_id,
                     &job.cancellation_token,
-                    &state.computational_merge_jobs,
+                    &state.services.computational_jobs,
                 )
             })();
             let mut candidate_path = None;
             let (status, error_code, candidate) = match outcome {
                 Ok(output)
                     if state
-                        .computational_merge_jobs
+                        .services
+                        .computational_jobs
                         .finish(&job.job_id)
                         .unwrap_or(false) =>
                 {
@@ -132,7 +133,7 @@ pub fn prepare_burst_sr_candidate(
                     )
                 }
                 Err(error) => {
-                    let _ = state.computational_merge_jobs.fail(&job.job_id);
+                    let _ = state.services.computational_jobs.fail(&job.job_id);
                     let status = if error == "computational_merge_cancelled" {
                         "cancelled"
                     } else {
@@ -142,7 +143,8 @@ pub fn prepare_burst_sr_candidate(
                 }
             };
             let published = state
-                .computational_merge_jobs
+                .services
+                .computational_jobs
                 .progress(&job.job_id)
                 .is_some_and(|progress| {
                     let result = BurstSrCandidateJobResult {
@@ -182,7 +184,8 @@ pub fn read_burst_sr_candidate_job(
         return Err("computational_merge_job_not_found".to_string());
     }
     let progress = state
-        .computational_merge_jobs
+        .services
+        .computational_jobs
         .progress(&id)
         .ok_or("computational_merge_job_not_found")?;
     Ok(BurstSrCandidateJobResult {

@@ -151,7 +151,7 @@ pub fn prepare_focus_stack_candidate(
         .iter()
         .map(|stage| stage.weight)
         .sum();
-    let job = state.computational_merge_jobs.begin(
+    let job = state.services.computational_jobs.begin(
         crate::merge::computational_job::ComputationalMergeFamily::FocusStack,
         STAGES[0],
         total_units,
@@ -178,13 +178,14 @@ pub fn prepare_focus_stack_candidate(
                     &tile_plan,
                     &job.job_id,
                     &job.cancellation_token,
-                    &state.computational_merge_jobs,
+                    &state.services.computational_jobs,
                 )
             })();
             let (status, error_code, candidate) = match outcome {
                 Ok(output) => {
                     if state
-                        .computational_merge_jobs
+                        .services
+                        .computational_jobs
                         .finish(&job.job_id)
                         .unwrap_or(false)
                     {
@@ -199,7 +200,7 @@ pub fn prepare_focus_stack_candidate(
                     }
                 }
                 Err(error) => {
-                    let _ = state.computational_merge_jobs.fail(&job.job_id);
+                    let _ = state.services.computational_jobs.fail(&job.job_id);
                     let status = if error == "computational_merge_cancelled" {
                         "cancelled"
                     } else {
@@ -208,7 +209,7 @@ pub fn prepare_focus_stack_candidate(
                     (status, Some(error), None)
                 }
             };
-            if let Some(progress) = state.computational_merge_jobs.progress(&job.job_id) {
+            if let Some(progress) = state.services.computational_jobs.progress(&job.job_id) {
                 let result = FocusStackCandidateJobResult {
                     job_id: thread_id.clone(),
                     status: status.into(),
@@ -236,7 +237,8 @@ pub fn read_focus_stack_job(
         return Ok(result);
     }
     let progress = state
-        .computational_merge_jobs
+        .services
+        .computational_jobs
         .progress(&id)
         .ok_or("computational_merge_job_not_found")?;
     Ok(FocusStackCandidateJobResult {
