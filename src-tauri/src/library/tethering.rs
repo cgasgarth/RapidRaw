@@ -379,7 +379,7 @@ pub fn open_tether_session(
 
 #[tauri::command]
 pub fn get_tether_session(state: tauri::State<'_, AppState>) -> TetherSessionResponse {
-    let session = state.services.tether.snapshot();
+    let session = state.library().tether().snapshot();
     TetherSessionResponse {
         status: session
             .as_ref()
@@ -534,7 +534,7 @@ fn open_tether_session_for_state(
         status: "open".to_string(),
     };
 
-    let session = state.services.tether.open(session);
+    let session = state.library().tether().open(session);
     Ok(TetherSessionResponse {
         session: Some(session),
         status: "open".to_string(),
@@ -542,7 +542,7 @@ fn open_tether_session_for_state(
 }
 
 fn close_tether_session_for_state(state: &AppState) -> TetherSessionResponse {
-    state.services.tether.close();
+    state.library().tether().close();
     TetherSessionResponse {
         session: None,
         status: "closed".to_string(),
@@ -562,8 +562,8 @@ fn trigger_tether_capture_for_state(
         metadata_template_id: None,
     });
     let session = state
-        .services
-        .tether
+        .library()
+        .tether()
         .snapshot()
         .ok_or_else(|| "Open a tether session before capture.".to_string())?;
     let capture_counter = session.capture_counter + 1;
@@ -685,8 +685,8 @@ fn trigger_tether_capture_for_state(
         status: "captured".to_string(),
     };
     if !state
-        .services
-        .tether
+        .library()
+        .tether()
         .commit_capture(&response, committed_capture_counter)
     {
         return Err("Tether session changed before capture publication.".to_string());
@@ -711,7 +711,7 @@ fn ensure_session_camera_available_for_state(
         "{} disconnected. Refresh tether discovery and reopen the session before the next capture.",
         session.camera_display_name
     );
-    state.services.tether.mark_reconnect_required(
+    state.library().tether().mark_reconnect_required(
         &session.session_id,
         tether_recovery_summary("reconnect_required", 0, Vec::new(), &message),
     );
@@ -723,7 +723,10 @@ fn find_previous_tether_import(
     session_id: &str,
     checksum: &str,
 ) -> Option<TetherCapturedImport> {
-    state.services.tether.previous_import(session_id, checksum)
+    state
+        .library()
+        .tether()
+        .previous_import(session_id, checksum)
 }
 
 fn write_verified_primary_capture(
@@ -1525,6 +1528,81 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_stale_library_operations_cannot_cross_domain_or_replace_current_authority() {
+        let state = Arc::new(AppState::new());
+        let import_jobs = Arc::clone(state.library().import_jobs());
+        let catalog_indexing = Arc::clone(state.library().catalog_indexing());
+        let thumbnails = Arc::clone(state.library().thumbnails());
+        let tether = Arc::clone(state.library().tether());
+
+        let stale_import = import_jobs.begin_new("stale-import".into()).unwrap();
+        let current_import = import_jobs.begin_new("current-import".into()).unwrap();
+        let stale_catalog = catalog_indexing.begin("stale-catalog".into()).unwrap();
+        let current_catalog = catalog_indexing.begin("current-catalog".into()).unwrap();
+        let (stale_thumbnail, _) = thumbnails.begin_explicit(2).unwrap();
+        let (current_thumbnail, _) = thumbnails.begin_explicit(2).unwrap();
+        tether.open(service_session("stale-tether"));
+        tether.open(service_session("current-tether"));
+
+        let barrier = Arc::new(Barrier::new(5));
+        let import_worker = {
+            let barrier = Arc::clone(&barrier);
+            let import_jobs = Arc::clone(&import_jobs);
+            let authority = stale_import.authority;
+            thread::spawn(move || {
+                barrier.wait();
+                import_jobs.cancel(&authority).unwrap()
+            })
+        };
+        let catalog_worker = {
+            let barrier = Arc::clone(&barrier);
+            let catalog_indexing = Arc::clone(&catalog_indexing);
+            thread::spawn(move || {
+                barrier.wait();
+                catalog_indexing.cancel(stale_catalog.authority).is_some()
+            })
+        };
+        let thumbnail_worker = {
+            let barrier = Arc::clone(&barrier);
+            let thumbnails = Arc::clone(&thumbnails);
+            thread::spawn(move || {
+                barrier.wait();
+                thumbnails.cancel(stale_thumbnail.authority).is_some()
+            })
+        };
+        let tether_worker = {
+            let barrier = Arc::clone(&barrier);
+            let tether = Arc::clone(&tether);
+            thread::spawn(move || {
+                barrier.wait();
+                tether.commit_capture(&service_capture("stale-tether", "stale-checksum"), 9)
+            })
+        };
+
+        barrier.wait();
+        assert!(!import_worker.join().unwrap());
+        assert!(!catalog_worker.join().unwrap());
+        assert!(!thumbnail_worker.join().unwrap());
+        assert!(!tether_worker.join().unwrap());
+
+        assert!(
+            !current_import
+                .cancellation
+                .load(std::sync::atomic::Ordering::Acquire)
+        );
+        assert_eq!(
+            import_jobs.status().unwrap().authority,
+            current_import.authority
+        );
+        assert!(catalog_indexing.is_current(current_catalog.authority));
+        assert!(thumbnails.is_current(current_thumbnail.authority));
+        let current_tether = tether.snapshot().unwrap();
+        assert_eq!(current_tether.session_id, "current-tether");
+        assert_eq!(current_tether.capture_counter, 0);
+        assert!(current_tether.captured_imports_by_checksum.is_empty());
+    }
+
+    #[test]
     fn fake_tether_provider_returns_one_ready_camera() {
         let response = discover_tethered_cameras(Some(TetherDiscoveryRequest {
             provider_mode: Some("fake".to_string()),
@@ -1614,11 +1692,11 @@ mod tests {
         );
         assert_eq!(session.session.as_ref().unwrap().capture_counter, 0);
         assert_eq!(session.session.as_ref().unwrap().recovery.status, "clean");
-        assert!(state.services.tether.snapshot().is_some());
+        assert!(state.library().tether().snapshot().is_some());
 
         let closed = close_tether_session_for_state(&state);
         assert_eq!(closed.status, "closed");
-        assert!(state.services.tether.snapshot().is_none());
+        assert!(state.library().tether().snapshot().is_none());
     }
 
     #[test]
@@ -1635,7 +1713,7 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("not available"));
-        assert!(state.services.tether.snapshot().is_none());
+        assert!(state.library().tether().snapshot().is_none());
     }
 
     #[test]
@@ -2177,7 +2255,7 @@ mod tests {
         assert_eq!(capture.ingest.collision_index, 1);
         assert_eq!(capture.ingest.file_name, "source_0012.ARW");
         assert_eq!(
-            state.services.tether.snapshot().unwrap().capture_counter,
+            state.library().tether().snapshot().unwrap().capture_counter,
             12
         );
 
@@ -2252,7 +2330,7 @@ mod tests {
         assert_eq!(duplicate.backup.destination_path, None);
         assert!(!root.join("duplicate-backup").exists());
         assert_eq!(
-            state.services.tether.snapshot().unwrap().capture_counter,
+            state.library().tether().snapshot().unwrap().capture_counter,
             1,
             "duplicate suppression should not consume the next capture sequence"
         );
@@ -2307,7 +2385,7 @@ mod tests {
 
         assert!(error.contains("Fake capture source does not exist"));
         assert_eq!(
-            state.services.tether.snapshot().unwrap().capture_counter,
+            state.library().tether().snapshot().unwrap().capture_counter,
             0,
             "failed capture attempts should not consume the next capture sequence"
         );
@@ -2335,7 +2413,7 @@ mod tests {
         let error =
             ensure_session_camera_available_for_state(&state, &session, &detached_discovery)
                 .unwrap_err();
-        let current_session = state.services.tether.snapshot().unwrap();
+        let current_session = state.library().tether().snapshot().unwrap();
 
         assert!(error.contains("disconnected"));
         assert_eq!(current_session.status, "reconnect_required");

@@ -179,6 +179,10 @@ impl AppState {
         let services = Arc::new(crate::app::services::AppServices::new());
         Self { services }
     }
+
+    pub(crate) fn library(&self) -> &crate::library::runtime_services::LibraryRuntimeServices {
+        self.services.library()
+    }
 }
 
 impl Default for AppState {

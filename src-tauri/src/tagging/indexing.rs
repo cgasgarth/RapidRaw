@@ -72,7 +72,7 @@ pub(crate) async fn start_background_indexing(
 
     #[cfg(feature = "ai")]
     {
-        let service = Arc::clone(&state.services.catalog_indexing);
+        let service = Arc::clone(state.library().catalog_indexing());
         let start = service.begin(folder_path.clone()).map_err(str::to_string)?;
         if let Some(cancelled) = start.cancelled_predecessor.as_ref() {
             emit_snapshot(&app_handle, crate::events::INDEXING_FINISHED, cancelled);
@@ -261,7 +261,7 @@ pub(crate) fn cancel_background_indexing(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> bool {
-    let Some(terminal) = state.services.catalog_indexing.cancel(authority) else {
+    let Some(terminal) = state.library().catalog_indexing().cancel(authority) else {
         return false;
     };
     emit_snapshot(&app_handle, crate::events::INDEXING_FINISHED, &terminal);

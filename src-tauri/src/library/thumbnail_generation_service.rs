@@ -488,8 +488,8 @@ mod tests {
         state: tauri::State<'_, crate::AppState>,
     ) -> bool {
         state
-            .services
-            .thumbnails
+            .library()
+            .thumbnails()
             .cancel(ThumbnailOperationAuthority {
                 generation,
                 operation_id,
@@ -510,7 +510,8 @@ mod tests {
         let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
             .build()
             .unwrap();
-        let service = Arc::clone(&app.state::<crate::AppState>().services.thumbnails);
+        let state = app.state::<crate::AppState>();
+        let service = Arc::clone(state.library().thumbnails());
         let (predecessor, _) = service.update(request(1, &["old"])).unwrap();
         let (successor, _) = service.update(request(2, &["current"])).unwrap();
 
