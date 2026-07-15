@@ -8,12 +8,17 @@ import {
   EditedPreviewEffectRunner,
   type EditedPreviewRequest,
   type ExecutedEditedPreview,
+  type MaterializedEditedPreview,
   type ScheduledEditedPreviewRequest,
 } from '../../../src/utils/editedPreviewEffectRunner';
 import { EditorPersistenceEffectRunner } from '../../../src/utils/editorPersistenceEffectRunner';
 import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 import type { InteractivePreviewScope } from '../../../src/utils/interactivePreviewPatch';
-import { fingerprintPreviewGraphRevision, PreviewCoordinator } from '../../../src/utils/previewCoordinator';
+import {
+  fingerprintPreviewGraphRevision,
+  PreviewCoordinator,
+  type PreviewCoordinatorEffect,
+} from '../../../src/utils/previewCoordinator';
 
 type BuildRequestOverrides = Omit<Partial<EditedPreviewRequest>, 'session' | 'viewerScope'> & {
   imageSessionId?: number;
@@ -120,18 +125,25 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
 
 function harness<T>({
   execute,
+  materialize = async (result) => ({ value: new Uint8Array(result.buffer)[0] as T }),
+  onEffects = () => {},
   onFailure = () => {},
   onPresented,
+  releaseMaterialized = () => {},
 }: {
   execute: (request: ScheduledEditedPreviewRequest) => Promise<ExecutedEditedPreview>;
+  materialize?: (result: ExecutedEditedPreview) => Promise<MaterializedEditedPreview<T>>;
+  onEffects?: (effects: readonly PreviewCoordinatorEffect[]) => void;
   onFailure?: (error: unknown) => void;
   onPresented: (value: T) => void;
+  releaseMaterialized?: (result: MaterializedEditedPreview<T>) => void;
 }) {
   const coordinator = new PreviewCoordinator();
   let runner: EditedPreviewEffectRunner<T>;
   const dispatch = (event: Parameters<PreviewCoordinator['dispatch']>[0]) => {
     const transition = coordinator.dispatch(event);
     runner?.consume(transition.effects);
+    onEffects(transition.effects);
     return transition;
   };
   runner = new EditedPreviewEffectRunner<T>({
@@ -139,9 +151,10 @@ function harness<T>({
     execute: (request) => execute(request),
     getPatchResidency: () => ({ residentIds: new Set(), revision: 1, sessionId: 1 }),
     markPatchesResident: () => {},
-    materialize: async (result) => ({ value: new Uint8Array(result.buffer)[0] as T }),
+    materialize,
     onCurrentFailure: onFailure,
     onPresented: ({ value }) => onPresented(value),
+    releaseMaterialized,
   });
   return { coordinator, dispatch, runner };
 }
@@ -395,6 +408,94 @@ describe('edited preview effect runner', () => {
     interactive.resolve(execution(1));
     await tick();
     expect(presented).toEqual([2]);
+  });
+
+  test('settled completion suppresses a materializing interactive result and releases its URL exactly once', async () => {
+    const interactiveMaterializing = deferred<void>();
+    const releaseInteractiveMaterialization = deferred<void>();
+    const presented: number[] = [];
+    const released: Array<{ reason: string; url: string }> = [];
+    const fallbackReleases: string[] = [];
+    const { runner } = harness<number>({
+      execute: async (request) => execution(request.kind === 'interactive' ? 1 : 2),
+      materialize: async (result) => {
+        const marker = new Uint8Array(result.buffer)[0] ?? 0;
+        if (marker === 1) {
+          interactiveMaterializing.resolve();
+          await releaseInteractiveMaterialization.promise;
+          return { artifactUrl: 'blob:interactive', value: marker };
+        }
+        return { artifactUrl: 'blob:settled', value: marker };
+      },
+      onEffects: (effects) => {
+        for (const effect of effects) {
+          if (effect.type === 'release-url') released.push({ reason: effect.reason, url: effect.url });
+        }
+      },
+      onPresented: (value) => presented.push(value),
+      releaseMaterialized: ({ artifactUrl }) => {
+        if (artifactUrl !== undefined) fallbackReleases.push(artifactUrl);
+      },
+    });
+    const request = buildRequest();
+
+    runner.request(buildRequest({ kind: 'interactive', snapshot: request.snapshot }));
+    await interactiveMaterializing.promise;
+    runner.request(buildRequest({ kind: 'settled', snapshot: request.snapshot }));
+    await tick();
+    await tick();
+    expect(presented).toEqual([2]);
+
+    releaseInteractiveMaterialization.resolve();
+    await tick();
+    await tick();
+
+    expect(presented).toEqual([2]);
+    expect(released).toEqual([{ reason: 'artifact-not-presented', url: 'blob:interactive' }]);
+    expect(fallbackReleases).toEqual([]);
+  });
+
+  test('settled completion releases a late patch URL through the materialized-value owner exactly once', async () => {
+    const interactiveMaterializing = deferred<void>();
+    const releaseInteractiveMaterialization = deferred<void>();
+    const presented: number[] = [];
+    const coordinatorReleases: string[] = [];
+    const materializedReleases: string[] = [];
+    const { runner } = harness<{ marker: number; url?: string }>({
+      execute: async (request) => execution(request.kind === 'interactive' ? 1 : 2),
+      materialize: async (result) => {
+        const marker = new Uint8Array(result.buffer)[0] ?? 0;
+        if (marker === 1) {
+          interactiveMaterializing.resolve();
+          await releaseInteractiveMaterialization.promise;
+          return { value: { marker, url: 'blob:interactive-patch' } };
+        }
+        return { value: { marker } };
+      },
+      onEffects: (effects) => {
+        for (const effect of effects) {
+          if (effect.type === 'release-url') coordinatorReleases.push(effect.url);
+        }
+      },
+      onPresented: ({ marker }) => presented.push(marker),
+      releaseMaterialized: ({ value }) => {
+        if (value.url !== undefined) materializedReleases.push(value.url);
+      },
+    });
+    const request = buildRequest();
+
+    runner.request(buildRequest({ kind: 'interactive', snapshot: request.snapshot }));
+    await interactiveMaterializing.promise;
+    runner.request(buildRequest({ kind: 'settled', snapshot: request.snapshot }));
+    await tick();
+    await tick();
+    releaseInteractiveMaterialization.resolve();
+    await tick();
+    await tick();
+
+    expect(presented).toEqual([2]);
+    expect(materializedReleases).toEqual(['blob:interactive-patch']);
+    expect(coordinatorReleases).toEqual([]);
   });
 
   test('preview presentation remains independent from a concurrent persistence failure', async () => {

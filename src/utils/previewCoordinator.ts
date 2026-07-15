@@ -145,6 +145,7 @@ export interface PreviewCoordinatorState {
 
 export type PreviewCoordinatorEffect =
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
+  | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'publish'; artifact: PreviewArtifact; identity: PreviewOperationIdentity; reason: string }
   | { type: 'release-url'; url: string; reason: string }
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
@@ -455,13 +456,16 @@ export function reducePreviewCoordinator(
       state.session === null ||
       !sameSession(state.session, identity.session)
     ) {
-      if (
-        event.type === 'operation-completed' &&
-        identity.kind === 'original' &&
-        event.artifact !== undefined &&
-        event.artifact.url !== state.originalArtifact?.url
-      ) {
-        effects.push({ type: 'release-url', url: event.artifact.url, reason: 'stale-original-artifact' });
+      if (event.type === 'operation-completed' && event.artifact !== undefined) {
+        const artifactAlreadyOwned =
+          event.artifact.url === state.originalArtifact?.url || event.artifact.url === state.visibleArtifact?.url;
+        if (!artifactAlreadyOwned) {
+          effects.push({
+            type: 'release-url',
+            url: event.artifact.url,
+            reason: identity.kind === 'original' ? 'stale-original-artifact' : 'artifact-not-presented',
+          });
+        }
       }
       state = { ...state, staleCompletionCount: state.staleCompletionCount + 1 };
       return {
@@ -475,6 +479,17 @@ export function reducePreviewCoordinator(
       return { effects, state: withReceipt(state, event, 'operation-failed', identity.operationId) };
     }
 
+    if (identity.kind === 'settled') {
+      const interactive = state.interactive;
+      if (interactive.identity !== undefined && ['queued', 'running'].includes(interactive.status)) {
+        effects.push({
+          type: 'cancel',
+          identity: interactive.identity,
+          reason: 'settled-operation-presented',
+        });
+        state = updateOperation(state, 'interactive', { ...interactive, status: 'superseded' });
+      }
+    }
     state = updateOperation(state, identity.kind, { identity, status: 'presented' });
     if (identity.kind === 'original') {
       if (event.artifact !== undefined) {
@@ -493,6 +508,9 @@ export function reducePreviewCoordinator(
       !(identity.kind === 'interactive' && state.visibleArtifact?.identity.kind === 'settled');
     if (event.artifact !== undefined && !shouldPublish && event.artifact.url !== state.visibleArtifact?.url) {
       effects.push({ type: 'release-url', url: event.artifact.url, reason: 'artifact-not-presented' });
+    }
+    if (shouldPublish || (event.artifact === undefined && identity.kind !== 'analytics')) {
+      effects.push({ type: 'present', identity, reason: 'operation-presented' });
     }
     if (shouldPublish && event.artifact !== undefined) {
       const previousUrl = state.visibleArtifact?.url;

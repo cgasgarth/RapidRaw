@@ -475,12 +475,20 @@ export class EditedPreviewEffectRunner<T> {
         identity: scheduled.identity,
         type: 'operation-completed',
       });
+      const shouldPresent = completed.effects.some(
+        (effect) =>
+          effect.type === 'present' &&
+          fingerprintPreviewOperationIdentity(effect.identity) ===
+            fingerprintPreviewOperationIdentity(scheduled.identity),
+      );
       if (completed.state.lastTransition?.staleCompletion !== true) {
         if (executed.newlySentPatchIds.size > 0) {
           this.markPatchesResident(scheduled.request.session.imageSessionId, executed.newlySentPatchIds);
         }
+      }
+      if (shouldPresent) {
         this.onPresented(materialized, context);
-      } else this.releaseMaterialized(materialized);
+      } else if (artifact === undefined) this.releaseMaterialized(materialized);
     } catch (error) {
       const failed = this.dispatch({ error: String(error), identity: scheduled.identity, type: 'operation-failed' });
       if (failed.state.lastTransition?.staleCompletion !== true) this.onCurrentFailure(error, context);

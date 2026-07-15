@@ -204,6 +204,16 @@ test('settled completion wins over a late interactive result and releases replac
     type: 'operation-completed',
   });
   expect(settledDone.effects).toContainEqual({
+    type: 'cancel',
+    identity: interactive.state.interactive.identity,
+    reason: 'settled-operation-presented',
+  });
+  expect(settledDone.effects).toContainEqual({
+    type: 'present',
+    identity: settled.state.settled.identity,
+    reason: 'operation-presented',
+  });
+  expect(settledDone.effects).toContainEqual({
     type: 'publish',
     artifact: { identity: settled.state.settled.identity, url: 'blob:settled' },
     identity: settled.state.settled.identity,
@@ -426,7 +436,9 @@ test('viewport transitions retain the last canonical pixels and reject the cance
   });
   expect(late.state.visibleArtifact?.url).toBe('blob:canonical-base');
   expect(late.state.staleCompletionCount).toBe(1);
-  expect(late.effects).toEqual([]);
+  expect(late.effects).toEqual([
+    { reason: 'artifact-not-presented', type: 'release-url', url: 'blob:cancelled-successor' },
+  ]);
 });
 
 test('display generation invalidates visible artifacts before a replacement render', () => {
