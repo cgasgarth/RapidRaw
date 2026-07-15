@@ -22,12 +22,15 @@ if (main['cancel-in-progress'] !== false) {
 
 const pr = readWorkflow('lint.yml').concurrency;
 if (!pr) throw new Error('PR Fast workflow is missing concurrency policy');
-if (pr.group !== 'pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}') {
-  throw new Error('PR Fast concurrency must remain isolated per pull request/ref');
+if (
+  pr.group !==
+  'pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}-${{ github.event.pull_request.head.sha || inputs.expected_head_sha || github.sha }}'
+) {
+  throw new Error('PR Fast concurrency must remain isolated per pull request/ref and immutable head');
 }
-if (pr['cancel-in-progress'] !== "${{ github.event_name == 'pull_request' }}") {
-  throw new Error('PR Fast cancellation policy changed unexpectedly');
+if (pr['cancel-in-progress'] !== false) {
+  throw new Error('PR Fast must retain every immutable-head run without cancellation');
 }
 if (pr.group === main.group) throw new Error('PR Fast and main-long groups must remain distinct');
 
-console.log('workflow concurrency contract ok (serialized main-long, isolated PR Fast)');
+console.log('workflow concurrency contract ok (serialized main-long, independent immutable PR heads)');
