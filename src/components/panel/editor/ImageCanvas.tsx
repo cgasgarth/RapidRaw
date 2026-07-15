@@ -961,7 +961,9 @@ const ImageCanvas = memo(
       }
     }, [publishInitialMaskDrawOverlay, viewerInitialMaskDrawContext, viewerInitialMaskDrawController]);
 
-    const isToolActive = isBrushActive || isAiSubjectActive || isInitialDrawing || isParametricActive;
+    const isObjectPromptActive = isMasking && activeSubMask?.type === Mask.AiObject;
+    const isToolActive =
+      isBrushActive || isAiSubjectActive || isInitialDrawing || isObjectPromptActive || isParametricActive;
     const effectiveMaskInteractionActive = (isMasking || isAiEditing) && isMaskInteractionActive;
     const samplerSuppressed =
       isCropping ||
