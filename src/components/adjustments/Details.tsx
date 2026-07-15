@@ -6,7 +6,8 @@ import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import {
   buildDetailEditTransaction,
   type DetailCommitIdentity,
-  isDetailNodeAdjustment,
+  isDetailBooleanNodeAdjustment,
+  isDetailNumberNodeAdjustment,
 } from '../../utils/detailEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
@@ -49,7 +50,7 @@ export default function DetailsPanel({
 
   const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
     const nextValue = Math.trunc(value);
-    if (!isForMask && isDetailNodeAdjustment(key)) {
+    if (!isForMask && isDetailNumberNodeAdjustment(key)) {
       const identity = detailCommitIdentityRef.current;
       if (identity === null) return;
       const result = applyEditTransaction(
@@ -64,11 +65,35 @@ export default function DetailsPanel({
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: nextValue }));
   };
 
-  const handleFloatAdjustmentChange = (key: string, value: number) => {
+  const handleFloatAdjustmentChange = (key: DetailsAdjustment, value: number) => {
+    if (!isForMask && isDetailNumberNodeAdjustment(key)) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildDetailEditTransaction(useEditorStore.getState(), identity, key, value, crypto.randomUUID()),
+      );
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
-  const handleBooleanAdjustmentChange = (key: string, value: boolean) => {
+  const handleBooleanAdjustmentChange = (key: DetailsAdjustment, value: boolean) => {
+    if (!isForMask && isDetailBooleanNodeAdjustment(key)) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildDetailEditTransaction(useEditorStore.getState(), identity, key, value, crypto.randomUUID()),
+      );
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
@@ -91,6 +116,7 @@ export default function DetailsPanel({
           <Switch
             chrome="editor"
             checked={adjustments.deblurEnabled}
+            id="detail-control-deblur-enabled"
             label={t('adjustments.details.enableDeblur')}
             onChange={(checked) => {
               handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
@@ -105,6 +131,7 @@ export default function DetailsPanel({
               handleAdjustmentChange(DetailsAdjustment.DeblurStrength, value);
             }}
             step={1}
+            testId="detail-control-deblur-strength"
             value={adjustments.deblurStrength}
             onDragStateChange={onDragStateChange}
             disabled={!adjustments.deblurEnabled}
@@ -119,6 +146,7 @@ export default function DetailsPanel({
               handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, value);
             }}
             step={0.05}
+            testId="detail-control-deblur-sigma"
             value={adjustments.deblurSigmaPx}
             onDragStateChange={onDragStateChange}
             disabled={!adjustments.deblurEnabled}

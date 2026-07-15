@@ -1,9 +1,11 @@
 import { DetailsAdjustment } from './adjustments';
 import type { EditTransactionRequest } from './editTransaction';
 
-export const DETAIL_NODE_ADJUSTMENTS = [
+export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.Clarity,
   DetailsAdjustment.ColorNoiseReduction,
+  DetailsAdjustment.DeblurSigmaPx,
+  DetailsAdjustment.DeblurStrength,
   DetailsAdjustment.Dehaze,
   DetailsAdjustment.DenoiseContrastProtection,
   DetailsAdjustment.DenoiseDetail,
@@ -13,7 +15,16 @@ export const DETAIL_NODE_ADJUSTMENTS = [
   DetailsAdjustment.Sharpness,
 ] as const;
 
+export const DETAIL_BOOLEAN_NODE_ADJUSTMENTS = [DetailsAdjustment.DeblurEnabled] as const;
+
+export const DETAIL_NODE_ADJUSTMENTS = [...DETAIL_NUMBER_NODE_ADJUSTMENTS, ...DETAIL_BOOLEAN_NODE_ADJUSTMENTS] as const;
+
 export type DetailNodeAdjustment = (typeof DETAIL_NODE_ADJUSTMENTS)[number];
+export type DetailNumberNodeAdjustment = (typeof DETAIL_NUMBER_NODE_ADJUSTMENTS)[number];
+export type DetailBooleanNodeAdjustment = (typeof DETAIL_BOOLEAN_NODE_ADJUSTMENTS)[number];
+export type DetailNodeAdjustmentValue<Key extends DetailNodeAdjustment> = Key extends DetailBooleanNodeAdjustment
+  ? boolean
+  : number;
 
 export interface DetailCommitIdentity {
   adjustmentRevision: number;
@@ -30,11 +41,17 @@ export interface DetailEditTransactionState {
 export const isDetailNodeAdjustment = (key: DetailsAdjustment): key is DetailNodeAdjustment =>
   DETAIL_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
 
-export const buildDetailEditTransaction = (
+export const isDetailNumberNodeAdjustment = (key: DetailsAdjustment): key is DetailNumberNodeAdjustment =>
+  DETAIL_NUMBER_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
+
+export const isDetailBooleanNodeAdjustment = (key: DetailsAdjustment): key is DetailBooleanNodeAdjustment =>
+  DETAIL_BOOLEAN_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
+
+export const buildDetailEditTransaction = <Key extends DetailNodeAdjustment>(
   state: DetailEditTransactionState,
   identity: DetailCommitIdentity,
-  key: DetailNodeAdjustment,
-  value: number,
+  key: Key,
+  value: DetailNodeAdjustmentValue<Key>,
   transactionId: string,
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {

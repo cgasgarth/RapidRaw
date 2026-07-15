@@ -326,6 +326,9 @@ describe('EditDocumentV2 legacy adapter', () => {
     const {
       clarity: _clarity,
       colorNoiseReduction: _colorNoiseReduction,
+      deblurEnabled: _deblurEnabled,
+      deblurSigmaPx: _deblurSigmaPx,
+      deblurStrength: _deblurStrength,
       dehaze: _dehaze,
       denoiseContrastProtection: _denoiseContrastProtection,
       denoiseDetail: _denoiseDetail,
@@ -338,6 +341,9 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(defaulted.nodes.detail_denoise_dehaze?.params).toEqual({
       clarity: 0,
       colorNoiseReduction: 0,
+      deblurEnabled: false,
+      deblurSigmaPx: 0.8,
+      deblurStrength: 0,
       dehaze: 0,
       denoiseContrastProtection: 50,
       denoiseDetail: 50,
@@ -349,6 +355,9 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(defaulted.migration?.defaulted).toEqual(
       expect.arrayContaining([
         'detail_denoise_dehaze.clarity',
+        'detail_denoise_dehaze.deblurEnabled',
+        'detail_denoise_dehaze.deblurSigmaPx',
+        'detail_denoise_dehaze.deblurStrength',
         'detail_denoise_dehaze.denoiseContrastProtection',
         'detail_denoise_dehaze.denoiseDetail',
       ]),
@@ -356,6 +365,21 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(compileEditDocumentNodeV2(defaulted.nodes.detail_denoise_dehaze).params.sharpness).toBe(24);
 
     const detailNode = defaulted.nodes.detail_denoise_dehaze;
+    const {
+      deblurEnabled: _enabled,
+      deblurSigmaPx: _sigma,
+      deblurStrength: _strength,
+      ...preDeblurParams
+    } = detailNode.params;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          detail_denoise_dehaze: { ...detailNode, params: preDeblurParams },
+        },
+      }),
+    ).not.toThrow();
     expect(() =>
       editDocumentV2Schema.parse({
         ...defaulted,
@@ -377,6 +401,23 @@ describe('EditDocumentV2 legacy adapter', () => {
         },
       }),
     ).toThrow();
+    for (const patch of [
+      { deblurSigmaPx: 0.44 },
+      { deblurSigmaPx: 1.36 },
+      { deblurStrength: 101 },
+      { deblurStrength: 32.5 },
+      { deblurEnabled: 1 },
+    ]) {
+      expect(() =>
+        editDocumentV2Schema.parse({
+          ...defaulted,
+          nodes: {
+            ...defaulted.nodes,
+            detail_denoise_dehaze: { ...detailNode, params: { ...detailNode?.params, ...patch } },
+          },
+        }),
+      ).toThrow();
+    }
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {

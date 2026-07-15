@@ -13,7 +13,9 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ sharpness: z.literal(25) }).passthrough(),
+    adjustments: z
+      .object({ deblurEnabled: z.literal(true), deblurSigmaPx: z.literal(1.1), deblurStrength: z.literal(32) })
+      .passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -35,7 +37,15 @@ const renderCallSchema = z.object({
               nodes: z
                 .object({
                   detail_denoise_dehaze: z
-                    .object({ params: z.object({ sharpness: z.number() }).passthrough() })
+                    .object({
+                      params: z
+                        .object({
+                          deblurEnabled: z.boolean(),
+                          deblurSigmaPx: z.number(),
+                          deblurStrength: z.number(),
+                        })
+                        .passthrough(),
+                    })
                     .passthrough(),
                 })
                 .passthrough(),
@@ -116,7 +126,7 @@ const waitForApplyCount = async (page: Page, expected: number) => {
   throw new Error(`Timed out waiting for ${String(expected)} renders; observed ${String(await applyCount(page))}.`);
 };
 
-const waitForRenderedSharpness = async (page: Page, expected: number) => {
+const waitForRenderedDeblur = async (page: Page, expected: { enabled: boolean; sigmaPx: number; strength: number }) => {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const call = renderCallSchema.safeParse(
@@ -129,12 +139,14 @@ const waitForRenderedSharpness = async (page: Page, expected: number) => {
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpness === expected
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurEnabled === expected.enabled &&
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurSigmaPx === expected.sigmaPx &&
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurStrength === expected.strength
     )
       return;
     await page.waitForTimeout(50);
   }
-  throw new Error(`Timed out waiting for rendered Sharpness ${String(expected)}.`);
+  throw new Error(`Timed out waiting for rendered Deblur ${JSON.stringify(expected)}.`);
 };
 
 const waitForSaveCount = async (page: Page, expected: number) => {
@@ -193,21 +205,35 @@ try {
   const baselineSaves = await saveCount(page);
   const baselineApplies = await applyCount(page);
   await page.evaluate(() => {
-    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push({
-      color: [24, 200, 80],
-      delayMs: 20,
-    });
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [24, 200, 80], delayMs: 20 },
+      { color: [80, 120, 220], delayMs: 20 },
+      { color: [220, 120, 80], delayMs: 20 },
+    );
   });
-  await page.getByTestId('detail-control-sharpness-value').click();
-  const input = page.getByTestId('detail-control-sharpness-input');
-  await input.fill('25');
-  await input.press('Enter');
-  await page.getByTestId('detail-control-sharpness-value').waitFor({ state: 'visible', timeout: 10_000 });
+
+  const enabled = page.locator('#detail-control-deblur-enabled');
+  await page.locator('label[for="detail-control-deblur-enabled"]').click();
   await waitForSaveCount(page, baselineSaves + 1);
   await waitForApplyCount(page, baselineApplies + 1);
-  if ((await page.getByTestId('detail-control-sharpness-value').textContent())?.trim() !== '25') {
-    throw new Error('Sharpness was not visibly committed.');
-  }
+  if (!(await enabled.isChecked())) throw new Error('Deblur Enabled was not visibly committed.');
+  await waitForRenderedDeblur(page, { enabled: true, sigmaPx: 0.8, strength: 0 });
+
+  await page.getByTestId('detail-control-deblur-strength-value').click();
+  const strengthInput = page.getByTestId('detail-control-deblur-strength-input');
+  await strengthInput.fill('32');
+  await strengthInput.press('Enter');
+  await waitForSaveCount(page, baselineSaves + 2);
+  await waitForApplyCount(page, baselineApplies + 2);
+  await waitForRenderedDeblur(page, { enabled: true, sigmaPx: 0.8, strength: 32 });
+
+  await page.getByTestId('detail-control-deblur-sigma-value').click();
+  const sigmaInput = page.getByTestId('detail-control-deblur-sigma-input');
+  await sigmaInput.fill('1.1');
+  await sigmaInput.press('Enter');
+  await waitForSaveCount(page, baselineSaves + 3);
+  await waitForApplyCount(page, baselineApplies + 3);
+  await waitForRenderedDeblur(page, { enabled: true, sigmaPx: 1.1, strength: 32 });
 
   const persisted = persistenceSchema.parse(
     await page.evaluate(
@@ -219,23 +245,28 @@ try {
   );
   if (
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
-    persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
+    persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) + 2 ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
-    throw new Error(`Sharpness did not persist one source-bound Detail revision: ${JSON.stringify(persisted)}`);
+    throw new Error(
+      `Deblur did not persist three sequential source-bound Detail revisions: ${JSON.stringify(persisted)}`,
+    );
   }
-  await waitForRenderedSharpness(page, 25);
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
-  if (!(await undo.isEnabled())) throw new Error('Sharpness commit did not create an undo boundary.');
+  if (!(await undo.isEnabled())) throw new Error('Deblur commits did not create Undo boundaries.');
   await undo.click();
-  await page.waitForFunction(
-    () => document.querySelector('[data-testid="detail-control-sharpness-value"]')?.textContent?.trim() === '0',
-    undefined,
-    { timeout: 10_000 },
-  );
-  await waitForApplyCount(page, baselineApplies + 2);
-  await waitForRenderedSharpness(page, 0);
+  await waitForApplyCount(page, baselineApplies + 4);
+  await waitForRenderedDeblur(page, { enabled: true, sigmaPx: 0.8, strength: 32 });
+
+  await undo.click();
+  await waitForApplyCount(page, baselineApplies + 5);
+  await waitForRenderedDeblur(page, { enabled: true, sigmaPx: 0.8, strength: 0 });
+
+  await undo.click();
+  await waitForApplyCount(page, baselineApplies + 6);
+  await waitForRenderedDeblur(page, { enabled: false, sigmaPx: 0.8, strength: 0 });
+  if (await enabled.isChecked()) throw new Error('Undo did not visibly restore disabled Deblur state.');
 
   console.log('detail edit transaction browser ok');
 } catch (error) {
