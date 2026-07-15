@@ -1455,6 +1455,7 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
         0,
       command,
     );
+  const touchCdp = await page.context().newCDPSession(page);
   const createMask = async (type: 'color' | 'luminance'): Promise<void> => {
     const contextual = page.getByTestId(`mask-contextual-create-${type}`);
     if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
@@ -1501,20 +1502,44 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       { timeout: 10_000 },
     );
   };
-  const clickTarget = async (pointerType: 'mouse' | 'touch'): Promise<void> => {
+  const targetPoint = async (): Promise<{ x: number; y: number }> => {
     const box = await toolStage.boundingBox();
-    if (box === null) throw new Error(`Parametric ${pointerType} proof could not resolve the Konva stage.`);
-    const point = { x: box.x + box.width * 0.43, y: Math.min(box.y + box.height * 0.47, viewport.height - 48) };
+    if (box === null) throw new Error('Parametric target proof could not resolve the Konva stage.');
+    return { x: box.x + box.width * 0.43, y: Math.min(box.y + box.height * 0.47, viewport.height - 48) };
+  };
+  const waitForParametricAuthorityIdle = () =>
+    page.evaluate(async () => {
+      const readAuthority = () => {
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        return `${canvas?.getAttribute('data-parametric-mask-context-geometry') ?? ''}|${canvas?.getAttribute('data-parametric-mask-context-revision') ?? ''}|${canvas?.getAttribute('data-parametric-mask-context-session') ?? ''}`;
+      };
+      let previous = readAuthority();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 120 && stableFrames < 30; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = readAuthority();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      if (stableFrames < 30) throw new Error('Parametric target authority did not stabilize before pointer input.');
+    });
+  const pointerDown = async (pointerType: 'mouse' | 'touch', point: { x: number; y: number }): Promise<void> => {
     if (pointerType === 'mouse') {
-      await page.mouse.click(point.x, point.y);
+      await page.mouse.move(point.x, point.y);
+      await page.mouse.down();
       return;
     }
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.dispatchTouchEvent', {
+    await touchCdp.send('Input.dispatchTouchEvent', {
       touchPoints: [{ ...point, force: 1, id: 31, radiusX: 1, radiusY: 1 }],
       type: 'touchStart',
     });
-    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  };
+  const pointerUp = async (pointerType: 'mouse' | 'touch'): Promise<void> => {
+    if (pointerType === 'mouse') {
+      await page.mouse.up();
+      return;
+    }
+    await touchCdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
   };
 
   await page.getByTestId('right-panel-switcher-button-masks').click();
@@ -1539,7 +1564,93 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       renders: await callCount('apply_adjustments'),
       saves: await callCount('save_metadata_and_update_thumbnail'),
     };
-    await clickTarget(index === 0 ? 'mouse' : 'touch');
+    await waitForParametricAuthorityIdle();
+    const pointerType = index === 0 ? 'mouse' : 'touch';
+    const point = await targetPoint();
+    await pointerDown(pointerType, point);
+    await page.waitForFunction((expectedPointerType) => {
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return (
+        canvas?.getAttribute('data-parametric-mask-controller-active') === 'true' &&
+        canvas.getAttribute('data-parametric-mask-pointer-type') === expectedPointerType &&
+        Number(canvas.getAttribute('data-parametric-mask-operation')) > 0
+      );
+    }, pointerType);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} pointer-down persisted before its owned release.`);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-parametric-mask-controller-active') === 'false',
+      undefined,
+      { timeout: 5_000 },
+    );
+    const cancellationTransition = await imageCanvas.getAttribute('data-parametric-mask-transition');
+    if (cancellationTransition !== 'escape') {
+      throw new Error(`Parametric ${type} Escape resolved as ${String(cancellationTransition)}.`);
+    }
+    await pointerUp(pointerType);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} Escape cancellation persisted a semantic target.`);
+    }
+
+    if (pointerType === 'touch') {
+      await waitForParametricAuthorityIdle();
+      await pointerDown(pointerType, point);
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="image-canvas"]')
+            ?.getAttribute('data-parametric-mask-controller-active') === 'true',
+      );
+      await page.evaluate(({ x, y }) => {
+        const touch = new Touch({ clientX: x, clientY: y, identifier: 31, target: document.body });
+        window.dispatchEvent(
+          new TouchEvent('touchcancel', { bubbles: true, cancelable: true, changedTouches: [touch], touches: [] }),
+        );
+      }, point);
+      await page.waitForFunction(() => {
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        return (
+          canvas?.getAttribute('data-parametric-mask-controller-active') === 'false' &&
+          canvas.getAttribute('data-parametric-mask-transition') === 'touchcancel'
+        );
+      });
+      await pointerUp(pointerType);
+      await page.waitForTimeout(50);
+      if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+        throw new Error('Parametric luminance touchcancel/late touchend persisted a semantic target.');
+      }
+    }
+
+    await waitForParametricAuthorityIdle();
+    await pointerDown(pointerType, point);
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-parametric-mask-controller-active') === 'true',
+    );
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} draft persisted before the second owned release.`);
+    }
+    await pointerUp(pointerType);
+    await page.waitForTimeout(150);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves + 1) {
+      const diagnostics = await imageCanvas.evaluate((element) => ({
+        active: element.getAttribute('data-parametric-mask-controller-active'),
+        contextGeometry: element.getAttribute('data-parametric-mask-context-geometry'),
+        contextRevision: element.getAttribute('data-parametric-mask-context-revision'),
+        operation: element.getAttribute('data-parametric-mask-operation'),
+        pointerId: element.getAttribute('data-parametric-mask-pointer-id'),
+        pointerType: element.getAttribute('data-parametric-mask-pointer-type'),
+        transition: element.getAttribute('data-parametric-mask-transition'),
+      }));
+      throw new Error(`Parametric ${type} release did not commit: ${JSON.stringify(diagnostics)}.`);
+    }
     await waitForPersistedTarget(type, false);
     await page.waitForFunction(
       ({ overlays, renders, saves }) => {
@@ -1553,6 +1664,20 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       baseline,
       { timeout: 10_000 },
     );
+    if (pointerType === 'mouse') {
+      await pointerUp(pointerType);
+    } else {
+      await page.evaluate(() => {
+        const touch = new Touch({ clientX: 0, clientY: 0, identifier: 31, target: document.body });
+        window.dispatchEvent(
+          new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [touch], touches: [] }),
+        );
+      });
+    }
+    await page.waitForTimeout(50);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves + 1) {
+      throw new Error(`Parametric ${type} late release duplicated its semantic transaction.`);
+    }
     const proof = await page.evaluate((maskType) => {
       const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
       const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
@@ -1618,6 +1743,98 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       await page.getByTestId('mask-reset-all').click();
       await page.getByTestId('mask-creation-others').waitFor({ state: 'visible', timeout: 10_000 });
     }
+  }
+
+  const sourceReplacementBaseline = await callCount('save_metadata_and_update_thumbnail');
+  const sourceA = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  const activeMaskId = await imageCanvas.getAttribute('data-parametric-mask-context-id');
+  if (sourceA === null || activeMaskId === null) {
+    throw new Error('Parametric A→B→successor-A proof could not resolve source/mask identity.');
+  }
+  const stalePoint = await targetPoint();
+  await pointerDown('mouse', stalePoint);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  const sourceBThumbnail = page
+    .locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${sourceA}"])`)
+    .first();
+  const sourceB = await sourceBThumbnail.getAttribute('data-image-path');
+  if (sourceB === null) throw new Error('Parametric A→B→successor-A proof requires source B.');
+  await sourceBThumbnail.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source B thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceB,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourceA}"]`).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source A thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceA,
+  );
+  await pointerUp('mouse');
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline ||
+    (await imageCanvas.getAttribute('data-parametric-mask-controller-active')) !== 'false'
+  ) {
+    throw new Error('A stale parametric target revived after A→B→successor-A session replacement.');
+  }
+
+  const activeMaskRow = page.getByTestId(`mask-submask-row-${activeMaskId}`);
+  await activeMaskRow.scrollIntoViewIfNeeded();
+  await activeMaskRow.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-context-active') ===
+      'true',
+  );
+  const successorPoint = await targetPoint();
+  const successorBaseline = await callCount('save_metadata_and_update_thumbnail');
+  await pointerDown('mouse', successorPoint);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  await pointerUp('mouse');
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    successorBaseline + 1,
+    { timeout: 10_000 },
+  );
+
+  const unmountBaseline = await callCount('save_metadata_and_update_thumbnail');
+  await pointerDown('mouse', { x: successorPoint.x + 24, y: successorPoint.y + 18 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await pointerUp('mouse');
+  await page.waitForTimeout(100);
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== unmountBaseline) {
+    throw new Error('Parametric target controller committed after ImageCanvas unmount.');
   }
 }
 

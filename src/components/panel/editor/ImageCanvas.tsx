@@ -2,12 +2,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
-import type { Stage as KonvaStage } from 'konva/lib/Stage';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import { Circle, Group, Layer, Rect, Stage } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
-import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
+import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -57,6 +57,7 @@ import { useViewerBrushController } from './useViewerBrushController';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
 import { useViewerInitialMaskDrawController } from './useViewerInitialMaskDrawController';
 import { useViewerMaskShapeController } from './useViewerMaskShapeController';
+import { useViewerParametricMaskTargetController } from './useViewerParametricMaskTargetController';
 import { useViewerPickerControllers } from './useViewerPickerControllers';
 import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
 import { useViewerSamplerController } from './useViewerSamplerController';
@@ -83,13 +84,12 @@ import {
   viewerInteractionToolId,
 } from './viewerInteractionCoordinator';
 import type { ViewerMaskShapeCurrentContext } from './viewerMaskShapeInteractionController';
-import {
-  createViewerParametricMaskTargetInteractionController,
-  type ViewerParametricMaskTargetCommand,
-  type ViewerParametricMaskTargetCurrentContext,
+import type {
+  ViewerParametricMaskTargetCommand,
+  ViewerParametricMaskTargetCurrentContext,
 } from './viewerParametricMaskTargetInteractionController';
 import type { ViewerPickerCommitResult } from './viewerPickerInteractionControllers';
-import { type ViewerKonvaPointerEvent, viewerPointerIdentity } from './viewerPointerEvents';
+import type { ViewerKonvaPointerEvent } from './viewerPointerEvents';
 import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
 
 const acknowledgeSurfacePaint = (): void => undefined;
@@ -100,7 +100,6 @@ declare global {
   }
 }
 
-type BrushPoint = ViewerBrushLine['points'][number];
 type DrawnLine = ViewerBrushLine;
 
 interface MaskParameters extends ViewerBrushParameters {
@@ -307,10 +306,6 @@ export const ImageCanvas = memo(
       status: 'error' | 'ready';
       url: string;
     } | null>(null);
-    const viewerParametricMaskTargetController = useMemo(
-      () => createViewerParametricMaskTargetInteractionController(),
-      [],
-    );
     const viewerInteractionCoordinator = useMemo(() => createViewerInteractionCoordinator(), []);
     const viewerInteractionTransitionRef = useRef<ViewerInteractionTransition | null>(null);
     const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
@@ -533,19 +528,6 @@ export const ImageCanvas = memo(
     const maxDimension = Math.max(stageWidth, stageHeight, 1);
     const maxSafeScale = Math.max(1, Math.min(settledScale, 4092 / maxDimension));
 
-    const getCanvasPointer = useCallback(
-      (stage: KonvaStage | null): Coord | null => {
-        if (!stage) return null;
-        const pos = stage.getPointerPosition();
-        if (!pos) return null;
-        return {
-          x: pos.x / maxSafeScale - groupOffsetX,
-          y: pos.y / maxSafeScale - groupOffsetY,
-        };
-      },
-      [groupOffsetX, groupOffsetY, maxSafeScale],
-    );
-
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Alt') {
@@ -639,20 +621,6 @@ export const ImageCanvas = memo(
       [activeSubMask],
     );
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
-    const getImageSpacePoint = useCallback(
-      (point: BrushPoint): BrushPoint => {
-        const orientedPoint = overlayGeometry.cropToOriented(
-          overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(point.x, point.y)),
-        );
-
-        return {
-          ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
-          x: orientedPoint.x,
-          y: orientedPoint.y,
-        };
-      },
-      [overlayGeometry],
-    );
     const activeBrushMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerBrushContext: ViewerBrushCurrentContext = {
       active: isBrushActive && activeBrushMaskId !== null,
@@ -804,6 +772,30 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
+    const viewerParametricMaskTargetBinding = useViewerParametricMaskTargetController({
+      baselineParameters: activeSubMaskParameters,
+      context: viewerParametricMaskTargetContext,
+      geometry: overlayGeometry,
+      groupOffsetX,
+      groupOffsetY,
+      maxSafeScale,
+      onCommit: onParametricMaskTargetCommit,
+      settings: {
+        flipHorizontal: adjustments.flipHorizontal ?? false,
+        flipVertical: adjustments.flipVertical ?? false,
+        orientationSteps: adjustments.orientationSteps ?? 0,
+        rotation: adjustments.rotation ?? 0,
+      },
+    });
+    const viewerParametricMaskTargetOverlayPoint = useMemo(() => {
+      const descriptor = viewerParametricMaskTargetBinding.overlay;
+      if (descriptor === null) return null;
+      return overlayGeometry.cropToView(
+        overlayGeometry.orientedToCrop(
+          overlayPoint<'oriented-pixels'>(descriptor.imagePoint.x, descriptor.imagePoint.y),
+        ),
+      );
+    }, [overlayGeometry, viewerParametricMaskTargetBinding.overlay]);
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
     const activeInitialMaskDrawId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerInitialMaskDrawContext = useMemo<ViewerInitialMaskDrawCurrentContext>(
@@ -931,30 +923,6 @@ export const ImageCanvas = memo(
 
         if (e.evt.cancelable) e.evt.preventDefault();
 
-        if (isParametricActive) {
-          if (!activeSubMaskParameters) return;
-          const pos = getCanvasPointer(e.target.getStage());
-          if (!pos) return;
-          const pointer = viewerPointerIdentity(e.evt);
-          const command = viewerParametricMaskTargetController.activate(
-            viewerParametricMaskTargetContext,
-            {
-              imagePoint: getImageSpacePoint(pos),
-              pointerId: pointer.pointerId,
-              pointerType: pointer.pointerType,
-            },
-            {
-              baselineParameters: activeSubMaskParameters,
-              flipHorizontal: adjustments.flipHorizontal ?? false,
-              flipVertical: adjustments.flipVertical ?? false,
-              orientationSteps: adjustments.orientationSteps ?? 0,
-              rotation: adjustments.rotation ?? 0,
-            },
-          );
-          if (command) onParametricMaskTargetCommit(command);
-          return;
-        }
-
         if (!isToolActive) {
           if (e.target === e.target.getStage()) {
             if (isMasking) {
@@ -966,21 +934,7 @@ export const ImageCanvas = memo(
           }
         }
       },
-      [
-        isParametricActive,
-        onSelectMask,
-        onSelectAiSubMask,
-        isMasking,
-        isAiEditing,
-        adjustments,
-        activeSubMaskParameters,
-        getImageSpacePoint,
-        isToolActive,
-        getCanvasPointer,
-        viewerParametricMaskTargetContext,
-        viewerParametricMaskTargetController,
-        onParametricMaskTargetCommit,
-      ],
+      [onSelectMask, onSelectAiSubMask, isMasking, isAiEditing, isToolActive],
     );
 
     const handleMouseEnter = useCallback(() => {
@@ -1298,8 +1252,17 @@ export const ImageCanvas = memo(
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
         data-parametric-mask-context-active={String(viewerParametricMaskTargetContext.active)}
+        data-parametric-mask-context-geometry={viewerParametricMaskTargetContext.geometryEpoch}
         data-parametric-mask-context-id={viewerParametricMaskTargetContext.maskId}
+        data-parametric-mask-context-revision={viewerParametricMaskTargetContext.sourceRevision}
+        data-parametric-mask-context-session={viewerParametricMaskTargetContext.imageSessionId}
+        data-parametric-mask-context-source={viewerParametricMaskTargetContext.sourceIdentity}
         data-parametric-mask-context-tool={viewerParametricMaskTargetContext.tool}
+        data-parametric-mask-controller-active={String(viewerParametricMaskTargetBinding.active)}
+        data-parametric-mask-operation={viewerParametricMaskTargetBinding.overlay?.key.operationGeneration ?? 0}
+        data-parametric-mask-pointer-id={viewerParametricMaskTargetBinding.overlay?.key.pointerId ?? ''}
+        data-parametric-mask-pointer-type={viewerParametricMaskTargetBinding.overlay?.key.pointerType ?? ''}
+        data-parametric-mask-transition={viewerParametricMaskTargetBinding.transition}
         data-ai-mask-box-active={String(viewerAiMaskBoxBinding.active)}
         data-ai-mask-box-context-active={String(viewerAiMaskBoxContext.active)}
         data-ai-mask-box-controller="ready"
@@ -1545,7 +1508,8 @@ export const ImageCanvas = memo(
                   if (
                     !viewerBrushBinding.handleMouseDown(event) &&
                     !viewerAiMaskBoxBinding.handleMouseDown(event) &&
-                    !viewerInitialMaskDrawBinding.handleMouseDown(event)
+                    !viewerInitialMaskDrawBinding.handleMouseDown(event) &&
+                    !viewerParametricMaskTargetBinding.handleMouseDown(event)
                   )
                     handleStart(event);
                 }}
@@ -1553,12 +1517,17 @@ export const ImageCanvas = memo(
                   if (
                     !viewerBrushBinding.handleTouchStart(event) &&
                     !viewerAiMaskBoxBinding.handleTouchStart(event) &&
-                    !viewerInitialMaskDrawBinding.handleTouchStart(event)
+                    !viewerInitialMaskDrawBinding.handleTouchStart(event) &&
+                    !viewerParametricMaskTargetBinding.handleTouchStart(event)
                   )
                     handleStart(event);
                 }}
                 onPointerDown={(event) => {
-                  if (!viewerBrushBinding.handlePenDown(event) && !viewerAiMaskBoxBinding.handlePenDown(event))
+                  if (
+                    !viewerBrushBinding.handlePenDown(event) &&
+                    !viewerAiMaskBoxBinding.handlePenDown(event) &&
+                    !viewerParametricMaskTargetBinding.handlePenDown(event)
+                  )
                     viewerInitialMaskDrawBinding.handlePenDown(event);
                 }}
                 onMouseEnter={handleMouseEnter}
@@ -1579,7 +1548,8 @@ export const ImageCanvas = memo(
                   if (
                     !viewerBrushBinding.handleMouseUp(event) &&
                     !viewerAiMaskBoxBinding.handleMouseUp(event) &&
-                    !viewerInitialMaskDrawBinding.handleMouseUp(event)
+                    !viewerInitialMaskDrawBinding.handleMouseUp(event) &&
+                    !viewerParametricMaskTargetBinding.handleMouseUp(event)
                   )
                     viewerMaskShapeBinding.release(event.evt);
                 }}
@@ -1587,20 +1557,29 @@ export const ImageCanvas = memo(
                   if (
                     !viewerBrushBinding.handleTouchEnd(event) &&
                     !viewerAiMaskBoxBinding.handleTouchEnd(event) &&
-                    !viewerInitialMaskDrawBinding.handleTouchEnd(event)
+                    !viewerInitialMaskDrawBinding.handleTouchEnd(event) &&
+                    !viewerParametricMaskTargetBinding.handleTouchEnd(event)
                   )
                     viewerMaskShapeBinding.release(event.evt);
+                }}
+                onTouchCancel={(event: KonvaEventObject<TouchEvent>) => {
+                  viewerParametricMaskTargetBinding.handleTouchCancel(event);
                 }}
                 onPointerUp={(event) => {
                   if (
                     !viewerBrushBinding.handlePenUp(event) &&
                     !viewerAiMaskBoxBinding.handlePenUp(event) &&
-                    !viewerInitialMaskDrawBinding.handlePenUp(event)
+                    !viewerInitialMaskDrawBinding.handlePenUp(event) &&
+                    !viewerParametricMaskTargetBinding.handlePenUp(event)
                   )
                     viewerMaskShapeBinding.release(event.evt);
                 }}
                 onPointerCancel={(event) => {
-                  if (!viewerBrushBinding.handlePenCancel(event) && !viewerAiMaskBoxBinding.handlePenCancel(event))
+                  if (
+                    !viewerBrushBinding.handlePenCancel(event) &&
+                    !viewerAiMaskBoxBinding.handlePenCancel(event) &&
+                    !viewerParametricMaskTargetBinding.handlePenCancel(event)
+                  )
                     viewerInitialMaskDrawBinding.handlePenCancel(event);
                 }}
               >
@@ -1704,6 +1683,19 @@ export const ImageCanvas = memo(
                           {...canvasOverlayShadowProps}
                           x={viewerBrushBinding.cursor.x}
                           y={viewerBrushBinding.cursor.y}
+                        />
+                      )}
+                      {viewerParametricMaskTargetOverlayPoint !== null && (
+                        <Circle
+                          fill="transparent"
+                          listening={false}
+                          radius={6}
+                          stroke={canvasOverlayTokens.colors.active}
+                          strokeScaleEnabled={false}
+                          strokeWidth={2}
+                          x={viewerParametricMaskTargetOverlayPoint.x}
+                          y={viewerParametricMaskTargetOverlayPoint.y}
+                          {...canvasOverlayShadowProps}
                         />
                       )}
                     </Group>
