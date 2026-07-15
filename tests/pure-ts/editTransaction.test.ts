@@ -197,6 +197,24 @@ describe('reduceEditTransaction', () => {
       },
     ]);
 
+    const hsl = structuredClone(INITIAL_ADJUSTMENTS.hsl);
+    hsl.reds.hue = 18;
+    const selectiveColorRangeControls = structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+    selectiveColorRangeControls.reds.widthDegrees = 48;
+    expect(
+      buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+        ...INITIAL_ADJUSTMENTS,
+        hsl,
+        selectiveColorRangeControls,
+      }),
+    ).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'selective_color_mixer',
+        patch: { hsl, selectiveColorRangeControls },
+      },
+    ]);
+
     const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
     const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
     expect(
@@ -268,7 +286,7 @@ describe('reduceEditTransaction', () => {
     const operations = buildEditorSectionNodeEnablementOperations(document, 'color', false);
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request({ operations }), undefined, document);
 
-    expect(operations).toHaveLength(8);
+    expect(operations).toHaveLength(9);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
     expect(result.after).toBe(INITIAL_ADJUSTMENTS);

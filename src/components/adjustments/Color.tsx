@@ -70,6 +70,21 @@ interface ColorWorkspaceTab {
   panel: ReactNode;
 }
 
+const resolveSelectiveColorAdjustments = (
+  adjustments: Adjustments,
+  authoritativeHsl: Adjustments['hsl'],
+  authoritativeSelectiveColorRangeControls: Adjustments['selectiveColorRangeControls'],
+  isForMask: boolean,
+  selectedImagePath: string | null,
+): Adjustments =>
+  isForMask || selectedImagePath === null
+    ? adjustments
+    : {
+        ...adjustments,
+        hsl: authoritativeHsl,
+        selectiveColorRangeControls: authoritativeSelectiveColorRangeControls,
+      };
+
 const getNextColorWorkspaceTabId = (
   tabs: Array<ColorWorkspaceTab>,
   activeTabId: ColorWorkspaceTabId,
@@ -144,6 +159,10 @@ export default function ColorPanel({
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const authoritativeHsl = useEditorStore((state) => state.adjustments.hsl);
+  const authoritativeSelectiveColorRangeControls = useEditorStore(
+    (state) => state.adjustments.selectiveColorRangeControls,
+  );
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
   const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
@@ -249,13 +268,24 @@ export default function ColorPanel({
   );
   const selectiveColorCommitIdentityRef = useRef(selectiveColorCommitIdentity);
   selectiveColorCommitIdentityRef.current = selectiveColorCommitIdentity;
+  const selectiveColorAdjustments = useMemo(
+    () =>
+      resolveSelectiveColorAdjustments(
+        adjustments,
+        authoritativeHsl,
+        authoritativeSelectiveColorRangeControls,
+        isForMask,
+        selectedImagePath,
+      ),
+    [adjustments, authoritativeHsl, authoritativeSelectiveColorRangeControls, isForMask, selectedImagePath],
+  );
   const selectiveColorMixerRef = useRef<SelectiveColorMixerSettings>({
-    hsl: adjustments.hsl,
-    selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
+    hsl: selectiveColorAdjustments.hsl,
+    selectiveColorRangeControls: selectiveColorAdjustments.selectiveColorRangeControls,
   });
   selectiveColorMixerRef.current = {
-    hsl: adjustments.hsl,
-    selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
+    hsl: selectiveColorAdjustments.hsl,
+    selectiveColorRangeControls: selectiveColorAdjustments.selectiveColorRangeControls,
   };
   const commitSelectiveColorMixer = useCallback(
     (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => {
@@ -439,7 +469,7 @@ export default function ColorPanel({
               activeColor={activeColor}
               activeColorBalanceRange={activeColorBalanceRange}
               adjustmentVisibility={adjustmentVisibility}
-              adjustments={adjustments}
+              adjustments={selectiveColorAdjustments}
               blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
               channelMixerCommitIdentity={channelMixerCommitIdentity}
               canCreateLocalAdjustmentFromActiveRange={!isForMask && selectedImage !== null}
@@ -531,6 +561,7 @@ export default function ColorPanel({
     onDragStateChange,
     renderedPreviewWarningStatus,
     selectedImage,
+    selectiveColorAdjustments,
     setAdjustments,
     setEditor,
     syncSkinToneUniformity,

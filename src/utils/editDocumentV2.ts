@@ -25,6 +25,7 @@ import {
   editDocumentPerceptualGradingV2Schema,
   editDocumentPointColorV2Schema,
   editDocumentSceneCurveV2Schema,
+  editDocumentSelectiveColorMixerV2Schema,
   editDocumentSourceArtifactsV2Schema,
   editDocumentToneEqualizerV2Schema,
   editDocumentV2Schema,
@@ -50,6 +51,10 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   }
   if (key === 'colorBalanceRgb') return editDocumentColorBalanceRgbV2Schema.shape.colorBalanceRgb;
   if (LUMA_LEVELS_FIELDS.has(key)) return editDocumentLumaLevelsV2Schema.shape.levels;
+  if (key === 'hsl') return editDocumentSelectiveColorMixerV2Schema.shape.hsl;
+  if (key === 'selectiveColorRangeControls') {
+    return editDocumentSelectiveColorMixerV2Schema.shape.selectiveColorRangeControls;
+  }
   return undefined;
 };
 
@@ -104,6 +109,38 @@ const normalizeLegacyLayers = (params: Readonly<Record<string, unknown>>) =>
     masks: Array.isArray(params['masks']) ? params['masks'] : [],
   });
 
+const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z.ZodType>> = {
+  black_white_mixer: editDocumentBlackWhiteMixerV2Schema,
+  camera_input: editDocumentCameraInputV2Schema,
+  channel_mixer: editDocumentChannelMixerV2Schema,
+  color_balance_rgb: editDocumentColorBalanceRgbV2Schema,
+  color_calibration: editDocumentColorCalibrationV2Schema,
+  detail_denoise_dehaze: editDocumentDetailDenoiseDehazeV2Schema,
+  display_creative: editDocumentDisplayCreativeV2Schema,
+  lens_correction: editDocumentLensCorrectionV2Schema,
+  luma_levels: editDocumentLumaLevelsV2Schema,
+  perceptual_grading: editDocumentPerceptualGradingV2Schema,
+  point_color: editDocumentPointColorV2Schema,
+  scene_curve: editDocumentSceneCurveV2Schema,
+  selective_color_mixer: editDocumentSelectiveColorMixerV2Schema,
+  tone_equalizer: editDocumentToneEqualizerV2Schema,
+};
+
+const normalizeMappedNodeParams = (
+  nodeType: EditDocumentNodeTypeV2,
+  defaults: Readonly<Record<string, unknown>>,
+  mappedParams: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const candidate = { ...defaults, ...mappedParams };
+  if (nodeType === 'geometry') return normalizeGeometryParams(candidate);
+  if (nodeType === 'layers') return normalizeLegacyLayers({ masks: [], ...mappedParams });
+  const schema = STRICT_LEGACY_NODE_PARAM_SCHEMAS[nodeType];
+  if (schema === undefined) return { ...mappedParams };
+  const parsed = schema.parse(candidate);
+  if (!hasRecordShape(parsed)) throw new Error(`EditDocumentV2 node '${nodeType}' params must be an object.`);
+  return { ...parsed };
+};
+
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
   const quarantinedOwnedEntries = entries.filter(([key, value]) => {
@@ -129,71 +166,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       const mappedParams = Object.fromEntries(
         mapped.filter((entry) => entry.nodeType === nodeType).map(({ key }) => [key, adjustments[key]]),
       );
-      const params =
-        nodeType === 'geometry'
-          ? normalizeGeometryParams({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-          : nodeType === 'camera_input'
-            ? editDocumentCameraInputV2Schema.parse({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-            : nodeType === 'scene_curve'
-              ? editDocumentSceneCurveV2Schema.parse({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-              : nodeType === 'detail_denoise_dehaze'
-                ? editDocumentDetailDenoiseDehazeV2Schema.parse({
-                    ...(descriptor?.defaultParams ?? {}),
-                    ...mappedParams,
-                  })
-                : nodeType === 'lens_correction'
-                  ? editDocumentLensCorrectionV2Schema.parse({
-                      ...(descriptor?.defaultParams ?? {}),
-                      ...mappedParams,
-                    })
-                  : nodeType === 'display_creative'
-                    ? editDocumentDisplayCreativeV2Schema.parse({
-                        ...(descriptor?.defaultParams ?? {}),
-                        ...mappedParams,
-                      })
-                    : nodeType === 'tone_equalizer'
-                      ? editDocumentToneEqualizerV2Schema.parse({
-                          ...(descriptor?.defaultParams ?? {}),
-                          ...mappedParams,
-                        })
-                      : nodeType === 'point_color'
-                        ? editDocumentPointColorV2Schema.parse({
-                            ...(descriptor?.defaultParams ?? {}),
-                            ...mappedParams,
-                          })
-                        : nodeType === 'black_white_mixer'
-                          ? editDocumentBlackWhiteMixerV2Schema.parse({
-                              ...(descriptor?.defaultParams ?? {}),
-                              ...mappedParams,
-                            })
-                          : nodeType === 'channel_mixer'
-                            ? editDocumentChannelMixerV2Schema.parse({
-                                ...(descriptor?.defaultParams ?? {}),
-                                ...mappedParams,
-                              })
-                            : nodeType === 'color_balance_rgb'
-                              ? editDocumentColorBalanceRgbV2Schema.parse({
-                                  ...(descriptor?.defaultParams ?? {}),
-                                  ...mappedParams,
-                                })
-                              : nodeType === 'luma_levels'
-                                ? editDocumentLumaLevelsV2Schema.parse({
-                                    ...(descriptor?.defaultParams ?? {}),
-                                    ...mappedParams,
-                                  })
-                                : nodeType === 'perceptual_grading'
-                                  ? editDocumentPerceptualGradingV2Schema.parse({
-                                      ...(descriptor?.defaultParams ?? {}),
-                                      ...mappedParams,
-                                    })
-                                  : nodeType === 'color_calibration'
-                                    ? editDocumentColorCalibrationV2Schema.parse({
-                                        ...(descriptor?.defaultParams ?? {}),
-                                        ...mappedParams,
-                                      })
-                                    : nodeType === 'layers'
-                                      ? normalizeLegacyLayers({ masks: [], ...mappedParams })
-                                      : mappedParams;
+      const params = normalizeMappedNodeParams(nodeType, descriptor?.defaultParams ?? {}, mappedParams);
       return [
         nodeType,
         {
@@ -232,6 +205,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'perceptual_grading',
       'point_color',
       'scene_curve',
+      'selective_color_mixer',
       'tone_equalizer',
     ] as const
   ).flatMap((nodeType) => {

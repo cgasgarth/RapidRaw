@@ -1,8 +1,10 @@
-import type { Adjustments } from './adjustments';
+import {
+  type SelectiveColorMixerSettings,
+  selectiveColorMixerSettingsSchema,
+} from '../schemas/color/selectiveColorMixerSchemas';
 import type { EditTransactionRequest } from './editTransaction';
-import { SELECTIVE_COLOR_RANGES } from './selectiveColorRanges';
 
-export type SelectiveColorMixerSettings = Pick<Adjustments, 'hsl' | 'selectiveColorRangeControls'>;
+export type { SelectiveColorMixerSettings } from '../schemas/color/selectiveColorMixerSchemas';
 
 export interface SelectiveColorCommitIdentity {
   adjustmentRevision: number;
@@ -28,36 +30,6 @@ export const isCurrentSelectiveColorIdentity = (
   currentImageSessionId(state) === identity.imageSessionId &&
   state.selectedImage?.path === identity.sourceIdentity;
 
-const assertMixerSettings = (settings: SelectiveColorMixerSettings): void => {
-  for (const range of SELECTIVE_COLOR_RANGES) {
-    const hsl = settings.hsl[range.key];
-    for (const [key, value] of Object.entries(hsl)) {
-      if (!Number.isFinite(value) || value < -100 || value > 100) {
-        throw new Error(`selective_color_transaction.invalid_hsl:${range.key}:${key}`);
-      }
-    }
-
-    const controls = settings.selectiveColorRangeControls[range.key];
-    if (
-      !Number.isFinite(controls.centerHueDegrees) ||
-      controls.centerHueDegrees < 0 ||
-      controls.centerHueDegrees >= 360
-    ) {
-      throw new Error(`selective_color_transaction.invalid_range:${range.key}:centerHueDegrees`);
-    }
-    if (!Number.isFinite(controls.widthDegrees) || controls.widthDegrees < 10 || controls.widthDegrees > 180) {
-      throw new Error(`selective_color_transaction.invalid_range:${range.key}:widthDegrees`);
-    }
-    if (
-      !Number.isFinite(controls.falloffSmoothness) ||
-      controls.falloffSmoothness < 0.25 ||
-      controls.falloffSmoothness > 4
-    ) {
-      throw new Error(`selective_color_transaction.invalid_range:${range.key}:falloffSmoothness`);
-    }
-  }
-};
-
 export const buildSelectiveColorEditTransaction = (
   state: SelectiveColorEditTransactionState,
   identity: SelectiveColorCommitIdentity,
@@ -79,7 +51,14 @@ export const buildSelectiveColorEditTransaction = (
       `selective_color_transaction.stale_revision:${String(identity.adjustmentRevision)}:${String(state.adjustmentRevision)}`,
     );
   }
-  assertMixerSettings(settings);
+  const parsed = selectiveColorMixerSettingsSchema.safeParse(settings);
+  if (!parsed.success) {
+    const [domain, range, field] = parsed.error.issues[0]?.path ?? [];
+    if (domain === 'hsl') {
+      throw new Error(`selective_color_transaction.invalid_hsl:${String(range)}:${String(field)}`);
+    }
+    throw new Error(`selective_color_transaction.invalid_range:${String(range)}:${String(field)}`);
+  }
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
@@ -87,11 +66,12 @@ export const buildSelectiveColorEditTransaction = (
     imageSessionId: identity.imageSessionId,
     operations: [
       {
+        nodeType: 'selective_color_mixer',
         patch: {
           hsl: structuredClone(settings.hsl),
           selectiveColorRangeControls: structuredClone(settings.selectiveColorRangeControls),
         },
-        type: 'patch-adjustments',
+        type: 'patch-edit-document-node',
       },
     ],
     persistence: 'commit',

@@ -88,9 +88,18 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
 
   act(() => getButton(container, 'channel-mixer-toggle').click());
   expect(useEditorStore.getState().adjustments.channelMixer.enabled).toBeTrue();
-  expect(useEditorStore.getState().history).toHaveLength(4);
+  const hslHue = container.querySelector('[data-testid="selective-color-range-controls"] input[type="range"]');
+  if (!(hslHue instanceof window.HTMLInputElement)) throw new Error('missing selective-color HSL slider');
+  act(() => {
+    hslHue.value = '21';
+    hslHue.dispatchEvent(new window.Event('input', { bubbles: true }));
+  });
+  expect(useEditorStore.getState().adjustments.hsl.reds.hue).toBe(21);
+  expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params.hsl.reds.hue).toBe(21);
+  expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hsl');
+  expect(useEditorStore.getState().history).toHaveLength(5);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
-    adjustmentRevision: 3,
+    adjustmentRevision: 4,
     imageSessionId: 'editor-image-session:91',
   });
   expect(genericSetter).not.toHaveBeenCalled();

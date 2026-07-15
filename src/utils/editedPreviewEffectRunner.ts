@@ -231,6 +231,7 @@ const executeNativeEditedPreview = async (
           'color_calibration',
           'channel_mixer',
           'color_balance_rgb',
+          'selective_color_mixer',
           'detail_denoise_dehaze',
           'display_creative',
           'geometry',

@@ -20,6 +20,7 @@ enum EditNodeTypeV2 {
     DetailDenoiseDehaze,
     PointColor,
     ColorBalanceRgb,
+    SelectiveColorMixer,
     BlackWhiteMixer,
     ChannelMixer,
     LumaLevels,
@@ -43,6 +44,7 @@ impl EditNodeTypeV2 {
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
+            Self::SelectiveColorMixer => ("selective_color_mixer", "scene_referred_v2", 1),
             Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
             Self::ChannelMixer => ("channel_mixer", "scene_referred_v2", 1),
             Self::LumaLevels => ("luma_levels", "scene_referred_v2", 1),
@@ -63,6 +65,7 @@ impl EditNodeTypeV2 {
             Self::DisplayCreative => Some("effects"),
             Self::PointColor
             | Self::ColorBalanceRgb
+            | Self::SelectiveColorMixer
             | Self::BlackWhiteMixer
             | Self::ChannelMixer
             | Self::LumaLevels
@@ -672,6 +675,159 @@ struct ColorBalanceRgbV2 {
 impl ColorBalanceRgbV2 {
     fn validate(&self) -> Result<(), String> {
         self.color_balance_rgb.validate()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct SelectiveColorHslValueV2 {
+    hue: f64,
+    luminance: f64,
+    saturation: f64,
+}
+
+impl SelectiveColorHslValueV2 {
+    fn validate(&self, range: &str) -> Result<(), String> {
+        for (field, value) in [
+            ("hue", self.hue),
+            ("luminance", self.luminance),
+            ("saturation", self.saturation),
+        ] {
+            if !value.is_finite() || !(-100.0..=100.0).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 selective_color_mixer field 'hsl.{range}.{field}' must be finite and within [-100, 100]"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SelectiveColorRangeControlV2 {
+    center_hue_degrees: f64,
+    falloff_smoothness: f64,
+    width_degrees: f64,
+}
+
+impl SelectiveColorRangeControlV2 {
+    fn validate(&self, range: &str) -> Result<(), String> {
+        for (field, value, minimum, maximum, maximum_is_exclusive) in [
+            (
+                "centerHueDegrees",
+                self.center_hue_degrees,
+                0.0,
+                360.0,
+                true,
+            ),
+            (
+                "falloffSmoothness",
+                self.falloff_smoothness,
+                0.25,
+                4.0,
+                false,
+            ),
+            ("widthDegrees", self.width_degrees, 10.0, 180.0, false),
+        ] {
+            let in_range = value >= minimum
+                && if maximum_is_exclusive {
+                    value < maximum
+                } else {
+                    value <= maximum
+                };
+            if !value.is_finite() || !in_range {
+                let upper = if maximum_is_exclusive { ")" } else { "]" };
+                return Err(format!(
+                    "EditDocumentV2 selective_color_mixer field 'selectiveColorRangeControls.{range}.{field}' must be finite and within [{minimum}, {maximum}{upper}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct SelectiveColorHslV2 {
+    aquas: SelectiveColorHslValueV2,
+    blues: SelectiveColorHslValueV2,
+    greens: SelectiveColorHslValueV2,
+    magentas: SelectiveColorHslValueV2,
+    oranges: SelectiveColorHslValueV2,
+    purples: SelectiveColorHslValueV2,
+    reds: SelectiveColorHslValueV2,
+    yellows: SelectiveColorHslValueV2,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct SelectiveColorRangeControlsV2 {
+    aquas: SelectiveColorRangeControlV2,
+    blues: SelectiveColorRangeControlV2,
+    greens: SelectiveColorRangeControlV2,
+    magentas: SelectiveColorRangeControlV2,
+    oranges: SelectiveColorRangeControlV2,
+    purples: SelectiveColorRangeControlV2,
+    reds: SelectiveColorRangeControlV2,
+    yellows: SelectiveColorRangeControlV2,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SelectiveColorMixerV2 {
+    hsl: SelectiveColorHslV2,
+    selective_color_range_controls: SelectiveColorRangeControlsV2,
+}
+
+impl SelectiveColorMixerV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (range, hsl, control) in [
+            (
+                "aquas",
+                self.hsl.aquas,
+                self.selective_color_range_controls.aquas,
+            ),
+            (
+                "blues",
+                self.hsl.blues,
+                self.selective_color_range_controls.blues,
+            ),
+            (
+                "greens",
+                self.hsl.greens,
+                self.selective_color_range_controls.greens,
+            ),
+            (
+                "magentas",
+                self.hsl.magentas,
+                self.selective_color_range_controls.magentas,
+            ),
+            (
+                "oranges",
+                self.hsl.oranges,
+                self.selective_color_range_controls.oranges,
+            ),
+            (
+                "purples",
+                self.hsl.purples,
+                self.selective_color_range_controls.purples,
+            ),
+            (
+                "reds",
+                self.hsl.reds,
+                self.selective_color_range_controls.reds,
+            ),
+            (
+                "yellows",
+                self.hsl.yellows,
+                self.selective_color_range_controls.yellows,
+            ),
+        ] {
+            hsl.validate(range)?;
+            control.validate(range)?;
+        }
+        Ok(())
     }
 }
 
@@ -1919,6 +2075,10 @@ fn compile_node_params(
             parse_color_balance_rgb(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::SelectiveColorMixer => {
+            parse_selective_color_mixer(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::BlackWhiteMixer => {
             parse_black_white_mixer(&node.params)?;
             Ok(node.params.clone())
@@ -2061,6 +2221,16 @@ fn parse_color_balance_rgb(params: &Map<String, Value>) -> Result<ColorBalanceRg
             .map_err(|error| format!("EditDocumentV2 color_balance_rgb is invalid: {error}"))?;
     color_balance_rgb.validate()?;
     Ok(color_balance_rgb)
+}
+
+fn parse_selective_color_mixer(
+    params: &Map<String, Value>,
+) -> Result<SelectiveColorMixerV2, String> {
+    let selective_color_mixer: SelectiveColorMixerV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 selective_color_mixer is invalid: {error}"))?;
+    selective_color_mixer.validate()?;
+    Ok(selective_color_mixer)
 }
 
 fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixerV2, String> {
@@ -2288,6 +2458,7 @@ mod tests {
     use crate::color::mixer_render::{
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
+    use crate::render::cpu_edit_graph::apply_hsl_panel;
     use crate::render::cpu_edit_graph::apply_luma_levels;
 
     fn scene_curve_params() -> Value {
@@ -2375,6 +2546,41 @@ mod tests {
             "params": color_balance_rgb_params(),
             "process": "scene_referred_v2",
             "type": "color_balance_rgb"
+        })
+    }
+
+    fn selective_color_mixer_params() -> Value {
+        json!({
+            "hsl": {
+                "aquas": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "blues": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "greens": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "magentas": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "oranges": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "purples": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "reds": { "hue": 20, "luminance": 12, "saturation": 30 },
+                "yellows": { "hue": 0, "luminance": 0, "saturation": 0 }
+            },
+            "selectiveColorRangeControls": {
+                "aquas": { "centerHueDegrees": 180, "falloffSmoothness": 1.5, "widthDegrees": 60 },
+                "blues": { "centerHueDegrees": 225, "falloffSmoothness": 1.5, "widthDegrees": 60 },
+                "greens": { "centerHueDegrees": 115, "falloffSmoothness": 1.5, "widthDegrees": 90 },
+                "magentas": { "centerHueDegrees": 330, "falloffSmoothness": 1.5, "widthDegrees": 50 },
+                "oranges": { "centerHueDegrees": 25, "falloffSmoothness": 1.5, "widthDegrees": 45 },
+                "purples": { "centerHueDegrees": 280, "falloffSmoothness": 1.5, "widthDegrees": 55 },
+                "reds": { "centerHueDegrees": 358, "falloffSmoothness": 1.5, "widthDegrees": 35 },
+                "yellows": { "centerHueDegrees": 60, "falloffSmoothness": 1.5, "widthDegrees": 40 }
+            }
+        })
+    }
+
+    fn selective_color_mixer_node() -> Value {
+        json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": selective_color_mixer_params(),
+            "process": "scene_referred_v2",
+            "type": "selective_color_mixer"
         })
     }
 
@@ -2754,6 +2960,7 @@ mod tests {
         });
         document["nodes"]["color_balance_rgb"] = color_balance_rgb_node();
         document["nodes"]["luma_levels"] = luma_levels_node();
+        document["nodes"]["selective_color_mixer"] = selective_color_mixer_node();
         document
     }
 
@@ -2859,6 +3066,9 @@ mod tests {
         });
         expected["colorBalanceRgb"] = color_balance_rgb_params()["colorBalanceRgb"].clone();
         expected["levels"] = luma_levels_params()["levels"].clone();
+        expected["hsl"] = selective_color_mixer_params()["hsl"].clone();
+        expected["selectiveColorRangeControls"] =
+            selective_color_mixer_params()["selectiveColorRangeControls"].clone();
         expected["cameraProfileAmount"] = json!(100);
         expected["centré"] = json!(-9);
         expected["localContrastHaloGuard"] = json!(62);
@@ -3687,6 +3897,76 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid levels output range must fail");
         assert!(error.contains("outputBlack must be below outputWhite"));
+    }
+
+    #[test]
+    fn selective_color_mixer_compiler_is_strict_and_drives_native_pixel_output() {
+        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
+            .expect("valid selective-color document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("selective-color document compiles");
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        let input = Vec3::new(0.8, 0.14, 0.08);
+        let output = apply_hsl_panel(input, adjustments.global.hsl);
+        assert!(
+            output.distance(input) > 1.0e-4,
+            "selective-color node must alter an in-range red pixel: {output:?}"
+        );
+
+        let mut legacy_document = document_with_legacy(selective_color_mixer_params());
+        legacy_document["nodes"]
+            .as_object_mut()
+            .expect("node map")
+            .remove("selective_color_mixer");
+        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
+            .expect("pre-selective-color-node v2 document remains parseable");
+        let legacy_compiled = legacy
+            .into_render_adjustments()
+            .expect("legacy selective-color fields compile");
+        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
+        let legacy_output = apply_hsl_panel(input, legacy_adjustments.global.hsl);
+        assert!(
+            output.distance(legacy_output) <= 1.0e-6,
+            "node and legacy selective-color authority must remain pixel-identical"
+        );
+
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["selective_color_mixer"]["params"]["futureMixer"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned selective-color field must fail");
+        assert!(error.contains("unknown field `futureMixer`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["selective_color_mixer"]["params"]["hsl"]
+            .as_object_mut()
+            .expect("hsl object")
+            .remove("greens");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing selective-color range must fail");
+        assert!(error.contains("missing field `greens`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["selective_color_mixer"]["params"]["hsl"]["reds"]["saturation"] =
+            json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range selective-color value must fail");
+        assert!(error.contains("hsl.reds.saturation"));
+
+        let mut invalid_control = document_with_legacy(json!({}));
+        invalid_control["nodes"]["selective_color_mixer"]["params"]["selectiveColorRangeControls"]
+            ["reds"]["centerHueDegrees"] = json!(360);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_control)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid selective-color range control must fail");
+        assert!(error.contains("selectiveColorRangeControls.reds.centerHueDegrees"));
     }
 
     #[test]

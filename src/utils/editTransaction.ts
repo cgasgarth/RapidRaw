@@ -253,6 +253,7 @@ export const buildAdjustmentMutationOperations = (
       'channel_mixer',
       'color_balance_rgb',
       'luma_levels',
+      'selective_color_mixer',
       'scene_curve',
       'tone_equalizer',
       'point_color',
