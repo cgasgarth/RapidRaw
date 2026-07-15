@@ -36,7 +36,31 @@ describe('image-open hydration edit transaction', () => {
       historyIndex: 1,
       imageSession: session,
       lastEditApplicationReceipt: null,
+      navigatorPreviewArtifact: {
+        graphIdentity: 'prior-image-graph',
+        id: 'prior-image-navigator',
+        imageSessionId: session.id,
+        url: 'blob:stale-prior-image-navigator',
+      },
+      provisionalPreviewFrame: {
+        receipt: {
+          colorAssumption: 'encoded_srgb_vendor_preview',
+          frameGeneration: 1,
+          height: 1365,
+          imageSession: session.generation,
+          orientationApplied: true,
+          provisionalReason: 'stale prior-session frame',
+          quality: 'embeddedProvisional',
+          selectionGeneration: session.generation,
+          sourceKind: 'arw',
+          sourceRevision: 'source-revision-v1:prior-image',
+          width: 2048,
+        },
+        url: 'blob:stale-prior-image-provisional',
+      },
       selectedImage,
+      transformedOriginalUrl: 'blob:stale-prior-image-transform',
+      uncroppedAdjustedPreviewUrl: 'blob:stale-prior-image-uncropped',
     });
   });
 
@@ -90,6 +114,11 @@ describe('image-open hydration edit transaction', () => {
     expect(afterStale.adjustments).toBe(beforeStale.adjustments);
     expect(afterStale.history).toBe(beforeStale.history);
     expect(afterStale.lastEditApplicationReceipt).toBe(beforeStale.lastEditApplicationReceipt);
+    expect(afterStale.finalPreviewUrl).toBe(beforeStale.finalPreviewUrl);
+    expect(afterStale.navigatorPreviewArtifact).toBe(beforeStale.navigatorPreviewArtifact);
+    expect(afterStale.provisionalPreviewFrame).toBe(beforeStale.provisionalPreviewFrame);
+    expect(afterStale.transformedOriginalUrl).toBe(beforeStale.transformedOriginalUrl);
+    expect(afterStale.uncroppedAdjustedPreviewUrl).toBe(beforeStale.uncroppedAdjustedPreviewUrl);
 
     const request = buildImageOpenHydrationEditTransaction(
       afterStale,
@@ -103,5 +132,10 @@ describe('image-open hydration edit transaction', () => {
     expect(useEditorStore.getState().historyIndex).toBe(0);
     expect(useEditorStore.getState().historyCheckpoints).toEqual([]);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toBeNull();
+    expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
+    expect(useEditorStore.getState().navigatorPreviewArtifact).toBeNull();
+    expect(useEditorStore.getState().provisionalPreviewFrame).toBeNull();
+    expect(useEditorStore.getState().transformedOriginalUrl).toBeNull();
+    expect(useEditorStore.getState().uncroppedAdjustedPreviewUrl).toBeNull();
   });
 });
