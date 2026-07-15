@@ -319,3 +319,64 @@ pub fn clear_image_caches(state: tauri::State<AppState>) {
 pub fn clear_session_caches(state: tauri::State<AppState>) {
     RenderCaches::new(state.inner()).clear_session_caches();
 }
+
+#[cfg(all(test, feature = "tauri-test"))]
+mod command_tests {
+    use super::*;
+    use serde_json::{Value, json};
+    use tauri::{Manager, ipc::InvokeBody, webview::InvokeRequest};
+
+    fn invoke(
+        webview: &tauri::WebviewWindow<tauri::test::MockRuntime>,
+        command: &str,
+        body: Value,
+        callback: u32,
+    ) -> Value {
+        tauri::test::get_ipc_response(
+            webview,
+            InvokeRequest {
+                cmd: command.into(),
+                callback: tauri::ipc::CallbackFn(callback),
+                error: tauri::ipc::CallbackFn(callback + 1),
+                url: "tauri://localhost".parse().unwrap(),
+                body: InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        )
+        .unwrap_or_else(|error| panic!("{command} IPC failed: {error}"))
+        .deserialize()
+        .unwrap()
+    }
+
+    #[test]
+    fn production_cache_commands_resolve_through_render_capability() {
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .invoke_handler(tauri::generate_handler![
+                clear_image_caches,
+                clear_session_caches,
+            ])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let state = app.state::<AppState>();
+        state
+            .render()
+            .native_caches()
+            .insert_geometry(91, Arc::new(DynamicImage::new_rgb8(4, 4)));
+
+        assert_eq!(
+            invoke(&webview, "clear_image_caches", json!({}), 0),
+            Value::Null
+        );
+        assert!(state.render().native_caches().geometry(91).is_some());
+        assert_eq!(
+            invoke(&webview, "clear_session_caches", json!({}), 2),
+            Value::Null
+        );
+        assert!(state.render().native_caches().geometry(91).is_none());
+    }
+}

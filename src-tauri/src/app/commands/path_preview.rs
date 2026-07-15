@@ -91,7 +91,7 @@ pub(crate) fn generate_preview_for_path(
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut = render_adjustments["lutPath"]
         .as_str()
-        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+        .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         render_adjustments.as_ref(),
         &source_path_str,

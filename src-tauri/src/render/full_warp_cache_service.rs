@@ -111,14 +111,14 @@ pub(crate) fn get_cached_full_warped_image(
         .ok_or("No original image loaded")?;
     let identity = RenderArtifactIdentity::source_geometry(
         &loaded_image.artifact_source,
-        state.services.preview_session.current_generation(),
+        state.render().preview_session().current_generation(),
         crate::cache_utils::calculate_transform_hash(adjustments),
         loaded_image.artifact_source.source_fingerprint(),
         geometry_hash,
         loaded_image.image.width(),
         loaded_image.image.height(),
     );
-    let token = match state.services.full_warp_cache.begin(identity)? {
+    let token = match state.render().full_warp_cache().begin(identity)? {
         WarpLookup::Hit(image) => return Ok(image),
         WarpLookup::Miss(token) => *token,
     };
@@ -132,8 +132,8 @@ pub(crate) fn get_cached_full_warped_image(
             .into_owned();
     let warped_image = Arc::new(warped_image);
     state
-        .services
-        .full_warp_cache
+        .render()
+        .full_warp_cache()
         .publish(token, Arc::clone(&warped_image));
     Ok(warped_image)
 }

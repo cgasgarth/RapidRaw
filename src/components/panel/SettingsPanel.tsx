@@ -45,6 +45,7 @@ import {
 } from '../../schemas/ai/aiProviderSchemas';
 import { type CloudUsage, cloudUsageSchema } from '../../schemas/cloudUsageSchemas';
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
+import { clearNativeImageCaches } from '../../tauri/cacheManagement';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
@@ -289,7 +290,7 @@ const KeybindRow = ({
     <div className="flex justify-between items-center py-2">
       <UiText variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</UiText>
       <div className="flex items-center gap-1">
-        {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
+        {isConflicting && <span className="text-yellow-400 text-xs">!</span>}
         <button
           onClick={() => {
             onStartRecording(def.action);
@@ -851,7 +852,7 @@ export function SettingsPanel({
         key === 'rawPreprocessingSharpeningRadius' ||
         key === 'applyPreprocessingToNonRaws'
       ) {
-        await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
+        await clearNativeImageCaches();
       }
     }
   };
@@ -866,7 +867,7 @@ export function SettingsPanel({
 
     const patch = buildCaptureSharpeningProcessingPatch(preset);
     await onSettingsChange({ ...appSettings, ...patch });
-    await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
+    await clearNativeImageCaches();
   };
 
   const handleCaptureSharpeningPresetChangeVoid = (presetId: string) => {
@@ -886,7 +887,7 @@ export function SettingsPanel({
     };
     const nextSettings = { ...appSettings, ...settingsPatch, rawProcessingMode: mode };
     await onSettingsChange(nextSettings);
-    await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
+    await clearNativeImageCaches();
   };
 
   const handleRawProcessingModeChangeVoid = (mode: RawProcessingMode) => {

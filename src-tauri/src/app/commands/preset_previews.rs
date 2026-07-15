@@ -138,7 +138,7 @@ pub(crate) fn render_preset_preview_bytes(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+    let lut = lut_path.and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         render_adjustments.as_ref(),
         &loaded_image.path,
@@ -300,7 +300,7 @@ pub(crate) async fn generate_all_community_previews(
                 normalize_film_look_adjustments_for_render(&scaled_adjustments);
             let lut_path = render_adjustments["lutPath"].as_str();
             let lut =
-                lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+                lut_path.and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
                 render_adjustments.as_ref(),
                 &preset.name,

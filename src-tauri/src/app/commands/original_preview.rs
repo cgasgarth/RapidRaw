@@ -61,7 +61,7 @@ pub(crate) fn generate_original_transformed_preview(
         .ok_or("No original image loaded")?;
     validate_source_identity(&expected_image_path, &loaded_image.path)?;
     let session = OriginalPreviewSession {
-        generation: state.services.preview_session.current_generation(),
+        generation: state.render().preview_session().current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -90,10 +90,10 @@ pub(crate) fn generate_original_transformed_preview(
     let encoded = encode_jpeg_data_url(&transformed_image, 80)?;
 
     state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.services.preview_session.current_generation();
+            let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .services
                 .editor

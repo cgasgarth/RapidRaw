@@ -887,8 +887,8 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
         return false;
     };
     state
-        .services
-        .native_caches
+        .render()
+        .native_caches()
         .contains_decoded_revision(&revision)
 }
 
@@ -1090,9 +1090,9 @@ pub(crate) async fn load_image_prepared(
 ) -> Result<LoadImageResult, String> {
     let image_load_operation = if cancellation.is_none() {
         Some(if install_active {
-            state.services.preview_session.begin_image_load()
+            state.render().preview_session().begin_image_load()
         } else {
-            state.services.preview_session.current_operation()
+            state.render().preview_session().current_operation()
         })
     } else {
         None
@@ -1147,8 +1147,8 @@ pub(crate) async fn load_image_prepared(
     let fingerprint_cache = Arc::clone(&state.services.source_fingerprints);
 
     let cached_data = state
-        .services
-        .native_caches
+        .render()
+        .native_caches()
         .decoded(&raw_processing_cache_key);
 
     let mut is_offline_smart_preview = false;
@@ -1374,7 +1374,7 @@ pub(crate) async fn load_image_prepared(
 
             let arc_img = Arc::new(pristine_img);
 
-            state.services.native_caches.insert_decoded(
+            state.render().native_caches().insert_decoded(
                 raw_processing_cache_key,
                 arc_img.clone(),
                 exif_data_loaded.clone(),
@@ -1402,16 +1402,16 @@ pub(crate) async fn load_image_prepared(
             .as_ref()
             .expect("active image loads own a typed operation");
         if state
-            .services
-            .preview_session
+            .render()
+            .preview_session()
             .complete_image_load(operation, &path, || {
                 state
                     .services
                     .viewer_sampling
                     .install_session(operation.generation(), &path);
                 state
-                    .services
-                    .full_warp_cache
+                    .render()
+                    .full_warp_cache()
                     .install_session(operation.generation(), &artifact_source);
                 state.services.editor.install_image(LoadedImage {
                     path: path.clone(),
