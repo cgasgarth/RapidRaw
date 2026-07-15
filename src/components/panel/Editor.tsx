@@ -89,6 +89,7 @@ import {
   type SubMaskInteractionIdentity,
 } from '../../utils/subMaskInteractionEditTransaction';
 import { debounce } from '../../utils/timing';
+import { buildViewerBrushEditTransaction } from '../../utils/viewerBrushEditTransaction';
 import {
   applyWhiteBalancePickerHoverPreview,
   buildWhiteBalancePickerEditTransaction,
@@ -109,6 +110,7 @@ import type {
   ViewerAiMaskBoxCurrentContext,
   ViewerAiMaskBoxSessionKey,
 } from './editor/viewerAiMaskBoxInteractionController';
+import type { ViewerBrushCommitResult } from './editor/viewerBrushCommandAdapter';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
 import {
   resolveViewerInput,
@@ -212,7 +214,9 @@ export default function Editor({
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const editorImageSession = useEditorStore((s) => s.imageSession);
+  const editorImageSessionGeneration = useEditorStore((s) => s.imageSessionId);
   const adjustments = useEditorStore((s) => s.adjustments);
+  const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
   const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
@@ -761,6 +765,23 @@ export default function Editor({
       );
     },
     [applyEditTransaction, overlayGeometry.geometryEpoch, overlayGeometry.orientedSize, viewerSampleGraphRevision],
+  );
+  const handleBrushCommit = useCallback(
+    (command: ViewerBrushCommitResult) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildViewerBrushEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command,
+          `viewer-brush:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
   );
   const presentationDescriptor = useMemo(
     () =>
@@ -2320,6 +2341,7 @@ export default function Editor({
           >
             <Suspense fallback={null}>
               <ImageCanvas
+                adjustmentRevision={committedAdjustmentRevision}
                 appSettings={appSettings}
                 activeAiPatchContainerId={activeAiPatchContainerId}
                 activeAiSubMaskId={activeAiSubMaskId}
@@ -2328,6 +2350,9 @@ export default function Editor({
                 adjustments={renderAdjustments}
                 adjustmentGeometryRevision={adjustmentGeometryRevision}
                 brushSettings={brushSettings}
+                brushImageSessionId={
+                  editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`
+                }
                 crop={crop}
                 exportSoftProofRecipeId={exportSoftProofRecipeId}
                 exportSoftProofTransform={exportSoftProofTransform}
@@ -2353,6 +2378,7 @@ export default function Editor({
                 maskOverlayUrl={maskOverlayUrl}
                 maskOverlayRuntimeState={maskOverlayRuntimeState}
                 onAiMaskBoxCommit={handleAiMaskBoxCommit}
+                onBrushCommit={handleBrushCommit}
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
                 onLiveMaskPreview={handleLiveMaskPreview}
                 onParametricMaskTargetCommit={handleParametricMaskTargetCommit}

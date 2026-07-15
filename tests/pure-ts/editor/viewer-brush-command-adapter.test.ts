@@ -9,9 +9,13 @@ import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/r
 
 const current: ViewerBrushCurrentContext = {
   active: true,
+  adjustmentRevision: 12,
+  containerId: 'layer:brush',
+  containerKind: 'masks',
   geometryEpoch: 4,
   imageSessionId: 'image-session:12:a',
   maskId: 'mask:brush',
+  sourceIdentity: '/raws/alaska/a.arw',
   sourceRevision: 'graph:9',
   toolId: 'brush',
 };
@@ -36,8 +40,7 @@ const sample = (pointerId: number, x: number): ViewerBrushPointerSample => ({
 
 describe('viewer brush command adapter', () => {
   test('preserves a committed first stroke when successor props are still stale', () => {
-    const patches: Array<Partial<SubMask>> = [];
-    const adapter = createViewerBrushCommandAdapter((_id, patch) => patches.push(patch));
+    const adapter = createViewerBrushCommandAdapter();
     const controller = createViewerBrushInteractionController();
     const settings = { canonicalTool: 'brush' as const, feather: 0.5, imageSpaceSize: 24 };
     const commitContext = {
@@ -59,19 +62,20 @@ describe('viewer brush command adapter', () => {
     const result = adapter.commit(second, commitContext);
     expect(result?.summary).toMatchObject({ lastStrokeMode: 'erase', strokeCount: 2 });
     expect(result?.parameters.lines?.map((line) => line.tool)).toEqual(['brush', 'eraser']);
-    expect(patches).toHaveLength(2);
   });
 
   test('rejects a delayed command after image, source, geometry, mask, or tool invalidation', () => {
-    const adapter = createViewerBrushCommandAdapter(() => {
-      throw new Error('stale command must not mutate');
-    });
+    const adapter = createViewerBrushCommandAdapter();
     const controller = createViewerBrushInteractionController();
     controller.begin(current, sample(1, 10), { canonicalTool: 'brush', feather: 0.5, imageSpaceSize: 24 });
     const [command] = controller.end(current);
     if (command?.kind !== 'commit') throw new Error('expected commit');
     const successors = [
       { ...current, imageSessionId: 'image-session:13:b' },
+      { ...current, adjustmentRevision: 13 },
+      { ...current, containerId: 'layer:other' },
+      { ...current, containerKind: 'aiPatches' as const },
+      { ...current, sourceIdentity: '/raws/alaska/b.arw' },
       { ...current, sourceRevision: 'graph:10' },
       { ...current, geometryEpoch: 5 },
       { ...current, maskId: 'mask:other' },
