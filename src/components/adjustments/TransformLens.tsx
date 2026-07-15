@@ -14,7 +14,11 @@ import { TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';
 import {
   buildLensCorrectionEditTransaction,
+  buildLensProfileEditTransaction,
+  isCurrentLensCorrectionIdentity,
+  isCurrentLensProfileRequest,
   type LensCorrectionCommitIdentity,
+  type LensProfilePatch,
   type ManualLensCorrectionAdjustment,
 } from '../../utils/lensCorrectionEditTransaction';
 import { parseExifMetadataNumber } from '../../utils/metadataPanelContracts';
@@ -122,6 +126,7 @@ export default function TransformLens({
   );
   const lensCorrectionCommitIdentityRef = useRef(lensCorrectionCommitIdentity);
   lensCorrectionCommitIdentityRef.current = lensCorrectionCommitIdentity;
+  const lensProfileRequestGenerationRef = useRef(0);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(
@@ -192,6 +197,29 @@ export default function TransformLens({
     };
   };
 
+  const lensProfileRequestIsCurrent = (identity: LensCorrectionCommitIdentity, requestGeneration: number) =>
+    isCurrentLensProfileRequest(
+      useEditorStore.getState(),
+      identity,
+      requestGeneration,
+      lensProfileRequestGenerationRef.current,
+    );
+
+  const commitLensProfilePatch = (
+    patch: LensProfilePatch,
+    identity = lensCorrectionCommitIdentityRef.current,
+  ): boolean => {
+    if (identity === null || !isCurrentLensCorrectionIdentity(useEditorStore.getState(), identity)) return false;
+    const result = applyEditTransaction(
+      buildLensProfileEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
+    );
+    lensCorrectionCommitIdentityRef.current = {
+      ...identity,
+      adjustmentRevision: result.nextAdjustmentRevision,
+    };
+    return true;
+  };
+
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> =>
     invoke<LensDistortionParams | null>(Invokes.GetLensDistortionParams, {
       aperture,
@@ -201,34 +229,53 @@ export default function TransformLens({
       model,
     });
 
-  const applyLensProfile = async (maker: string, model: string, mode: LensCorrectionMode) => {
+  const applyLensProfile = async (
+    maker: string,
+    model: string,
+    mode: LensCorrectionMode,
+    identity: LensCorrectionCommitIdentity,
+    requestGeneration: number,
+  ) => {
     try {
       const lensDistortionParams = await fetchDistortionParams(maker, model);
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        lensCorrectionMode: mode,
-        lensDistortionParams,
-        lensMaker: maker,
-        lensModel: model,
-      }));
+      if (!lensProfileRequestIsCurrent(identity, requestGeneration)) return;
+      if (
+        !commitLensProfilePatch(
+          { lensCorrectionMode: mode, lensDistortionParams, lensMaker: maker, lensModel: model },
+          identity,
+        )
+      )
+        return;
       setDetectionStatus(lensDistortionParams === null ? 'not_found' : 'success');
     } catch (error) {
+      if (!lensProfileRequestIsCurrent(identity, requestGeneration)) return;
       setDetectionStatus('error');
       console.error('Failed to apply lens profile', error);
     }
   };
 
   const handleModeChange = (mode: LensCorrectionMode) => {
-    updateAdjustment('lensCorrectionMode', mode);
+    const requestGeneration = ++lensProfileRequestGenerationRef.current;
     if (mode === 'auto') {
-      void handleAutoDetect();
+      const identity = lensCorrectionCommitIdentityRef.current;
+      if (identity !== null) void handleAutoDetect(identity, requestGeneration);
+      return;
     }
+    commitLensProfilePatch({ lensCorrectionMode: mode });
   };
 
-  const handleAutoDetect = async () => {
+  const handleAutoDetect = async (
+    identity = lensCorrectionCommitIdentityRef.current,
+    requestGeneration = ++lensProfileRequestGenerationRef.current,
+  ) => {
+    if (identity === null) return;
     const exifMaker = String(getExifValue(selectedExif, 'Make') ?? '');
     const exifModel = String(getExifValue(selectedExif, 'LensModel') ?? '');
     if (!exifModel) {
+      commitLensProfilePatch(
+        { lensCorrectionMode: 'auto', lensDistortionParams: null, lensMaker: null, lensModel: null },
+        identity,
+      );
       setDetectionStatus('not_found');
       return;
     }
@@ -241,38 +288,39 @@ export default function TransformLens({
           model: exifModel,
         }),
       );
+      if (!lensProfileRequestIsCurrent(identity, requestGeneration)) return;
       if (detected === null) {
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          lensCorrectionMode: 'auto',
-          lensDistortionParams: null,
-          lensMaker: null,
-          lensModel: null,
-        }));
+        commitLensProfilePatch(
+          { lensCorrectionMode: 'auto', lensDistortionParams: null, lensMaker: null, lensModel: null },
+          identity,
+        );
         setDetectionStatus('not_found');
         return;
       }
-      await applyLensProfile(detected.maker, detected.model, 'auto');
+      await applyLensProfile(detected.maker, detected.model, 'auto', identity, requestGeneration);
     } catch (error) {
+      if (!lensProfileRequestIsCurrent(identity, requestGeneration)) return;
       setDetectionStatus('error');
       console.error('Failed to detect lens profile', error);
     }
   };
 
   const handleMakerChange = (maker: string) => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
+    lensProfileRequestGenerationRef.current += 1;
+    commitLensProfilePatch({
       lensCorrectionMode: 'manual',
       lensDistortionParams: null,
       lensMaker: maker,
       lensModel: null,
-    }));
+    });
     setDetectionStatus('idle');
   };
 
   const handleModelChange = (model: string) => {
     if (!adjustments.lensMaker) return;
-    void applyLensProfile(adjustments.lensMaker, model, 'manual');
+    const identity = lensCorrectionCommitIdentityRef.current;
+    const requestGeneration = ++lensProfileRequestGenerationRef.current;
+    if (identity !== null) void applyLensProfile(adjustments.lensMaker, model, 'manual', identity, requestGeneration);
   };
 
   const makerOptions = useMemo(() => toOptions(makers), [makers]);
