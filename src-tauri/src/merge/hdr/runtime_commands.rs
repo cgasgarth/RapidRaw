@@ -166,7 +166,7 @@ pub(crate) async fn merge_hdr(
     {
         return Err("hdr_apply_blocked_unresolved_deghost_ownership".to_string());
     }
-    let job = state.computational_merge_jobs.begin(
+    let job = state.services.computational_jobs.begin(
         crate::merge::computational_job::ComputationalMergeFamily::Hdr,
         "decode",
         3,
@@ -181,7 +181,7 @@ pub(crate) async fn merge_hdr(
 
         let loaded_items = load_hdr_merge_items(&paths, &app_handle, true)?;
         job.cancellation_token.checkpoint()?;
-        state.computational_merge_jobs.publish_progress(
+        state.services.computational_jobs.publish_progress(
             &job.job_id,
             "merge",
             1,
@@ -213,7 +213,7 @@ pub(crate) async fn merge_hdr(
         )?;
         let hdr_merged = native.scene_linear;
         job.cancellation_token.checkpoint()?;
-        state.computational_merge_jobs.publish_progress(
+        state.services.computational_jobs.publish_progress(
             &job.job_id,
             "preview",
             2,
@@ -279,7 +279,7 @@ pub(crate) async fn merge_hdr(
             .hdr
             .publish_merge(&accepted, runtime_plan, source_refs, hdr_merged)
             .map_err(str::to_string)?;
-        state.computational_merge_jobs.publish_progress(
+        state.services.computational_jobs.publish_progress(
             &job.job_id,
             "ready_to_publish",
             3,
@@ -297,7 +297,10 @@ pub(crate) async fn merge_hdr(
         Ok(())
     }
     .await;
-    state.computational_merge_jobs.settle(&job.job_id, result)
+    state
+        .services
+        .computational_jobs
+        .settle(&job.job_id, result)
 }
 
 fn build_hdr_apply_source_roles(source_refs: &[PendingHdrSourceRef]) -> Vec<HdrApplySourceRole> {

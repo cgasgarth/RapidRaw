@@ -133,6 +133,8 @@ pub struct AppServices {
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
     pub(crate) focus_stack_results: Arc<crate::merge::focus_stack::job::FocusStackResultService>,
+    pub(crate) computational_jobs:
+        Arc<crate::merge::computational_job::ComputationalMergeJobRegistry>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
     pub(crate) burst_sr:
         Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
@@ -172,6 +174,7 @@ impl AppServices {
             lens_database: Arc::default(),
             focus_stack: Arc::default(),
             focus_stack_results: Arc::default(),
+            computational_jobs: Arc::default(),
             hdr: Arc::default(),
             burst_sr: Arc::default(),
             panorama: Arc::default(),
@@ -196,6 +199,10 @@ impl AppServices {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::merge::computational_job::{
+        ComputationalMergeFamily, ComputationalMergeJobId, ComputationalMergeJobStatus,
+    };
+    use std::sync::Barrier;
     use std::thread;
 
     #[test]
@@ -227,5 +234,94 @@ mod tests {
         for handle in handles {
             handle.join().unwrap();
         }
+    }
+
+    #[test]
+    fn computational_job_service_keeps_concurrent_families_independent() {
+        let services = Arc::new(AppServices::new());
+        let hdr = services
+            .computational_jobs
+            .begin(ComputationalMergeFamily::Hdr, "decode", 2, 2)
+            .unwrap();
+        let focus = services
+            .computational_jobs
+            .begin(ComputationalMergeFamily::FocusStack, "align", 2, 2)
+            .unwrap();
+        let super_resolution = services
+            .computational_jobs
+            .begin(ComputationalMergeFamily::SuperResolution, "register", 2, 2)
+            .unwrap();
+        let barrier = Arc::new(Barrier::new(4));
+
+        let cancel_hdr = {
+            let services = Arc::clone(&services);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                services
+                    .computational_jobs
+                    .cancel_active_family(ComputationalMergeFamily::Hdr)
+            })
+        };
+        let advance_focus = {
+            let services = Arc::clone(&services);
+            let barrier = Arc::clone(&barrier);
+            let job_id = focus.job_id.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                services
+                    .computational_jobs
+                    .publish_progress(&job_id, "merge", 1, 2, 1, None)
+            })
+        };
+        let finish_super_resolution = {
+            let services = Arc::clone(&services);
+            let barrier = Arc::clone(&barrier);
+            let job_id = super_resolution.job_id;
+            thread::spawn(move || {
+                barrier.wait();
+                services.computational_jobs.finish(&job_id)
+            })
+        };
+
+        barrier.wait();
+        assert!(cancel_hdr.join().unwrap().unwrap());
+        assert_eq!(advance_focus.join().unwrap().unwrap().fraction, 0.5);
+        assert!(finish_super_resolution.join().unwrap().unwrap());
+        assert!(hdr.cancellation_token.checkpoint().is_err());
+        assert!(!services.computational_jobs.finish(&hdr.job_id).unwrap());
+        assert_eq!(
+            services
+                .computational_jobs
+                .progress(&hdr.job_id)
+                .unwrap()
+                .status,
+            ComputationalMergeJobStatus::Cancelled
+        );
+        assert_eq!(
+            services
+                .computational_jobs
+                .cancel_active_family(ComputationalMergeFamily::Hdr)
+                .unwrap_err(),
+            "computational_merge_job_not_found"
+        );
+        assert_eq!(
+            services
+                .computational_jobs
+                .cancel(&ComputationalMergeJobId::from_string(
+                    "stale-job-id".to_string()
+                ))
+                .unwrap_err(),
+            "computational_merge_job_not_found"
+        );
+        assert_eq!(
+            services
+                .computational_jobs
+                .progress(&focus.job_id)
+                .unwrap()
+                .status,
+            ComputationalMergeJobStatus::Active
+        );
+        assert!(services.computational_jobs.finish(&focus.job_id).unwrap());
     }
 }
