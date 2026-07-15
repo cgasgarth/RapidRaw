@@ -72,6 +72,7 @@ import {
   isEditorPixelInspectionZoom,
   resolveEditorZoom,
 } from '../../utils/editorZoom';
+import { buildInitialMaskDrawEditTransaction } from '../../utils/initialMaskDrawEditTransaction';
 import {
   buildMaskOverlayInvokePayload,
   buildMaskOverlayRequestIdentity,
@@ -110,6 +111,7 @@ import ImageCanvas from './editor/ImageCanvas';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
 import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
+import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
 import {
   isViewerDrag,
   resolveViewerInput,
@@ -737,6 +739,24 @@ export default function Editor({
       viewerSampleGraphRevision,
     ],
   );
+  const handleInitialMaskDrawCommit = useCallback(
+    (command: ViewerInitialMaskDrawCommand) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildInitialMaskDrawEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command.key,
+          command.parameters,
+          crypto.randomUUID(),
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
 
   const zoomToCenter = useCallback(
     (newScale: number, duration: number) => {
@@ -1029,7 +1049,12 @@ export default function Editor({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.target instanceof Element && e.target.closest('[data-canvas-pointer-owner="compare-divider"]')) return;
+      const declaredPointerOwner =
+        e.target instanceof Element
+          ? e.target.closest('[data-canvas-pointer-owner]')?.getAttribute('data-canvas-pointer-owner')
+          : null;
+      if (declaredPointerOwner === 'compare-divider') return;
+      if (declaredPointerOwner === 'active-tool' && e.pointerType !== 'touch' && e.button !== 1) return;
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
       activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       pointerStarts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1087,14 +1112,14 @@ export default function Editor({
       if (!activePointers.current.has(e.pointerId)) return;
       activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      const isViewerOwner = pointerOwners.current.get(e.pointerId) === 'viewer-pan';
       const start = pointerStarts.current.get(e.pointerId);
-      if (start && isViewerDrag(start, { x: e.clientX, y: e.clientY })) {
+      if (isViewerOwner && start && isViewerDrag(start, { x: e.clientX, y: e.clientY })) {
         draggedPointers.current.add(e.pointerId);
         suppressDoubleClickUntilRef.current = performance.now() + 600;
         setIsViewerGestureDragging(true);
       }
 
-      const isViewerOwner = pointerOwners.current.get(e.pointerId) === 'viewer-pan';
       if (
         activePointers.current.size === 1 &&
         lastPanPos.current &&
@@ -2211,6 +2236,7 @@ export default function Editor({
                 if (!id) return;
                 void handleGenerateAiMask(id, start, end);
               }}
+              onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
               onLiveMaskPreview={handleLiveMaskPreview}
               onQuickErase={(id, start, end) => {
                 void handleQuickErase(id, start, end);
