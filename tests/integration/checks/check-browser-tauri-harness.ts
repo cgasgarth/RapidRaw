@@ -941,6 +941,17 @@ try {
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
+  if (browserScenario === 'viewport-controller') {
+    await verifyViewportInteractionController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected viewport-controller browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('viewer viewport browser controller proof passed');
+    process.exit(0);
+  }
   const commandOverflowButton = page.getByTestId('editor-command-overflow-trigger');
   await commandOverflowButton.click();
   const splitCompareButton = page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u });
@@ -1961,6 +1972,100 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await assertSingleFullFrameOutput(page, sourceIdentity);
 
   await writeBoundsReport('passed');
+}
+
+async function verifyViewportInteractionController(page: Page): Promise<void> {
+  const previewPanel = page.getByTestId('editor-image-preview-panel');
+  const zoomSelector = page.getByTestId('viewer-footer-zoom-select');
+  await zoomSelector.selectOption('2');
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-200', width: 2048 });
+
+  await page.keyboard.press('r');
+  await previewPanel.waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() => document.querySelector('[data-viewer-active-tool="crop"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  const bounds = await previewPanel.boundingBox();
+  if (!bounds) throw new Error('Viewport controller proof could not resolve the preview bounds.');
+  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  const positionBefore = Number(await previewPanel.getAttribute('data-editor-transform-position-x'));
+
+  await page.keyboard.down('Space');
+  await page.waitForFunction(() => document.querySelector('[data-viewer-temporary-hand="true"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 72, center.y + 24, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up('Space');
+  await page.waitForFunction(
+    () => document.querySelector('[data-viewer-gesture-state="idle"][data-viewer-temporary-hand="false"]') !== null,
+    undefined,
+    { timeout: 10_000 },
+  );
+  const positionAfter = Number(await previewPanel.getAttribute('data-editor-transform-position-x'));
+  if (!Number.isFinite(positionBefore) || !Number.isFinite(positionAfter) || positionAfter <= positionBefore + 20) {
+    throw new Error(
+      `Temporary-hand crop pan did not move the visible frame (${String(positionBefore)} -> ${String(positionAfter)}).`,
+    );
+  }
+
+  await page.keyboard.down('Space');
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 12, center.y + 8);
+  await previewPanel.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse' });
+  await page.waitForFunction(() => document.querySelector('[data-viewer-gesture-state="idle"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  await page.mouse.up();
+  await page.keyboard.up('Space');
+
+  await page.keyboard.down('Space');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('[data-viewer-temporary-hand="false"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  await page.keyboard.up('Space');
+  await page.keyboard.down('Space');
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await page.waitForFunction(() => document.querySelector('[data-viewer-temporary-hand="false"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  await page.keyboard.up('Space');
+
+  await page.keyboard.press('r');
+  await zoomSelector.selectOption('2');
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-before-resize', width: 2048 });
+  const layoutEpochBefore = Number(await previewPanel.getAttribute('data-editor-layout-epoch'));
+  await page.setViewportSize({ height: 760, width: 1200 });
+  await page.waitForFunction(
+    (previousEpoch) =>
+      Number(
+        document.querySelector('[data-testid="editor-image-preview-panel"]')?.getAttribute('data-editor-layout-epoch'),
+      ) > previousEpoch,
+    layoutEpochBefore,
+    { timeout: 10_000 },
+  );
+  const resizedTransform = await previewPanel.evaluate((element) => ({
+    mode: element.getAttribute('data-editor-zoom-mode'),
+    resolvedScale: Number(element.getAttribute('data-editor-resolved-transform-scale')),
+    scale: Number(element.getAttribute('data-editor-transform-scale')),
+    x: Number(element.getAttribute('data-editor-transform-position-x')),
+    y: Number(element.getAttribute('data-editor-transform-position-y')),
+  }));
+  if (
+    resizedTransform.mode !== 'ratio' ||
+    !Object.values(resizedTransform).every((value) => typeof value === 'string' || Number.isFinite(value)) ||
+    Math.abs(resizedTransform.scale - resizedTransform.resolvedScale) > 0.001
+  ) {
+    throw new Error(`Resize broke viewport transform authority: ${JSON.stringify(resizedTransform)}.`);
+  }
+
+  await page.setViewportSize(viewport);
+  await zoomSelector.selectOption('fit');
+  await assertRenderedImageGeometry(page, { height: 397, label: 'viewport-controller-reset-fit', width: 529.33 });
 }
 
 async function assertPositionedZoomOutput(

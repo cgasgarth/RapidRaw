@@ -43,17 +43,7 @@ import {
   updateCropDraft,
 } from '../../utils/cropUtils';
 import { resolveComparePaneLayout } from '../../utils/editorCompare';
-import {
-  applyPointerOverscrollResistance,
-  applyWheelPanResistance,
-  getRecentPanVelocity,
-  getWheelPanDelta,
-  getWheelZoomExponent,
-  getWheelZoomMultiplier,
-  MAX_PAN_VELOCITY_SAMPLES,
-  PAN_VELOCITY_THRESHOLD,
-  WHEEL_SNAP_DELAY_MS,
-} from '../../utils/editorGestureMath';
+import { WHEEL_SNAP_DELAY_MS } from '../../utils/editorGestureMath';
 import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../utils/editorOverlayGeometry';
 import { createEditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
 import { getEditorPreviewDimensions } from '../../utils/editorPreviewDimensions';
@@ -114,12 +104,9 @@ import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
 import {
-  isViewerDrag,
   resolveViewerInput,
-  resolveViewerWheelIntent,
   shouldActivateTemporaryHand,
   type ViewerActiveTool,
-  type ViewerGestureOwner,
   type ViewerPointerType,
 } from './editor/viewerInputResolver';
 import type { ViewerParametricMaskTargetCommand } from './editor/viewerParametricMaskTargetInteractionController';
@@ -128,6 +115,11 @@ import {
   getViewerLightsOutLabel,
   resolveViewerFramePresentation,
 } from './editor/viewerPresentationContracts';
+import {
+  createViewerViewportInteractionController,
+  type ViewerViewportCurrentContext,
+  type ViewerViewportTransition,
+} from './editor/viewerViewportInteractionController';
 import { Mask, type SubMask } from './right/layers/Masks';
 
 interface TransformController {
@@ -323,15 +315,12 @@ export default function Editor({
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
-  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pointerOwners = useRef<Map<number, ViewerGestureOwner>>(new Map());
-  const pointerStarts = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const draggedPointers = useRef<Set<number>>(new Set());
-  const lastPanPos = useRef<{ x: number; y: number } | null>(null);
-  const lastPinch = useRef<{ dist: number; midX: number; midY: number } | null>(null);
-  const panVelocityHistory = useRef<{ x: number; y: number; t: number }[]>([]);
-  const isMiddleMousePanning = useRef(false);
-  const hadViewerPanGesture = useRef(false);
+  const viewportInteractionControllerRef = useRef<ReturnType<typeof createViewerViewportInteractionController> | null>(
+    null,
+  );
+  if (viewportInteractionControllerRef.current === null) {
+    viewportInteractionControllerRef.current = createViewerViewportInteractionController();
+  }
   const [isTemporaryHand, setIsTemporaryHand] = useState(false);
   const [isViewerGestureDragging, setIsViewerGestureDragging] = useState(false);
   const [viewportLayoutEpoch, setViewportLayoutEpoch] = useState(0);
@@ -970,18 +959,111 @@ export default function Editor({
     if (wheelSnapTimeout.current) clearTimeout(wheelSnapTimeout.current);
   }, [animationFrameId, physicsFrameId, wheelSnapTimeout]);
 
+  const getViewportInteractionContext = useCallback((): ViewerViewportCurrentContext => {
+    const container = imageContainerRef.current;
+    const rect = container?.getBoundingClientRect();
+    return {
+      activeTool: activeViewerTool,
+      geometryEpoch: viewportLayoutEpochRef.current,
+      getBounds: getTransformBounds,
+      imageSessionId: editorImageSession?.id ?? `editor-image-session:${selectedImage?.path ?? 'none'}`,
+      inputMode: appSettings?.canvasInputMode === 'trackpad' ? 'trackpad' : 'mouse',
+      maxScale: maxScaleRef.current,
+      minScale: minScaleRef.current,
+      sourceIdentity: selectedImage?.path ?? '',
+      sourceRevision: viewerSampleGraphRevision,
+      surface: {
+        height: container?.clientHeight ?? 0,
+        left: rect?.left ?? 0,
+        top: rect?.top ?? 0,
+        width: container?.clientWidth ?? 0,
+      },
+      transform: transformStateRef.current,
+      zoomSpeedMultiplier: appSettings?.zoomSpeedMultiplier ?? 1,
+    };
+  }, [
+    activeViewerTool,
+    appSettings?.canvasInputMode,
+    appSettings?.zoomSpeedMultiplier,
+    editorImageSession?.id,
+    getTransformBounds,
+    maxScaleRef,
+    minScaleRef,
+    selectedImage?.path,
+    transformStateRef,
+    viewerSampleGraphRevision,
+  ]);
+
+  const applyViewportTransition = useCallback(
+    (transition: ViewerViewportTransition) => {
+      if (transition.cancelMotion) cancelViewerMotion();
+      if (transition.focalPoint) {
+        captureFocalPoint({ x: transition.focalPoint.x, y: transition.focalPoint.y }, transition.focalPoint.source);
+      }
+      if (transition.transform) {
+        applyTransform(transition.transform.positionX, transition.transform.positionY, transition.transform.scale);
+      }
+      if (transition.semanticZoomScale !== null) synchronizeGestureZoomMode(transition.semanticZoomScale);
+      if (transition.physics) startPhysicsLoop(transition.physics.vx, transition.physics.vy);
+      if (transition.wheelSnap) {
+        if (wheelSnapTimeout.current) clearTimeout(wheelSnapTimeout.current);
+        wheelSnapTimeout.current = window.setTimeout(() => startPhysicsLoop(0, 0), WHEEL_SNAP_DELAY_MS);
+      }
+      if (transition.dragged) suppressDoubleClickUntilRef.current = performance.now() + 600;
+      setIsPanningState(transition.state.isPanning);
+      setIsMiddleMousePanningState(transition.state.isMiddleMousePanning);
+      setIsViewerGestureDragging(transition.state.isDragging);
+      setIsTemporaryHand(transition.state.temporaryHand);
+    },
+    [
+      applyTransform,
+      cancelViewerMotion,
+      captureFocalPoint,
+      setIsMiddleMousePanningState,
+      setIsPanningState,
+      startPhysicsLoop,
+      synchronizeGestureZoomMode,
+      wheelSnapTimeout,
+    ],
+  );
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        applyViewportTransition(
+          viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+            reason: 'escape',
+            type: 'cancel',
+          }),
+        );
+        return;
+      }
       const focusContext = isEditableKeyboardTarget(event.target) ? 'editable' : 'viewer';
       if (!shouldActivateTemporaryHand({ focusContext, key: event.key })) return;
       event.preventDefault();
-      setIsTemporaryHand(true);
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          active: true,
+          type: 'temporary-hand',
+        }),
+      );
     };
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key !== ' ') return;
-      setIsTemporaryHand(false);
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          active: false,
+          type: 'temporary-hand',
+        }),
+      );
     };
-    const handleWindowBlur = () => setIsTemporaryHand(false);
+    const handleWindowBlur = () =>
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          reason: 'blur',
+          type: 'cancel',
+        }),
+      );
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
@@ -990,8 +1072,14 @@ export default function Editor({
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
       window.removeEventListener('blur', handleWindowBlur);
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          reason: 'unmount',
+          type: 'cancel',
+        }),
+      );
     };
-  }, []);
+  }, [applyViewportTransition, getViewportInteractionContext]);
 
   useEffect(() => {
     const container = imageContainerRef.current;
@@ -999,74 +1087,25 @@ export default function Editor({
 
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
-      cancelViewerMotion();
-
-      const isTrackpad = appSettings?.canvasInputMode === 'trackpad';
-      const zoomSpeedMult = getWheelZoomMultiplier(isTrackpad, appSettings?.zoomSpeedMultiplier ?? 1);
-      const isZoomIntent =
-        resolveViewerWheelIntent({
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          altKey: e.altKey,
+          clientX: e.clientX,
+          clientY: e.clientY,
           ctrlKey: e.ctrlKey,
-          inputMode: isTrackpad ? 'trackpad' : 'mouse',
-        }) === 'zoom';
-
-      if (isZoomIntent) {
-        const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const exponent = getWheelZoomExponent(e, zoomSpeedMult);
-
-        let newScale = transformStateRef.current.scale * Math.exp(-exponent);
-        newScale = Math.max(minScaleRef.current, Math.min(maxScaleRef.current, newScale));
-
-        const ratio = newScale / transformStateRef.current.scale;
-        const newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio;
-        const newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio;
-
-        const bounded = clampToBounds(newX, newY, newScale);
-        applyTransform(bounded.x, bounded.y, bounded.scale);
-        synchronizeGestureZoomMode(bounded.scale);
-        captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
-      } else {
-        if (transformStateRef.current.scale <= 1.01) return;
-
-        const { positionX: curX, positionY: curY, scale } = transformStateRef.current;
-        const bounds = getTransformBounds(scale);
-
-        const { dx, dy } = getWheelPanDelta(e, isTrackpad);
-
-        const { x: newX, y: newY } = applyWheelPanResistance(curX - dx, curY - dy, bounds);
-
-        applyTransform(newX, newY, scale);
-        const rect = container.getBoundingClientRect();
-        captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
-
-        if (wheelSnapTimeout.current) clearTimeout(wheelSnapTimeout.current);
-        wheelSnapTimeout.current = window.setTimeout(() => {
-          startPhysicsLoop(0, 0);
-        }, WHEEL_SNAP_DELAY_MS);
-      }
+          deltaX: e.deltaX,
+          deltaY: e.deltaY,
+          shiftKey: e.shiftKey,
+          type: 'wheel',
+        }),
+      );
     };
 
     container.addEventListener('wheel', handleNativeWheel, { passive: false });
     return () => {
       container.removeEventListener('wheel', handleNativeWheel);
     };
-  }, [
-    applyTransform,
-    captureFocalPoint,
-    cancelViewerMotion,
-    clampToBounds,
-    getTransformBounds,
-    maxScaleRef,
-    minScaleRef,
-    startPhysicsLoop,
-    synchronizeGestureZoomMode,
-    transformStateRef,
-    wheelSnapTimeout,
-    appSettings?.canvasInputMode,
-    appSettings?.zoomSpeedMultiplier,
-  ]);
+  }, [applyViewportTransition, getViewportInteractionContext]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1075,202 +1114,82 @@ export default function Editor({
           ? e.target.closest('[data-canvas-pointer-owner]')?.getAttribute('data-canvas-pointer-owner')
           : null;
       if (declaredPointerOwner === 'compare-divider') return;
-      if (declaredPointerOwner === 'active-tool' && e.pointerType !== 'touch' && e.button !== 1) return;
+      if (declaredPointerOwner === 'active-tool' && e.pointerType !== 'touch' && e.button !== 1 && !isTemporaryHand)
+        return;
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      pointerStarts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const resolution = resolveViewerInput({
-        activeTool: activeViewerTool,
+      const transition = viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
         button: e.button,
-        focusContext: 'viewer',
-        isDragging: false,
-        isTemporaryHand,
-        pointerCount: activePointers.current.size,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        pointerId: e.pointerId,
         pointerType: viewerPointerType(e.pointerType),
-        zoomed: transformStateRef.current.scale > 1.01,
+        time: performance.now(),
+        type: 'pointerdown',
       });
-      pointerOwners.current.set(e.pointerId, resolution.owner);
-      cancelViewerMotion();
-
-      if (resolution.owner !== 'viewer-pan') return;
-
-      hadViewerPanGesture.current = true;
-      panVelocityHistory.current = [];
-      const rect = e.currentTarget.getBoundingClientRect();
-      captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
-      if (resolution.reason === 'middle-button') {
-        isMiddleMousePanning.current = true;
-        setIsMiddleMousePanningState(true);
-      }
-
-      if (activePointers.current.size === 1) {
-        lastPanPos.current = { x: e.clientX, y: e.clientY };
-      } else if (activePointers.current.size === 2) {
-        const pts = Array.from(activePointers.current.values());
-        const [firstPointer, secondPointer] = pts;
-        if (!firstPointer || !secondPointer) return;
-        lastPinch.current = {
-          dist: Math.hypot(firstPointer.x - secondPointer.x, firstPointer.y - secondPointer.y),
-          midX: (firstPointer.x + secondPointer.x) / 2,
-          midY: (firstPointer.y + secondPointer.y) / 2,
-        };
-      }
-
-      if (resolution.shouldCapturePointer) e.currentTarget.setPointerCapture(e.pointerId);
+      applyViewportTransition(transition);
+      if (transition.capturePointerId === e.pointerId) e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [
-      activeViewerTool,
-      cancelViewerMotion,
-      captureFocalPoint,
-      isTemporaryHand,
-      setIsMiddleMousePanningState,
-      transformStateRef,
-    ],
+    [applyViewportTransition, getViewportInteractionContext, isTemporaryHand],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!activePointers.current.has(e.pointerId)) return;
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const isViewerOwner = pointerOwners.current.get(e.pointerId) === 'viewer-pan';
-      const start = pointerStarts.current.get(e.pointerId);
-      if (isViewerOwner && start && isViewerDrag(start, { x: e.clientX, y: e.clientY })) {
-        draggedPointers.current.add(e.pointerId);
-        suppressDoubleClickUntilRef.current = performance.now() + 600;
-        setIsViewerGestureDragging(true);
-      }
-
-      if (
-        activePointers.current.size === 1 &&
-        lastPanPos.current &&
-        isViewerOwner &&
-        draggedPointers.current.has(e.pointerId)
-      ) {
-        setIsPanningState(true);
-        panVelocityHistory.current.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-        if (panVelocityHistory.current.length > MAX_PAN_VELOCITY_SAMPLES) panVelocityHistory.current.shift();
-
-        let dx = e.clientX - lastPanPos.current.x;
-        let dy = e.clientY - lastPanPos.current.y;
-        lastPanPos.current = { x: e.clientX, y: e.clientY };
-
-        const bounds = getTransformBounds(transformStateRef.current.scale);
-        const curX = transformStateRef.current.positionX;
-        const curY = transformStateRef.current.positionY;
-
-        ({ dx, dy } = applyPointerOverscrollResistance(dx, dy, { x: curX, y: curY }, bounds));
-
-        applyTransform(curX + dx, curY + dy, transformStateRef.current.scale);
-        const rect = imageContainerRef.current?.getBoundingClientRect();
-        if (rect) captureFocalPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, 'pointer');
-      } else if (activePointers.current.size === 2 && lastPinch.current) {
-        setIsPanningState(true);
-        setIsViewerGestureDragging(true);
-        suppressDoubleClickUntilRef.current = performance.now() + 600;
-        const pts = Array.from(activePointers.current.values());
-        const [firstPointer, secondPointer] = pts;
-        if (!firstPointer || !secondPointer) return;
-        const dist = Math.hypot(firstPointer.x - secondPointer.x, firstPointer.y - secondPointer.y);
-        const midX = (firstPointer.x + secondPointer.x) / 2;
-        const midY = (firstPointer.y + secondPointer.y) / 2;
-
-        const distDelta = dist / lastPinch.current.dist;
-        let newScale = transformStateRef.current.scale * distDelta;
-        newScale = Math.max(minScaleRef.current, Math.min(maxScaleRef.current, newScale));
-
-        const rect = imageContainerRef.current?.getBoundingClientRect();
-        if (rect) {
-          const mouseX = midX - rect.left;
-          const mouseY = midY - rect.top;
-          const ratio = newScale / transformStateRef.current.scale;
-
-          const panX = midX - lastPinch.current.midX;
-          const panY = midY - lastPinch.current.midY;
-
-          const newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio + panX;
-          const newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio + panY;
-
-          const bounded = clampToBounds(newX, newY, newScale);
-          applyTransform(bounded.x, bounded.y, bounded.scale);
-          synchronizeGestureZoomMode(bounded.scale);
-          captureFocalPoint({ x: mouseX, y: mouseY }, 'pointer');
-        }
-
-        lastPinch.current = { dist, midX, midY };
-      }
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          button: e.button,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          pointerId: e.pointerId,
+          pointerType: viewerPointerType(e.pointerType),
+          time: performance.now(),
+          type: 'pointermove',
+        }),
+      );
     },
-    [
-      applyTransform,
-      captureFocalPoint,
-      clampToBounds,
-      getTransformBounds,
-      maxScaleRef,
-      minScaleRef,
-      setIsPanningState,
-      synchronizeGestureZoomMode,
-      transformStateRef,
-    ],
+    [applyViewportTransition, getViewportInteractionContext],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      const wasViewerGesture = pointerOwners.current.get(e.pointerId) === 'viewer-pan';
-      const dragged = draggedPointers.current.delete(e.pointerId);
-      if (dragged) suppressDoubleClickUntilRef.current = performance.now() + 600;
-      activePointers.current.delete(e.pointerId);
-      pointerOwners.current.delete(e.pointerId);
-      pointerStarts.current.delete(e.pointerId);
-
+      const transition = viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        button: e.button,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        pointerId: e.pointerId,
+        pointerType: viewerPointerType(e.pointerType),
+        time: performance.now(),
+        type: 'pointerup',
+      });
+      applyViewportTransition(transition);
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
-
-      if (activePointers.current.size === 1) {
-        const remainingPointer = Array.from(activePointers.current.entries())[0];
-        if (!remainingPointer) return;
-        const [pointerId, pointer] = remainingPointer;
-        lastPanPos.current =
-          pointerOwners.current.get(pointerId) === 'viewer-pan' ? { x: pointer.x, y: pointer.y } : null;
-        lastPinch.current = null;
-      } else if (activePointers.current.size === 0) {
-        lastPanPos.current = null;
-        lastPinch.current = null;
-        setIsPanningState(false);
-        setIsViewerGestureDragging(false);
-        isMiddleMousePanning.current = false;
-        setIsMiddleMousePanningState(false);
-        const container = imageContainerRef.current;
-        if (container) {
-          captureFocalPoint({ x: container.clientWidth / 2, y: container.clientHeight / 2 }, 'center');
-        }
-
-        const { vx, vy } = getRecentPanVelocity(panVelocityHistory.current, performance.now());
-
-        const { positionX, positionY, scale } = transformStateRef.current;
-        const bounds = getTransformBounds(scale);
-        const outOfBounds =
-          positionX > bounds.maxX || positionX < bounds.minX || positionY > bounds.maxY || positionY < bounds.minY;
-
-        if (
-          wasViewerGesture &&
-          hadViewerPanGesture.current &&
-          (Math.abs(vx) > PAN_VELOCITY_THRESHOLD || Math.abs(vy) > PAN_VELOCITY_THRESHOLD || outOfBounds)
-        ) {
-          startPhysicsLoop(vx, vy);
-        }
-        hadViewerPanGesture.current = false;
-      }
     },
-    [
-      getTransformBounds,
-      setIsMiddleMousePanningState,
-      setIsPanningState,
-      setIsViewerGestureDragging,
-      startPhysicsLoop,
-      captureFocalPoint,
-      transformStateRef,
-    ],
+    [applyViewportTransition, getViewportInteractionContext],
+  );
+
+  const handlePointerCancel = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          pointerId: e.pointerId,
+          type: 'pointercancel',
+        }),
+      );
+    },
+    [applyViewportTransition, getViewportInteractionContext],
+  );
+
+  const handleLostPointerCapture = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      applyViewportTransition(
+        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          pointerId: e.pointerId,
+          type: 'lostpointercapture',
+        }),
+      );
+    },
+    [applyViewportTransition, getViewportInteractionContext],
   );
 
   const handleClick = useCallback(
@@ -1360,20 +1279,7 @@ export default function Editor({
     const focalPoint = focalPointRef.current;
     let viewportAnchor = null;
     if (focalPoint?.source === 'pointer') {
-      const rect = container.getBoundingClientRect();
-      const activePoints = Array.from(activePointers.current.values());
-      const firstPoint = activePoints[0];
-      if (firstPoint) {
-        const secondPoint = activePoints[1];
-        viewportAnchor = secondPoint
-          ? {
-              x: (firstPoint.x + secondPoint.x) / 2 - rect.left,
-              y: (firstPoint.y + secondPoint.y) / 2 - rect.top,
-            }
-          : { x: firstPoint.x - rect.left, y: firstPoint.y - rect.top };
-      } else {
-        viewportAnchor = { x: focalPoint.viewportX, y: focalPoint.viewportY };
-      }
+      viewportAnchor = { x: focalPoint.viewportX, y: focalPoint.viewportY };
     } else if (focalPoint?.source === 'navigator') {
       viewportAnchor = { x: focalPoint.viewportX, y: focalPoint.viewportY };
     }
@@ -1392,17 +1298,14 @@ export default function Editor({
     if (contextChanged) {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
-      activePointers.current.clear();
-      pointerOwners.current.clear();
-      pointerStarts.current.clear();
-      draggedPointers.current.clear();
-      hadViewerPanGesture.current = false;
-      lastPanPos.current = null;
-      lastPinch.current = null;
-      panVelocityHistory.current = [];
-      setIsPanningState(false);
-      setIsMiddleMousePanningState(false);
-      setIsViewerGestureDragging(false);
+      const cancellation = viewportInteractionControllerRef.current!.synchronize({
+        ...getViewportInteractionContext(),
+        geometryEpoch: viewportLayoutEpochRef.current + 1,
+      });
+      setIsPanningState(cancellation.state.isPanning);
+      setIsMiddleMousePanningState(cancellation.state.isMiddleMousePanning);
+      setIsViewerGestureDragging(cancellation.state.isDragging);
+      setIsTemporaryHand(cancellation.state.temporaryHand);
       focalPointRef.current = null;
     }
 
@@ -1437,6 +1340,7 @@ export default function Editor({
   }, [
     animationFrameId,
     focalPointRef,
+    getViewportInteractionContext,
     imageRenderSize,
     physicsFrameId,
     viewportContextKey,
@@ -2191,7 +2095,8 @@ export default function Editor({
           onPointerDownCapture={handlePointerDown}
           onPointerMoveCapture={handlePointerMove}
           onPointerUpCapture={handlePointerUp}
-          onPointerCancelCapture={handlePointerUp}
+          onPointerCancelCapture={handlePointerCancel}
+          onLostPointerCaptureCapture={handleLostPointerCapture}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
