@@ -4,7 +4,9 @@ use crate::render::film_emulation::{
     AP1_LUMINANCE, FilmEmulationParams, FilmEmulationProfileRef, REFERENCE_PROFILE_CONTENT_SHA256,
     REFERENCE_PROFILE_ID, REFERENCE_PROFILE_VERSION, REFERENCE_SHAPER_P, apply_pixel,
 };
-use crate::render::film_execution_plan::{FilmExecutionPlanV1, FilmFrameContextV1, execute_cpu};
+use crate::render::film_execution_plan::{
+    FilmExecutionPlanV1, FilmExecutionReceiptV1, FilmFrameContextV1, execute_cpu,
+};
 use crate::render::film_optical_scatter::{
     apply as apply_optical_scatter, reference as reference_optical_scatter,
 };
@@ -104,6 +106,14 @@ struct FilmValidationThresholdsV1 {
     rmse: f32,
     neutral_axis_drift: f32,
     identity_delta_e00: f32,
+    model_reference_max_abs: f32,
+    model_reference_rmse: f32,
+    reference_delta_e00_mean: f32,
+    reference_delta_e00_max: f32,
+    neutral_chroma_max: f32,
+    gamut_hue_drift_max: f32,
+    gamut_neutral_axis_drift_max: f32,
+    gamut_perceptual_delta_l1_max: f32,
     monotonic_tolerance: f32,
     grain_repeat_tolerance: f32,
     grain_mean_drift: f32,
@@ -163,6 +173,27 @@ struct FilmNativeAnalyticSampleReportV1 {
     disabled_output: [f32; 3],
     mix_zero_output: [f32; 3],
     full_mix_output: [f32; 3],
+    model_reference_output: [f32; 3],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FilmNativeAnalyticBaselineSampleV1<'a> {
+    id: &'a str,
+    input: [f32; 3],
+    disabled_output: [f32; 3],
+    mix_zero_output: [f32; 3],
+    full_mix_output: [f32; 3],
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FilmNativeExecutionPlanReportV1 {
+    backend_abi_version: String,
+    model_abi_version: String,
+    plan_sha256: String,
+    post_film_hash: String,
+    stage_order: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -180,6 +211,9 @@ struct FilmNativeAnalyticReportV1 {
     negative_component_count: u32,
     high_component_count: u32,
     deterministic_hash: String,
+    execution_plan: FilmNativeExecutionPlanReportV1,
+    model_reference_max_abs: f32,
+    model_reference_rmse: f32,
     samples: Vec<FilmNativeAnalyticSampleReportV1>,
     passed: bool,
     failures: Vec<String>,
@@ -310,6 +344,14 @@ fn validate_governance(
             fixture.thresholds.rmse,
             fixture.thresholds.neutral_axis_drift,
             fixture.thresholds.identity_delta_e00,
+            fixture.thresholds.model_reference_max_abs,
+            fixture.thresholds.model_reference_rmse,
+            fixture.thresholds.reference_delta_e00_mean,
+            fixture.thresholds.reference_delta_e00_max,
+            fixture.thresholds.neutral_chroma_max,
+            fixture.thresholds.gamut_hue_drift_max,
+            fixture.thresholds.gamut_neutral_axis_drift_max,
+            fixture.thresholds.gamut_perceptual_delta_l1_max,
             fixture.thresholds.monotonic_tolerance,
             fixture.thresholds.grain_repeat_tolerance,
             fixture.thresholds.grain_mean_drift,
@@ -370,6 +412,37 @@ fn validate_governance(
     Ok(())
 }
 
+fn render_analytic_samples(
+    samples: &[FilmAnalyticSampleV1],
+    params: FilmEmulationParams,
+    revision: &str,
+) -> Result<(Vec<Vec3>, FilmExecutionReceiptV1, FilmExecutionPlanV1), &'static str> {
+    let width = u32::try_from(samples.len()).map_err(|_| "film_validation_sample_count_invalid")?;
+    let image = ImageBuffer::from_fn(width, 1, |x, _| image::Rgb(samples[x as usize].input));
+    let plan = FilmExecutionPlanV1::reference(
+        REFERENCE_PROFILE_CONTENT_SHA256,
+        REFERENCE_PROFILE_CONTENT_SHA256,
+    );
+    let context = FilmFrameContextV1 {
+        source_identity: "film-validation.reference-analytic.v1".to_string(),
+        source_dimensions: [width, 1],
+        full_resolution_origin: [0, 0],
+        render_scale_milli: 1000,
+        quality: "settled_preview_v1".to_string(),
+        deterministic_seed_inputs: "film-validation:analytic:seed-v1".to_string(),
+        revision: revision.to_string(),
+    };
+    let (output, receipt) = execute_cpu(&image, params, &plan, &context)?;
+    Ok((
+        output
+            .pixels()
+            .map(|pixel| Vec3::from_array(pixel.0))
+            .collect(),
+        receipt,
+        plan,
+    ))
+}
+
 fn run_reference_analytic_gate(
     fixture_json: &str,
     vector_bytes: &[u8],
@@ -396,18 +469,27 @@ fn run_reference_analytic_gate(
         mix: 1.0,
         ..disabled
     };
+    let (disabled_outputs, _, _) =
+        render_analytic_samples(&vectors.samples, disabled, "analytic-disabled-v1")?;
+    let (mix_zero_outputs, _, _) =
+        render_analytic_samples(&vectors.samples, mix_zero, "analytic-mix-zero-v1")?;
+    let (full_mix_outputs, full_mix_receipt, execution_plan) =
+        render_analytic_samples(&vectors.samples, full_mix, "analytic-full-mix-v1")?;
     let mut identity_deltas = Vec::new();
+    let mut model_reference_deltas = Vec::new();
     let mut neutral_axis_drift = 0.0_f32;
     let mut negative_component_count = 0_u32;
     let mut high_component_count = 0_u32;
     let mut failures = Vec::new();
     let mut samples = Vec::with_capacity(vectors.samples.len());
 
-    for sample in &vectors.samples {
+    for (index, sample) in vectors.samples.iter().enumerate() {
         let input = Vec3::from_array(sample.input);
-        let disabled_output = apply_pixel(input, disabled);
-        let mix_zero_output = apply_pixel(input, mix_zero);
-        let full_mix_output = apply_pixel(input, full_mix);
+        let disabled_output = disabled_outputs[index];
+        let mix_zero_output = mix_zero_outputs[index];
+        let full_mix_output = full_mix_outputs[index];
+        let model_reference_output = apply_pixel(input, full_mix);
+        model_reference_deltas.extend((full_mix_output - model_reference_output).abs().to_array());
         if sample
             .assertions
             .contains(&FilmAnalyticAssertionV1::IdentityDisabled)
@@ -450,6 +532,7 @@ fn run_reference_analytic_gate(
             disabled_output: disabled_output.to_array(),
             mix_zero_output: mix_zero_output.to_array(),
             full_mix_output: full_mix_output.to_array(),
+            model_reference_output: model_reference_output.to_array(),
         });
     }
 
@@ -473,11 +556,43 @@ fn run_reference_analytic_gate(
     if neutral_axis_drift > fixture.thresholds.neutral_axis_drift {
         failures.push("neutral_axis_threshold_failed".to_string());
     }
+    let model_reference_max_abs = model_reference_deltas
+        .iter()
+        .copied()
+        .fold(0.0_f32, f32::max);
+    let model_reference_rmse = if model_reference_deltas.is_empty() {
+        0.0
+    } else {
+        (model_reference_deltas
+            .iter()
+            .map(|delta| delta * delta)
+            .sum::<f32>()
+            / model_reference_deltas.len() as f32)
+            .sqrt()
+    };
+    if model_reference_max_abs > fixture.thresholds.model_reference_max_abs {
+        failures.push("model_reference_max_abs_failed".to_string());
+    }
+    if model_reference_rmse > fixture.thresholds.model_reference_rmse {
+        failures.push("model_reference_rmse_failed".to_string());
+    }
 
     let mut monotonic_violation_count = 0_u32;
     let mut previous_luminance = f32::NEG_INFINITY;
-    for value in &vectors.neutral_ramp.values {
-        let output = apply_pixel(Vec3::splat(*value), full_mix);
+    let neutral_samples = vectors
+        .neutral_ramp
+        .values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| FilmAnalyticSampleV1 {
+            id: format!("neutral-ramp-{index}"),
+            input: [*value; 3],
+            assertions: BTreeSet::new(),
+        })
+        .collect::<Vec<_>>();
+    let (neutral_outputs, _, _) =
+        render_analytic_samples(&neutral_samples, full_mix, "analytic-neutral-ramp-v1")?;
+    for output in neutral_outputs {
         if !output.is_finite() {
             failures.push(format!(
                 "non_finite_neutral_ramp:{}",
@@ -500,7 +615,19 @@ fn run_reference_analytic_gate(
     let deterministic_hash = format!(
         "sha256:{}",
         hex::encode(Sha256::digest(
-            serde_json::to_vec(&samples).map_err(|_| "film_validation_report_invalid")?
+            serde_json::to_vec(
+                &samples
+                    .iter()
+                    .map(|sample| FilmNativeAnalyticBaselineSampleV1 {
+                        id: &sample.id,
+                        input: sample.input,
+                        disabled_output: sample.disabled_output,
+                        mix_zero_output: sample.mix_zero_output,
+                        full_mix_output: sample.full_mix_output,
+                    })
+                    .collect::<Vec<_>>()
+            )
+            .map_err(|_| "film_validation_report_invalid")?
         ))
     );
     Ok(FilmNativeAnalyticReportV1 {
@@ -516,6 +643,15 @@ fn run_reference_analytic_gate(
         negative_component_count,
         high_component_count,
         deterministic_hash,
+        execution_plan: FilmNativeExecutionPlanReportV1 {
+            backend_abi_version: execution_plan.backend_abi_version,
+            model_abi_version: execution_plan.model_abi_version,
+            plan_sha256: execution_plan.plan_sha256,
+            post_film_hash: full_mix_receipt.post_film_hash,
+            stage_order: full_mix_receipt.stage_order,
+        },
+        model_reference_max_abs,
+        model_reference_rmse,
         samples,
         passed: failures.is_empty(),
         failures,
@@ -922,10 +1058,17 @@ mod tests {
         assert!(report.passed, "Film gate failures: {:?}", report.failures);
         assert_eq!(report.max_abs, 0.0);
         assert_eq!(report.rmse, 0.0);
+        assert_eq!(report.model_reference_max_abs, 0.0);
+        assert_eq!(report.model_reference_rmse, 0.0);
         assert_eq!(report.monotonic_violation_count, 0);
         assert!(report.negative_component_count > 0);
         assert!(report.high_component_count > 0);
         assert_eq!(report.deterministic_hash, repeat.deterministic_hash);
+        assert_eq!(
+            report.execution_plan.post_film_hash,
+            repeat.execution_plan.post_film_hash
+        );
+        assert_eq!(report.execution_plan.model_abi_version, "film_model_abi_v1");
         println!(
             "FILM_NATIVE_ANALYTIC_REPORT={}",
             serde_json::to_string(&report).expect("report serialization")

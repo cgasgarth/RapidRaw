@@ -43,6 +43,14 @@ export const filmValidationThresholdsV1Schema = z
     rmse: z.number().finite().nonnegative().max(0.1),
     neutralAxisDrift: z.number().finite().nonnegative().max(0.1),
     identityDeltaE00: z.number().finite().nonnegative().max(1),
+    modelReferenceMaxAbs: z.number().finite().nonnegative().max(0.1),
+    modelReferenceRmse: z.number().finite().nonnegative().max(0.1),
+    referenceDeltaE00Mean: z.number().finite().nonnegative().max(5),
+    referenceDeltaE00Max: z.number().finite().nonnegative().max(10),
+    neutralChromaMax: z.number().finite().nonnegative().max(5),
+    gamutHueDriftMax: z.number().finite().nonnegative().max(180),
+    gamutNeutralAxisDriftMax: z.number().finite().nonnegative().max(3),
+    gamutPerceptualDeltaL1Max: z.number().finite().nonnegative().max(10),
     monotonicTolerance: z.number().finite().nonnegative().max(0.01),
     grainRepeatTolerance: z.number().finite().nonnegative().max(0.1),
     grainMeanDrift: z.number().finite().nonnegative().max(0.1),
@@ -91,8 +99,8 @@ export const filmValidationFixtureV1Schema = z
     render: z
       .object({
         profileRefs: z.array(filmEmulationProfileRefV1Schema).min(1),
-        viewTransforms: z.array(z.string().trim().min(1)).min(1),
-        outputProfiles: z.array(z.string().trim().min(1)).min(1),
+        viewTransforms: z.tuple([z.literal('AgX v1')]),
+        outputProfiles: z.tuple([z.literal('srgb'), z.literal('display_p3')]),
         bitDepths: z.array(z.union([z.literal(8), z.literal(16), z.literal(32)])).min(1),
         proofCrops: z.array(cropSchema).min(1),
       })
@@ -172,6 +180,7 @@ export const filmNativeAnalyticSampleReportV1Schema = z
     disabledOutput: rgbSchema,
     mixZeroOutput: rgbSchema,
     fullMixOutput: rgbSchema,
+    modelReferenceOutput: rgbSchema,
   })
   .strict();
 
@@ -189,11 +198,120 @@ export const filmNativeAnalyticReportV1Schema = z
     negativeComponentCount: z.number().int().nonnegative(),
     highComponentCount: z.number().int().nonnegative(),
     deterministicHash: sha256Schema,
+    executionPlan: z
+      .object({
+        backendAbiVersion: z.string().trim().min(1),
+        modelAbiVersion: z.string().trim().min(1),
+        planSha256: z.string().trim().min(1),
+        postFilmHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        stageOrder: z.array(z.string().trim().min(1)).min(1),
+      })
+      .strict(),
+    modelReferenceMaxAbs: z.number().finite().nonnegative(),
+    modelReferenceRmse: z.number().finite().nonnegative(),
     samples: z.array(filmNativeAnalyticSampleReportV1Schema).min(1),
     passed: z.boolean(),
     failures: z.array(z.string().trim().min(1)),
   })
   .strict();
+
+export const filmOutputGamutSampleV1Schema = z
+  .object({
+    id: z.string().trim().min(1),
+    mappedLinearRgb: rgbSchema,
+    preMapLinearRgb: rgbSchema,
+  })
+  .strict();
+
+export const filmOutputGamutTargetReportV1Schema = z
+  .object({
+    hardClipChangedChannelCount: z.number().int().nonnegative(),
+    maxHueAngleDriftDeg: z.number().finite().nonnegative().max(180),
+    maxNeutralAxisDrift: z.number().finite().nonnegative(),
+    maxPerceptualDeltaL1: z.number().finite().nonnegative(),
+    outputHash: sha256Schema,
+    postMapOutOfGamutChannelCount: z.number().int().nonnegative(),
+    preMapOutOfGamutChannelCount: z.number().int().nonnegative(),
+    samples: z.array(filmOutputGamutSampleV1Schema).min(1),
+    target: z.enum(['srgb', 'display_p3']),
+  })
+  .strict();
+
+export const filmOutputGamutReportV1Schema = z
+  .object({
+    contract: z.literal('rapidraw.film_output_gamut_report.v1'),
+    fixtureId: filmValidationFixtureV1Schema.shape.id,
+    postFilmHash: sha256Schema,
+    profileRef: filmEmulationProfileRefV1Schema,
+    sourceSha256: sha256Schema,
+    targets: z.array(filmOutputGamutTargetReportV1Schema).length(2),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (new Set(report.targets.map(({ target }) => target)).size !== report.targets.length)
+      context.addIssue({ code: 'custom', message: 'Output gamut targets must be unique.', path: ['targets'] });
+  });
+
+const measuredProfileEvidenceV1Schema = z
+  .object({
+    holdoutSampleIds: z.array(z.string().trim().min(1)).min(5),
+    limitations: z.array(z.string().trim().min(1)).min(1),
+    method: z.string().trim().min(1),
+    outlierSampleIds: z.array(z.string().trim().min(1)),
+    uncertaintyDeltaE00: z.number().finite().positive(),
+  })
+  .strict();
+
+export const filmReleaseApprovalV1Schema = z
+  .object({
+    contract: z.literal('rapidraw.film_release_approval.v1'),
+    fixtureId: filmValidationFixtureV1Schema.shape.id,
+    sourceSha256: sha256Schema,
+    profileRef: filmEmulationProfileRefV1Schema,
+    profileClaim: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('reference_model') }).strict(),
+      z.object({ evidence: measuredProfileEvidenceV1Schema, kind: z.literal('measured') }).strict(),
+    ]),
+    executionIdentity: z
+      .object({
+        backendAbiVersion: z.string().trim().min(1),
+        modelAbiVersion: z.string().trim().min(1),
+      })
+      .strict(),
+    approvedBaselines: z
+      .object({
+        grainHash: sha256Schema,
+        postFilmHash: sha256Schema,
+      })
+      .strict(),
+    approval: z
+      .object({
+        approvedAt: z.iso.datetime({ offset: true }),
+        approvalCommit: z.string().regex(/^[a-f0-9]{40}$/u),
+        issueUrl: z.url(),
+        prUrl: z.url(),
+        reason: z.string().trim().min(1),
+        reviewer: z.string().trim().min(1),
+      })
+      .strict(),
+    releasePolicy: z
+      .object({
+        nativeProofIssueUrl: z.url(),
+        nativeProofReceiptSha256: sha256Schema.nullable(),
+        productionFilmPixelsChanged: z.boolean(),
+        requireNativeProofOnPixelChange: z.literal(true),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((approval, context) => {
+    if (approval.releasePolicy.productionFilmPixelsChanged && approval.releasePolicy.nativeProofReceiptSha256 === null)
+      context.addIssue({
+        code: 'custom',
+        message: 'Production Film pixel changes require a native #5030 proof receipt.',
+        path: ['releasePolicy', 'nativeProofReceiptSha256'],
+      });
+  });
 
 export const filmNativeStochasticOpticalReportV1Schema = z
   .object({
@@ -256,3 +374,5 @@ export type FilmValidationReportV1 = z.infer<typeof filmValidationReportV1Schema
 export type FilmAnalyticVectorSetV1 = z.infer<typeof filmAnalyticVectorSetV1Schema>;
 export type FilmNativeAnalyticReportV1 = z.infer<typeof filmNativeAnalyticReportV1Schema>;
 export type FilmNativeStochasticOpticalReportV1 = z.infer<typeof filmNativeStochasticOpticalReportV1Schema>;
+export type FilmOutputGamutReportV1 = z.infer<typeof filmOutputGamutReportV1Schema>;
+export type FilmReleaseApprovalV1 = z.infer<typeof filmReleaseApprovalV1Schema>;
