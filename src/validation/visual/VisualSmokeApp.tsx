@@ -2491,13 +2491,12 @@ function BrushMaskCanvasVisualSmoke() {
                 isSliderDragging={false}
                 isStraightenActive={false}
                 maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
-                onGenerateAiMask={() => {}}
+                onAiMaskBoxCommit={() => {}}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
                 onLiveMaskPreview={(preview) => {
                   if (isMaskContainer(preview)) setLivePreview(preview);
                 }}
-                onQuickErase={() => {}}
                 onSelectAiSubMask={() => {}}
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
@@ -2704,10 +2703,9 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 isStraightenActive={isStraightenActive}
                 liveRotation={liveRotation}
                 maskOverlayUrl={null}
-                onGenerateAiMask={() => {}}
+                onAiMaskBoxCommit={() => {}}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
-                onQuickErase={() => {}}
                 onSelectAiSubMask={() => {}}
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
@@ -2904,10 +2902,9 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     isSliderDragging: false,
     isStraightenActive: false,
     liveRotation: null,
-    onGenerateAiMask: () => {},
+    onAiMaskBoxCommit: () => {},
     onInitialMaskDrawCommit: ignoreInitialMaskDrawCommit,
     onParametricMaskTargetCommit: ignoreParametricMaskTargetCommit,
-    onQuickErase: () => {},
     onSelectAiSubMask: () => {},
     onSelectMask: () => {},
     onStraighten: () => {},

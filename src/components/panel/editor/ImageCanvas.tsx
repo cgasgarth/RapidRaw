@@ -78,6 +78,13 @@ import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import {
+  createViewerAiMaskBoxInteractionController,
+  ViewerAiMaskBoxCommand,
+  ViewerAiMaskBoxCurrentContext,
+  ViewerAiMaskBoxOverlayDescriptor,
+  ViewerAiMaskBoxSample,
+} from './viewerAiMaskBoxInteractionController';
+import {
   createViewerBrushCommandAdapter,
   type ViewerBrushCommandCaptureSummary,
   type ViewerBrushParameters,
@@ -231,11 +238,10 @@ interface ImageCanvasProps {
   isRotationActive?: boolean;
   maskOverlayUrl: string | null;
   maskOverlayRuntimeState?: { identity: string | null; status: 'current' | 'none' | 'stale-ignored' };
-  onGenerateAiMask: (id: string | null, start: Coord, end: Coord) => void;
+  onAiMaskBoxCommit: (command: ViewerAiMaskBoxCommand) => void;
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
-  onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
   onStraighten: (val: number, identity: CropStraightenSessionIdentity) => void;
@@ -277,7 +283,7 @@ interface ImageCanvasProps {
   onViewerSamplerStateChange?: (state: ViewerSamplerState) => void;
 }
 
-const ImageCanvas = memo(
+export const ImageCanvas = memo(
   ({
     appSettings,
     activeAiPatchContainerId,
@@ -311,11 +317,10 @@ const ImageCanvas = memo(
     isRotationActive,
     maskOverlayUrl,
     maskOverlayRuntimeState,
-    onGenerateAiMask,
+    onAiMaskBoxCommit,
     onInitialMaskDrawCommit,
     onLiveMaskPreview,
     onParametricMaskTargetCommit,
-    onQuickErase,
     onSelectAiSubMask,
     onSelectMask,
     onStraighten,
@@ -369,8 +374,9 @@ const ImageCanvas = memo(
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<KonvaStage | null>(null);
     const pointerGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
-    const previewBoxRef = useRef<{ start: Coord; end: Coord } | null>(null);
-    const [previewBox, setPreviewBox] = useState<{ start: Coord; end: Coord } | null>(null);
+    const viewerAiMaskBoxController = useMemo(() => createViewerAiMaskBoxInteractionController(), []);
+    const aiMaskBoxTransitionRef = useRef('idle');
+    const [aiMaskBoxOverlay, setAiMaskBoxOverlay] = useState<ViewerAiMaskBoxOverlayDescriptor | null>(null);
     const viewerInitialMaskDrawController = useMemo(() => createViewerInitialMaskDrawInteractionController(), []);
     const initialMaskDrawTransitionRef = useRef('idle');
     const [initialMaskDrawOverlay, setInitialMaskDrawOverlay] = useState<ViewerInitialMaskDrawOverlayDescriptor | null>(
@@ -878,6 +884,61 @@ const ImageCanvas = memo(
     const isAiSubjectActive =
       (isMasking || isAiEditing) &&
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
+    const activeAiMaskBoxId = isMasking ? activeMaskId : activeAiSubMaskId;
+    const viewerAiMaskBoxContext = useMemo<ViewerAiMaskBoxCurrentContext>(
+      () => ({
+        active:
+          isAiSubjectActive &&
+          activeAiMaskBoxId !== null &&
+          (isMasking ? activeMaskContainerId !== null : activeAiPatchContainerId !== null),
+        containerFamily: isMasking ? 'masks' : 'aiPatches',
+        containerId: (isMasking ? activeMaskContainerId : activeAiPatchContainerId) ?? 'ai-mask-box-container:none',
+        geometryEpoch: overlayGeometry.geometryEpoch,
+        imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+        maskId: activeAiMaskBoxId ?? 'ai-mask-box:none',
+        sourceIdentity: selectedImage.path,
+        sourceRevision: presentationDescriptor.graphRevision,
+        tool: activeSubMask?.type === Mask.QuickEraser ? 'quick-eraser' : 'ai-subject',
+      }),
+      [
+        activeAiMaskBoxId,
+        activeAiPatchContainerId,
+        activeMaskContainerId,
+        activeSubMask?.type,
+        imageSessionId,
+        isAiSubjectActive,
+        isMasking,
+        overlayGeometry.geometryEpoch,
+        presentationDescriptor.graphRevision,
+        selectedImage.path,
+      ],
+    );
+    const createAiMaskBoxSample = useCallback(
+      (viewPoint: Coord, event: MouseEvent | TouchEvent | PointerEvent): ViewerAiMaskBoxSample => ({
+        ...viewerBrushPointerMetadata(event),
+        imagePoint: getImageSpacePoint(viewPoint),
+        viewPoint,
+      }),
+      [getImageSpacePoint],
+    );
+    const publishAiMaskBoxOverlay = useCallback(() => {
+      setAiMaskBoxOverlay(viewerAiMaskBoxController.overlays()[0] ?? null);
+    }, [viewerAiMaskBoxController]);
+    const executeAiMaskBoxCommands = useCallback(
+      (commands: readonly ViewerAiMaskBoxCommand[]) => {
+        for (const command of commands) onAiMaskBoxCommit(command);
+        if (commands.length > 0) drawingStageRef.current = null;
+        publishAiMaskBoxOverlay();
+      },
+      [onAiMaskBoxCommit, publishAiMaskBoxOverlay],
+    );
+    useEffect(() => {
+      if (viewerAiMaskBoxController.synchronize(viewerAiMaskBoxContext)) {
+        aiMaskBoxTransitionRef.current = 'session-invalidated';
+        isDrawing.current = false;
+        publishAiMaskBoxOverlay();
+      }
+    }, [publishAiMaskBoxOverlay, viewerAiMaskBoxContext, viewerAiMaskBoxController]);
     const isParametricActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance);
     const activeParametricMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
@@ -1150,15 +1211,16 @@ const ImageCanvas = memo(
         isDrawing.current = false;
         drawingStageRef.current = null;
         pointerGeometryEpochRef.current = null;
-        setPreviewBox(null);
-        previewBoxRef.current = null;
+        viewerAiMaskBoxController.cancel();
+        aiMaskBoxTransitionRef.current = reason;
+        setAiMaskBoxOverlay(null);
         viewerInitialMaskDrawController.cancel();
         initialMaskDrawTransitionRef.current = reason;
         setInitialMaskDrawOverlay(null);
         setIsMaskInteractionActive(false);
         setCursorPreview((preview) => ({ ...preview, visible: false }));
       },
-      [viewerInitialMaskDrawController],
+      [viewerAiMaskBoxController, viewerInitialMaskDrawController],
     );
 
     useEffect(
@@ -1375,17 +1437,22 @@ const ImageCanvas = memo(
           const pos = getCanvasPointer(stage);
           if (!pos) {
             isDrawing.current = false;
-            setPreviewBox(null);
-            previewBoxRef.current = null;
+            viewerAiMaskBoxController.cancel();
+            publishAiMaskBoxOverlay();
             return;
           }
 
           if (isAiSubjectActive) {
-            isDrawing.current = true;
+            if (!activeSubMaskParameters) return;
             drawingStageRef.current = stage;
-            const newBox = { start: pos, end: pos };
-            previewBoxRef.current = newBox;
-            setPreviewBox(newBox);
+            const began = viewerAiMaskBoxController.begin(
+              viewerAiMaskBoxContext,
+              createAiMaskBoxSample(pos, e.evt),
+              activeSubMaskParameters,
+            );
+            isDrawing.current = began;
+            aiMaskBoxTransitionRef.current = began ? 'pointer-started' : 'pointer-start-rejected';
+            publishAiMaskBoxOverlay();
             return;
           }
           if (isBrushActive) {
@@ -1436,10 +1503,14 @@ const ImageCanvas = memo(
         brushImageSpaceSize,
         canonicalBrushTool,
         createBrushPointerSample,
+        createAiMaskBoxSample,
         createInitialMaskDrawSample,
         executeBrushCommands,
         getCanvasPointer,
         publishInitialMaskDrawOverlay,
+        publishAiMaskBoxOverlay,
+        viewerAiMaskBoxContext,
+        viewerAiMaskBoxController,
         viewerInitialMaskDrawContext,
         viewerInitialMaskDrawController,
         viewerBrushContext,
@@ -1508,13 +1579,13 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (isAiSubjectActive && previewBoxRef.current) {
+        if (isAiSubjectActive && viewerAiMaskBoxController.isActive()) {
           if (!pos) {
             return;
           }
-          const updatedBox = { ...previewBoxRef.current, end: pos };
-          previewBoxRef.current = updatedBox;
-          setPreviewBox(updatedBox);
+          const sourceEvent = isKonvaEvent(e) ? e.evt : e;
+          const moved = viewerAiMaskBoxController.move(viewerAiMaskBoxContext, createAiMaskBoxSample(pos, sourceEvent));
+          if (moved || !viewerAiMaskBoxController.isActive()) publishAiMaskBoxOverlay();
           if (isKonvaEvent(e) && e.evt.cancelable) e.evt.preventDefault();
           return;
         }
@@ -1538,12 +1609,16 @@ const ImageCanvas = memo(
         effectiveImageDimensions,
         isMasking,
         createBrushPointerSample,
+        createAiMaskBoxSample,
         createInitialMaskDrawSample,
         executeBrushCommands,
         finishCanvasToolInteraction,
         getCanvasPointer,
         getImageSpacePoint,
         publishInitialMaskDrawOverlay,
+        publishAiMaskBoxOverlay,
+        viewerAiMaskBoxContext,
+        viewerAiMaskBoxController,
         viewerInitialMaskDrawContext,
         viewerInitialMaskDrawController,
         viewerBrushContext,
@@ -1590,63 +1665,40 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (!isAiSubjectActive || !previewBoxRef.current) {
+        if (!isAiSubjectActive || !viewerAiMaskBoxController.isActive()) {
           finishCanvasToolInteraction('pointer-up-empty');
           return;
         }
 
-        if (isAiSubjectActive && previewBoxRef.current) {
-          const box = previewBoxRef.current;
-
-          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-
-          const startPoint = getImageSpacePoint(box.start);
-          let endPoint = getImageSpacePoint(box.end);
-
-          const dx = box.end.x - box.start.x;
-          const dy = box.end.y - box.start.y;
-          if (Math.sqrt(dx * dx + dy * dy) < 5) {
-            endPoint = { x: startPoint.x, y: startPoint.y };
-          }
-
-          if (activeId) {
-            viewerAdjustmentCommandServices.updateSubMask(activeId, {
-              parameters: {
-                ...activeSubMaskParameters,
-                startX: startPoint.x,
-                startY: startPoint.y,
-                endX: endPoint.x,
-                endY: endPoint.y,
-              },
-            });
-          }
-
-          if (activeSubMask.type === Mask.QuickEraser) {
-            onQuickErase(activeId, startPoint, endPoint);
-          } else if (activeSubMask.type === Mask.AiSubject) {
-            onGenerateAiMask(activeId, startPoint, endPoint);
-          }
-          finishCanvasToolInteraction('pointer-up');
-          return;
-        }
-
-        finishCanvasToolInteraction('pointer-up');
+        const sourceEvent = event && isKonvaEvent(event) ? event.evt : event;
+        if (!sourceEvent) return;
+        const metadata = viewerBrushPointerMetadata(sourceEvent);
+        const stage = event && isKonvaEvent(event) ? event.target.getStage() : null;
+        const viewPoint = stage ? getCanvasPointer(stage) : null;
+        const commands = viewerAiMaskBoxController.end(
+          viewerAiMaskBoxContext,
+          metadata.pointerId,
+          metadata.pointerType,
+          viewPoint ? createAiMaskBoxSample(viewPoint, sourceEvent) : undefined,
+        );
+        executeAiMaskBoxCommands(commands);
+        isDrawing.current = viewerAiMaskBoxController.isActive();
+        aiMaskBoxTransitionRef.current =
+          commands.length > 0
+            ? 'pointer-ended'
+            : viewerAiMaskBoxController.isActive()
+              ? 'unrelated-pointer-ended'
+              : 'session-invalidated';
+        return;
       },
       [
         isInitialDrawing,
-        activeAiSubMaskId,
-        activeMaskId,
-        activeSubMask,
-        activeSubMaskParameters,
         isBrushActive,
-        isMasking,
-        onGenerateAiMask,
-        onQuickErase,
-        viewerAdjustmentCommandServices,
+        createAiMaskBoxSample,
         createBrushPointerSample,
+        executeAiMaskBoxCommands,
         executeBrushCommands,
         getCanvasPointer,
-        getImageSpacePoint,
         effectiveImageDimensions,
         imageRenderSize,
         isAiSubjectActive,
@@ -1654,6 +1706,8 @@ const ImageCanvas = memo(
         executeInitialMaskDrawCommands,
         viewerInitialMaskDrawContext,
         viewerInitialMaskDrawController,
+        viewerAiMaskBoxContext,
+        viewerAiMaskBoxController,
         viewerBrushContext,
         viewerBrushController,
       ],
@@ -1975,7 +2029,7 @@ const ImageCanvas = memo(
         ? 'disabled'
         : isSliderDragging
           ? 'loading'
-          : effectiveMaskInteractionActive || liveBrushLine || previewBox || initialMaskDrawOverlay
+          : effectiveMaskInteractionActive || liveBrushLine || aiMaskBoxOverlay || initialMaskDrawOverlay
             ? 'drag'
             : activeRemoveSource
               ? activeRemoveSource.status === 'ready'
@@ -2058,6 +2112,19 @@ const ImageCanvas = memo(
         data-parametric-mask-context-active={String(viewerParametricMaskTargetContext.active)}
         data-parametric-mask-context-id={viewerParametricMaskTargetContext.maskId}
         data-parametric-mask-context-tool={viewerParametricMaskTargetContext.tool}
+        data-ai-mask-box-active={String(aiMaskBoxOverlay !== null)}
+        data-ai-mask-box-context-active={String(viewerAiMaskBoxContext.active)}
+        data-ai-mask-box-controller="ready"
+        data-ai-mask-box-context-container={viewerAiMaskBoxContext.containerId}
+        data-ai-mask-box-context-family={viewerAiMaskBoxContext.containerFamily}
+        data-ai-mask-box-context-geometry={String(viewerAiMaskBoxContext.geometryEpoch)}
+        data-ai-mask-box-context-mask={viewerAiMaskBoxContext.maskId}
+        data-ai-mask-box-context-revision={viewerAiMaskBoxContext.sourceRevision}
+        data-ai-mask-box-context-tool={viewerAiMaskBoxContext.tool}
+        data-ai-mask-box-operation={aiMaskBoxOverlay?.sessionKey.operationGeneration ?? 0}
+        data-ai-mask-box-pointer-id={aiMaskBoxOverlay?.input.pointerId ?? ''}
+        data-ai-mask-box-pointer-type={aiMaskBoxOverlay?.input.pointerType ?? ''}
+        data-ai-mask-box-transition={aiMaskBoxTransitionRef.current}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
           const isCancellation =
@@ -2318,12 +2385,18 @@ const ImageCanvas = memo(
                           );
                         })}
 
-                      {previewBox && (
+                      {aiMaskBoxOverlay && (
                         <Rect
-                          x={Math.min(previewBox.start.x, previewBox.end.x)}
-                          y={Math.min(previewBox.start.y, previewBox.end.y)}
-                          width={Math.max(0.1, Math.abs(previewBox.end.x - previewBox.start.x))}
-                          height={Math.max(0.1, Math.abs(previewBox.end.y - previewBox.start.y))}
+                          x={Math.min(aiMaskBoxOverlay.start.viewPoint.x, aiMaskBoxOverlay.end.viewPoint.x)}
+                          y={Math.min(aiMaskBoxOverlay.start.viewPoint.y, aiMaskBoxOverlay.end.viewPoint.y)}
+                          width={Math.max(
+                            0.1,
+                            Math.abs(aiMaskBoxOverlay.end.viewPoint.x - aiMaskBoxOverlay.start.viewPoint.x),
+                          )}
+                          height={Math.max(
+                            0.1,
+                            Math.abs(aiMaskBoxOverlay.end.viewPoint.y - aiMaskBoxOverlay.start.viewPoint.y),
+                          )}
                           stroke={canvasOverlayTokens.colors.active}
                           strokeWidth={2}
                           {...canvasOverlayShadowProps}
