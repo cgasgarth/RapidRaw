@@ -1,6 +1,13 @@
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEditorStore } from '../../store/useEditorStore';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
+import {
+  buildDetailEditTransaction,
+  type DetailCommitIdentity,
+  isDetailNodeAdjustment,
+} from '../../utils/detailEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Switch from '../ui/primitives/Switch';
@@ -26,9 +33,35 @@ export default function DetailsPanel({
   onDragStateChange,
 }: DetailsPanelProps) {
   const { t } = useTranslation();
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const detailCommitIdentity = useMemo<DetailCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const detailCommitIdentityRef = useRef(detailCommitIdentity);
+  detailCommitIdentityRef.current = detailCommitIdentity;
 
-  const handleAdjustmentChange = (key: string, value: number) => {
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: Math.trunc(value) }));
+  const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
+    const nextValue = Math.trunc(value);
+    if (!isForMask && isDetailNodeAdjustment(key)) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildDetailEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
+      );
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: nextValue }));
   };
 
   const handleFloatAdjustmentChange = (key: string, value: number) => {
@@ -43,7 +76,13 @@ export default function DetailsPanel({
   const density = professionalInspectorDensityTokens;
 
   return (
-    <div className="space-y-0">
+    <div
+      className="space-y-0"
+      data-commit-adjustment-revision={detailCommitIdentity?.adjustmentRevision}
+      data-commit-image-session={detailCommitIdentity?.imageSessionId}
+      data-commit-source-identity={detailCommitIdentity?.sourceIdentity}
+      data-testid="detail-controls"
+    >
       {!isForMask && adjustmentVisibility['deblur'] !== false && (
         <div className={detailGroupClassName}>
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
@@ -174,6 +213,7 @@ export default function DetailsPanel({
               handleAdjustmentChange(DetailsAdjustment.Sharpness, value);
             }}
             step={1}
+            testId="detail-control-sharpness"
             value={adjustments.sharpness}
             onDragStateChange={onDragStateChange}
           />
