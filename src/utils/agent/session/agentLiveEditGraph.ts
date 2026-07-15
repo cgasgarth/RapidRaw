@@ -14,7 +14,10 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import {
+  buildAgentEditGraphEditTransaction,
+  captureAgentEditGraphCommitIdentity,
+} from '../../agentEditGraphEditTransaction';
 
 type LiveEditGraphBridge = RawEngineLocalAppServerBridge;
 type EditGraphParameterPatchCommandV1 = Extract<
@@ -136,17 +139,15 @@ export const applyEditGraphCommandToLiveEditor = async (
   assertCurrentRevision(command);
 
   const state = useEditorStore.getState();
+  const commitIdentity = captureAgentEditGraphCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Live editor editGraph apply requires a selected image session.');
   const nextAdjustments = applyEditGraphOperationsToAdjustments(state.adjustments, command.parameters.operations);
   const bridgeResult = await dispatchEditGraphBridgeCommand(bridge, command, requestId);
   const mutation = editGraphMutationResultV1Schema.parse(bridgeResult);
-  const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-
-  useEditorStore.setState({
-    adjustments: nextAdjustments,
-    history: history.history,
-    historyIndex: history.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  });
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentEditGraphEditTransaction(currentState, commitIdentity, nextAdjustments, command.commandId),
+  );
 
   return mutation;
 };
