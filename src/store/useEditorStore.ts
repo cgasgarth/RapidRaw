@@ -699,7 +699,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         : nextResult;
       result = publishedResult;
-      if (nextResult.noOp) return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
+      if (nextResult.noOp) {
+        if (request.history === 'reset') {
+          return { history: [structuredClone(nextResult.after)], historyCheckpoints: [], historyIndex: 0 };
+        }
+        return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
+      }
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }

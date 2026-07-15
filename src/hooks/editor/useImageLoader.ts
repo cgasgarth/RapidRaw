@@ -11,6 +11,7 @@ import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadErro
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { hydrateImageOpenAdjustments } from '../../utils/imageOpenAdjustmentHydration';
+import { buildImageOpenHydrationEditTransaction } from '../../utils/imageOpenHydrationEditTransaction';
 import { beginImageOpenWithSchema } from '../../utils/imageOpenInvokes';
 import { isImageOpenUpdateCurrent } from '../../utils/imageOpenPhaseCurrentness';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
@@ -45,8 +46,15 @@ export function useImageLoader() {
         if (isNativeCommittedHydrationSession(sessionId)) return;
         acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
         const hydratedAdjustments = hydrateImageOpenAdjustments(metadata.metadata, selectedImagePath);
-        setEditor({ adjustments: hydratedAdjustments });
-        resetHistory(hydratedAdjustments);
+        const state = useEditorStore.getState();
+        state.applyEditTransaction(
+          buildImageOpenHydrationEditTransaction(
+            state,
+            { imageSessionId: sessionId, path: selectedImagePath },
+            hydratedAdjustments,
+            `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
+          ),
+        );
       };
 
       const loadImageSession = async () => {
