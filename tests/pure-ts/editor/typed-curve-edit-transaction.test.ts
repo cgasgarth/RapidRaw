@@ -179,4 +179,66 @@ describe('typed curve edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(1);
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
   });
+
+  test('commits through the canonical fallback session and rejects its successor', () => {
+    const current = {
+      ...useEditorStore.getState().adjustments,
+      rawEngineEditGraphVersion: 2,
+      sceneCurveV1: sceneCurve,
+    };
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(current);
+    useEditorStore.setState({
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, current, editDocumentV2),
+      adjustments: current,
+      editDocumentV2,
+      finalPreviewUrl: 'blob:fallback-curve-before',
+      history: [current],
+      imageSession: null,
+      imageSessionId: 41,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: TypedCurveCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:41',
+      sourceIdentity: sourcePath,
+    };
+    expect(captureTypedCurveCommitIdentity(state)).toEqual(fallbackIdentity);
+
+    const noOp = state.applyEditTransaction(
+      buildTypedCurveEditTransaction(state, fallbackIdentity, { curve: sceneCurve, domain: 'scene' }, 'fallback-no-op'),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-curve-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const nextCurve = { ...sceneCurve, middleGrey: 0.2 };
+    const result = state.applyEditTransaction(
+      buildTypedCurveEditTransaction(state, fallbackIdentity, { curve: nextCurve, domain: 'scene' }, 'fallback-curve'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['sceneCurveV1'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-curve',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.sceneCurveV1).toEqual(sceneCurve);
+    expect(() =>
+      buildTypedCurveEditTransaction(
+        { ...state, imageSessionId: 42 },
+        fallbackIdentity,
+        { curve: nextCurve, domain: 'scene' },
+        'stale-fallback-curve',
+      ),
+    ).toThrow('typed_curve_transaction.stale_session');
+  });
 });
