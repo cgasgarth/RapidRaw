@@ -161,6 +161,7 @@ const commandNames: Record<
   | 'renderNegativeLabDryRunPreviewArtifact'
   | 'preflightNegativeLabSource'
   | 'readExifForPaths'
+  | 'resolveOriginalSourceIdentity'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
   | 'samplePointColorPicker'
@@ -224,6 +225,7 @@ const commandNames: Record<
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   preflightNegativeLabSource: Invokes.PreflightNegativeLabSource,
   readExifForPaths: Invokes.ReadExifForPaths,
+  resolveOriginalSourceIdentity: Invokes.ResolveOriginalSourceIdentity,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
   samplePointColorPicker: Invokes.SamplePointColorPicker,
@@ -394,6 +396,18 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           if (response.failure !== undefined) reject(new Error(response.failure));
           else resolve(response.value);
         }, response.delayMs);
+      });
+    }
+    case commandNames.resolveOriginalSourceIdentity: {
+      const path = getStringArg(args, 'path') ?? '';
+      let hash = 0xcbf29ce484222325n;
+      for (const byte of new TextEncoder().encode(path)) {
+        hash ^= BigInt(byte);
+        hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+      }
+      return Promise.resolve({
+        available: path.length > 0,
+        sourceRevision: path.length > 0 ? `source-revision-v1:${hash.toString(16).padStart(16, '0').repeat(4)}` : null,
       });
     }
     case commandNames.analyzeAutoEdit: {
