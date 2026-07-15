@@ -55,7 +55,7 @@ const processIsAlive = (pid: number): boolean => {
   }
 };
 
-const coordinatorRoot = (explicitRoot?: string): string => {
+export const resolveResourceCoordinatorRoot = (explicitRoot?: string): string => {
   const override = explicitRoot ?? Bun.env.RAWENGINE_RESOURCE_COORDINATOR_ROOT;
   if (override) return resolve(override);
   const result = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
@@ -161,7 +161,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const ownerId = options.ownerId ?? processOwnerId;
   const leaseFrame: LeaseFrame = { id: crypto.randomUUID(), label: options.label };
-  const root = coordinatorRoot(options.root);
+  const root = resolveResourceCoordinatorRoot(options.root);
   const slotSuffix = (slot: number): string => (capacity === 1 ? '' : `.slot-${slot}`);
   const lockPaths = Array.from({ length: capacity }, (_, slot) =>
     join(root, `${options.resource}${slotSuffix(slot)}.lock`),

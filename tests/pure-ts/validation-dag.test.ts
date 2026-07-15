@@ -32,6 +32,43 @@ const initFixtureRepository = async (
   return { exitCode, stderr };
 };
 
+const spawnNestedOutputValidation = (options: {
+  coordinator: string;
+  ownerId: string;
+  repetitions: number;
+  root: string;
+  waitTimeoutMs?: number;
+}) => {
+  const coordinatorPath = join(import.meta.dir, '../../scripts/lib/ci/resource-coordinator.ts');
+  const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
+  const script = `import { acquireResourceLease } from ${JSON.stringify(coordinatorPath)};
+import { runValidation, validationOutputResource } from ${JSON.stringify(enginePath)};
+const root=${JSON.stringify(options.root)};
+const coordinator=${JSON.stringify(options.coordinator)};
+const outer=await acquireResourceLease({label:'outer-validation-output',resource:validationOutputResource(root,'dist'),root:coordinator});
+try {
+  for(let index=0;index<${String(options.repetitions)};index+=1){
+    const node={id:'nested-output-'+index,command:['bun','-e',"await Bun.write('dist/artifact',Bun.env.RAWENGINE_RESOURCE_OWNER_ID??'missing')"],dependencies:[],inputs:['frontend'],resourceClass:'light',cachePolicy:'none',modes:['commit'],timeoutMs:2000,outputs:['dist']};
+    const exitCode=await runValidation([node],{mode:'commit',changedPaths:['input.ts'],noCache:true,verifyCache:false,explainCache:false,root,resourceCoordinatorRoot:coordinator});
+    if(exitCode!==0)process.exit(23);
+  }
+  console.log('nested-output-complete '+outer.ownerId);
+}finally{await outer.release();}`;
+  return Bun.spawn(['bun', '-e', script], {
+    cwd: options.root,
+    env: {
+      ...process.env,
+      RAWENGINE_RESOURCE_COORDINATOR_ROOT: options.coordinator,
+      RAWENGINE_RESOURCE_OWNER_ID: options.ownerId,
+      RAWENGINE_RESOURCE_OWNER_ROOT: options.coordinator,
+      RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
+      RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS: String(options.waitTimeoutMs ?? 250),
+    },
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+};
+
 describe('affected validation DAG', () => {
   test('classifies nonzero, signal, timeout, and possible OOM exits exactly', () => {
     expect(classifyProcessTermination(1, { interrupted: false, timedOut: false })).toEqual({
@@ -545,6 +582,80 @@ await lease.release();`;
       validationOutputResource(parallelWorktrees[1], 'dist'),
     );
     expect(performance.now() - startedAt).toBeLessThan(1_200);
+  });
+
+  test('programmatic nested validation inherits its active output-lease owner without self-queueing', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-output-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    try {
+      await mkdir(root);
+      await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
+      await initFixtureRepository(root);
+      const child = spawnNestedOutputValidation({
+        coordinator,
+        ownerId: 'nested-output-owner',
+        repetitions: 2,
+        root,
+      });
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expect(stdout).toContain('nested-output-complete nested-output-owner');
+      expect(await Bun.file(join(coordinator, `${validationOutputResource(root, 'dist')}.lock`)).exists()).toBeFalse();
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
+  test('keeps repeated nested output leases bounded across concurrent unrelated owners', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-output-stress-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    const children: Array<ReturnType<typeof Bun.spawn>> = [];
+    try {
+      await mkdir(root);
+      await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
+      await initFixtureRepository(root);
+      for (let index = 0; index < 3; index += 1) {
+        children.push(
+          spawnNestedOutputValidation({
+            coordinator,
+            ownerId: `nested-output-owner-${String(index)}`,
+            repetitions: 3,
+            root,
+            waitTimeoutMs: 4_000,
+          }),
+        );
+      }
+      const results = await Promise.all(
+        children.map(async (child) => {
+          const [exitCode, stdout, stderr] = await Promise.all([
+            child.exited,
+            new Response(child.stdout).text(),
+            new Response(child.stderr).text(),
+          ]);
+          return { exitCode, stderr, stdout };
+        }),
+      );
+      expect(
+        results.map(({ exitCode }) => exitCode),
+        results.map(({ stderr, stdout }) => `${stdout}\n${stderr}`).join('\n---\n'),
+      ).toEqual([0, 0, 0]);
+      for (let index = 0; index < results.length; index += 1) {
+        expect(results[index]?.stdout).toContain(`nested-output-complete nested-output-owner-${String(index)}`);
+      }
+      expect(await Bun.file(join(coordinator, `${validationOutputResource(root, 'dist')}.lock`)).exists()).toBeFalse();
+    } finally {
+      for (const child of children) {
+        if (child.exitCode === null) child.kill('SIGKILL');
+      }
+      await Promise.allSettled(children.map((child) => child.exited));
+      await rm(directory, { force: true, recursive: true });
+    }
   });
 
   test('holds producer output ownership through downstream consumers', async () => {
