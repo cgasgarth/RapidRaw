@@ -192,19 +192,19 @@ describe('lens correction edit transaction', () => {
     expect(() =>
       buildLensProfileEditTransaction(
         restored,
-        identity({ adjustmentRevision: 2 }),
+        identity({ adjustmentRevision: 1 }),
         { lensCorrectionMode: 'auto' },
         'stale-profile',
       ),
     ).toThrow('lens_correction_transaction.stale_revision');
 
-    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 1 }), 4, 4)).toBe(true);
-    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 1 }), 3, 4)).toBe(false);
-    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 2 }), 4, 4)).toBe(false);
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 2 }), 4, 4)).toBe(true);
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 2 }), 3, 4)).toBe(false);
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 1 }), 4, 4)).toBe(false);
     expect(
       isCurrentLensProfileRequest(
         { ...restored, selectedImage: { path: '/fixtures/other.ARW' } },
-        identity({ adjustmentRevision: 1 }),
+        identity({ adjustmentRevision: 2 }),
         4,
         4,
       ),
@@ -212,7 +212,7 @@ describe('lens correction edit transaction', () => {
     expect(
       isCurrentLensProfileRequest(
         { ...restored, imageSession: { id: 'other-session' } },
-        identity({ adjustmentRevision: 1 }),
+        identity({ adjustmentRevision: 2 }),
         4,
         4,
       ),

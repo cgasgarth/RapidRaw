@@ -49,6 +49,7 @@ import {
   type EditTransactionResult,
   reduceEditTransaction,
 } from '../utils/editTransaction';
+import { buildHistoryNavigationEditTransaction } from '../utils/historyNavigationEditTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
 import type { PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
@@ -603,6 +604,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.preview_requires_proposal');
       }
       const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
+      const historyTargetIndex = request.history === 'navigation' ? request.historyTargetIndex : undefined;
+      if (request.history === 'navigation') {
+        if (
+          historyTargetIndex === undefined ||
+          !Number.isInteger(historyTargetIndex) ||
+          historyTargetIndex < 0 ||
+          historyTargetIndex >= state.history.length
+        ) {
+          throw new Error(`edit_transaction.invalid_history_target:${String(historyTargetIndex)}`);
+        }
+      } else if (request.historyTargetIndex !== undefined) {
+        throw new Error('edit_transaction.history_target_requires_navigation');
+      }
       if (
         nativeHistoryBaseline !== undefined &&
         (request.persistence !== 'native-committed' || request.history !== 'single-entry')
@@ -624,6 +638,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (reconcilesHydratedNativeCommit && !areAdjustmentsEqual(state.adjustments, nextResult.after)) {
         throw new Error('edit_transaction.native_history_baseline_mismatch');
       }
+      if (
+        historyTargetIndex !== undefined &&
+        !areAdjustmentsEqual(state.history[historyTargetIndex] ?? state.adjustments, nextResult.after)
+      ) {
+        throw new Error('edit_transaction.history_target_mismatch');
+      }
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
         request.history === 'coalesced-interaction' &&
@@ -644,9 +664,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         : nextResult;
       result = publishedResult;
-      if (nextResult.noOp) return {};
+      if (nextResult.noOp) return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
       const nextHistory =
-        request.history === 'none'
+        request.history === 'none' || request.history === 'navigation'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
           : request.history === 'reset'
             ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
@@ -675,7 +695,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
-        historyIndex: nextHistory.historyIndex,
+        historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
+        ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
       };
     });
     if (!result) throw new Error('edit_transaction.not_applied');
@@ -785,29 +806,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   undo: () => {
-    set((state) => {
-      const nextState = undoEditHistory(state);
-      if (nextState.historyIndex === state.historyIndex) return {};
-      return {
-        ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, nextState.adjustments),
-        ...resolveAiSelectionState(state, nextState.adjustments),
-        historyIndex: nextState.historyIndex,
-      };
-    });
+    const state = get();
+    const nextState = undoEditHistory(state);
+    if (nextState.historyIndex === state.historyIndex) return;
+    state.applyEditTransaction(
+      buildHistoryNavigationEditTransaction(
+        state,
+        nextState.historyIndex,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+      ),
+    );
   },
 
   redo: () => {
-    set((state) => {
-      const nextState = redoEditHistory(state);
-      if (nextState.historyIndex === state.historyIndex) return {};
-      return {
-        ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, nextState.adjustments),
-        ...resolveAiSelectionState(state, nextState.adjustments),
-        historyIndex: nextState.historyIndex,
-      };
-    });
+    const state = get();
+    const nextState = redoEditHistory(state);
+    if (nextState.historyIndex === state.historyIndex) return;
+    state.applyEditTransaction(
+      buildHistoryNavigationEditTransaction(
+        state,
+        nextState.historyIndex,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+      ),
+    );
   },
 
   resetHistory: (initialState) => {
@@ -821,16 +842,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   goToHistoryIndex: (index) => {
-    set((state) => {
-      const nextState = goToEditHistoryIndex(state, index);
-      if (nextState.historyIndex === state.historyIndex) return {};
-      return {
-        ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, nextState.adjustments),
-        ...resolveAiSelectionState(state, nextState.adjustments),
-        historyIndex: nextState.historyIndex,
-      };
-    });
+    const state = get();
+    const nextState = goToEditHistoryIndex(state, index);
+    if (nextState.historyIndex === state.historyIndex) return;
+    state.applyEditTransaction(
+      buildHistoryNavigationEditTransaction(
+        state,
+        nextState.historyIndex,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+      ),
+    );
   },
 }));
 

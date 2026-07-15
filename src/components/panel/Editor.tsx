@@ -92,6 +92,7 @@ import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
+import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
 import { debounce } from '../../utils/timing';
@@ -121,6 +122,7 @@ import {
   type ViewerGestureOwner,
   type ViewerPointerType,
 } from './editor/viewerInputResolver';
+import type { ViewerParametricMaskTargetCommand } from './editor/viewerParametricMaskTargetInteractionController';
 import {
   getNextViewerLightsOutLevel,
   getViewerLightsOutLabel,
@@ -697,6 +699,24 @@ export default function Editor({
       selectedImage?.width,
       transformState,
     ],
+  );
+  const handleParametricMaskTargetCommit = useCallback(
+    (command: ViewerParametricMaskTargetCommand) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildParametricMaskTargetEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command.key,
+          command.parameters,
+          `parametric-mask-target:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
   );
   const presentationDescriptor = useMemo(
     () =>
@@ -2241,6 +2261,7 @@ export default function Editor({
               }}
               onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
               onLiveMaskPreview={handleLiveMaskPreview}
+              onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
               onQuickErase={(id, start, end) => {
                 void handleQuickErase(id, start, end);
               }}

@@ -624,6 +624,182 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   }
 }
 
+async function verifyParametricMaskTargetController(page: Page): Promise<void> {
+  const imageCanvas = page.getByTestId('image-canvas');
+  const toolStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const callCount = (command: string) =>
+    page.evaluate(
+      (expectedCommand) =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expectedCommand).length ??
+        0,
+      command,
+    );
+  const createMask = async (type: 'color' | 'luminance'): Promise<void> => {
+    const contextual = page.getByTestId(`mask-contextual-create-${type}`);
+    if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
+      await contextual.click();
+      return;
+    }
+    const emptyGridOthers = page.getByTestId('mask-creation-others');
+    if ((await emptyGridOthers.count()) > 0) {
+      await emptyGridOthers.scrollIntoViewIfNeeded();
+      await emptyGridOthers.click();
+    } else {
+      const more = page.getByTestId('mask-contextual-create-more');
+      await more.click();
+      await page.getByRole('menuitem', { exact: true, name: 'Others' }).click();
+    }
+    await page.getByRole('menuitem', { exact: true, name: type === 'color' ? 'Color' : 'Luminance' }).click();
+  };
+  const waitForPersistedTarget = async (type: 'color' | 'luminance', expectedInitial: boolean): Promise<void> => {
+    await page.waitForFunction(
+      ({ initial, maskType }) => {
+        const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1);
+        const masks = latest?.args?.['adjustments']?.['masks'];
+        if (!Array.isArray(masks) || typeof latest?.endedAtMs !== 'number') return false;
+        const mask = masks
+          .flatMap((container) =>
+            typeof container === 'object' && container !== null && Array.isArray(container['subMasks'])
+              ? container['subMasks']
+              : [],
+          )
+          .find((candidate) => candidate?.['type'] === maskType);
+        const parameters = mask?.['parameters'];
+        if (typeof parameters !== 'object' || parameters === null) return false;
+        return initial
+          ? parameters['isInitialDraw'] === true
+          : !('isInitialDraw' in parameters) &&
+              Number.isFinite(parameters['targetX']) &&
+              Number.isFinite(parameters['targetY']) &&
+              parameters['targetX'] >= 0 &&
+              parameters['targetY'] >= 0;
+      },
+      { initial: expectedInitial, maskType: type },
+      { timeout: 10_000 },
+    );
+  };
+  const clickTarget = async (pointerType: 'mouse' | 'touch'): Promise<void> => {
+    const box = await toolStage.boundingBox();
+    if (box === null) throw new Error(`Parametric ${pointerType} proof could not resolve the Konva stage.`);
+    const point = { x: box.x + box.width * 0.43, y: Math.min(box.y + box.height * 0.47, viewport.height - 48) };
+    if (pointerType === 'mouse') {
+      await page.mouse.click(point.x, point.y);
+      return;
+    }
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ ...point, force: 1, id: 31, radiusX: 1, radiusY: 1 }],
+      type: 'touchStart',
+    });
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  };
+
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  await page.getByText('Create New Mask', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  for (const [index, type] of (['color', 'luminance'] as const).entries()) {
+    const creationSaves = await callCount('save_metadata_and_update_thumbnail');
+    await createMask(type);
+    await page.waitForFunction((expectedType) => {
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return (
+        canvas?.getAttribute('data-parametric-mask-context-active') === 'true' &&
+        canvas.getAttribute('data-parametric-mask-context-tool') === expectedType
+      );
+    }, type);
+    await waitForPersistedTarget(type, true);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== creationSaves + 1) {
+      throw new Error(`Creating the ${type} mask did not persist exactly once.`);
+    }
+
+    const baseline = {
+      overlays: await callCount('generate_mask_overlay'),
+      renders: await callCount('apply_adjustments'),
+      saves: await callCount('save_metadata_and_update_thumbnail'),
+    };
+    await clickTarget(index === 0 ? 'mouse' : 'touch');
+    await waitForPersistedTarget(type, false);
+    await page.waitForFunction(
+      ({ overlays, renders, saves }) => {
+        const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+        return (
+          calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+          calls.filter(({ command }) => command === 'apply_adjustments').length > renders &&
+          calls.filter(({ command }) => command === 'generate_mask_overlay').length > overlays
+        );
+      },
+      baseline,
+      { timeout: 10_000 },
+    );
+    const proof = await page.evaluate((maskType) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+      const findMask = (containers: unknown) =>
+        Array.isArray(containers)
+          ? containers
+              .flatMap((container) =>
+                typeof container === 'object' && container !== null && Array.isArray(container['subMasks'])
+                  ? container['subMasks']
+                  : [],
+              )
+              .find((candidate) => candidate?.['type'] === maskType)
+          : undefined;
+      return {
+        overlay: findMask(
+          latest('generate_mask_overlay')?.['maskDef']?.['subMasks'] === undefined
+            ? []
+            : [{ subMasks: latest('generate_mask_overlay')?.['maskDef']?.['subMasks'] }],
+        ),
+        persisted: findMask(latest('save_metadata_and_update_thumbnail')?.['adjustments']?.['masks']),
+        receipt: {
+          source: document
+            .querySelector('[data-testid="editor-image-preview-panel"]')
+            ?.getAttribute('data-last-edit-source'),
+          transactionId: document
+            .querySelector('[data-testid="editor-image-preview-panel"]')
+            ?.getAttribute('data-last-edit-transaction-id'),
+        },
+        renderRequest: latest('apply_adjustments')?.['request'],
+      };
+    }, type);
+    const persistedParameters = proof.persisted?.['parameters'];
+    const overlayParameters = proof.overlay?.['parameters'];
+    if (
+      proof.receipt.source !== 'layer-command' ||
+      !proof.receipt.transactionId?.startsWith('parametric-mask-target:') ||
+      typeof persistedParameters?.['targetX'] !== 'number' ||
+      typeof persistedParameters['targetY'] !== 'number' ||
+      overlayParameters?.['targetX'] !== persistedParameters['targetX'] ||
+      overlayParameters?.['targetY'] !== persistedParameters['targetY'] ||
+      typeof proof.renderRequest !== 'object' ||
+      proof.renderRequest === null
+    ) {
+      throw new Error(`Parametric ${type} output proof was incomplete: ${JSON.stringify(proof.receipt)}.`);
+    }
+    const rendered = editDocumentV2Schema
+      .parse(proof.renderRequest['editDocumentV2'])
+      .layers.masks.flatMap((container) => container.subMasks)
+      .find((candidate) => candidate.type === type);
+    if (
+      rendered?.parameters?.['targetX'] !== persistedParameters['targetX'] ||
+      rendered.parameters['targetY'] !== persistedParameters['targetY']
+    ) {
+      throw new Error(`Parametric ${type} render output diverged from persisted target.`);
+    }
+
+    await page.locator('button[data-command-id="undo"]:visible').first().click();
+    await waitForPersistedTarget(type, true);
+    if ((await imageCanvas.getAttribute('data-parametric-mask-context-tool')) !== type) {
+      throw new Error(`Undo did not restore the active ${type} target session.`);
+    }
+    if (index === 0) {
+      await page.getByTestId('mask-reset-all').click();
+      await page.getByTestId('mask-creation-others').waitFor({ state: 'visible', timeout: 10_000 });
+    }
+  }
+}
+
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 45_000) {
@@ -686,7 +862,8 @@ try {
   await waitForDevServer(server);
   browser = await chromium.launch({ headless: true });
   page = await browser.newPage({
-    hasTouch: browserScenario === 'initial-mask-draw-controller',
+    hasTouch:
+      browserScenario === 'initial-mask-draw-controller' || browserScenario === 'parametric-mask-target-controller',
     viewport,
   });
   const consoleErrors: string[] = [];
@@ -747,6 +924,20 @@ try {
     browser = undefined;
     await stopServer(server);
     console.log('initial mask draw browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'parametric-mask-target-controller') {
+    await verifyParametricMaskTargetController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected parametric-mask browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected parametric-mask browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('parametric mask target browser controller proof passed');
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
