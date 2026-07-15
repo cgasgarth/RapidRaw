@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
+import { editDocumentBlackWhiteMixerV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
+
 import { parseBlackWhiteMixerSettings } from '../../../src/schemas/color/blackWhiteMixerSchemas';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../src/utils/color/monochromePresets';
 import {
@@ -20,6 +22,52 @@ const zeroWeights = {
 };
 
 describe('versioned monochrome runtime', () => {
+  test('shares acceptance and rejection with EditDocument node validation', () => {
+    const fixtures: unknown[] = [
+      { enabled: false, weights: zeroWeights },
+      {
+        enabled: true,
+        presetId: 'neutral_panchromatic',
+        process: 'neutral_panchromatic_v1',
+        sourceClass: 'color_source',
+        weights: zeroWeights,
+      },
+      {
+        enabled: true,
+        presetId: 'manual',
+        process: 'legacy_fixed_band_v1',
+        sourceClass: 'color_source',
+        weights: zeroWeights,
+      },
+      {
+        enabled: true,
+        presetId: 'manual',
+        process: 'continuous_sensitivity_v1',
+        sourceClass: 'color_source',
+        weights: { ...zeroWeights, reds: 101 },
+      },
+      {
+        enabled: true,
+        presetId: 'manual',
+        process: 'continuous_sensitivity_v1',
+        sourceClass: 'future_source',
+        weights: { ...zeroWeights, reds: 20 },
+      },
+    ];
+    for (const fixture of fixtures) {
+      const app = (() => {
+        try {
+          return { success: true, value: parseBlackWhiteMixerSettings(fixture) } as const;
+        } catch {
+          return { success: false } as const;
+        }
+      })();
+      const node = editDocumentBlackWhiteMixerV2Schema.safeParse({ blackWhiteMixer: fixture });
+      expect(node.success).toBe(app.success);
+      if (node.success && app.success) expect(node.data.blackWhiteMixer).toEqual(app.value);
+    }
+  });
+
   test('keeps missing process values on the pixel-stable legacy process', () => {
     const parsed = parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights });
     expect(parsed.process).toBe('legacy_fixed_band_v1');

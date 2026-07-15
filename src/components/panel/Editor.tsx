@@ -273,8 +273,8 @@ export default function Editor({
 
   const debouncedSetHistory = useMemo(
     () =>
-      debounce((newAdj: Adjustments) => {
-        pushHistory(newAdj);
+      debounce((newAdj: Adjustments, expected: { adjustmentRevision: number; imageSessionId: string }) => {
+        pushHistory(newAdj, expected);
       }, 500),
     [pushHistory],
   );
@@ -284,7 +284,10 @@ export default function Editor({
       setEditor((state) => {
         const prevAdjustments = state.adjustments;
         const newAdjustments = typeof value === 'function' ? value(prevAdjustments) : { ...prevAdjustments, ...value };
-        debouncedSetHistory(newAdjustments);
+        debouncedSetHistory(newAdjustments, {
+          adjustmentRevision: state.adjustmentRevision + 1,
+          imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        });
         return { adjustments: newAdjustments };
       });
     },

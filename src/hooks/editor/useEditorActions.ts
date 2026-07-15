@@ -55,7 +55,11 @@ import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
-  useEditorStore.getState().pushHistory(newAdj);
+  const state = useEditorStore.getState();
+  state.pushHistory(newAdj, {
+    adjustmentRevision: state.adjustmentRevision,
+    imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  });
 }, 500);
 
 export const debouncedSave = debounce(

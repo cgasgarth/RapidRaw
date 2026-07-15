@@ -14,6 +14,7 @@ import type {
   ColorBalanceRgbSettings,
 } from '../../../schemas/color/colorBalanceRgbSchemas';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
@@ -26,8 +27,10 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   activeColor: BlackWhiteMixerChannel;
   activeColorBalanceRange: ColorBalanceRgbRange;
   adjustmentVisibility: Record<string, boolean>;
+  blackWhiteMixerCommitIdentity: BlackWhiteMixerCommitIdentity | null;
   canCreateLocalAdjustmentFromActiveRange?: boolean;
   isForMask: boolean;
+  commitBlackWhiteMixer: (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => void;
   onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
@@ -202,7 +205,9 @@ export const ColorMixerControls = ({
   activeColorBalanceRange,
   adjustmentVisibility,
   adjustments,
+  blackWhiteMixerCommitIdentity,
   canCreateLocalAdjustmentFromActiveRange = false,
+  commitBlackWhiteMixer,
   isForMask,
   onCreateLocalAdjustmentFromActiveRange,
   onDragStateChange,
@@ -569,6 +574,8 @@ export const ColorMixerControls = ({
           activeColorBalanceRange={activeColorBalanceRange}
           adjustmentVisibility={adjustmentVisibility}
           adjustments={adjustments}
+          blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
+          commitBlackWhiteMixer={commitBlackWhiteMixer}
           onDragStateChange={onDragStateChange}
           setActiveChannelMixerOutput={setActiveChannelMixerOutput}
           setActiveColor={setActiveColor}
@@ -586,6 +593,8 @@ type AdvancedMixerControlsProps = Pick<
   | 'activeColor'
   | 'activeColorBalanceRange'
   | 'adjustmentVisibility'
+  | 'blackWhiteMixerCommitIdentity'
+  | 'commitBlackWhiteMixer'
   | 'setActiveChannelMixerOutput'
   | 'setActiveColor'
   | 'setActiveColorBalanceRange'
@@ -598,6 +607,8 @@ const AdvancedMixerControls = ({
   activeColorBalanceRange,
   adjustmentVisibility,
   adjustments,
+  blackWhiteMixerCommitIdentity,
+  commitBlackWhiteMixer,
   onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
@@ -619,22 +630,16 @@ const AdvancedMixerControls = ({
   const channelMixerModified = isChannelMixerModified(channelMixer);
 
   const resetBlackWhite = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      blackWhiteMixer: structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
-    }));
+    commitBlackWhiteMixer(() => structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer));
   };
   const resetBlackWhiteChannel = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      blackWhiteMixer: {
-        ...previous.blackWhiteMixer,
-        weights: {
-          ...previous.blackWhiteMixer.weights,
-          [activeColor]: INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor],
-        },
-        presetId: 'manual',
+    commitBlackWhiteMixer((current) => ({
+      ...current,
+      weights: {
+        ...current.weights,
+        [activeColor]: INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor],
       },
+      presetId: 'manual',
     }));
   };
   const resetColorBalance = () => {
@@ -723,12 +728,9 @@ const AdvancedMixerControls = ({
                     checked={blackWhite.enabled}
                     label={t('adjustments.color.blackWhiteMixer.title')}
                     onChange={() =>
-                      setAdjustments((previous) => ({
-                        ...previous,
-                        blackWhiteMixer: previous.blackWhiteMixer.enabled
-                          ? { ...previous.blackWhiteMixer, enabled: false }
-                          : enableBlackWhiteMixer(previous.blackWhiteMixer, activeColor),
-                      }))
+                      commitBlackWhiteMixer((current) =>
+                        current.enabled ? { ...current, enabled: false } : enableBlackWhiteMixer(current, activeColor),
+                      )
                     }
                     testId="black-white-mixer-toggle"
                   />
@@ -747,6 +749,9 @@ const AdvancedMixerControls = ({
           </summary>
           <div
             className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
+            data-commit-adjustment-revision={blackWhiteMixerCommitIdentity?.adjustmentRevision}
+            data-commit-image-session={blackWhiteMixerCommitIdentity?.imageSessionId}
+            data-commit-source-identity={blackWhiteMixerCommitIdentity?.sourceIdentity}
             data-enabled={String(blackWhite.enabled)}
             data-testid="black-white-mixer-controls"
           >
@@ -759,15 +764,10 @@ const AdvancedMixerControls = ({
                   })}
                   className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
                   data-testid="black-white-mixer-preset"
-                  onChange={(event) =>
-                    setAdjustments((previous) => ({
-                      ...previous,
-                      blackWhiteMixer: applyMonochromePreset(
-                        previous.blackWhiteMixer,
-                        event.target.value as typeof previous.blackWhiteMixer.presetId,
-                      ),
-                    }))
-                  }
+                  onChange={(event) => {
+                    const presetId = event.target.value as BlackWhiteMixerSettings['presetId'];
+                    commitBlackWhiteMixer((current) => applyMonochromePreset(current, presetId));
+                  }}
                   value={blackWhite.presetId}
                 >
                   <option value="manual">
@@ -788,15 +788,10 @@ const AdvancedMixerControls = ({
                   })}
                   className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
                   data-testid="black-white-mixer-source-class"
-                  onChange={(event) =>
-                    setAdjustments((previous) => ({
-                      ...previous,
-                      blackWhiteMixer: {
-                        ...previous.blackWhiteMixer,
-                        sourceClass: event.target.value as typeof previous.blackWhiteMixer.sourceClass,
-                      },
-                    }))
-                  }
+                  onChange={(event) => {
+                    const sourceClass = event.target.value as BlackWhiteMixerSettings['sourceClass'];
+                    commitBlackWhiteMixer((current) => ({ ...current, sourceClass }));
+                  }}
                   value={blackWhite.sourceClass}
                 >
                   <option value="color_source">
@@ -871,16 +866,14 @@ const AdvancedMixerControls = ({
                 min={-100}
                 onDragStateChange={onDragStateChange}
                 onValueChange={(value) =>
-                  setAdjustments((previous) => ({
-                    ...previous,
-                    blackWhiteMixer: {
-                      ...previous.blackWhiteMixer,
-                      weights: { ...previous.blackWhiteMixer.weights, [activeColor]: value },
-                      presetId: 'manual',
-                    },
+                  commitBlackWhiteMixer((current) => ({
+                    ...current,
+                    presetId: 'manual',
+                    weights: { ...current.weights, [activeColor]: value },
                   }))
                 }
                 step={1}
+                testId="black-white-mixer-contribution"
                 value={blackWhite.weights[activeColor]}
               />
               <div className="flex justify-end">
