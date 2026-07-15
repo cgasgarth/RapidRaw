@@ -29,9 +29,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Require a non-recursive branch update credential
+        env:
+          READY_PR_UPDATE_TOKEN: ${{ secrets.READY_PR_UPDATE_TOKEN }}
+        run: |
+          if [[ -z "$READY_PR_UPDATE_TOKEN" ]]; then
+            echo '::error::READY_PR_UPDATE_TOKEN is required. Use a least-privilege GitHub App installation token or fine-grained user token; GITHUB_TOKEN makes PR checks require manual approval.'
+            exit 1
+          fi
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          token: ${{ secrets.READY_PR_UPDATE_TOKEN }}
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -40,5 +50,5 @@ jobs:
       - name: Merge main and dispatch required checks
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ github.token }}
+          READY_PR_UPDATE_TOKEN: ${{ secrets.READY_PR_UPDATE_TOKEN }}
         run: bun scripts/ci/update-ready-pr-branches.ts
