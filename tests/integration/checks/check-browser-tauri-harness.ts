@@ -1318,7 +1318,16 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
     };
   });
 
-  await page.getByTestId('black-white-mixer-toggle').click();
+  const toggle = page.getByTestId('black-white-mixer-toggle');
+  if ((await toggle.getAttribute('aria-checked')) !== 'false') {
+    throw new Error('Black & White Mixer transaction proof requires a disabled baseline.');
+  }
+  await toggle.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
+    undefined,
+    { timeout: 10_000 },
+  );
   await page.getByTestId('black-white-mixer-contribution-value').click();
   const responseInput = page.getByTestId('black-white-mixer-contribution-input');
   await responseInput.fill('32');
