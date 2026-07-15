@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { blackWhiteMixerSettingsSchema } from './color/blackWhiteMixerSchemas.js';
 import { channelMixerSettingsSchema } from './color/channelMixerSchemas.js';
 import { colorBalanceRgbSettingsSchema } from './color/colorBalanceRgbSchemas.js';
+import { levelsSettingsSchema } from './color/levelsSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import {
@@ -110,6 +111,20 @@ export const EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS = {
 } as const;
 
 export const EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS = ['colorBalanceRgb'] as const;
+export const editDocumentLumaLevelsV2Schema = z.object({ levels: levelsSettingsSchema }).strict();
+
+export const EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS = {
+  levels: {
+    enabled: false,
+    gamma: 1,
+    inputBlack: 0,
+    inputWhite: 1,
+    outputBlack: 0,
+    outputWhite: 1,
+  },
+} as const;
+
+export const EDIT_DOCUMENT_LUMA_LEVELS_FIELDS = ['levels'] as const;
 
 const legacyColorGradingRangeV2Schema = z
   .object({
@@ -659,6 +674,16 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'channel_mixer',
     process: 'scene_referred_v2',
     renderStage: 'channel_mixer',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS,
+    editorSection: 'color',
+    legacyFields: EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
+    nodeType: 'luma_levels',
+    process: 'scene_referred_v2',
+    renderStage: 'luma_levels',
     implementationVersion: 1,
   },
   {
@@ -1264,6 +1289,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'luma_levels') {
+        const levels = editDocumentLumaLevelsV2Schema.safeParse(node.params);
+        if (!levels.success) {
+          for (const issue of levels.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'perceptual_grading') {
         const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
         if (!perceptualGrading.success) {
@@ -1500,7 +1533,7 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     nodeType: 'lens_correction',
     schemas: editDocumentManualChromaticAberrationV2Schema.shape,
   });
-  return normalizeLegacyNodeOwnership(document, {
+  document = normalizeLegacyNodeOwnership(document, {
     createNode: {
       enabledFromNodeType: 'channel_mixer',
       implementationVersion: 1,
@@ -1510,6 +1543,17 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     fields: EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS,
     nodeType: 'color_balance_rgb',
     schemas: editDocumentColorBalanceRgbV2Schema.shape,
+  });
+  return normalizeLegacyNodeOwnership(document, {
+    createNode: {
+      enabledFromNodeType: 'channel_mixer',
+      implementationVersion: 1,
+      process: 'scene_referred_v2',
+    },
+    defaults: EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS,
+    fields: EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
+    nodeType: 'luma_levels',
+    schemas: editDocumentLumaLevelsV2Schema.shape,
   });
 }, editDocumentV2ObjectSchema);
 
@@ -1526,6 +1570,7 @@ export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Sc
 export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhiteMixerV2Schema>;
 export type EditDocumentChannelMixerV2 = z.infer<typeof editDocumentChannelMixerV2Schema>;
 export type EditDocumentColorBalanceRgbV2 = z.infer<typeof editDocumentColorBalanceRgbV2Schema>;
+export type EditDocumentLumaLevelsV2 = z.infer<typeof editDocumentLumaLevelsV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
@@ -1560,6 +1605,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'black_white_mixer') editDocumentBlackWhiteMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'channel_mixer') editDocumentChannelMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'color_balance_rgb') editDocumentColorBalanceRgbV2Schema.parse(envelope.params);
+  if (envelope.type === 'luma_levels') editDocumentLumaLevelsV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);

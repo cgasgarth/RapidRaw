@@ -52,7 +52,7 @@ export const buildLevelsEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: [{ patch: { levels: parsed.data }, type: 'patch-adjustments' }],
+    operations: [{ nodeType: 'luma_levels', patch: { levels: parsed.data }, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'manual-control',
     transactionId,

@@ -131,6 +131,48 @@ test('ColorAdvancedControls slider commits calibration through fallback authorit
   expect(genericSetter).not.toHaveBeenCalled();
 });
 
+test('ColorAdvancedControls Levels actions commit through the luma Levels node', () => {
+  installDom();
+  const adjustments = initializeFallbackStore(93);
+  const genericSetter = mock(() => undefined);
+  const container = render(
+    createElement(ColorAdvancedControls, {
+      adjustmentVisibility: {},
+      adjustments,
+      appSettings: null,
+      isColorCalibrationVisible: false,
+      levelsClippingWarnings: [],
+      mode: 'levels',
+      setAdjustments: genericSetter,
+    }),
+  );
+
+  act(() => getButton(container, 'color-levels-toggle').click());
+  expect(useEditorStore.getState().adjustments.levels.enabled).toBeTrue();
+  expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels.enabled).toBeTrue();
+  expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('levels');
+
+  const inputBlack = container.querySelector('[data-testid="color-levels-controls"] input[type="range"]');
+  if (!(inputBlack instanceof window.HTMLInputElement)) throw new Error('missing Levels input-black slider');
+  act(() => {
+    inputBlack.value = '8';
+    inputBlack.dispatchEvent(new window.Event('input', { bubbles: true }));
+  });
+
+  expect(useEditorStore.getState().adjustments.levels.inputBlack).toBe(0.08);
+  expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toMatchObject({
+    enabled: true,
+    inputBlack: 0.08,
+  });
+  expect(useEditorStore.getState().history).toHaveLength(3);
+  expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+    adjustmentRevision: 2,
+    imageSessionId: 'editor-image-session:93',
+    source: 'manual-control',
+  });
+  expect(genericSetter).not.toHaveBeenCalled();
+});
+
 function initializeFallbackStore(imageSessionId: number): Adjustments {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);

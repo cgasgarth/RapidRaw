@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
+  EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeEnvelopeV2,
@@ -18,6 +19,7 @@ import {
   editDocumentLayersV2Schema,
   editDocumentLensCorrectionV2Schema,
   editDocumentLocalContrastV2Schema,
+  editDocumentLumaLevelsV2Schema,
   editDocumentManualChromaticAberrationV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentPerceptualGradingV2Schema,
@@ -35,6 +37,7 @@ const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeD
 const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
 const LOCAL_CONTRAST_FIELDS = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
 const MANUAL_CHROMATIC_ABERRATION_FIELDS = new Set<string>(EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS);
+const LUMA_LEVELS_FIELDS = new Set<string>(EDIT_DOCUMENT_LUMA_LEVELS_FIELDS);
 
 const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (LOCAL_CONTRAST_FIELDS.has(key)) {
@@ -46,6 +49,7 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
     ];
   }
   if (key === 'colorBalanceRgb') return editDocumentColorBalanceRgbV2Schema.shape.colorBalanceRgb;
+  if (LUMA_LEVELS_FIELDS.has(key)) return editDocumentLumaLevelsV2Schema.shape.levels;
   return undefined;
 };
 
@@ -172,19 +176,24 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                                   ...(descriptor?.defaultParams ?? {}),
                                   ...mappedParams,
                                 })
-                              : nodeType === 'perceptual_grading'
-                                ? editDocumentPerceptualGradingV2Schema.parse({
+                              : nodeType === 'luma_levels'
+                                ? editDocumentLumaLevelsV2Schema.parse({
                                     ...(descriptor?.defaultParams ?? {}),
                                     ...mappedParams,
                                   })
-                                : nodeType === 'color_calibration'
-                                  ? editDocumentColorCalibrationV2Schema.parse({
+                                : nodeType === 'perceptual_grading'
+                                  ? editDocumentPerceptualGradingV2Schema.parse({
                                       ...(descriptor?.defaultParams ?? {}),
                                       ...mappedParams,
                                     })
-                                  : nodeType === 'layers'
-                                    ? normalizeLegacyLayers({ masks: [], ...mappedParams })
-                                    : mappedParams;
+                                  : nodeType === 'color_calibration'
+                                    ? editDocumentColorCalibrationV2Schema.parse({
+                                        ...(descriptor?.defaultParams ?? {}),
+                                        ...mappedParams,
+                                      })
+                                    : nodeType === 'layers'
+                                      ? normalizeLegacyLayers({ masks: [], ...mappedParams })
+                                      : mappedParams;
       return [
         nodeType,
         {
@@ -219,6 +228,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'display_creative',
       'geometry',
       'lens_correction',
+      'luma_levels',
       'perceptual_grading',
       'point_color',
       'scene_curve',

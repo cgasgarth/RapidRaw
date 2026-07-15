@@ -6,6 +6,11 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
+import {
   buildLevelsEditTransaction,
   isCurrentLevelsIdentity,
   type LevelsCommitIdentity,
@@ -57,6 +62,8 @@ describe('Levels edit transaction', () => {
 
   test('commits one validated Levels action with receipt, invalidation, and Undo/Redo', () => {
     const before = useEditorStore.getState();
+    const beforeNode = before.editDocumentV2.nodes.luma_levels;
+    const beforeTone = before.editDocumentV2.nodes.scene_global_color_tone;
     const next = initialLevels();
     next.enabled = true;
     next.inputBlack = 0.08;
@@ -65,10 +72,12 @@ describe('Levels edit transaction', () => {
     next.outputBlack = 0.03;
     next.outputWhite = 0.97;
 
-    const result = before.applyEditTransaction(
-      buildLevelsEditTransaction(before, identity(), next, 'levels-global-change'),
-    );
+    const request = buildLevelsEditTransaction(before, identity(), next, 'levels-global-change');
+    const result = before.applyEditTransaction(request);
 
+    expect(request.operations).toEqual([
+      { nodeType: 'luma_levels', patch: { levels: next }, type: 'patch-edit-document-node' },
+    ]);
     expect(result).toMatchObject({
       changedKeys: ['levels'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
@@ -88,11 +97,74 @@ describe('Levels edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustments.levels).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes.luma_levels).not.toBe(beforeNode);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('levels');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.levels).toEqual(INITIAL_ADJUSTMENTS.levels);
+    expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toEqual(
+      INITIAL_ADJUSTMENTS.levels,
+    );
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().adjustments.levels).toEqual(next);
+    expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
+  });
+
+  test('carries Levels node authority through save execution and reopen', async () => {
+    const before = useEditorStore.getState();
+    const beforeDocument = before.editDocumentV2;
+    const next = initialLevels();
+    next.enabled = true;
+    next.gamma = 1.4;
+    next.inputBlack = 0.05;
+    before.applyEditTransaction(buildLevelsEditTransaction(before, identity(), next, 'save-levels'));
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'b'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.installSession({
+      adjustmentRevision: 0,
+      adjustments: { ...committed.adjustments, levels: initialLevels() },
+      editDocumentV2: beforeDocument,
+      imageSessionId: session.id,
+      path: sourcePath,
+      sessionGeneration: session.generation,
+    });
+    if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed Levels receipt');
+    runner.submitCommitted({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: session.generation,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(executions).toHaveLength(1);
+    expect(executions[0]?.editDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.luma_levels.params.levels).toEqual(next);
+    expect(reopened).toEqual(committed.editDocumentV2);
   });
 
   test('keeps exact no-ops inert and makes reset one undoable action', () => {

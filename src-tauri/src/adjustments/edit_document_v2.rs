@@ -22,6 +22,7 @@ enum EditNodeTypeV2 {
     ColorBalanceRgb,
     BlackWhiteMixer,
     ChannelMixer,
+    LumaLevels,
     PerceptualGrading,
     CameraInput,
     LensCorrection,
@@ -44,6 +45,7 @@ impl EditNodeTypeV2 {
             Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
             Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
             Self::ChannelMixer => ("channel_mixer", "scene_referred_v2", 1),
+            Self::LumaLevels => ("luma_levels", "scene_referred_v2", 1),
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
@@ -63,6 +65,7 @@ impl EditNodeTypeV2 {
             | Self::ColorBalanceRgb
             | Self::BlackWhiteMixer
             | Self::ChannelMixer
+            | Self::LumaLevels
             | Self::PerceptualGrading
             | Self::CameraInput
             | Self::ColorCalibration => Some("color"),
@@ -738,6 +741,59 @@ struct ChannelMixerV2 {
 impl ChannelMixerV2 {
     fn validate(&self) -> Result<(), String> {
         self.channel_mixer.validate()
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LumaLevelsSettingsV2 {
+    enabled: bool,
+    gamma: f64,
+    input_black: f64,
+    input_white: f64,
+    output_black: f64,
+    output_white: f64,
+}
+
+impl LumaLevelsSettingsV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("gamma", self.gamma, 0.1, 5.0),
+            ("inputBlack", self.input_black, 0.0, 1.0),
+            ("inputWhite", self.input_white, 0.0, 1.0),
+            ("outputBlack", self.output_black, 0.0, 1.0),
+            ("outputWhite", self.output_white, 0.0, 1.0),
+        ] {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 luma_levels field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        if self.input_black >= self.input_white {
+            return Err(
+                "EditDocumentV2 luma_levels inputBlack must be below inputWhite".to_string(),
+            );
+        }
+        if self.output_black >= self.output_white {
+            return Err(
+                "EditDocumentV2 luma_levels outputBlack must be below outputWhite".to_string(),
+            );
+        }
+        let _ = self.enabled;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct LumaLevelsV2 {
+    levels: LumaLevelsSettingsV2,
+}
+
+impl LumaLevelsV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.levels.validate()
     }
 }
 
@@ -1871,6 +1927,10 @@ fn compile_node_params(
             parse_channel_mixer(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::LumaLevels => {
+            parse_luma_levels(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::PerceptualGrading => {
             parse_perceptual_grading(&node.params)?;
             Ok(node.params.clone())
@@ -2016,6 +2076,13 @@ fn parse_channel_mixer(params: &Map<String, Value>) -> Result<ChannelMixerV2, St
         .map_err(|error| format!("EditDocumentV2 channel_mixer is invalid: {error}"))?;
     channel_mixer.validate()?;
     Ok(channel_mixer)
+}
+
+fn parse_luma_levels(params: &Map<String, Value>) -> Result<LumaLevelsV2, String> {
+    let levels: LumaLevelsV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 luma_levels is invalid: {error}"))?;
+    levels.validate()?;
+    Ok(levels)
 }
 
 fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGradingV2, String> {
@@ -2213,6 +2280,7 @@ fn validate_layers_domain(
 
 #[cfg(test)]
 mod tests {
+    use glam::Vec3;
     use serde_json::{Value, json};
 
     use super::super::parse::get_all_adjustments_from_json;
@@ -2220,6 +2288,7 @@ mod tests {
     use crate::color::mixer_render::{
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
+    use crate::render::cpu_edit_graph::apply_luma_levels;
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -2420,6 +2489,29 @@ mod tests {
                 "preserveLuminance": false,
                 "red": { "blue": -8, "constant": 2, "green": 24, "red": 112 }
             }
+        })
+    }
+
+    fn luma_levels_params() -> Value {
+        json!({
+            "levels": {
+                "enabled": true,
+                "gamma": 2,
+                "inputBlack": 0.1,
+                "inputWhite": 0.9,
+                "outputBlack": 0.2,
+                "outputWhite": 0.8
+            }
+        })
+    }
+
+    fn luma_levels_node() -> Value {
+        json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": luma_levels_params(),
+            "process": "scene_referred_v2",
+            "type": "luma_levels"
         })
     }
 
@@ -2661,6 +2753,7 @@ mod tests {
             "sourceArtifacts": { "aiPatches": [] }
         });
         document["nodes"]["color_balance_rgb"] = color_balance_rgb_node();
+        document["nodes"]["luma_levels"] = luma_levels_node();
         document
     }
 
@@ -2765,6 +2858,7 @@ mod tests {
             "whites": 9
         });
         expected["colorBalanceRgb"] = color_balance_rgb_params()["colorBalanceRgb"].clone();
+        expected["levels"] = luma_levels_params()["levels"].clone();
         expected["cameraProfileAmount"] = json!(100);
         expected["centré"] = json!(-9);
         expected["localContrastHaloGuard"] = json!(62);
@@ -3518,6 +3612,81 @@ mod tests {
             .into_render_adjustments()
             .expect_err("enabled identity color balance must fail");
         assert!(error.contains("requires a non-zero channel response"));
+    }
+
+    #[test]
+    fn luma_levels_compiler_is_strict_and_drives_native_pixel_output() {
+        let document: EditDocumentV2 =
+            serde_json::from_value(document_with_legacy(json!({}))).expect("valid levels document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("levels document compiles");
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        let output = apply_luma_levels(Vec3::splat(0.5), adjustments.global.levels, false);
+        let expected = 0.2 + 0.6 * 0.5_f32.sqrt();
+        assert!(
+            (output.x - expected).abs() <= 1.0e-6
+                && (output.y - expected).abs() <= 1.0e-6
+                && (output.z - expected).abs() <= 1.0e-6,
+            "unexpected levels output: {output:?}"
+        );
+
+        let mut pre_levels_node = document_with_legacy(json!({
+            "levels": luma_levels_params()["levels"].clone()
+        }));
+        pre_levels_node["nodes"]
+            .as_object_mut()
+            .expect("node map")
+            .remove("luma_levels");
+        serde_json::from_value::<EditDocumentV2>(pre_levels_node)
+            .expect("pre-levels-node v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-levels-node v2 document remains compilable");
+
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["luma_levels"]["params"]["levels"]["futurePivot"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned levels field must fail");
+        assert!(error.contains("unknown field `futurePivot`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["luma_levels"]["params"]["levels"]
+            .as_object_mut()
+            .expect("levels object")
+            .remove("gamma");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing levels field must fail");
+        assert!(error.contains("missing field `gamma`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["luma_levels"]["params"]["levels"]["gamma"] = json!(5.1);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range levels gamma must fail");
+        assert!(error.contains("field 'gamma'"));
+
+        let mut invalid_input = document_with_legacy(json!({}));
+        invalid_input["nodes"]["luma_levels"]["params"]["levels"]["inputBlack"] = json!(0.9);
+        invalid_input["nodes"]["luma_levels"]["params"]["levels"]["inputWhite"] = json!(0.9);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_input)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid levels input range must fail");
+        assert!(error.contains("inputBlack must be below inputWhite"));
+
+        let mut invalid_output = document_with_legacy(json!({}));
+        invalid_output["nodes"]["luma_levels"]["params"]["levels"]["outputBlack"] = json!(0.8);
+        invalid_output["nodes"]["luma_levels"]["params"]["levels"]["outputWhite"] = json!(0.2);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_output)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid levels output range must fail");
+        assert!(error.contains("outputBlack must be below outputWhite"));
     }
 
     #[test]
