@@ -1,11 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FilmStageControlDescriptorV1 } from '../../../packages/rawengine-schema/src/index.js';
+import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
+import {
+  buildDisplayCreativeEditTransaction,
+  type DisplayCreativeCommitIdentity,
+  isDisplayCreativeNodeAdjustment,
+} from '../../utils/displayCreativeEditTransaction';
 import {
   buildFilmLookPresetDraft,
   type FilmLookBrowserItem,
@@ -94,11 +100,37 @@ export default function EffectsPanel({
   const { t } = useTranslation();
   const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
   const [filmStageP, setFilmStageP] = useState(FILM_REFERENCE_STAGE_DEFAULT_P);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const displayCreativeCommitIdentity = useMemo<DisplayCreativeCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const displayCreativeCommitIdentityRef = useRef(displayCreativeCommitIdentity);
+  displayCreativeCommitIdentityRef.current = displayCreativeCommitIdentity;
 
   const handleAdjustmentChange = (key: string, value: number) => {
+    const nextValue = Math.trunc(value);
+    if (!isForMask && isDisplayCreativeNodeAdjustment(key)) {
+      const identity = displayCreativeCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildDisplayCreativeEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
+      );
+      displayCreativeCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      [key]: Math.trunc(value),
+      [key]: nextValue,
       ...(FILM_LOOK_CONTROLLED_ADJUSTMENT_KEYS.has(key) ? { filmLookId: null, filmLookStrength: 100 } : {}),
     }));
   };
@@ -234,7 +266,13 @@ export default function EffectsPanel({
   ];
 
   return (
-    <div className={density.gutter.section}>
+    <div
+      className={density.gutter.section}
+      data-commit-adjustment-revision={displayCreativeCommitIdentity?.adjustmentRevision}
+      data-commit-image-session={displayCreativeCommitIdentity?.imageSessionId}
+      data-commit-source-identity={displayCreativeCommitIdentity?.sourceIdentity}
+      data-testid="effects-controls"
+    >
       <section
         aria-label={t('adjustments.effects.activeSummary', { defaultValue: 'Active effects summary' })}
         className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
@@ -384,6 +422,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.VignetteAmount, value);
                 }}
                 step={1}
+                testId="effects-control-vignette-amount"
                 value={adjustments.vignetteAmount}
                 onDragStateChange={onDragStateChange}
               />
