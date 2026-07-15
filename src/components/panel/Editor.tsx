@@ -2272,93 +2272,101 @@ export default function Editor({
           >
             <Suspense fallback={null}>
               <ImageCanvas
-                adjustmentRevision={committedAdjustmentRevision}
                 appSettings={appSettings}
-                activeAiPatchContainerId={activeAiPatchContainerId}
-                activeAiSubMaskId={activeAiSubMaskId}
-                activeMaskContainerId={activeMaskContainerId}
-                activeMaskId={activeMaskId}
                 adjustments={renderAdjustments}
-                adjustmentGeometryRevision={adjustmentGeometryRevision}
-                brushSettings={brushSettings}
-                brushImageSessionId={
-                  editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`
-                }
-                crop={crop}
                 exportSoftProofRecipeId={exportSoftProofRecipeId}
                 exportSoftProofTransform={exportSoftProofTransform}
                 finalPreviewUrl={finalPreviewUrl}
                 provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
                 gamutWarningOverlay={gamutWarningOverlay}
-                handleCropComplete={handleCropComplete}
-                handleCropStart={handleCropStart}
-                imageSessionId={editorImageSession?.id ?? null}
                 imageRenderSize={imageRenderSize}
                 originalImageRenderSize={comparePaneLayout.original}
                 overlayGeometry={overlayGeometry}
                 interactivePatch={interactivePatch}
-                isAiEditing={isAiEditing}
-                isCropping={isCropping}
-                isMaskControlHovered={isMaskControlHovered}
-                isMasking={isMasking}
-                isStraightenActive={isStraightenActive}
                 isExportSoftProofEnabled={isExportSoftProofEnabled}
-                isRotationActive={isRotationActive}
                 isSliderDragging={isSliderDragging}
                 isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
                 maskOverlay={maskOverlayBinding.descriptor}
-                onAiMaskBoxCommit={handleAiMaskBoxCommit}
-                onBrushCommit={handleBrushCommit}
-                onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
-                onLiveMaskPreview={handleLiveMaskPreview}
-                onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
-                onPickerCommit={handlePickerCommit}
-                onRetouchCommand={handleRetouchCommand}
-                onSelectAiSubMask={(id) => {
-                  setEditor({ activeAiSubMaskId: id });
-                }}
-                onSelectMask={(id) => {
-                  setEditor({ activeMaskId: id });
-                }}
-                onStraighten={handleStraighten}
                 selectedImage={selectedImage}
-                setCrop={handleCropChange}
-                setIsMaskHovered={setIsMaskHovered}
-                setIsMaskTouchInteracting={setIsMaskTouchInteracting}
-                compareMode={compare.mode}
-                compareOrientation={compare.orientation}
-                compareDividerPosition={compare.dividerPosition}
-                compareLabelsVisible={compare.labelsVisible}
-                onCompareDividerPositionChange={(position) => {
-                  dispatchCompare({ position, type: 'set-divider' });
-                }}
-                onCompareDividerReset={() => {
-                  dispatchCompare({ type: 'reset-divider' });
-                }}
                 showOriginal={compare.isOriginalHeld}
                 transformedOriginalUrl={referenceCompareSource?.renderUrl ?? transformedOriginalUrl}
                 comparisonLabel={referenceCompareSource?.label ?? null}
                 uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-                updateSubMask={updateSubMaskLocal}
-                whiteBalanceRuntime={{
-                  active: isWbPickerActive,
-                  baseWhiteBalance: {
-                    temperature: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).temperature,
-                    tint: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).tint,
-                  },
-                  commands: {
-                    cancelPreview: handleWbPreviewCancel,
-                    commit: handleWbPicked,
-                    preview: handleWbPreview,
-                  },
-                  imageSessionId:
+                toolRuntime={{
+                  activeAiPatchContainerId,
+                  activeAiSubMaskId,
+                  activeMaskContainerId,
+                  activeMaskId,
+                  adjustmentGeometryRevision,
+                  adjustmentRevision: committedAdjustmentRevision,
+                  brushImageSessionId:
                     editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
-                  lastReceipt: lastWhiteBalancePickerReceipt,
+                  brushSettings,
+                  commands: {
+                    commitAiMaskBox: handleAiMaskBoxCommit,
+                    commitBrush: handleBrushCommit,
+                    commitInitialMaskDraw: handleInitialMaskDrawCommit,
+                    commitParametricMaskTarget: handleParametricMaskTargetCommit,
+                    commitPicker: handlePickerCommit,
+                    commitRetouch: handleRetouchCommand,
+                    commitStraighten: handleStraighten,
+                    liveMaskPreview: handleLiveMaskPreview,
+                    selectAiSubMask: (id) => {
+                      setEditor({ activeAiSubMaskId: id });
+                    },
+                    selectMask: (id) => {
+                      setEditor({ activeMaskId: id });
+                    },
+                    setMaskHovered: setIsMaskHovered,
+                    setMaskTouchInteracting: setIsMaskTouchInteracting,
+                    updateSubMask: updateSubMaskLocal,
+                  },
+                  compare: {
+                    dividerPosition: compare.dividerPosition,
+                    labelsVisible: compare.labelsVisible,
+                    mode: compare.mode,
+                    onDividerPositionChange: (position) => {
+                      dispatchCompare({ position, type: 'set-divider' });
+                    },
+                    onDividerReset: () => {
+                      dispatchCompare({ type: 'reset-divider' });
+                    },
+                    orientation: compare.orientation,
+                  },
+                  crop: {
+                    active: isCropping,
+                    onChange: handleCropChange,
+                    onComplete: handleCropComplete,
+                    onStart: handleCropStart,
+                    straightenActive: isStraightenActive,
+                    value: crop,
+                  },
+                  imageSessionId: editorImageSession?.id ?? null,
+                  input: { activeTool: activeViewerTool, isTemporaryHand },
+                  isAiEditing,
+                  isMaskControlHovered,
+                  isMasking,
+                  isRotationActive: Boolean(isRotationActive),
+                  onSamplerStateChange: setViewerSamplerState,
+                  whiteBalance: {
+                    active: isWbPickerActive,
+                    baseWhiteBalance: {
+                      temperature: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).temperature,
+                      tint: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).tint,
+                    },
+                    commands: {
+                      cancelPreview: handleWbPreviewCancel,
+                      commit: handleWbPicked,
+                      preview: handleWbPreview,
+                    },
+                    imageSessionId:
+                      editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
+                    lastReceipt: lastWhiteBalancePickerReceipt,
+                  },
                 }}
                 overlayRotation={overlayRotation}
                 overlayMode={overlayMode}
                 cursorStyle={cursorStyle}
-                viewerInputState={{ activeTool: activeViewerTool, isTemporaryHand }}
                 isMaxZoom={isMaxZoom}
                 liveRotation={liveRotation}
                 transformState={transformState}
@@ -2367,7 +2375,6 @@ export default function Editor({
                 wgpuFrameSerial={wgpuFrameSerial}
                 wgpuFailureSerial={wgpuFailureSerial}
                 viewerSampleGraphRevision={viewerSampleGraphRevision}
-                onViewerSamplerStateChange={setViewerSamplerState}
               />
             </Suspense>
             {provisionalPreviewFrame !== null && !selectedImage.isReady && (
