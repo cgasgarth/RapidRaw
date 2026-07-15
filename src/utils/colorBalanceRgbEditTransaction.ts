@@ -37,6 +37,14 @@ const assertColorBalanceRgb = (settings: ColorBalanceRgbSettings): void => {
       }
     }
   }
+  if (
+    settings.enabled &&
+    (['shadows', 'midtones', 'highlights'] as const).every((range) =>
+      (['red', 'green', 'blue'] as const).every((channel) => settings[range][channel] === 0),
+    )
+  ) {
+    throw new Error('color_balance_rgb_transaction.enabled_identity');
+  }
 };
 
 export const buildColorBalanceRgbEditTransaction = (
@@ -66,7 +74,13 @@ export const buildColorBalanceRgbEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: [{ patch: { colorBalanceRgb: structuredClone(colorBalanceRgb) }, type: 'patch-adjustments' }],
+    operations: [
+      {
+        nodeType: 'color_balance_rgb',
+        patch: { colorBalanceRgb: structuredClone(colorBalanceRgb) },
+        type: 'patch-edit-document-node',
+      },
+    ],
     persistence: 'commit',
     source: 'manual-control',
     transactionId,

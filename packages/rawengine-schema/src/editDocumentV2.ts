@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { blackWhiteMixerSettingsSchema } from './color/blackWhiteMixerSchemas.js';
 import { channelMixerSettingsSchema } from './color/channelMixerSchemas.js';
+import { colorBalanceRgbSettingsSchema } from './color/colorBalanceRgbSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import {
@@ -94,6 +95,21 @@ export const editDocumentBlackWhiteMixerV2Schema = z
   .object({ blackWhiteMixer: blackWhiteMixerSettingsSchema })
   .strict();
 export const editDocumentChannelMixerV2Schema = z.object({ channelMixer: channelMixerSettingsSchema }).strict();
+export const editDocumentColorBalanceRgbV2Schema = z
+  .object({ colorBalanceRgb: colorBalanceRgbSettingsSchema })
+  .strict();
+
+export const EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS = {
+  colorBalanceRgb: {
+    enabled: false,
+    highlights: { blue: 0, green: 0, red: 0 },
+    midtones: { blue: 0, green: 0, red: 0 },
+    preserveLuminance: true,
+    shadows: { blue: 0, green: 0, red: 0 },
+  },
+} as const;
+
+export const EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS = ['colorBalanceRgb'] as const;
 
 const legacyColorGradingRangeV2Schema = z
   .object({
@@ -588,6 +604,16 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'point_color',
     process: 'scene_referred_v2',
     renderStage: 'point_color',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS,
+    editorSection: 'color',
+    legacyFields: EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS,
+    nodeType: 'color_balance_rgb',
+    process: 'scene_referred_v2',
+    renderStage: 'color_balance_rgb',
     implementationVersion: 1,
   },
   {
@@ -1230,6 +1256,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'color_balance_rgb') {
+        const colorBalanceRgb = editDocumentColorBalanceRgbV2Schema.safeParse(node.params);
+        if (!colorBalanceRgb.success) {
+          for (const issue of colorBalanceRgb.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'perceptual_grading') {
         const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
         if (!perceptualGrading.success) {
@@ -1332,6 +1366,11 @@ const isEditDocumentRecord = (value: unknown): value is Readonly<Record<string, 
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 interface LegacyNodeOwnershipMigration {
+  createNode?: {
+    enabledFromNodeType: string;
+    implementationVersion: number;
+    process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  };
   defaults: Readonly<Record<string, unknown>>;
   fields: readonly string[];
   nodeType: string;
@@ -1344,8 +1383,23 @@ const normalizeLegacyNodeOwnership = (
 ): Readonly<Record<string, unknown>> => {
   const nodes = document['nodes'];
   if (!isEditDocumentRecord(nodes)) return document;
-  const node = nodes[ownership.nodeType];
-  if (!isEditDocumentRecord(node) || !isEditDocumentRecord(node['params'])) return document;
+  const existingNode = nodes[ownership.nodeType];
+  const enabledSourceNode = nodes[ownership.createNode?.enabledFromNodeType ?? ''];
+  const node = isEditDocumentRecord(existingNode)
+    ? existingNode
+    : ownership.createNode === undefined
+      ? undefined
+      : {
+          enabled:
+            isEditDocumentRecord(enabledSourceNode) && typeof enabledSourceNode['enabled'] === 'boolean'
+              ? enabledSourceNode['enabled']
+              : true,
+          implementationVersion: ownership.createNode.implementationVersion,
+          params: {},
+          process: ownership.createNode.process,
+          type: ownership.nodeType,
+        };
+  if (node === undefined || !isEditDocumentRecord(node['params'])) return document;
   if (!isEditDocumentRecord(document['extensions'])) return document;
   const extensions = { ...document['extensions'] };
   const rawLegacy = extensions['legacyAdjustments'];
@@ -1440,11 +1494,22 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     nodeType: 'detail_denoise_dehaze',
     schemas: editDocumentLocalContrastV2Schema.shape,
   });
-  return normalizeLegacyNodeOwnership(document, {
+  document = normalizeLegacyNodeOwnership(document, {
     defaults: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,
     fields: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
     nodeType: 'lens_correction',
     schemas: editDocumentManualChromaticAberrationV2Schema.shape,
+  });
+  return normalizeLegacyNodeOwnership(document, {
+    createNode: {
+      enabledFromNodeType: 'channel_mixer',
+      implementationVersion: 1,
+      process: 'scene_referred_v2',
+    },
+    defaults: EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS,
+    fields: EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS,
+    nodeType: 'color_balance_rgb',
+    schemas: editDocumentColorBalanceRgbV2Schema.shape,
   });
 }, editDocumentV2ObjectSchema);
 
@@ -1460,6 +1525,7 @@ export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualiz
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
 export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhiteMixerV2Schema>;
 export type EditDocumentChannelMixerV2 = z.infer<typeof editDocumentChannelMixerV2Schema>;
+export type EditDocumentColorBalanceRgbV2 = z.infer<typeof editDocumentColorBalanceRgbV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
@@ -1493,6 +1559,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
   if (envelope.type === 'black_white_mixer') editDocumentBlackWhiteMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'channel_mixer') editDocumentChannelMixerV2Schema.parse(envelope.params);
+  if (envelope.type === 'color_balance_rgb') editDocumentColorBalanceRgbV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);

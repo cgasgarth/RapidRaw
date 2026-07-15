@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   enableBlackWhiteMixer,
   enableChannelMixer,
+  enableColorBalanceRgb,
   formatRgbSummary,
   getHueBandSegments,
   getNextAdvancedMixerSelection,
@@ -74,6 +75,15 @@ describe('Advanced mixer view models', () => {
         green: { ...INITIAL_ADJUSTMENTS.channelMixer.green, constant: 4 },
       }),
     ).toBe(true);
+  });
+
+  test('enables identity Color Balance with a visible active-range edit and preserves existing edits', () => {
+    const enabled = enableColorBalanceRgb(structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb), 'midtones');
+    expect(enabled).toMatchObject({ enabled: true, midtones: { red: 10 } });
+
+    const edited = structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb);
+    edited.highlights.blue = -12;
+    expect(enableColorBalanceRgb(edited, 'shadows')).toEqual({ ...edited, enabled: true });
   });
 
   test('resets only the selected RGB range or channel output', () => {

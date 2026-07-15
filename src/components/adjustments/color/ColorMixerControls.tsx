@@ -90,6 +90,22 @@ export const isColorBalanceRgbModified = (settings: ColorBalanceRgbSettings): bo
     ),
   );
 
+export const enableColorBalanceRgb = (
+  settings: ColorBalanceRgbSettings,
+  activeRange: ColorBalanceRgbRange,
+): ColorBalanceRgbSettings => {
+  const hasAdjustment = colorBalanceRanges.some((range) =>
+    colorBalanceChannels.some((channel) => settings[range][channel] !== 0),
+  );
+  return hasAdjustment
+    ? { ...settings, enabled: true }
+    : {
+        ...settings,
+        enabled: true,
+        [activeRange]: { ...settings[activeRange], red: 10 },
+      };
+};
+
 export const isChannelMixerModified = (settings: ChannelMixerSettings): boolean =>
   settings.enabled !== INITIAL_ADJUSTMENTS.channelMixer.enabled ||
   settings.preserveLuminance !== INITIAL_ADJUSTMENTS.channelMixer.preserveLuminance ||
@@ -927,7 +943,13 @@ const AdvancedMixerControls = ({
                   <HeaderToggle
                     checked={colorBalance.enabled}
                     label={t('adjustments.color.colorBalanceRgb.title')}
-                    onChange={() => commitColorBalanceRgb((current) => ({ ...current, enabled: !current.enabled }))}
+                    onChange={() =>
+                      commitColorBalanceRgb((current) =>
+                        current.enabled
+                          ? { ...current, enabled: false }
+                          : enableColorBalanceRgb(current, activeColorBalanceRange),
+                      )
+                    }
                     testId="color-balance-toggle"
                   />
                   <ChevronDown aria-hidden="true" className="text-text-secondary group-open:rotate-180" size={14} />

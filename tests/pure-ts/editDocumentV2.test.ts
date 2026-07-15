@@ -81,6 +81,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'display_creative',
       'detail_denoise_dehaze',
       'point_color',
+      'color_balance_rgb',
       'black_white_mixer',
       'channel_mixer',
       'perceptual_grading',
@@ -161,6 +162,47 @@ describe('EditDocumentV2 legacy adapter', () => {
       };
     }
     expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
+  });
+
+  test('owns strict Color Balance RGB state and excludes it from quarantined legacy fields', () => {
+    const colorBalanceRgb = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones, red: 24 },
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      colorBalanceRgb,
+    });
+
+    expect(document.nodes.color_balance_rgb?.params).toEqual({ colorBalanceRgb });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('colorBalanceRgb');
+    expect(document.migration?.mapped).toContain('color_balance_rgb.colorBalanceRgb');
+    expect(compileEditDocumentNodeV2(document.nodes.color_balance_rgb).params).toEqual({ colorBalanceRgb });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.color_balance_rgb) {
+      unknown.nodes.color_balance_rgb.params.colorBalanceRgb = { ...colorBalanceRgb, futureRange: true };
+    }
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.color_balance_rgb) {
+      outOfRange.nodes.color_balance_rgb.params.colorBalanceRgb = {
+        ...colorBalanceRgb,
+        highlights: { ...colorBalanceRgb.highlights, blue: 101 },
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
+
+    const identity = structuredClone(document);
+    if (identity.nodes.color_balance_rgb) {
+      identity.nodes.color_balance_rgb.params.colorBalanceRgb = {
+        ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+        enabled: true,
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(identity)).toThrow();
   });
 
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
@@ -698,6 +740,56 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(corruptFlat.migration?.defaulted).toContain('lens_correction.chromaticAberrationBlueYellow');
     expect(corruptFlat.migration?.mapped).not.toContain('lens_correction.chromaticAberrationBlueYellow');
+  });
+
+  test('promotes pre-Color-Balance node state and quarantines corrupt legacy values idempotently', () => {
+    const colorBalanceRgb = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones, red: 18 },
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      colorBalanceRgb,
+    });
+    const oldV2 = structuredClone(document);
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.extensions.legacyAdjustments.colorBalanceRgb = colorBalanceRgb;
+    delete oldV2.nodes.color_balance_rgb;
+    migration.mapped = migration.mapped.filter((path) => path !== 'color_balance_rgb.colorBalanceRgb');
+    migration.quarantined.push('colorBalanceRgb');
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.color_balance_rgb.params).toEqual({ colorBalanceRgb });
+    expect(reopened.nodes.color_balance_rgb.enabled).toBe(reopened.nodes.channel_mixer.enabled);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('colorBalanceRgb');
+    expect(reopened.migration?.mapped).toContain('color_balance_rgb.colorBalanceRgb');
+    expect(reopened.migration?.quarantined).not.toContain('colorBalanceRgb');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptV2 = structuredClone(document);
+    const corrupt = {
+      ...colorBalanceRgb,
+      midtones: { ...colorBalanceRgb.midtones, green: 500 },
+    };
+    corruptV2.extensions.legacyAdjustments.colorBalanceRgb = corrupt;
+    delete corruptV2.nodes.color_balance_rgb;
+    const quarantined = editDocumentV2Schema.parse(corruptV2);
+    expect(quarantined.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb);
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ colorBalanceRgb: corrupt });
+    expect(quarantined.migration?.defaulted).toContain('color_balance_rgb.colorBalanceRgb');
+    expect(quarantined.migration?.quarantined).toContain('colorBalanceRgb');
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
+
+    const corruptFlatAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    corruptFlatAdjustments.colorBalanceRgb.midtones.green = Number.NaN;
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2(corruptFlatAdjustments);
+    expect(corruptFlat.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({
+      colorBalanceRgb: corruptFlatAdjustments.colorBalanceRgb,
+    });
+    expect(corruptFlat.migration?.mapped).not.toContain('color_balance_rgb.colorBalanceRgb');
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {
@@ -1321,6 +1413,25 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.channel_mixer).toBe(authoritative.nodes.channel_mixer);
     expect(renderDocument.nodes.channel_mixer?.params).toEqual({ channelMixer });
     expect(renderDocument.nodes.point_color).toEqual(preparedDocument.nodes.point_color);
+  });
+
+  test('render preparation overlays the authoritative Color Balance RGB envelope', () => {
+    const colorBalanceRgb = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones, red: 24 },
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      colorBalanceRgb,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['color_balance_rgb']);
+
+    expect(renderDocument.nodes.color_balance_rgb).toBe(authoritative.nodes.color_balance_rgb);
+    expect(renderDocument.nodes.color_balance_rgb?.params).toEqual({ colorBalanceRgb });
+    expect(renderDocument.nodes.channel_mixer).toEqual(preparedDocument.nodes.channel_mixer);
   });
 
   test('render preparation overlays the authoritative perceptual-grading envelope', () => {
