@@ -28,6 +28,7 @@ pub(crate) mod film_runtime_proof;
 pub(crate) mod film_thumbnail_cache;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;
+pub(crate) mod interactive_gpu_pressure;
 pub(crate) mod mask_generation;
 pub(crate) mod measured_reversal;
 pub(crate) mod native_cache;
