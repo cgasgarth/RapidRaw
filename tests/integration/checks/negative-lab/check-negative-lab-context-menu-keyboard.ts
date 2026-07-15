@@ -339,7 +339,7 @@ function prepareAppStores({
   multiSelectedPaths: string[];
   supportedTypes: { nonRaw: string[]; raw: string[] };
 }) {
-  useEditorStore.setState({ copiedAdjustments: null, selectedImage: null });
+  useEditorStore.setState({ copiedEditDocumentV2: null, selectedImage: null });
   useLibraryStore.setState({
     activeAlbumId: null,
     albumTree: [],

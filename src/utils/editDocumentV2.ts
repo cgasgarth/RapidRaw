@@ -350,6 +350,98 @@ export const replaceEditDocumentV2SourceArtifacts = (
 export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>
   descriptorFor(nodeType)?.capabilities;
 
+export interface EditDocumentV2CopyPayload {
+  readonly nodes: Partial<Record<EditDocumentNodeTypeV2, EditDocumentNodeEnvelopeV2>>;
+  readonly schemaVersion: 2;
+}
+
+export const EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS = EDIT_DOCUMENT_NODE_DESCRIPTORS.filter(
+  ({ capabilities }) => capabilities.copy && capabilities.paste && capabilities.provenance === 'strip',
+).flatMap(({ legacyFields }) => [...legacyFields]);
+
+export const EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES = EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
+  descriptor.capabilities.copy && descriptor.capabilities.paste && descriptor.capabilities.provenance === 'strip'
+    ? [descriptor.nodeType]
+    : [],
+);
+
+export const getEditDocumentV2CopyableNodeTypes = (
+  includedAdjustments: readonly string[] = EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+): readonly EditDocumentNodeTypeV2[] => {
+  const included = new Set(includedAdjustments);
+  return EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
+    descriptor.capabilities.copy &&
+    descriptor.capabilities.paste &&
+    descriptor.capabilities.provenance === 'strip' &&
+    (included.has(descriptor.nodeType) || descriptor.legacyFields.some((field) => included.has(field)))
+      ? [descriptor.nodeType]
+      : [],
+  );
+};
+
+export const getEditDocumentV2CopyableLegacyFieldsForSelection = (selection: readonly string[]): readonly string[] => {
+  const selected = new Set(getEditDocumentV2CopyableNodeTypes(selection));
+  return EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
+    selected.has(descriptor.nodeType) ? [...descriptor.legacyFields] : [],
+  );
+};
+
+/** Build a provenance-free, descriptor-approved clipboard from render authority. */
+export const copyEditDocumentV2Nodes = (
+  document: EditDocumentV2,
+  includedAdjustments?: readonly string[],
+): EditDocumentV2CopyPayload => ({
+  nodes: Object.fromEntries(
+    getEditDocumentV2CopyableNodeTypes(includedAdjustments).flatMap((nodeType) => {
+      const payload = copyEditDocumentV2Node(document, nodeType);
+      return payload === null ? [] : [[nodeType, payload]];
+    }),
+  ),
+  schemaVersion: 2,
+});
+
+export const selectEditDocumentV2CopyPayload = (
+  payload: EditDocumentV2CopyPayload,
+  includedAdjustments: readonly string[],
+  skipDefaultNodes: boolean,
+): EditDocumentV2CopyPayload => {
+  const selected = new Set(getEditDocumentV2CopyableNodeTypes(includedAdjustments));
+  return {
+    nodes: Object.fromEntries(
+      Object.entries(payload.nodes).flatMap(([nodeType, node]) => {
+        const descriptor = descriptorFor(nodeType as EditDocumentNodeTypeV2);
+        if (
+          node === undefined ||
+          descriptor === undefined ||
+          !selected.has(nodeType as EditDocumentNodeTypeV2) ||
+          (skipDefaultNodes && node.enabled && JSON.stringify(node.params) === JSON.stringify(descriptor.defaultParams))
+        ) {
+          return [];
+        }
+        return [[nodeType, node]];
+      }),
+    ),
+    schemaVersion: 2,
+  };
+};
+
+/** Legacy projection exists only for native paths that have not adopted EditDocumentV2 yet. */
+export const lowerEditDocumentV2CopyPayloadToLegacyAdjustments = (
+  payload: EditDocumentV2CopyPayload,
+): Partial<Adjustments> => {
+  const lowered: Record<string, unknown> = {};
+  for (const [nodeType, node] of Object.entries(payload.nodes)) {
+    if (node === undefined) continue;
+    const descriptor = descriptorFor(nodeType as EditDocumentNodeTypeV2);
+    if (descriptor === undefined || !descriptor.capabilities.paste) continue;
+    for (const field of descriptor.legacyFields) {
+      if (Object.hasOwn(node.params, field)) lowered[field] = structuredClone(node.params[field]);
+    }
+    if (nodeType === 'display_creative') lowered['effectsEnabled'] = node.enabled;
+  }
+  return lowered as Partial<Adjustments>;
+};
+
 /** Apply one focused node update across documents only when its descriptor allows batch edits. */
 export const batchUpdateEditDocumentV2Nodes = (
   documents: readonly EditDocumentV2[],
@@ -465,9 +557,9 @@ export const pasteEditDocumentV2Node = (
   nodeType: EditDocumentNodeTypeV2,
   payload: unknown,
 ): EditDocumentV2 => {
-  const parsed = editDocumentV2Schema.parse(document);
+  editDocumentV2Schema.parse(document);
   const descriptor = descriptorFor(nodeType);
-  const node = parsed.nodes[nodeType];
+  const node = document.nodes[nodeType];
   const candidate = editDocumentNodeEnvelopeV2Schema.safeParse(payload);
   if (
     descriptor === undefined ||
@@ -478,10 +570,15 @@ export const pasteEditDocumentV2Node = (
     candidate.data.process !== descriptor.process ||
     candidate.data.implementationVersion !== descriptor.implementationVersion
   ) {
-    return parsed;
+    return document;
   }
-  return editDocumentV2Schema.parse({
-    ...parsed,
-    nodes: { ...parsed.nodes, [nodeType]: { ...candidate.data, params: structuredClone(candidate.data.params) } },
-  });
+  if (JSON.stringify(node) === JSON.stringify(candidate.data)) return document;
+  const nextNode = { ...candidate.data, params: structuredClone(candidate.data.params) };
+  const next: EditDocumentV2 = {
+    ...document,
+    geometry: nodeType === 'geometry' ? editDocumentGeometryV2Schema.parse(nextNode.params) : document.geometry,
+    nodes: { ...document.nodes, [nodeType]: nextNode },
+  };
+  editDocumentV2Schema.parse(next);
+  return next;
 };

@@ -8,6 +8,7 @@ import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/edi
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 import { Invokes } from '../../../src/tauri/commands';
+import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../../src/utils/tauriEventNames';
 
 const host = '127.0.0.1';
@@ -3253,9 +3254,14 @@ try {
   await commandPaletteForCopyPaste.getByRole('button', { name: /Copy and paste settings/u }).click();
   const copyPasteDialog = page.getByRole('dialog', { name: /Copy & Paste Settings/u });
   await copyPasteDialog.waitFor({ timeout: 10_000 });
-  await copyPasteDialog.getByText('Dust Spot Visualization').waitFor({ timeout: 10_000 });
-  if ((await copyPasteDialog.getByText('DustSpotVisualization').count()) > 0) {
-    throw new Error('Copy & Paste Settings leaked the dust spot internal identifier.');
+  if (
+    (await copyPasteDialog.getByRole('checkbox').count()) !== EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES.length ||
+    (await copyPasteDialog.getByText('Tone', { exact: true }).count()) !== 1 ||
+    (await copyPasteDialog.getByText('Profile & Tone', { exact: true }).count()) !== 1 ||
+    (await copyPasteDialog.getByText('Masks', { exact: true }).count()) !== 0 ||
+    (await copyPasteDialog.getByText('Dust Spot Visualization', { exact: true }).count()) !== 0
+  ) {
+    throw new Error('Copy & Paste Settings diverged from descriptor-approved node availability.');
   }
   const saveButton = copyPasteDialog.getByRole('button', { name: 'Save' });
   await saveButton.waitFor({ timeout: 10_000 });

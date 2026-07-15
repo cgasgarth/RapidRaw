@@ -5,7 +5,10 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
+import {
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  getEditDocumentV2CopyableLegacyFieldsForSelection,
+} from '../../utils/editDocumentV2';
 import { EditorPersistenceEffectRunner } from '../../utils/editorPersistenceEffectRunner';
 import { registerEditorPersistenceBarrierAdapter } from '../../utils/editorPersistenceService';
 import { formatUnknownError } from '../../utils/errorFormatting';
@@ -22,7 +25,7 @@ export function useEditorPersistence(): void {
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const includedAdjustments = useSettingsStore(
-    (state) => state.appSettings?.copyPasteSettings?.includedAdjustments ?? COPYABLE_ADJUSTMENT_KEYS,
+    (state) => state.appSettings?.copyPasteSettings?.includedAdjustments ?? EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
   );
   const runnerRef = useRef<EditorPersistenceEffectRunner | null>(null);
   const runner =
@@ -43,7 +46,9 @@ export function useEditorPersistence(): void {
   const multiSelection = useMemo(() => {
     if (!selectedImage?.path) return null;
     const paths = multiSelectedPaths.filter((path) => path !== selectedImage.path);
-    return paths.length === 0 ? null : { includedAdjustments, paths };
+    return paths.length === 0
+      ? null
+      : { includedAdjustments: getEditDocumentV2CopyableLegacyFieldsForSelection(includedAdjustments), paths };
   }, [includedAdjustments, multiSelectedPaths, selectedImage?.path]);
 
   useEffect(() => {

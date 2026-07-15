@@ -13,14 +13,18 @@ import {
   batchUpdateEditDocumentV2Nodes,
   buildEditDocumentV2Diagnostics,
   copyEditDocumentV2Node,
+  copyEditDocumentV2Nodes,
+  EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
+  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   pasteEditDocumentV2Node,
   prepareEditDocumentV2ForRender,
   replaceEditDocumentV2SourceArtifacts,
   resetEditDocumentV2Node,
+  selectEditDocumentV2CopyPayload,
   setEditDocumentV2NodeEnabled,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
@@ -1377,9 +1381,67 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     const pasted = pasteEditDocumentV2Node(document, 'scene_global_color_tone', clipboard);
     expect(pasted.nodes.scene_global_color_tone?.params.exposure).toBe(2);
-    expect(pasted.nodes.geometry).toEqual(document.nodes.geometry);
-    expect(pasted.provenance).toEqual(document.provenance);
+    expect(pasted.nodes.geometry).toBe(document.nodes.geometry);
+    expect(pasted.provenance).toBe(document.provenance);
     expect(copyEditDocumentV2Node(document, 'source_artifacts')).toBeNull();
+  });
+
+  test('builds a descriptor-only multi-node clipboard and lowers only approved compatibility fields', () => {
+    const withArtifacts = replaceEditDocumentV2SourceArtifacts(
+      legacyAdjustmentsToEditDocumentV2({
+        ...structuredClone(INITIAL_ADJUSTMENTS),
+        exposure: 1.25,
+        referenceMatchApplicationReceipt: referenceMatchReceipt,
+      }),
+      { aiPatches: [sourcePatch] },
+    );
+    const source = setEditDocumentV2NodeEnabled(withArtifacts, 'scene_global_color_tone', false);
+    const clipboard = copyEditDocumentV2Nodes(source);
+
+    expect(Object.keys(clipboard.nodes)).toContain('scene_global_color_tone');
+    expect(clipboard.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
+    expect(clipboard.nodes).not.toHaveProperty('layers');
+    expect(clipboard.nodes).not.toHaveProperty('source_artifacts');
+    expect(clipboard).not.toHaveProperty('provenance');
+    expect(clipboard).not.toHaveProperty('sourceArtifacts');
+    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('masks');
+    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('aiPatches');
+
+    const selected = selectEditDocumentV2CopyPayload(clipboard, ['exposure'], true);
+    expect(Object.keys(selected.nodes)).toEqual(['scene_global_color_tone']);
+    expect(selected.nodes.scene_global_color_tone?.enabled).toBeFalse();
+    expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).toMatchObject({ exposure: 1.25 });
+    expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).not.toHaveProperty(
+      'referenceMatchApplicationReceipt',
+    );
+  });
+
+  test('preserves disabled state and unrelated structural identity across paste and reopen authority', () => {
+    const source = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 2 }),
+      'scene_global_color_tone',
+      false,
+    );
+    const clipboard = copyEditDocumentV2Nodes(source, ['exposure']);
+    const destination = replaceEditDocumentV2SourceArtifacts(
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: -1 }),
+      { aiPatches: [sourcePatch] },
+    );
+    const pasted = pasteEditDocumentV2Node(
+      destination,
+      'scene_global_color_tone',
+      clipboard.nodes.scene_global_color_tone,
+    );
+
+    expect(pasted.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 2 } });
+    expect(pasted.nodes.geometry).toBe(destination.nodes.geometry);
+    expect(pasted.nodes.layers).toBe(destination.nodes.layers);
+    expect(pasted.nodes.source_artifacts).toBe(destination.nodes.source_artifacts);
+    expect(pasted.sourceArtifacts).toBe(destination.sourceArtifacts);
+    expect(editDocumentV2Schema.parse(structuredClone(pasted))).toEqual(pasted);
+    expect(
+      prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, pasted, ['scene_global_color_tone']).nodes,
+    ).toHaveProperty('scene_global_color_tone.enabled', false);
   });
 
   test('rejects malformed or cross-node clipboard payloads without mutation', () => {

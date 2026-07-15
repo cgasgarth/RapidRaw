@@ -1,13 +1,12 @@
-import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
+import type { EditDocumentV2CopyPayload } from './editDocumentV2';
 import type { EditHistoryCheckpoint } from './editHistory';
-import {
-  buildAdjustmentMutationOperations,
-  type EditApplicationReceipt,
-  type EditTransactionPersistenceContext,
-  type EditTransactionRequest,
+import type {
+  EditApplicationReceipt,
+  EditTransactionPersistenceContext,
+  EditTransactionRequest,
 } from './editTransaction';
-import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
 export interface CopyPasteEditTransactionState {
   adjustmentRevision: number;
@@ -33,7 +32,7 @@ export interface CopyPasteCompensationTarget {
 export const buildCopyPasteEditTransaction = (
   state: CopyPasteEditTransactionState,
   targetPath: string,
-  adjustmentPatch: Partial<Adjustments>,
+  payload: EditDocumentV2CopyPayload,
   transactionId: string,
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== targetPath) {
@@ -43,12 +42,16 @@ export const buildCopyPasteEditTransaction = (
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-    operations: buildAdjustmentMutationOperations(
-      state.adjustments,
-      reconcileReferenceMatchReceiptsAfterEdit(state.adjustments, {
-        ...state.adjustments,
-        ...adjustmentPatch,
-      }),
+    operations: Object.entries(payload.nodes).flatMap(([nodeType, node]) =>
+      node === undefined
+        ? []
+        : [
+            {
+              node: structuredClone(node),
+              nodeType: nodeType as EditDocumentNodeTypeV2,
+              type: 'replace-edit-document-node' as const,
+            },
+          ],
     ),
     persistence: 'commit',
     source: 'copy-paste',

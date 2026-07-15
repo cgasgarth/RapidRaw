@@ -119,6 +119,7 @@ import {
 import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
+import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import {
@@ -1233,7 +1234,7 @@ function useProfessionalFilmstripContextSmokeState() {
     };
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
-      copiedAdjustments: { contrast: adjustments.contrast, exposure: adjustments.exposure },
+      copiedEditDocumentV2: copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2(adjustments)),
       displaySize: { height: 680, width: 1020 },
       histogram: null,
       history: [adjustments],
