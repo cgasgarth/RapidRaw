@@ -17,6 +17,7 @@ interface LeaseOwner {
 interface LeaseFrame {
   id: string;
   label: string;
+  pid: number;
 }
 
 interface LeaseWaiter extends LeaseOwner {
@@ -29,6 +30,7 @@ export interface ResourceLeaseOptions {
   hostBudgetOwnerId?: string;
   label: string;
   onQueued?: () => void;
+  ownerAliases?: readonly string[];
   ownerId?: string;
   resource: string;
   signal?: AbortSignal;
@@ -233,7 +235,7 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const ownerId = options.ownerId ?? processOwnerId;
-  const leaseFrame: LeaseFrame = { id: crypto.randomUUID(), label: options.label };
+  const leaseFrame: LeaseFrame = { id: crypto.randomUUID(), label: options.label, pid: process.pid };
   const root = resolveResourceCoordinatorRoot(options.root);
   const slotSuffix = (slot: number): string => (capacity === 1 ? '' : `.slot-${slot}`);
   const lockPaths = Array.from({ length: capacity }, (_, slot) =>
@@ -262,7 +264,10 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
     if (owned.length < weight)
       throw new Error(`resource_weight_upgrade_requires_outer_release: ${options.resource} ${owned.length}->${weight}`);
     for (const { ownerPath, owner } of owned) {
-      const leases = [...(owner.leases ?? [{ id: `legacy-${ownerId}`, label: owner.label }]), leaseFrame];
+      const leases = [
+        ...(owner.leases ?? [{ id: `legacy-${ownerId}`, label: owner.label, pid: owner.pid }]),
+        leaseFrame,
+      ];
       const updated = { ...owner, label: leaseFrame.label, leases };
       await replaceFile(ownerPath, `${JSON.stringify(updated)}\n`);
     }
@@ -281,9 +286,11 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
             if (owner?.ownerId !== ownerId) continue;
             const leases = (owner.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
             if (leases.length > 0) {
+              const rootPid = leases[0]?.pid ?? owner.pid;
+              await replaceFile(lockPidPath(lockPath), `${rootPid}\n`);
               await replaceFile(
                 ownerPath,
-                `${JSON.stringify({ ...owner, label: leases.at(-1)?.label ?? owner.label, leases })}\n`,
+                `${JSON.stringify({ ...owner, label: leases.at(-1)?.label ?? owner.label, leases, pid: rootPid })}\n`,
               );
               continue;
             }
@@ -297,8 +304,10 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
           for (const { lockPath, ownerPath } of nested) {
             const owner = await readOwner(ownerPath);
             if (owner?.ownerId !== ownerId || !owner.leases?.some((lease) => lease.id === leaseFrame.id)) continue;
-            await replaceFile(lockPidPath(lockPath), `${pid}\n`);
-            await replaceFile(ownerPath, `${JSON.stringify({ ...owner, pid })}\n`);
+            const leases = owner.leases.map((lease) => (lease.id === leaseFrame.id ? { ...lease, pid } : lease));
+            const rootPid = leases[0]?.pid ?? owner.pid;
+            await replaceFile(lockPidPath(lockPath), `${rootPid}\n`);
+            await replaceFile(ownerPath, `${JSON.stringify({ ...owner, leases, pid: rootPid })}\n`);
           }
         });
       },
@@ -387,9 +396,16 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
                 if (current?.ownerId !== ownerId) continue;
                 const leases = (current.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
                 if (leases.length > 0) {
+                  const rootPid = leases[0]?.pid ?? current.pid;
+                  await replaceFile(lockPidPath(lockPath), `${rootPid}\n`);
                   await replaceFile(
                     ownerPath,
-                    `${JSON.stringify({ ...current, label: leases.at(-1)?.label ?? current.label, leases })}\n`,
+                    `${JSON.stringify({
+                      ...current,
+                      label: leases.at(-1)?.label ?? current.label,
+                      leases,
+                      pid: rootPid,
+                    })}\n`,
                   );
                   continue;
                 }
@@ -406,8 +422,10 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
                 const current = await readOwner(ownerPath);
                 if (current?.ownerId !== ownerId || !current.leases?.some((lease) => lease.id === leaseFrame.id))
                   continue;
-                owner = { ...current, pid };
-                await replaceFile(lockPidPath(lockPath), `${pid}\n`);
+                const leases = current.leases.map((lease) => (lease.id === leaseFrame.id ? { ...lease, pid } : lease));
+                const rootPid = leases[0]?.pid ?? current.pid;
+                owner = { ...current, leases, pid: rootPid };
+                await replaceFile(lockPidPath(lockPath), `${rootPid}\n`);
                 await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
               }
             });
@@ -420,6 +438,11 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
         let owner = blocker;
         for (const ownerPath of ownerPaths) {
           owner ??= await readOwner(ownerPath);
+        }
+        if (owner?.ownerId !== undefined && options.ownerAliases?.includes(owner.ownerId)) {
+          throw new Error(
+            `${options.label} refused self-queue on ${options.resource}: effective owner ${ownerId} aliases ${owner.ownerId}`,
+          );
         }
         const waitedMs = Date.now() - waitStartedAt;
         if (waitedMs >= timeoutMs) {
@@ -454,52 +477,60 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   const root = resolveResourceCoordinatorRoot(options.root);
   const inheritedHostOwner = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID;
   const inheritedHostRoot = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT;
-  const hostBudgetOwnerId =
+  const effectiveOwnerId =
     options.hostBudgetOwnerId ??
-    (inheritedHostOwner !== undefined && inheritedHostRoot === root ? inheritedHostOwner : options.ownerId);
+    (inheritedHostOwner !== undefined && inheritedHostRoot === root
+      ? inheritedHostOwner
+      : (options.ownerId ?? processOwnerId));
   let queuedNotified = false;
   const notifyQueued = (): void => {
     if (queuedNotified) return;
     queuedNotified = true;
     options.onQueued?.();
   };
-  const hostLease = await acquireSingleResourceLease({
-    capacity,
-    label: `host-budget:${options.label}`,
+  // Queue on the concrete resource before reserving host-wide capacity. A
+  // cross-worktree waiter must not consume weighted budget while its native
+  // resource is still owned, and both layers must share one reentrant owner.
+  const resourceLease = await acquireSingleResourceLease({
+    ...options,
     onQueued: notifyQueued,
-    ownerId: hostBudgetOwnerId,
-    pollMs: options.pollMs,
-    resource: HOST_BUDGET_RESOURCE,
-    root,
-    signal: options.signal,
-    timeoutMs: options.timeoutMs,
-    weight: validationHostBudgetWeight(resourceClass, capacity),
+    ownerAliases: [...new Set([...(options.ownerAliases ?? []), options.ownerId, processOwnerId])].filter(
+      (ownerId): ownerId is string => ownerId !== undefined && ownerId !== effectiveOwnerId,
+    ),
+    ownerId: effectiveOwnerId,
   });
   try {
-    const resourceLease = await acquireSingleResourceLease({
-      ...options,
+    const hostLease = await acquireSingleResourceLease({
+      capacity,
+      label: `host-budget:${options.label}`,
       onQueued: notifyQueued,
-      ownerId: hostLease.ownerId,
+      ownerId: effectiveOwnerId,
+      pollMs: options.pollMs,
+      resource: HOST_BUDGET_RESOURCE,
+      root,
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+      weight: validationHostBudgetWeight(resourceClass, capacity),
     });
     let released = false;
     return {
-      ownerId: resourceLease.ownerId,
+      ownerId: effectiveOwnerId,
       release: async () => {
         if (released) return;
         released = true;
         try {
-          await resourceLease.release();
-        } finally {
           await hostLease.release();
+        } finally {
+          await resourceLease.release();
         }
       },
       updateOwnerPid: async (pid: number) => {
-        await hostLease.updateOwnerPid(pid);
         await resourceLease.updateOwnerPid(pid);
+        await hostLease.updateOwnerPid(pid);
       },
     };
   } catch (error) {
-    await hostLease.release();
+    await resourceLease.release();
     throw error;
   }
 }

@@ -97,12 +97,12 @@ const expectSuccessfulExit = async (child: ReturnType<typeof Bun.spawn>): Promis
   expect(exitCode, stderr).toBe(0);
 };
 
-const coordinated = (root: string, label: string, script: string) =>
+const coordinated = (root: string, label: string, script: string, cwd?: string) =>
   trackChild(
     Bun.spawn(
       [
         'bun',
-        'scripts/ci/run-resource-coordinated.ts',
+        join(import.meta.dir, '../../../scripts/ci/run-resource-coordinated.ts'),
         '--resource',
         'native-heavy',
         '--label',
@@ -113,6 +113,7 @@ const coordinated = (root: string, label: string, script: string) =>
         script,
       ],
       {
+        cwd,
         env: {
           ...Bun.env,
           RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
@@ -559,6 +560,96 @@ console.log('nested-wrapper-owner '+nested.ownerId); await nested.release();`,
     expect(await queuedLabels(root)).toEqual([]);
   });
 
+  test('restores the live outer PID after a nested wrapper child exits', async () => {
+    const root = await temporaryRoot();
+    const runner = join(import.meta.dir, '../../../scripts/ci/run-resource-coordinated.ts');
+    const outer = await acquireResourceLease({
+      hostBudgetCapacity: 4,
+      hostBudgetOwnerId: 'validation-node-owner',
+      label: 'validation-resource-native-heavy:rust-clippy',
+      ownerId: 'validation-run-owner',
+      resource: 'native-heavy',
+      root,
+    });
+    const nested = trackChild(
+      Bun.spawn(
+        [
+          'bun',
+          runner,
+          '--resource',
+          'native-heavy',
+          '--label',
+          'nested-clippy',
+          '--',
+          'bun',
+          '-e',
+          "console.log('nested-clippy-complete')",
+        ],
+        {
+          env: {
+            ...Bun.env,
+            RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
+            RAWENGINE_RESOURCE_OWNER_ID: 'validation-run-owner',
+            RAWENGINE_VALIDATION_HOST_BUDGET_CAPACITY: '4',
+            RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID: 'validation-node-owner',
+            RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT: root,
+          },
+          stderr: 'pipe',
+          stdout: 'pipe',
+        },
+      ),
+    );
+    await expectSuccessfulExit(nested);
+    const owner = JSON.parse(await readFile(join(root, 'native-heavy.owner.json'), 'utf8')) as {
+      leases: Array<{ label: string; pid: number }>;
+      pid: number;
+    };
+    expect(owner.pid).toBe(process.pid);
+    expect(owner.leases).toEqual([
+      expect.objectContaining({ label: 'validation-resource-native-heavy:rust-clippy', pid: process.pid }),
+    ]);
+
+    const follower = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'post-wrapper-follower'});console.log('follower-acquired');await lease.release();`,
+    );
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('post-wrapper-follower'),
+      'follower stole the live outer lease after nested child exit',
+    );
+    await outer.release();
+    await expectSuccessfulExit(follower);
+    expect(await new Response(follower.stdout).text()).toContain('follower-acquired');
+  });
+
+  test('rejects a related owner identity mismatch instead of self-queueing without a child', async () => {
+    const root = await temporaryRoot();
+    const outer = await acquireResourceLease({
+      label: 'legacy-outer-native',
+      ownerId: 'validation-run-owner',
+      resource: 'native-heavy',
+      root,
+    });
+    try {
+      await expect(
+        acquireResourceLease({
+          hostBudgetCapacity: 4,
+          hostBudgetOwnerId: 'validation-node-owner',
+          label: 'nested-clippy',
+          ownerId: 'validation-run-owner',
+          resource: 'native-heavy',
+          root,
+          timeoutMs: 5_000,
+        }),
+      ).rejects.toThrow(
+        'nested-clippy refused self-queue on native-heavy: effective owner validation-node-owner aliases validation-run-owner',
+      );
+      expect(await queuedLabels(root)).toEqual([]);
+    } finally {
+      await outer.release();
+    }
+  });
+
   test('keeps the outer lock until the last nested release while unrelated owners remain FIFO', async () => {
     const root = await temporaryRoot();
     const outer = await acquireResourceLease({ label: 'outer', resource: 'native-heavy', root });
@@ -617,8 +708,9 @@ console.log('post-interrupt-acquired'); await lease.release();`,
     const worker = (index: number) =>
       directLease(
         root,
-        `const outer=await acquireResourceLease({resource:'native-heavy',label:'precommit-${index}:native-build'});
-const nested=await acquireResourceLease({resource:'native-heavy',label:'precommit-${index}:performance-bisect'});
+        `const identity={hostBudgetCapacity:4,hostBudgetOwnerId:'precommit-node-${index}',ownerId:'precommit-run-${index}'};
+const outer=await acquireResourceLease({...identity,resource:'native-heavy',label:'precommit-${index}:native-build'});
+const nested=await acquireResourceLease({...identity,resource:'native-heavy',label:'precommit-${index}:performance-bisect'});
 await Bun.write(${JSON.stringify(acquired(index))},'acquired');
 while(!(await Bun.file(${JSON.stringify(release(index))}).exists())) await Bun.sleep(10);
 await nested.release(); await outer.release();`,
@@ -690,27 +782,46 @@ await lease.release();`,
 
   test('serializes heavy processes while an uncoordinated lightweight process still runs', async () => {
     const root = await temporaryRoot();
+    const firstWorktree = join(root, 'first-worktree');
+    const secondWorktree = join(root, 'second-worktree');
+    const releaseFirst = join(root, 'release-first-heavy');
+    await Promise.all([mkdir(firstWorktree), mkdir(secondWorktree)]);
     const first = coordinated(
       root,
       'first-heavy',
-      `console.log('first-start '+Date.now()); await Bun.sleep(350); console.log('first-end '+Date.now())`,
+      `console.log('first-start '+Date.now()); while(!(await Bun.file(${JSON.stringify(releaseFirst)}).exists())) await Bun.sleep(10); console.log('first-end '+Date.now())`,
+      firstWorktree,
     );
-    await Bun.sleep(60);
-    const second = coordinated(root, 'second-heavy', `console.log('second-start '+Date.now())`);
+    await waitFor(
+      async () =>
+        (await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '')).includes('first-heavy'),
+      'first heavy owner did not acquire native resource',
+    );
+    const second = coordinated(root, 'second-heavy', `console.log('second-start '+Date.now())`, secondWorktree);
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('second-heavy'),
+      'second worktree did not queue on native resource',
+    );
+    expect(await queuedLabels(root, 'validation-host-heavy')).not.toContain('host-budget:second-heavy');
+    const hostOwners = await Promise.all(
+      (await readdir(root))
+        .filter((entry) => entry.startsWith('validation-host-heavy') && entry.endsWith('.owner.json'))
+        .map(async (entry) => await readFile(join(root, entry), 'utf8')),
+    );
+    expect(hostOwners.some((owner) => owner.includes('host-budget:second-heavy'))).toBeFalse();
     const lightweightStartedAt = Date.now();
     const lightweight = trackChild(Bun.spawn(['bun', '-e', `await Bun.sleep(20)`]));
     expect(await lightweight.exited).toBe(0);
     expect(Date.now() - lightweightStartedAt).toBeLessThan(250);
 
+    await writeFile(releaseFirst, 'release\n');
     await expectSuccessfulExit(first);
     await expectSuccessfulExit(second);
     const firstOutput = await new Response(first.stdout).text();
     const secondOutput = await new Response(second.stdout).text();
     const firstEnd = Number(firstOutput.match(/first-end (\d+)/)?.[1]);
     const secondStart = Number(secondOutput.match(/second-start (\d+)/)?.[1]);
-    expect(secondOutput).toContain(
-      'host-budget:second-heavy waiting for validation-host-heavy: host-budget:first-heavy pid=',
-    );
+    expect(secondOutput).toContain('second-heavy waiting for native-heavy: first-heavy pid=');
     expect(secondStart).toBeGreaterThanOrEqual(firstEnd);
   });
 
