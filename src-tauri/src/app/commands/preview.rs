@@ -48,8 +48,8 @@ pub(crate) async fn apply_adjustments(
         )
         .map_err(str::to_string)?;
     state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .validate_active_source(&request.expected_image_path)
         .map_err(|error| error.to_string())?;
     let render_adjustments = request.edit_document_v2.into_render_adjustments()?;
@@ -67,8 +67,8 @@ pub(crate) async fn apply_adjustments(
         responder: tx,
     };
     state
-        .services
-        .preview_runtime
+        .render()
+        .preview_runtime()
         .submit(job)
         .map_err(|_| "preview_worker_stopped".to_string())?;
 

@@ -12,7 +12,7 @@ pub(crate) async fn load_and_parse_lut(
     path: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<LutParseResult, String> {
-    let lut = state.services.native_caches.get_or_load_lut(&path)?;
+    let lut = state.render().native_caches().get_or_load_lut(&path)?;
     Ok(LutParseResult { size: lut.size })
 }
 

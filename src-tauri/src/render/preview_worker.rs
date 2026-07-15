@@ -159,7 +159,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         preview_id,
     } = config;
 
-    let preview_frame_request = state.services.preview_frames.begin_request();
+    let preview_frame_request = state.render().preview_frames().begin_request();
     let fn_start = std::time::Instant::now();
     cancellation_checkpoint(cancellation, PreviewStage::Source)?;
     let context = get_or_init_gpu_context(&state, app_handle)?;
@@ -172,8 +172,8 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         .image_snapshot()
         .ok_or("No original image loaded")?;
     state
-        .services
-        .preview_session
+        .render()
+        .preview_session()
         .validate_active_source(expected_image_path)
         .map_err(|error| error.to_string())?;
     validate_expected_preview_image(&loaded_image.path, expected_image_path)
@@ -196,7 +196,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let lut = adjustments_clone["lutPath"]
         .as_str()
-        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+        .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let settings_revision = u64::from(tm_override.unwrap_or(0));
     let revision = viewer_sample_graph_revision.map_or_else(
         || {
@@ -266,7 +266,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     preview_identity.retouch_stage = render_plan.fingerprints.retouch;
     preview_identity.completed_stage = "geometry-retouch-base";
 
-    let cached_preview = state.services.preview_frames.snapshot();
+    let cached_preview = state.render().preview_frames().snapshot();
 
     let base_valid = cached_preview
         .as_ref()
@@ -455,7 +455,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             preview_operation_identity: preview_operation_identity.clone(),
             products: requested_products(compute_waveform, active_waveform_channel),
             active_waveform_channel: channel_filter,
-            service: Arc::clone(&state.services.analytics),
+            service: Arc::clone(state.render().analytics()),
         })
     } else {
         None
@@ -567,7 +567,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         fn_start,
     )?;
     cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
-    if !state.services.preview_frames.publish_if_current(
+    if !state.render().preview_frames().publish_if_current(
         preview_frame_request,
         CachedPreview {
             image: crate::gpu_processing::RevisionedImage::new(
@@ -848,11 +848,11 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
         PreviewSchedulingPolicy::default(),
-        Some(Arc::clone(&state.services.interactive_gpu_pressure)),
+        Some(Arc::clone(state.render().interactive_gpu_pressure())),
     );
     let worker_token = state
-        .services
-        .preview_runtime
+        .render()
+        .preview_runtime()
         .install(Arc::clone(&scheduler));
 
     thread::spawn(move || {
@@ -921,8 +921,8 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
         }
         app_handle
             .state::<AppState>()
-            .services
-            .preview_runtime
+            .render()
+            .preview_runtime()
             .uninstall(worker_token);
     });
 }

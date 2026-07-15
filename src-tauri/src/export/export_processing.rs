@@ -970,7 +970,7 @@ fn prepare_export_render_inputs(
         .insert("showClipping".into(), Value::Bool(false));
     let lut = effective_adjustments["lutPath"]
         .as_str()
-        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
+        .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let revision = content_revision(
         &effective_adjustments,
         0,
@@ -1674,10 +1674,10 @@ async fn run_batch_export_pipeline(
     });
     let resources = PipelineResources::new(budget, diagnostics.clone());
     let interactive_gpu_pressure = Arc::clone(
-        &app_handle
+        app_handle
             .state::<AppState>()
-            .services
-            .interactive_gpu_pressure,
+            .render()
+            .interactive_gpu_pressure(),
     );
     let gpu_lane = CooperativeGpuLane::with_interactive_gpu_pressure(
         budget.gpu_slots,

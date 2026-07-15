@@ -42,6 +42,7 @@ pub(crate) mod render_caches;
 pub(crate) mod render_pipeline;
 pub(crate) mod render_plan;
 pub(crate) mod resample;
+pub(crate) mod runtime_services;
 pub(crate) mod wgpu_nodes;
 
 #[cfg(all(test, feature = "tauri-test"))]

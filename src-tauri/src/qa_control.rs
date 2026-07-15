@@ -235,8 +235,8 @@ fn process_resource_usage() -> Value {
 
 fn scheduler_metrics(app_state: &AppState) -> Value {
     app_state
-        .services
-        .preview_runtime
+        .render()
+        .preview_runtime()
         .metrics_snapshot()
         .map(|metrics| {
             json!({
@@ -293,8 +293,8 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
         .map(|image| image.path);
     let cache_report = RenderCaches::new(app_state).native_cache_report();
     let preview = app_state
-        .services
-        .preview_frames
+        .render()
+        .preview_frames()
         .try_snapshot()
         .map(|preview| {
             let identity = &preview.identity;
@@ -314,7 +314,7 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
         "identity": state.identity,
         "sessionRevision": state.session_revision.load(Ordering::Acquire),
         "renderRevision": state.render_revision.load(Ordering::Acquire),
-        "loadImageGeneration": app_state.services.preview_session.current_generation(),
+        "loadImageGeneration": app_state.render().preview_session().current_generation(),
         "sourcePath": state.source_path.lock().ok().and_then(|path| path.clone()),
         "activeNativeSource": active_native_source,
         "preview": preview,
