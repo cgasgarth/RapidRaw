@@ -110,9 +110,7 @@ describe('detail edit transaction', () => {
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurEnabled);
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurSigmaPx);
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurStrength);
-    for (const field of [DetailsAdjustment.SharpnessThreshold]) {
-      expect(isDetailNodeAdjustment(field)).toBeFalse();
-    }
+    expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.SharpnessThreshold);
 
     const noOp = state.applyEditTransaction(buildDetailEditTransaction(state, identity(), 'sharpness', 0, 'no-op'));
     expect(noOp.noOp).toBe(true);
@@ -162,12 +160,20 @@ describe('detail edit transaction', () => {
     expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(24);
   });
 
-  test('carries local contrast node authority through save execution and reopen', async () => {
+  test('carries sharpness-threshold node authority through Undo, Redo, save execution, and reopen', async () => {
     const before = useEditorStore.getState();
     const beforeDocument = before.editDocumentV2;
     before.applyEditTransaction(
-      buildDetailEditTransaction(before, identity(), DetailsAdjustment.Structure, 31, 'save-local-contrast'),
+      buildDetailEditTransaction(before, identity(), DetailsAdjustment.SharpnessThreshold, 42, 'save-threshold'),
     );
+    expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(42);
+    expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty(
+      'sharpnessThreshold',
+    );
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(15);
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(42);
     const committed = useEditorStore.getState();
     const executions: EditorPersistenceExecution[] = [];
     const runner = new EditorPersistenceEffectRunner({
@@ -184,7 +190,7 @@ describe('detail edit transaction', () => {
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustments, structure: 0 },
+      adjustments: { ...committed.adjustments, sharpnessThreshold: 15 },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -206,12 +212,12 @@ describe('detail edit transaction', () => {
     await Promise.resolve();
 
     expect(executions).toHaveLength(1);
-    expect(executions[0]?.editDocumentV2.nodes.detail_denoise_dehaze.params.structure).toBe(31);
+    expect(executions[0]?.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(42);
     const reopened = hydrateImageOpenEditDocumentV2(
       { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
       executions[0]?.adjustments ?? committed.adjustments,
     );
-    expect(reopened.nodes.detail_denoise_dehaze.params.structure).toBe(31);
+    expect(reopened.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(42);
     expect(reopened).toEqual(committed.editDocumentV2);
   });
 

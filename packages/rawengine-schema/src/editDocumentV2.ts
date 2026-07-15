@@ -69,6 +69,13 @@ export const EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS = Object.keys(
   EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
 ) as (keyof typeof EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS)[];
 
+export const editDocumentSharpnessThresholdV2Schema = z
+  .object({ sharpnessThreshold: z.number().finite().min(0).max(80) })
+  .strict();
+
+export const EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS = { sharpnessThreshold: 15 } as const;
+export const EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS = ['sharpnessThreshold'] as const;
+
 export const editDocumentDetailDenoiseDehazeV2Schema = z
   .object({
     clarity: z.number().finite().min(-100).max(100),
@@ -84,6 +91,7 @@ export const editDocumentDetailDenoiseDehazeV2Schema = z
     denoiseShadowBias: z.number().finite().min(-100).max(100),
     lumaNoiseReduction: z.number().finite().min(0).max(100),
     sharpness: z.number().finite().min(-100).max(100),
+    ...editDocumentSharpnessThresholdV2Schema.shape,
     ...editDocumentLocalContrastV2Schema.shape,
   })
   .strict();
@@ -647,6 +655,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       denoiseShadowBias: 0,
       lumaNoiseReduction: 0,
       sharpness: 0,
+      ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS,
     },
     editorSection: 'details',
     legacyFields: [
@@ -662,6 +671,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'denoiseShadowBias',
       'lumaNoiseReduction',
       'sharpness',
+      ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
       ...EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
     ],
     nodeType: 'detail_denoise_dehaze',
@@ -1660,6 +1670,12 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     fields: EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
     nodeType: 'detail_denoise_dehaze',
     schemas: editDocumentLocalContrastV2Schema.shape,
+  });
+  document = normalizeLegacyNodeOwnership(document, {
+    defaults: EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS,
+    fields: EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
+    nodeType: 'detail_denoise_dehaze',
+    schemas: editDocumentSharpnessThresholdV2Schema.shape,
   });
   document = normalizeLegacyNodeOwnership(document, {
     defaults: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,

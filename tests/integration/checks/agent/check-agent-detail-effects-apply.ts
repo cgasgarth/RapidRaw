@@ -211,6 +211,7 @@ if (
 if (
   state.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity !== 9 ||
   state.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpness !== 18 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold !== 20 ||
   state.editDocumentV2.nodes.display_creative?.params.grainAmount !== 18 ||
   state.editDocumentV2.nodes.display_creative.params.vignetteAmount !== -14
 ) {
