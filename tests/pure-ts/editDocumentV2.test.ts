@@ -273,6 +273,123 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('scene curves default legacy state and reject malformed render authority', () => {
+    const {
+      curveMode: _curveMode,
+      curves: _curves,
+      parametricCurve: _parametricCurve,
+      pointCurves: _pointCurves,
+      toneCurve: _toneCurve,
+      ...legacyCurves
+    } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyCurves);
+    expect(defaulted.nodes.scene_curve?.params).toMatchObject({
+      curveMode: 'point',
+      toneCurve: 'auto_filmic',
+    });
+    expect(defaulted.migration?.defaulted).toEqual(
+      expect.arrayContaining([
+        'scene_curve.curveMode',
+        'scene_curve.curves',
+        'scene_curve.parametricCurve',
+        'scene_curve.pointCurves',
+        'scene_curve.toneCurve',
+      ]),
+    );
+
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      outputCurveV1: {
+        domain: 'view_encoded',
+        peakNits: 203,
+        points: [
+          { input: 0, output: 0 },
+          { input: 1, output: 1 },
+        ],
+        sdrReferenceWhiteNits: 203,
+        targetIdentity: 'rapid-view-default',
+      },
+      sceneCurveV1: {
+        channelMode: 'luminance_preserving',
+        middleGrey: 0.18,
+        points: [
+          { xEv: -16, yEv: -16 },
+          { xEv: 16, yEv: 16 },
+        ],
+      },
+    });
+    const sceneNode = document.nodes.scene_curve;
+    expect(compileEditDocumentNodeV2(sceneNode).params).toEqual(sceneNode?.params);
+
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_curve: {
+            ...sceneNode,
+            params: {
+              ...sceneNode?.params,
+              curves: {
+                ...INITIAL_ADJUSTMENTS.curves,
+                luma: Array.from({ length: 17 }, (_, index) => ({ x: index, y: index })),
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_curve: {
+            ...sceneNode,
+            params: {
+              ...sceneNode?.params,
+              parametricCurve: {
+                ...INITIAL_ADJUSTMENTS.parametricCurve,
+                luma: { ...INITIAL_ADJUSTMENTS.parametricCurve?.luma, split2: 20 },
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_curve: {
+            ...sceneNode,
+            params: {
+              ...sceneNode?.params,
+              sceneCurveV1: {
+                channelMode: 'linked_rgb',
+                middleGrey: 0.18,
+                points: [
+                  { xEv: -1, yEv: 1 },
+                  { xEv: 1, yEv: 0 },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          scene_curve: { ...sceneNode, params: { ...sceneNode?.params, futureCurve: true } },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('geometry is strict, bounded, unit-explicit, and atomically mirrored into its domain', () => {
     const legacyPixelCrop = { height: 1800, width: 2400, x: 400, y: 300 };
     const document = legacyAdjustmentsToEditDocumentV2({
@@ -397,6 +514,25 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(renderDocument.nodes.geometry).toEqual(preparedDocument.nodes.geometry);
     expect(renderDocument.nodes.scene_global_color_tone).toEqual(preparedDocument.nodes.scene_global_color_tone);
+  });
+
+  test('render preparation overlays the authoritative scene-curve envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      curveMode: 'parametric',
+      toneCurve: 'shadow_lift',
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['scene_curve']);
+
+    expect(renderDocument.nodes.scene_curve).toBe(authoritative.nodes.scene_curve);
+    expect(renderDocument.nodes.scene_curve?.params).toMatchObject({
+      curveMode: 'parametric',
+      toneCurve: 'shadow_lift',
+    });
+    expect(renderDocument.nodes.camera_input).toEqual(preparedDocument.nodes.camera_input);
+    expect(renderDocument.nodes.geometry).toEqual(preparedDocument.nodes.geometry);
   });
 
   test('render preparation transfers the layers envelope and explicit domain together', () => {

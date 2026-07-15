@@ -104,6 +104,7 @@ const DEFAULT_POINT_CURVES: Record<ActiveChannel, Array<Coord>> = {
     { x: 255, y: 255 },
   ],
 };
+const MAX_LEGACY_CURVE_POINTS = 16;
 
 const formatPercent = (value: number) => `${String(value)}%`;
 const formatSvgNumber = (value: number) => String(value);
@@ -756,6 +757,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
     const { clientX, clientY } = eventPoint;
     const rect = svg.getBoundingClientRect();
     const { x, y } = clientPointToCurvePoint(clientX, clientY, rect);
+    if (activePoints.length >= MAX_LEGACY_CURVE_POINTS) return;
 
     const newPoints = [...activePoints, { x, y }].sort((a: Coord, b: Coord) => a.x - b.x);
     const newPointIndex = newPoints.findIndex((p: Coord) => p.x === x && p.y === y);

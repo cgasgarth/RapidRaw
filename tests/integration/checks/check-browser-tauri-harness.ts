@@ -399,6 +399,7 @@ try {
   }
   await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
+  await verifySceneCurveTransaction(page);
   await verifyViewerPickerControllers(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
@@ -1342,6 +1343,61 @@ async function verifyColorRangeLocalAdjustmentTransaction(page: Page): Promise<v
     throw new Error(
       `Color-range local adjustment did not persist one revision-scoped layer artifact: ${JSON.stringify({ colorMask, sidecar, transaction })}`,
     );
+  }
+}
+
+async function verifySceneCurveTransaction(page: Page): Promise<void> {
+  await page.getByTestId('color-workspace-tab-foundation').click();
+  const toneCurve = page.getByRole('combobox', { name: 'Tone Curve' });
+  await toneCurve.scrollIntoViewIfNeeded();
+  const baseline = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      previews: calls.filter(({ command }) => command === 'apply_adjustments').length,
+      saves: calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length,
+    };
+  });
+
+  await toneCurve.selectOption('soft_contrast');
+  await page.waitForFunction(
+    ({ previews, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const previewCalls = calls.filter(({ command }) => command === 'apply_adjustments');
+      const latestRequest = previewCalls.at(-1)?.args?.request;
+      const editDocument =
+        typeof latestRequest === 'object' && latestRequest !== null ? latestRequest['editDocumentV2'] : null;
+      const nodes = typeof editDocument === 'object' && editDocument !== null ? editDocument['nodes'] : null;
+      const sceneCurve = typeof nodes === 'object' && nodes !== null ? nodes['scene_curve'] : null;
+      const params = typeof sceneCurve === 'object' && sceneCurve !== null ? sceneCurve['params'] : null;
+      return (
+        previewCalls.length > previews &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        typeof params === 'object' &&
+        params !== null &&
+        params['toneCurve'] === 'soft_contrast' &&
+        params['curveMode'] === 'parametric'
+      );
+    },
+    baseline,
+    { timeout: 10_000 },
+  );
+
+  const request = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter(({ command }) => command === 'apply_adjustments')
+      .at(-1);
+    return call?.args?.request ?? null;
+  });
+  if (request === null || typeof request !== 'object' || 'jsAdjustments' in request) {
+    throw new Error('Tone Curve preview retained the flat adjustments render payload.');
+  }
+  const editDocument = editDocumentV2Schema.parse(request['editDocumentV2']);
+  const sceneCurve = editDocument.nodes.scene_curve?.params;
+  if (sceneCurve?.toneCurve !== 'soft_contrast' || sceneCurve.curveMode !== 'parametric') {
+    throw new Error(`Tone Curve UI edit did not reach scene_curve render authority: ${JSON.stringify(sceneCurve)}`);
+  }
+  if ((await toneCurve.inputValue()) !== 'soft_contrast') {
+    throw new Error('Tone Curve selector did not retain the committed value.');
   }
 }
 

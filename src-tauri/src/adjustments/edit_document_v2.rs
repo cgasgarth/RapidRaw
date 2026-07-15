@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
+use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
+
 const EDIT_DOCUMENT_V2_SCHEMA_VERSION: u8 = 2;
 const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 
@@ -169,6 +172,252 @@ fn validate_scene_tone_parameter(
     Err(format!(
         "EditDocumentV2 node 'scene_global_color_tone' field '{field}' must be finite and within [{minimum}, {maximum}]"
     ))
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum SceneCurveModeV2 {
+    Point,
+    Parametric,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum SceneCurveToneCurveV2 {
+    AutoFilmic,
+    Linear,
+    SoftContrast,
+    HighContrast,
+    ShadowLift,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveLegacyPointV2 {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveLegacyChannelsV2 {
+    blue: Vec<SceneCurveLegacyPointV2>,
+    green: Vec<SceneCurveLegacyPointV2>,
+    luma: Vec<SceneCurveLegacyPointV2>,
+    red: Vec<SceneCurveLegacyPointV2>,
+}
+
+impl SceneCurveLegacyChannelsV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (channel, points) in [
+            ("blue", &self.blue),
+            ("green", &self.green),
+            ("luma", &self.luma),
+            ("red", &self.red),
+        ] {
+            if !(2..=16).contains(&points.len()) {
+                return Err(format!(
+                    "EditDocumentV2 scene_curve {channel} requires 2..=16 points"
+                ));
+            }
+            if points.iter().any(|point| {
+                !point.x.is_finite()
+                    || !point.y.is_finite()
+                    || !(0.0..=255.0).contains(&point.x)
+                    || !(0.0..=255.0).contains(&point.y)
+            }) {
+                return Err(format!(
+                    "EditDocumentV2 scene_curve {channel} points must be finite within 0..=255"
+                ));
+            }
+            if points.windows(2).any(|pair| pair[1].x <= pair[0].x) {
+                return Err(format!(
+                    "EditDocumentV2 scene_curve {channel} x coordinates must increase"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveParametricChannelV2 {
+    black_level: f64,
+    darks: f64,
+    highlights: f64,
+    lights: f64,
+    shadows: f64,
+    split1: f64,
+    split2: f64,
+    split3: f64,
+    white_level: f64,
+}
+
+impl SceneCurveParametricChannelV2 {
+    fn validate(&self) -> Result<(), String> {
+        let signed_values = [self.darks, self.highlights, self.lights, self.shadows];
+        if signed_values
+            .iter()
+            .any(|value| !value.is_finite() || !(-100.0..=100.0).contains(value))
+            || !self.black_level.is_finite()
+            || !(0.0..=100.0).contains(&self.black_level)
+            || !self.white_level.is_finite()
+            || !(-100.0..=0.0).contains(&self.white_level)
+            || !self.split1.is_finite()
+            || !self.split2.is_finite()
+            || !self.split3.is_finite()
+            || !(0.0..=100.0).contains(&self.split1)
+            || !(0.0..=100.0).contains(&self.split2)
+            || !(0.0..=100.0).contains(&self.split3)
+            || !(self.split1 < self.split2 && self.split2 < self.split3)
+        {
+            return Err("EditDocumentV2 scene_curve parametric channel is invalid".to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveParametricChannelsV2 {
+    blue: SceneCurveParametricChannelV2,
+    green: SceneCurveParametricChannelV2,
+    luma: SceneCurveParametricChannelV2,
+    red: SceneCurveParametricChannelV2,
+}
+
+impl SceneCurveParametricChannelsV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.blue.validate()?;
+        self.green.validate()?;
+        self.luma.validate()?;
+        self.red.validate()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum SceneCurveChannelModeV1 {
+    LuminancePreserving,
+    LinkedRgb,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurvePointV1 {
+    x_ev: f32,
+    y_ev: f32,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveSettingsV1 {
+    channel_mode: SceneCurveChannelModeV1,
+    middle_grey: f32,
+    points: Vec<SceneCurvePointV1>,
+}
+
+impl SceneCurveSettingsV1 {
+    fn validate(&self) -> Result<(), String> {
+        let points = self
+            .points
+            .iter()
+            .map(|point| CurvePoint::new(point.x_ev, point.y_ev))
+            .collect::<Vec<_>>();
+        let channel_mode = match self.channel_mode {
+            SceneCurveChannelModeV1::LuminancePreserving => CurveChannelMode::LuminancePreserving,
+            SceneCurveChannelModeV1::LinkedRgb => CurveChannelMode::LinkedRgb,
+        };
+        compile_scene_curve(&points, self.middle_grey, channel_mode)
+            .map(|_| ())
+            .map_err(|error| {
+                format!("EditDocumentV2 scene_curve sceneCurveV1 is invalid: {error:?}")
+            })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum OutputCurveDomainV1 {
+    ViewEncoded,
+    OutputEncoded,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OutputCurvePointV1 {
+    input: f32,
+    output: f32,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OutputCurveSettingsV1 {
+    domain: OutputCurveDomainV1,
+    peak_nits: f32,
+    points: Vec<OutputCurvePointV1>,
+    sdr_reference_white_nits: f32,
+    target_identity: String,
+}
+
+impl OutputCurveSettingsV1 {
+    fn validate(&self) -> Result<(), String> {
+        if self.target_identity.is_empty() || self.target_identity.len() > 128 {
+            return Err(
+                "EditDocumentV2 scene_curve outputCurveV1 targetIdentity requires 1..=128 bytes"
+                    .to_string(),
+            );
+        }
+        let target = match self.domain {
+            OutputCurveDomainV1::ViewEncoded => {
+                OutputCurveTargetV1::view_encoded(0, self.sdr_reference_white_nits, self.peak_nits)
+            }
+            OutputCurveDomainV1::OutputEncoded => OutputCurveTargetV1::output_encoded(
+                0,
+                self.sdr_reference_white_nits,
+                self.peak_nits,
+            ),
+        };
+        let points = self
+            .points
+            .iter()
+            .map(|point| OutputCurvePoint::new(point.input, point.output))
+            .collect::<Vec<_>>();
+        compile_output_curve(target, &points)
+            .map(|_| ())
+            .map_err(|error| {
+                format!("EditDocumentV2 scene_curve outputCurveV1 is invalid: {error:?}")
+            })
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneCurveV2 {
+    curve_mode: SceneCurveModeV2,
+    curves: SceneCurveLegacyChannelsV2,
+    output_curve_v1: Option<OutputCurveSettingsV1>,
+    parametric_curve: SceneCurveParametricChannelsV2,
+    point_curves: SceneCurveLegacyChannelsV2,
+    scene_curve_v1: Option<SceneCurveSettingsV1>,
+    tone_curve: SceneCurveToneCurveV2,
+}
+
+impl SceneCurveV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.curves.validate()?;
+        self.point_curves.validate()?;
+        self.parametric_curve.validate()?;
+        if let Some(scene_curve) = &self.scene_curve_v1 {
+            scene_curve.validate()?;
+        }
+        if let Some(output_curve) = &self.output_curve_v1 {
+            output_curve.validate()?;
+        }
+        let _ = (&self.curve_mode, &self.tone_curve);
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -613,6 +862,10 @@ fn compile_node_params(
             params.compile()?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::SceneCurve => {
+            parse_scene_curve(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::Geometry => {
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
@@ -634,6 +887,13 @@ fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, Stri
         .map_err(|error| format!("EditDocumentV2 camera_input is invalid: {error}"))?;
     camera_input.validate()?;
     Ok(camera_input)
+}
+
+fn parse_scene_curve(params: &Map<String, Value>) -> Result<SceneCurveV2, String> {
+    let scene_curve: SceneCurveV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 scene_curve is invalid: {error}"))?;
+    scene_curve.validate()?;
+    Ok(scene_curve)
 }
 
 fn validate_node_contract(
@@ -798,6 +1058,50 @@ mod tests {
     use super::super::parse::get_all_adjustments_from_json;
     use super::EditDocumentV2;
 
+    fn scene_curve_params() -> Value {
+        let identity_curves = json!({
+            "blue": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }],
+            "green": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }],
+            "luma": [{ "x": 0, "y": 0 }, { "x": 255, "y": 250 }],
+            "red": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }]
+        });
+        let parametric_channel = json!({
+            "blackLevel": 0,
+            "darks": 0,
+            "highlights": 0,
+            "lights": 0,
+            "shadows": 0,
+            "split1": 25,
+            "split2": 50,
+            "split3": 75,
+            "whiteLevel": 0
+        });
+        json!({
+            "curveMode": "point",
+            "curves": identity_curves,
+            "outputCurveV1": {
+                "domain": "view_encoded",
+                "peakNits": 203,
+                "points": [{ "input": 0, "output": 0 }, { "input": 1, "output": 1 }],
+                "sdrReferenceWhiteNits": 203,
+                "targetIdentity": "rapid-view-default"
+            },
+            "parametricCurve": {
+                "blue": parametric_channel,
+                "green": parametric_channel,
+                "luma": parametric_channel,
+                "red": parametric_channel
+            },
+            "pointCurves": identity_curves,
+            "sceneCurveV1": {
+                "channelMode": "luminance_preserving",
+                "middleGrey": 0.18,
+                "points": [{ "xEv": -16, "yEv": -16 }, { "xEv": 16, "yEv": 16 }]
+            },
+            "toneCurve": "soft_contrast"
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -838,7 +1142,7 @@ mod tests {
                 "scene_curve": {
                     "enabled": true,
                     "implementationVersion": 1,
-                    "params": { "toneCurve": [{ "x": 0, "y": 0 }, { "x": 255, "y": 250 }] },
+                    "params": scene_curve_params(),
                     "process": "scene_referred_v2",
                     "type": "scene_curve"
                 },
@@ -966,7 +1270,6 @@ mod tests {
     #[test]
     fn compiles_node_keyed_document_to_render_parity_adjustments() {
         let legacy = json!({
-            "curves": {},
             "futureField": { "enabled": true },
             "rawEngineEditGraphVersion": 2,
             "sectionVisibility": { "basic": true, "color": true, "details": true, "effects": true },
@@ -988,7 +1291,6 @@ mod tests {
             "clarity": 16,
             "contrast": 18,
             "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
-            "curves": {},
             "dehaze": 8,
             "exposure": 0.75,
             "flipHorizontal": false,
@@ -1009,7 +1311,6 @@ mod tests {
             "sharpness": 24,
             "temperature": 12,
             "tint": -3,
-            "toneCurve": [{ "x": 0, "y": 0 }, { "x": 255, "y": 250 }],
             "toneMapper": "basic",
             "vibrance": 11,
             "whites": 9
@@ -1033,6 +1334,12 @@ mod tests {
             "x": 0.32168,
             "y": 0.33767
         });
+        for (key, value) in scene_curve_params()
+            .as_object()
+            .expect("scene-curve params object")
+        {
+            expected[key] = value.clone();
+        }
         assert_eq!(compiled, expected);
 
         let expected_render = get_all_adjustments_from_json(&expected, true, None);
@@ -1186,6 +1493,47 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid white-balance chromaticity must fail");
         assert!(error.contains("chromaticity is invalid"));
+    }
+
+    #[test]
+    fn scene_curve_compiler_rejects_unowned_and_malformed_render_authority() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["scene_curve"]["params"]["futureCurve"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned scene-curve field must fail");
+        assert!(error.contains("unknown field `futureCurve`"));
+
+        let mut too_many_points = document_with_legacy(json!({}));
+        too_many_points["nodes"]["scene_curve"]["params"]["curves"]["luma"] = Value::Array(
+            (0..17)
+                .map(|index| json!({ "x": index, "y": index }))
+                .collect(),
+        );
+        let error = serde_json::from_value::<EditDocumentV2>(too_many_points)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("oversized legacy curve must fail");
+        assert!(error.contains("requires 2..=16 points"));
+
+        let mut non_monotone_scene = document_with_legacy(json!({}));
+        non_monotone_scene["nodes"]["scene_curve"]["params"]["sceneCurveV1"]["points"] =
+            json!([{ "xEv": -1, "yEv": 1 }, { "xEv": 1, "yEv": 0 }]);
+        let error = serde_json::from_value::<EditDocumentV2>(non_monotone_scene)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("non-monotone scene curve must fail");
+        assert!(error.contains("OutputNotMonotone"));
+
+        let mut invalid_headroom = document_with_legacy(json!({}));
+        invalid_headroom["nodes"]["scene_curve"]["params"]["outputCurveV1"]["peakNits"] =
+            json!(100);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_headroom)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("output curve below reference white must fail");
+        assert!(error.contains("InvalidTargetLuminance"));
     }
 
     #[test]
