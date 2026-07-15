@@ -27,6 +27,8 @@ interface BoundaryViolation {
   line: number;
 }
 
+type GuardedEditorMethod = 'hydrateEditorRenderAuthority' | 'setEditor' | 'setState';
+
 const unwrap = (expression: ts.Expression): ts.Expression => {
   let current = expression;
   while (
@@ -83,23 +85,92 @@ export const findEditorRenderAuthorityViolations = (filePath: string, contents: 
     filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const violations: BoundaryViolation[] = [];
+  const methodAliases = new Map<string, GuardedEditorMethod>();
+  const editorStoreAliases = new Set(['useEditorStore']);
   const report = (node: ts.Node, label: string) => {
     violations.push({
       label,
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
     });
   };
+  const isEditorStoreExpression = (expression: ts.Expression): boolean => {
+    const current = unwrap(expression);
+    return ts.isIdentifier(current) && editorStoreAliases.has(current.text);
+  };
+  const resolveGuardedMethod = (expression: ts.Expression): GuardedEditorMethod | null => {
+    const current = unwrap(expression);
+    if (ts.isIdentifier(current)) {
+      return (
+        methodAliases.get(current.text) ??
+        (current.text === 'setEditor' || current.text === 'hydrateEditorRenderAuthority' ? current.text : null)
+      );
+    }
+    if (!ts.isPropertyAccessExpression(current)) return null;
+    if (current.name.text === 'setEditor' || current.name.text === 'hydrateEditorRenderAuthority') {
+      return current.name.text;
+    }
+    return current.name.text === 'setState' && isEditorStoreExpression(current.expression) ? 'setState' : null;
+  };
+  const bindIdentifier = (name: ts.Identifier, method: GuardedEditorMethod | null): boolean => {
+    if (method === null || methodAliases.get(name.text) === method) return false;
+    methodAliases.set(name.text, method);
+    return true;
+  };
+  const collectAliases = (): void => {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const collect = (node: ts.Node): void => {
+        if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+          const initializer = unwrap(node.initializer);
+          if (ts.isIdentifier(node.name)) {
+            if (isEditorStoreExpression(initializer) && !editorStoreAliases.has(node.name.text)) {
+              editorStoreAliases.add(node.name.text);
+              changed = true;
+            }
+            changed = bindIdentifier(node.name, resolveGuardedMethod(initializer)) || changed;
+          } else if (ts.isObjectBindingPattern(node.name)) {
+            const fromEditorStore = isEditorStoreExpression(initializer);
+            for (const element of node.name.elements) {
+              if (!ts.isIdentifier(element.name)) continue;
+              const property = element.propertyName ?? element.name;
+              const propertyText =
+                ts.isIdentifier(property) || ts.isStringLiteral(property)
+                  ? property.text
+                  : property.getText(sourceFile);
+              const method =
+                propertyText === 'setEditor' || propertyText === 'hydrateEditorRenderAuthority'
+                  ? propertyText
+                  : propertyText === 'setState' && fromEditorStore
+                    ? 'setState'
+                    : null;
+              changed = bindIdentifier(element.name, method) || changed;
+            }
+          }
+        } else if (
+          ts.isBinaryExpression(node) &&
+          node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isIdentifier(node.left)
+        ) {
+          changed = bindIdentifier(node.left, resolveGuardedMethod(node.right)) || changed;
+        }
+        ts.forEachChild(node, collect);
+      };
+      collect(sourceFile);
+    }
+  };
+  collectAliases();
   const visit = (node: ts.Node): void => {
     if (!ts.isCallExpression(node)) {
       ts.forEachChild(node, visit);
       return;
     }
-    const method = ts.isPropertyAccessExpression(node.expression)
-      ? node.expression.name.text
-      : ts.isIdentifier(node.expression)
-        ? node.expression.text
-        : null;
+    const method = resolveGuardedMethod(node.expression);
     const update = node.arguments[0] === undefined ? null : objectUpdate(node.arguments[0]);
+    const isGuardedInternalSetStateCall =
+      filePath.endsWith('/src/store/useEditorStore.ts') &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'directEditorStoreSetState';
     if (method === 'setEditor') {
       const forbidden = objectUpdates(node.arguments[0] ?? ts.factory.createObjectLiteralExpression())
         .flatMap(({ properties }) => properties.map(propertyName))
@@ -109,11 +180,7 @@ export const findEditorRenderAuthorityViolations = (filePath: string, contents: 
     if (method === 'hydrateEditorRenderAuthority') {
       report(node, 'production hydration bypasses EditTransaction');
     }
-    if (
-      method === 'setState' &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.expression.getText(sourceFile).includes('useEditorStore')
-    ) {
+    if (method === 'setState' && !isGuardedInternalSetStateCall) {
       if (update === null) {
         report(node, 'dynamic useEditorStore.setState update');
       } else {
@@ -144,6 +211,28 @@ const selfTest = () => {
     ['direct Zustand authority', 'useEditorStore.setState({ adjustmentRevision: 2 });', ['setState writes']],
     ['dynamic Zustand update', 'useEditorStore.setState(update);', ['dynamic']],
     ['explicit hydration', 'store.hydrateEditorRenderAuthority({ adjustments });', ['hydration']],
+    [
+      'aliased setEditor',
+      'const write = store.setEditor; const commit = write; commit({ historyIndex: 2 });',
+      ['setEditor writes historyIndex'],
+    ],
+    [
+      'aliased hydration',
+      'const hydrate = store.hydrateEditorRenderAuthority; hydrate({ adjustments });',
+      ['hydration'],
+    ],
+    [
+      'destructured renamed hydration',
+      'const { hydrateEditorRenderAuthority: restore } = store; restore({ adjustments });',
+      ['hydration'],
+    ],
+    [
+      'aliased Zustand setState',
+      'const publish = useEditorStore.setState; const commit = publish; commit({ history: [] });',
+      ['setState writes history'],
+    ],
+    ['destructured Zustand setState', 'const { setState: publish } = useEditorStore; publish(update);', ['dynamic']],
+    ['unrelated setState alias', 'const publish = other.setState; publish({ history: [] });', []],
     ['UI selection allowlist', 'useEditorStore.setState({ activeMaskId: null });', []],
     ['nested proposal', 'store.setEditor({ proposal: { adjustments } });', []],
   ] as const;
