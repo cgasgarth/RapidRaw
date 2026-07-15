@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::collections::{HashMap, VecDeque};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -52,20 +53,61 @@ pub struct FocusStackCandidateJobResult {
     pub progress: ComputationalMergeProgress,
 }
 
-#[derive(Default)]
-pub struct FocusStackJobResults(Mutex<HashMap<String, FocusStackCandidateJobResult>>);
+const DEFAULT_RESULT_CAPACITY: usize = 64;
 
-impl FocusStackJobResults {
+struct FocusStackResultState {
+    results: HashMap<String, FocusStackCandidateJobResult>,
+    terminal_order: VecDeque<String>,
+}
+
+pub(crate) struct FocusStackResultService {
+    state: Mutex<FocusStackResultState>,
+    capacity: usize,
+}
+
+impl Default for FocusStackResultService {
+    fn default() -> Self {
+        Self::with_capacity(DEFAULT_RESULT_CAPACITY)
+    }
+}
+
+impl FocusStackResultService {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            state: Mutex::new(FocusStackResultState {
+                results: HashMap::new(),
+                terminal_order: VecDeque::new(),
+            }),
+            capacity: capacity.max(1),
+        }
+    }
+
     pub(crate) fn read(
         &self,
         id: &ComputationalMergeJobId,
     ) -> Option<FocusStackCandidateJobResult> {
-        self.0.lock().ok()?.get(&id.to_string()).cloned()
+        self.state
+            .lock()
+            .expect("focus result service poisoned")
+            .results
+            .get(&id.to_string())
+            .cloned()
     }
-    fn insert(&self, id: String, result: FocusStackCandidateJobResult) {
-        if let Ok(mut results) = self.0.lock() {
-            results.insert(id, result);
+
+    fn publish(&self, result: FocusStackCandidateJobResult) -> bool {
+        let id = result.job_id.clone();
+        let mut state = self.state.lock().expect("focus result service poisoned");
+        if state.results.contains_key(&id) {
+            return false;
         }
+        state.results.insert(id.clone(), result);
+        state.terminal_order.push_back(id);
+        while state.terminal_order.len() > self.capacity {
+            if let Some(expired) = state.terminal_order.pop_front() {
+                state.results.remove(&expired);
+            }
+        }
+        true
     }
 }
 
@@ -174,7 +216,7 @@ pub fn prepare_focus_stack_candidate(
                     candidate,
                     progress,
                 };
-                state.focus_stack_job_results.insert(thread_id, result);
+                state.services.focus_stack_results.publish(result);
             }
         })
         .map_err(|e| format!("focus_candidate_job_spawn_failed:{e}"))?;
@@ -190,7 +232,7 @@ pub fn read_focus_stack_job(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<FocusStackCandidateJobResult, String> {
     let id = ComputationalMergeJobId::from_string(job_id.clone());
-    if let Some(result) = state.focus_stack_job_results.read(&id) {
+    if let Some(result) = state.services.focus_stack_results.read(&id) {
         return Ok(result);
     }
     let progress = state
@@ -209,6 +251,31 @@ pub fn read_focus_stack_job(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::merge::computational_job::{ComputationalMergeFamily, ComputationalMergeJobStatus};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    fn result(job_id: &str, status: String) -> FocusStackCandidateJobResult {
+        let job_id = ComputationalMergeJobId::from_string(job_id.to_string());
+        FocusStackCandidateJobResult {
+            job_id: job_id.to_string(),
+            status,
+            error_code: None,
+            candidate: None,
+            progress: ComputationalMergeProgress {
+                schema_version: 1,
+                job_id,
+                family: ComputationalMergeFamily::FocusStack,
+                stage: "complete".into(),
+                completed_units: 1,
+                total_units: 1,
+                completed_weight: 1,
+                total_weight: 1,
+                fraction: 1.0,
+                status: ComputationalMergeJobStatus::Succeeded,
+            },
+        }
+    }
 
     #[test]
     fn frozen_stage_graph_is_complete_and_weighted() {
@@ -220,6 +287,67 @@ mod tests {
         assert_eq!(
             stages[6].units,
             12 * 3 * super::super::tiles::PYRAMID_LEVELS as u64
+        );
+    }
+
+    #[test]
+    fn terminal_results_are_bounded_by_completion_order() {
+        let service = FocusStackResultService::with_capacity(2);
+        assert!(service.publish(result("one", "one".into())));
+        assert!(service.publish(result("two", "two".into())));
+        assert!(service.publish(result("three", "three".into())));
+
+        assert!(
+            service
+                .read(&ComputationalMergeJobId::from_string("one".into()))
+                .is_none()
+        );
+        assert!(
+            service
+                .read(&ComputationalMergeJobId::from_string("two".into()))
+                .is_some()
+        );
+        assert!(
+            service
+                .read(&ComputationalMergeJobId::from_string("three".into()))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn concurrent_duplicate_terminal_publication_is_first_write_wins() {
+        const WORKERS: usize = 16;
+        let service = Arc::new(FocusStackResultService::default());
+        let release = Arc::new(Barrier::new(WORKERS));
+        let workers = (0..WORKERS)
+            .map(|index| {
+                let release = Arc::clone(&release);
+                let service = Arc::clone(&service);
+                thread::spawn(move || {
+                    let status = format!("terminal-{index}");
+                    release.wait();
+                    (status.clone(), service.publish(result("shared", status)))
+                })
+            })
+            .collect::<Vec<_>>();
+        let outcomes = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        let winner = outcomes
+            .iter()
+            .find(|(_, published)| *published)
+            .expect("one terminal publisher");
+        assert_eq!(
+            outcomes.iter().filter(|(_, published)| *published).count(),
+            1
+        );
+        assert_eq!(
+            service
+                .read(&ComputationalMergeJobId::from_string("shared".into()))
+                .unwrap()
+                .status,
+            winner.0
         );
     }
 }

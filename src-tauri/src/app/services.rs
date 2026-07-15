@@ -109,6 +109,7 @@ pub struct AppServices {
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
+    pub(crate) focus_stack_results: Arc<crate::merge::focus_stack::job::FocusStackResultService>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
     pub(crate) burst_sr:
         Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
@@ -136,6 +137,7 @@ impl AppServices {
             gpu_crash_marker: Arc::default(),
             lens_database: Arc::default(),
             focus_stack: Arc::default(),
+            focus_stack_results: Arc::default(),
             hdr: Arc::default(),
             burst_sr: Arc::default(),
             panorama: Arc::default(),
