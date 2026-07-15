@@ -15,6 +15,13 @@ export interface CopyPasteEditTransactionState {
   selectedImage: { path: string } | null;
 }
 
+export interface CopyPasteCompensationTarget {
+  adjustmentRevision: number;
+  adjustments: Adjustments;
+  imageSessionId: string;
+  targetPath: string;
+}
+
 export const buildCopyPasteEditTransaction = (
   state: CopyPasteEditTransactionState,
   targetPath: string,
@@ -38,6 +45,21 @@ export const buildCopyPasteEditTransaction = (
     persistence: 'commit',
     source: 'copy-paste',
     transactionId,
+  };
+};
+
+export const captureCopyPasteCompensationTarget = (
+  state: CopyPasteEditTransactionState,
+  targetPath: string,
+): CopyPasteCompensationTarget => {
+  if (state.selectedImage?.path !== targetPath) {
+    throw new Error(`copy_paste_compensation.stale_source:${targetPath}:${state.selectedImage?.path ?? 'none'}`);
+  }
+  return {
+    adjustmentRevision: state.adjustmentRevision,
+    adjustments: structuredClone(state.adjustments),
+    imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+    targetPath,
   };
 };
 
@@ -71,4 +93,29 @@ export const classifyCopyPasteNativeCompletion = (
     return 'stale-transaction';
   }
   return 'current';
+};
+
+export const buildCopyPastePersistenceCompensation = (
+  state: CopyPasteEditTransactionState & { lastEditApplicationReceipt: EditApplicationReceipt | null },
+  transaction: EditTransactionPersistenceContext,
+  target: CopyPasteCompensationTarget,
+): EditTransactionRequest | null => {
+  if (
+    target.targetPath !== state.selectedImage?.path ||
+    target.imageSessionId !== transaction.imageSessionId ||
+    target.adjustmentRevision !== transaction.baseAdjustmentRevision ||
+    classifyCopyPasteNativeCompletion(state, target.targetPath, transaction) !== 'current'
+  ) {
+    return null;
+  }
+
+  return {
+    baseAdjustmentRevision: state.adjustmentRevision,
+    history: 'single-entry',
+    imageSessionId: target.imageSessionId,
+    operations: buildAdjustmentMutationOperations(state.adjustments, target.adjustments),
+    persistence: 'native-committed',
+    source: 'copy-paste',
+    transactionId: `${transaction.transactionId}:compensate`,
+  };
 };

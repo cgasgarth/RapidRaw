@@ -5,6 +5,8 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildCopyPasteEditTransaction,
+  buildCopyPastePersistenceCompensation,
+  captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../../src/utils/copyPasteEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -137,5 +139,55 @@ describe('copy/paste edit transaction', () => {
     expect(() => useEditorStore.getState().applyEditTransaction(staleRevision)).toThrow(
       'edit_transaction.stale_base:1:2',
     );
+  });
+
+  test('compensates an exact native failure without overwriting a newer edit', () => {
+    const before = useEditorStore.getState();
+    const target = captureCopyPasteCompensationTarget(before, targetPath);
+    const request = buildCopyPasteEditTransaction(before, targetPath, { exposure: 0.75 }, 'paste-failure');
+    const result = before.applyEditTransaction(request);
+    const persistence = buildEditTransactionPersistenceContext(request, result);
+    const compensation = buildCopyPastePersistenceCompensation(useEditorStore.getState(), persistence, target);
+
+    expect(compensation).toMatchObject({
+      baseAdjustmentRevision: 1,
+      history: 'single-entry',
+      imageSessionId: session.id,
+      persistence: 'native-committed',
+      source: 'copy-paste',
+      transactionId: 'paste-failure:compensate',
+    });
+    if (compensation === null) throw new Error('Expected exact native failure compensation.');
+    useEditorStore.getState().applyEditTransaction(compensation);
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 2,
+      adjustments: { brightness: 0.2, exposure: 0.1 },
+      historyIndex: 2,
+      lastEditApplicationReceipt: {
+        adjustmentRevision: 2,
+        persistence: 'native-committed',
+        source: 'copy-paste',
+        transactionId: 'paste-failure:compensate',
+      },
+    });
+
+    const nextState = useEditorStore.getState();
+    const nextTarget = captureCopyPasteCompensationTarget(nextState, targetPath);
+    const nextRequest = buildCopyPasteEditTransaction(nextState, targetPath, { exposure: 0.5 }, 'paste-stale-failure');
+    const nextResult = nextState.applyEditTransaction(nextRequest);
+    const nextPersistence = buildEditTransactionPersistenceContext(nextRequest, nextResult);
+    const newerState = useEditorStore.getState();
+    newerState.applyEditTransaction({
+      baseAdjustmentRevision: newerState.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: session.id,
+      operations: [{ patch: { contrast: 0.25 }, type: 'patch-adjustments' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'newer-after-paste',
+    });
+
+    expect(buildCopyPastePersistenceCompensation(useEditorStore.getState(), nextPersistence, nextTarget)).toBeNull();
+    expect(useEditorStore.getState().adjustments).toMatchObject({ contrast: 0.25, exposure: 0.5 });
   });
 });

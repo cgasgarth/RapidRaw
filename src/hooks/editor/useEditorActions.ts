@@ -30,7 +30,13 @@ import {
   contextAutoAdjustPatchSchema,
   isCurrentContextAutoAdjustRequest,
 } from '../../utils/contextAutoAdjustEditTransaction';
-import { buildCopyPasteEditTransaction, classifyCopyPasteNativeCompletion } from '../../utils/copyPasteEditTransaction';
+import {
+  buildCopyPasteEditTransaction,
+  buildCopyPastePersistenceCompensation,
+  type CopyPasteCompensationTarget,
+  captureCopyPasteCompensationTarget,
+  classifyCopyPasteNativeCompletion,
+} from '../../utils/copyPasteEditTransaction';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import {
   awaitMatchingEditorPersistence,
@@ -390,12 +396,14 @@ export function useEditorActions() {
         baseAdjustmentRevision,
         nextAdjustmentRevision: baseAdjustmentRevision + 1,
       };
+      let compensationTarget: CopyPasteCompensationTarget | null = null;
 
       pathsToUpdate.forEach((p) => {
         globalImageCache.delete(p);
       });
 
       if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+        compensationTarget = captureCopyPasteCompensationTarget(editorState, selectedImage.path);
         const request = buildCopyPasteEditTransaction(
           editorState,
           selectedImage.path,
@@ -423,7 +431,14 @@ export function useEditorActions() {
             // The native receipt confirms disk/catalog side effects; EditTransaction remains the canonical document.
           }
         })
-        .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
+        .catch((err: unknown) => {
+          if (compensationTarget !== null) {
+            const current = useEditorStore.getState();
+            const compensation = buildCopyPastePersistenceCompensation(current, transaction, compensationTarget);
+            if (compensation !== null) current.applyEditTransaction(compensation);
+          }
+          toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`);
+        });
 
       setProcess({ isPasted: true });
     },
