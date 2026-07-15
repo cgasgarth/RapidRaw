@@ -107,7 +107,9 @@ export const resolveValidationHostBudgetCapacity = async (explicitCapacity?: num
 const hostBudgetClass = (options: ResourceLeaseOptions): HostBudgetClass | undefined => {
   const { resource } = options;
   if (resource === 'native-heavy')
-    return options.hostBudgetCapacity !== undefined || Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_DIRECT === '1'
+    return options.hostBudgetCapacity !== undefined ||
+      options.hostBudgetOwnerId !== undefined ||
+      Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_DIRECT === '1'
       ? 'native-heavy'
       : undefined;
   if (resource === 'validation-class-native-heavy') return 'native-heavy';
