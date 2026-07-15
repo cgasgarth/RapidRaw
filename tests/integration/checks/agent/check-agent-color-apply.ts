@@ -370,7 +370,7 @@ if (
   state.editDocumentV2.nodes.camera_input?.params.cameraProfile !== 'camera_portrait' ||
   state.editDocumentV2.nodes.camera_input.params.temperature !== 8 ||
   state.editDocumentV2.nodes.perceptual_grading?.params.colorGrading.highlights.saturation !== 7 ||
-  state.editDocumentV2.nodes.scene_global_color_tone?.params.saturation !== 5
+  state.editDocumentV2.nodes.color_presence?.params.saturation !== 5
 ) {
   throw new Error('agent.color.apply did not update canonical color nodes.');
 }

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+  EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
   EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
@@ -13,6 +14,7 @@ import {
   editDocumentChannelMixerV2Schema,
   editDocumentColorBalanceRgbV2Schema,
   editDocumentColorCalibrationV2Schema,
+  editDocumentColorPresenceV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
   editDocumentGeometryV2Schema,
@@ -32,6 +34,7 @@ import {
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
   getEditDocumentNodeTypesForEditorSection,
+  sceneGlobalColorToneParamsV2Schema,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 
@@ -40,8 +43,12 @@ const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
 const LOCAL_CONTRAST_FIELDS = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
 const MANUAL_CHROMATIC_ABERRATION_FIELDS = new Set<string>(EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS);
 const LUMA_LEVELS_FIELDS = new Set<string>(EDIT_DOCUMENT_LUMA_LEVELS_FIELDS);
+const COLOR_PRESENCE_FIELDS = new Set<string>(EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS);
 
 const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
+  if (COLOR_PRESENCE_FIELDS.has(key)) {
+    return editDocumentColorPresenceV2Schema.shape[key as (typeof EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS)[number]];
+  }
   if (LOCAL_CONTRAST_FIELDS.has(key)) {
     return editDocumentLocalContrastV2Schema.shape[key as (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number]];
   }
@@ -125,6 +132,8 @@ const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z
   luma_levels: editDocumentLumaLevelsV2Schema,
   perceptual_grading: editDocumentPerceptualGradingV2Schema,
   point_color: editDocumentPointColorV2Schema,
+  color_presence: editDocumentColorPresenceV2Schema,
+  scene_global_color_tone: sceneGlobalColorToneParamsV2Schema,
   scene_curve: editDocumentSceneCurveV2Schema,
   selective_color_mixer: editDocumentSelectiveColorMixerV2Schema,
   tone_equalizer: editDocumentToneEqualizerV2Schema,

@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { BasicAdjustment, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   type BasicToneCommitIdentity,
   buildBasicToneEditTransaction,
   captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { buildAdjustmentMutationOperations } from '../../../src/utils/editTransaction';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/basic-tone.ARW';
 const session = createEditorImageSession({ generation: 12, path: sourcePath, source: 'cache' });
@@ -122,6 +124,57 @@ describe('basic tone edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('basic_tone_transaction.stale_revision');
+  });
+
+  test('commits Color Presence as one persistent node across reopen and Undo/Redo', () => {
+    const state = useEditorStore.getState();
+    const beforeGeometry = state.editDocumentV2.nodes.geometry;
+    const next = { ...state.adjustments, hue: 32, vibrance: 44 };
+    const operations = buildAdjustmentMutationOperations(state.adjustments, next);
+    expect(operations).toEqual([
+      {
+        nodeType: 'color_presence',
+        patch: { [ColorAdjustment.Hue]: 32, [ColorAdjustment.Vibrance]: 44 },
+        type: 'patch-edit-document-node',
+      },
+    ]);
+
+    const result = state.applyEditTransaction({
+      baseAdjustmentRevision: 0,
+      history: 'single-entry',
+      imageSessionId: session.id,
+      operations,
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'color-presence',
+    });
+    expect(result.afterEditDocumentV2.nodes.color_presence.params).toMatchObject({
+      hue: 32,
+      saturation: 0,
+      vibrance: 44,
+    });
+    expect(result.afterEditDocumentV2.nodes.geometry).toBe(beforeGeometry);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hue');
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('vibrance');
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: structuredClone(result.after), editDocumentV2: structuredClone(result.afterEditDocumentV2) },
+      structuredClone(result.after),
+    );
+    expect(reopened.nodes.color_presence.params).toMatchObject({ hue: 32, saturation: 0, vibrance: 44 });
+    expect(result.applicationReceipt).toMatchObject({ adjustmentRevision: 1, persistence: 'commit' });
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.color_presence.params).toMatchObject({
+      hue: 0,
+      saturation: 0,
+      vibrance: 0,
+    });
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.color_presence.params).toMatchObject({
+      hue: 32,
+      saturation: 0,
+      vibrance: 44,
+    });
   });
 
   test('commits through the canonical fallback session and rejects its successor', () => {

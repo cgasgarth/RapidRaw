@@ -17,6 +17,7 @@ const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 #[serde(rename_all = "snake_case")]
 enum EditNodeTypeV2 {
     SceneGlobalColorTone,
+    ColorPresence,
     SceneCurve,
     ToneEqualizer,
     DisplayCreative,
@@ -41,6 +42,7 @@ impl EditNodeTypeV2 {
         match self {
             Self::Geometry => ("geometry", "legacy_pipeline_v1", 1),
             Self::SceneGlobalColorTone => ("scene_global_color_tone", "scene_referred_v2", 1),
+            Self::ColorPresence => ("color_presence", "scene_referred_v2", 1),
             Self::SceneCurve => ("scene_curve", "scene_referred_v2", 1),
             Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
@@ -67,6 +69,7 @@ impl EditNodeTypeV2 {
             Self::DetailDenoiseDehaze => Some("details"),
             Self::DisplayCreative => Some("effects"),
             Self::PointColor
+            | Self::ColorPresence
             | Self::ColorBalanceRgb
             | Self::SelectiveColorMixer
             | Self::BlackWhiteMixer
@@ -99,8 +102,13 @@ struct SceneGlobalColorToneParamsV2 {
     contrast: f64,
     exposure: f64,
     highlights: f64,
-    saturation: f64,
+    // Optional only for V2 documents persisted before the Color Presence node.
+    hue: Option<f64>,
+    // Optional only for V2 documents persisted before the Color Presence node.
+    saturation: Option<f64>,
     shadows: f64,
+    // Optional only for V2 documents persisted before the Color Presence node.
+    vibrance: Option<f64>,
     whites: f64,
 }
 
@@ -111,11 +119,49 @@ impl SceneGlobalColorToneParamsV2 {
         validate_scene_tone_parameter("contrast", self.contrast, -100.0, 100.0)?;
         validate_scene_tone_parameter("exposure", self.exposure, -5.0, 5.0)?;
         validate_scene_tone_parameter("highlights", self.highlights, -100.0, 100.0)?;
-        validate_scene_tone_parameter("saturation", self.saturation, -100.0, 100.0)?;
+        if let Some(hue) = self.hue {
+            validate_scene_tone_parameter("hue", hue, -180.0, 180.0)?;
+        }
+        if let Some(saturation) = self.saturation {
+            validate_scene_tone_parameter("saturation", saturation, -100.0, 100.0)?;
+        }
         validate_scene_tone_parameter("shadows", self.shadows, -100.0, 100.0)?;
+        if let Some(vibrance) = self.vibrance {
+            validate_scene_tone_parameter("vibrance", vibrance, -100.0, 100.0)?;
+        }
         validate_scene_tone_parameter("whites", self.whites, -100.0, 100.0)?;
         Ok(())
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ColorPresenceParamsV2 {
+    hue: f64,
+    saturation: f64,
+    vibrance: f64,
+}
+
+impl ColorPresenceParamsV2 {
+    fn compile(&self) -> Result<(), String> {
+        validate_color_presence_parameter("hue", self.hue, -180.0, 180.0)?;
+        validate_color_presence_parameter("saturation", self.saturation, -100.0, 100.0)?;
+        validate_color_presence_parameter("vibrance", self.vibrance, -100.0, 100.0)
+    }
+}
+
+fn validate_color_presence_parameter(
+    field: &str,
+    value: f64,
+    minimum: f64,
+    maximum: f64,
+) -> Result<(), String> {
+    if value.is_finite() && value >= minimum && value <= maximum {
+        return Ok(());
+    }
+    Err(format!(
+        "EditDocumentV2 node 'color_presence' field '{field}' must be finite and within [{minimum}, {maximum}]"
+    ))
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -2174,6 +2220,21 @@ impl EditDocumentV2 {
                 &migration.quarantined,
             );
         }
+        if self.nodes.contains_key(&EditNodeTypeV2::ColorPresence)
+            && self
+                .nodes
+                .get(&EditNodeTypeV2::SceneGlobalColorTone)
+                .is_some_and(|node| {
+                    ["hue", "saturation", "vibrance"]
+                        .iter()
+                        .any(|field| node.params.contains_key(*field))
+                })
+        {
+            return Err(
+                "EditDocumentV2 color_presence conflicts with legacy scene-global Color Presence fields"
+                    .to_string(),
+            );
+        }
         validate_geometry_domain(&self.nodes, &self.geometry)?;
         validate_layers_domain(&self.nodes, &self.layers)?;
         validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
@@ -2213,6 +2274,15 @@ fn compile_node_params(
             .map_err(|error| {
                 format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
             })?;
+            params.compile()?;
+            Ok(node.params.clone())
+        }
+        EditNodeTypeV2::ColorPresence => {
+            let params =
+                serde_json::from_value::<ColorPresenceParamsV2>(Value::Object(node.params.clone()))
+                    .map_err(|error| {
+                        format!("EditDocumentV2 node 'color_presence' has invalid params: {error}")
+                    })?;
             params.compile()?;
             Ok(node.params.clone())
         }
@@ -2620,8 +2690,9 @@ mod tests {
     use crate::color::mixer_render::{
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
-    use crate::render::cpu_edit_graph::apply_hsl_panel;
-    use crate::render::cpu_edit_graph::apply_luma_levels;
+    use crate::render::cpu_edit_graph::{
+        apply_creative_color, apply_hsl_panel, apply_hue_shift, apply_luma_levels,
+    };
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -3487,6 +3558,111 @@ mod tests {
             .expect_err("out-of-range exposure must fail");
         assert!(error.contains("field 'exposure'"));
         assert!(error.contains("[-5, 5]"));
+    }
+
+    #[test]
+    fn color_presence_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
+        let mut value = document_with_legacy(json!({}));
+        value["nodes"]["scene_global_color_tone"]["params"]
+            .as_object_mut()
+            .expect("scene-global params")
+            .remove("saturation");
+        value["nodes"]["color_presence"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "hue": 36, "saturation": 7, "vibrance": 48 },
+            "process": "scene_referred_v2",
+            "type": "color_presence"
+        });
+        let compiled = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("valid Color Presence document")
+            .into_render_adjustments()
+            .expect("Color Presence node compiles");
+        assert_eq!(compiled["hue"], json!(36));
+        assert_eq!(compiled["saturation"], json!(7));
+        assert_eq!(compiled["vibrance"], json!(48));
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        assert!((adjustments.global.hue - 36.0).abs() <= f32::EPSILON);
+        assert!((adjustments.global.saturation - 0.07).abs() <= f32::EPSILON);
+        assert!((adjustments.global.vibrance - 0.48).abs() <= f32::EPSILON);
+        let input = Vec3::new(0.78, 0.24, 0.09);
+        let output = apply_creative_color(
+            apply_hue_shift(input, adjustments.global.hue),
+            adjustments.global.saturation,
+            adjustments.global.vibrance,
+        );
+        assert!(
+            output.distance(input) > 1.0e-3,
+            "Color Presence node must alter a chromatic pixel: {output:?}"
+        );
+
+        let legacy = serde_json::from_value::<EditDocumentV2>(document_with_legacy(json!({
+            "hue": 36,
+            "vibrance": 48
+        })))
+        .expect("pre-Color-Presence V2 document remains parseable")
+        .into_render_adjustments()
+        .expect("legacy Color Presence fields compile");
+        let legacy_adjustments = get_all_adjustments_from_json(&legacy, false, None);
+        let legacy_output = apply_creative_color(
+            apply_hue_shift(input, legacy_adjustments.global.hue),
+            legacy_adjustments.global.saturation,
+            legacy_adjustments.global.vibrance,
+        );
+        assert!(
+            output.distance(legacy_output) <= 1.0e-6,
+            "node and legacy Color Presence output must match"
+        );
+
+        let mut mixed_authority = document_with_legacy(json!({}));
+        mixed_authority["nodes"]["color_presence"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "hue": 0, "saturation": 0, "vibrance": 0 },
+            "process": "scene_referred_v2",
+            "type": "color_presence"
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(mixed_authority)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("mixed Color Presence ownership must fail");
+        assert!(error.contains("conflicts with legacy scene-global"));
+
+        let mut invalid_hue = document_with_legacy(json!({}));
+        invalid_hue["nodes"]["scene_global_color_tone"]["params"]
+            .as_object_mut()
+            .expect("scene-global params")
+            .remove("saturation");
+        invalid_hue["nodes"]["color_presence"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "hue": 181, "saturation": 0, "vibrance": 0 },
+            "process": "scene_referred_v2",
+            "type": "color_presence"
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_hue)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range hue must fail");
+        assert!(error.contains("field 'hue'"));
+
+        let mut invalid_vibrance = document_with_legacy(json!({}));
+        invalid_vibrance["nodes"]["scene_global_color_tone"]["params"]
+            .as_object_mut()
+            .expect("scene-global params")
+            .remove("saturation");
+        invalid_vibrance["nodes"]["color_presence"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "hue": 0, "saturation": 0, "vibrance": -101 },
+            "process": "scene_referred_v2",
+            "type": "color_presence"
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_vibrance)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range vibrance must fail");
+        assert!(error.contains("field 'vibrance'"));
     }
 
     #[test]

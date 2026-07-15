@@ -248,6 +248,7 @@ export const buildAdjustmentMutationOperations = (
     [
       'black_white_mixer',
       'scene_global_color_tone',
+      'color_presence',
       'camera_input',
       'color_calibration',
       'channel_mixer',
