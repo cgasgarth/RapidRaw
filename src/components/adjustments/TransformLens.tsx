@@ -23,6 +23,12 @@ import {
 } from '../../utils/lensCorrectionEditTransaction';
 import { parseExifMetadataNumber } from '../../utils/metadataPanelContracts';
 import {
+  buildPerspectiveCorrectionEditTransaction,
+  capturePerspectiveCorrectionCommitIdentity,
+  isCurrentPerspectiveAnalysisRequest,
+  type PerspectiveCorrectionCommitIdentity,
+} from '../../utils/perspectiveCorrectionEditTransaction';
+import {
   getLensCorrectionAvailability,
   hasSupportedLensCorrections,
   type LensDistortionParams,
@@ -127,6 +133,16 @@ export default function TransformLens({
   const lensCorrectionCommitIdentityRef = useRef(lensCorrectionCommitIdentity);
   lensCorrectionCommitIdentityRef.current = lensCorrectionCommitIdentity;
   const lensProfileRequestGenerationRef = useRef(0);
+  const perspectiveCommitIdentity = useMemo<PerspectiveCorrectionCommitIdentity | null>(
+    () =>
+      selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImagePath],
+  );
+  const perspectiveCommitIdentityRef = useRef(perspectiveCommitIdentity);
+  perspectiveCommitIdentityRef.current = perspectiveCommitIdentity;
+  const perspectiveRequestGenerationRef = useRef(0);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(
@@ -357,24 +373,66 @@ export default function TransformLens({
   );
 
   const updatePerspective = (next: Partial<Adjustments['perspectiveCorrection']>) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      perspectiveCorrection: { ...prev.perspectiveCorrection, ...next },
-    }));
+    const identity = perspectiveCommitIdentityRef.current;
+    if (identity === null) return;
+    perspectiveRequestGenerationRef.current += 1;
+    const result = applyEditTransaction(
+      buildPerspectiveCorrectionEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+    );
+    perspectiveCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+    if (perspectiveStatus === 'analyzing') {
+      setPerspectiveStatus('idle');
+      setPerspectiveMessage(null);
+    }
   };
 
   const analyzePerspective = async () => {
+    const state = useEditorStore.getState();
+    const identity = capturePerspectiveCorrectionCommitIdentity(state);
+    if (identity === null) return;
+    const requestGeneration = ++perspectiveRequestGenerationRef.current;
+    const analysisAdjustments = structuredClone(state.adjustments);
     setPerspectiveStatus('analyzing');
     try {
       const raw = await invoke<unknown>(Invokes.AnalyzePerspectiveCorrection, {
-        adjustments,
-        settings: { ...adjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
+        adjustments: analysisAdjustments,
+        settings: { ...analysisAdjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
       });
       const result = perspectiveAnalysisResultSchema.parse(raw);
-      updatePerspective({ resolvedPlan: result.receipt.plan });
+      const current = useEditorStore.getState();
+      if (
+        !isCurrentPerspectiveAnalysisRequest(
+          current,
+          identity,
+          requestGeneration,
+          perspectiveRequestGenerationRef.current,
+        )
+      )
+        return;
+      const committed = applyEditTransaction(
+        buildPerspectiveCorrectionEditTransaction(
+          current,
+          identity,
+          { resolvedPlan: result.receipt.plan },
+          crypto.randomUUID(),
+        ),
+      );
+      perspectiveCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: committed.nextAdjustmentRevision,
+      };
       setPerspectiveStatus(result.receipt.abstentionReason === null ? 'ready' : 'abstained');
       setPerspectiveMessage(result.receipt.abstentionReason ?? result.receipt.plan.warningCodes[0] ?? null);
     } catch (error) {
+      if (
+        !isCurrentPerspectiveAnalysisRequest(
+          useEditorStore.getState(),
+          identity,
+          requestGeneration,
+          perspectiveRequestGenerationRef.current,
+        )
+      )
+        return;
       setPerspectiveStatus('error');
       setPerspectiveMessage('perspective.analysis_failed');
       console.error('Failed to analyze perspective', error);
@@ -382,57 +440,49 @@ export default function TransformLens({
   };
 
   const addGuide = (className: 'horizontal' | 'vertical') => {
-    setAdjustments((prev) => {
-      const familyCount = prev.perspectiveCorrection.guides.filter((guide) => guide.class === className).length;
-      if (familyCount >= 2) return prev;
-      const position = familyCount === 0 ? 0.25 : 0.75;
-      const endpointsSourceNormalized: [[number, number], [number, number]] =
-        className === 'horizontal'
-          ? [
-              [0.15, position],
-              [0.85, position],
-            ]
-          : [
-              [position, 0.15],
-              [position, 0.85],
-            ];
-      return {
-        ...prev,
-        perspectiveCorrection: {
-          ...prev.perspectiveCorrection,
-          guides: [
-            ...prev.perspectiveCorrection.guides,
-            {
-              class: className,
-              endpointsSourceNormalized,
-              id: crypto.randomUUID(),
-              weight: 1,
-            },
-          ],
-          resolvedPlan: null,
+    const current = useEditorStore.getState().adjustments.perspectiveCorrection;
+    const familyCount = current.guides.filter((guide) => guide.class === className).length;
+    if (familyCount >= 2) return;
+    const position = familyCount === 0 ? 0.25 : 0.75;
+    const endpointsSourceNormalized: [[number, number], [number, number]] =
+      className === 'horizontal'
+        ? [
+            [0.15, position],
+            [0.85, position],
+          ]
+        : [
+            [position, 0.15],
+            [position, 0.85],
+          ];
+    updatePerspective({
+      guides: [
+        ...current.guides,
+        {
+          class: className,
+          endpointsSourceNormalized,
+          id: crypto.randomUUID(),
+          weight: 1,
         },
-      };
+      ],
+      resolvedPlan: null,
     });
   };
 
   const updateGuideCoordinate = (id: string, endpoint: 0 | 1, axis: 0 | 1, value: number) => {
     if (!Number.isFinite(value)) return;
-    setAdjustments((prev) => ({
-      ...prev,
-      perspectiveCorrection: {
-        ...prev.perspectiveCorrection,
-        guides: prev.perspectiveCorrection.guides.map((guide) => {
-          if (guide.id !== id) return guide;
-          const endpoints = guide.endpointsSourceNormalized.map((point) => [...point]) as [
-            [number, number],
-            [number, number],
-          ];
-          endpoints[endpoint][axis] = Math.min(1, Math.max(0, value));
-          return { ...guide, endpointsSourceNormalized: endpoints };
-        }),
-        resolvedPlan: null,
-      },
-    }));
+    const current = useEditorStore.getState().adjustments.perspectiveCorrection;
+    updatePerspective({
+      guides: current.guides.map((guide) => {
+        if (guide.id !== id) return guide;
+        const endpoints = guide.endpointsSourceNormalized.map((point) => [...point]) as [
+          [number, number],
+          [number, number],
+        ];
+        endpoints[endpoint][axis] = Math.min(1, Math.max(0, value));
+        return { ...guide, endpointsSourceNormalized: endpoints };
+      }),
+      resolvedPlan: null,
+    });
   };
   const detectionLabel =
     detectionStatus === 'detecting'
@@ -482,6 +532,7 @@ export default function TransformLens({
                 perspectiveStatus === 'analyzing' || !adjustments.perspectiveCorrection.mode.startsWith('auto_')
               }
               onClick={() => void analyzePerspective()}
+              data-testid="perspective-analyze-button"
               type="button"
             >
               {perspectiveStatus === 'analyzing' ? <Loader className="animate-spin" size={14} /> : <Wand2 size={14} />}

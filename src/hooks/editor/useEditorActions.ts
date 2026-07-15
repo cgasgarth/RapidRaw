@@ -24,6 +24,12 @@ import {
   buildBasicToneImageCommandContext,
   hasBasicToneAdjustmentChange,
 } from '../../utils/basicToneCommandBridge';
+import {
+  buildContextAutoAdjustEditTransaction,
+  captureContextAutoAdjustBase,
+  contextAutoAdjustPatchSchema,
+  isCurrentContextAutoAdjustRequest,
+} from '../../utils/contextAutoAdjustEditTransaction';
 import { buildCopyPasteEditTransaction, classifyCopyPasteNativeCompletion } from '../../utils/copyPasteEditTransaction';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import {
@@ -97,6 +103,7 @@ interface MetadataResponse {
 }
 
 const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
+let contextAutoAdjustRequestGeneration = 0;
 
 const createOperationId = (): string => crypto.randomUUID();
 
@@ -191,19 +198,28 @@ export function useEditorActions() {
   );
 
   const handleAutoAdjustments = useCallback(async () => {
-    const selectedImage = useEditorStore.getState().selectedImage;
-    if (!selectedImage?.isReady) return;
+    const base = captureContextAutoAdjustBase(useEditorStore.getState());
+    if (base === null) return;
+    const requestGeneration = ++contextAutoAdjustRequestGeneration;
     try {
-      const autoAdjustments: Adjustments = await invoke(Invokes.CalculateAutoAdjustments);
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        ...autoAdjustments,
-        sectionVisibility: { ...prev.sectionVisibility, ...autoAdjustments.sectionVisibility },
-      }));
+      const patch = contextAutoAdjustPatchSchema.parse(await invoke<unknown>(Invokes.CalculateAutoAdjustments));
+      const state = useEditorStore.getState();
+      if (!isCurrentContextAutoAdjustRequest(state, base, requestGeneration, contextAutoAdjustRequestGeneration))
+        return;
+      applyEditTransaction(buildContextAutoAdjustEditTransaction(state, base, patch, crypto.randomUUID()));
     } catch (err) {
-      toast.error(`Failed to apply auto adjustments: ${formatUnknownError(err)}`);
+      if (
+        isCurrentContextAutoAdjustRequest(
+          useEditorStore.getState(),
+          base,
+          requestGeneration,
+          contextAutoAdjustRequestGeneration,
+        )
+      ) {
+        toast.error(`Failed to apply auto adjustments: ${formatUnknownError(err)}`);
+      }
     }
-  }, [setAdjustments]);
+  }, [applyEditTransaction]);
 
   const handleLutSelect = useCallback(
     async (path: string) => {

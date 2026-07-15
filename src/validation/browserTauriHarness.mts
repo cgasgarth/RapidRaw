@@ -83,6 +83,7 @@ declare global {
       imageOpenDelayMs: number;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
+      perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -109,6 +110,7 @@ const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === 
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'analyzeAutoEdit'
+  | 'analyzePerspectiveCorrection'
   | 'calculateAutoAdjustments'
   | 'applyAutoAdjustmentsToPaths'
   | 'commitBatchAutoAdjustment'
@@ -173,6 +175,7 @@ const commandNames: Record<
   string
 > = {
   analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
+  analyzePerspectiveCorrection: Invokes.AnalyzePerspectiveCorrection,
   calculateAutoAdjustments: Invokes.CalculateAutoAdjustments,
   applyAutoAdjustmentsToPaths: Invokes.ApplyAutoAdjustmentsToPaths,
   commitBatchAutoAdjustment: Invokes.CommitBatchAutoAdjustment,
@@ -252,6 +255,35 @@ const harnessSupportedTypes = {
 };
 const harnessPreviewJpegBase64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAAEAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z';
+
+const createHarnessAutoAdjustments = (exposure: number): Record<string, unknown> => ({
+  blacks: -4,
+  brightness: 1.2,
+  clarity: 8,
+  contrast: 18,
+  dehaze: 5,
+  exposure,
+  highlights: -10,
+  sectionVisibility: { basic: true, color: true, effects: true },
+  shadows: 12,
+  vibrance: 16,
+  vignetteAmount: -3,
+  whiteBalanceMigration: 'native_v1',
+  whiteBalanceTechnical: {
+    adaptation: 'cat16_v1',
+    confidence: 0.8,
+    contract: 'rapidraw.white_balance.v1',
+    duv: 0,
+    kelvin: 6504,
+    mode: 'auto',
+    sampleCount: 256,
+    source: 'auto',
+    x: 0.31271,
+    y: 0.32902,
+  },
+  whites: 6,
+  centré: 2,
+});
 
 let callbackId = 0;
 const callbacks = new Map<number, (event: unknown) => void>();
@@ -333,6 +365,7 @@ export const installBrowserTauriHarness = (): void => {
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
+    perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
     setAdjustmentsForPath: (path, adjustments) => {
       harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
@@ -376,25 +409,12 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.calculateAutoAdjustments: {
       const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.autoAdjustResponses.shift() ?? {
         delayMs: 0,
-        value: {
-          whiteBalanceTechnical: {
-            adaptation: 'cat16_v1',
-            confidence: 0.82,
-            contract: 'rapidraw.white_balance.v1',
-            duv: 0.006,
-            kelvin: 4725,
-            mode: 'auto',
-            sampleCount: 384,
-            source: 'auto',
-            x: 0.35,
-            y: 0.36,
-          },
-        },
+        value: createHarnessAutoAdjustments(0.35),
       };
       return new Promise((resolve, reject) => {
         window.setTimeout(() => {
           if (response.failure !== undefined) reject(new Error(response.failure));
-          else resolve(response.value);
+          else resolve(structuredClone(response.value));
         }, response.delayMs);
       });
     }
@@ -409,6 +429,56 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         available: path.length > 0,
         sourceRevision: path.length > 0 ? `source-revision-v1:${hash.toString(16).padStart(16, '0').repeat(4)}` : null,
       });
+    }
+    case commandNames.analyzePerspectiveCorrection: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.perspectiveAnalysisResponses.shift();
+      const matrix = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ];
+      const analysisIdentity = {
+        analysisDimensions: [1024, 768],
+        implementationVersion: 1,
+        lensGeometryFingerprint: 2,
+        orientationFingerprint: 3,
+        sourceRevision: 4,
+      };
+      const value = response?.value ?? {
+        analysis: {
+          confidence: 0.92,
+          horizonAngleDegrees: 1.5,
+          identity: analysisIdentity,
+          lines: [],
+          warningCodes: [],
+        },
+        receipt: {
+          abstentionReason: null,
+          conditionEstimate: 1,
+          guideCount: 0,
+          horizontalGuideCount: 0,
+          plan: {
+            analysisIdentity,
+            confidence: 0.92,
+            correctedToSource: matrix,
+            fingerprint: 42,
+            implementationVersion: 1,
+            retainedArea: 0.81,
+            sourceToCorrected: matrix,
+            suggestedCrop: { height: 0.8, width: 0.8, x: 0.1, y: 0.1 },
+            validPolygon: [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 1],
+            ],
+            warningCodes: [],
+          },
+          residualDegreesP95: 0.25,
+          verticalGuideCount: 0,
+        },
+      };
+      return new Promise((resolve) => window.setTimeout(() => resolve(value), response?.delayMs ?? 0));
     }
     case commandNames.analyzeAutoEdit: {
       const request = args?.['request'] as { graphRevision?: string; imageSessionId?: string } | undefined;
