@@ -1,13 +1,18 @@
 import cx from 'clsx';
 import { ChevronDown } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEditorStore } from '../../../store/useEditorStore';
 import {
   type Adjustments,
   ColorAdjustment,
   type ColorCalibration,
   INITIAL_ADJUSTMENTS,
 } from '../../../utils/adjustments';
+import {
+  buildColorCalibrationEditTransaction,
+  type ColorCalibrationCommitIdentity,
+} from '../../../utils/colorCalibrationEditTransaction';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -35,7 +40,22 @@ export const ColorAdvancedControls = ({
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const [activePrimary, setActivePrimary] = useState('red');
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const commitIdentity = useMemo<ColorCalibrationCommitIdentity | null>(
+    () =>
+      imageSessionId !== null && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImagePath],
+  );
+  const commitIdentityRef = useRef(commitIdentity);
+  commitIdentityRef.current = commitIdentity;
   const colorCalibration = adjustments.colorCalibration;
+  const colorCalibrationRef = useRef(colorCalibration);
+  colorCalibrationRef.current = colorCalibration;
   const levels = adjustments.levels;
   const isLevelsVisible = mode !== 'calibration' && adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isCalibrationVisible = mode !== 'levels' && isColorCalibrationVisible;
@@ -53,25 +73,32 @@ export const ColorAdvancedControls = ({
     [t],
   );
 
+  const commitColorCalibration = (nextColorCalibration: Adjustments['colorCalibration']) => {
+    const identity = commitIdentityRef.current;
+    if (identity === null) {
+      colorCalibrationRef.current = nextColorCalibration;
+      setAdjustments((previous) => ({ ...previous, colorCalibration: nextColorCalibration }));
+      return;
+    }
+    const result = applyEditTransaction(
+      buildColorCalibrationEditTransaction(
+        useEditorStore.getState(),
+        identity,
+        nextColorCalibration,
+        crypto.randomUUID(),
+      ),
+    );
+    colorCalibrationRef.current = nextColorCalibration;
+    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+  };
+
   const handleShadowsChange = (value: number) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      colorCalibration: {
-        ...prev.colorCalibration,
-        shadowsTint: value,
-      },
-    }));
+    commitColorCalibration({ ...colorCalibrationRef.current, shadowsTint: value });
   };
 
   const handlePrimaryChange = (key: 'Hue' | 'Saturation', value: number) => {
     const fullKey = `${activePrimary}${key}` as keyof ColorCalibration;
-    setAdjustments((prev) => ({
-      ...prev,
-      colorCalibration: {
-        ...prev.colorCalibration,
-        [fullKey]: value,
-      },
-    }));
+    commitColorCalibration({ ...colorCalibrationRef.current, [fullKey]: value });
   };
 
   const handleLevelsToggle = () => {
@@ -248,7 +275,13 @@ export const ColorAdvancedControls = ({
           </section>
         )}
         {isCalibrationVisible && (
-          <section className="py-1.5" data-testid="color-calibration-controls">
+          <section
+            className="py-1.5"
+            data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+            data-commit-image-session={commitIdentity?.imageSessionId}
+            data-commit-source-identity={commitIdentity?.sourceIdentity}
+            data-testid="color-calibration-controls"
+          >
             <CompactInspectorSectionHeader
               modified={isCalibrationModified}
               modifiedLabel={modifiedLabel}
@@ -263,6 +296,7 @@ export const ColorAdvancedControls = ({
                 min={-100}
                 max={100}
                 step={1}
+                testId="color-calibration-shadows-tint-range"
                 value={colorCalibration.shadowsTint}
                 onValueChange={(value) => {
                   handleShadowsChange(value);
@@ -290,6 +324,7 @@ export const ColorAdvancedControls = ({
                   min={-100}
                   max={100}
                   step={1}
+                  testId="color-calibration-primary-hue-range"
                   value={currentValues.hue}
                   onValueChange={(value) => {
                     handlePrimaryChange('Hue', value);

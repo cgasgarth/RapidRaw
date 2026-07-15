@@ -400,6 +400,7 @@ try {
   await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await verifySceneCurveTransaction(page);
+  await verifyColorCalibrationTransaction(page);
   await verifyViewerPickerControllers(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
@@ -1399,6 +1400,139 @@ async function verifySceneCurveTransaction(page: Page): Promise<void> {
   if ((await toneCurve.inputValue()) !== 'soft_contrast') {
     throw new Error('Tone Curve selector did not retain the committed value.');
   }
+}
+
+async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
+  await page.getByTestId('color-workspace-tab-foundation').click();
+  const disclosure = page.getByTestId('color-calibration-disclosure');
+  if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
+  const controls = page.getByTestId('color-calibration-controls');
+  const identity = await controls.evaluate((element) => ({
+    adjustmentRevision: element.dataset.commitAdjustmentRevision,
+    imageSessionId: element.dataset.commitImageSession,
+    sourceIdentity: element.dataset.commitSourceIdentity,
+  }));
+  if (
+    identity.sourceIdentity !== '/tmp/rawengine-browser-harness/browser-harness.ARW' ||
+    identity.imageSessionId === undefined ||
+    identity.adjustmentRevision === undefined
+  ) {
+    throw new Error(`Color Calibration controls did not expose complete commit identity: ${JSON.stringify(identity)}`);
+  }
+
+  const shadowsSlider = page.getByTestId('color-calibration-shadows-tint-range').locator('input[type="range"]');
+  const hueSlider = page.getByTestId('color-calibration-primary-hue-range').locator('input[type="range"]');
+  await shadowsSlider.scrollIntoViewIfNeeded();
+  const baseline = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      previews: calls.filter(({ command }) => command === 'apply_adjustments').length,
+      saves: calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length,
+    };
+  });
+  await page.evaluate(() => {
+    const shadows = document.querySelector<HTMLInputElement>(
+      '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+    );
+    const redHue = document.querySelector<HTMLInputElement>(
+      '[data-testid="color-calibration-primary-hue-range"] input[type="range"]',
+    );
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (shadows === null || redHue === null || setValue === undefined) {
+      throw new Error('Color Calibration rapid-edit inputs were unavailable.');
+    }
+    setValue.call(shadows, '18');
+    shadows.dispatchEvent(new Event('input', { bubbles: true }));
+    setValue.call(redHue, '12');
+    redHue.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    ({ previews, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const previewCalls = calls.filter(({ command }) => command === 'apply_adjustments');
+      const latestRequest = previewCalls.at(-1)?.args?.request;
+      const editDocument =
+        typeof latestRequest === 'object' && latestRequest !== null ? latestRequest['editDocumentV2'] : null;
+      const nodes = typeof editDocument === 'object' && editDocument !== null ? editDocument['nodes'] : null;
+      const calibration = typeof nodes === 'object' && nodes !== null ? nodes['color_calibration'] : null;
+      const params = typeof calibration === 'object' && calibration !== null ? calibration['params'] : null;
+      const colorCalibration = typeof params === 'object' && params !== null ? params['colorCalibration'] : null;
+      return (
+        previewCalls.length > previews &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length >= saves + 1 &&
+        typeof colorCalibration === 'object' &&
+        colorCalibration !== null &&
+        colorCalibration['shadowsTint'] === 18 &&
+        colorCalibration['redHue'] === 12
+      );
+    },
+    baseline,
+    { timeout: 10_000 },
+  );
+
+  const persisted = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .at(-1)?.args,
+  );
+  const transaction = persisted?.['transaction'];
+  const colorCalibration = persisted?.['adjustments']?.['colorCalibration'];
+  if (
+    colorCalibration?.['shadowsTint'] !== 18 ||
+    colorCalibration?.['redHue'] !== 12 ||
+    transaction?.['imageSessionId'] !== identity.imageSessionId ||
+    transaction?.['baseAdjustmentRevision'] !== Number(identity.adjustmentRevision) + 1 ||
+    transaction?.['nextAdjustmentRevision'] !== transaction?.['baseAdjustmentRevision'] + 1
+  ) {
+    throw new Error(`Color Calibration did not persist one source-bound node revision: ${JSON.stringify(persisted)}`);
+  }
+
+  const request = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments').at(-1)
+        ?.args?.request,
+  );
+  if (request === null || typeof request !== 'object' || 'jsAdjustments' in request) {
+    throw new Error('Color Calibration preview retained the flat adjustments render payload.');
+  }
+  const editDocument = editDocumentV2Schema.parse(request['editDocumentV2']);
+  const renderedCalibration = editDocument.nodes.color_calibration?.params.colorCalibration;
+  if (renderedCalibration?.shadowsTint !== 18 || renderedCalibration.redHue !== 12) {
+    throw new Error('Rapid Color Calibration UI edits did not retain both fields in render authority.');
+  }
+  if ((await shadowsSlider.inputValue()) !== '18' || (await hueSlider.inputValue()) !== '12') {
+    throw new Error('Rapid Color Calibration sliders did not retain both committed values.');
+  }
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  await undo.click();
+  await page.waitForFunction(
+    () =>
+      (
+        document.querySelector(
+          '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+        ) as HTMLInputElement | null
+      )?.value === '18' &&
+      (
+        document.querySelector(
+          '[data-testid="color-calibration-primary-hue-range"] input[type="range"]',
+        ) as HTMLInputElement | null
+      )?.value === '0',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await undo.click();
+  await page.waitForFunction(
+    () =>
+      (
+        document.querySelector(
+          '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+        ) as HTMLInputElement | null
+      )?.value === '0',
+    undefined,
+    { timeout: 10_000 },
+  );
 }
 
 async function waitForStableGeometryEpoch(page: Page): Promise<void> {

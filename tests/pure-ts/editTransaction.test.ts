@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, curve, tone-equalizer, point-color, lens, perceptual-grading, and geometry changes', () => {
+  test('routes focused tone, camera, calibration, curve, tone-equalizer, point-color, lens, grading, and geometry', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -88,6 +88,17 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'camera_input',
         patch: { cameraProfile: 'camera_neutral', cameraProfileAmount: 65 },
+      },
+    ]);
+
+    const colorCalibration = { ...INITIAL_ADJUSTMENTS.colorCalibration, redHue: 18 };
+    expect(
+      buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, colorCalibration }),
+    ).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'color_calibration',
+        patch: { colorCalibration },
       },
     ]);
 

@@ -22,6 +22,7 @@ enum EditNodeTypeV2 {
     PerceptualGrading,
     CameraInput,
     LensCorrection,
+    ColorCalibration,
     Geometry,
     Layers,
     SourceArtifacts,
@@ -40,6 +41,7 @@ impl EditNodeTypeV2 {
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
+            Self::ColorCalibration => ("color_calibration", "scene_referred_v2", 1),
             Self::Layers => ("layers", "scene_referred_v2", 1),
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
         }
@@ -549,6 +551,51 @@ impl PointColorPlanV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ColorCalibrationSettingsV2 {
+    blue_hue: f64,
+    blue_saturation: f64,
+    green_hue: f64,
+    green_saturation: f64,
+    red_hue: f64,
+    red_saturation: f64,
+    shadows_tint: f64,
+}
+
+impl ColorCalibrationSettingsV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value) in [
+            ("blueHue", self.blue_hue),
+            ("blueSaturation", self.blue_saturation),
+            ("greenHue", self.green_hue),
+            ("greenSaturation", self.green_saturation),
+            ("redHue", self.red_hue),
+            ("redSaturation", self.red_saturation),
+            ("shadowsTint", self.shadows_tint),
+        ] {
+            if !value.is_finite() || !(-100.0..=100.0).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 color_calibration field '{field}' must be finite and within [-100, 100]"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ColorCalibrationV2 {
+    color_calibration: ColorCalibrationSettingsV2,
+}
+
+impl ColorCalibrationV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.color_calibration.validate()
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -1435,6 +1482,10 @@ fn compile_node_params(
             parse_perceptual_grading(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::ColorCalibration => {
+            parse_color_calibration(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::DisplayCreative => {
             parse_display_creative(&node.params)?;
             Ok(node.params.clone())
@@ -1501,6 +1552,14 @@ fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGra
             .map_err(|error| format!("EditDocumentV2 perceptual_grading is invalid: {error}"))?;
     perceptual_grading.validate()?;
     Ok(perceptual_grading)
+}
+
+fn parse_color_calibration(params: &Map<String, Value>) -> Result<ColorCalibrationV2, String> {
+    let color_calibration: ColorCalibrationV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 color_calibration is invalid: {error}"))?;
+    color_calibration.validate()?;
+    Ok(color_calibration)
 }
 
 fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreativeV2, String> {
@@ -1862,6 +1921,20 @@ mod tests {
         })
     }
 
+    fn color_calibration_params() -> Value {
+        json!({
+            "colorCalibration": {
+                "blueHue": -6,
+                "blueSaturation": 9,
+                "greenHue": 4,
+                "greenSaturation": -3,
+                "redHue": 12,
+                "redSaturation": 18,
+                "shadowsTint": -8
+            }
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1970,6 +2043,13 @@ mod tests {
                     },
                     "process": "scene_referred_v2",
                     "type": "camera_input"
+                },
+                "color_calibration": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": color_calibration_params(),
+                    "process": "scene_referred_v2",
+                    "type": "color_calibration"
                 },
                 "geometry": {
                     "enabled": true,
@@ -2089,6 +2169,7 @@ mod tests {
             "cameraProfile": "camera_standard",
             "clarity": 16,
             "colorNoiseReduction": 0,
+            "colorCalibration": color_calibration_params()["colorCalibration"].clone(),
             "contrast": 18,
             "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
             "deblurEnabled": true,
@@ -2676,6 +2757,38 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid perceptual fulcrums must fail");
         assert!(error.contains("Fulcrums"));
+    }
+
+    #[test]
+    fn color_calibration_compiler_rejects_unowned_missing_and_out_of_range_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["color_calibration"]["params"]["colorCalibration"]["futurePrimary"] =
+            json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned color-calibration field must fail");
+        assert!(error.contains("unknown field `futurePrimary`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["color_calibration"]["params"]["colorCalibration"]
+            .as_object_mut()
+            .expect("color-calibration settings object")
+            .remove("blueHue");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing color-calibration field must fail");
+        assert!(error.contains("missing field `blueHue`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["color_calibration"]["params"]["colorCalibration"]["redHue"] =
+            json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range color calibration must fail");
+        assert!(error.contains("redHue"));
     }
 
     #[test]
