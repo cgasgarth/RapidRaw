@@ -76,7 +76,9 @@ test('export settings preserve output sharpening through defaults, updates, and 
   expect(hook.current.outputSharpening).toEqual(updatedOutputSharpening);
 
   act(() => {
-    hook.current.handleApplyPreset(buildExportPreset({ id: 'legacy-preset', name: 'Legacy preset' }));
+    hook.current.handleApplyPreset(
+      buildExportPreset({ id: 'disabled-sharpening', name: 'Disabled sharpening', outputSharpening: null }),
+    );
   });
 
   expect(hook.current.outputSharpening).toBeNull();
@@ -96,6 +98,7 @@ test('export recipe serialization keeps output sharpening settings instead of dr
     dontEnlarge: true,
     enableResize: true,
     enableWatermark: false,
+    exportMasks: false,
     fileFormat: FileFormats.Jpeg,
     filenameTemplate: '{original_filename}_print',
     id: 'recipe-with-output-sharpening',
@@ -103,6 +106,8 @@ test('export recipe serialization keeps output sharpening settings instead of dr
     keepMetadata: true,
     name: 'Recipe with output sharpening',
     outputSharpening,
+    preserveFolders: false,
+    preserveTimestamps: false,
     renderingIntent: ExportRenderingIntent.Perceptual,
     resizeMode: 'longEdge',
     resizeValue: 3600,
@@ -147,16 +152,22 @@ function ExportSettingsHookHarness({
 
 function buildExportPreset(overrides: Partial<ExportPreset>): ExportPreset {
   return {
+    blackPointCompensation: false,
+    colorProfile: ExportColorProfile.Srgb,
     dontEnlarge: true,
     enableResize: false,
     enableWatermark: false,
+    exportMasks: false,
     fileFormat: FileFormats.Jpeg,
     filenameTemplate: '{original_filename}_edited',
     id: 'preset',
     jpegQuality: 90,
     keepMetadata: true,
     name: 'Preset',
+    outputSharpening: null,
+    preserveFolders: false,
     preserveTimestamps: false,
+    renderingIntent: ExportRenderingIntent.RelativeColorimetric,
     resizeMode: 'longEdge',
     resizeValue: 2048,
     stripGps: true,

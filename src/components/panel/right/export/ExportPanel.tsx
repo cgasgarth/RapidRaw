@@ -28,6 +28,12 @@ import { useExportSettings } from '../../../../hooks/export/useExportSettings';
 import { useOsPlatform } from '../../../../hooks/ui/useOsPlatform';
 import { prepareAdjustmentPayloadForBackend } from '../../../../schemas/adjustmentPayloadSchemas';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
+import {
+  buildCurrentExportRecipe,
+  exportResizeModeSchema,
+  findCurrentExportRecipe,
+  withoutExportRecipeId,
+} from '../../../../schemas/export/exportRecipeSchemas';
 import { outputSharpeningSettingsSchema } from '../../../../schemas/outputSharpeningSchemas';
 import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
@@ -421,23 +427,21 @@ export default function ExportPanel({
   useEffect(() => {
     if (initDone.current || appSettings === null || !isVisible) return;
     initDone.current = true;
-    const lastUsed = appSettings.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID);
-    if (lastUsed) {
-      handleApplyPreset(lastUsed);
-    }
+    const lastUsed = findCurrentExportRecipe(appSettings.exportPresets ?? [], EXPORT_LAST_USED_PRESET_ID);
+    if (lastUsed) handleApplyPreset(lastUsed);
   }, [appSettings, handleApplyPreset, isVisible]);
 
   const saveLastUsedPreset = useCallback(
     (exportPath: string) => {
       if (!appSettings) return;
-      const lastUsedPreset: ExportPreset = {
-        ...currentSettingsObject,
+      const lastUsedPreset = buildCurrentExportRecipe({
         id: EXPORT_LAST_USED_PRESET_ID,
-        name: EXPORT_LAST_USED_PRESET_ID,
         lastExportPath: exportPath,
-      };
+        name: EXPORT_LAST_USED_PRESET_ID,
+        settings: currentSettingsObject,
+      });
       const updatedPresets = [
-        ...(appSettings.exportPresets ?? []).filter((p) => p.id !== EXPORT_LAST_USED_PRESET_ID),
+        ...withoutExportRecipeId(appSettings.exportPresets ?? [], EXPORT_LAST_USED_PRESET_ID),
         lastUsedPreset,
       ];
       onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
@@ -879,7 +883,7 @@ export default function ExportPanel({
     renderingIntent,
   });
   const currentSoftProofPreset = useMemo(
-    () => (appSettings?.exportPresets ?? []).find((preset) => preset.id === exportSoftProofRecipeId) ?? null,
+    () => findCurrentExportRecipe(appSettings?.exportPresets ?? [], exportSoftProofRecipeId ?? ''),
     [appSettings?.exportPresets, exportSoftProofRecipeId],
   );
   const softProofResolverStatus = useMemo(
@@ -956,9 +960,9 @@ export default function ExportPanel({
   const handleUseCurrentSoftProofForExport = useCallback(() => {
     if (!currentSoftProofPreset || !softProofResolverStatus.canUseCurrentSoftProofForExport) return;
     updateColorSelection({
-      blackPointCompensation: currentSoftProofPreset.blackPointCompensation ?? false,
-      colorProfile: currentSoftProofPreset.colorProfile ?? ExportColorProfile.Srgb,
-      renderingIntent: currentSoftProofPreset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
+      blackPointCompensation: currentSoftProofPreset.blackPointCompensation,
+      colorProfile: currentSoftProofPreset.colorProfile,
+      renderingIntent: currentSoftProofPreset.renderingIntent,
     });
   }, [currentSoftProofPreset, softProofResolverStatus.canUseCurrentSoftProofForExport, updateColorSelection]);
 
@@ -1242,7 +1246,10 @@ export default function ExportPanel({
           : null,
     });
     const operationExportSettings = buildExportSettings(filenameTemplate);
-    const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID)?.lastExportPath;
+    const lastExportPath = findCurrentExportRecipe(
+      appSettings?.exportPresets ?? [],
+      EXPORT_LAST_USED_PRESET_ID,
+    )?.lastExportPath;
     const operation: AppOperationContext = beginAppOperation({
       action: 'export_images',
       component: 'export.panel',
@@ -1855,7 +1862,10 @@ export default function ExportPanel({
                         <Dropdown
                           options={resizeModeOptions}
                           value={resizeMode}
-                          onChange={setResizeMode}
+                          onChange={(value) => {
+                            const parsed = exportResizeModeSchema.safeParse(value);
+                            if (parsed.success) setResizeMode(parsed.data);
+                          }}
                           disabled={isExporting}
                           className="w-full"
                         />

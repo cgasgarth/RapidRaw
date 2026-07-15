@@ -9,6 +9,8 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
 use crate::app_state::AppState;
+use crate::export::export_color_policy::{ExportColorProfile, ExportRenderingIntent};
+use crate::export::export_postprocess::{OutputSharpeningSettings, WatermarkAnchor};
 use crate::render_caches::RenderCaches;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -219,7 +221,7 @@ impl Default for CopyPasteSettings {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportPreset {
-    #[serde(default)]
+    pub black_point_compensation: bool,
     pub color_profile: ExportColorProfile,
     pub id: String,
     pub name: String,
@@ -230,37 +232,28 @@ pub struct ExportPreset {
     pub resize_value: u32,
     pub dont_enlarge: bool,
     pub keep_metadata: bool,
+    pub preserve_timestamps: bool,
     pub strip_gps: bool,
     pub filename_template: String,
     pub enable_watermark: bool,
     pub watermark_path: Option<String>,
-    pub watermark_anchor: Option<String>,
+    pub watermark_anchor: WatermarkAnchor,
     pub watermark_scale: u32,
     pub watermark_spacing: u32,
     pub watermark_opacity: u32,
-    #[serde(default)]
-    pub export_masks: Option<bool>,
-    #[serde(default)]
-    pub preserve_folders: Option<bool>,
-    #[serde(default)]
+    pub export_masks: bool,
+    pub output_sharpening: Option<OutputSharpeningSettings>,
+    pub preserve_folders: bool,
+    pub rendering_intent: ExportRenderingIntent,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_export_path: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportColorProfile {
-    #[default]
-    Srgb,
-    DisplayP3,
-    AdobeRgb1998,
-    ProPhotoRgb,
-    SourceEmbedded,
-}
-
-pub fn default_export_presets() -> Vec<ExportPreset> {
-    vec![
+pub fn default_export_presets() -> Vec<Value> {
+    [
         ExportPreset {
-            color_profile: Default::default(),
+            black_point_compensation: false,
+            color_profile: ExportColorProfile::Srgb,
             id: "default-hq".to_string(),
             name: "High Quality".to_string(),
             file_format: "jpeg".to_string(),
@@ -270,20 +263,24 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: true,
+            preserve_timestamps: false,
             strip_gps: false,
             filename_template: "{original_filename}".to_string(),
             enable_watermark: false,
             watermark_path: None,
-            watermark_anchor: Some("bottomRight".to_string()),
+            watermark_anchor: WatermarkAnchor::BottomRight,
             watermark_scale: 10,
             watermark_spacing: 5,
             watermark_opacity: 75,
-            export_masks: Some(false),
-            preserve_folders: Some(false),
+            export_masks: false,
+            output_sharpening: None,
+            preserve_folders: false,
+            rendering_intent: ExportRenderingIntent::RelativeColorimetric,
             last_export_path: None,
         },
         ExportPreset {
-            color_profile: Default::default(),
+            black_point_compensation: false,
+            color_profile: ExportColorProfile::Srgb,
             id: "default-fast".to_string(),
             name: "Fast (Web)".to_string(),
             file_format: "jpeg".to_string(),
@@ -293,20 +290,24 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 2048,
             dont_enlarge: true,
             keep_metadata: false,
+            preserve_timestamps: false,
             strip_gps: true,
             filename_template: "{original_filename}_web".to_string(),
             enable_watermark: false,
             watermark_path: None,
-            watermark_anchor: Some("bottomRight".to_string()),
+            watermark_anchor: WatermarkAnchor::BottomRight,
             watermark_scale: 10,
             watermark_spacing: 5,
             watermark_opacity: 75,
-            export_masks: Some(false),
-            preserve_folders: Some(false),
+            export_masks: false,
+            output_sharpening: None,
+            preserve_folders: false,
+            rendering_intent: ExportRenderingIntent::RelativeColorimetric,
             last_export_path: None,
         },
         ExportPreset {
-            color_profile: Default::default(),
+            black_point_compensation: false,
+            color_profile: ExportColorProfile::Srgb,
             id: "client-proof-tiff".to_string(),
             name: "Client Proof TIFF".to_string(),
             file_format: "tiff".to_string(),
@@ -316,19 +317,25 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             resize_value: 4000,
             dont_enlarge: true,
             keep_metadata: true,
+            preserve_timestamps: false,
             strip_gps: true,
             filename_template: "{original_filename}_client".to_string(),
             enable_watermark: false,
             watermark_path: None,
-            watermark_anchor: Some("bottomCenter".to_string()),
+            watermark_anchor: WatermarkAnchor::BottomCenter,
             watermark_scale: 12,
             watermark_spacing: 4,
             watermark_opacity: 60,
-            export_masks: Some(true),
-            preserve_folders: Some(true),
+            export_masks: true,
+            output_sharpening: None,
+            preserve_folders: true,
+            rendering_intent: ExportRenderingIntent::RelativeColorimetric,
             last_export_path: None,
         },
     ]
+    .into_iter()
+    .map(|recipe| serde_json::to_value(recipe).expect("default export recipe must serialize"))
+    .collect()
 }
 
 pub fn default_linear_raw_mode() -> String {
@@ -422,7 +429,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub library_view_mode: Option<String>,
     #[serde(default = "default_export_presets")]
-    pub export_presets: Vec<ExportPreset>,
+    pub export_presets: Vec<Value>,
     #[serde(default)]
     pub my_lenses: Option<Vec<MyLens>>,
     #[serde(default)]
@@ -793,6 +800,63 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const CURRENT_EXPORT_RECIPE_FIELDS: [&str; 24] = [
+        "blackPointCompensation",
+        "colorProfile",
+        "dontEnlarge",
+        "enableResize",
+        "enableWatermark",
+        "exportMasks",
+        "fileFormat",
+        "filenameTemplate",
+        "id",
+        "jpegQuality",
+        "keepMetadata",
+        "name",
+        "outputSharpening",
+        "preserveFolders",
+        "preserveTimestamps",
+        "renderingIntent",
+        "resizeMode",
+        "resizeValue",
+        "stripGps",
+        "watermarkAnchor",
+        "watermarkOpacity",
+        "watermarkPath",
+        "watermarkScale",
+        "watermarkSpacing",
+    ];
+
+    #[test]
+    fn default_export_presets_serialize_complete_current_records() {
+        for recipe in default_export_presets() {
+            let object = recipe
+                .as_object()
+                .expect("default recipe must be an object");
+            for field in CURRENT_EXPORT_RECIPE_FIELDS {
+                assert!(object.contains_key(field), "default recipe missing {field}");
+            }
+        }
+    }
+
+    #[test]
+    fn incomplete_export_recipe_state_round_trips_without_upgrade() {
+        let incomplete = serde_json::json!({
+            "fileFormat": "jpeg",
+            "id": "incomplete-current-recipe",
+            "name": "Needs review"
+        });
+        let settings = AppSettings {
+            export_presets: vec![incomplete.clone()],
+            ..AppSettings::default()
+        };
+
+        let serialized = serde_json::to_value(&settings).unwrap();
+        let reparsed: AppSettings = serde_json::from_value(serialized).unwrap();
+
+        assert_eq!(reparsed.export_presets, vec![incomplete]);
+    }
 
     fn write_preview_settings(path: &Path, resolution: u32, quality: &str) {
         let settings = AppSettings {

@@ -27,40 +27,8 @@ const recipeIdentitySchema = z
   })
   .loose();
 
-const recipeObjectSchema = z.record(z.string(), z.unknown());
-
-const normalizeLegacyBuiltInRecipe = (value: Record<string, unknown>): Record<string, unknown> => {
-  const id = typeof value['id'] === 'string' ? value['id'] : '';
-  if (!BUILT_IN_RECIPE_IDS.has(id)) return value;
-
-  const normalized: Record<string, unknown> = {
-    colorProfile: 'srgb',
-    exportMasks: false,
-    outputSharpening: null,
-    preserveFolders: false,
-    preserveTimestamps: false,
-    renderingIntent: 'relativeColorimetric',
-    watermarkAnchor: 'bottomRight',
-    watermarkOpacity: 75,
-    watermarkPath: null,
-    watermarkScale: 10,
-    watermarkSpacing: 5,
-    ...value,
-  };
-
-  if (typeof normalized['exportMasks'] !== 'boolean') normalized['exportMasks'] = false;
-  if (typeof normalized['preserveFolders'] !== 'boolean') normalized['preserveFolders'] = false;
-  if (typeof normalized['preserveTimestamps'] !== 'boolean') normalized['preserveTimestamps'] = false;
-  if (normalized['lastExportPath'] === null) delete normalized['lastExportPath'];
-
-  return normalized;
-};
-
 const asRecipeLike = (value: unknown): ExportRecipe | null => {
-  const recipeObject = recipeObjectSchema.safeParse(value);
-  const parsed = exportRecipeSchema.safeParse(
-    recipeObject.success ? normalizeLegacyBuiltInRecipe(recipeObject.data) : value,
-  );
+  const parsed = exportRecipeSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 };
 

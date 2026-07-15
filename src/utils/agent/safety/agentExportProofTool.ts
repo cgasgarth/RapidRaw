@@ -291,7 +291,13 @@ export const buildAgentExportPresetSettings = ({
   preferredPresetId?: string | undefined;
   presets: unknown;
 }): AgentExportPresetSettings => {
-  const parsedPresets = z.array(exportRecipeV1Schema).parse(presets);
+  const parsedPresets = z
+    .array(z.unknown())
+    .parse(presets)
+    .flatMap((value) => {
+      const parsed = exportRecipeV1Schema.safeParse(value);
+      return parsed.success ? [parsed.data] : [];
+    });
   const preset =
     (preferredPresetId === undefined
       ? undefined

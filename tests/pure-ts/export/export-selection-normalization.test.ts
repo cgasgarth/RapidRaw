@@ -140,16 +140,22 @@ test('export cancellation ends in the terminal status render without an observer
 
 function preset(id: string, fileFormat = 'jpeg'): ExportPreset {
   return {
+    blackPointCompensation: false,
+    colorProfile: ExportColorProfile.Srgb,
     dontEnlarge: true,
     enableResize: false,
     enableWatermark: false,
+    exportMasks: false,
     fileFormat,
     filenameTemplate: '{original_filename}',
     id,
-    jpegQuality: 90,
+    jpegQuality: fileFormat === 'jpeg' ? 90 : 100,
     keepMetadata: true,
     name: id,
+    outputSharpening: null,
+    preserveFolders: false,
     preserveTimestamps: false,
+    renderingIntent: ExportRenderingIntent.RelativeColorimetric,
     resizeMode: 'longEdge',
     resizeValue: 2048,
     stripGps: true,

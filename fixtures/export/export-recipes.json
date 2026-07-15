@@ -1,5 +1,6 @@
 [
   {
+    "blackPointCompensation": false,
     "dontEnlarge": true,
     "enableResize": true,
     "enableWatermark": false,
@@ -10,6 +11,7 @@
     "jpegQuality": 92,
     "keepMetadata": true,
     "name": "Client Proof JPEG",
+    "outputSharpening": null,
     "preserveFolders": true,
     "preserveTimestamps": true,
     "resizeMode": "longEdge",
@@ -24,6 +26,7 @@
     "renderingIntent": "relativeColorimetric"
   },
   {
+    "blackPointCompensation": false,
     "dontEnlarge": true,
     "enableResize": false,
     "enableWatermark": false,
@@ -34,6 +37,7 @@
     "jpegQuality": 95,
     "keepMetadata": true,
     "name": "High Quality",
+    "outputSharpening": null,
     "preserveFolders": false,
     "preserveTimestamps": true,
     "resizeMode": "longEdge",
@@ -48,6 +52,7 @@
     "renderingIntent": "relativeColorimetric"
   },
   {
+    "blackPointCompensation": false,
     "dontEnlarge": true,
     "enableResize": true,
     "enableWatermark": false,
@@ -58,6 +63,7 @@
     "jpegQuality": 80,
     "keepMetadata": false,
     "name": "Fast Web",
+    "outputSharpening": null,
     "preserveFolders": false,
     "preserveTimestamps": false,
     "resizeMode": "width",
@@ -72,6 +78,7 @@
     "renderingIntent": "relativeColorimetric"
   },
   {
+    "blackPointCompensation": false,
     "dontEnlarge": true,
     "enableResize": true,
     "enableWatermark": true,
@@ -82,6 +89,7 @@
     "jpegQuality": 100,
     "keepMetadata": true,
     "name": "Client Proof TIFF",
+    "outputSharpening": null,
     "preserveFolders": true,
     "preserveTimestamps": true,
     "resizeMode": "longEdge",

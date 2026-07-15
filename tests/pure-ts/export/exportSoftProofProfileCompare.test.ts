@@ -6,6 +6,7 @@ import {
   ExportRenderingIntent,
   FileFormats,
 } from '../../../src/components/ui/ExportImportProperties';
+import { exportRecipeSchema } from '../../../src/schemas/export/exportRecipeSchemas';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildSoftProofProfileCompareInvokeRequest,
@@ -88,11 +89,12 @@ describe('export soft-proof profile compare', () => {
       name: 'Current export settings proof',
       presets: first,
     });
+    const resolver = exportRecipeSchema.parse(second[0]);
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
-    expect(second[0]?.id).toBe(EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID);
-    expect(second[0]?.colorProfile).toBe(ExportColorProfile.Srgb);
+    expect(resolver.id).toBe(EXPORT_SOFT_PROOF_RESOLVER_PRESET_ID);
+    expect(resolver.colorProfile).toBe(ExportColorProfile.Srgb);
   });
 
   test('gates use-proof action through export color capabilities', () => {
@@ -112,12 +114,15 @@ describe('export soft-proof profile compare', () => {
         dontEnlarge: true,
         enableResize: false,
         enableWatermark: false,
+        exportMasks: false,
         fileFormat: FileFormats.Jpeg,
         filenameTemplate: '{original_filename}_edited',
         id: 'proof-display-p3',
         jpegQuality: 90,
         keepMetadata: true,
         name: 'Display P3 proof',
+        outputSharpening: null,
+        preserveFolders: false,
         preserveTimestamps: false,
         renderingIntent: ExportRenderingIntent.RelativeColorimetric,
         resizeMode: 'longEdge',

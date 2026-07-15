@@ -1,4 +1,4 @@
-import type { ExportPreset } from '../../components/ui/ExportImportProperties';
+import { exportRecipeSchema } from '../../schemas/export/exportRecipeSchemas';
 
 export type ExportSoftProofRecipeStatus = 'disabled' | 'enabled' | 'fallback' | 'unavailable';
 
@@ -14,10 +14,13 @@ export const resolveExportSoftProofRecipe = ({
   requestedRecipeId,
 }: {
   enabled: boolean;
-  presets: readonly ExportPreset[];
+  presets: readonly unknown[];
   requestedRecipeId: string | null;
 }): ResolvedExportSoftProofRecipe => {
-  const recipeIds = presets.filter((preset) => preset.fileFormat !== 'cube').map((preset) => preset.id);
+  const recipeIds = presets.flatMap((preset) => {
+    const parsed = exportRecipeSchema.safeParse(preset);
+    return parsed.success && parsed.data.fileFormat !== 'cube' ? [parsed.data.id] : [];
+  });
   const requestedIsValid = requestedRecipeId !== null && recipeIds.includes(requestedRecipeId);
   const recipeId = requestedIsValid ? requestedRecipeId : (recipeIds[0] ?? null);
   if (recipeId === null) return { enabled: false, recipeId: null, status: 'unavailable' };
