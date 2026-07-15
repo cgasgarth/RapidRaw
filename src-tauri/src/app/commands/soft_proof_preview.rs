@@ -5,6 +5,7 @@ use rapidraw_codecs::JpegPreset;
 use serde::Deserialize;
 use tauri::{Emitter, ipc::Response};
 
+use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_state::{
     AnalyticsFrameId, AnalyticsJob, AnalyticsProducts, AnalyticsSamplingPolicy, AppState,
     LoadedImage,
@@ -21,7 +22,7 @@ use crate::lut_processing::Lut;
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
 use crate::{
     color, compile_consumer_render_plan, export, generate_transformed_preview, get_or_load_lut,
-    hydrate_adjustments, image_analytics, render_pipeline, validate_expected_preview_image,
+    hydrate_adjustments, image_analytics, render_pipeline,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,7 +79,8 @@ pub(crate) fn generate_export_soft_proof_preview(
         .clone()
         .ok_or("No original image loaded")?;
     if let Some(expected_image_path) = request.expected_image_path.as_deref() {
-        validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
+        validate_expected_preview_image(&loaded_image.path, expected_image_path)
+            .map_err(|error| error.to_string())?;
     }
     let session = SoftProofPreviewSession {
         generation: state.services.preview_session.current_generation(),
