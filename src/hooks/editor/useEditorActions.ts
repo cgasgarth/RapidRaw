@@ -37,7 +37,6 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../utils/copyPasteEditTransaction';
-import { calculateCenteredCrop } from '../../utils/cropUtils';
 import {
   awaitMatchingEditorPersistence,
   beginEditorPersistenceBarrier,
@@ -59,6 +58,10 @@ import {
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { buildLutLoadEditTransaction, captureLutCommitIdentity } from '../../utils/lutEditTransaction';
+import {
+  buildOrientationRotateEditTransaction,
+  captureOrientationRotateCommitIdentity,
+} from '../../utils/orientationRotateEditTransaction';
 import {
   acceptReferenceMatchAdjustmentTransfer,
   reconcileReferenceMatchReceiptsAfterEdit,
@@ -189,25 +192,12 @@ export function useEditorActions() {
 
   const handleRotate = useCallback(
     (degrees: number) => {
-      const { selectedImage, adjustments } = useEditorStore.getState();
-      const increment = degrees > 0 ? 1 : 3;
-      const newAspectRatio =
-        adjustments.aspectRatio && adjustments.aspectRatio !== 0 ? 1 / adjustments.aspectRatio : null;
-      const newOrientationSteps = ((adjustments.orientationSteps || 0) + increment) % 4;
-      const newCrop =
-        selectedImage?.width && selectedImage.height
-          ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio)
-          : null;
-
-      setAdjustments((prev) => ({
-        ...prev,
-        aspectRatio: newAspectRatio,
-        orientationSteps: newOrientationSteps,
-        rotation: 0,
-        crop: newCrop,
-      }));
+      const state = useEditorStore.getState();
+      const identity = captureOrientationRotateCommitIdentity(state);
+      if (identity === null) return;
+      applyEditTransaction(buildOrientationRotateEditTransaction(state, identity, degrees, createOperationId()));
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleAutoAdjustments = useCallback(async () => {
