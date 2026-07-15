@@ -39,6 +39,11 @@ import {
   type EditorCompareState,
   reduceEditorCompare,
 } from '../utils/editorCompare';
+import {
+  type EditorTeardownTransactionRequest,
+  type EditorTeardownTransactionResult,
+  isEditorTeardownIdentityCurrent,
+} from '../utils/editorTeardownTransaction';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import {
   type EditApplicationReceipt,
@@ -257,6 +262,7 @@ interface EditorState {
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
   publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
+  applyEditorTeardownTransaction: (request: EditorTeardownTransactionRequest) => EditorTeardownTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
   setReferenceMatchReferences: (
@@ -596,6 +602,54 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ...historyNavigationPreviewInvalidation,
       ...publishAdjustmentState(state, adjustments),
     })),
+
+  applyEditorTeardownTransaction: (request) => {
+    let result: EditorTeardownTransactionResult | null = null;
+    set((state) => {
+      if (!isEditorTeardownIdentityCurrent(state, request)) throw new Error('editor_teardown.stale_identity');
+      const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+      const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+      const adjustmentsChanged = !areAdjustmentsEqual(state.adjustments, adjustments);
+      const adjustmentRevision = state.adjustmentRevision + (adjustmentsChanged ? 1 : 0);
+      const imageSessionId = state.imageSessionId + 1;
+      state.patchResidency.reset(imageSessionId);
+      result = { adjustmentRevision, adjustmentsChanged, transactionId: request.transactionId };
+      return {
+        ...historyNavigationPreviewInvalidation,
+        ...publishAdjustmentState(state, adjustments, editDocumentV2),
+        activeAiPatchContainerId: null,
+        activeAiSubMaskId: null,
+        activeMaskContainerId: null,
+        activeMaskId: null,
+        adjustmentRevision,
+        autoEditPreviewSession: null,
+        compare: DEFAULT_EDITOR_COMPARE_STATE,
+        gamutWarningOverlay: null,
+        hasRenderedFirstFrame: false,
+        histogram: null,
+        history: [structuredClone(adjustments)],
+        historyCheckpoints: [],
+        historyIndex: 0,
+        imageSession: null,
+        imageSessionId,
+        isMaskControlHovered: false,
+        isWbPickerActive: false,
+        lastBasicToneCommand: null,
+        lastEditApplicationReceipt: null,
+        lastReferenceMatchApplicationReceipt: null,
+        lastWhiteBalancePickerReceipt: null,
+        presetApplication: null,
+        referenceMatchSpatialAnalysis: null,
+        referenceMatchPreview: null,
+        selectedImage: null,
+        viewportRevision: state.viewportRevision + 1,
+        previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
+        waveform: null,
+      };
+    });
+    if (result === null) throw new Error('editor_teardown.not_applied');
+    return result;
+  },
 
   applyEditTransaction: (request) => {
     let result: EditTransactionResult | null = null;
