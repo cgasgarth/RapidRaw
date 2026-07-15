@@ -1,6 +1,7 @@
 import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
+import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
 type BrowserTauriEventCallback = (event: unknown) => void;
@@ -1405,7 +1406,10 @@ const decodeHarnessApplyPreview = (): ArrayBuffer => {
 };
 
 interface HarnessApplyPreviewRequest {
+  computeWaveform: boolean;
+  expectedImagePath: string;
   isInteractive: boolean;
+  previewOperationIdentity: PreviewOperationIdentity;
   roi: [number, number, number, number] | null;
   targetResolution: number;
 }
@@ -1424,13 +1428,73 @@ const normalizeHarnessApplyPreviewRequest = (args: Record<string, unknown> | und
       : null;
   const requestedResolution = request['targetResolution'];
   return {
+    computeWaveform: request['computeWaveform'] === true,
+    expectedImagePath:
+      typeof request['expectedImagePath'] === 'string'
+        ? request['expectedImagePath']
+        : `${browserHarnessRoot}/browser-harness.ARW`,
     isInteractive: request['isInteractive'] === true,
+    previewOperationIdentity: previewOperationIdentitySchema.parse(request['previewOperationIdentity']),
     roi,
     targetResolution:
       typeof requestedResolution === 'number' && Number.isFinite(requestedResolution)
         ? Math.min(4096, Math.max(1, Math.round(requestedResolution)))
         : 1024,
   };
+};
+
+const emitHarnessPreviewAnalytics = (request: HarnessApplyPreviewRequest): void => {
+  const resource = (kind: string) => ({
+    byteLen: 256,
+    mimeType: 'application/x-rapidraw-rgba8',
+    resourceId: kind === 'luma' ? 'a'.repeat(64) : 'b'.repeat(64),
+    url: `/__browser-harness-analytics/${kind}`,
+  });
+  dispatchBrowserHarnessEvent('analytics-result', {
+    frameId: {
+      graphRevision: request.previewOperationIdentity.operationId,
+      imageSession: request.previewOperationIdentity.session.imageSessionId,
+      previewGeneration: request.previewOperationIdentity.generation,
+    },
+    gamut: null,
+    histogram: {
+      blue: [0.1, 0.2, 0.3],
+      green: [0.2, 0.3, 0.4],
+      luma: [0.3, 0.4, 0.5],
+      red: [0.4, 0.5, 0.6],
+    },
+    path: request.expectedImagePath,
+    previewOperationIdentity: request.previewOperationIdentity,
+    requestedProducts: request.computeWaveform ? 31 : 1,
+    scopes: request.computeWaveform
+      ? {
+          height: 256,
+          luma: resource('luma'),
+          parade: resource('parade'),
+          rgb: resource('rgb'),
+          vectorscope: resource('vectorscope'),
+          width: 256,
+        }
+      : null,
+    spatial: {
+      gridHeight: 1,
+      gridWidth: 1,
+      tiles: [
+        {
+          blueMean: 0.3,
+          clippedFraction: 0,
+          greenMean: 0.4,
+          lumaMean: 0.5,
+          lumaSpread: 0.1,
+          redMean: 0.6,
+          sampleCount: 64,
+          x: 0,
+          y: 0,
+        },
+      ],
+    },
+    timing: { finishingMs: 0.2, fullImageConversions: 0, samplingMs: 0.5, sourcePixelsRead: 64 },
+  });
 };
 
 const encodeHarnessPreviewJpeg = async (
@@ -1461,6 +1525,7 @@ const encodeHarnessPreviewJpeg = async (
 
 const createHarnessApplyPreview = async (args: Record<string, unknown> | undefined): Promise<ArrayBuffer> => {
   const request = normalizeHarnessApplyPreviewRequest(args);
+  if (request.roi === null) emitHarnessPreviewAnalytics(request);
   const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.shift();
   if (injected !== undefined) {
     const canvas = document.createElement('canvas');

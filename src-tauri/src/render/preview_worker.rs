@@ -8,7 +8,10 @@ use tauri::{Emitter, Manager};
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_settings::load_preview_runtime_settings_or_default;
-use crate::app_state::{AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState};
+use crate::app_state::{
+    AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState,
+    FrontendPreviewOperationIdentity,
+};
 use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
@@ -71,6 +74,7 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) adjustments_json: serde_json::Value,
     pub(crate) expected_image_path: &'a str,
     pub(crate) is_interactive: bool,
+    pub(crate) preview_operation_identity: &'a FrontendPreviewOperationIdentity,
     pub(crate) target_resolution: Option<u32>,
     pub(crate) roi: Option<(f32, f32, f32, f32)>,
     pub(crate) compute_waveform: bool,
@@ -145,6 +149,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         mut adjustments_json,
         expected_image_path,
         is_interactive,
+        preview_operation_identity,
         target_resolution,
         roi,
         compute_waveform,
@@ -447,6 +452,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
                 preview_generation: preview_id.generation,
                 graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
             },
+            preview_operation_identity: preview_operation_identity.clone(),
             products: requested_products(compute_waveform, active_waveform_channel),
             active_waveform_channel: channel_filter,
             service: Arc::clone(&state.services.analytics),
@@ -862,6 +868,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                     adjustments_json: (*job.adjustments).clone(),
                     expected_image_path: &job.expected_image_path,
                     is_interactive: job.is_interactive,
+                    preview_operation_identity: &job.preview_operation_identity,
                     target_resolution: job.target_resolution,
                     roi: job.roi,
                     compute_waveform: job.compute_waveform,

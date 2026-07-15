@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
-use crate::app_state::{AnalyticsFrameId, AnalyticsJob};
+use crate::app_state::{AnalyticsJob, AnalyticsJobIdentity};
 
 #[derive(Default)]
 struct Slots {
@@ -22,7 +22,7 @@ pub struct AnalyticsSchedulerMetrics {
 pub struct AnalyticsScheduler {
     slots: Mutex<Slots>,
     wake: Condvar,
-    current: Mutex<Option<AnalyticsFrameId>>,
+    current: Mutex<Option<AnalyticsJobIdentity>>,
     pub metrics: AnalyticsSchedulerMetrics,
 }
 
@@ -41,7 +41,7 @@ impl AnalyticsScheduler {
         if slots.shutdown {
             return Err(job);
         }
-        *self.current.lock().unwrap() = Some(job.frame_id);
+        *self.current.lock().unwrap() = Some(job.identity());
         self.metrics.scheduled.fetch_add(1, Ordering::Relaxed);
         if slots.pending.replace(job).is_some() {
             self.metrics.superseded.fetch_add(1, Ordering::Relaxed);
@@ -67,8 +67,9 @@ impl AnalyticsScheduler {
         }
     }
 
-    pub fn is_current(&self, id: AnalyticsFrameId) -> bool {
-        *self.current.lock().unwrap() == Some(id) && !self.slots.lock().unwrap().shutdown
+    pub fn is_current(&self, identity: &AnalyticsJobIdentity) -> bool {
+        self.current.lock().unwrap().as_ref() == Some(identity)
+            && !self.slots.lock().unwrap().shutdown
     }
 
     pub fn finish(&self, completed: bool) {
@@ -91,12 +92,15 @@ impl AnalyticsScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_state::{AnalyticsProducts, AnalyticsSamplingPolicy};
+    use crate::app_state::{AnalyticsFrameId, AnalyticsProducts, AnalyticsSamplingPolicy};
     use image::DynamicImage;
 
     fn job_for(image_session: u64, generation: u64) -> AnalyticsJob {
         AnalyticsJob {
             path: "fixture".into(),
+            preview_operation_identity: Box::new(
+                crate::app_state::FrontendPreviewOperationIdentity::compatibility_identity(),
+            ),
             frame_id: AnalyticsFrameId {
                 image_session,
                 preview_generation: generation,
@@ -121,7 +125,7 @@ mod tests {
         for generation in 2..=10_001 {
             scheduler.submit(job(generation)).unwrap();
         }
-        assert!(!scheduler.is_current(active.frame_id));
+        assert!(!scheduler.is_current(&active.identity()));
         assert_eq!(
             scheduler.next().unwrap().frame_id.preview_generation,
             10_001
@@ -139,10 +143,26 @@ mod tests {
         scheduler.submit(job(1)).unwrap();
         let active = scheduler.next().unwrap();
         scheduler.submit(job(2)).unwrap();
-        assert!(!scheduler.is_current(active.frame_id));
+        assert!(!scheduler.is_current(&active.identity()));
         scheduler.shutdown();
         scheduler.finish(false);
         assert!(scheduler.next().is_none());
+    }
+
+    #[test]
+    fn same_native_frame_rejects_a_superseded_frontend_preview_operation() {
+        let scheduler = AnalyticsScheduler::new();
+        scheduler.submit(job(1)).unwrap();
+        let active = scheduler.next().unwrap();
+        let mut successor = job(1);
+        successor.preview_operation_identity.operation_id = 2;
+        successor.preview_operation_identity.generation = 2;
+        scheduler.submit(successor).unwrap();
+
+        assert!(!scheduler.is_current(&active.identity()));
+        let current = scheduler.next().unwrap();
+        assert_eq!(current.preview_operation_identity.operation_id, 2);
+        assert!(scheduler.is_current(&current.identity()));
     }
 
     #[test]
@@ -153,10 +173,10 @@ mod tests {
         scheduler.submit(job_for(11, 1)).unwrap();
         scheduler.submit(job_for(12, 1)).unwrap();
 
-        assert!(!scheduler.is_current(old_a.frame_id));
+        assert!(!scheduler.is_current(&old_a.identity()));
         let successor_a = scheduler.next().unwrap();
         assert_eq!(successor_a.frame_id.image_session, 12);
-        assert!(scheduler.is_current(successor_a.frame_id));
+        assert!(scheduler.is_current(&successor_a.identity()));
         assert_eq!(scheduler.metrics.superseded.load(Ordering::Relaxed), 1);
     }
 }

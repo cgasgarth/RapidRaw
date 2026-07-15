@@ -49,7 +49,7 @@ impl PreviewRuntimeService {
         token
     }
 
-    pub(crate) fn submit(&self, job: PreviewJob) -> Result<PreviewRequestId, PreviewJob> {
+    pub(crate) fn submit(&self, job: PreviewJob) -> Result<PreviewRequestId, Box<PreviewJob>> {
         let scheduler = self
             .state
             .lock()
@@ -58,7 +58,7 @@ impl PreviewRuntimeService {
             .clone();
         match scheduler {
             Some(scheduler) => scheduler.submit(job),
-            None => Err(job),
+            None => Err(Box::new(job)),
         }
     }
 
@@ -151,6 +151,9 @@ mod tests {
                 adjustments: Arc::new(json!({})),
                 expected_image_path: "preview.raw".into(),
                 is_interactive: true,
+                preview_operation_identity: Box::new(
+                    crate::app_state::FrontendPreviewOperationIdentity::compatibility_identity(),
+                ),
                 target_resolution: None,
                 roi: None,
                 compute_waveform: false,

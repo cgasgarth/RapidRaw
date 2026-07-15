@@ -6,7 +6,9 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, RgbaImage};
 use serde::Serialize;
 
 use crate::analytics_resources::{AnalyticsResourceDescriptor, publish};
-use crate::app_state::{AnalyticsFrameId, AnalyticsJob, AnalyticsProducts};
+use crate::app_state::{
+    AnalyticsFrameId, AnalyticsJob, AnalyticsProducts, FrontendPreviewOperationIdentity,
+};
 
 const SCOPE_SIZE: usize = 256;
 const GAMUT_MAX: u32 = 512;
@@ -108,6 +110,7 @@ pub struct AnalyticsTiming {
 #[serde(rename_all = "camelCase")]
 pub struct AnalyticsResult {
     pub frame_id: AnalyticsFrameId,
+    pub preview_operation_identity: FrontendPreviewOperationIdentity,
     pub path: String,
     pub requested_products: u32,
     pub histogram: Option<HistogramData>,
@@ -530,6 +533,7 @@ pub fn calculate(
         || scopes.vectorscope.is_some();
     Ok(AnalyticsResult {
         frame_id: job.frame_id,
+        preview_operation_identity: (*job.preview_operation_identity).clone(),
         path: job.path.clone(),
         requested_products: job.products.bits(),
         histogram,
@@ -775,6 +779,9 @@ pub fn calculate_gamut_warning_overlay_from_image(
 fn compat_job(image: &DynamicImage, products: AnalyticsProducts) -> AnalyticsJob {
     AnalyticsJob {
         path: String::new(),
+        preview_operation_identity: Box::new(
+            crate::app_state::FrontendPreviewOperationIdentity::compatibility_identity(),
+        ),
         frame_id: AnalyticsFrameId::default(),
         image: Arc::new(image.clone()),
         products,
@@ -807,7 +814,13 @@ mod tests {
     #[test]
     fn disabled_products_allocate_no_outputs() {
         let image = DynamicImage::new_rgb8(4, 4);
-        let result = calculate(&compat_job(&image, AnalyticsProducts::HISTOGRAM), || true).unwrap();
+        let mut job = compat_job(&image, AnalyticsProducts::HISTOGRAM);
+        job.preview_operation_identity.operation_id = 42;
+        let result = calculate(&job, || true).unwrap();
+        assert_eq!(
+            result.preview_operation_identity,
+            *job.preview_operation_identity
+        );
         assert!(result.histogram.is_some());
         assert!(result.gamut.is_none());
         assert!(result.scopes.is_none());

@@ -45,9 +45,10 @@ impl AnalyticsRuntimeService {
         let worker_scheduler = Arc::clone(&scheduler);
         let worker = std::thread::spawn(move || {
             while let Some(job) = worker_scheduler.next() {
-                let id = job.frame_id;
-                let result = image_analytics::calculate(&job, || worker_scheduler.is_current(id));
-                let current = worker_scheduler.is_current(id);
+                let identity = job.identity();
+                let result =
+                    image_analytics::calculate(&job, || worker_scheduler.is_current(&identity));
+                let current = worker_scheduler.is_current(&identity);
                 if current && let Ok(result) = result {
                     sink(result);
                     worker_scheduler.finish(true);
@@ -100,6 +101,9 @@ mod tests {
     fn job(generation: u64) -> AnalyticsJob {
         AnalyticsJob {
             path: "/fixtures/analytics.raw".to_string(),
+            preview_operation_identity: Box::new(
+                crate::app_state::FrontendPreviewOperationIdentity::compatibility_identity(),
+            ),
             frame_id: AnalyticsFrameId {
                 image_session: 4,
                 preview_generation: generation,

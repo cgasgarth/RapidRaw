@@ -27,6 +27,7 @@ import {
   type PreviewCoordinatorTransition,
   type PreviewOperationIdentity,
   type PreviewSessionIdentity,
+  previewOperationIdentitySchema,
 } from './previewCoordinator';
 import type { PreviewViewportAuthoritySnapshot } from './previewViewportSnapshot';
 import { invokeWithSchema } from './tauriSchemaInvoke';
@@ -39,6 +40,7 @@ const applyAdjustmentsInvokeSchema = z
     editDocumentV2: editDocumentV2Schema,
     expectedImagePath: z.string().trim().min(1),
     isInteractive: z.boolean(),
+    previewOperationIdentity: previewOperationIdentitySchema,
     roi: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
     targetResolution: z.number().int().positive(),
     viewerSampleGraphRevision: z.string().nullable().optional(),
@@ -185,6 +187,7 @@ const validateRequestIdentity = (request: EditedPreviewRequest): void => {
 const executeNativeEditedPreview = async (
   request: ScheduledEditedPreviewRequest,
   payload: ReturnType<PreparedAdjustmentPayloadCache['prepare']>['payload'],
+  identity: PreviewOperationIdentity,
 ): Promise<Omit<ExecutedEditedPreview, 'newlySentPatchIds'>> => {
   if (request.proof !== null && request.kind === 'settled') {
     const proofRequest = {
@@ -195,6 +198,7 @@ const executeNativeEditedPreview = async (
       expectedImagePath: request.session.sourceImagePath,
       exportSoftProofRecipeId: request.proof.exportSoftProofRecipeId,
       jsAdjustments: payload,
+      previewOperationIdentity: identity,
       renderingIntent: request.proof.renderingIntent,
       targetResolution: request.targetResolution,
       viewerSampleGraphRevision: request.session.graphRevision,
@@ -240,6 +244,7 @@ const executeNativeEditedPreview = async (
         ]),
         expectedImagePath: request.session.sourceImagePath,
         isInteractive: request.kind === 'interactive',
+        previewOperationIdentity: identity,
         roi: request.roi,
         targetResolution: request.targetResolution,
         viewerSampleGraphRevision: request.session.graphRevision,
@@ -278,7 +283,7 @@ const executeEditedPreviewWithCache =
           })
         : null;
     try {
-      const result = await executeNativeEditedPreview(request, payload);
+      const result = await executeNativeEditedPreview(request, payload, identity);
       if (operation !== null) {
         logAppOperationSuccess(operation, {
           byteLength: result.buffer.byteLength,

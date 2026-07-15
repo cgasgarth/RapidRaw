@@ -134,7 +134,9 @@ export function useImageProcessing() {
       for (const effect of transition.effects) {
         if (effect.type !== 'publish') continue;
         if (effect.identity.kind === 'settled') {
-          setEditor({ finalPreviewUrl: effect.artifact.url });
+          setEditor({ finalPreviewUrl: effect.artifact.url, presentedPreviewArtifact: effect.artifact });
+        } else if (effect.identity.kind === 'interactive') {
+          setEditor({ presentedPreviewArtifact: effect.artifact });
         } else if (effect.identity.kind === 'original') {
           setEditor({ transformedOriginalUrl: effect.artifact.url });
         }

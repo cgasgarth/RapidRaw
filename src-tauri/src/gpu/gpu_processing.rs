@@ -5778,6 +5778,9 @@ fn process_and_get_dynamic_image_inner(
                         let _ = analytics.service.submit(crate::AnalyticsJob {
                             path: analytics.path,
                             frame_id: analytics.frame_id,
+                            preview_operation_identity: Box::new(
+                                analytics.preview_operation_identity,
+                            ),
                             image: std::sync::Arc::new(dynamic_img),
                             products: analytics.products,
                             active_waveform_channel: analytics.active_waveform_channel,
@@ -5795,6 +5798,7 @@ fn process_and_get_dynamic_image_inner(
                     let _ = analytics.service.submit(crate::AnalyticsJob {
                         path: analytics.path,
                         frame_id: analytics.frame_id,
+                        preview_operation_identity: Box::new(analytics.preview_operation_identity),
                         image: std::sync::Arc::new(dynamic_img),
                         products: analytics.products,
                         active_waveform_channel: analytics.active_waveform_channel,

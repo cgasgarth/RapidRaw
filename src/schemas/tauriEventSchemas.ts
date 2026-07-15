@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
+import { previewOperationIdentitySchema } from '../utils/previewCoordinator';
 import { panoramaRenderedReviewSchema } from './computational-merge/panoramaUiSchemas';
 import { denoiseOperationHandleSchema } from './denoiseWorkflowSchemas';
 import { importJobAuthoritySchema } from './fileOperationSchemas';
@@ -11,11 +12,101 @@ import {
 } from './thumbnailOperationSchemas';
 
 const nonnegativeNumberSchema = z.number().nonnegative();
+const nonnegativeIntegerSchema = z.number().int().nonnegative().safe();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;
 type CullingProgressPayload = Progress & { stage: string };
 
 export const stringPayloadSchema = z.string();
 export const countPayloadSchema = nonnegativeNumberSchema;
+
+const analyticsResourceDescriptorSchema = z
+  .object({
+    byteLen: nonnegativeIntegerSchema,
+    mimeType: z.string().trim().min(1),
+    resourceId: z.string().regex(/^[a-f0-9]{64}$/u),
+    url: z.string().trim().min(1),
+  })
+  .strict();
+
+export const analyticsResultPayloadSchema = z
+  .object({
+    frameId: z
+      .object({
+        graphRevision: nonnegativeIntegerSchema,
+        imageSession: nonnegativeIntegerSchema,
+        previewGeneration: nonnegativeIntegerSchema,
+      })
+      .strict(),
+    gamut: z
+      .object({
+        coverageRatio: nonnegativeNumberSchema,
+        height: nonnegativeIntegerSchema,
+        mask: analyticsResourceDescriptorSchema,
+        maxChannelValue: nonnegativeIntegerSchema,
+        minChannelValue: nonnegativeIntegerSchema,
+        pixelCount: nonnegativeIntegerSchema,
+        warningPixelCount: nonnegativeIntegerSchema,
+        width: nonnegativeIntegerSchema,
+      })
+      .strict()
+      .nullable(),
+    histogram: z
+      .object({
+        blue: z.array(nonnegativeNumberSchema),
+        green: z.array(nonnegativeNumberSchema),
+        luma: z.array(nonnegativeNumberSchema),
+        red: z.array(nonnegativeNumberSchema),
+      })
+      .strict()
+      .nullable(),
+    path: z.string().trim().min(1),
+    previewOperationIdentity: previewOperationIdentitySchema,
+    requestedProducts: nonnegativeIntegerSchema,
+    scopes: z
+      .object({
+        height: nonnegativeIntegerSchema,
+        luma: analyticsResourceDescriptorSchema.nullable(),
+        parade: analyticsResourceDescriptorSchema.nullable(),
+        rgb: analyticsResourceDescriptorSchema.nullable(),
+        vectorscope: analyticsResourceDescriptorSchema.nullable(),
+        width: nonnegativeIntegerSchema,
+      })
+      .strict()
+      .nullable(),
+    spatial: z
+      .object({
+        gridHeight: nonnegativeIntegerSchema,
+        gridWidth: nonnegativeIntegerSchema,
+        tiles: z.array(
+          z
+            .object({
+              blueMean: z.number().finite(),
+              clippedFraction: nonnegativeNumberSchema,
+              greenMean: z.number().finite(),
+              lumaMean: z.number().finite(),
+              lumaSpread: nonnegativeNumberSchema,
+              redMean: z.number().finite(),
+              sampleCount: nonnegativeIntegerSchema,
+              x: nonnegativeIntegerSchema,
+              y: nonnegativeIntegerSchema,
+            })
+            .strict(),
+        ),
+      })
+      .strict()
+      .nullable(),
+    timing: z
+      .object({
+        finishingMs: nonnegativeNumberSchema,
+        fullImageConversions: nonnegativeIntegerSchema,
+        samplingMs: nonnegativeNumberSchema,
+        sourcePixelsRead: nonnegativeIntegerSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
+export type AnalyticsResultPayload = z.infer<typeof analyticsResultPayloadSchema>;
 
 export const displayTargetChangePayloadSchema = z
   .object({

@@ -53,7 +53,7 @@ import {
 } from '../utils/editTransaction';
 import { buildHistoryNavigationEditTransaction } from '../utils/historyNavigationEditTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
-import type { PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
+import type { PreviewArtifact, PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
@@ -184,6 +184,7 @@ interface EditorState {
 
   // Previews & Overlays
   finalPreviewUrl: string | null;
+  presentedPreviewArtifact: PreviewArtifact | null;
   provisionalPreviewFrame: ProvisionalPreviewFrame | null;
   navigatorPreviewArtifact: NavigatorPreviewArtifact | null;
   uncroppedAdjustedPreviewUrl: string | null;
@@ -313,6 +314,7 @@ const createSessionCheckpointId = (historyIndex: number): string => {
 const historyNavigationPreviewInvalidation = {
   exportSoftProofTransform: null,
   finalPreviewUrl: null,
+  presentedPreviewArtifact: null,
   provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   gamutWarningOverlay: null,
@@ -404,6 +406,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   historyIndex: 0,
 
   finalPreviewUrl: null,
+  presentedPreviewArtifact: null,
   provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
@@ -534,6 +537,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if ('imageSession' in update) {
         update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
         update.navigatorPreviewArtifact = null;
+        update.presentedPreviewArtifact = null;
         update.provisionalPreviewFrame = null;
         state.patchResidency.reset(update.imageSessionId);
       } else if (
@@ -551,10 +555,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
               });
         update.navigatorPreviewArtifact = null;
+        update.presentedPreviewArtifact = null;
         state.patchResidency.reset(update.imageSessionId);
       }
       if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
         update.navigatorPreviewArtifact = null;
+      }
+      if ('finalPreviewUrl' in update && !('presentedPreviewArtifact' in update)) {
+        update.presentedPreviewArtifact = null;
       }
       if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
         update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
