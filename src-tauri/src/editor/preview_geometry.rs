@@ -96,7 +96,7 @@ pub(crate) async fn preview_geometry_transform(
         .wrapping_add(u64::from(target_dim));
 
     let base_image_to_warp = {
-        let maybe_cached_image = state.geometry_cache.get(&visual_hash);
+        let maybe_cached_image = state.services.native_caches.geometry(visual_hash);
 
         if let Some(cached_image) = maybe_cached_image {
             cached_image.as_ref().clone()
