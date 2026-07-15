@@ -5,9 +5,13 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { DetailsAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildDetailEditTransaction,
+  DETAIL_BOOLEAN_NODE_ADJUSTMENTS,
   DETAIL_NODE_ADJUSTMENTS,
+  DETAIL_NUMBER_NODE_ADJUSTMENTS,
   type DetailCommitIdentity,
+  isDetailBooleanNodeAdjustment,
   isDetailNodeAdjustment,
+  isDetailNumberNodeAdjustment,
 } from '../../../src/utils/detailEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -84,17 +88,24 @@ describe('detail edit transaction', () => {
 
   test('owns the migrated Detail keys, exact no-ops, and stale source/session/revision rejection', () => {
     const state = useEditorStore.getState();
-    for (const field of DETAIL_NODE_ADJUSTMENTS) {
+    for (const field of DETAIL_NUMBER_NODE_ADJUSTMENTS) {
       expect(isDetailNodeAdjustment(field)).toBeTrue();
+      expect(isDetailNumberNodeAdjustment(field)).toBeTrue();
       expect(buildDetailEditTransaction(state, identity(), field, 0, `detail-${field}`).operations).toEqual([
         { nodeType: 'detail_denoise_dehaze', patch: { [field]: 0 }, type: 'patch-edit-document-node' },
       ]);
     }
-    for (const field of [
-      DetailsAdjustment.DeblurStrength,
-      DetailsAdjustment.SharpnessThreshold,
-      DetailsAdjustment.Structure,
-    ]) {
+    for (const field of DETAIL_BOOLEAN_NODE_ADJUSTMENTS) {
+      expect(isDetailNodeAdjustment(field)).toBeTrue();
+      expect(isDetailBooleanNodeAdjustment(field)).toBeTrue();
+      expect(buildDetailEditTransaction(state, identity(), field, true, `detail-${field}`).operations).toEqual([
+        { nodeType: 'detail_denoise_dehaze', patch: { [field]: true }, type: 'patch-edit-document-node' },
+      ]);
+    }
+    expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurEnabled);
+    expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurSigmaPx);
+    expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurStrength);
+    for (const field of [DetailsAdjustment.SharpnessThreshold, DetailsAdjustment.Structure]) {
       expect(isDetailNodeAdjustment(field)).toBeFalse();
     }
 

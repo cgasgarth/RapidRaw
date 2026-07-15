@@ -283,6 +283,10 @@ fn validate_scene_tone_parameter(
 struct DetailDenoiseDehazeV2 {
     clarity: f64,
     color_noise_reduction: f64,
+    // Optional only for v2 documents persisted before Deblur joined this node.
+    deblur_enabled: Option<bool>,
+    deblur_sigma_px: Option<f64>,
+    deblur_strength: Option<f64>,
     dehaze: f64,
     denoise_contrast_protection: f64,
     denoise_detail: f64,
@@ -618,6 +622,14 @@ impl PointColorV2 {
 
 impl DetailDenoiseDehazeV2 {
     fn validate(&self) -> Result<(), String> {
+        if self.deblur_strength.is_some_and(|value| {
+            !value.is_finite() || value.fract() != 0.0 || !(0.0..=100.0).contains(&value)
+        }) {
+            return Err(
+                "EditDocumentV2 detail_denoise_dehaze field 'deblurStrength' must be an integer within [0, 100]"
+                    .to_string(),
+            );
+        }
         for (field, value, minimum, maximum) in [
             ("clarity", self.clarity, -100.0, 100.0),
             (
@@ -650,6 +662,16 @@ impl DetailDenoiseDehazeV2 {
                 ));
             }
         }
+        if self
+            .deblur_sigma_px
+            .is_some_and(|value| !value.is_finite() || !(0.45..=1.35).contains(&value))
+        {
+            return Err(
+                "EditDocumentV2 detail_denoise_dehaze field 'deblurSigmaPx' must be finite and within [0.45, 1.35]"
+                    .to_string(),
+            );
+        }
+        let _ = self.deblur_enabled;
         Ok(())
     }
 }
@@ -1706,6 +1728,9 @@ mod tests {
         json!({
             "clarity": 16,
             "colorNoiseReduction": 0,
+            "deblurEnabled": true,
+            "deblurSigmaPx": 0.8,
+            "deblurStrength": 32,
             "dehaze": 8,
             "denoiseContrastProtection": 50,
             "denoiseDetail": 50,
@@ -2066,6 +2091,9 @@ mod tests {
             "colorNoiseReduction": 0,
             "contrast": 18,
             "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
+            "deblurEnabled": true,
+            "deblurSigmaPx": 0.8,
+            "deblurStrength": 32,
             "dehaze": 8,
             "denoiseContrastProtection": 50,
             "denoiseDetail": 50,
@@ -2339,6 +2367,18 @@ mod tests {
 
     #[test]
     fn detail_compiler_rejects_unowned_missing_and_out_of_range_params() {
+        let mut pre_deblur = document_with_legacy(json!({}));
+        let params = pre_deblur["nodes"]["detail_denoise_dehaze"]["params"]
+            .as_object_mut()
+            .expect("detail params object");
+        params.remove("deblurEnabled");
+        params.remove("deblurSigmaPx");
+        params.remove("deblurStrength");
+        serde_json::from_value::<EditDocumentV2>(pre_deblur)
+            .expect("pre-Deblur v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-Deblur v2 document remains compilable");
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["detail_denoise_dehaze"]["params"]["futureDetail"] = json!(true);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)
@@ -2365,6 +2405,21 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range detail field must fail");
         assert!(error.contains("lumaNoiseReduction"));
+
+        for (field, invalid) in [
+            ("deblurSigmaPx", json!(0.44)),
+            ("deblurSigmaPx", json!(1.36)),
+            ("deblurStrength", json!(101)),
+            ("deblurStrength", json!(32.5)),
+        ] {
+            let mut invalid_deblur = document_with_legacy(json!({}));
+            invalid_deblur["nodes"]["detail_denoise_dehaze"]["params"][field] = invalid;
+            let error = serde_json::from_value::<EditDocumentV2>(invalid_deblur)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("invalid deblur field must fail");
+            assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
+        }
     }
 
     #[test]

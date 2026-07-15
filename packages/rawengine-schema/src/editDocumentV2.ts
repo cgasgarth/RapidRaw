@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
-import { lensProfileDistortionParamsV1Schema, lensProfilePatchV1Schema } from './rawEngineSchemas.js';
+import {
+  detailDeblurUiControlsV1Schema,
+  lensProfileDistortionParamsV1Schema,
+  lensProfilePatchV1Schema,
+} from './rawEngineSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
@@ -24,6 +28,10 @@ export const editDocumentDetailDenoiseDehazeV2Schema = z
   .object({
     clarity: z.number().finite().min(-100).max(100),
     colorNoiseReduction: z.number().finite().min(0).max(100),
+    // Optional only for already-persisted v2 Detail nodes created before Deblur ownership.
+    deblurEnabled: detailDeblurUiControlsV1Schema.shape.deblurEnabled.optional(),
+    deblurSigmaPx: detailDeblurUiControlsV1Schema.shape.deblurSigmaPx.optional(),
+    deblurStrength: detailDeblurUiControlsV1Schema.shape.deblurStrength.optional(),
     dehaze: z.number().finite().min(-100).max(100),
     denoiseContrastProtection: z.number().finite().min(0).max(100),
     denoiseDetail: z.number().finite().min(0).max(100),
@@ -447,6 +455,9 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     defaultParams: {
       clarity: 0,
       colorNoiseReduction: 0,
+      deblurEnabled: false,
+      deblurSigmaPx: 0.8,
+      deblurStrength: 0,
       dehaze: 0,
       denoiseContrastProtection: 50,
       denoiseDetail: 50,
@@ -458,6 +469,9 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     legacyFields: [
       'clarity',
       'colorNoiseReduction',
+      'deblurEnabled',
+      'deblurSigmaPx',
+      'deblurStrength',
       'dehaze',
       'denoiseContrastProtection',
       'denoiseDetail',
