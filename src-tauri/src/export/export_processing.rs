@@ -1624,8 +1624,12 @@ async fn run_batch_export_pipeline(
         report.current_stage = Some(ExportStage::Planned);
     });
     let resources = PipelineResources::new(budget, diagnostics.clone());
-    let interactive_gpu_pressure =
-        Arc::clone(&app_handle.state::<AppState>().interactive_gpu_pressure);
+    let interactive_gpu_pressure = Arc::clone(
+        &app_handle
+            .state::<AppState>()
+            .services
+            .interactive_gpu_pressure,
+    );
     let gpu_lane = CooperativeGpuLane::with_interactive_gpu_pressure(
         budget.gpu_slots,
         diagnostics.clone(),

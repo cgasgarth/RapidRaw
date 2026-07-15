@@ -3,7 +3,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::app_state::PreviewJob;
-use crate::render::interactive_gpu_pressure::InteractiveGpuPressure;
+use crate::render::interactive_gpu_pressure::{
+    InteractiveGpuPressure, InteractiveGpuPressureLease,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PreviewQuality {
@@ -76,6 +78,7 @@ struct PendingPreviewSlots {
     shutdown: bool,
     active_quality: Option<PreviewQuality>,
     last_interactive_submission: Option<Instant>,
+    interactive_pressure_lease: Option<InteractiveGpuPressureLease>,
 }
 
 #[derive(Default)]
@@ -107,9 +110,7 @@ impl PreviewScheduler {
         let mut slots = self.pending.lock().unwrap();
         supersede_slot(slots.interactive.take(), generation);
         supersede_slot(slots.settled.take(), generation);
-        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
-            pressure.set_preview_pending(slots.active_quality == Some(PreviewQuality::Interactive));
-        }
+        self.sync_interactive_gpu_pressure(&mut slots);
         generation
     }
 
@@ -184,12 +185,7 @@ impl PreviewScheduler {
                 slots.settled.replace(request)
             }
         };
-        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
-            pressure.set_preview_pending(
-                slots.active_quality == Some(PreviewQuality::Interactive)
-                    || slots.interactive.is_some(),
-            );
-        }
+        self.sync_interactive_gpu_pressure(&mut slots);
         if displaced.is_some() {
             self.metrics
                 .pending_replacements
@@ -243,10 +239,8 @@ impl PreviewScheduler {
     pub fn finish(&self, quality: PreviewQuality, rendered: bool) {
         let mut slots = self.pending.lock().unwrap();
         slots.active_quality = None;
-        if quality == PreviewQuality::Interactive
-            && let Some(pressure) = self.interactive_gpu_pressure.as_ref()
-        {
-            pressure.set_preview_pending(slots.interactive.is_some());
+        if quality == PreviewQuality::Interactive {
+            self.sync_interactive_gpu_pressure(&mut slots);
         }
         drop(slots);
         if !rendered {
@@ -276,10 +270,26 @@ impl PreviewScheduler {
         slots.shutdown = true;
         stop_slot(slots.interactive.take());
         stop_slot(slots.settled.take());
-        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
-            pressure.set_preview_pending(false);
-        }
+        slots.interactive_pressure_lease.take();
         self.wake.notify_all();
+    }
+
+    fn sync_interactive_gpu_pressure(&self, slots: &mut PendingPreviewSlots) {
+        let pending = slots.active_quality == Some(PreviewQuality::Interactive)
+            || slots.interactive.is_some();
+        match (
+            pending,
+            slots.interactive_pressure_lease.is_some(),
+            self.interactive_gpu_pressure.as_ref(),
+        ) {
+            (true, false, Some(pressure)) => {
+                slots.interactive_pressure_lease = Some(pressure.acquire());
+            }
+            (false, true, _) => {
+                slots.interactive_pressure_lease.take();
+            }
+            _ => {}
+        }
     }
 
     fn abort_at(&self, id: PreviewRequestId, stage: PreviewStage) -> Result<(), PreviewAbort> {
@@ -433,7 +443,9 @@ mod tests {
         assert!(scheduler.submit(job(true).0).is_ok());
         assert!(pressure.has_pending_preview());
         let active = scheduler.next().expect("interactive request");
+        assert!(pressure.has_pending_preview());
         assert!(scheduler.submit(job(true).0).is_ok());
+        assert!(pressure.has_pending_preview());
         scheduler.finish(active.quality, true);
         assert!(pressure.has_pending_preview());
         let replacement = scheduler.next().expect("replacement request");
@@ -447,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn source_switch_clears_displaced_interactive_gpu_pressure() {
+    fn source_switch_releases_displaced_queue_but_preserves_active_pressure() {
         let pressure = Arc::new(InteractiveGpuPressure::default());
         let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
             PreviewSchedulingPolicy::default(),
@@ -460,6 +472,37 @@ mod tests {
         next_source.expected_image_path = "b.raw".to_string();
         assert!(scheduler.submit(next_source).is_ok());
 
+        assert!(!pressure.has_pending_preview());
+
+        let mut interactive = job(true).0;
+        interactive.expected_image_path = "b.raw".to_string();
+        assert!(scheduler.submit(interactive).is_ok());
+        let active = scheduler.next().expect("interactive request");
+        assert!(pressure.has_pending_preview());
+
+        let mut third_source = job(false).0;
+        third_source.expected_image_path = "c.raw".to_string();
+        assert!(scheduler.submit(third_source).is_ok());
+        assert!(pressure.has_pending_preview());
+        scheduler.finish(active.quality, false);
+        assert!(!pressure.has_pending_preview());
+    }
+
+    #[test]
+    fn invalidation_and_shutdown_release_queued_interactive_pressure() {
+        let pressure = Arc::new(InteractiveGpuPressure::default());
+        let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
+            PreviewSchedulingPolicy::default(),
+            Some(Arc::clone(&pressure)),
+        );
+        assert!(scheduler.submit(job(true).0).is_ok());
+        assert!(pressure.has_pending_preview());
+        scheduler.invalidate_current();
+        assert!(!pressure.has_pending_preview());
+
+        assert!(scheduler.submit(job(true).0).is_ok());
+        assert!(pressure.has_pending_preview());
+        scheduler.shutdown();
         assert!(!pressure.has_pending_preview());
     }
 
