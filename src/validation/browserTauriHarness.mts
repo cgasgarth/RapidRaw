@@ -744,9 +744,9 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
                 imageId: `path:${path}`,
                 imageSessionId: null,
                 path,
-                renderFingerprint: 1,
+                renderFingerprint: 'u64:0000000000000001',
                 sidecarRevision: `sha256:${'e'.repeat(64)}`,
-                thumbnailRevision: `sha256:${'f'.repeat(64)}`,
+                thumbnailRevision: 'f'.repeat(64),
                 transactionId: null,
               })),
             ),
@@ -773,9 +773,9 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             imageId: `path:${path}`,
             imageSessionId: (args?.['transaction'] as { imageSessionId?: unknown } | undefined)?.imageSessionId ?? null,
             path,
-            renderFingerprint: 1,
+            renderFingerprint: 'u64:0000000000000001',
             sidecarRevision: response?.sidecarRevision ?? `sha256:${'a'.repeat(64)}`,
-            thumbnailRevision: `sha256:${'d'.repeat(64)}`,
+            thumbnailRevision: 'd'.repeat(64),
             transactionId: (args?.['transaction'] as { transactionId?: unknown } | undefined)?.transactionId ?? null,
           });
         }, response?.delayMs ?? 0);
