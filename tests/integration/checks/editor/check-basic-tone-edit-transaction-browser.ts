@@ -13,7 +13,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ exposure: z.literal(0.65) }).passthrough(),
+    adjustments: z.object({ exposure: z.number() }).passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -70,20 +70,19 @@ const stopServer = async () => {
   ]);
 };
 
-const commitNumericControl = async (page: Page, testId: string, value: string) => {
-  await page.getByTestId(`${testId}-value`).click();
-  const input = page.getByTestId(`${testId}-input`);
-  await input.fill(value);
-  await input.press('Enter');
-  await page.getByTestId(`${testId}-value`).waitFor({ state: 'visible', timeout: 10_000 });
-};
-
 const saveCount = async (page: Page) =>
   page.evaluate(
     () =>
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
         ({ command }) => command === 'save_metadata_and_update_thumbnail',
       ).length ?? 0,
+  );
+
+const renderCount = async (page: Page) =>
+  page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
   );
 
 const waitForSaveCount = async (page: Page, expected: number) => {
@@ -135,10 +134,34 @@ try {
   ) {
     throw new Error(`Basic controls did not expose complete commit identity: ${JSON.stringify(identity)}`);
   }
+  const exposureRange = page.getByTestId('basic-control-exposure-range');
+  const rangeBox = await exposureRange.boundingBox();
+  if (rangeBox === null) throw new Error('Exposure range did not have layout bounds.');
+  const startX = rangeBox.x + rangeBox.width / 2;
+  const pointerY = rangeBox.y + rangeBox.height / 2;
   const baselineSaves = await saveCount(page);
-  await commitNumericControl(page, 'basic-control-exposure', '0.65');
+  const baselineRenders = await renderCount(page);
+  await page.mouse.move(startX, pointerY);
+  await page.mouse.down();
+  for (const fraction of [0.53, 0.56, 0.59, 0.62, 0.65]) {
+    await page.mouse.move(rangeBox.x + rangeBox.width * fraction, pointerY);
+    await page.waitForTimeout(60);
+  }
+  await page.waitForFunction(
+    (before) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0) >=
+      before + 2,
+    baselineRenders,
+    { timeout: 10_000 },
+  );
+  if ((await saveCount(page)) !== baselineSaves) {
+    throw new Error('Exposure drag persisted before its release boundary.');
+  }
+  await page.mouse.up();
   await waitForSaveCount(page, baselineSaves + 1);
-  if ((await page.getByTestId('basic-control-exposure-value').textContent())?.trim() !== '0.65') {
+  const committedExposure = Number((await page.getByTestId('basic-control-exposure-value').textContent())?.trim());
+  if (!Number.isFinite(committedExposure) || committedExposure === 0) {
     throw new Error('Exposure was not visibly committed.');
   }
 
@@ -151,6 +174,7 @@ try {
     ),
   );
   if (
+    persisted.adjustments.exposure !== committedExposure ||
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
     persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
@@ -160,12 +184,37 @@ try {
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
   if (!(await undo.isEnabled())) throw new Error('Exposure commit did not create an undo boundary.');
+  const undoBaselineSaves = await saveCount(page);
   await undo.click();
   await page.waitForFunction(
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0',
     undefined,
     { timeout: 10_000 },
   );
+  await waitForSaveCount(page, undoBaselineSaves + 1);
+  await page.waitForTimeout(320);
+
+  const cancelBaselineSaves = await saveCount(page);
+  const cancelBaselineRenders = await renderCount(page);
+  await page.mouse.move(startX, pointerY);
+  await page.mouse.down();
+  await page.mouse.move(rangeBox.x + rangeBox.width * 0.35, pointerY);
+  await page.waitForFunction(
+    (before) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0) > before,
+    cancelBaselineRenders,
+    { timeout: 10_000 },
+  );
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  if ((await saveCount(page)) !== cancelBaselineSaves) {
+    throw new Error('Cancelled exposure drag created a persistence transaction.');
+  }
+  if ((await page.getByTestId('basic-control-exposure-value').textContent())?.trim() !== '0') {
+    throw new Error('Cancelled exposure drag did not restore the canonical control value.');
+  }
 
   console.log('basic tone edit transaction browser ok');
 } catch (error) {

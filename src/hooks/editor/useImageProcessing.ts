@@ -16,6 +16,7 @@ import {
 } from '../../utils/adaptivePreviewQuality';
 import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
+import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
 import {
   EditedPreviewEffectRunner,
   type EditedPreviewExecutionContext,
@@ -79,8 +80,17 @@ export function useImageProcessing() {
   const previewViewportTransform = useEditorStore((state) => state.previewViewportTransform);
   const originalSize = useEditorStore((state) => state.originalSize);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const committedAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const basicToneSliderInteraction = useEditorStore((state) => state.basicToneSliderInteraction);
   const editorImageSession = useEditorStore((state) => state.imageSession);
-  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
+  const imageSessionId = useEditorStore((state) => state.imageSessionId);
+  const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
+    adjustmentRevision: committedAdjustmentRevision,
+    imageSession: editorImageSession,
+    imageSessionId,
+    selectedImage,
+  });
+  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
     imageSessionId: editorImageSession?.id ?? null,
     path: selectedImage?.path ?? null,
   });
@@ -94,7 +104,6 @@ export function useImageProcessing() {
     renderAdjustmentSnapshot === adjustmentSnapshot
       ? referenceMatchAdjustments
       : (renderAdjustmentSnapshot.value as Adjustments);
-  const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
@@ -381,12 +390,18 @@ export function useImageProcessing() {
     const selectedImage = editor.selectedImage;
     if (!selectedImage) return null;
     const sourceImagePath = selectedImage.path;
-    const scopeAdjustmentSnapshot = resolveAutoEditRenderSnapshot(
+    const basicToneScopeSnapshot = resolveBasicToneSliderRenderSnapshot(
       editor.adjustmentSnapshot,
+      editor.basicToneSliderInteraction,
+      editor,
+    );
+    const scopeAdjustmentSnapshot = resolveAutoEditRenderSnapshot(
+      basicToneScopeSnapshot,
       editor.autoEditPreviewSession,
       { imageSessionId: editor.imageSession?.id ?? null, path: sourceImagePath },
     );
-    const autoEditPreviewActive = scopeAdjustmentSnapshot !== editor.adjustmentSnapshot;
+    const autoEditPreviewActive = scopeAdjustmentSnapshot !== basicToneScopeSnapshot;
+    const basicTonePreviewActive = basicToneScopeSnapshot !== editor.adjustmentSnapshot;
 
     const dpr = getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio);
     const normalizedTargetRes = Math.max(1, Math.round(targetRes));
@@ -428,9 +443,11 @@ export function useImageProcessing() {
           maskRevision: scopeAdjustmentSnapshot.maskRevision,
           patchRevision: scopeAdjustmentSnapshot.patchRevision,
           proofRevision: editor.proofRevision,
-          proposalFingerprint: autoEditPreviewActive
-            ? (editor.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
-            : (editor.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
+          proposalFingerprint: basicTonePreviewActive
+            ? (editor.basicToneSliderInteraction?.interactionId ?? 'basic-tone-preview')
+            : autoEditPreviewActive
+              ? (editor.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
+              : (editor.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
         }),
         imageSessionId: editor.imageSessionId,
         maskRevision: scopeAdjustmentSnapshot.maskRevision,

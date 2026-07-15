@@ -32,6 +32,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
+import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
 import { buildCropEditTransaction } from '../../utils/cropEditTransaction';
 import {
   activeCropDraft,
@@ -219,9 +220,16 @@ export default function Editor({
   const adjustments = useEditorStore((s) => s.adjustments);
   const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
+  const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
   const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
   const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
-  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
+  const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
+    adjustmentRevision: committedAdjustmentRevision,
+    imageSession: editorImageSession,
+    imageSessionId: editorImageSessionGeneration,
+    selectedImage,
+  });
+  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
     imageSessionId: editorImageSession?.id ?? null,
     path: selectedImage?.path ?? null,
   });
@@ -253,6 +261,7 @@ export default function Editor({
     exportSoftProofRecipeId,
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
+    basicToneSliderPreviewIdentity: basicToneSliderInteraction?.interactionId ?? null,
     autoEditPreviewIdentity: autoEditPreviewSession?.previewIdentity ?? null,
     referenceMatchPreview: referenceMatchPreview
       ? {

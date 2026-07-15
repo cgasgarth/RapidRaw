@@ -97,7 +97,62 @@ test('touch promotion and cancellation share the exact once drag boundary', asyn
   expect(requiredRange(view.container).value).toBe('10');
 });
 
-async function renderSlider(value: number, changes: number[], dragStates: boolean[]) {
+test('explicit lifecycle previews many pointer values but commits or cancels exactly once', async () => {
+  const changes: number[] = [];
+  const dragStates: boolean[] = [];
+  const lifecycle: string[] = [];
+  const view = await renderSlider(10, changes, dragStates, lifecycle);
+  const range = requiredRange(view.container);
+  range.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
+
+  await act(async () => {
+    range.dispatchEvent(mouseEvent('mousedown', 20));
+    window.dispatchEvent(mouseEvent('mousemove', 35));
+    window.dispatchEvent(mouseEvent('mousemove', 60));
+    window.dispatchEvent(mouseEvent('mouseup', 60));
+    await flushPromises();
+  });
+  expect(changes.length).toBeGreaterThanOrEqual(3);
+  expect(lifecycle).toEqual(['start', 'commit']);
+
+  lifecycle.length = 0;
+  await act(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 310));
+    range.dispatchEvent(mouseEvent('mousedown', 40));
+    window.dispatchEvent(mouseEvent('mousemove', 50));
+    window.dispatchEvent(new window.Event('blur'));
+    window.dispatchEvent(mouseEvent('mouseup', 50));
+    await flushPromises();
+  });
+  expect(lifecycle).toEqual(['start', 'cancel']);
+});
+
+test('typed numeric text commits once without creating a transient preview interaction', async () => {
+  const changes: number[] = [];
+  const dragStates: boolean[] = [];
+  const lifecycle: string[] = [];
+  const view = await renderSlider(10, changes, dragStates, lifecycle);
+  const valueButton = view.container.querySelector<HTMLElement>('[data-testid="draft-slider-value"]');
+  if (valueButton === null) throw new Error('Expected numeric value button.');
+
+  await act(async () => {
+    valueButton.click();
+    await flushPromises();
+  });
+  const input = view.container.querySelector<HTMLInputElement>('[data-testid="draft-slider-input"]');
+  if (input === null) throw new Error('Expected numeric value input.');
+  await act(async () => {
+    input.value = '42';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    input.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    await flushPromises();
+  });
+
+  expect(changes).toEqual([42]);
+  expect(lifecycle).toEqual([]);
+});
+
+async function renderSlider(value: number, changes: number[], dragStates: boolean[], lifecycle?: string[]) {
   installDom();
   const translations = await createTestI18n();
   const container = document.createElement('div');
@@ -116,6 +171,9 @@ async function renderSlider(value: number, changes: number[], dragStates: boolea
             min: 0,
             onChange: (event: SliderChangeEvent) => changes.push(Number(event.target.value)),
             onDragStateChange: (state: boolean) => dragStates.push(state),
+            onInteractionCancel: lifecycle ? () => lifecycle.push('cancel') : undefined,
+            onInteractionCommit: lifecycle ? () => lifecycle.push('commit') : undefined,
+            onInteractionStart: lifecycle ? () => lifecycle.push('start') : undefined,
             step: 1,
             testId: 'draft-slider',
             value: nextValue,
