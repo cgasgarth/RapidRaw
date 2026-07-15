@@ -125,15 +125,32 @@ struct CoordinatorInner {
     frame_generation: u64,
     settled_frame_published: bool,
     collection_generation: u64,
-    in_flight: HashMap<String, Arc<Notify>>,
+    in_flight: HashMap<String, InFlightPrefetch>,
     diagnostics: ImageOpenDiagnostics,
     embedded_preview_cache: HashMap<String, Arc<ExtractedEmbeddedPreview>>,
     embedded_preview_cache_order: VecDeque<String>,
     embedded_preview_cache_bytes: usize,
 }
 
+struct InFlightPrefetch {
+    identity: PrefetchOperationIdentity,
+    notify: Arc<Notify>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PrefetchOperationIdentity {
+    collection_generation: u64,
+    cancellation_generation: usize,
+}
+
+struct ScheduledPrefetch {
+    path: String,
+    notify: Arc<Notify>,
+    identity: PrefetchOperationIdentity,
+}
+
 #[derive(Clone)]
-pub struct ImageOpenCoordinator {
+pub(crate) struct ImageOpenCoordinator {
     inner: Arc<Mutex<CoordinatorInner>>,
     prefetch_generation: Arc<AtomicUsize>,
 }
@@ -170,10 +187,14 @@ impl ImageOpenCoordinator {
         inner.settled_frame_published = false;
         inner.diagnostics.foreground_opens += 1;
         inner.diagnostics.metadata_reads += 1;
-        let joined = inner.in_flight.get(&prefetch_key(path)).cloned();
+        let joined = inner
+            .in_flight
+            .get(&prefetch_key(path))
+            .map(|prefetch| Arc::clone(&prefetch.notify));
         if joined.is_some() {
             inner.diagnostics.prefetch_promotions += 1;
         } else {
+            Self::cancel_in_flight(&mut inner);
             self.prefetch_generation.fetch_add(1, Ordering::SeqCst);
         }
         Ok(joined)
@@ -303,14 +324,11 @@ impl ImageOpenCoordinator {
         preview
     }
 
-    fn schedule(
-        &self,
-        request: &ScheduleImagePrefetchRequest,
-    ) -> Vec<(String, Arc<Notify>, usize)> {
+    fn schedule(&self, request: &ScheduleImagePrefetchRequest) -> Vec<ScheduledPrefetch> {
         let mut inner = self.inner.lock().unwrap();
         if request.collection_generation != inner.collection_generation {
             inner.collection_generation = request.collection_generation;
-            inner.diagnostics.prefetch_cancelled += inner.in_flight.len() as u64;
+            Self::cancel_in_flight(&mut inner);
             self.prefetch_generation.fetch_add(1, Ordering::SeqCst);
         }
         let cancellation_generation = self.prefetch_generation.load(Ordering::SeqCst);
@@ -336,24 +354,53 @@ impl ImageOpenCoordinator {
                 break;
             }
             let notify = Arc::new(Notify::new());
-            inner.in_flight.insert(key, Arc::clone(&notify));
+            let identity = PrefetchOperationIdentity {
+                collection_generation: request.collection_generation,
+                cancellation_generation,
+            };
+            inner.in_flight.insert(
+                key,
+                InFlightPrefetch {
+                    identity,
+                    notify: Arc::clone(&notify),
+                },
+            );
             inner.diagnostics.prefetch_started += 1;
             inner.diagnostics.peak_prefetch_in_flight = inner
                 .diagnostics
                 .peak_prefetch_in_flight
                 .max(inner.in_flight.len());
-            scheduled.push((path.clone(), notify, cancellation_generation));
+            scheduled.push(ScheduledPrefetch {
+                path: path.clone(),
+                notify,
+                identity,
+            });
         }
         scheduled
     }
 
-    fn finish_prefetch(&self, path: &str, generation: u64, completed: bool) {
+    fn finish_prefetch(&self, path: &str, identity: PrefetchOperationIdentity, completed: bool) {
         let mut inner = self.inner.lock().unwrap();
-        inner.in_flight.remove(&prefetch_key(path));
-        if generation != inner.collection_generation || !completed {
+        let key = prefetch_key(path);
+        let owns_entry = inner
+            .in_flight
+            .get(&key)
+            .is_some_and(|prefetch| prefetch.identity == identity);
+        if !owns_entry {
+            return;
+        }
+        inner.in_flight.remove(&key);
+        if identity.collection_generation != inner.collection_generation || !completed {
             inner.diagnostics.prefetch_cancelled += 1;
         } else {
             inner.diagnostics.prefetch_completed += 1;
+        }
+    }
+
+    fn cancel_in_flight(inner: &mut CoordinatorInner) {
+        inner.diagnostics.prefetch_cancelled += inner.in_flight.len() as u64;
+        for (_, prefetch) in inner.in_flight.drain() {
+            prefetch.notify.notify_one();
         }
     }
 
@@ -402,13 +449,13 @@ pub async fn begin_image_open(
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     promote_editor_initialization(&app);
     let joined = state
-        .image_open_coordinator
+        .image_open()
         .begin_foreground(&request.session_id, &request.path)?;
     if let Some(notify) = &joined {
         let _ = tokio::time::timeout(Duration::from_secs(30), notify.notified()).await;
     }
     if !state
-        .image_open_coordinator
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         let _ = app.emit(
@@ -446,7 +493,7 @@ pub async fn begin_image_open(
         None
     };
     if crate::formats::is_raw_file(&request.path) {
-        let preview_coordinator = state.image_open_coordinator.clone();
+        let preview_coordinator = state.image_open().clone();
         preview_coordinator.record_embedded_attempt();
         let preview_source_path = source_path.clone();
         let preview_session = request.session_id.clone();
@@ -563,7 +610,7 @@ pub async fn begin_image_open(
         });
     }
     if !state
-        .image_open_coordinator
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
@@ -579,14 +626,14 @@ pub async fn begin_image_open(
     )
     .await?;
     if !state
-        .image_open_coordinator
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
     }
     let decode_ready_millis = started.elapsed().as_millis() as u64;
     let frame_generation = state
-        .image_open_coordinator
+        .image_open()
         .claim_frame(
             &request.session_id,
             &request.path,
@@ -642,10 +689,15 @@ pub fn schedule_image_prefetch(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> ImageOpenDiagnostics {
-    let generation = request.collection_generation;
-    for (path, notify, cancellation_generation) in state.image_open_coordinator.schedule(&request) {
+    for scheduled in state.image_open().schedule(&request) {
+        let ScheduledPrefetch {
+            path,
+            notify,
+            identity,
+        } = scheduled;
         let task_app = app.clone();
-        let cancellation = Arc::clone(&state.image_open_coordinator.prefetch_generation);
+        let cancellation = Arc::clone(&state.image_open().prefetch_generation);
+        let cancellation_generation = identity.cancellation_generation;
         tauri::async_runtime::spawn(async move {
             let task_state = task_app.state::<AppState>();
             let completed = prefetch_image(
@@ -657,17 +709,17 @@ pub fn schedule_image_prefetch(
             .await
             .is_ok();
             task_state
-                .image_open_coordinator
-                .finish_prefetch(&path, generation, completed);
+                .image_open()
+                .finish_prefetch(&path, identity, completed);
             notify.notify_one();
         });
     }
-    state.image_open_coordinator.report()
+    state.image_open().report()
 }
 
 #[tauri::command]
 pub fn get_image_open_diagnostics(state: State<'_, AppState>) -> ImageOpenDiagnostics {
-    state.image_open_coordinator.report()
+    state.image_open().report()
 }
 
 #[cfg(test)]
@@ -738,6 +790,96 @@ mod tests {
     }
 
     #[test]
+    fn stale_completion_cannot_evict_same_path_from_new_collection() {
+        let coordinator = ImageOpenCoordinator::default();
+        let first = coordinator.schedule(&ScheduleImagePrefetchRequest {
+            collection_generation: 1,
+            candidates: vec!["same.raw".into()],
+            memory_pressure: false,
+            workload_busy: false,
+        });
+        let first_identity = first[0].identity;
+        let second = coordinator.schedule(&ScheduleImagePrefetchRequest {
+            collection_generation: 2,
+            candidates: vec!["same.raw".into()],
+            memory_pressure: false,
+            workload_busy: false,
+        });
+        let second_identity = second[0].identity;
+        assert_ne!(first_identity, second_identity);
+
+        coordinator.finish_prefetch("same.raw", first_identity, false);
+        assert!(
+            coordinator
+                .schedule(&ScheduleImagePrefetchRequest {
+                    collection_generation: 2,
+                    candidates: vec!["same.raw".into()],
+                    memory_pressure: false,
+                    workload_busy: false,
+                })
+                .is_empty()
+        );
+
+        coordinator.finish_prefetch("same.raw", second_identity, true);
+        assert_eq!(
+            coordinator
+                .schedule(&ScheduleImagePrefetchRequest {
+                    collection_generation: 2,
+                    candidates: vec!["same.raw".into()],
+                    memory_pressure: false,
+                    workload_busy: false,
+                })
+                .len(),
+            1
+        );
+        let report = coordinator.report();
+        assert_eq!(report.prefetch_cancelled, 1);
+        assert_eq!(report.prefetch_completed, 1);
+    }
+
+    #[test]
+    fn foreground_miss_releases_cancelled_prefetch_for_rescheduling() {
+        let coordinator = ImageOpenCoordinator::default();
+        let first = coordinator.schedule(&ScheduleImagePrefetchRequest {
+            collection_generation: 1,
+            candidates: vec!["prefetch.raw".into()],
+            memory_pressure: false,
+            workload_busy: false,
+        });
+        let first_identity = first[0].identity;
+        let foreground = ImageOpenSessionId {
+            selection_generation: 1,
+            image_session: 1,
+        };
+        assert!(
+            coordinator
+                .begin_foreground(&foreground, "foreground.raw")
+                .unwrap()
+                .is_none()
+        );
+
+        let replacement = coordinator.schedule(&ScheduleImagePrefetchRequest {
+            collection_generation: 1,
+            candidates: vec!["prefetch.raw".into()],
+            memory_pressure: false,
+            workload_busy: false,
+        });
+        assert_eq!(replacement.len(), 1);
+        coordinator.finish_prefetch("prefetch.raw", first_identity, false);
+        assert!(
+            coordinator
+                .schedule(&ScheduleImagePrefetchRequest {
+                    collection_generation: 1,
+                    candidates: vec!["prefetch.raw".into()],
+                    memory_pressure: false,
+                    workload_busy: false,
+                })
+                .is_empty()
+        );
+        assert_eq!(coordinator.report().prefetch_cancelled, 1);
+    }
+
+    #[test]
     fn collection_change_and_unmatched_foreground_invalidate_decode_tokens() {
         let coordinator = ImageOpenCoordinator::default();
         let first = coordinator.schedule(&ScheduleImagePrefetchRequest {
@@ -746,14 +888,14 @@ mod tests {
             memory_pressure: false,
             workload_busy: false,
         });
-        let first_token = first[0].2;
+        let first_token = first[0].identity.cancellation_generation;
         let second = coordinator.schedule(&ScheduleImagePrefetchRequest {
             collection_generation: 2,
             candidates: vec!["new.raw".into()],
             memory_pressure: false,
             workload_busy: false,
         });
-        assert_ne!(first_token, second[0].2);
+        assert_ne!(first_token, second[0].identity.cancellation_generation);
 
         let session = ImageOpenSessionId {
             selection_generation: 1,
@@ -763,7 +905,7 @@ mod tests {
             .begin_foreground(&session, "foreground.raw")
             .unwrap();
         assert_ne!(
-            second[0].2,
+            second[0].identity.cancellation_generation,
             coordinator.prefetch_generation.load(Ordering::SeqCst)
         );
     }
