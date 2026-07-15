@@ -35,8 +35,12 @@ export interface DetailCommitIdentity {
 export interface DetailEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: DetailEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const isDetailNodeAdjustment = (key: DetailsAdjustment): key is DetailNodeAdjustment =>
   DETAIL_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
@@ -59,8 +63,8 @@ export const buildDetailEditTransaction = <Key extends DetailNodeAdjustment>(
       `detail_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(`detail_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`);
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`detail_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(

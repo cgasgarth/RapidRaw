@@ -35,8 +35,12 @@ export interface DisplayCreativeCommitIdentity {
 export interface DisplayCreativeEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: DisplayCreativeEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const isDisplayCreativeNodeAdjustment = (key: string): key is DisplayCreativeNodeAdjustment =>
   DISPLAY_CREATIVE_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
@@ -60,9 +64,9 @@ export const buildDisplayCreativePatchEditTransaction = (
       `display_creative_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `display_creative_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `display_creative_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
