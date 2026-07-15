@@ -805,7 +805,7 @@ impl<W: Write> Write for DigestingWriter<W> {
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    get_or_load_lut, hydrate_adjustments, load_settings_or_default, resolve_warped_image_for_masks,
+    hydrate_adjustments, load_settings_or_default, resolve_warped_image_for_masks,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -921,7 +921,7 @@ fn prepare_export_render_inputs(
         .insert("showClipping".into(), Value::Bool(false));
     let lut = effective_adjustments["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let revision = content_revision(
         &effective_adjustments,
         0,

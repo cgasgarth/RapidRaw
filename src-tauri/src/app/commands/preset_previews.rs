@@ -10,9 +10,9 @@ use crate::{
     AppState, CommunityPreset, Crop, MaskDefinition, RenderRequest, adjustment_fields,
     calculate_transform_hash, downscale_f32_image, encode_jpeg_response, generate_mask_bitmap,
     generate_transformed_preview, get_cached_or_generate_mask, get_or_init_gpu_context,
-    get_or_load_lut, is_raw_file, load_settings_or_default,
-    normalize_film_look_adjustments_for_render, parse_virtual_path, process_and_get_dynamic_image,
-    render_pipeline, resolve_tonemapper_override_from_handle,
+    is_raw_file, load_settings_or_default, normalize_film_look_adjustments_for_render,
+    parse_virtual_path, process_and_get_dynamic_image, render_pipeline,
+    resolve_tonemapper_override_from_handle,
 };
 
 fn scale_crop_adjustment(adjustments: &serde_json::Value, scale: f32) -> serde_json::Value {
@@ -107,7 +107,7 @@ pub(crate) fn generate_preset_preview(
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let lut = lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         render_adjustments.as_ref(),
         &loaded_image.path,
@@ -245,7 +245,8 @@ pub(crate) async fn generate_all_community_previews(
             let render_adjustments =
                 normalize_film_look_adjustments_for_render(&scaled_adjustments);
             let lut_path = render_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut =
+                lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
                 render_adjustments.as_ref(),
                 &preset.name,

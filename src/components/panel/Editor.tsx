@@ -84,6 +84,10 @@ import { buildParametricMaskTargetEditTransaction } from '../../utils/parametric
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
+import {
+  buildSubMaskInteractionEditTransaction,
+  type SubMaskInteractionIdentity,
+} from '../../utils/subMaskInteractionEditTransaction';
 import { debounce } from '../../utils/timing';
 import {
   applyWhiteBalancePickerHoverPreview,
@@ -486,20 +490,11 @@ export default function Editor({
   );
 
   const updateSubMaskLocal = useCallback(
-    (subMaskId: string | null, updatedData: Partial<SubMask>) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        masks: prev.masks.map((c: MaskContainer) => ({
-          ...c,
-          subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-        aiPatches: prev.aiPatches.map((p: AiPatch) => ({
-          ...p,
-          subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-      }));
+    (subMaskId: string | null, updatedData: Partial<SubMask>, identity: SubMaskInteractionIdentity) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(buildSubMaskInteractionEditTransaction(state, identity, subMaskId, updatedData));
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleWbPicked = useCallback(

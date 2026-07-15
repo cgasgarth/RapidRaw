@@ -1070,7 +1070,7 @@ fn generate_thumbnail_data_with_target(
         let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
         let lut = meta.adjustments["lutPath"]
             .as_str()
-            .and_then(|path| crate::get_or_load_lut(&state, path).ok());
+            .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
         let revision = content_revision(
             &meta.adjustments,
             0,

@@ -26,7 +26,7 @@ use crate::render::preview_frame_cache_service::CachedPreview;
 use crate::render_plan::{
     CompileRenderPlanContext, RenderPlanRevision, compile_render_plan_cached, content_revision,
 };
-use crate::{get_or_load_lut, render_caches, render_pipeline};
+use crate::{render_caches, render_pipeline};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NativePreviewPresentationReason {
@@ -191,7 +191,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let lut = adjustments_clone["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(&state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let settings_revision = u64::from(tm_override.unwrap_or(0));
     let revision = viewer_sample_graph_revision.map_or_else(
         || {

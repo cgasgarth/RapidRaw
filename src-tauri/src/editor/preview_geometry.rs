@@ -19,8 +19,8 @@ use crate::image_processing::{
 };
 use crate::render::render_caches;
 use crate::render::render_plan::compile_consumer_render_plan;
+use crate::resolve_tonemapper_override_from_handle;
 use crate::{calculate_transform_hash, calculate_visual_hash};
-use crate::{get_or_load_lut, resolve_tonemapper_override_from_handle};
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -164,7 +164,8 @@ pub(crate) async fn preview_geometry_transform(
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
             let lut_path = temp_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut =
+                lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
                 &temp_adjustments,
                 &loaded_image_path,
