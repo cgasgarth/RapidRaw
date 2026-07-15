@@ -81,6 +81,7 @@ try {
   await validateCompactMixerSurface(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
   await validateColorBalanceRgbTransaction(rendered.container);
+  await validateLevelsTransaction(rendered.container);
   await validateColorRangeLocalAdjustmentTransaction(rendered.container);
   await validateOutputFocusEvent(rendered.container, true);
 
@@ -577,6 +578,71 @@ async function validateColorBalanceRgbTransaction(container: Element) {
   assert.equal(fullReset.adjustmentRevision, beforeFullReset.adjustmentRevision + 1);
   assert.equal(fullReset.history.length, beforeFullReset.history.length + 1);
   assert.deepEqual(fullReset.adjustments.colorBalanceRgb, INITIAL_ADJUSTMENTS.colorBalanceRgb);
+}
+
+async function validateLevelsTransaction(container: Element) {
+  const disclosure = getByTestId<HTMLDetailsElement>(container, 'advanced-color-disclosure');
+  const summary = disclosure.querySelector<HTMLElement>('summary');
+  assert.ok(summary, 'Levels disclosure summary was not rendered.');
+  await click(summary);
+
+  await act(async () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:levels-rendered-before',
+      transformedOriginalUrl: 'blob:levels-transformed-before',
+    });
+    await flushPromises();
+  });
+  const beforeToggle = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'color-levels-toggle'));
+  const toggled = useEditorStore.getState();
+  assert.equal(toggled.adjustmentRevision, beforeToggle.adjustmentRevision + 1);
+  assert.equal(toggled.history.length, beforeToggle.history.length + 1);
+  assert.equal(toggled.adjustments.levels.enabled, true);
+  assert.equal(toggled.lastEditApplicationReceipt?.source, 'manual-control');
+  assert.equal(toggled.finalPreviewUrl, null, 'Levels toggle must invalidate rendered output.');
+  assert.equal(toggled.transformedOriginalUrl, null, 'Levels toggle must invalidate transformed output.');
+
+  const changeLevel = async (label: string, value: number, key: Exclude<keyof Adjustments['levels'], 'enabled'>) => {
+    const control = getRangeByLabel(getByTestId(container, 'color-levels-controls'), label);
+    assert.ok(control, `${label} Levels slider was not rendered.`);
+    const before = useEditorStore.getState();
+    await changeRange(control, value);
+    const committed = useEditorStore.getState();
+    assert.equal(committed.adjustmentRevision, before.adjustmentRevision + 1, `${label} must advance one revision.`);
+    assert.equal(committed.history.length, before.history.length + 1, `${label} must append one history entry.`);
+    assert.equal(committed.lastEditApplicationReceipt?.source, 'manual-control');
+    assert.equal(Math.round(committed.adjustments.levels[key] * 100), value);
+  };
+
+  await changeLevel('Input Black', 8, 'inputBlack');
+  await changeLevel('Input White', 92, 'inputWhite');
+  await changeLevel('Gamma', 125, 'gamma');
+  await changeLevel('Output Black', 3, 'outputBlack');
+  await changeLevel('Output White', 97, 'outputWhite');
+
+  const beforeReset = useEditorStore.getState();
+  const editedLevels = structuredClone(beforeReset.adjustments.levels);
+  await click(getByTestId<HTMLButtonElement>(container, 'color-levels-reset'));
+  const reset = useEditorStore.getState();
+  assert.equal(reset.adjustmentRevision, beforeReset.adjustmentRevision + 1);
+  assert.equal(reset.history.length, beforeReset.history.length + 1);
+  assert.deepEqual(reset.adjustments.levels, INITIAL_ADJUSTMENTS.levels);
+
+  await act(async () => {
+    useEditorStore.getState().undo();
+    await flushPromises();
+  });
+  assert.deepEqual(useEditorStore.getState().adjustments.levels, editedLevels);
+  assert.equal(
+    getRangeByLabel(getByTestId(container, 'color-levels-controls'), 'Gamma')?.value,
+    '125',
+    'Rendered Undo must restore the complete edited Levels document.',
+  );
+  await act(async () => {
+    useEditorStore.getState().redo();
+    await flushPromises();
+  });
 }
 
 async function validateColorRangeLocalAdjustmentTransaction(container: Element) {
