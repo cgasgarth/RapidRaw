@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
   ApprovalClass,
@@ -12,7 +13,7 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -70,14 +71,14 @@ export const agentGeometryApplyRequestSchema = z
 
 export const agentGeometryApplyResponseSchema = z
   .object({
-    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
-    changedPixelCount: z.number().int().positive(),
+    changedPixelCount: z.number().int().nonnegative(),
     receipt: z
       .object({
-        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        adjustedFields: z.array(z.string().trim().min(1)),
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
@@ -145,7 +146,7 @@ const estimateGeometryPixelChange = ({
   const changedFieldCount = GEOMETRY_KEYS.filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   ).length;
-  return Math.max(1, Math.round((imageArea / 256) * Math.max(1, changedFieldCount)));
+  return changedFieldCount === 0 ? 0 : Math.max(1, Math.round((imageArea / 256) * changedFieldCount));
 };
 
 const buildGeometryPatchOperations = (
@@ -214,18 +215,20 @@ const buildAgentGeometryEditGraphCommand = ({
     },
   });
 
-const dispatchTypedGeometryEditGraphApply = async ({
-  expectedGraphRevision,
-  imagePath,
-  operations,
-  request,
-}: {
-  expectedGraphRevision: string;
-  imagePath: string;
-  operations: EditGraphParameterPatchOperationV1[];
-  request: AgentGeometryApplyRequest;
-}): Promise<EditGraphMutationResultV1> => {
-  const bridge = createLiveEditorAppServerBridge();
+const dispatchTypedGeometryEditGraphApply = async (
+  {
+    expectedGraphRevision,
+    imagePath,
+    operations,
+    request,
+  }: {
+    expectedGraphRevision: string;
+    imagePath: string;
+    operations: EditGraphParameterPatchOperationV1[];
+    request: AgentGeometryApplyRequest;
+  },
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
+): Promise<EditGraphMutationResultV1> => {
   const dryRunCommand = buildAgentGeometryEditGraphCommand({
     commandId: `${request.operationId}_dry_run`,
     dryRun: true,
@@ -254,7 +257,10 @@ const dispatchTypedGeometryEditGraphApply = async ({
   return editGraphMutationResultV1Schema.parse(apply.result);
 };
 
-export const applyAgentGeometry = async (request: AgentGeometryApplyRequest): Promise<AgentGeometryApplyResponse> => {
+export const applyAgentGeometry = async (
+  request: AgentGeometryApplyRequest,
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
+): Promise<AgentGeometryApplyResponse> => {
   const parsedRequest = agentGeometryApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
   if (parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash) {
@@ -264,27 +270,33 @@ export const applyAgentGeometry = async (request: AgentGeometryApplyRequest): Pr
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent geometry apply requires a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Agent geometry apply requires a selected image session.');
 
   const beforeAdjustments = state.adjustments;
   const undoGraphRevision = `history_${state.historyIndex}`;
   const operations = buildGeometryPatchOperations(beforeAdjustments, parsedRequest.geometry);
-  const typedMutation = await dispatchTypedGeometryEditGraphApply({
-    expectedGraphRevision: undoGraphRevision,
-    imagePath: selectedImage.path,
-    operations,
-    request: parsedRequest,
-  });
+  const typedMutation = await dispatchTypedGeometryEditGraphApply(
+    {
+      expectedGraphRevision: undoGraphRevision,
+      imagePath: selectedImage.path,
+      operations,
+      request: parsedRequest,
+    },
+    bridge,
+  );
   const nextAdjustments = applyGeometryPatchToAdjustments(beforeAdjustments, parsedRequest.geometry);
-  const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-  useEditorStore.setState({
-    adjustments: nextAdjustments,
-    history: history.history,
-    historyIndex: history.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  });
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+  );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
-  const adjustedFields = GEOMETRY_KEYS.filter((key) => parsedRequest.geometry[key] !== undefined);
+  const adjustedFields = GEOMETRY_KEYS.filter(
+    (key) =>
+      parsedRequest.geometry[key] !== undefined &&
+      JSON.stringify(beforeAdjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+  );
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
   return agentGeometryApplyResponseSchema.parse({
