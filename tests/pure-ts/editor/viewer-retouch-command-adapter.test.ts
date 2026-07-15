@@ -14,6 +14,7 @@ const current = (overrides: Partial<ViewerRetouchCurrentContext> = {}): ViewerRe
   layerId: 'layer:1',
   layerRevision: 'layer-revision:7',
   mode: 'clone',
+  sourceIdentity: '/raw/a.ARW',
   sourceRevision: 'graph:9',
   toolId: 'retouch-handles',
   ...overrides,
