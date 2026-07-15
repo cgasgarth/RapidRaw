@@ -579,7 +579,7 @@ mod tests {
             .build()
             .unwrap();
         let state = app.state::<crate::app_state::AppState>();
-        state.services.panorama.begin_plan(
+        state.computational().panorama().begin_plan(
             vec!["a".into(), "b".into()],
             "ipc-cancel".into(),
             Arc::new(AlignmentCancellation::default()),
@@ -599,6 +599,6 @@ mod tests {
         )
         .expect("panorama cancel IPC response");
 
-        assert!(!state.services.panorama.cancel("ipc-cancel"));
+        assert!(!state.computational().panorama().cancel("ipc-cancel"));
     }
 }
