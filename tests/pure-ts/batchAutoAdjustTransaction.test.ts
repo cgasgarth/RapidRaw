@@ -212,6 +212,53 @@ describe('Batch Auto Adjust transaction boundary', () => {
     expect(resolve({ ...identity, imageSessionId: 'successor' }, { ...acceptedAdjustments, exposure: 0.8 })).toBeNull();
   });
 
+  test('rejects a deferred legacy history snapshot after newer mixer transactions', () => {
+    const deferred = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 8 };
+    useEditorStore.getState().setEditor({ adjustments: deferred });
+    const deferredIdentity = {
+      adjustmentRevision: useEditorStore.getState().adjustmentRevision,
+      imageSessionId: session.id,
+    };
+    const enableIdentity = { ...identity, adjustmentRevision: deferredIdentity.adjustmentRevision };
+    const enabled = {
+      ...deferred,
+      blackWhiteMixer: { ...deferred.blackWhiteMixer, enabled: true, process: 'continuous_sensitivity_v1' as const },
+    };
+    useEditorStore.getState().applyEditTransaction(
+      buildSelectedBatchAutoAdjustTransaction({
+        acceptedAdjustments: enabled,
+        captured: enableIdentity,
+        current: enableIdentity,
+        result: applied,
+      }) ??
+        (() => {
+          throw new Error('Expected enable transaction.');
+        })(),
+    );
+    const responseState = useEditorStore.getState();
+    const response = {
+      ...responseState.adjustments,
+      blackWhiteMixer: {
+        ...responseState.adjustments.blackWhiteMixer,
+        weights: { ...responseState.adjustments.blackWhiteMixer.weights, reds: 32 },
+      },
+    };
+    responseState.applyEditTransaction({
+      baseAdjustmentRevision: responseState.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: session.id,
+      operations: [{ adjustments: response, type: 'replace-adjustments' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'black-white-response',
+    });
+
+    useEditorStore.getState().pushHistory(deferred, deferredIdentity);
+    expect(useEditorStore.getState().history).toHaveLength(3);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.blackWhiteMixer).toEqual(enabled.blackWhiteMixer);
+  });
+
   test('protects same-path successor hydration before accepting unchanged state or rejecting a newer edit', () => {
     const successor = { ...identity, adjustmentRevision: 4, imageSessionId: 'successor-a' };
     expect(

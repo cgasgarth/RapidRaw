@@ -267,7 +267,7 @@ interface EditorState {
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
   applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
-  pushHistory: (newAdjustments: Adjustments) => void;
+  pushHistory: (newAdjustments: Adjustments, expected: { adjustmentRevision: number; imageSessionId: string }) => void;
   renameHistoryCheckpoint: (checkpointId: string, label: string) => void;
   undo: () => void;
   redo: () => void;
@@ -754,8 +754,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  pushHistory: (newAdj) => {
+  pushHistory: (newAdj, expected) => {
     set((state) => {
+      const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+      if (
+        state.adjustmentRevision !== expected.adjustmentRevision ||
+        currentImageSessionId !== expected.imageSessionId ||
+        !areAdjustmentsEqual(state.adjustments, newAdj)
+      ) {
+        return {};
+      }
       const nextHistory = pushEditHistoryEntryWithCheckpoints(
         state.history,
         state.historyIndex,
