@@ -80,6 +80,7 @@ impl<C: Clone, D> GpuContextServiceCore<C, D> {
         Some(state.coordinator.clone())
     }
 
+    #[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
     fn install_coordinator(&self, coordinator: Arc<D>) -> Option<C> {
         let mut state = self.state.lock().expect("GPU context state poisoned");
         state.coordinator = Some(coordinator);
@@ -168,6 +169,7 @@ impl GpuContextService {
         self.core.publish_context(token, context)
     }
 
+    #[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
     pub(crate) fn install_coordinator(
         &self,
         coordinator: Arc<DisplayTargetCoordinator>,
