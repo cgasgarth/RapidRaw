@@ -42,6 +42,10 @@ export class PresentedPreviewReleaseCoordinator {
     this.pendingByUrl.set(pendingUrl, { channel, successorUrl });
   }
 
+  hasPendingRelease(url: string): boolean {
+    return this.pendingByUrl.has(url);
+  }
+
   pendingCount(): number {
     return this.pendingByUrl.size;
   }

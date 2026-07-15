@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import { displayTargetChangePayloadSchema } from '../../../src/schemas/tauriEventSchemas';
-import { isNewDisplayResourceGeneration } from '../../../src/utils/displayTargetChange';
 
 const change = {
   deviceGeneration: 7,
@@ -22,12 +21,5 @@ describe('display target change protocol', () => {
         target: { ...change.target, colorSpace: 'uncalibrated' },
       }).success,
     ).toBe(false);
-  });
-
-  test('only a newer safe generation can supersede the active preview', () => {
-    expect(isNewDisplayResourceGeneration(1, 2)).toBe(true);
-    expect(isNewDisplayResourceGeneration(2, 2)).toBe(false);
-    expect(isNewDisplayResourceGeneration(3, 2)).toBe(false);
-    expect(isNewDisplayResourceGeneration(3, Number.MAX_SAFE_INTEGER + 1)).toBe(false);
   });
 });

@@ -319,6 +319,97 @@ export const qaScenarios: readonly QaScenario[] = [
   },
   {
     ...browserDefaults,
+    id: 'browser.editor.display-target-invalidation',
+    tags: ['browser', 'editor', 'display', 'preview'],
+    dependencies: [],
+    fixture: { id: 'editor' },
+    isolation: 'fresh-context',
+    timeoutMs: 45_000,
+    async run({ page }) {
+      await openEditorFixture(page);
+      const navigatorImage = page.getByTestId('editor-navigator').locator('img');
+      await navigatorImage.waitFor();
+      await page.waitForTimeout(200);
+
+      const { applyCallCount, originalUrl } = await page.evaluate(() => {
+        const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+        const image = document.querySelector<HTMLImageElement>('[data-testid="editor-navigator"] img');
+        if (harness === undefined || image?.src === undefined) throw new Error('Display proof fixture is unavailable.');
+        const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
+        URL.revokeObjectURL = (url) => {
+          harness.revokedObjectUrls.push(url);
+          revokeObjectUrl(url);
+        };
+        harness.applyPreviewResponses.push(
+          { color: [210, 32, 32], delayMs: 300 },
+          { color: [32, 190, 64], delayMs: 0 },
+        );
+        return {
+          applyCallCount: harness.calls.filter(({ command }) => command === 'apply_adjustments').length,
+          originalUrl: image.src,
+        };
+      });
+      const emitDisplayGeneration = (generation: number) =>
+        page.evaluate((displayResourceGeneration) => {
+          window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent('display-target-changed', {
+            deviceGeneration: 7,
+            displayResourceGeneration,
+            target: {
+              colorSpace: 'display_encoded_srgb',
+              displayId: 42,
+              profileSha256: `sha256:display-profile-${String(displayResourceGeneration)}`,
+              scaleFactorBits: 4_607_182_418_800_017_400,
+            },
+          });
+        }, generation);
+      const waitForApplyCalls = (count: number) =>
+        page.waitForFunction(
+          (expected) =>
+            (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+              ({ command }) => command === 'apply_adjustments',
+            ).length === expected,
+          count,
+        );
+
+      await emitDisplayGeneration(2);
+      await waitForApplyCalls(applyCallCount + 1);
+      await emitDisplayGeneration(2);
+      await emitDisplayGeneration(1);
+      await page.waitForTimeout(50);
+      await waitForApplyCalls(applyCallCount + 1);
+      await emitDisplayGeneration(3);
+      await waitForApplyCalls(applyCallCount + 2);
+      await page.waitForTimeout(400);
+
+      const proof = await page.evaluate(async (staleUrl) => {
+        const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+        const image = document.querySelector<HTMLImageElement>('[data-testid="editor-navigator"] img');
+        if (harness === undefined || image === null) throw new Error('Display proof output is unavailable.');
+        const response = await fetch(image.src);
+        const bitmap = await createImageBitmap(await response.blob());
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext('2d');
+        if (context === null) throw new Error('Display proof canvas is unavailable.');
+        context.drawImage(bitmap, 0, 0, 1, 1);
+        bitmap.close();
+        return {
+          pixel: [...context.getImageData(0, 0, 1, 1).data],
+          releases: harness.revokedObjectUrls.filter((url) => url === staleUrl).length,
+          totalApplyCalls: harness.calls.filter(({ command }) => command === 'apply_adjustments').length,
+        };
+      }, originalUrl);
+      if (proof.totalApplyCalls !== applyCallCount + 2)
+        throw new Error(`Stale display events scheduled ${String(proof.totalApplyCalls - applyCallCount)} renders.`);
+      if (proof.releases !== 1)
+        throw new Error(`Invalidated display URL was released ${String(proof.releases)} times instead of once.`);
+      const [red = 0, green = 0] = proof.pixel;
+      if (green <= red) throw new Error(`Reordered stale display render replaced the current frame: ${proof.pixel}.`);
+    },
+  },
+  {
+    ...browserDefaults,
     id: 'browser.editor.original-compare-lifecycle',
     tags: ['browser', 'editor', 'compare', 'preview'],
     dependencies: [],
