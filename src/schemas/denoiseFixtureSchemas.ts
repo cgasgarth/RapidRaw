@@ -15,21 +15,16 @@ const metricRangeSchema = z
     message: 'Metric range min must be less than or equal to max.',
   });
 
-export const denoiseFixtureLimitationSchema = z.enum([
+const denoiseFixtureLimitationSchema = z.enum([
   'e2e_workflow',
   'preview_export_parity',
   'real_raw_quality',
   'runtime_denoise_quality',
 ]);
 
-export const denoiseFixtureKindSchema = z.enum([
-  'chroma_edge',
-  'fine_texture',
-  'flat_shadow',
-  'private_high_iso_chroma',
-]);
+const denoiseFixtureKindSchema = z.enum(['chroma_edge', 'fine_texture', 'flat_shadow', 'private_high_iso_chroma']);
 
-export const denoiseArtifactKindSchema = z.enum([
+const denoiseArtifactKindSchema = z.enum([
   'expected_denoised_reference',
   'export_artifact_placeholder',
   'preview_artifact_placeholder',
@@ -38,7 +33,7 @@ export const denoiseArtifactKindSchema = z.enum([
   'synthetic_noisy_input',
 ]);
 
-export const denoiseArtifactSchema = z
+const denoiseArtifactSchema = z
   .object({
     hash: sha256Schema.nullable(),
     kind: denoiseArtifactKindSchema,
@@ -47,7 +42,7 @@ export const denoiseArtifactSchema = z
   })
   .strict();
 
-export const denoiseExpectedMetricSchema = z
+const denoiseExpectedMetricSchema = z
   .object({
     chromaSigmaAfter: metricRangeSchema,
     deltaEMax: metricRangeSchema,
@@ -69,7 +64,7 @@ const denoiseBaseFixtureSchema = z
   })
   .strict();
 
-export const denoiseSyntheticFixtureSchema = denoiseBaseFixtureSchema.extend({
+const denoiseSyntheticFixtureSchema = denoiseBaseFixtureSchema.extend({
   generator: z
     .object({
       basePattern: z.enum(['chroma_edge', 'flat_shadow_ramp', 'fine_texture_patch']),
@@ -85,7 +80,7 @@ export const denoiseSyntheticFixtureSchema = denoiseBaseFixtureSchema.extend({
   sourceKind: z.literal('synthetic_public'),
 });
 
-export const denoisePrivateRawFixtureSchema = denoiseBaseFixtureSchema.extend({
+const denoisePrivateRawFixtureSchema = denoiseBaseFixtureSchema.extend({
   generator: z.null(),
   privateRawEvidence: z
     .object({
@@ -99,7 +94,7 @@ export const denoisePrivateRawFixtureSchema = denoiseBaseFixtureSchema.extend({
   sourceKind: z.literal('private_raw_placeholder'),
 });
 
-export const denoiseFixtureSchema = z.discriminatedUnion('sourceKind', [
+const denoiseFixtureSchema = z.discriminatedUnion('sourceKind', [
   denoiseSyntheticFixtureSchema,
   denoisePrivateRawFixtureSchema,
 ]);
@@ -195,7 +190,7 @@ export const denoiseFixtureManifestSchema = z
     }
   });
 
-export type DenoiseFixture = z.infer<typeof denoiseFixtureSchema>;
+type DenoiseFixture = z.infer<typeof denoiseFixtureSchema>;
 export type DenoiseFixtureManifest = z.infer<typeof denoiseFixtureManifestSchema>;
 
 export function parseDenoiseFixtureManifest(value: unknown): DenoiseFixtureManifest {

@@ -8,7 +8,7 @@ import {
 } from '../../../schemas/agent/agentRuntimeSchemas';
 import { buildRawEngineAppServerRouteCatalog } from '../../rawEngineAppServerHost';
 
-export const agentAppServerToolReadinessFamilySchema = z
+const agentAppServerToolReadinessFamilySchema = z
   .object({
     applyRouteCount: z.number().int().nonnegative(),
     dryRunRouteCount: z.number().int().nonnegative(),
@@ -20,7 +20,7 @@ export const agentAppServerToolReadinessFamilySchema = z
   })
   .strict();
 
-export const agentAppServerToolReadinessSummarySchema = z
+const agentAppServerToolReadinessSummarySchema = z
   .object({
     applyRouteCount: z.number().int().nonnegative(),
     dryRunRouteCount: z.number().int().nonnegative(),
@@ -33,7 +33,7 @@ export const agentAppServerToolReadinessSummarySchema = z
   })
   .strict();
 
-export type AgentAppServerToolReadinessFamily = z.infer<typeof agentAppServerToolReadinessFamilySchema>;
+type AgentAppServerToolReadinessFamily = z.infer<typeof agentAppServerToolReadinessFamilySchema>;
 export type AgentAppServerToolReadinessSummary = z.infer<typeof agentAppServerToolReadinessSummarySchema>;
 
 const routeHasMode = (route: RawEngineAppServerRouteCatalogEntry, mode: RawEngineAppServerRouteModeValue): boolean =>

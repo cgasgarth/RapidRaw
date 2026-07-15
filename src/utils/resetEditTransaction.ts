@@ -9,7 +9,7 @@ const resetAdjustmentDocumentSchema = z.custom<Partial<Adjustments>>(
   'Reset adjustments must be an object',
 );
 
-export const resetAdjustmentsResultSchema = z
+const resetAdjustmentsResultSchema = z
   .object({
     adjustments: resetAdjustmentDocumentSchema,
     path: z.string().min(1),

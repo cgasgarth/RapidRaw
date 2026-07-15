@@ -3,7 +3,7 @@ import { getViteEnv } from '../../utils/frontendEnv.mjs';
 
 const isDevelopment = getViteEnv().DEV;
 
-export interface RenderProfile {
+interface RenderProfile {
   commits: number;
   maxCommitDuration: number;
   renders: number;
@@ -34,7 +34,7 @@ export const recordIslandCommit: ProfilerOnRenderCallback = (id, _phase, actualD
   profile.maxCommitDuration = Math.max(profile.maxCommitDuration, actualDuration);
 };
 
-export const appRenderProfiler = {
+const appRenderProfiler = {
   beginScenario(name: string) {
     scenario = name;
   },

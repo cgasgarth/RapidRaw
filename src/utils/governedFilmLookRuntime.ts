@@ -24,9 +24,9 @@ import {
   hashFilmLookColorPipelinePixels,
 } from './film-look/filmLookColorPipelineCommand';
 
-export const GOVERNED_FILM_LOOK_RUNTIME_SCHEMA_VERSION = 1;
+const GOVERNED_FILM_LOOK_RUNTIME_SCHEMA_VERSION = 1;
 
-export const governedFilmLookPixelSchema = z
+const governedFilmLookPixelSchema = z
   .object({
     b: z.number().min(0).max(1),
     g: z.number().min(0).max(1),
@@ -36,7 +36,7 @@ export const governedFilmLookPixelSchema = z
   })
   .strict();
 
-export const governedFilmLookRecipeSchema = z
+const governedFilmLookRecipeSchema = z
   .object({
     grain: z
       .object({
@@ -60,7 +60,7 @@ export const governedFilmLookRecipeSchema = z
   })
   .strict();
 
-export const governedFilmLookCommandSchema = z
+const governedFilmLookCommandSchema = z
   .object({
     actor: z
       .object({
@@ -97,7 +97,7 @@ export const governedFilmLookCommandSchema = z
   })
   .strict();
 
-export const governedFilmLookRuntimeResultSchema = z
+const governedFilmLookRuntimeResultSchema = z
   .object({
     adjustmentPatch: z.record(z.string(), z.number()),
     afterHash: z.string().trim().min(1),
@@ -180,7 +180,7 @@ export interface ApplyGovernedFilmLookOptions {
   sourcePixels: ReadonlyArray<GovernedFilmLookPixel>;
 }
 
-export const DEFAULT_GOVERNED_FILM_LOOK_RECIPE = {
+const DEFAULT_GOVERNED_FILM_LOOK_RECIPE = {
   grain: {
     amount: 28,
     roughness: 52,

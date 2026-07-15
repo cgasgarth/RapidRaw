@@ -20,7 +20,7 @@ export const rawDemosaicPathSchema = z.enum(['bayer_hq', 'fast', 'linear_bypass'
 
 export const rawProcessingProfileSchema = z.enum(['balanced', 'fast', 'maximum']);
 
-export const rawCameraProfileStatusSchema = z.enum([
+const rawCameraProfileStatusSchema = z.enum([
   'fallback',
   'interpolated',
   'selected_dcp',
@@ -28,12 +28,12 @@ export const rawCameraProfileStatusSchema = z.enum([
   'unavailable',
 ]);
 
-export const rawCameraProfileAlgorithmIdSchema = z.enum([
+const rawCameraProfileAlgorithmIdSchema = z.enum([
   'dual_illuminant_mired_v1',
   'dual_illuminant_camera_neutral_mired_v2',
 ]);
 
-export const rawIlluminantEstimateMethodSchema = z.enum([
+const rawIlluminantEstimateMethodSchema = z.enum([
   'as_shot_white_xy',
   'camera_neutral_iterative',
   'wb_coeff_ratio',
@@ -46,7 +46,7 @@ const rawProfileIlluminantXySchema = z
   .tuple([z.number().positive().max(1), z.number().positive().max(1)])
   .refine(([x, y]) => x + y < 1, 'Chromaticity x + y must be less than 1.');
 
-export const rawCameraProfileColorCheckerGateStatusSchema = z.enum([
+const rawCameraProfileColorCheckerGateStatusSchema = z.enum([
   'gated_fail',
   'gated_pass',
   'gated_warn',
@@ -54,7 +54,7 @@ export const rawCameraProfileColorCheckerGateStatusSchema = z.enum([
   'runtime_smoke_only',
 ]);
 
-export const rawCameraProfileColorCheckerGateSchema = z
+const rawCameraProfileColorCheckerGateSchema = z
   .object({
     fallbackReason: z.string().trim().min(1).nullable().optional(),
     maxDeltaE00: z.number().nonnegative().nullable().optional(),
@@ -90,7 +90,7 @@ export const rawCameraProfileColorCheckerGateSchema = z
     }
   });
 
-export const rawCameraProfileReportSchema = z
+const rawCameraProfileReportSchema = z
   .object({
     algorithmId: rawCameraProfileAlgorithmIdSchema,
     cameraModel: z.string().trim().min(1).nullable().optional(),
@@ -311,7 +311,7 @@ export const loadedMetadataSchema = z
   })
   .loose();
 
-export const loadImageResultSchema = z
+const loadImageResultSchema = z
   .object({
     exif: exifSchema.optional(),
     height: z.number().nonnegative(),
@@ -323,14 +323,14 @@ export const loadImageResultSchema = z
   })
   .loose();
 
-export const imageOpenSessionIdSchema = z
+const imageOpenSessionIdSchema = z
   .object({
     imageSession: z.number().int().nonnegative(),
     selectionGeneration: z.number().int().nonnegative(),
   })
   .strict();
 
-export const progressiveImageFrameReceiptSchema = z
+const progressiveImageFrameReceiptSchema = z
   .object({
     colorAssumption: z.string().min(1),
     frameGeneration: z.number().int().positive(),
@@ -437,6 +437,5 @@ export const isNullAdjustmentSnapshot = (
 export const parseLoadedMetadata = (value: unknown): LoadedMetadata => loadedMetadataSchema.parse(value);
 
 export const parseLoadImageResult = (value: unknown): LoadImageResult => loadImageResultSchema.parse(value);
-export const parseBeginImageOpenResult = (value: unknown): BeginImageOpenResult =>
-  beginImageOpenResultSchema.parse(value);
+const parseBeginImageOpenResult = (value: unknown): BeginImageOpenResult => beginImageOpenResultSchema.parse(value);
 export const parseImageOpenUpdate = (value: unknown): ImageOpenUpdate => imageOpenUpdateSchema.parse(value);

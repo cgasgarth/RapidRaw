@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-export const cameraProfileClassSchema = z.enum([
+const cameraProfileClassSchema = z.enum([
   'generic_camera_profile',
   'licensed_camera_profile',
   'measured_camera_profile',
 ]);
-export const cameraProfileInputTransformSchema = z.enum([
+const cameraProfileInputTransformSchema = z.enum([
   'dng_color_matrix',
   'embedded_dng_color_matrix',
   'libraw_camera_matrix',
@@ -67,8 +67,8 @@ export const cameraProfileLookupCatalogSchema = z
     }
   });
 
-export type CameraProfileLookupCatalog = z.infer<typeof cameraProfileLookupCatalogSchema>;
-export type CameraProfileMetadata = z.infer<typeof cameraProfileMetadataSchema>;
+type CameraProfileLookupCatalog = z.infer<typeof cameraProfileLookupCatalogSchema>;
+type CameraProfileMetadata = z.infer<typeof cameraProfileMetadataSchema>;
 export type CameraProfileWarning = z.infer<typeof cameraProfileWarningSchema>;
 
 export interface CameraProfileLookupResult {

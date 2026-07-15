@@ -8,7 +8,7 @@ export const PR_REQUIRED_BUDGET_SECONDS = 240;
 export type PrFastLane = 'js' | 'frontend' | 'schema' | 'dependencies' | 'rust' | 'workflow' | 'docs';
 
 export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> = {
-  js: ['fast-lint', 'fast-typecheck', 'fast-contract-tests', 'fast-format'],
+  js: ['fast-lint', 'fast-typecheck', 'fast-fallow-health', 'fast-contract-tests', 'fast-format'],
   frontend: ['fast-build-i18n', 'fast-unsafe-unused', 'fast-visual'],
   schema: ['fast-schema'],
   dependencies: ['fast-js-security'],
@@ -22,6 +22,7 @@ export const PR_REQUIRED_JOB_NAMES: Readonly<Record<string, string>> = {
   'fast-contract-tests': 'pr fast: affected contract tests',
   'fast-docs': 'pr fast: documentation contracts',
   'fast-format': 'pr fast: format',
+  'fast-fallow-health': 'pr fast: Fallow health',
   'fast-js-security': 'pr fast: JavaScript audit',
   'fast-lint': 'pr fast: lint',
   'fast-rust': 'pr fast: affected native feedback',

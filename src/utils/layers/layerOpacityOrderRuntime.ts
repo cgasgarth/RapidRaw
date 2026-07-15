@@ -20,7 +20,7 @@ export function renderLayerOpacityOrderRuntime(input: LayerOpacityOrderRuntimeIn
   });
 }
 
-export function applyLayerOpacityOrderOperations(
+function applyLayerOpacityOrderOperations(
   layers: ReadonlyArray<LayerBlendStackLayer>,
   operations: ReadonlyArray<LayerOpacityOrderRuntimeOperation>,
 ): Array<LayerBlendStackLayer> {

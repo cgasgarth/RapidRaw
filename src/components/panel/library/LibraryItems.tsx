@@ -778,8 +778,8 @@ const ListItemComponent = ({
   );
 };
 
-export const Thumbnail = memo(ThumbnailComponent);
-export const ListItem = memo(ListItemComponent);
+const Thumbnail = memo(ThumbnailComponent);
+const ListItem = memo(ListItemComponent);
 
 const RowComponent = ({
   index,

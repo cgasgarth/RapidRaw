@@ -214,7 +214,7 @@ export const ColorProfileToneControls = ({
   );
 };
 
-export const getProfileToneLabels = (adjustments: Adjustments, t: TFunction) => {
+const getProfileToneLabels = (adjustments: Adjustments, t: TFunction) => {
   const cameraProfileOptions = [
     { key: 'camera_standard', label: t('adjustments.color.profileTone.cameraProfiles.camera_standard') },
     { key: 'camera_neutral', label: t('adjustments.color.profileTone.cameraProfiles.camera_neutral') },

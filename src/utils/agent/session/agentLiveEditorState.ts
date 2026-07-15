@@ -7,8 +7,6 @@ import {
 import { agentSelectedImageProposalRuntime } from '../context/agentSelectedImageProposalRuntime';
 import { buildLiveEditorProjectLibrarySnapshot } from './agentLiveEditorCoreState';
 
-export { buildLiveEditorProjectLibrarySnapshot } from './agentLiveEditorCoreState';
-
 export const createLiveEditorAppServerBridge = () =>
   createRawEngineLocalAppServerBridge({
     getProjectLibrarySnapshot: buildLiveEditorProjectLibrarySnapshot,

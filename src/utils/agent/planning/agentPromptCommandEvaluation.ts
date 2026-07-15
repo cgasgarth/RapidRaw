@@ -14,7 +14,7 @@ const selectableColorRangeSchema = z.enum([
   'magentas',
 ]);
 
-export const agentPromptCommandFixtureSchema = z
+const agentPromptCommandFixtureSchema = z
   .object({
     expectedHslRange: selectableColorRangeSchema,
     expectedRecipeKind: agentEditRecipeKindSchema,
@@ -24,7 +24,7 @@ export const agentPromptCommandFixtureSchema = z
   })
   .strict();
 
-export const agentPromptCommandEvaluationSchema = z
+const agentPromptCommandEvaluationSchema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
     changedPixelCount: z.number().int().min(1),

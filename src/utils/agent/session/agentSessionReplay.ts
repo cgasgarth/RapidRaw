@@ -3,9 +3,9 @@ import { agentModelSelectionReceiptSchema } from './agentAppServerModelSelection
 import type { AgentSessionAuditRecord, AgentSessionAuditStorageAdapter } from './agentSessionAuditStore';
 import { readAgentSessionAuditStore, verifyAgentSessionArtifactLineage } from './agentSessionAuditStore';
 
-export const agentSessionReplayStatusSchema = z.enum(['matched', 'diverged']);
+const agentSessionReplayStatusSchema = z.enum(['matched', 'diverged']);
 
-export const agentSessionReplayReportSchema = z
+const agentSessionReplayReportSchema = z
   .object({
     artifactDivergences: z.array(
       z
@@ -28,7 +28,7 @@ export type AgentSessionReplayReport = z.infer<typeof agentSessionReplayReportSc
 
 export type AgentArtifactReplayHashProvider = (artifact: AgentSessionAuditRecord['artifactLineage'][number]) => string;
 
-export const replayAgentSessionAuditRecord = (
+const replayAgentSessionAuditRecord = (
   record: AgentSessionAuditRecord,
   replayHashForArtifact: AgentArtifactReplayHashProvider = (artifact) => artifact.contentHash,
 ): AgentSessionReplayReport => {

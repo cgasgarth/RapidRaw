@@ -35,7 +35,7 @@ export interface NegativeLabRuntimeProfileCatalog {
   userProfiles?: NegativeLabRuntimeProfileBrowserRow[];
 }
 
-export const NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG = {
+const NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG = {
   catalogId: 'negative_lab_measured_profile_catalog',
   catalogVersion: '2026-06-16',
   profiles: [],

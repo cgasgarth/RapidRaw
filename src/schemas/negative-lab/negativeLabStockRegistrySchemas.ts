@@ -13,22 +13,22 @@ import {
   negativeLabStockRegistryV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 
-export const NEGATIVE_LAB_STOCK_REGISTRY_SCHEMA_VERSION = 1;
+const NEGATIVE_LAB_STOCK_REGISTRY_SCHEMA_VERSION = 1;
 
-export const negativeLabStockRegistryProcessFamilySchema = negativeLabStockRegistryProcessFamilyV1Schema;
-export const negativeLabStockRegistryCategorySchema = negativeLabStockRegistryCategoryV1Schema;
-export const negativeLabStockRegistryAvailabilitySchema = negativeLabStockRegistryAvailabilityV1Schema;
-export const negativeLabStockRegistryClaimTierSchema = negativeLabStockRegistryClaimTierV1Schema;
-export const negativeLabStockRegistryLegalNamingStatusSchema = negativeLabStockRegistryLegalNamingStatusV1Schema;
-export const negativeLabStockRegistryFixtureStatusSchema = negativeLabStockRegistryFixtureStatusV1Schema;
-export const negativeLabStockRegistryProfileStatusSchema = negativeLabStockRegistryProfileStatusV1Schema;
+const negativeLabStockRegistryProcessFamilySchema = negativeLabStockRegistryProcessFamilyV1Schema;
+const negativeLabStockRegistryCategorySchema = negativeLabStockRegistryCategoryV1Schema;
+const negativeLabStockRegistryAvailabilitySchema = negativeLabStockRegistryAvailabilityV1Schema;
+const negativeLabStockRegistryClaimTierSchema = negativeLabStockRegistryClaimTierV1Schema;
+const negativeLabStockRegistryLegalNamingStatusSchema = negativeLabStockRegistryLegalNamingStatusV1Schema;
+const negativeLabStockRegistryFixtureStatusSchema = negativeLabStockRegistryFixtureStatusV1Schema;
+const negativeLabStockRegistryProfileStatusSchema = negativeLabStockRegistryProfileStatusV1Schema;
 export const negativeLabStockRegistryIdSchema = negativeLabStockRegistryIdV1Schema;
 export const negativeLabStockRegistryEntrySchema = negativeLabStockRegistryEntryV1Schema;
 export const negativeLabStockRegistrySchema = negativeLabStockRegistryV1Schema;
 
 export type NegativeLabStockRegistry = NegativeLabStockRegistryV1;
-export type NegativeLabStockRegistryEntry = NegativeLabStockRegistryEntryV1;
-export type NegativeLabStockRegistryId = NegativeLabStockRegistryEntryV1['registryId'];
+type NegativeLabStockRegistryEntry = NegativeLabStockRegistryEntryV1;
+type NegativeLabStockRegistryId = NegativeLabStockRegistryEntryV1['registryId'];
 
-export const parseNegativeLabStockRegistry = (value: unknown): NegativeLabStockRegistry =>
+const parseNegativeLabStockRegistry = (value: unknown): NegativeLabStockRegistry =>
   negativeLabStockRegistrySchema.parse(value);

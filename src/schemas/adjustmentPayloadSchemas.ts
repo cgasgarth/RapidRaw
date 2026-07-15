@@ -26,7 +26,7 @@ const backendMaskContainerPayloadSchema = z
   })
   .loose();
 
-export const backendAdjustmentPayloadSchema = z
+const backendAdjustmentPayloadSchema = z
   .object({
     aiPatches: z.array(backendAiPatchPayloadSchema).optional(),
     masks: z.array(backendMaskContainerPayloadSchema).optional(),

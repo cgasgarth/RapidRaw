@@ -152,7 +152,7 @@ export const sortFilmLookBrowserItems = (
 export const clampFilmLookStrength = (strength: number): number =>
   Math.min(MAX_FILM_LOOK_STRENGTH, Math.max(MIN_FILM_LOOK_STRENGTH, Math.round(strength)));
 
-export const formatFilmLookStrength = (strength: number) => `${clampFilmLookStrength(strength)}%`;
+const formatFilmLookStrength = (strength: number) => `${clampFilmLookStrength(strength)}%`;
 
 export const formatFilmLookPresetName = (look: FilmLookBrowserItem, strength: number) =>
   `${look.displayName} ${formatFilmLookStrength(strength)}`;

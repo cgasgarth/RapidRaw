@@ -29,7 +29,7 @@ import {
   type LayerStackCommandBridgeResult,
 } from './layerStackCommandBridge';
 
-export const COLOR_RANGE_LOCAL_ADJUSTMENT_RECEIPT_PARAMETER_KEY = 'colorRangeLocalAdjustmentReceipt';
+const COLOR_RANGE_LOCAL_ADJUSTMENT_RECEIPT_PARAMETER_KEY = 'colorRangeLocalAdjustmentReceipt';
 
 export interface ColorRangeLocalAdjustmentLayerInput {
   colorRangeParameters: ColorRangeMaskParameters;
@@ -122,7 +122,7 @@ const receiptSchema = z
   })
   .strict();
 
-export function createColorRangeLocalAdjustmentSubMask(
+function createColorRangeLocalAdjustmentSubMask(
   id: string,
   name: string,
   parameters: ColorRangeMaskParameters,

@@ -2,7 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import type { ThumbnailCacheEntry, ThumbnailSmartPreviewState } from './ThumbnailCache';
 import { thumbnailCache } from './thumbnailCacheInstance';
 
-export function useThumbnailEntry(path: string): ThumbnailCacheEntry | undefined {
+function useThumbnailEntry(path: string): ThumbnailCacheEntry | undefined {
   const subscribe = useCallback((listener: () => void) => thumbnailCache.subscribe(path, listener), [path]);
   const getSnapshot = useCallback(() => thumbnailCache.getSnapshot(path), [path]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

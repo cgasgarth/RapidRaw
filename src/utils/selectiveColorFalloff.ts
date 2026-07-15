@@ -1,4 +1,4 @@
-export const DEFAULT_SELECTIVE_COLOR_FALLOFF_SHARPNESS = 1.5;
+const DEFAULT_SELECTIVE_COLOR_FALLOFF_SHARPNESS = 1.5;
 
 const wrapHueDistance = (leftHueDegrees: number, rightHueDegrees: number) => {
   const rawDistance = Math.abs(leftHueDegrees - rightHueDegrees);

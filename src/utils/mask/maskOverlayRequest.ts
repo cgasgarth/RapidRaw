@@ -33,7 +33,7 @@ export interface BuildMaskOverlayInvokePayloadParams {
 }
 
 export interface BuildMaskOverlayTriggerHashParams {
-  activeMaskDef: AiPatch | MaskContainer | undefined;
+  activeMaskDef: MaskPreviewDefinition | undefined;
   adjustments: Adjustments;
   imageRenderSize: Pick<RenderSize, 'height' | 'width'>;
   maskOverlaySettings: MaskOverlaySettings;
@@ -87,7 +87,7 @@ const stripBackendMaskDataFromSubMasks = (
   });
 };
 
-export const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustments>(
+const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustments>(
   value: T,
   patchesSentToBackend: ReadonlySet<string>,
 ): T => {

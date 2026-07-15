@@ -98,7 +98,7 @@ const negativeLabNativeApplyExecutor = async (
   return buildNegativeLabNativeApplyResultV1({ acceptedPlan, handoffs, request });
 };
 
-export const buildNegativeLabNativeApplyResultV1 = ({
+const buildNegativeLabNativeApplyResultV1 = ({
   acceptedPlan,
   handoffs,
   request,
@@ -231,7 +231,7 @@ export const resetNegativeLabAgentAppServerToolDispatchForTests = (): void => {
   });
 };
 
-export const dispatchNegativeLabAgentAppServerTool = (request: {
+const dispatchNegativeLabAgentAppServerTool = (request: {
   arguments: unknown;
   runtimeToolName: string;
 }): NegativeLabAppServerRuntimeToolResultV1 => {

@@ -55,7 +55,7 @@ export const dispatchAgentLiveEditorTool = async ({
   return response.result;
 };
 
-export const dispatchAgentExportReviewTool = async ({
+const dispatchAgentExportReviewTool = async ({
   request,
   requestId,
 }: {
@@ -70,7 +70,7 @@ export const dispatchAgentExportReviewTool = async ({
     }),
   );
 
-export const dispatchAgentFinalExportTool = async ({
+const dispatchAgentFinalExportTool = async ({
   request,
   requestId,
 }: {

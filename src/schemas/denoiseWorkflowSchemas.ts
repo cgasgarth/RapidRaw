@@ -9,7 +9,7 @@ export const denoiseOperationHandleSchema = z
 
 export type DenoiseOperationHandle = z.infer<typeof denoiseOperationHandleSchema>;
 
-export const denoiseOperationsMatch = (active: DenoiseOperationHandle | null, incoming: DenoiseOperationHandle) =>
+const denoiseOperationsMatch = (active: DenoiseOperationHandle | null, incoming: DenoiseOperationHandle) =>
   active?.imageGeneration === incoming.imageGeneration && active.operationGeneration === incoming.operationGeneration;
 
 export const isCurrentDenoiseEvent = (
@@ -25,7 +25,7 @@ export const denoiseCancelReceiptSchema = z
   })
   .strict();
 
-export const denoiseWorkflowReportSchema = z
+const denoiseWorkflowReportSchema = z
   .object({
     artifactPath: z.string().min(1),
     applyStatus: z.literal('applied'),

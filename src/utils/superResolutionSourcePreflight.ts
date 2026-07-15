@@ -6,7 +6,7 @@ import {
 } from '../../packages/rawengine-schema/src/super-resolution/superResolutionSourceValidation.ts';
 import { parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 
-export const superResolutionSourcePreflightMetadataSchema = z
+const superResolutionSourcePreflightMetadataSchema = z
   .object({
     exif: z.record(z.string(), z.string()).nullable().optional(),
     height: z.number().int().positive().optional(),
@@ -16,7 +16,7 @@ export const superResolutionSourcePreflightMetadataSchema = z
   })
   .strict();
 
-export const superResolutionSourcePreflightRequestSchema = z
+const superResolutionSourcePreflightRequestSchema = z
   .object({
     requestedScale: z.number().min(1).max(4),
     sources: z.array(superResolutionSourcePreflightMetadataSchema).min(1),

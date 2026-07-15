@@ -18,7 +18,7 @@ export const ToneColorAppServerExecutionMode = {
   DryRunCommand: 'dry_run_command',
 } as const;
 
-export type ToneColorAppServerExecutionMode =
+type ToneColorAppServerExecutionMode =
   (typeof ToneColorAppServerExecutionMode)[keyof typeof ToneColorAppServerExecutionMode];
 
 export const TONE_COLOR_APP_SERVER_EXECUTION_MODES = [

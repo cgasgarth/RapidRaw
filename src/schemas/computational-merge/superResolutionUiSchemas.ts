@@ -5,9 +5,9 @@ export const superResolutionDetailPolicySchema = z.enum(['conservative', 'balanc
 export const superResolutionModeSchema = z.enum(['conservative', 'standard', 'aggressive']);
 export const superResolutionQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
 export const superResolutionReconstructionModeSchema = z.enum(['model_detail', 'optical_flow']);
-export const superResolutionSourceModeSchema = z.enum(['multi_image', 'single_image_ai_x2']);
+const superResolutionSourceModeSchema = z.enum(['multi_image', 'single_image_ai_x2']);
 
-export const superResolutionUiSettingsSchema = z
+const superResolutionUiSettingsSchema = z
   .object({
     alignmentMode: superResolutionAlignmentModeSchema,
     detailPolicy: superResolutionDetailPolicySchema,

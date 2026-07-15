@@ -19,5 +19,5 @@ export const buildAgentColorRecipeHashInput = (adjustments: Adjustments) => ({
   vibrance: adjustments.vibrance,
 });
 
-export const hashAgentColorRecipeInput = (adjustments: Adjustments): string =>
+const hashAgentColorRecipeInput = (adjustments: Adjustments): string =>
   stableAgentPreviewHash(JSON.stringify(buildAgentColorRecipeHashInput(adjustments)));

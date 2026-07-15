@@ -6,14 +6,14 @@ export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generi
 
 export const negativeLabUiPresetFilmClassSchema = z.enum(['color_negative', 'black_and_white_silver']);
 export const negativeLabUiPresetProcessFamilySchema = z.enum(['c41_color_negative', 'black_and_white_silver_negative']);
-export const negativeLabUiPresetProfileStatusSchema = z.enum(['generic_unmeasured', 'fixture_measured']);
-export const negativeLabUiPresetRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
-export const negativeLabUiPresetClaimLevelSchema = z.enum(['generic_starting_point_only', 'measured_profile']);
-export const negativeLabUiPresetMeasurementSourceSchema = z.enum([
+const negativeLabUiPresetProfileStatusSchema = z.enum(['generic_unmeasured', 'fixture_measured']);
+const negativeLabUiPresetRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+const negativeLabUiPresetClaimLevelSchema = z.enum(['generic_starting_point_only', 'measured_profile']);
+const negativeLabUiPresetMeasurementSourceSchema = z.enum([
   'generic_engineered_starting_point',
   'fixture_measured_profile',
 ]);
-export const negativeLabUiPresetClaimPolicySchema = z.enum([
+const negativeLabUiPresetClaimPolicySchema = z.enum([
   'generic_starting_point_no_stock_claim',
   'measured_profile_required_before_stock_claim',
 ]);
@@ -30,8 +30,8 @@ export const negativeLabBaseFogSampleRectSchema = z
     message: 'Negative Lab base/fog sample rect must stay within normalized image bounds.',
   });
 
-export const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1', 'e6_positive_v1']);
-export const negativeLabRenderIntentSchema = z.enum(['print', 'flat_log_master']);
+const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1', 'e6_positive_v1']);
+const negativeLabRenderIntentSchema = z.enum(['print', 'flat_log_master']);
 export const negativeLabFlatLogMasterParamsSchema = z
   .object({
     algorithm_version: z.literal(1).default(1),
@@ -40,8 +40,8 @@ export const negativeLabFlatLogMasterParamsSchema = z
   })
   .strict();
 export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
-export const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
-export const negativeLabDetailFinishParamsSchema = z
+const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
+const negativeLabDetailFinishParamsSchema = z
   .object({
     algorithm_version: z.literal(1).default(1),
     enabled: z.boolean().default(false),
@@ -55,13 +55,13 @@ export const negativeLabDetailFinishParamsSchema = z
     working_space: z.literal('scene_linear_luminance_v1').default('scene_linear_luminance_v1'),
   })
   .strict();
-export const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
+const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
   'automatic_analysis',
   'manual_base_fog_sample',
   'profile_embedded_base_fog_sample',
 ]);
 
-export const negativeLabDensityPrintV2ParamsSchema = z
+const negativeLabDensityPrintV2ParamsSchema = z
   .object({
     algorithm_version: z.literal(1).default(1),
     anchor_density: z.number().min(0).max(1).default(0.5),
@@ -92,7 +92,7 @@ export const negativeLabDensityPrintV2ParamsSchema = z
   });
 
 /** Upgrades the original v1 density-print fields to the native H&D contract. */
-export const migrateNegativeLabDensityPrintV2Params = (
+const migrateNegativeLabDensityPrintV2Params = (
   params: Partial<z.input<typeof negativeLabDensityPrintV2ParamsSchema>>,
 ): NegativeLabDensityPrintV2Params => {
   const parsed = negativeLabDensityPrintV2ParamsSchema.parse({
@@ -204,7 +204,7 @@ export const negativeLabPresetParamsSchema = z
     }
   });
 
-export const negativeLabBuiltInUiPresetSchema = z
+const negativeLabBuiltInUiPresetSchema = z
   .object({
     claimLevel: negativeLabUiPresetClaimLevelSchema,
     claimPolicy: negativeLabUiPresetClaimPolicySchema,
@@ -345,24 +345,22 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
     }
   });
 
-export type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPresetSchema>;
+type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPresetSchema>;
 export type NegativeLabBaseFogSampleRect = z.infer<typeof negativeLabBaseFogSampleRectSchema>;
-export type NegativeLabBaseFogBoundsProvenance = z.infer<typeof negativeLabBaseFogBoundsProvenanceSchema>;
-export type NegativeLabConversionModel = z.infer<typeof negativeLabConversionModelSchema>;
-export type NegativeLabDensityPrintAlgorithm = z.infer<typeof negativeLabDensityPrintAlgorithmSchema>;
-export type NegativeLabDensityPrintOutputTag = z.infer<typeof negativeLabDensityPrintOutputTagSchema>;
-export type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;
-export type NegativeLabNativeDensityNormalizationMetrics = z.infer<
-  typeof negativeLabNativeDensityNormalizationMetricsSchema
->;
+type NegativeLabBaseFogBoundsProvenance = z.infer<typeof negativeLabBaseFogBoundsProvenanceSchema>;
+type NegativeLabConversionModel = z.infer<typeof negativeLabConversionModelSchema>;
+type NegativeLabDensityPrintAlgorithm = z.infer<typeof negativeLabDensityPrintAlgorithmSchema>;
+type NegativeLabDensityPrintOutputTag = z.infer<typeof negativeLabDensityPrintOutputTagSchema>;
+type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;
+type NegativeLabNativeDensityNormalizationMetrics = z.infer<typeof negativeLabNativeDensityNormalizationMetricsSchema>;
 export type NegativeLabPresetParams = z.infer<typeof negativeLabPresetParamsSchema>;
 export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltInUiPresetCatalogSchema>;
-export type NegativeLabUiPresetFilmClass = z.infer<typeof negativeLabUiPresetFilmClassSchema>;
-export type NegativeLabUiPresetProcessFamily = z.infer<typeof negativeLabUiPresetProcessFamilySchema>;
-export type NegativeLabUiPresetProfileStatus = z.infer<typeof negativeLabUiPresetProfileStatusSchema>;
-export type NegativeLabUiPresetRuntimeStatus = z.infer<typeof negativeLabUiPresetRuntimeStatusSchema>;
-export type NegativeLabUiPresetClaimLevel = z.infer<typeof negativeLabUiPresetClaimLevelSchema>;
-export type NegativeLabUiPresetMeasurementSource = z.infer<typeof negativeLabUiPresetMeasurementSourceSchema>;
+type NegativeLabUiPresetFilmClass = z.infer<typeof negativeLabUiPresetFilmClassSchema>;
+type NegativeLabUiPresetProcessFamily = z.infer<typeof negativeLabUiPresetProcessFamilySchema>;
+type NegativeLabUiPresetProfileStatus = z.infer<typeof negativeLabUiPresetProfileStatusSchema>;
+type NegativeLabUiPresetRuntimeStatus = z.infer<typeof negativeLabUiPresetRuntimeStatusSchema>;
+type NegativeLabUiPresetClaimLevel = z.infer<typeof negativeLabUiPresetClaimLevelSchema>;
+type NegativeLabUiPresetMeasurementSource = z.infer<typeof negativeLabUiPresetMeasurementSourceSchema>;
 
 export const parseNegativeLabBuiltInUiPresetCatalog = (value: unknown): NegativeLabBuiltInUiPresetCatalog =>
   negativeLabBuiltInUiPresetCatalogSchema.parse(value);
@@ -390,8 +388,8 @@ export const negativeBaseFogSampleReadoutSchema = z
   })
   .strict();
 
-export const negativeBaseFogDensitometerStatusSchema = z.enum(['balanced', 'minor_cast', 'strong_cast']);
-export const negativeBaseFogDensitometerChannelSchema = z.enum(['red', 'green', 'blue']);
+const negativeBaseFogDensitometerStatusSchema = z.enum(['balanced', 'minor_cast', 'strong_cast']);
+const negativeBaseFogDensitometerChannelSchema = z.enum(['red', 'green', 'blue']);
 export const negativeBaseFogDensitometerReadoutSchema = z
   .object({
     densityRange: z.number().min(0),
@@ -417,7 +415,7 @@ const negativeLabNativeDensityBoundsSetSchema = z
       .strict(),
   })
   .strict();
-export const negativeLabNativeDensityNormalizationMetricsSchema = z
+const negativeLabNativeDensityNormalizationMetricsSchema = z
   .object({
     axisBounds: z
       .object({ color: negativeLabNativeDensityAxisBoundsSchema, luma: negativeLabNativeDensityAxisBoundsSchema })
@@ -535,15 +533,14 @@ export const negativeLabSavedPositiveHandoffSchema = z
   });
 
 export const negativeConversionSavedPositiveHandoffsSchema = z.array(negativeLabSavedPositiveHandoffSchema).min(1);
-export const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
+const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
 
 export type NegativeBaseFogDensitometerReadout = z.infer<typeof negativeBaseFogDensitometerReadoutSchema>;
 export type NegativeBaseFogEstimate = z.infer<typeof negativeBaseFogEstimateSchema>;
 export type NegativeBaseFogSampleReadout = z.infer<typeof negativeBaseFogSampleReadoutSchema>;
 export type NegativeLabSavedPositiveHandoff = z.infer<typeof negativeLabSavedPositiveHandoffSchema>;
 
-export const parseNegativeBaseFogEstimate = (value: unknown): NegativeBaseFogEstimate =>
+const parseNegativeBaseFogEstimate = (value: unknown): NegativeBaseFogEstimate =>
   negativeBaseFogEstimateSchema.parse(value);
 
-export const parseNegativeConversionSavedPaths = (value: unknown): string[] =>
-  negativeConversionSavedPathsSchema.parse(value);
+const parseNegativeConversionSavedPaths = (value: unknown): string[] => negativeConversionSavedPathsSchema.parse(value);

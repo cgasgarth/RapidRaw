@@ -45,7 +45,7 @@ const assertCurrent = (state: ViewerPickerEditTransactionState, command: ViewerP
   if (command.kind !== key.toolId) rejectPicker('stale_tool');
 };
 
-export const buildPointColorPickerPoint = (
+const buildPointColorPickerPoint = (
   command: Extract<ViewerPickerCommitResult, { kind: 'point-color' }>,
   createId: () => string,
 ): Adjustments['pointColor']['points'][number] => ({

@@ -2,7 +2,7 @@ import type { AiPatch, MaskContainer } from '../../../utils/adjustments';
 import type { SubMask } from '../right/layers/Masks';
 import type { ViewerPointerType } from './viewerPointerEvents';
 
-export type ViewerMaskShapeContainer = AiPatch | MaskContainer;
+type ViewerMaskShapeContainer = AiPatch | MaskContainer;
 export type ViewerMaskShapeContainerKind = 'aiPatches' | 'masks';
 
 export interface ViewerMaskShapeCurrentContext {

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const xmpMetadataConflictChoiceSchema = z.enum(['local', 'external', 'merge']);
+const xmpMetadataConflictChoiceSchema = z.enum(['local', 'external', 'merge']);
 
-export const xmpMetadataConflictFieldSchema = z.object({
+const xmpMetadataConflictFieldSchema = z.object({
   field: z.enum(['rating', 'colorLabel', 'keywords']),
   label: z.string(),
   local: z.unknown(),
@@ -21,7 +21,7 @@ export const xmpMetadataConflictDecisionSchema = z.object({
   choice: xmpMetadataConflictChoiceSchema,
 });
 
-export const xmpMetadataConflictReceiptSchema = z.object({
+const xmpMetadataConflictReceiptSchema = z.object({
   id: z.string(),
   resolvedAt: z.string(),
   xmpPath: z.string(),
@@ -30,5 +30,5 @@ export const xmpMetadataConflictReceiptSchema = z.object({
 
 export type XmpMetadataConflictChoice = z.infer<typeof xmpMetadataConflictChoiceSchema>;
 export type XmpMetadataConflictDecision = z.infer<typeof xmpMetadataConflictDecisionSchema>;
-export type XmpMetadataConflictField = z.infer<typeof xmpMetadataConflictFieldSchema>;
+type XmpMetadataConflictField = z.infer<typeof xmpMetadataConflictFieldSchema>;
 export type XmpMetadataConflictReport = z.infer<typeof xmpMetadataConflictReportSchema>;

@@ -1019,7 +1019,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
   );
 };
 
-export const buildRawEngineAppServerHealthResponse = ({
+const buildRawEngineAppServerHealthResponse = ({
   requestId,
 }: RawEngineAppServerHealthRequest): RawEngineAppServerHealthResponse =>
   rawEngineAppServerHealthResponseSchema.parse({
@@ -1030,7 +1030,7 @@ export const buildRawEngineAppServerHealthResponse = ({
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 
-export const buildRawEngineAppServerCapabilitiesResponse = ({
+const buildRawEngineAppServerCapabilitiesResponse = ({
   requestId,
 }: RawEngineAppServerCapabilitiesRequest): RawEngineAppServerCapabilitiesResponse =>
   rawEngineAppServerCapabilitiesResponseSchema.parse({
@@ -1041,7 +1041,7 @@ export const buildRawEngineAppServerCapabilitiesResponse = ({
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 
-export const buildRawEngineAppServerRouteCatalogResponse = ({
+const buildRawEngineAppServerRouteCatalogResponse = ({
   requestId,
 }: RawEngineAppServerRouteCatalogRequest): RawEngineAppServerRouteCatalogResponse =>
   rawEngineAppServerRouteCatalogResponseSchema.parse({

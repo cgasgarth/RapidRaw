@@ -95,13 +95,9 @@ const receiptSchema = z
   })
   .strict();
 
-export const BRUSH_LOCAL_ADJUSTMENT_RECEIPT_PARAMETER_KEY = 'brushLocalAdjustmentReceipt';
+const BRUSH_LOCAL_ADJUSTMENT_RECEIPT_PARAMETER_KEY = 'brushLocalAdjustmentReceipt';
 
-export function createBrushLocalAdjustmentSubMask(
-  id: string,
-  name: string,
-  parameters: Record<string, unknown>,
-): SubMask {
+function createBrushLocalAdjustmentSubMask(id: string, name: string, parameters: Record<string, unknown>): SubMask {
   return {
     id,
     invert: false,

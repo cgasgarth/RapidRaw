@@ -109,13 +109,7 @@ export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PA
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
-export const LAZY_COMPUTATIONAL_MODAL_IDS = [
-  'panorama',
-  'hdr',
-  'superResolution',
-  'focusStack',
-  'negativeLab',
-] as const;
+const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack', 'negativeLab'] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
 
 const MODAL_STATE_BY_LAZY_ID = {
@@ -126,7 +120,7 @@ const MODAL_STATE_BY_LAZY_ID = {
   superResolution: 'superResolutionModalState',
 } as const satisfies Record<LazyComputationalModalId, keyof UIState>;
 
-export const collectOpenedLazyModalIds = (
+const collectOpenedLazyModalIds = (
   mountedIds: ReadonlySet<LazyComputationalModalId>,
   update: Partial<UIState>,
 ): ReadonlySet<LazyComputationalModalId> => {

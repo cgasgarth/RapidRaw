@@ -173,7 +173,7 @@ export const professionalInspectorDensityTokens = {
   },
 } as const;
 
-export const agentReviewWorkspaceTokens = {
+const agentReviewWorkspaceTokens = {
   actionButton:
     'inline-flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded border px-2 text-[11px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:border-editor-border disabled:bg-editor-panel disabled:text-text-tertiary',
   card: 'rounded border border-editor-border bg-editor-panel-well p-2',

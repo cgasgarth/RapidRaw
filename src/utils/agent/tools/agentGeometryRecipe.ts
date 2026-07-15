@@ -18,5 +18,5 @@ export const buildAgentGeometryRecipeHashInput = (adjustments: Adjustments) => (
   transformYOffset: adjustments.transformYOffset,
 });
 
-export const hashAgentGeometryRecipeInput = (adjustments: Adjustments): string =>
+const hashAgentGeometryRecipeInput = (adjustments: Adjustments): string =>
   stableAgentPreviewHash(JSON.stringify(buildAgentGeometryRecipeHashInput(adjustments)));

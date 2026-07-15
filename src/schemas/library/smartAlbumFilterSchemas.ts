@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-export const smartAlbumMatchModeSchema = z.enum(['all', 'any']);
-export const smartAlbumSortOrderSchema = z.enum(['asc', 'desc']);
-export const smartAlbumSortKeySchema = z.enum(['name', 'captured_at', 'rating', 'color_label', 'file_extension']);
-export const smartAlbumConditionFieldSchema = z.enum([
+const smartAlbumMatchModeSchema = z.enum(['all', 'any']);
+const smartAlbumSortOrderSchema = z.enum(['asc', 'desc']);
+const smartAlbumSortKeySchema = z.enum(['name', 'captured_at', 'rating', 'color_label', 'file_extension']);
+const smartAlbumConditionFieldSchema = z.enum([
   'aperture',
   'camera_make',
   'camera_model',
@@ -18,7 +18,7 @@ export const smartAlbumConditionFieldSchema = z.enum([
   'raw_status',
   'tag',
 ]);
-export const smartAlbumConditionOperatorSchema = z.enum([
+const smartAlbumConditionOperatorSchema = z.enum([
   'between',
   'contains',
   'equals',
@@ -45,7 +45,7 @@ const textFieldSchema = z.enum([
 const numberOperatorSchema = z.enum(['between', 'equals', 'gte', 'lte', 'not_equals']);
 const textOperatorSchema = z.enum(['contains', 'equals', 'is_empty', 'is_not_empty', 'not_contains', 'not_equals']);
 
-export const smartAlbumConditionSchema = z
+const smartAlbumConditionSchema = z
   .object({
     field: smartAlbumConditionFieldSchema,
     negate: z.boolean().default(false),
@@ -96,14 +96,14 @@ export const smartAlbumConditionSchema = z
     }
   });
 
-export const smartAlbumSortSchema = z
+const smartAlbumSortSchema = z
   .object({
     key: smartAlbumSortKeySchema,
     order: smartAlbumSortOrderSchema,
   })
   .strict();
 
-export const smartAlbumSchema = z
+const smartAlbumSchema = z
   .object({
     conditions: z.array(smartAlbumConditionSchema).min(1),
     createdAt: z.iso.datetime(),
@@ -150,7 +150,7 @@ export const smartAlbumCatalogSchema = z
     }
   });
 
-export const smartAlbumAssetSchema = z
+const smartAlbumAssetSchema = z
   .object({
     aperture: z.number().positive().nullable(),
     cameraMake: z.string().nullable(),
@@ -170,12 +170,12 @@ export const smartAlbumAssetSchema = z
   })
   .strict();
 
-export const smartAlbumAssetSetSchema = z.array(smartAlbumAssetSchema);
+const smartAlbumAssetSetSchema = z.array(smartAlbumAssetSchema);
 
 export type SmartAlbum = z.infer<typeof smartAlbumSchema>;
 export type SmartAlbumAsset = z.infer<typeof smartAlbumAssetSchema>;
 export type SmartAlbumCatalog = z.infer<typeof smartAlbumCatalogSchema>;
-export type SmartAlbumCondition = z.infer<typeof smartAlbumConditionSchema>;
+type SmartAlbumCondition = z.infer<typeof smartAlbumConditionSchema>;
 type SmartAlbumNumberField = z.infer<typeof numberFieldSchema>;
 type SmartAlbumTextField = z.infer<typeof textFieldSchema>;
 
@@ -217,7 +217,7 @@ const getNumberValue = (asset: SmartAlbumAsset, field: SmartAlbumNumberField): n
   }
 };
 
-export const matchesSmartAlbumCondition = (asset: SmartAlbumAsset, condition: SmartAlbumCondition): boolean => {
+const matchesSmartAlbumCondition = (asset: SmartAlbumAsset, condition: SmartAlbumCondition): boolean => {
   let matches = false;
   const numberFieldResult = numberFieldSchema.safeParse(condition.field);
   if (numberFieldResult.success) {

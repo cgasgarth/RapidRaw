@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const dustSpotVisualizationModeSchema = z.enum(['off', 'candidate_overlay', 'edge_guard']);
+const dustSpotVisualizationModeSchema = z.enum(['off', 'candidate_overlay', 'edge_guard']);
 
 export const dustSpotVisualizationSettingsSchema = z
   .object({
@@ -37,4 +37,4 @@ export const dustSpotVisualizationFixtureSchema = z
   })
   .strict();
 
-export type DustSpotVisualizationSettings = z.infer<typeof dustSpotVisualizationSettingsSchema>;
+type DustSpotVisualizationSettings = z.infer<typeof dustSpotVisualizationSettingsSchema>;

@@ -6,7 +6,7 @@ import type { NegativeLabSessionRecipeState } from '../../schemas/negative-lab/n
 import { buildNegativeLabConversionPlanResult } from './app-server/negativeLabAppServerRoutes';
 import { createNegativeLabSessionState, type NegativeLabSessionSnapshot } from './negativeLabSessionState';
 
-export interface NegativeLabConversionBundleReplayProof {
+interface NegativeLabConversionBundleReplayProof {
   outputCount: number;
   outputFormat: NegativeLabConversionBundle['conversion']['outputFormat'];
   profileProvenanceHash: string;
@@ -70,7 +70,7 @@ const basenameOf = (path: string): string => {
   return separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
 };
 
-export const validateNegativeLabConversionBundleReplay = (value: unknown): NegativeLabConversionBundleReplayProof => {
+const validateNegativeLabConversionBundleReplay = (value: unknown): NegativeLabConversionBundleReplayProof => {
   const bundle = negativeLabConversionBundleSchema.parse(value);
   const selectedProfile = bundle.conversion.selectedProfile;
 

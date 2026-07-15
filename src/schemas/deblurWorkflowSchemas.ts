@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const deblurWorkflowReportSchema = z
+const deblurWorkflowReportSchema = z
   .object({
     artifactPath: z.string().min(1),
     applyStatus: z.literal('applied'),

@@ -50,12 +50,12 @@ export const DEFAULT_EDITOR_ZOOM_MODE: EditorZoomMode = { kind: 'fit' };
 export const EDITOR_ZOOM_MIN_RATIO = 0.1;
 export const EDITOR_ZOOM_MAX_RATIO = 4;
 export const EDITOR_ZOOM_STEP_LADDER = [0.25, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2, 3, 4] as const;
-export const PIXELATED_INSPECTION_DEVICE_RATIO = 2;
+const PIXELATED_INSPECTION_DEVICE_RATIO = 2;
 
 const finitePositive = (value: number, fallback: number): number =>
   Number.isFinite(value) && value > 0 ? value : fallback;
 
-export const normalizeEditorZoomRatio = (value: number): number =>
+const normalizeEditorZoomRatio = (value: number): number =>
   Math.min(EDITOR_ZOOM_MAX_RATIO, Math.max(EDITOR_ZOOM_MIN_RATIO, finitePositive(value, 1)));
 
 export const getEditorZoomDpr = (value: number | undefined): number => finitePositive(value ?? 1, 1);
@@ -99,7 +99,7 @@ export const getEditorZoomSourceSize = ({
     : { height: originalSize.height, width: originalSize.width };
 };
 
-export const isEditorZoomModeEqual = (left: EditorZoomMode, right: EditorZoomMode): boolean =>
+const isEditorZoomModeEqual = (left: EditorZoomMode, right: EditorZoomMode): boolean =>
   left.kind === right.kind &&
   (left.kind !== 'ratio' ||
     right.kind !== 'ratio' ||

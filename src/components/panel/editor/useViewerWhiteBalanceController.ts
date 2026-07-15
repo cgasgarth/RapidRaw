@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Adjustments } from '../../../utils/adjustments';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
 import {
   buildWhiteBalancePickerAdjustmentCommand,
-  type WhiteBalancePickerRuntimeReceipt,
+  type WhiteBalancePickerAdjustmentCommand,
 } from '../../../utils/whiteBalancePicker';
 import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
 import {
@@ -17,11 +16,11 @@ import { sampleViewerWhiteBalancePatch, type ViewerWhiteBalanceSampleService } f
 
 interface UseViewerWhiteBalanceControllerInput {
   readonly active: boolean;
-  readonly baseAdjustments: Adjustments;
+  readonly baseWhiteBalance: { readonly temperature: number; readonly tint: number };
   readonly geometry: EditorOverlayGeometry;
   readonly imageSessionId: string;
-  readonly onCommit?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
-  readonly onPreview?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
+  readonly onCommit?: (command: WhiteBalancePickerAdjustmentCommand) => void;
+  readonly onPreview?: (command: WhiteBalancePickerAdjustmentCommand) => void;
   readonly onPreviewCancel?: () => void;
   readonly presentation: EditorPresentationDescriptor;
   readonly previewUrl: string | null;
@@ -43,7 +42,7 @@ const hoverIntervalMs = 150;
 
 export const useViewerWhiteBalanceController = ({
   active,
-  baseAdjustments,
+  baseWhiteBalance,
   geometry,
   imageSessionId,
   onCommit,
@@ -112,7 +111,10 @@ export const useViewerWhiteBalanceController = ({
   }, [controller, onPreviewCancel, refresh]);
 
   const executeRequest = useCallback(
-    (request: ViewerWhiteBalanceInteractionRequest, capturedAdjustments: Adjustments) => {
+    (
+      request: ViewerWhiteBalanceInteractionRequest,
+      capturedWhiteBalance: { readonly temperature: number; readonly tint: number },
+    ) => {
       void sample(request)
         .then((result) => {
           if (result === null) {
@@ -136,17 +138,18 @@ export const useViewerWhiteBalanceController = ({
           refresh();
           const command = buildWhiteBalancePickerAdjustmentCommand({
             ...result,
-            currentAdjustments: capturedAdjustments,
+            currentTemperature: capturedWhiteBalance.temperature,
+            currentTint: capturedWhiteBalance.tint,
             currentPreviewIdentity: contextRef.current.previewIdentity,
             previewIdentity: request.identity.previewIdentity,
             selectedImagePath,
           });
           if (request.identity.intent === 'commit') {
             setLastStatus('commit-accepted');
-            onCommit?.(command.receipt, command.nextAdjustments);
+            onCommit?.(command);
           } else {
             setLastStatus('preview-accepted');
-            onPreview?.(command.receipt, command.nextAdjustments);
+            onPreview?.(command);
           }
         })
         .catch(() => {
@@ -187,7 +190,7 @@ export const useViewerWhiteBalanceController = ({
         const request = controller.completeGesture(contextRef.current, event.pointerId);
         setLastStatus(request === null ? 'pointerup-rejected' : 'sampling-commit');
         refresh();
-        if (request !== null) executeRequest(request, baseAdjustments);
+        if (request !== null) executeRequest(request, baseWhiteBalance);
         return;
       }
       if (event.type === 'pointerdown') {
@@ -213,10 +216,10 @@ export const useViewerWhiteBalanceController = ({
       const request = controller.beginPreview(contextRef.current, point, event.pointerId);
       if (request !== null) {
         refresh();
-        executeRequest(request, baseAdjustments);
+        executeRequest(request, baseWhiteBalance);
       }
     },
-    [active, baseAdjustments, cancelInteraction, controller, executeRequest, refresh, resolvePoint],
+    [active, baseWhiteBalance, cancelInteraction, controller, executeRequest, refresh, resolvePoint],
   );
 
   const snapshot = controller.snapshot();

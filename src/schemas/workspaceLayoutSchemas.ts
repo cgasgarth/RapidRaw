@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from './zodUniqueHelpers';
 
-export const workspaceSurfaceSchema = z.enum(['library', 'editor', 'negative_lab', 'merge', 'export']);
-export const workspaceDensitySchema = z.enum(['compact', 'comfortable', 'dense']);
-export const workspacePanelIdSchema = z.enum([
+const workspaceSurfaceSchema = z.enum(['library', 'editor', 'negative_lab', 'merge', 'export']);
+const workspaceDensitySchema = z.enum(['compact', 'comfortable', 'dense']);
+const workspacePanelIdSchema = z.enum([
   'adjustments',
   'agent',
   'ai',
@@ -15,9 +15,9 @@ export const workspacePanelIdSchema = z.enum([
   'masks',
   'presets',
 ]);
-export const workspacePanelDockSchema = z.enum(['left', 'right', 'bottom', 'hidden']);
+const workspacePanelDockSchema = z.enum(['left', 'right', 'bottom', 'hidden']);
 
-export const workspacePanelLayoutSchema = z
+const workspacePanelLayoutSchema = z
   .object({
     collapsed: z.boolean(),
     dock: workspacePanelDockSchema,
@@ -35,7 +35,7 @@ export const workspacePanelLayoutSchema = z
     }
   });
 
-export const workspaceLayoutSchema = z
+const workspaceLayoutSchema = z
   .object({
     activePanelId: workspacePanelIdSchema.nullable(),
     createdAt: z.iso.datetime(),

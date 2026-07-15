@@ -33,6 +33,12 @@ export const validationManifest: readonly ValidationNode[] = [
   node('lint', ['bun', 'run', 'lint'], ['frontend', 'schema', 'scripts']),
   node('format', ['bun', 'run', 'format:check'], ['docs', 'frontend', 'schema', 'scripts', 'workflows', 'rust']),
   node('typecheck', ['bun', 'run', 'typecheck'], ['frontend', 'schema'], 'cpu-heavy'),
+  node(
+    'fallow-health',
+    ['bun', 'run', 'check:fallow-health'],
+    ['frontend', 'schema', 'scripts', 'dependencies'],
+    'cpu-heavy',
+  ),
   node('unit', ['bun', 'run', 'test:unit'], ['frontend', 'schema', 'scripts'], 'suite-exclusive'),
   node('unsafe-casts', ['bun', 'tests/integration/checks/check-unsafe-casts.ts'], ['frontend']),
   node(

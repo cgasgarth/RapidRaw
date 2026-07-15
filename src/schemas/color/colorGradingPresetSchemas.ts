@@ -23,7 +23,7 @@ export const colorGradingPresetSchema = z
   })
   .strict();
 
-export const colorGradingPresetCatalogSchema = z
+const colorGradingPresetCatalogSchema = z
   .object({
     presets: z.array(colorGradingPresetSchema).min(1),
     version: z.literal(1),
@@ -43,7 +43,7 @@ export const colorGradingPresetCatalogSchema = z
     }
   });
 
-export type ColorGradingPreset = z.infer<typeof colorGradingPresetSchema>;
+type ColorGradingPreset = z.infer<typeof colorGradingPresetSchema>;
 export type ColorGradingPresetCatalog = z.infer<typeof colorGradingPresetCatalogSchema>;
 
 export const parseColorGradingPresetCatalog = (value: unknown): ColorGradingPresetCatalog =>

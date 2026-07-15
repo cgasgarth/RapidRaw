@@ -10,5 +10,5 @@ export const buildAgentCurveLevelsRecipeHashInput = (adjustments: Adjustments) =
   toneCurve: adjustments.toneCurve,
 });
 
-export const hashAgentCurveLevelsRecipeInput = (adjustments: Adjustments): string =>
+const hashAgentCurveLevelsRecipeInput = (adjustments: Adjustments): string =>
   stableAgentPreviewHash(JSON.stringify(buildAgentCurveLevelsRecipeHashInput(adjustments)));

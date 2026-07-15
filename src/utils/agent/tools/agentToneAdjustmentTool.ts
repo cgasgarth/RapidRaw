@@ -307,7 +307,7 @@ const setPatchedToneAdjustments = (
   return adjustments;
 };
 
-export const renderAgentToneDryRunPreview = async ({
+const renderAgentToneDryRunPreview = async ({
   baseAdjustments,
   patch,
   path,

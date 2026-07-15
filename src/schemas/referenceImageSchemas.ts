@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-export const referenceImageModeSchema = z.enum(['side_by_side', 'overlay', 'split_view']);
-export const referenceImagePlacementSchema = z.enum(['left', 'right', 'top', 'bottom', 'floating']);
-export const referenceImageColorIntentSchema = z.enum(['match_display', 'preserve_reference', 'proof_output']);
+const referenceImageModeSchema = z.enum(['side_by_side', 'overlay', 'split_view']);
+const referenceImagePlacementSchema = z.enum(['left', 'right', 'top', 'bottom', 'floating']);
+const referenceImageColorIntentSchema = z.enum(['match_display', 'preserve_reference', 'proof_output']);
 
-export const referenceImageSchema = z
+const referenceImageSchema = z
   .object({
     colorIntent: referenceImageColorIntentSchema,
     id: z.string().trim().min(1),
@@ -62,7 +62,7 @@ export const referenceImageWorkspaceSchema = z
 
 export type ReferenceImageWorkspace = z.infer<typeof referenceImageWorkspaceSchema>;
 
-export const activeReferenceImage = (workspace: ReferenceImageWorkspace) =>
+const activeReferenceImage = (workspace: ReferenceImageWorkspace) =>
   workspace.references.find((reference) => reference.id === workspace.activeReferenceId) ?? workspace.references[0];
 
 export const referenceWorkspaceSummary = (workspace: ReferenceImageWorkspace): string => {

@@ -62,7 +62,7 @@ const DEFAULT_DENSITY_PRINT_V2_PARAMS: NonNullable<NegativeLabPresetParams['prin
   output_domain: 'scene_linear_print',
 };
 
-export const clampNegativeLabUnitValue = (value: number): number => Math.min(1, Math.max(0, value));
+const clampNegativeLabUnitValue = (value: number): number => Math.min(1, Math.max(0, value));
 
 const applyPositiveEndpoints = (value: number, params: NegativeLabPresetParams): number => {
   const blackPoint = clampNegativeLabUnitValue(params.black_point + params.black_point_offset);
@@ -117,7 +117,7 @@ const buildNegativeLabDensityBoundsFromDensitySample = (
   { max: Math.max(1, densityRgb[2]), min: 0 },
 ];
 
-export const buildNegativeLabDensityBounds = (
+const buildNegativeLabDensityBounds = (
   negativeRgb: readonly NegativeLabRgbTriplet[],
   baseFogRgb: NegativeLabRgbTriplet,
 ): NegativeLabDensityBounds => {

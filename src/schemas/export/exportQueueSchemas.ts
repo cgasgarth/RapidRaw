@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 import { EXPORT_QUEUE_FILE_FORMAT_IDS } from '../../utils/export/exportFormatIds';
 
-export const exportQueueJobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
-export const exportQueuePrioritySchema = z.enum(['normal', 'high']);
-export type ExportQueuePriority = z.infer<typeof exportQueuePrioritySchema>;
+const exportQueueJobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
+const exportQueuePrioritySchema = z.enum(['normal', 'high']);
+type ExportQueuePriority = z.infer<typeof exportQueuePrioritySchema>;
 
-export const exportQueueRecipeRefSchema = z
+const exportQueueRecipeRefSchema = z
   .object({
     fileFormat: z.enum(EXPORT_QUEUE_FILE_FORMAT_IDS),
     recipeId: z.string().trim().min(1),
@@ -14,7 +14,7 @@ export const exportQueueRecipeRefSchema = z
   })
   .strict();
 
-export const exportQueueJobSchema = z
+const exportQueueJobSchema = z
   .object({
     completedAt: z.iso.datetime().nullable(),
     createdAt: z.iso.datetime(),
@@ -100,7 +100,7 @@ export const exportQueueSchema = z
     }
   });
 
-export const exportQueueExecutionPlanSchema = z
+const exportQueueExecutionPlanSchema = z
   .object({
     activeJobIds: z.array(z.string().trim().min(1)),
     availableSlots: z.number().int().min(0),
@@ -111,10 +111,10 @@ export const exportQueueExecutionPlanSchema = z
 
 export type ExportQueue = z.infer<typeof exportQueueSchema>;
 export type ExportQueueExecutionPlan = z.infer<typeof exportQueueExecutionPlanSchema>;
-export type ExportQueueJob = z.infer<typeof exportQueueJobSchema>;
+type ExportQueueJob = z.infer<typeof exportQueueJobSchema>;
 
 export const parseExportQueue = (value: unknown): ExportQueue => exportQueueSchema.parse(value);
-export const parseExportQueueJob = (value: unknown): ExportQueueJob => exportQueueJobSchema.parse(value);
+const parseExportQueueJob = (value: unknown): ExportQueueJob => exportQueueJobSchema.parse(value);
 
 const EXPORT_QUEUE_PRIORITY_WEIGHT: Record<ExportQueuePriority, number> = {
   high: 0,

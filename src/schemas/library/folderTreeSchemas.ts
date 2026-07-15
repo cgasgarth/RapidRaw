@@ -11,7 +11,7 @@ export interface FolderTreePayload {
   created: number;
 }
 
-export const folderTreeSchema: z.ZodType<FolderTreePayload> = z.lazy(() =>
+const folderTreeSchema: z.ZodType<FolderTreePayload> = z.lazy(() =>
   z
     .object({
       children: z.array(folderTreeSchema),

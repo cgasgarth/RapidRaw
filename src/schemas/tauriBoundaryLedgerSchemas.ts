@@ -49,7 +49,7 @@ const tauriBoundaryEntrySchema = z
     }
   });
 
-export const tauriBoundaryLedgerSchema = z
+const tauriBoundaryLedgerSchema = z
   .object({
     $schema: z.url(),
     entries: z.array(tauriBoundaryEntrySchema).min(1),

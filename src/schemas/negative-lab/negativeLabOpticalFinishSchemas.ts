@@ -34,5 +34,5 @@ export const negativeLabOpticalFinishMetricsSchema = z
   })
   .strict();
 
-export type NegativeLabOpticalFinishParams = z.infer<typeof negativeLabOpticalFinishParamsSchema>;
-export type NegativeLabOpticalFinishMetrics = z.infer<typeof negativeLabOpticalFinishMetricsSchema>;
+type NegativeLabOpticalFinishParams = z.infer<typeof negativeLabOpticalFinishParamsSchema>;
+type NegativeLabOpticalFinishMetrics = z.infer<typeof negativeLabOpticalFinishMetricsSchema>;

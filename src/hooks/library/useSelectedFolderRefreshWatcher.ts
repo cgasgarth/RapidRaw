@@ -10,7 +10,7 @@ import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 
-export const LIBRARY_CHANGE_BATCH_EVENT = 'library-filesystem-change-batch';
+const LIBRARY_CHANGE_BATCH_EVENT = 'library-filesystem-change-batch';
 
 const libraryPathChangeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('added'), path: z.string() }).strict(),

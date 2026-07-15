@@ -1,16 +1,16 @@
 import { z } from 'zod';
 
-export const agentChatMessageRoleSchema = z.enum(['assistant', 'system', 'user']);
-export const agentChatToolCallModeSchema = z.enum(['apply', 'dry_run', 'read']);
-export const agentChatToolCallStatusSchema = z.enum(['blocked', 'failed', 'queued', 'running', 'succeeded', 'warning']);
-export const agentChatApprovalStateSchema = z.enum(['approved', 'not_required', 'rejected', 'required']);
-export const agentChatReviewActionStateSchema = z.enum(['available', 'disabled', 'rejected', 'unavailable']);
-export const agentArtifactReviewStatusSchema = z.enum(['audit_only', 'ready', 'review_required']);
-export const agentAuditTranscriptOutcomeSchema = z.enum(['blocked', 'success', 'warning']);
-export const agentReviewHandoffRollbackStatusSchema = z.enum(['available', 'blocked', 'not_required']);
-export const agentReviewHandoffOutputStatusSchema = z.enum(['review_artifact_ready', 'runtime_apply_verified']);
-export const agentSelectedFrameScopePolicyStateSchema = z.enum(['passed', 'review_required']);
-export const agentAuditEvidenceTierSchema = z.enum([
+const agentChatMessageRoleSchema = z.enum(['assistant', 'system', 'user']);
+const agentChatToolCallModeSchema = z.enum(['apply', 'dry_run', 'read']);
+const agentChatToolCallStatusSchema = z.enum(['blocked', 'failed', 'queued', 'running', 'succeeded', 'warning']);
+const agentChatApprovalStateSchema = z.enum(['approved', 'not_required', 'rejected', 'required']);
+const agentChatReviewActionStateSchema = z.enum(['available', 'disabled', 'rejected', 'unavailable']);
+const agentArtifactReviewStatusSchema = z.enum(['audit_only', 'ready', 'review_required']);
+const agentAuditTranscriptOutcomeSchema = z.enum(['blocked', 'success', 'warning']);
+const agentReviewHandoffRollbackStatusSchema = z.enum(['available', 'blocked', 'not_required']);
+const agentReviewHandoffOutputStatusSchema = z.enum(['review_artifact_ready', 'runtime_apply_verified']);
+const agentSelectedFrameScopePolicyStateSchema = z.enum(['passed', 'review_required']);
+const agentAuditEvidenceTierSchema = z.enum([
   'ui_only',
   'schema_only',
   'dry_run_only',
@@ -19,29 +19,29 @@ export const agentAuditEvidenceTierSchema = z.enum([
   'e2e_verified',
 ]);
 const legacyRuntimeApplyStatus = ['runtime', 'apply_demo'].join('_');
-export const agentChatRuntimeStatusSchema = z.preprocess(
+const agentChatRuntimeStatusSchema = z.preprocess(
   (value) => (value === legacyRuntimeApplyStatus ? 'runtime_apply_ready' : value),
   z.enum(['ui_only_demo', 'runtime_apply_ready']),
 );
-export const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', 'current', 'pending']);
-export const agentFailureRecoveryActionStateSchema = z.enum(['available', 'completed']);
-export const agentLongEditProgressStageStateSchema = z.enum(['completed', 'current', 'pending']);
-export const agentE2eClosureStepStatusSchema = z.enum(['verified']);
-export const agentSelectedImagePreviewLoopControlStateSchema = z.enum([
+const agentLivePromptWalkthroughStageStateSchema = z.enum(['completed', 'current', 'pending']);
+const agentFailureRecoveryActionStateSchema = z.enum(['available', 'completed']);
+const agentLongEditProgressStageStateSchema = z.enum(['completed', 'current', 'pending']);
+const agentE2eClosureStepStatusSchema = z.enum(['verified']);
+const agentSelectedImagePreviewLoopControlStateSchema = z.enum([
   'available',
   'disabled',
   'dispatched',
   'rejected',
   'unavailable',
 ]);
-export const agentSelectedImagePreviewLoopIterationApprovalStateSchema = z.enum([
+const agentSelectedImagePreviewLoopIterationApprovalStateSchema = z.enum([
   'approved',
   'blocked_stale',
   'latest_reviewed',
   'pending_review',
   'superseded',
 ]);
-export const agentSelectedImagePreviewLoopBlockerSchema = z.enum([
+const agentSelectedImagePreviewLoopBlockerSchema = z.enum([
   'missing_dry_run_approval',
   'missing_selected_image',
   'private_raw_proof_unavailable',
@@ -52,7 +52,7 @@ export const agentSelectedImagePreviewLoopBlockerSchema = z.enum([
   'stale_recipe_hash',
 ]);
 
-export const agentChatMessageSchema = z
+const agentChatMessageSchema = z
   .object({
     body: z.string().min(1),
     id: z.string().min(1),
@@ -61,7 +61,7 @@ export const agentChatMessageSchema = z
   })
   .strict();
 
-export const agentChatToolCallSchema = z
+const agentChatToolCallSchema = z
   .object({
     approvalState: agentChatApprovalStateSchema,
     durationMs: z.number().int().nonnegative().optional(),
@@ -128,7 +128,7 @@ export const agentChatDryRunReviewSchema = z
   })
   .strict();
 
-export const agentLivePromptWalkthroughSchema = z
+const agentLivePromptWalkthroughSchema = z
   .object({
     approval: z
       .object({
@@ -157,7 +157,7 @@ export const agentLivePromptWalkthroughSchema = z
   })
   .strict();
 
-export const agentFailureRecoverySchema = z
+const agentFailureRecoverySchema = z
   .object({
     editAction: z
       .object({
@@ -182,7 +182,7 @@ export const agentFailureRecoverySchema = z
   })
   .strict();
 
-export const agentLongEditProgressSchema = z
+const agentLongEditProgressSchema = z
   .object({
     completedStageCount: z.number().int().nonnegative(),
     estimatedTotalMs: z.number().int().positive(),
@@ -205,7 +205,7 @@ export const agentLongEditProgressSchema = z
   })
   .strict();
 
-export const agentE2eClosureSchema = z
+const agentE2eClosureSchema = z
   .object({
     id: z.string().min(1),
     proofHref: z.string().min(1),
@@ -282,7 +282,7 @@ export const agentArtifactReviewSchema = z
   })
   .strict();
 
-export const agentAuditTranscriptSchema = z
+const agentAuditTranscriptSchema = z
   .object({
     evidenceTier: agentAuditEvidenceTierSchema,
     finalRevision: z.string().min(1),
@@ -321,7 +321,7 @@ export const agentAuditTranscriptSchema = z
   })
   .strict();
 
-export const agentReviewHandoffSchema = z
+const agentReviewHandoffSchema = z
   .object({
     afterArtifactId: z.string().min(1),
     afterLabel: z.string().min(1),
@@ -376,7 +376,7 @@ export const agentReviewHandoffSchema = z
   })
   .strict();
 
-export const agentSelectedFrameScopeSchema = z
+const agentSelectedFrameScopeSchema = z
   .object({
     approvalLabel: z.string().min(1),
     approvalState: agentChatApprovalStateSchema,
@@ -433,7 +433,7 @@ export const agentSelectedFrameScopeSchema = z
   })
   .strict();
 
-export const agentPrivateRawArtifactsSchema = z
+const agentPrivateRawArtifactsSchema = z
   .object({
     artifactCount: z.number().int().positive(),
     fixtureId: z.string().min(1),
@@ -447,7 +447,7 @@ export const agentPrivateRawArtifactsSchema = z
   })
   .strict();
 
-export const agentSelectedImagePreviewLoopReviewSchema = z
+const agentSelectedImagePreviewLoopReviewSchema = z
   .object({
     acceptedDryRunPlanCount: z.number().int().min(1),
     applyReceipts: z
@@ -694,7 +694,7 @@ export const agentSelectedImagePreviewLoopReviewSchema = z
   })
   .strict();
 
-export const agentInitialPromptPreviewContextSchema = z
+const agentInitialPromptPreviewContextSchema = z
   .object({
     accessScope: z.literal('local_private'),
     artifactId: z.string().min(1),
@@ -740,16 +740,16 @@ export const agentChatTranscriptSchema = z
 
 export type AgentChatMessage = z.infer<typeof agentChatMessageSchema>;
 export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
-export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
-export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
-export type AgentInitialPromptPreviewContext = z.infer<typeof agentInitialPromptPreviewContextSchema>;
+type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
+type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
+type AgentInitialPromptPreviewContext = z.infer<typeof agentInitialPromptPreviewContextSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
-export type AgentE2eClosure = z.infer<typeof agentE2eClosureSchema>;
-export type AgentFailureRecovery = z.infer<typeof agentFailureRecoverySchema>;
-export type AgentLivePromptWalkthrough = z.infer<typeof agentLivePromptWalkthroughSchema>;
-export type AgentLongEditProgress = z.infer<typeof agentLongEditProgressSchema>;
-export type AgentPrivateRawArtifacts = z.infer<typeof agentPrivateRawArtifactsSchema>;
-export type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
-export type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;
-export type AgentSelectedImagePreviewLoopReview = z.infer<typeof agentSelectedImagePreviewLoopReviewSchema>;
+type AgentE2eClosure = z.infer<typeof agentE2eClosureSchema>;
+type AgentFailureRecovery = z.infer<typeof agentFailureRecoverySchema>;
+type AgentLivePromptWalkthrough = z.infer<typeof agentLivePromptWalkthroughSchema>;
+type AgentLongEditProgress = z.infer<typeof agentLongEditProgressSchema>;
+type AgentPrivateRawArtifacts = z.infer<typeof agentPrivateRawArtifactsSchema>;
+type AgentReviewHandoff = z.infer<typeof agentReviewHandoffSchema>;
+type AgentSelectedFrameScope = z.infer<typeof agentSelectedFrameScopeSchema>;
+type AgentSelectedImagePreviewLoopReview = z.infer<typeof agentSelectedImagePreviewLoopReviewSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;

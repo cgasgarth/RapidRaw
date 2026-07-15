@@ -2,10 +2,10 @@ import { z } from 'zod';
 
 export const NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION = 1;
 
-export const negativeLabFrameHealthStatusSchema = z.enum(['active', 'queued', 'skipped']);
-export const negativeLabFrameBaseStatusSchema = z.enum(['pending', 'estimated']);
-export const negativeLabFrameBaseScopeSchema = z.enum(['frame', 'roll']);
-export const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
+const negativeLabFrameHealthStatusSchema = z.enum(['active', 'queued', 'skipped']);
+const negativeLabFrameBaseStatusSchema = z.enum(['pending', 'estimated']);
+const negativeLabFrameBaseScopeSchema = z.enum(['frame', 'roll']);
+const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
 export const negativeLabFrameCropStatusSchema = z.enum([
   'active_frame_editable',
   'detected_frame',
@@ -13,9 +13,9 @@ export const negativeLabFrameCropStatusSchema = z.enum([
   'roll_default',
   'skipped',
 ]);
-export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
-export const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review', 'skip']);
-export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
+const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
+const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review', 'skip']);
+const negativeLabFrameBatchDispositionReasonSchema = z.enum([
   'acquisition_review_required',
   'base_not_estimated',
   'bounds_review_required',
@@ -23,8 +23,8 @@ export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
   'preview_required',
   'ready_to_apply',
 ]);
-export const negativeLabFrameWarningSeveritySchema = z.enum(['ok', 'info', 'review']);
-export const negativeLabFrameWarningCodeSchema = z.enum([
+const negativeLabFrameWarningSeveritySchema = z.enum(['ok', 'info', 'review']);
+const negativeLabFrameWarningCodeSchema = z.enum([
   'base_estimate_active_frame_only',
   'bounds_missing_visible_base',
   'bounds_narrow_luma_span',
@@ -39,7 +39,7 @@ export const negativeLabAcquisitionWarningCodeSchema = z.enum([
   'unknown_acquisition_state',
 ]);
 export const negativeLabAcquisitionSourceFamilySchema = z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown']);
-export const negativeLabAcquisitionSeveritySchema = z.enum(['ok', 'review']);
+const negativeLabAcquisitionSeveritySchema = z.enum(['ok', 'review']);
 export const negativeLabFrameAcquisitionHealthSchema = z
   .object({
     severity: negativeLabAcquisitionSeveritySchema,
@@ -59,7 +59,7 @@ export const negativeLabFrameAcquisitionHealthSchema = z
     }
   });
 
-export const negativeLabAcquisitionHealthReportSchema = z
+const negativeLabAcquisitionHealthReportSchema = z
   .object({
     lossyCount: z.number().int().nonnegative(),
     rawLikeCount: z.number().int().nonnegative(),
@@ -86,7 +86,7 @@ export const negativeLabAcquisitionHealthReportSchema = z
     }
   });
 
-export const negativeLabFrameHealthEntrySchema = z
+const negativeLabFrameHealthEntrySchema = z
   .object({
     active: z.boolean(),
     acquisitionSourceFamily: negativeLabAcquisitionSourceFamilySchema,
@@ -245,7 +245,7 @@ export const negativeLabBatchDryRunSummarySchema = z
     }
   });
 
-export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
+type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
 export type NegativeLabFrameBaseScope = z.infer<typeof negativeLabFrameBaseScopeSchema>;
 export type NegativeLabFrameCropStatus = z.infer<typeof negativeLabFrameCropStatusSchema>;
 export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWarningSeveritySchema>;

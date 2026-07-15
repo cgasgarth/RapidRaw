@@ -105,7 +105,7 @@ const outputSchema = {
 type PendingRpc = { reject: (error: Error) => void; resolve: (value: unknown) => void };
 type PendingTurn = { reject: (error: Error) => void; resolve: (value: z.infer<typeof turnCompletedSchema>) => void };
 
-export class AgentCodexAppServerModelTransport implements AgentSelectedImageModelTransport {
+class AgentCodexAppServerModelTransport implements AgentSelectedImageModelTransport {
   private child: Child | undefined;
   private nextId = 1;
   private readonly pendingRpc = new Map<number, PendingRpc>();

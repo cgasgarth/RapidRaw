@@ -39,9 +39,9 @@ import {
   stableAgentPreviewHash,
 } from './agentPreviewEnvelope';
 
-export const AGENT_TONE_COLOR_DRY_RUN_EXPERT_TOOL_NAME = 'rawengine.agent.tone_color.dry_run_expert_edit';
+const AGENT_TONE_COLOR_DRY_RUN_EXPERT_TOOL_NAME = 'rawengine.agent.tone_color.dry_run_expert_edit';
 
-export const agentToneColorDryRunExpertIntentSchema = z.enum([
+const agentToneColorDryRunExpertIntentSchema = z.enum([
   'brighten',
   'contrast',
   'cool_white_balance',

@@ -1,13 +1,18 @@
 import { z } from 'zod';
 import type { Adjustments } from './adjustments';
-import { buildTechnicalWhiteBalance, cctToXy, technicalWhiteBalanceSchema } from './color/whiteBalance';
+import {
+  buildTechnicalWhiteBalance,
+  cctToXy,
+  type TechnicalWhiteBalance,
+  technicalWhiteBalanceSchema,
+} from './color/whiteBalance';
 import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
 const sliderMinimum = -100;
 const sliderMaximum = 100;
 
-export const whiteBalancePickerSampleSchema = z
+const whiteBalancePickerSampleSchema = z
   .object({
     red: z.number().min(0).max(255),
     green: z.number().min(0).max(255),
@@ -59,14 +64,20 @@ export interface WhiteBalancePickerRuntimeReceipt {
 
 export interface WhiteBalancePickerAdjustmentCommand {
   adjustment: WhiteBalancePickerResult;
-  nextAdjustments: Adjustments;
+  patch: {
+    temperature: number;
+    tint: number;
+    whiteBalanceMigration: 'native_v1';
+    whiteBalanceTechnical: TechnicalWhiteBalance;
+  };
   receipt: WhiteBalancePickerRuntimeReceipt;
 }
 
 export interface WhiteBalancePickerAdjustmentCommandInput {
   averageRgb: z.infer<typeof whiteBalancePickerSampleSchema>;
   coordinates: WhiteBalancePickerSampleCoordinates;
-  currentAdjustments: Adjustments;
+  currentTemperature: number;
+  currentTint: number;
   previewIdentity: string;
   currentPreviewIdentity?: string;
   patchPixelCount?: number;
@@ -82,7 +93,7 @@ export interface WhiteBalancePickerPatchSample {
   spatialVariance: number;
 }
 
-export class WhiteBalancePickerSampleError extends Error {
+class WhiteBalancePickerSampleError extends Error {
   constructor(public readonly code: 'stale_preview' | 'clipped_patch' | 'non_uniform_patch') {
     super(`white_balance_picker_${code}`);
   }
@@ -105,15 +116,16 @@ export interface WhiteBalancePickerEditTransactionState {
 
 export const buildWhiteBalancePickerEditTransaction = (
   state: WhiteBalancePickerEditTransactionState,
-  receipt: WhiteBalancePickerRuntimeReceipt,
-  nextAdjustments: Adjustments,
+  command: WhiteBalancePickerAdjustmentCommand,
   transactionId: string,
 ): EditTransactionRequest => {
+  const { receipt } = command;
   if (state.selectedImage?.path !== receipt.selectedImagePath) {
     throw new Error(
       `white_balance_picker_stale_source:${receipt.selectedImagePath}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
+  const nextAdjustments = applyWhiteBalancePickerAdjustmentCommand(state.adjustments, command);
   return {
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
@@ -140,12 +152,12 @@ export const createWhiteBalancePickerPreviewSession = (
 
 export const applyWhiteBalancePickerHoverPreview = (
   session: WhiteBalancePickerPreviewSession,
-  nextAdjustments: Adjustments,
-  receipt: Pick<WhiteBalancePickerRuntimeReceipt, 'previewIdentity' | 'selectedImagePath'>,
+  command: WhiteBalancePickerAdjustmentCommand,
 ): { adjustments: Adjustments; session: WhiteBalancePickerPreviewSession } => {
+  const { receipt } = command;
   if (session.sourceIdentity !== receipt.selectedImagePath) throw new WhiteBalancePickerSampleError('stale_preview');
   return {
-    adjustments: nextAdjustments,
+    adjustments: applyWhiteBalancePickerAdjustmentCommand(session.baseAdjustments, command),
     session: {
       ...session,
       lastPreviewIdentity: receipt.previewIdentity,
@@ -298,7 +310,8 @@ export const analyzeWhiteBalancePickerRgbaSample = (
 export const buildWhiteBalancePickerAdjustmentCommand = ({
   averageRgb,
   coordinates,
-  currentAdjustments,
+  currentTemperature,
+  currentTint,
   patchPixelCount = 1,
   previewIdentity,
   currentPreviewIdentity = previewIdentity,
@@ -311,16 +324,13 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
     throw new WhiteBalancePickerSampleError('clipped_patch');
   if (spatialVariance > 0.025) throw new WhiteBalancePickerSampleError('non_uniform_patch');
   const adjustment = calculateWhiteBalancePickerAdjustment({
-    currentTemperature: currentAdjustments.temperature,
-    currentTint: currentAdjustments.tint,
+    currentTemperature,
+    currentTint,
     sample: averageRgb,
   });
   const estimate = estimateNeutralSampleIlluminant(averageRgb);
   const technical = buildTechnicalWhiteBalance('chromaticity', estimate.kelvin, estimate.duv, 'picker');
-  const nextAdjustments = {
-    ...currentAdjustments,
-    // Retain legacy mirrors for command/audit compatibility; render authority
-    // is the typed technical illuminant below.
+  const patch = {
     temperature: adjustment.temperature,
     tint: adjustment.tint,
     whiteBalanceTechnical: technicalWhiteBalanceSchema.parse({
@@ -335,7 +345,7 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
 
   return {
     adjustment,
-    nextAdjustments,
+    patch,
     receipt: {
       averageRgb: whiteBalancePickerSampleSchema.parse(averageRgb),
       algorithm: 'neutral_patch_scene_linear_chromaticity_v1',
@@ -355,6 +365,16 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
     },
   };
 };
+
+export const applyWhiteBalancePickerAdjustmentCommand = (
+  baseAdjustments: Adjustments,
+  command: WhiteBalancePickerAdjustmentCommand,
+): Adjustments => ({
+  ...baseAdjustments,
+  // Retain legacy mirrors for command/audit compatibility; render authority
+  // is the typed technical illuminant below.
+  ...command.patch,
+});
 
 export const applyWhiteBalanceToRgbPixel = (
   pixel: RgbPixel,

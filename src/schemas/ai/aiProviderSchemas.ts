@@ -6,11 +6,11 @@ export const AiProviderId = {
   Local: 'cpu',
 } as const;
 
-export const aiProviderIdSchema = z.enum([AiProviderId.Local, AiProviderId.Connector, AiProviderId.Cloud]);
+const aiProviderIdSchema = z.enum([AiProviderId.Local, AiProviderId.Connector, AiProviderId.Cloud]);
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>;
 
-export const DEFAULT_AI_PROVIDER_ID: AiProviderId = AiProviderId.Local;
+const DEFAULT_AI_PROVIDER_ID: AiProviderId = AiProviderId.Local;
 
 export const AiProviderFallbackReason = {
   CloudPlanRequired: 'cloud_plan_required',
@@ -19,23 +19,23 @@ export const AiProviderFallbackReason = {
   InvalidProvider: 'invalid_provider',
 } as const;
 
-export const aiProviderFallbackReasonSchema = z.enum([
+const aiProviderFallbackReasonSchema = z.enum([
   AiProviderFallbackReason.CloudPlanRequired,
   AiProviderFallbackReason.CloudSignedOut,
   AiProviderFallbackReason.ConnectorUnavailable,
   AiProviderFallbackReason.InvalidProvider,
 ]);
 
-export type AiProviderFallbackReason = z.infer<typeof aiProviderFallbackReasonSchema>;
+type AiProviderFallbackReason = z.infer<typeof aiProviderFallbackReasonSchema>;
 
-export const aiProviderSettingsSchema = z
+const aiProviderSettingsSchema = z
   .object({
     aiConnectorAddress: z.string().trim().min(1).optional(),
     aiProvider: z.preprocess((value) => normalizeAiProviderId(value), aiProviderIdSchema),
   })
   .loose();
 
-export type AiProviderSettings = z.infer<typeof aiProviderSettingsSchema>;
+type AiProviderSettings = z.infer<typeof aiProviderSettingsSchema>;
 
 export const normalizeAiProviderId = (value: unknown): AiProviderId => {
   const parsed = aiProviderIdSchema.safeParse(value);
@@ -46,7 +46,7 @@ export const normalizeAiProviderId = (value: unknown): AiProviderId => {
   return DEFAULT_AI_PROVIDER_ID;
 };
 
-export const aiProviderRuntimeInputSchema = z
+const aiProviderRuntimeInputSchema = z
   .object({
     aiProvider: z.unknown().optional(),
     isAIConnectorConnected: z.boolean().default(false),
@@ -69,7 +69,7 @@ export const aiProviderRuntimeStateSchema = z
 export type AiProviderRuntimeInput = z.input<typeof aiProviderRuntimeInputSchema>;
 export type AiProviderRuntimeState = z.infer<typeof aiProviderRuntimeStateSchema>;
 
-export const aiEditApprovalInputSchema = z
+const aiEditApprovalInputSchema = z
   .object({
     aiProvider: aiProviderIdSchema,
     useFastInpaint: z.boolean(),
