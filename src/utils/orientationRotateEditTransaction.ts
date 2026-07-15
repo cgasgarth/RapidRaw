@@ -12,17 +12,21 @@ export interface OrientationRotateEditTransactionState {
   adjustmentRevision: number;
   adjustments: Pick<Adjustments, 'aspectRatio' | 'crop' | 'orientationSteps' | 'rotation'>;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { height?: number | null; path: string; width?: number | null } | null;
 }
+
+const currentImageSessionId = (state: OrientationRotateEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const captureOrientationRotateCommitIdentity = (
   state: OrientationRotateEditTransactionState,
 ): OrientationRotateCommitIdentity | null =>
-  state.imageSession === null || state.selectedImage === null
+  state.selectedImage === null
     ? null
     : {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       };
 
@@ -33,7 +37,7 @@ const assertCurrentIdentity = (
   if (state.selectedImage?.path !== identity.sourceIdentity) {
     throw new Error('orientation_rotate_transaction.stale_source');
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error('orientation_rotate_transaction.stale_session');
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

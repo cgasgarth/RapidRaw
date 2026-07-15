@@ -158,7 +158,7 @@ describe('orientation rotate edit transaction', () => {
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
   });
 
-  test('rejects malformed angles and requires a selected image session', () => {
+  test('rejects malformed angles and requires a selected image', () => {
     const state = useEditorStore.getState();
     expect(() => buildOrientationRotateEditTransaction(state, identity(), 45, 'invalid')).toThrow(
       'orientation_rotate_transaction.invalid_degrees',
@@ -167,6 +167,32 @@ describe('orientation rotate edit transaction', () => {
       'orientation_rotate_transaction.invalid_degrees',
     );
     expect(captureOrientationRotateCommitIdentity({ ...state, selectedImage: null })).toBeNull();
-    expect(captureOrientationRotateCommitIdentity({ ...state, imageSession: null })).toBeNull();
+  });
+
+  test('rotates selected-image fallback sessions without an explicit imageSession object', () => {
+    const state = useEditorStore.getState();
+    useEditorStore.setState({ imageSession: null, imageSessionId: 52 });
+    const fallbackState = useEditorStore.getState();
+    const fallbackIdentity = captureOrientationRotateCommitIdentity(fallbackState);
+    expect(fallbackIdentity).toEqual({
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:52',
+      sourceIdentity: sourcePath,
+    });
+    if (fallbackIdentity === null) throw new Error('expected fallback identity');
+    const result = fallbackState.applyEditTransaction(
+      buildOrientationRotateEditTransaction(fallbackState, fallbackIdentity, -90, 'fallback-rotate'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['aspectRatio', 'crop', 'orientationSteps', 'rotation'], noOp: false });
+    expect(useEditorStore.getState().adjustments).toMatchObject({ aspectRatio: 3 / 4, orientationSteps: 3 });
+
+    expect(() =>
+      buildOrientationRotateEditTransaction(
+        { ...state, imageSession: null, imageSessionId: 53 },
+        fallbackIdentity,
+        90,
+        'stale-fallback',
+      ),
+    ).toThrow('orientation_rotate_transaction.stale_session');
   });
 });
