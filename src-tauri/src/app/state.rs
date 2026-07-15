@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
@@ -123,7 +122,6 @@ pub struct AppState {
     pub gpu_initialization: InitializationService,
     pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
-    pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,
     pub original_image: Mutex<Option<LoadedImage>>,
     pub cached_preview: Mutex<Option<CachedPreview>>,
     pub gpu_context: Mutex<Option<GpuContext>>,
@@ -181,7 +179,6 @@ impl AppState {
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
-            gpu_crash_flag_path: Mutex::new(None),
             original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
