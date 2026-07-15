@@ -46,14 +46,6 @@ import {
   type SubMaskInteractionTarget,
   scheduleSubMaskInteractionEnd,
 } from '../../../utils/subMaskInteractionEditTransaction';
-import {
-  buildViewerSamplerIdentity,
-  isViewerSampleResultCurrent,
-  LatestViewerSampleScheduler,
-  type ViewerSampleRequest,
-  type ViewerSampleResult,
-  type ViewerSampleTarget,
-} from '../../../utils/viewerSampler';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import type { WhiteBalancePickerRuntimeReceipt } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
@@ -76,11 +68,13 @@ import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
 import { useViewerPickerControllers } from './useViewerPickerControllers';
 import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
+import { useViewerSamplerController } from './useViewerSamplerController';
 import { useViewerWhiteBalanceController } from './useViewerWhiteBalanceController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
 import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
+import { ViewerSamplerOverlay } from './ViewerSamplerOverlay';
 import { ViewerSurface } from './ViewerSurface';
 import {
   createViewerAiMaskBoxInteractionController,
@@ -124,8 +118,6 @@ import {
 } from './viewerParametricMaskTargetInteractionController';
 import type { ViewerPickerCommitResult } from './viewerPickerInteractionControllers';
 import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
-import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
-import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 
 const acknowledgeSurfacePaint = (): void => undefined;
 
@@ -1058,161 +1050,24 @@ export const ImageCanvas = memo(
       effectiveMaskInteractionActive ||
       isToolActive ||
       (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
-    interface LocalViewerSamplerState {
-      locked: boolean;
-      result: ViewerSampleResult | null;
-      target: ViewerSampleTarget;
-    }
-    const initialViewerSamplerState: LocalViewerSamplerState = {
-      locked: false,
-      result: null,
-      target: isExportSoftProofEnabled ? 'softProof' : 'edited',
-    };
-    const [viewerSampler, setViewerSampler] = useState(initialViewerSamplerState);
-    const viewerSamplerRef = useRef(viewerSampler);
-    viewerSamplerRef.current = viewerSampler;
-    const transitionViewerSamplerRef = useRef<
-      (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
-    >(() => undefined);
-    const handleToggleViewerSampleLock = useCallback(() => {
-      transitionViewerSamplerRef.current((current) => ({ ...current, locked: !current.locked }));
-    }, []);
-    const transitionViewerSampler = useCallback(
-      (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => {
-        const next = transition(viewerSamplerRef.current);
-        viewerSamplerRef.current = next;
-        setViewerSampler(next);
-        onViewerSamplerStateChange?.({
-          locked: next.locked,
-          onToggleLock: handleToggleViewerSampleLock,
-          result: next.result,
-          suppressed: samplerSuppressed,
-          target: next.target,
-        });
-      },
-      [handleToggleViewerSampleLock, onViewerSamplerStateChange, samplerSuppressed],
-    );
-    transitionViewerSamplerRef.current = transitionViewerSampler;
-    const viewerSampleLocked = viewerSampler.locked;
-    const viewerSamplerIdentity = buildViewerSamplerIdentity({
+    const viewerSamplerController = useViewerSamplerController({
       backend: wgpuPreviewVisibility.previewBackend,
       compareDividerPosition,
       compareMode,
       compareOrientation,
+      displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
+      editedRenderSize: imageRenderSize,
       geometryEpoch: overlayGeometry.geometryEpoch,
       graphRevision: viewerSampleGraphRevision,
       imageIdentity: selectedImage.path,
+      imageSessionId: imageSessionId ?? pickerImageSessionId,
+      ...(onViewerSamplerStateChange === undefined ? {} : { onStateChange: onViewerSamplerStateChange }),
+      originalRenderSize: originalImageRenderSize,
+      proofEnabled: isExportSoftProofEnabled,
       proofRecipeId: exportSoftProofRecipeId ?? null,
-      softProofEnabled: isExportSoftProofEnabled,
+      sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
+      suppressed: samplerSuppressed,
     });
-
-    const latestViewerSampleRequestRef = useRef<ViewerSampleRequest | null>(null);
-    const viewerSamplerCommandService = useMemo(() => createViewerSamplerCommandService(), []);
-    const executeViewerSampleRef = useRef<(request: ViewerSampleRequest) => Promise<void>>(async () => {});
-    const viewerSampleSchedulerRef = useRef<LatestViewerSampleScheduler | null>(null);
-    if (!viewerSampleSchedulerRef.current) {
-      viewerSampleSchedulerRef.current = new LatestViewerSampleScheduler((request) =>
-        executeViewerSampleRef.current(request),
-      );
-    }
-    executeViewerSampleRef.current = async (request) => {
-      try {
-        const result = await viewerSamplerCommandService.sample(request);
-        if (isViewerSampleResultCurrent(result, latestViewerSampleRequestRef.current)) {
-          transitionViewerSampler((current) => ({ ...current, result }));
-        }
-      } catch {
-        if (latestViewerSampleRequestRef.current?.requestIdentity === request.requestIdentity) {
-          transitionViewerSampler((current) => ({
-            ...current,
-            result: {
-              status: 'unavailable',
-              requestIdentity: request.requestIdentity,
-              reason: 'frameUnavailable',
-              spaceLabel: 'Unavailable',
-            },
-          }));
-        }
-      }
-    };
-
-    useEffect(
-      () => () => {
-        viewerSampleSchedulerRef.current?.dispose();
-      },
-      [],
-    );
-
-    useEffect(() => {
-      latestViewerSampleRequestRef.current = null;
-      viewerSampleSchedulerRef.current?.clear();
-      // Locks pin interaction, not pixels: any render identity change invalidates
-      // the result so a locked footer can never describe another frame.
-      transitionViewerSampler((current) => ({ ...current, result: null }));
-    }, [samplerSuppressed, transitionViewerSampler, viewerSamplerIdentity]);
-
-    const handleViewerSamplerPointerMove = useCallback(
-      (event: React.PointerEvent<HTMLDivElement>) => {
-        if (viewerSampleLocked || samplerSuppressed || event.pointerType === 'touch') return;
-        const surface = event.currentTarget;
-        const rect = surface.getBoundingClientRect();
-        const resolved = resolveViewerSamplerInteraction(
-          {
-            compareDividerPosition,
-            compareMode,
-            compareOrientation,
-            displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
-            editedRenderSize: imageRenderSize,
-            geometryEpoch: overlayGeometry.geometryEpoch,
-            graphRevision: viewerSampleGraphRevision,
-            imageIdentity: selectedImage.path,
-            originalRenderSize: originalImageRenderSize,
-            proofEnabled: isExportSoftProofEnabled,
-            sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
-          },
-          { altKey: event.altKey, clientX: event.clientX, clientY: event.clientY },
-          {
-            height: rect.height,
-            layoutHeight: surface.offsetHeight,
-            layoutWidth: surface.offsetWidth,
-            width: rect.width,
-            x: rect.x,
-            y: rect.y,
-          },
-        );
-        if (resolved === null) {
-          latestViewerSampleRequestRef.current = null;
-          viewerSampleSchedulerRef.current?.clear();
-          transitionViewerSampler((current) => ({ ...current, result: null }));
-          return;
-        }
-        transitionViewerSampler((current) => ({ ...current, target: resolved.target }));
-        latestViewerSampleRequestRef.current = resolved.request;
-        viewerSampleSchedulerRef.current?.schedule(resolved.request);
-      },
-      [
-        compareMode,
-        compareDividerPosition,
-        compareOrientation,
-        imageRenderSize,
-        isExportSoftProofEnabled,
-        originalImageRenderSize,
-        overlayGeometry,
-        samplerSuppressed,
-        selectedImage.height,
-        selectedImage.path,
-        selectedImage.width,
-        viewerSampleGraphRevision,
-        viewerSampleLocked,
-      ],
-    );
-
-    const handleViewerSamplerPointerLeave = useCallback(() => {
-      if (viewerSampleLocked) return;
-      latestViewerSampleRequestRef.current = null;
-      viewerSampleSchedulerRef.current?.clear();
-      transitionViewerSampler((current) => ({ ...current, result: null }));
-    }, [viewerSampleLocked]);
 
     const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl });
 
@@ -2052,8 +1907,14 @@ export const ImageCanvas = memo(
         data-ai-mask-box-transition={aiMaskBoxTransitionRef.current}
         data-retouch-interaction-active={String(retouchHandlesController.interactionActive)}
         data-retouch-last-commit-status={retouchHandlesController.lastCommitStatus}
+        data-viewer-sampler-locked={String(viewerSamplerController.state.locked)}
+        data-viewer-sampler-request-identity={viewerSamplerController.state.result?.requestIdentity ?? ''}
+        data-viewer-sampler-status={viewerSamplerController.state.result?.status ?? 'idle'}
+        data-viewer-sampler-suppressed={String(viewerSamplerController.state.suppressed)}
+        data-viewer-sampler-target={viewerSamplerController.state.target}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
+          viewerSamplerController.handleInputEvent(event);
           const isCancellation =
             event.type === 'blur' ||
             event.type === 'escape' ||
@@ -2075,7 +1936,7 @@ export const ImageCanvas = memo(
           }
         }}
         onPointerLeave={() => {
-          handleViewerSamplerPointerLeave();
+          viewerSamplerController.handlePointerLeave();
           whiteBalanceController.cancelPreview();
         }}
         onPointerDown={(event) => {
@@ -2087,9 +1948,6 @@ export const ImageCanvas = memo(
             event.preventDefault();
             return;
           }
-        }}
-        onPointerMove={(event) => {
-          handleViewerSamplerPointerMove(event);
         }}
         onPointerUp={(event) => {
           if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -2156,6 +2014,7 @@ export const ImageCanvas = memo(
               sourceRevision={presentationDescriptor.graphRevision}
             />
             <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
+            <ViewerSamplerOverlay descriptor={viewerSamplerController.overlay} />
             <ViewerFocusRetouchOverlay descriptors={focusRetouchController.overlays} geometry={overlayGeometry} />
             {displayedMaskUrl && (
               <img

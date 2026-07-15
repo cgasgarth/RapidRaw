@@ -64,6 +64,12 @@ interface BrowserHarnessTonePlacementResponse {
   value: unknown;
 }
 
+interface BrowserHarnessViewerSampleResponse {
+  delayMs: number;
+  rgb?: [number, number, number];
+  status?: 'available' | 'unavailable';
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -94,6 +100,7 @@ declare global {
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
       perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
       tonePlacementResponses: Array<BrowserHarnessTonePlacementResponse>;
+      viewerSampleResponses: Array<BrowserHarnessViewerSampleResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -182,6 +189,7 @@ const commandNames: Record<
   | 'saveMetadataAndUpdateThumbnail'
   | 'samplePointColorPicker'
   | 'sampleToneEqualizerPicker'
+  | 'sampleViewerPixel'
   | 'scheduleImagePrefetch'
   | 'startBackgroundIndexing'
   | 'testAiConnectorConnection'
@@ -251,6 +259,7 @@ const commandNames: Record<
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
   samplePointColorPicker: Invokes.SamplePointColorPicker,
   sampleToneEqualizerPicker: Invokes.SampleToneEqualizerPicker,
+  sampleViewerPixel: Invokes.SampleViewerPixel,
   scheduleImagePrefetch: Invokes.ScheduleImagePrefetch,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
   testAiConnectorConnection: Invokes.TestAIConnectorConnection,
@@ -390,6 +399,7 @@ export const installBrowserTauriHarness = (): void => {
     perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
     tonePlacementResponses: [],
+    viewerSampleResponses: [],
     setAdjustmentsForPath: (path, adjustments) => {
       harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
     },
@@ -963,6 +973,48 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             }),
           80,
         );
+      });
+    }
+    case commandNames.sampleViewerPixel: {
+      const request = args?.['request'] as
+        | {
+            normalizedImagePoint?: { x?: number; y?: number };
+            requestIdentity?: string;
+            sourceImageSize?: { height?: number; width?: number };
+          }
+        | undefined;
+      const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.viewerSampleResponses.shift();
+      const delayMs = injected?.delayMs ?? 20;
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          const requestIdentity = request?.requestIdentity ?? 'browser-harness-viewer-sample';
+          if (injected?.status === 'unavailable') {
+            resolve({
+              reason: 'frameUnavailable',
+              requestIdentity,
+              spaceLabel: 'Unavailable',
+              status: 'unavailable',
+            });
+            return;
+          }
+          const normalizedX = request?.normalizedImagePoint?.x ?? 0.5;
+          const normalizedY = request?.normalizedImagePoint?.y ?? 0.5;
+          const width = request?.sourceImageSize?.width ?? 1600;
+          const height = request?.sourceImageSize?.height ?? 1200;
+          const rgb = injected?.rgb ?? [normalizedX, normalizedY, 0.25];
+          resolve({
+            clippedChannels: [],
+            imagePointPx: {
+              x: Math.max(0, Math.round(normalizedX * Math.max(0, width - 1))),
+              y: Math.max(0, Math.round(normalizedY * Math.max(0, height - 1))),
+            },
+            luma: rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722,
+            requestIdentity,
+            rgb,
+            spaceLabel: 'Display encoded browser harness',
+            status: 'available',
+          });
+        }, delayMs);
       });
     }
     case commandNames.configureLibraryChangefeed:

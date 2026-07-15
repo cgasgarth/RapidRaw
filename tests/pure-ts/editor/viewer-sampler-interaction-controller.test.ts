@@ -29,6 +29,7 @@ describe('viewer sampler interaction controller', () => {
       normalizedImagePoint: { x: 0.75, y: 0.5 },
       sampleRadiusImagePx: 0,
     });
+    expect(result?.viewPoint).toEqual({ x: 900, y: 400 });
   });
 
   test('selects original pixels on the left side and honors Alt radius', () => {
@@ -56,5 +57,49 @@ describe('viewer sampler interaction controller', () => {
         },
       ),
     ).toBeNull();
+  });
+
+  test('keeps overlay and command coordinates identical across fit, fill, 1:1, crop/orientation, and DPR scale', () => {
+    const scenarios = [
+      {
+        displayedImageRect: { height: 400, width: 800, x: 100, y: 50 },
+        label: 'fit',
+        normalized: { x: 0.25, y: 0.75 },
+        surface: { height: 500, layoutHeight: 500, layoutWidth: 1000, width: 1000, x: 10, y: 20 },
+      },
+      {
+        displayedImageRect: { height: 700, width: 1200, x: -100, y: -100 },
+        label: 'fill',
+        normalized: { x: 0.5, y: 0.5 },
+        surface: { height: 500, layoutHeight: 500, layoutWidth: 1000, width: 1000, x: 0, y: 0 },
+      },
+      {
+        displayedImageRect: { height: 600, width: 400, x: 200, y: 100 },
+        label: '1:1 crop/orientation at DPR transform',
+        normalized: { x: 0.75, y: 0.25 },
+        surface: { height: 1600, layoutHeight: 800, layoutWidth: 1000, width: 2000, x: 30, y: 40 },
+      },
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const scaleX = scenario.surface.width / scenario.surface.layoutWidth;
+      const scaleY = scenario.surface.height / scenario.surface.layoutHeight;
+      const clientX =
+        scenario.surface.x +
+        (scenario.displayedImageRect.x + scenario.normalized.x * scenario.displayedImageRect.width) * scaleX;
+      const clientY =
+        scenario.surface.y +
+        (scenario.displayedImageRect.y + scenario.normalized.y * scenario.displayedImageRect.height) * scaleY;
+      const resolved = resolveViewerSamplerInteraction(
+        { ...context, compareMode: 'off', displayedImageRect: scenario.displayedImageRect },
+        { altKey: false, clientX, clientY },
+        scenario.surface,
+      );
+      expect(resolved?.request.normalizedImagePoint, scenario.label).toEqual(scenario.normalized);
+      expect(resolved?.viewPoint, scenario.label).toEqual({
+        x: scenario.displayedImageRect.x + scenario.normalized.x * scenario.displayedImageRect.width,
+        y: scenario.displayedImageRect.y + scenario.normalized.y * scenario.displayedImageRect.height,
+      });
+    }
   });
 });
