@@ -5,6 +5,7 @@ import { colorBalanceRgbSettingsSchema } from './color/colorBalanceRgbSchemas.js
 import { levelsSettingsSchema } from './color/levelsSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
+import { selectiveColorMixerSettingsSchema } from './color/selectiveColorMixerSchemas.js';
 import {
   detailDeblurUiControlsV1Schema,
   lensProfileDistortionParamsV1Schema,
@@ -125,6 +126,34 @@ export const EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS = {
 } as const;
 
 export const EDIT_DOCUMENT_LUMA_LEVELS_FIELDS = ['levels'] as const;
+
+export const editDocumentSelectiveColorMixerV2Schema = selectiveColorMixerSettingsSchema;
+
+const NEUTRAL_SELECTIVE_COLOR_HSL = { hue: 0, luminance: 0, saturation: 0 } as const;
+export const EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_DEFAULTS = {
+  hsl: {
+    aquas: NEUTRAL_SELECTIVE_COLOR_HSL,
+    blues: NEUTRAL_SELECTIVE_COLOR_HSL,
+    greens: NEUTRAL_SELECTIVE_COLOR_HSL,
+    magentas: NEUTRAL_SELECTIVE_COLOR_HSL,
+    oranges: NEUTRAL_SELECTIVE_COLOR_HSL,
+    purples: NEUTRAL_SELECTIVE_COLOR_HSL,
+    reds: NEUTRAL_SELECTIVE_COLOR_HSL,
+    yellows: NEUTRAL_SELECTIVE_COLOR_HSL,
+  },
+  selectiveColorRangeControls: {
+    aquas: { centerHueDegrees: 180, falloffSmoothness: 1.5, widthDegrees: 60 },
+    blues: { centerHueDegrees: 225, falloffSmoothness: 1.5, widthDegrees: 60 },
+    greens: { centerHueDegrees: 115, falloffSmoothness: 1.5, widthDegrees: 90 },
+    magentas: { centerHueDegrees: 330, falloffSmoothness: 1.5, widthDegrees: 50 },
+    oranges: { centerHueDegrees: 25, falloffSmoothness: 1.5, widthDegrees: 45 },
+    purples: { centerHueDegrees: 280, falloffSmoothness: 1.5, widthDegrees: 55 },
+    reds: { centerHueDegrees: 358, falloffSmoothness: 1.5, widthDegrees: 35 },
+    yellows: { centerHueDegrees: 60, falloffSmoothness: 1.5, widthDegrees: 40 },
+  },
+} as const;
+
+export const EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_FIELDS = ['hsl', 'selectiveColorRangeControls'] as const;
 
 const legacyColorGradingRangeV2Schema = z
   .object({
@@ -629,6 +658,16 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'color_balance_rgb',
     process: 'scene_referred_v2',
     renderStage: 'color_balance_rgb',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_DEFAULTS,
+    editorSection: 'color',
+    legacyFields: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_FIELDS,
+    nodeType: 'selective_color_mixer',
+    process: 'scene_referred_v2',
+    renderStage: 'selective_color_mixer',
     implementationVersion: 1,
   },
   {
@@ -1297,6 +1336,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'selective_color_mixer') {
+        const selectiveColorMixer = editDocumentSelectiveColorMixerV2Schema.safeParse(node.params);
+        if (!selectiveColorMixer.success) {
+          for (const issue of selectiveColorMixer.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'perceptual_grading') {
         const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
         if (!perceptualGrading.success) {
@@ -1544,7 +1591,7 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     nodeType: 'color_balance_rgb',
     schemas: editDocumentColorBalanceRgbV2Schema.shape,
   });
-  return normalizeLegacyNodeOwnership(document, {
+  document = normalizeLegacyNodeOwnership(document, {
     createNode: {
       enabledFromNodeType: 'channel_mixer',
       implementationVersion: 1,
@@ -1554,6 +1601,17 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     fields: EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
     nodeType: 'luma_levels',
     schemas: editDocumentLumaLevelsV2Schema.shape,
+  });
+  return normalizeLegacyNodeOwnership(document, {
+    createNode: {
+      enabledFromNodeType: 'channel_mixer',
+      implementationVersion: 1,
+      process: 'scene_referred_v2',
+    },
+    defaults: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_DEFAULTS,
+    fields: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_FIELDS,
+    nodeType: 'selective_color_mixer',
+    schemas: editDocumentSelectiveColorMixerV2Schema.shape,
   });
 }, editDocumentV2ObjectSchema);
 
@@ -1571,6 +1629,7 @@ export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhit
 export type EditDocumentChannelMixerV2 = z.infer<typeof editDocumentChannelMixerV2Schema>;
 export type EditDocumentColorBalanceRgbV2 = z.infer<typeof editDocumentColorBalanceRgbV2Schema>;
 export type EditDocumentLumaLevelsV2 = z.infer<typeof editDocumentLumaLevelsV2Schema>;
+export type EditDocumentSelectiveColorMixerV2 = z.infer<typeof editDocumentSelectiveColorMixerV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
@@ -1606,6 +1665,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'channel_mixer') editDocumentChannelMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'color_balance_rgb') editDocumentColorBalanceRgbV2Schema.parse(envelope.params);
   if (envelope.type === 'luma_levels') editDocumentLumaLevelsV2Schema.parse(envelope.params);
+  if (envelope.type === 'selective_color_mixer') editDocumentSelectiveColorMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);

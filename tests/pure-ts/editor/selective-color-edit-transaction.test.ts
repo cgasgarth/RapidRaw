@@ -5,6 +5,11 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
+import {
   buildSelectiveColorEditTransaction,
   isCurrentSelectiveColorIdentity,
   type SelectiveColorCommitIdentity,
@@ -65,6 +70,8 @@ describe('selective color edit transaction', () => {
 
   test('commits HSL and range controls as one canonical output-invalidating history boundary', () => {
     const before = useEditorStore.getState();
+    const beforeNode = before.editDocumentV2.nodes.selective_color_mixer;
+    const beforeTone = before.editDocumentV2.nodes.scene_global_color_tone;
     const next = initialMixer();
     next.hsl.oranges = { ...next.hsl.oranges, saturation: 28 };
     next.selectiveColorRangeControls.oranges = {
@@ -72,10 +79,16 @@ describe('selective color edit transaction', () => {
       widthDegrees: 52,
     };
 
-    const result = before.applyEditTransaction(
-      buildSelectiveColorEditTransaction(before, identity(), next, 'selective-color-orange'),
-    );
+    const request = buildSelectiveColorEditTransaction(before, identity(), next, 'selective-color-orange');
+    const result = before.applyEditTransaction(request);
 
+    expect(request.operations).toEqual([
+      {
+        nodeType: 'selective_color_mixer',
+        patch: { hsl: next.hsl, selectiveColorRangeControls: next.selectiveColorRangeControls },
+        type: 'patch-edit-document-node',
+      },
+    ]);
     expect(result).toMatchObject({
       changedKeys: ['hsl', 'selectiveColorRangeControls'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
@@ -97,12 +110,78 @@ describe('selective color edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustments.hsl.oranges.saturation).toBe(28);
     expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.oranges.widthDegrees).toBe(52);
+    expect(result.afterEditDocumentV2.nodes.selective_color_mixer.params).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes.selective_color_mixer).not.toBe(beforeNode);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hsl');
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('selectiveColorRangeControls');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.hsl.oranges.saturation).toBe(0);
     expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.oranges).toEqual(
       INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges,
     );
+    expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params).toEqual(initialMixer());
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params).toEqual(next);
+  });
+
+  test('carries selective-color node authority through save execution and reopen', async () => {
+    const before = useEditorStore.getState();
+    const beforeDocument = before.editDocumentV2;
+    const next = initialMixer();
+    next.hsl.reds = { hue: 18, luminance: 7, saturation: 31 };
+    next.selectiveColorRangeControls.reds = {
+      ...next.selectiveColorRangeControls.reds,
+      falloffSmoothness: 2.25,
+      widthDegrees: 48,
+    };
+    before.applyEditTransaction(buildSelectiveColorEditTransaction(before, identity(), next, 'save-selective-color'));
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'c'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.installSession({
+      adjustmentRevision: 0,
+      adjustments: { ...committed.adjustments, ...initialMixer() },
+      editDocumentV2: beforeDocument,
+      imageSessionId: session.id,
+      path: sourcePath,
+      sessionGeneration: session.generation,
+    });
+    if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed selective-color receipt');
+    runner.submitCommitted({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: session.generation,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(executions).toHaveLength(1);
+    expect(executions[0]?.editDocumentV2.nodes.selective_color_mixer.params).toEqual(next);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.selective_color_mixer.params).toEqual(next);
+    expect(reopened).toEqual(committed.editDocumentV2);
   });
 
   test('keeps exact no-ops inert and makes a whole-mixer reset one undoable transaction', () => {

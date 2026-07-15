@@ -1953,7 +1953,7 @@ fn apply_hue_shift(color: Vec3, shift: f32) -> Vec3 {
     srgb_to_linear(hsv_to_rgb(hsv))
 }
 
-fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
+pub(crate) fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
     const RANGES: [(f32, f32); 8] = [
         (358.0, 35.0),
         (25.0, 45.0),

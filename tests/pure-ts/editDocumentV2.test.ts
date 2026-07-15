@@ -82,6 +82,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'detail_denoise_dehaze',
       'point_color',
       'color_balance_rgb',
+      'selective_color_mixer',
       'black_white_mixer',
       'channel_mixer',
       'luma_levels',
@@ -238,6 +239,55 @@ describe('EditDocumentV2 legacy adapter', () => {
       invalidRange.nodes.luma_levels.params.levels.inputWhite = 0.9;
     }
     expect(() => editDocumentV2Schema.parse(invalidRange)).toThrow();
+  });
+
+  test('owns strict selective-color HSL and range controls outside legacy extensions', () => {
+    const hsl = structuredClone(INITIAL_ADJUSTMENTS.hsl);
+    hsl.reds = { hue: 18, luminance: 7, saturation: 31 };
+    const selectiveColorRangeControls = structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+    selectiveColorRangeControls.reds = {
+      ...selectiveColorRangeControls.reds,
+      falloffSmoothness: 2.25,
+      widthDegrees: 48,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      hsl,
+      selectiveColorRangeControls,
+    });
+
+    expect(document.nodes.selective_color_mixer?.params).toEqual({ hsl, selectiveColorRangeControls });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('hsl');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('selectiveColorRangeControls');
+    expect(document.migration?.mapped).toEqual(
+      expect.arrayContaining(['selective_color_mixer.hsl', 'selective_color_mixer.selectiveColorRangeControls']),
+    );
+    expect(compileEditDocumentNodeV2(document.nodes.selective_color_mixer).params).toEqual({
+      hsl,
+      selectiveColorRangeControls,
+    });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.selective_color_mixer) unknown.nodes.selective_color_mixer.params.futureMixer = true;
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.selective_color_mixer) {
+      outOfRange.nodes.selective_color_mixer.params.hsl = {
+        ...hsl,
+        reds: { ...hsl.reds, saturation: 101 },
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
+
+    const invalidControl = structuredClone(document);
+    if (invalidControl.nodes.selective_color_mixer) {
+      invalidControl.nodes.selective_color_mixer.params.selectiveColorRangeControls = {
+        ...selectiveColorRangeControls,
+        reds: { ...selectiveColorRangeControls.reds, centerHueDegrees: 360 },
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(invalidControl)).toThrow();
   });
 
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
@@ -874,6 +924,64 @@ describe('EditDocumentV2 legacy adapter', () => {
       levels: corruptFlatAdjustments.levels,
     });
     expect(corruptFlat.migration?.mapped).not.toContain('luma_levels.levels');
+  });
+
+  test('promotes pre-selective-color node state and quarantines corrupt legacy values idempotently', () => {
+    const hsl = structuredClone(INITIAL_ADJUSTMENTS.hsl);
+    hsl.oranges = { hue: -11, luminance: 6, saturation: 27 };
+    const selectiveColorRangeControls = structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+    selectiveColorRangeControls.oranges.widthDegrees = 54;
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      hsl,
+      selectiveColorRangeControls,
+    });
+    const oldV2 = structuredClone(document);
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.extensions.legacyAdjustments.hsl = hsl;
+    oldV2.extensions.legacyAdjustments.selectiveColorRangeControls = selectiveColorRangeControls;
+    delete oldV2.nodes.selective_color_mixer;
+    migration.mapped = migration.mapped.filter((path) => !path.startsWith('selective_color_mixer.'));
+    migration.quarantined.push('hsl', 'selectiveColorRangeControls');
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.selective_color_mixer.params).toEqual({ hsl, selectiveColorRangeControls });
+    expect(reopened.nodes.selective_color_mixer.enabled).toBe(reopened.nodes.channel_mixer.enabled);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('hsl');
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('selectiveColorRangeControls');
+    expect(reopened.migration?.mapped).toEqual(
+      expect.arrayContaining(['selective_color_mixer.hsl', 'selective_color_mixer.selectiveColorRangeControls']),
+    );
+    expect(reopened.migration?.quarantined).not.toContain('hsl');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptV2 = structuredClone(document);
+    const corruptHsl = structuredClone(hsl);
+    corruptHsl.reds.saturation = 500;
+    corruptV2.extensions.legacyAdjustments.hsl = corruptHsl;
+    corruptV2.extensions.legacyAdjustments.selectiveColorRangeControls = selectiveColorRangeControls;
+    delete corruptV2.nodes.selective_color_mixer;
+    const quarantined = editDocumentV2Schema.parse(corruptV2);
+    expect(quarantined.nodes.selective_color_mixer.params.hsl).toEqual(INITIAL_ADJUSTMENTS.hsl);
+    expect(quarantined.nodes.selective_color_mixer.params.selectiveColorRangeControls).toEqual(
+      selectiveColorRangeControls,
+    );
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ hsl: corruptHsl });
+    expect(quarantined.migration?.defaulted).toContain('selective_color_mixer.hsl');
+    expect(quarantined.migration?.quarantined).toContain('hsl');
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
+
+    const corruptFlatAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    corruptFlatAdjustments.selectiveColorRangeControls.blues.widthDegrees = Number.NaN;
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2(corruptFlatAdjustments);
+    expect(corruptFlat.nodes.selective_color_mixer.params.selectiveColorRangeControls).toEqual(
+      INITIAL_ADJUSTMENTS.selectiveColorRangeControls,
+    );
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({
+      selectiveColorRangeControls: corruptFlatAdjustments.selectiveColorRangeControls,
+    });
+    expect(corruptFlat.migration?.mapped).not.toContain('selective_color_mixer.selectiveColorRangeControls');
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {
@@ -1537,6 +1645,25 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.luma_levels).toBe(authoritative.nodes.luma_levels);
     expect(renderDocument.nodes.luma_levels?.params).toEqual({ levels });
     expect(renderDocument.nodes.channel_mixer).toEqual(preparedDocument.nodes.channel_mixer);
+  });
+
+  test('render preparation overlays the authoritative selective-color envelope', () => {
+    const hsl = structuredClone(INITIAL_ADJUSTMENTS.hsl);
+    hsl.reds = { hue: 18, luminance: 7, saturation: 31 };
+    const selectiveColorRangeControls = structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+    selectiveColorRangeControls.reds.widthDegrees = 48;
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      hsl,
+      selectiveColorRangeControls,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['selective_color_mixer']);
+
+    expect(renderDocument.nodes.selective_color_mixer).toBe(authoritative.nodes.selective_color_mixer);
+    expect(renderDocument.nodes.selective_color_mixer?.params).toEqual({ hsl, selectiveColorRangeControls });
+    expect(renderDocument.nodes.color_balance_rgb).toEqual(preparedDocument.nodes.color_balance_rgb);
   });
 
   test('render preparation overlays the authoritative perceptual-grading envelope', () => {
