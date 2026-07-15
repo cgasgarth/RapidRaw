@@ -9,6 +9,7 @@ import {
   type PreviewCoordinatorEffect,
   type PreviewCoordinatorEvent,
   type PreviewCoordinatorTransition,
+  type PreviewOperationIdentity,
 } from './previewCoordinator';
 import type { ReferenceSpatialAnalysis } from './referenceMatch';
 import { ANALYTICS_RESULT_EVENT } from './tauriEventNames';
@@ -32,7 +33,6 @@ export interface PreviewAnalyticsUpdate {
 
 export interface PreviewAnalyticsEffectRunnerOptions {
   readonly dispatch: PreviewCoordinatorDispatch;
-  readonly getPresentationState: () => PreviewAnalyticsPresentationState;
   readonly now?: () => Date;
   readonly publish: (update: PreviewAnalyticsUpdate) => void;
   readonly subscribe?: AnalyticsSubscribe;
@@ -48,11 +48,13 @@ const clearUpdate = (): PreviewAnalyticsUpdate => ({
   waveform: null,
 });
 
-/** Owns native analytics listener lifetime and executes coordinator publication decisions. */
+/** Owns analytics listener lifetime, exact artifact presentation binding, and coordinator publication effects. */
 export class PreviewAnalyticsEffectRunner {
   private active = false;
   private epoch = 0;
   private nextReceiptId = 1;
+  private presentedIdentity: string | null = null;
+  private readonly awaitingPresentation = new Map<number, string>();
   private readonly pending = new Map<number, AnalyticsResultPayload>();
   private readonly presentations = new Map<string, PreviewAnalyticsPresentationState>();
   private readonly subscribe: AnalyticsSubscribe;
@@ -63,26 +65,54 @@ export class PreviewAnalyticsEffectRunner {
   }
 
   consume(effects: readonly PreviewCoordinatorEffect[]): void {
+    const publishedReceiptIds = new Set(
+      effects.filter((effect) => effect.type === 'publish-analytics').map((effect) => effect.receiptId),
+    );
     for (const effect of effects) {
       if (effect.type === 'publish' && effect.identity.kind !== 'original') {
+        this.presentedIdentity = fingerprintPreviewOperationIdentity(effect.identity);
         this.presentations.clear();
-        this.presentations.set(
-          fingerprintPreviewOperationIdentity(effect.identity),
-          structuredClone(this.options.getPresentationState()),
-        );
       } else if (effect.type === 'publish-analytics') {
         const result = this.pending.get(effect.receiptId);
-        this.pending.delete(effect.receiptId);
-        const presentation = this.presentations.get(fingerprintPreviewOperationIdentity(effect.identity));
-        if (result !== undefined && presentation !== undefined) this.publishResult(result, presentation);
+        const identity = fingerprintPreviewOperationIdentity(effect.identity);
+        const presentation = this.presentations.get(identity);
+        if (result !== undefined && presentation !== undefined) {
+          this.pending.delete(effect.receiptId);
+          this.publishResult(result, presentation);
+        } else if (result !== undefined) {
+          this.awaitingPresentation.set(effect.receiptId, identity);
+        }
       } else if (effect.type === 'discard-analytics') {
         this.pending.delete(effect.receiptId);
+        this.awaitingPresentation.delete(effect.receiptId);
       } else if (effect.type === 'clear-analytics') {
-        this.pending.clear();
+        for (const receiptId of this.pending.keys()) {
+          if (!publishedReceiptIds.has(receiptId)) this.pending.delete(receiptId);
+        }
+        for (const receiptId of this.awaitingPresentation.keys()) {
+          if (!publishedReceiptIds.has(receiptId)) this.awaitingPresentation.delete(receiptId);
+        }
+        this.presentedIdentity = null;
         this.presentations.clear();
         this.options.publish(clearUpdate());
       }
     }
+  }
+
+  bindPresentation(identity: PreviewOperationIdentity, presentation: PreviewAnalyticsPresentationState): boolean {
+    const fingerprint = fingerprintPreviewOperationIdentity(identity);
+    if (fingerprint !== this.presentedIdentity) return false;
+    const capturedPresentation = structuredClone(presentation);
+    this.presentations.clear();
+    this.presentations.set(fingerprint, capturedPresentation);
+    for (const [receiptId, awaitingIdentity] of this.awaitingPresentation) {
+      if (awaitingIdentity !== fingerprint) continue;
+      const result = this.pending.get(receiptId);
+      this.awaitingPresentation.delete(receiptId);
+      this.pending.delete(receiptId);
+      if (result !== undefined) this.publishResult(result, capturedPresentation);
+    }
+    return true;
   }
 
   start(): Promise<void> {
@@ -115,6 +145,8 @@ export class PreviewAnalyticsEffectRunner {
     this.unlisten?.();
     this.unlisten = null;
     this.pending.clear();
+    this.awaitingPresentation.clear();
+    this.presentedIdentity = null;
     this.presentations.clear();
   }
 
