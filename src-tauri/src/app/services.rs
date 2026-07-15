@@ -133,6 +133,7 @@ pub struct AppServices {
     pub(crate) gpu_context: Arc<crate::gpu::gpu_context_service::GpuContextService>,
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     export: crate::export::runtime_services::ExportRuntimeServices,
+    film: crate::render::film_runtime_services::FilmRuntimeServices,
     pub(crate) preview_runtime: Arc<crate::render::preview_runtime_service::PreviewRuntimeService>,
     pub(crate) preview_frames:
         Arc<crate::render::preview_frame_cache_service::PreviewFrameCacheService>,
@@ -173,6 +174,7 @@ impl AppServices {
             gpu_context: Arc::default(),
             lens_database: Arc::default(),
             export: Default::default(),
+            film: Default::default(),
             preview_runtime: Arc::default(),
             preview_frames: Arc::default(),
             library: Default::default(),
@@ -204,6 +206,10 @@ impl AppServices {
 
     pub(crate) fn export(&self) -> &crate::export::runtime_services::ExportRuntimeServices {
         &self.export
+    }
+
+    pub(crate) fn film(&self) -> &crate::render::film_runtime_services::FilmRuntimeServices {
+        &self.film
     }
 }
 
