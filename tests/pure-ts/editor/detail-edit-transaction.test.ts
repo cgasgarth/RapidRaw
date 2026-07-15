@@ -14,6 +14,11 @@ import {
   isDetailNumberNodeAdjustment,
 } from '../../../src/utils/detailEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/detail-controls.ARW';
 const session = createEditorImageSession({ generation: 14, path: sourcePath, source: 'cache' });
@@ -105,7 +110,7 @@ describe('detail edit transaction', () => {
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurEnabled);
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurSigmaPx);
     expect(DETAIL_NODE_ADJUSTMENTS).toContain(DetailsAdjustment.DeblurStrength);
-    for (const field of [DetailsAdjustment.SharpnessThreshold, DetailsAdjustment.Structure]) {
+    for (const field of [DetailsAdjustment.SharpnessThreshold]) {
       expect(isDetailNodeAdjustment(field)).toBeFalse();
     }
 
@@ -136,6 +141,80 @@ describe('detail edit transaction', () => {
     expect(() =>
       buildDetailEditTransaction(state, identity({ adjustmentRevision: 1 }), 'sharpness', 1, 'stale-revision'),
     ).toThrow('detail_transaction.stale_revision');
+  });
+
+  test('commits local contrast through node authority and Undo restores the lowered state', () => {
+    const state = useEditorStore.getState();
+    const beforeDetail = state.editDocumentV2.nodes.detail_denoise_dehaze;
+    const beforeTone = state.editDocumentV2.nodes.scene_global_color_tone;
+    const result = state.applyEditTransaction(
+      buildDetailEditTransaction(state, identity(), DetailsAdjustment.LocalContrastRadiusPx, 42, 'local-radius'),
+    );
+
+    expect(result.changedKeys).toEqual(['localContrastRadiusPx']);
+    expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(42);
+    expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze).not.toBe(beforeDetail);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(useEditorStore.getState().adjustments.localContrastRadiusPx).toBe(42);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.localContrastRadiusPx).toBe(24);
+    expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(24);
+  });
+
+  test('carries local contrast node authority through save execution and reopen', async () => {
+    const before = useEditorStore.getState();
+    const beforeDocument = before.editDocumentV2;
+    before.applyEditTransaction(
+      buildDetailEditTransaction(before, identity(), DetailsAdjustment.Structure, 31, 'save-local-contrast'),
+    );
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'a'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.submit({
+      adjustmentRevision: 0,
+      adjustments: { ...committed.adjustments, structure: 0 },
+      editDocumentV2: beforeDocument,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: null,
+      sessionGeneration: session.generation,
+    });
+    runner.submit({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: session.generation,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(executions).toHaveLength(1);
+    expect(executions[0]?.editDocumentV2.nodes.detail_denoise_dehaze.params.structure).toBe(31);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.detail_denoise_dehaze.params.structure).toBe(31);
+    expect(reopened).toEqual(committed.editDocumentV2);
   });
 
   test('commits through the canonical selected-image fallback session', () => {

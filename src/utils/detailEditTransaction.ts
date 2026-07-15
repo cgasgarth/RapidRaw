@@ -12,7 +12,12 @@ export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.DenoiseNaturalGrain,
   DetailsAdjustment.DenoiseShadowBias,
   DetailsAdjustment.LumaNoiseReduction,
+  DetailsAdjustment.LocalContrastHaloGuard,
+  DetailsAdjustment.LocalContrastMidtoneMask,
+  DetailsAdjustment.LocalContrastRadiusPx,
   DetailsAdjustment.Sharpness,
+  DetailsAdjustment.Structure,
+  DetailsAdjustment.Centré,
 ] as const;
 
 export const DETAIL_BOOLEAN_NODE_ADJUSTMENTS = [DetailsAdjustment.DeblurEnabled] as const;
@@ -42,13 +47,13 @@ export interface DetailEditTransactionState {
 const currentImageSessionId = (state: DetailEditTransactionState): string =>
   state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
-export const isDetailNodeAdjustment = (key: DetailsAdjustment): key is DetailNodeAdjustment =>
+export const isDetailNodeAdjustment = (key: PropertyKey): key is DetailNodeAdjustment =>
   DETAIL_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
 
-export const isDetailNumberNodeAdjustment = (key: DetailsAdjustment): key is DetailNumberNodeAdjustment =>
+export const isDetailNumberNodeAdjustment = (key: PropertyKey): key is DetailNumberNodeAdjustment =>
   DETAIL_NUMBER_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
 
-export const isDetailBooleanNodeAdjustment = (key: DetailsAdjustment): key is DetailBooleanNodeAdjustment =>
+export const isDetailBooleanNodeAdjustment = (key: PropertyKey): key is DetailBooleanNodeAdjustment =>
   DETAIL_BOOLEAN_NODE_ADJUSTMENTS.some((candidate) => candidate === key);
 
 export const buildDetailEditTransaction = <Key extends DetailNodeAdjustment>(
