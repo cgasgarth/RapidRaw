@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradingSettingsV1};
 use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
 use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -18,6 +19,7 @@ enum EditNodeTypeV2 {
     DisplayCreative,
     DetailDenoiseDehaze,
     PointColor,
+    PerceptualGrading,
     CameraInput,
     Geometry,
     Layers,
@@ -34,6 +36,7 @@ impl EditNodeTypeV2 {
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
+            Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::Layers => ("layers", "scene_referred_v2", 1),
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
@@ -445,6 +448,69 @@ impl PointColorPlanV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LegacyColorGradingRangeV2 {
+    hue: f64,
+    luminance: f64,
+    saturation: f64,
+}
+
+impl LegacyColorGradingRangeV2 {
+    fn validate(&self) -> Result<(), String> {
+        if point_color_in_range(self.hue, 0.0, 360.0)
+            && point_color_in_range(self.luminance, -100.0, 100.0)
+            && point_color_in_range(self.saturation, 0.0, 100.0)
+        {
+            return Ok(());
+        }
+        Err("EditDocumentV2 perceptual_grading wheel range is invalid".to_string())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LegacyColorGradingV2 {
+    balance: f64,
+    blending: f64,
+    global: LegacyColorGradingRangeV2,
+    highlights: LegacyColorGradingRangeV2,
+    midtones: LegacyColorGradingRangeV2,
+    shadows: LegacyColorGradingRangeV2,
+}
+
+impl LegacyColorGradingV2 {
+    fn validate(&self) -> Result<(), String> {
+        if !point_color_in_range(self.balance, -100.0, 100.0)
+            || !point_color_in_range(self.blending, 0.0, 100.0)
+        {
+            return Err(
+                "EditDocumentV2 perceptual_grading balance or blending is invalid".to_string(),
+            );
+        }
+        self.global.validate()?;
+        self.highlights.validate()?;
+        self.midtones.validate()?;
+        self.shadows.validate()
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PerceptualGradingV2 {
+    color_grading: LegacyColorGradingV2,
+    perceptual_grading_v1: PerceptualGradingSettingsV1,
+}
+
+impl PerceptualGradingV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.color_grading.validate()?;
+        PerceptualGradingPlanV1::compile(self.perceptual_grading_v1.clone())
+            .map(|_| ())
+            .map_err(|error| format!("EditDocumentV2 perceptual_grading is invalid: {error:?}"))
+    }
 }
 
 impl PointColorV2 {
@@ -1246,6 +1312,10 @@ fn compile_node_params(
             parse_point_color(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::PerceptualGrading => {
+            parse_perceptual_grading(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::DisplayCreative => {
             parse_display_creative(&node.params)?;
             Ok(node.params.clone())
@@ -1300,6 +1370,14 @@ fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String
         .map_err(|error| format!("EditDocumentV2 point_color is invalid: {error}"))?;
     point_color.validate()?;
     Ok(point_color)
+}
+
+fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGradingV2, String> {
+    let perceptual_grading: PerceptualGradingV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 perceptual_grading is invalid: {error}"))?;
+    perceptual_grading.validate()?;
+    Ok(perceptual_grading)
 }
 
 fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreativeV2, String> {
@@ -1610,6 +1688,46 @@ mod tests {
         })
     }
 
+    fn perceptual_grading_params() -> Value {
+        let range = json!({
+            "brilliance": 0,
+            "chroma": 0,
+            "hueDegrees": 0,
+            "luminanceEv": 0,
+            "saturation": 0
+        });
+        json!({
+            "colorGrading": {
+                "balance": 20,
+                "blending": 50,
+                "global": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "highlights": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "midtones": { "hue": 35, "luminance": 5, "saturation": 24 },
+                "shadows": { "hue": 0, "luminance": 0, "saturation": 0 }
+            },
+            "perceptualGradingV1": {
+                "balance": 0.2,
+                "blending": 0.5,
+                "falloff": 1,
+                "global": range,
+                "highlightFulcrumEv": 2,
+                "highlights": range,
+                "midtones": {
+                    "brilliance": 0,
+                    "chroma": 0.0576,
+                    "hueDegrees": 35,
+                    "luminanceEv": 0.1,
+                    "saturation": 0
+                },
+                "neutralProtection": 0.5,
+                "perceptualModel": "oklab_d65_from_acescg_v1",
+                "shadowFulcrumEv": -2,
+                "shadows": range,
+                "skinProtection": 0
+            }
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1681,6 +1799,13 @@ mod tests {
                     "params": point_color_params(),
                     "process": "scene_referred_v2",
                     "type": "point_color"
+                },
+                "perceptual_grading": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": perceptual_grading_params(),
+                    "process": "scene_referred_v2",
+                    "type": "perceptual_grading"
                 },
                 "camera_input": {
                     "enabled": true,
@@ -1827,6 +1952,8 @@ mod tests {
             "lumaNoiseReduction": 5,
             "masks": [],
             "orientationSteps": 1,
+            "colorGrading": perceptual_grading_params()["colorGrading"].clone(),
+            "perceptualGradingV1": perceptual_grading_params()["perceptualGradingV1"].clone(),
             "pointColor": point_color_params()["pointColor"].clone(),
             "rawEngineEditGraphVersion": 2,
             "rotation": 0.5,
@@ -2231,6 +2358,46 @@ mod tests {
             .into_render_adjustments()
             .expect_err("unknown point-color process must fail");
         assert!(error.contains("process or point count is invalid"));
+    }
+
+    #[test]
+    fn perceptual_grading_compiler_rejects_unowned_missing_and_invalid_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["perceptual_grading"]["params"]["futureGrading"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned perceptual-grading field must fail");
+        assert!(error.contains("unknown field `futureGrading`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["perceptual_grading"]["params"]
+            .as_object_mut()
+            .expect("perceptual-grading params object")
+            .remove("perceptualGradingV1");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing perceptual-grading plan must fail");
+        assert!(error.contains("missing field `perceptualGradingV1`"));
+
+        let mut legacy_range = document_with_legacy(json!({}));
+        legacy_range["nodes"]["perceptual_grading"]["params"]["colorGrading"]["midtones"]["saturation"] =
+            json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(legacy_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range legacy grading must fail");
+        assert!(error.contains("wheel range is invalid"));
+
+        let mut fulcrums = document_with_legacy(json!({}));
+        fulcrums["nodes"]["perceptual_grading"]["params"]["perceptualGradingV1"]["highlightFulcrumEv"] =
+            json!(-3);
+        let error = serde_json::from_value::<EditDocumentV2>(fulcrums)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid perceptual fulcrums must fail");
+        assert!(error.contains("Fulcrums"));
     }
 
     #[test]
