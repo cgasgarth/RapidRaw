@@ -6,6 +6,7 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbaImage};
 use tauri::{Emitter, Manager};
 
 use crate::adjustment_utils::hydrate_adjustments;
+use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_settings::load_preview_runtime_settings_or_default;
 use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
@@ -166,7 +167,13 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         .ok_or("No original image loaded")?
         .clone();
     drop(loaded_image_guard);
-    crate::validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
+    state
+        .services
+        .preview_session
+        .validate_active_source(expected_image_path)
+        .map_err(|error| error.to_string())?;
+    validate_expected_preview_image(&loaded_image.path, expected_image_path)
+        .map_err(|error| error.to_string())?;
     if let Some(plan) =
         crate::layers::apply_authoritative_layer_stack(&mut adjustments_json, expected_image_path)?
     {
