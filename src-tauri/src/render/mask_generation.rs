@@ -2186,8 +2186,10 @@ pub fn generate_mask_overlay(
     }
 
     if let Some(sub_masks) = mask_def.get_mut("subMasks").and_then(|v| v.as_array_mut()) {
-        let mut cache = state.payload_residency_cache.lock().unwrap();
-        crate::adjustment_utils::hydrate_sub_masks(sub_masks, &mut cache);
+        state
+            .services
+            .payload_residency
+            .hydrate_sub_masks(sub_masks);
     }
 
     let parsed_mask_def: MaskDefinition = serde_json::from_value(mask_def)

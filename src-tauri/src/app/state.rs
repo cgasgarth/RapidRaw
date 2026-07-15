@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
@@ -144,7 +143,6 @@ pub struct AppState {
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
-    pub payload_residency_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     pub load_image_generation: Arc<AtomicUsize>,
@@ -218,7 +216,6 @@ impl AppState {
                 policy("masks", 96, 128, Some(64)),
                 Arc::clone(&cache_budget),
             ),
-            payload_residency_cache: Mutex::new(HashMap::new()),
             geometry_cache: MemoryLruCache::new(
                 policy("geometry", 256, 384, Some(16)),
                 Arc::clone(&cache_budget),

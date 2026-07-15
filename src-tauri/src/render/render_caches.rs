@@ -105,9 +105,7 @@ impl<'a> RenderCaches<'a> {
 
     pub fn clear_session_caches(&self) {
         crate::patch_assets::clear_patch_asset_cache();
-        if let Ok(mut payload_cache) = self.state.payload_residency_cache.lock() {
-            payload_cache.clear();
-        }
+        self.state.services.payload_residency.clear();
         self.state.mask_cache.clear();
         self.state.geometry_cache.clear();
         self.state.services.viewer_sampling.clear_frames();
