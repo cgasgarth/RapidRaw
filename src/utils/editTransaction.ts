@@ -169,7 +169,15 @@ export const buildAdjustmentMutationOperations = (
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
   const focusedNodeType = (
-    ['scene_global_color_tone', 'camera_input', 'scene_curve', 'tone_equalizer', 'point_color', 'geometry'] as const
+    [
+      'scene_global_color_tone',
+      'camera_input',
+      'scene_curve',
+      'tone_equalizer',
+      'point_color',
+      'lens_correction',
+      'geometry',
+    ] as const
   ).find((nodeType) => {
     const descriptor = getEditDocumentNodeDescriptor(nodeType);
     return (
@@ -239,6 +247,16 @@ export const reduceEditTransaction = (
         'orientationSteps',
         'flipHorizontal',
         'flipVertical',
+        'lensCorrectionMode',
+        'lensDistortionAmount',
+        'lensDistortionEnabled',
+        'lensDistortionParams',
+        'lensMaker',
+        'lensModel',
+        'lensTcaAmount',
+        'lensTcaEnabled',
+        'lensVignetteAmount',
+        'lensVignetteEnabled',
         'perspectiveCorrection',
       ].includes(key),
     )

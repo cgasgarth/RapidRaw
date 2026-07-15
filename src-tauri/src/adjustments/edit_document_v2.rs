@@ -19,6 +19,7 @@ enum EditNodeTypeV2 {
     DetailDenoiseDehaze,
     PointColor,
     CameraInput,
+    LensCorrection,
     Geometry,
     Layers,
     SourceArtifacts,
@@ -35,6 +36,7 @@ impl EditNodeTypeV2 {
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
+            Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
             Self::Layers => ("layers", "scene_referred_v2", 1),
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
         }
@@ -160,6 +162,101 @@ impl GeometryV2 {
         if let Some(crop) = &self.crop {
             crop.validate()?;
         }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LensDistortionParamsV2 {
+    k1: f64,
+    k2: f64,
+    k3: f64,
+    model: u8,
+    tca_vb: f64,
+    tca_vr: f64,
+    vig_k1: f64,
+    vig_k2: f64,
+    vig_k3: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LensCorrectionV2 {
+    lens_correction_mode: String,
+    lens_distortion_amount: u16,
+    lens_distortion_enabled: bool,
+    lens_distortion_params: Option<LensDistortionParamsV2>,
+    lens_maker: Option<String>,
+    lens_model: Option<String>,
+    lens_tca_amount: u16,
+    lens_tca_enabled: bool,
+    lens_vignette_amount: u16,
+    lens_vignette_enabled: bool,
+}
+
+impl LensCorrectionV2 {
+    fn validate(&self) -> Result<(), String> {
+        if !matches!(self.lens_correction_mode.as_str(), "auto" | "manual") {
+            return Err("EditDocumentV2 lens_correction mode must be auto or manual".to_string());
+        }
+        for (field, value) in [
+            ("lensDistortionAmount", self.lens_distortion_amount),
+            ("lensTcaAmount", self.lens_tca_amount),
+            ("lensVignetteAmount", self.lens_vignette_amount),
+        ] {
+            if value > 200 {
+                return Err(format!(
+                    "EditDocumentV2 lens_correction field '{field}' must be finite and within [0, 200]"
+                ));
+            }
+        }
+        if self.lens_maker.as_ref().is_some_and(|value| {
+            let length = value.trim().chars().count();
+            length == 0 || length > 160
+        }) {
+            return Err(
+                "EditDocumentV2 lens_correction maker must contain 1..=160 characters".to_string(),
+            );
+        }
+        if self.lens_model.as_ref().is_some_and(|value| {
+            let length = value.trim().chars().count();
+            length == 0 || length > 240
+        }) {
+            return Err(
+                "EditDocumentV2 lens_correction model must contain 1..=240 characters".to_string(),
+            );
+        }
+        if self.lens_model.is_some() && self.lens_maker.is_none() {
+            return Err("EditDocumentV2 lens_correction model requires a lens maker".to_string());
+        }
+        if let Some(params) = &self.lens_distortion_params {
+            let values = [
+                params.k1,
+                params.k2,
+                params.k3,
+                params.tca_vb,
+                params.tca_vr,
+                params.vig_k1,
+                params.vig_k2,
+                params.vig_k3,
+            ];
+            if values
+                .iter()
+                .any(|value| !value.is_finite() || !(-10.0..=10.0).contains(value))
+                || params.model > 10
+            {
+                return Err(
+                    "EditDocumentV2 lens_correction profile coefficients must be within [-10, 10] and model within [0, 10]"
+                        .to_string(),
+                );
+            }
+        }
+        let _ = (
+            self.lens_distortion_enabled,
+            self.lens_tca_enabled,
+            self.lens_vignette_enabled,
+        );
         Ok(())
     }
 }
@@ -1254,6 +1351,10 @@ fn compile_node_params(
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::LensCorrection => {
+            parse_lens_correction(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::SourceArtifacts => {
             parse_source_artifacts(&node.params)?;
             Ok(node.params.clone())
@@ -1364,6 +1465,14 @@ fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
         .map_err(|error| format!("EditDocumentV2 geometry is invalid: {error}"))?;
     geometry.validate()?;
     Ok(geometry)
+}
+
+fn parse_lens_correction(params: &Map<String, Value>) -> Result<LensCorrectionV2, String> {
+    let lens_correction: LensCorrectionV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 lens_correction is invalid: {error}"))?;
+    lens_correction.validate()?;
+    Ok(lens_correction)
 }
 
 fn validate_source_artifact_domain(
@@ -1726,6 +1835,24 @@ mod tests {
                     "process": "legacy_pipeline_v1",
                     "type": "geometry"
                 },
+                "lens_correction": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": {
+                        "lensCorrectionMode": "manual",
+                        "lensDistortionAmount": 100,
+                        "lensDistortionEnabled": true,
+                        "lensDistortionParams": null,
+                        "lensMaker": null,
+                        "lensModel": null,
+                        "lensTcaAmount": 100,
+                        "lensTcaEnabled": true,
+                        "lensVignetteAmount": 100,
+                        "lensVignetteEnabled": true
+                    },
+                    "process": "legacy_pipeline_v1",
+                    "type": "lens_correction"
+                },
                 "layers": {
                     "enabled": true,
                     "implementationVersion": 1,
@@ -1841,6 +1968,16 @@ mod tests {
             "whites": 9
         });
         expected["cameraProfileAmount"] = json!(100);
+        expected["lensCorrectionMode"] = json!("manual");
+        expected["lensDistortionAmount"] = json!(100);
+        expected["lensDistortionEnabled"] = json!(true);
+        expected["lensDistortionParams"] = Value::Null;
+        expected["lensMaker"] = Value::Null;
+        expected["lensModel"] = Value::Null;
+        expected["lensTcaAmount"] = json!(100);
+        expected["lensTcaEnabled"] = json!(true);
+        expected["lensVignetteAmount"] = json!(100);
+        expected["lensVignetteEnabled"] = json!(true);
         expected["creativeTemperature"] = json!(0);
         expected["creativeTint"] = json!(0);
         expected["whiteBalanceMigration"] = json!("native_v1");
@@ -2231,6 +2368,92 @@ mod tests {
             .into_render_adjustments()
             .expect_err("unknown point-color process must fail");
         assert!(error.contains("process or point count is invalid"));
+    }
+
+    #[test]
+    fn lens_correction_compiler_rejects_unowned_malformed_and_out_of_range_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["lens_correction"]["params"]["futureOptic"] = json!(1);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned lens field must fail");
+        assert!(error.contains("unknown field `futureOptic`"));
+
+        let mut malformed = document_with_legacy(json!({}));
+        malformed["nodes"]["lens_correction"]["params"]["lensDistortionParams"] =
+            json!({ "k1": 0.1 });
+        let error = serde_json::from_value::<EditDocumentV2>(malformed)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("incomplete lens profile must fail");
+        assert!(error.contains("lens_correction is invalid"));
+
+        for field in [
+            "lensDistortionAmount",
+            "lensTcaAmount",
+            "lensVignetteAmount",
+        ] {
+            for invalid in [json!(201), json!(100.5)] {
+                let mut out_of_range = document_with_legacy(json!({}));
+                out_of_range["nodes"]["lens_correction"]["params"][field] = invalid;
+                let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+                    .expect("document envelope remains parseable")
+                    .into_render_adjustments()
+                    .expect_err("non-integer or out-of-range lens amount must fail");
+                assert!(error.contains(field) || error.contains("lens_correction is invalid"));
+            }
+        }
+
+        for field in [
+            "k1", "k2", "k3", "tca_vb", "tca_vr", "vig_k1", "vig_k2", "vig_k3",
+        ] {
+            let mut coefficient = document_with_legacy(json!({}));
+            coefficient["nodes"]["lens_correction"]["params"]["lensDistortionParams"] = json!({
+                "k1": 0, "k2": 0, "k3": 0, "model": 1, "tca_vb": 1, "tca_vr": 1,
+                "vig_k1": 0, "vig_k2": 0, "vig_k3": 0
+            });
+            coefficient["nodes"]["lens_correction"]["params"]["lensDistortionParams"][field] =
+                json!(10.1);
+            let error = serde_json::from_value::<EditDocumentV2>(coefficient)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("out-of-range lens coefficient must fail");
+            assert!(error.contains("[-10, 10]"));
+        }
+
+        for invalid_model in [json!(11), json!(1.5)] {
+            let mut model = document_with_legacy(json!({}));
+            model["nodes"]["lens_correction"]["params"]["lensDistortionParams"] = json!({
+                "k1": 0, "k2": 0, "k3": 0, "model": invalid_model, "tca_vb": 1, "tca_vr": 1,
+                "vig_k1": 0, "vig_k2": 0, "vig_k3": 0
+            });
+            let error = serde_json::from_value::<EditDocumentV2>(model)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("non-integer or out-of-range lens model must fail");
+            assert!(error.contains("model") || error.contains("lens_correction is invalid"));
+        }
+
+        for (field, value) in [
+            ("lensMaker", "x".repeat(161)),
+            ("lensModel", "x".repeat(241)),
+        ] {
+            let mut identity = document_with_legacy(json!({}));
+            identity["nodes"]["lens_correction"]["params"][field] = json!(value);
+            if field == "lensModel" {
+                identity["nodes"]["lens_correction"]["params"]["lensMaker"] = json!("maker");
+            }
+            let error = serde_json::from_value::<EditDocumentV2>(identity)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("oversized lens identity must fail");
+            assert!(error.contains(if field == "lensMaker" {
+                "maker"
+            } else {
+                "model"
+            }));
+        }
     }
 
     #[test]

@@ -76,6 +76,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'detail_denoise_dehaze',
       'point_color',
       'camera_input',
+      'lens_correction',
       'geometry',
       'layers',
       'source_artifacts',
@@ -84,6 +85,50 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
     expect(document.migration?.quarantined).toContain('sectionVisibility');
+  });
+
+  test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      lensDistortionAmount: 125,
+      lensDistortionParams: {
+        k1: 0.1,
+        k2: 0,
+        k3: 0,
+        model: 1,
+        tca_vb: 0.99,
+        tca_vr: 1.01,
+        vig_k1: 0.2,
+        vig_k2: 0,
+        vig_k3: 0,
+      },
+      lensMaker: 'Fixture Optics',
+      lensModel: '35mm Prime',
+    });
+    expect(document.nodes.lens_correction?.params).toMatchObject({
+      lensDistortionAmount: 125,
+      lensMaker: 'Fixture Optics',
+      lensModel: '35mm Prime',
+    });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('lensDistortionAmount');
+
+    for (const [field, value] of [
+      ['lensDistortionAmount', 100.5],
+      ['lensTcaAmount', 201],
+      ['lensVignetteAmount', -1],
+    ] as const) {
+      const invalid = structuredClone(document);
+      if (invalid.nodes.lens_correction) invalid.nodes.lens_correction.params[field] = value;
+      expect(() => editDocumentV2Schema.parse(invalid)).toThrow();
+    }
+    const invalidCoefficient = structuredClone(document);
+    if (invalidCoefficient.nodes.lens_correction) {
+      invalidCoefficient.nodes.lens_correction.params.lensDistortionParams = {
+        ...document.nodes.lens_correction?.params.lensDistortionParams,
+        k1: 10.1,
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(invalidCoefficient)).toThrow();
   });
 
   test('legacy adapter is deterministic and preserves unmigrated fields in extensions', () => {
@@ -920,7 +965,7 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     expect(diagnostics.schemaVersion).toBe(2);
     expect(diagnostics.activeNodeTypes).toEqual(editDocumentV2NodeInventory(document));
-    expect(diagnostics.legacyNodeTypes).toEqual(['geometry']);
+    expect(diagnostics.legacyNodeTypes).toEqual(['lens_correction', 'geometry']);
     expect(diagnostics.nodeDiagnostics.find(({ nodeType }) => nodeType === 'scene_curve')?.status).toBe('disabled');
     expect(diagnostics.quarantinedNodeTypes).toEqual(['future_color_v9']);
     expect(diagnostics.renderStageFingerprints[0]?.fingerprint).toContain('scene_global_color_tone');
