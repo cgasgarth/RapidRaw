@@ -40,9 +40,12 @@ import {
   type PreviewCoordinatorEvent,
   type PreviewQualitySnapshot,
   type PreviewSessionIdentity,
-  quantizePreviewRoi,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import {
+  type PreviewViewportAuthoritySnapshot,
+  PreviewViewportSnapshotController,
+} from '../../utils/previewViewportSnapshot';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -50,6 +53,7 @@ import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 interface InteractivePreviewScopeSnapshot {
   roi: [number, number, number, number] | null;
   scope: InteractivePreviewScope;
+  viewport: PreviewViewportAuthoritySnapshot;
 }
 
 type ParsedInteractivePatch = ReturnType<typeof parseInteractivePreviewPatchPayload>;
@@ -108,14 +112,13 @@ export function useImageProcessing() {
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewportScopeRevisionRef = useRef<{ inputs: readonly unknown[]; revision: number }>({
-    inputs: [],
-    revision: 1,
-  });
   const interactiveScopeRef = useRef<
     (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
   >(() => null);
   const previewQualityControllerRef = useRef(createPreviewQualityPolicy());
+  const previewViewportControllerRef = useRef<PreviewViewportSnapshotController | null>(null);
+  const previewViewportController = previewViewportControllerRef.current ?? new PreviewViewportSnapshotController();
+  previewViewportControllerRef.current = previewViewportController;
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
@@ -351,24 +354,24 @@ export function useImageProcessing() {
   editedPreviewRunnerRef.current = editedPreviewRunner;
 
   const previewSessionIdentity = useCallback(
-    (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
+    (scope: InteractivePreviewScope, viewport: PreviewViewportAuthoritySnapshot): PreviewSessionIdentity => {
       const positive = (value: number): number => Math.max(1, Math.round(value));
       return {
         adjustmentRevision: positive(scope.adjustmentRevision),
         backend: scope.backend,
         displayGeneration: positive(previewCoordinator.snapshot().displayGeneration),
-        geometryRevision: positive(Number(scope.geometryIdentity)),
+        geometryRevision: viewport.input.geometryRevision,
         graphRevision: scope.graphIdentity,
         imageSessionId: positive(scope.imageSessionId),
         maskRevision: positive(scope.maskRevision),
         patchRevision: positive(scope.patchRevision),
         proofRevision: positive(scope.proofRevision),
-        roiFingerprint: fingerprintPreviewRoi(roi),
-        sourceImagePath: scope.sourceImagePath,
-        sourceRevision: positive(scope.imageSessionId),
-        targetHeight: positive(targetRes),
-        targetWidth: positive(targetRes),
-        viewportRevision: positive(scope.viewportIdentity),
+        roiFingerprint: viewport.coordinator.roiFingerprint,
+        sourceImagePath: viewport.input.sourceImagePath,
+        sourceRevision: viewport.input.sourceRevision,
+        targetHeight: viewport.coordinator.targetHeight,
+        targetWidth: viewport.coordinator.targetWidth,
+        viewportRevision: viewport.coordinator.revision,
       };
     },
     [previewCoordinator],
@@ -392,27 +395,29 @@ export function useImageProcessing() {
     );
     const autoEditPreviewActive = scopeAdjustmentSnapshot !== editor.adjustmentSnapshot;
 
-    const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+    const dpr = getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio);
     const normalizedTargetRes = Math.max(1, Math.round(targetRes));
-    const viewportInputs = [
-      editor.viewportRevision,
-      settings?.editorPreviewResolution ?? 1920,
-      settings?.enableZoomHifi ?? true,
-      settings?.highResZoomMultiplier ?? 1,
-      settings?.useFullDpiRendering ?? false,
-    ] as const;
-    if (
-      viewportInputs.length !== viewportScopeRevisionRef.current.inputs.length ||
-      viewportInputs.some((value, index) => value !== viewportScopeRevisionRef.current.inputs[index])
-    ) {
-      viewportScopeRevisionRef.current = {
-        inputs: viewportInputs,
-        revision: viewportScopeRevisionRef.current.revision + 1,
-      };
-    }
-    const quantizedRoi = quantizePreviewRoi(roi, normalizedTargetRes);
-    return {
+    const viewport = previewViewportController.snapshot({
+      devicePixelRatio: dpr,
+      geometryRevision: scopeAdjustmentSnapshot.geometryRevision,
+      layout: editor.baseRenderSize,
+      qualityPolicy: {
+        editorPreviewResolution: settings?.editorPreviewResolution ?? 1920,
+        enableZoomHifi: settings?.enableZoomHifi ?? true,
+        highResZoomMultiplier: settings?.highResZoomMultiplier ?? 1,
+        useFullDpiRendering: settings?.useFullDpiRendering ?? false,
+      },
       roi,
+      sourceImagePath,
+      sourceRevision: editor.imageSessionId,
+      targetHeight: normalizedTargetRes,
+      targetWidth: normalizedTargetRes,
+      transform: editor.previewViewportTransform,
+      zoomMode: editor.zoomMode,
+    });
+    const quantizedRoi = viewport.roi;
+    return {
+      roi: quantizedRoi === null ? null : [...quantizedRoi],
       scope: {
         backend: settings?.useWgpuRenderer !== false && editor.hasRenderedFirstFrame ? 'wgpu' : 'cpu',
         basePreviewUrl: resolveEditorPreviewSource({
@@ -444,8 +449,9 @@ export function useImageProcessing() {
         roiH: quantizedRoi?.[3] ?? null,
         sourceImagePath,
         targetResolution: normalizedTargetRes,
-        viewportIdentity: viewportScopeRevisionRef.current.revision,
+        viewportIdentity: viewport.coordinator.revision,
       },
+      viewport,
     };
   };
 
@@ -507,7 +513,7 @@ export function useImageProcessing() {
     const scopeSnapshot = interactiveScopeRef.current(appSettings?.editorPreviewResolution ?? 1920, null);
     if (scopeSnapshot === null) return;
     dispatchPreviewCoordinator({
-      session: previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.scope.targetResolution, scopeSnapshot.roi),
+      session: previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.viewport),
       type: 'image-session-installed',
     });
   }, [
@@ -548,7 +554,7 @@ export function useImageProcessing() {
       const normalizedTargetRes = quality.effectiveTargetResolution;
       const scopeSnapshot = interactiveScopeRef.current(normalizedTargetRes, quality.effectiveRoi);
       if (scopeSnapshot === null) return;
-      const session = previewSessionIdentity(scopeSnapshot.scope, normalizedTargetRes, scopeSnapshot.roi);
+      const session = previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.viewport);
       dispatchPreviewCoordinator({ session, type: 'image-session-installed' });
       const identity = editedPreviewRunner.request(
         {
@@ -572,6 +578,7 @@ export function useImageProcessing() {
           snapshot: renderAdjustmentSnapshot,
           targetResolution: normalizedTargetRes,
           viewerScope: scopeSnapshot.scope,
+          viewportAuthority: scopeSnapshot.viewport,
         },
         delayMs,
       );
@@ -704,7 +711,8 @@ export function useImageProcessing() {
     (targetRes: number, delayMs: number): void => {
       const scopeSnapshot = interactiveScopeRef.current(targetRes, null);
       if (scopeSnapshot === null) return;
-      const session = previewSessionIdentity(scopeSnapshot.scope, targetRes, null);
+      const session = previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.viewport);
+      dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: scopeSnapshot.viewport.coordinator });
       if (!originalPreviewRunner.needsRequest(session, targetRes)) return;
       originalPreviewRunner.request(
         session,

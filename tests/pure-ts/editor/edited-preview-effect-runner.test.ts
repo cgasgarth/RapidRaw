@@ -19,8 +19,9 @@ import {
   PreviewCoordinator,
   type PreviewCoordinatorEffect,
 } from '../../../src/utils/previewCoordinator';
+import { PreviewViewportSnapshotController } from '../../../src/utils/previewViewportSnapshot';
 
-type BuildRequestOverrides = Omit<Partial<EditedPreviewRequest>, 'session' | 'viewerScope'> & {
+type BuildRequestOverrides = Omit<Partial<EditedPreviewRequest>, 'session' | 'viewerScope' | 'viewportAuthority'> & {
   imageSessionId?: number;
   session?: Partial<EditedPreviewRequest['session']>;
   sourceImagePath?: string;
@@ -79,6 +80,46 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
     viewportIdentity: 1,
     ...overrides.viewerScope,
   };
+  const viewportController = new PreviewViewportSnapshotController();
+  const requestedViewportRevision = overrides.session?.viewportRevision ?? viewerScope.viewportIdentity;
+  for (let revision = 1; revision < requestedViewportRevision; revision += 1) {
+    viewportController.snapshot({
+      devicePixelRatio: viewerScope.devicePixelRatio,
+      geometryRevision: snapshot.geometryRevision,
+      layout: { containerHeight: 800, containerWidth: 1200, height: 800, offsetX: revision, offsetY: 0, width: 1200 },
+      qualityPolicy: {
+        editorPreviewResolution: 1920,
+        enableZoomHifi: true,
+        highResZoomMultiplier: 1,
+        useFullDpiRendering: false,
+      },
+      roi: overrides.roi ?? null,
+      sourceImagePath,
+      sourceRevision: imageSessionId,
+      targetHeight: targetResolution,
+      targetWidth: targetResolution,
+      transform: { positionX: 0, positionY: 0, scale: 1 },
+      zoomMode: { kind: 'fit' },
+    });
+  }
+  const viewportAuthority = viewportController.snapshot({
+    devicePixelRatio: viewerScope.devicePixelRatio,
+    geometryRevision: snapshot.geometryRevision,
+    layout: { containerHeight: 800, containerWidth: 1200, height: 800, offsetX: 0, offsetY: 0, width: 1200 },
+    qualityPolicy: {
+      editorPreviewResolution: 1920,
+      enableZoomHifi: true,
+      highResZoomMultiplier: 1,
+      useFullDpiRendering: false,
+    },
+    roi: overrides.roi ?? null,
+    sourceImagePath,
+    sourceRevision: imageSessionId,
+    targetHeight: targetResolution,
+    targetWidth: targetResolution,
+    transform: { positionX: 0, positionY: 0, scale: 1 },
+    zoomMode: { kind: 'fit' },
+  });
   return {
     ...overrides,
     activeWaveformChannel: overrides.activeWaveformChannel ?? null,
@@ -114,12 +155,13 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
       sourceRevision: imageSessionId,
       targetHeight: targetResolution,
       targetWidth: targetResolution,
-      viewportRevision: 1,
+      viewportRevision: viewportAuthority.coordinator.revision,
       ...overrides.session,
     },
     snapshot,
     targetResolution,
     viewerScope,
+    viewportAuthority,
   };
 };
 
