@@ -196,4 +196,54 @@ describe('camera input edit transaction', () => {
       }),
     ).toBeFalse();
   });
+
+  test('applies and validates camera input through the canonical fallback session', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-camera-before',
+      imageSession: null,
+      imageSessionId: 32,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity = captureCameraInputCommitIdentity(state);
+    expect(fallbackIdentity).toEqual({
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:32',
+      sourceIdentity: sourcePath,
+    });
+    if (fallbackIdentity === null) throw new Error('expected fallback camera identity');
+    const noOp = state.applyEditTransaction(
+      buildCameraInputEditTransaction(state, fallbackIdentity, { cameraProfile: 'camera_standard' }, 'fallback-no-op'),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:fallback-camera-before');
+    const result = useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildCameraInputEditTransaction(
+          useEditorStore.getState(),
+          fallbackIdentity,
+          { cameraProfile: 'camera_neutral', cameraProfileAmount: 64 },
+          'fallback-camera',
+        ),
+      );
+    expect(result).toMatchObject({ changedKeys: ['cameraProfile', 'cameraProfileAmount'], noOp: false });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      imageSessionId: fallbackIdentity.imageSessionId,
+      transactionId: 'fallback-camera',
+    });
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.cameraProfile).toBe('camera_standard');
+
+    expect(() =>
+      buildCameraInputEditTransaction(
+        { ...state, imageSessionId: 33 },
+        fallbackIdentity,
+        { cameraProfile: 'camera_neutral' },
+        'stale-fallback',
+      ),
+    ).toThrow('camera_input_transaction.stale_session');
+    expect(isCurrentCameraInputAsyncRequest({ ...state, imageSessionId: 33 }, fallbackIdentity, 1, 1)).toBeFalse();
+  });
 });
