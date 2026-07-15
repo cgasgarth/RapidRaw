@@ -52,7 +52,7 @@ export function useEditorPersistence(): void {
   }, [includedAdjustments, multiSelectedPaths, selectedImage?.path]);
 
   useEffect(() => {
-    if (!selectedImage?.isReady || imageSession === null) return;
+    if (!selectedImage?.path || imageSession === null) return;
     runner.installSession({
       adjustmentRevision,
       adjustments,
@@ -85,7 +85,6 @@ export function useEditorPersistence(): void {
     multiSelection,
     receipt,
     runner,
-    selectedImage?.isReady,
     selectedImage?.path,
   ]);
 
