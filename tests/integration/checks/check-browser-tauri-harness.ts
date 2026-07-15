@@ -985,13 +985,17 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   await switchAwayAndBack(activePath, false);
   await page.waitForFunction(
     (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'commit_batch_auto_adjustment',
-      ).length ?? 0) === expected,
+      typeof window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'commit_batch_auto_adjustment')
+        .at(expected - 1)?.endedAtMs === 'number' &&
+      document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     raceBaseline.commit + 1,
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(1_700);
+  await page.waitForFunction(
+    () => Number(document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim()) === 0.7,
+    { timeout: 10_000 },
+  );
   if (Number((await exposure.textContent())?.trim()) !== 0.7) {
     const commitArgs = await page.evaluate(
       () =>
@@ -1013,13 +1017,14 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   await exposureInput.press('Enter');
   await page.waitForFunction(
     (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
-        ({ command }) => command === 'commit_batch_auto_adjustment',
-      ).length ?? 0) === expected,
+      typeof window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'commit_batch_auto_adjustment')
+        .at(expected - 1)?.endedAtMs === 'number' &&
+      document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     editedRaceBaseline.commit + 1,
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(1_700);
+  await page.waitForTimeout(50);
   if (Number((await exposure.textContent())?.trim()) !== 0.8) {
     throw new Error('A delayed Batch Auto Adjust commit replaced an edited successor A session.');
   }

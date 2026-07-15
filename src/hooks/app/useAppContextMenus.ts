@@ -77,6 +77,7 @@ import {
   type BatchAutoAdjustSelectionIdentity,
   buildSelectedBatchAutoAdjustTransaction,
   resolveBatchAutoAdjustAcceptanceIdentity,
+  resolveBatchAutoAdjustHydrationProtection,
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
@@ -639,6 +640,17 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                         path: latest.selectedImage.path,
                       }
                     : null;
+                  const hydrationProtection = resolveBatchAutoAdjustHydrationProtection({
+                    captured: capturedSelection,
+                    current: latestSelection,
+                    result: committed,
+                  });
+                  if (hydrationProtection !== null) {
+                    protectNativeCommittedHydrationSession(
+                      hydrationProtection.sessionId,
+                      hydrationProtection.transactionId,
+                    );
+                  }
                   const acceptanceIdentity = resolveBatchAutoAdjustAcceptanceIdentity({
                     captured: capturedSelection,
                     capturedAdjustments,
@@ -647,10 +659,6 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   });
                   if (acceptanceIdentity !== null) {
                     const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
-                    protectNativeCommittedHydrationSession(
-                      acceptanceIdentity.imageSessionId,
-                      committed.receipt.transactionId,
-                    );
                     const transaction = buildSelectedBatchAutoAdjustTransaction({
                       acceptedAdjustments,
                       captured: capturedSelection,

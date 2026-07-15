@@ -12,6 +12,7 @@ import {
   type BatchAutoAdjustSelectionIdentity,
   buildSelectedBatchAutoAdjustTransaction,
   resolveBatchAutoAdjustAcceptanceIdentity,
+  resolveBatchAutoAdjustHydrationProtection,
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../src/utils/batchAutoAdjustTransaction';
@@ -149,6 +150,37 @@ describe('Batch Auto Adjust transaction boundary', () => {
       result: applied,
     });
     expect(transaction).toMatchObject({ baseAdjustmentRevision: 4, imageSessionId: 'successor-a' });
+  });
+
+  test('protects same-path successor hydration before accepting unchanged state or rejecting a newer edit', () => {
+    const successor = { ...identity, adjustmentRevision: 4, imageSessionId: 'successor-a' };
+    expect(
+      resolveBatchAutoAdjustHydrationProtection({ captured: identity, current: successor, result: applied }),
+    ).toEqual({ sessionId: 'successor-a', transactionId: 'blake3:batch-auto-adjust-1' });
+
+    expect(
+      resolveBatchAutoAdjustAcceptanceIdentity({
+        captured: identity,
+        capturedAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+        current: successor,
+        currentAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      }),
+    ).toEqual(successor);
+    expect(
+      resolveBatchAutoAdjustAcceptanceIdentity({
+        captured: identity,
+        capturedAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+        current: successor,
+        currentAdjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.8 },
+      }),
+    ).toBeNull();
+    expect(
+      resolveBatchAutoAdjustHydrationProtection({
+        captured: identity,
+        current: { ...successor, path: '/fixtures/other.raw' },
+        result: applied,
+      }),
+    ).toBeNull();
   });
 
   test('distinguishes a path switch from a newer same-path edit before native commit', () => {

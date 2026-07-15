@@ -34,6 +34,26 @@ export const shouldCompensateBatchAutoAdjustPersistence = ({
 
 export type SelectedBatchAutoAdjustDisposition = 'apply-selected' | 'commit-target-only' | 'reject-stale';
 
+export interface BatchAutoAdjustHydrationProtection {
+  sessionId: string;
+  transactionId: string;
+}
+
+export const resolveBatchAutoAdjustHydrationProtection = ({
+  captured,
+  current,
+  result,
+}: {
+  captured: BatchAutoAdjustSelectionIdentity;
+  current: BatchAutoAdjustSelectionIdentity | null;
+  result: BatchAutoAdjustPathResultV1;
+}): BatchAutoAdjustHydrationProtection | null =>
+  (result.status === 'applied' || result.status === 'no_op') &&
+  result.path === captured.path &&
+  current?.path === captured.path
+    ? { sessionId: current.imageSessionId, transactionId: result.receipt.transactionId }
+    : null;
+
 export const selectedBatchAutoAdjustDisposition = (
   captured: BatchAutoAdjustSelectionIdentity,
   current: BatchAutoAdjustSelectionIdentity | null,
