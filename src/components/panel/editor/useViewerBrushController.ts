@@ -20,12 +20,14 @@ import {
   type ViewerBrushPointerSample,
   type ViewerBrushSettings,
 } from './viewerBrushInteractionController';
-import { createViewerBrushPointerLifecycle } from './viewerBrushPointerLifecycle';
 import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
-
-export type ViewerBrushKonvaEvent = KonvaEventObject<MouseEvent | PointerEvent | TouchEvent>;
-export type ViewerBrushMoveEvent = ViewerBrushKonvaEvent | MouseEvent | TouchEvent;
-export type ViewerBrushEndEvent = ViewerBrushKonvaEvent | MouseEvent | TouchEvent;
+import {
+  isViewerKonvaPointerEvent,
+  type ViewerKonvaPointerEvent,
+  type ViewerPointerEndEvent,
+  type ViewerPointerMoveEvent,
+} from './viewerPointerEvents';
+import { createViewerPointerLifecycle } from './viewerPointerLifecycle';
 
 interface ViewerBrushCursorDescriptor {
   readonly visible: boolean;
@@ -55,22 +57,19 @@ export interface ViewerBrushControllerBinding {
   readonly liveLine: ViewerBrushLine | null;
   cancel(reason: ViewerBrushCancelReason): void;
   handleInputEvent(event: ViewerSurfaceInputEvent): void;
-  handleMouseDown(event: ViewerBrushKonvaEvent): boolean;
+  handleMouseDown(event: ViewerKonvaPointerEvent): boolean;
   handleMouseEnter(): void;
   handleMouseLeave(): void;
-  handleMouseMove(event: ViewerBrushKonvaEvent): boolean;
-  handleMouseUp(event: ViewerBrushKonvaEvent): boolean;
+  handleMouseMove(event: ViewerKonvaPointerEvent): boolean;
+  handleMouseUp(event: ViewerKonvaPointerEvent): boolean;
   handlePenCancel(event: KonvaEventObject<PointerEvent>): boolean;
   handlePenDown(event: KonvaEventObject<PointerEvent>): boolean;
   handlePenMove(event: KonvaEventObject<PointerEvent>): boolean;
   handlePenUp(event: KonvaEventObject<PointerEvent>): boolean;
-  handleTouchEnd(event: ViewerBrushKonvaEvent): boolean;
-  handleTouchMove(event: ViewerBrushKonvaEvent): boolean;
-  handleTouchStart(event: ViewerBrushKonvaEvent): boolean;
+  handleTouchEnd(event: ViewerKonvaPointerEvent): boolean;
+  handleTouchMove(event: ViewerKonvaPointerEvent): boolean;
+  handleTouchStart(event: ViewerKonvaPointerEvent): boolean;
 }
-
-const isKonvaEvent = (event: ViewerBrushMoveEvent): event is ViewerBrushKonvaEvent =>
-  'evt' in event && 'target' in event;
 
 const pointerMetadata = (event: MouseEvent | PointerEvent | TouchEvent) => {
   const pointerType =
@@ -109,7 +108,7 @@ export const useViewerBrushController = ({
 }: UseViewerBrushControllerInput): ViewerBrushControllerBinding => {
   const controller = useMemo(() => createViewerBrushInteractionController(), []);
   const commandAdapter = useMemo(() => createViewerBrushCommandAdapter(), []);
-  const pointerLifecycle = useMemo(() => createViewerBrushPointerLifecycle(), []);
+  const pointerLifecycle = useMemo(() => createViewerPointerLifecycle(), []);
   const stageRef = useRef<KonvaStage | null>(null);
   const mountedRef = useRef(true);
   const currentRef = useRef({
@@ -225,7 +224,7 @@ export const useViewerBrushController = ({
     [controller, execute, pointerLifecycle],
   );
   const handleStart = useCallback(
-    (event: ViewerBrushKonvaEvent): boolean => {
+    (event: ViewerKonvaPointerEvent): boolean => {
       const current = currentRef.current;
       if (!current.context.active) return false;
       if ('button' in event.evt && event.evt.button !== 0) return true;
@@ -240,15 +239,15 @@ export const useViewerBrushController = ({
     [controller, execute, toSample, toViewPoint],
   );
   const handleMove = useCallback(
-    (event: ViewerBrushMoveEvent): boolean => {
+    (event: ViewerPointerMoveEvent): boolean => {
       const current = currentRef.current;
       if (!current.context.active) return false;
-      const stage = isKonvaEvent(event) ? event.target.getStage() : stageRef.current;
-      if (!isKonvaEvent(event) && stage !== null) stage.setPointersPositions(event);
+      const stage = isViewerKonvaPointerEvent(event) ? event.target.getStage() : stageRef.current;
+      if (!isViewerKonvaPointerEvent(event) && stage !== null) stage.setPointersPositions(event);
       const point = toViewPoint(stage);
       setCursor((previous) => (point === null ? { ...previous, visible: false } : { ...point, visible: true }));
       if (point !== null) {
-        const sourceEvent = isKonvaEvent(event) ? event.evt : event;
+        const sourceEvent = isViewerKonvaPointerEvent(event) ? event.evt : event;
         execute(controller.move(current.context, toSample(point, sourceEvent)));
         if (sourceEvent.cancelable) sourceEvent.preventDefault();
       }
@@ -257,15 +256,15 @@ export const useViewerBrushController = ({
     [controller, execute, toSample, toViewPoint],
   );
   const handleEnd = useCallback(
-    (event?: ViewerBrushEndEvent): boolean => {
+    (event?: ViewerPointerEndEvent): boolean => {
       const current = currentRef.current;
       if (!current.context.active) return false;
-      const stage = event && isKonvaEvent(event) ? event.target.getStage() : null;
+      const stage = event && isViewerKonvaPointerEvent(event) ? event.target.getStage() : null;
       const point = toViewPoint(stage);
       execute(
         controller.end(
           current.context,
-          event && isKonvaEvent(event) && point !== null ? toSample(point, event.evt) : undefined,
+          event && isViewerKonvaPointerEvent(event) && point !== null ? toSample(point, event.evt) : undefined,
         ),
       );
       return true;
@@ -274,7 +273,7 @@ export const useViewerBrushController = ({
   );
 
   const handleMouseDown = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       if ('button' in event.evt && event.evt.button !== 0) return true;
       const metadata = pointerMetadata(event.evt);
@@ -283,7 +282,7 @@ export const useViewerBrushController = ({
     [context.active, handleStart, pointerLifecycle],
   );
   const handleMouseMove = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       const metadata = pointerMetadata(event.evt);
       return pointerLifecycle.move(metadata.pointerType, metadata.pointerId) ? handleMove(event) : true;
@@ -291,7 +290,7 @@ export const useViewerBrushController = ({
     [context.active, handleMove, pointerLifecycle],
   );
   const handleMouseUp = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       const metadata = pointerMetadata(event.evt);
       return pointerLifecycle.end(metadata.pointerType, metadata.pointerId) ? handleEnd(event) : true;
@@ -299,7 +298,7 @@ export const useViewerBrushController = ({
     [context.active, handleEnd, pointerLifecycle],
   );
   const handleTouchStart = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       const metadata = pointerMetadata(event.evt);
       return pointerLifecycle.begin(metadata.pointerType, metadata.pointerId) ? handleStart(event) : true;
@@ -307,7 +306,7 @@ export const useViewerBrushController = ({
     [context.active, handleStart, pointerLifecycle],
   );
   const handleTouchMove = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       const metadata = pointerMetadata(event.evt);
       return pointerLifecycle.move(metadata.pointerType, metadata.pointerId) ? handleMove(event) : true;
@@ -315,7 +314,7 @@ export const useViewerBrushController = ({
     [context.active, handleMove, pointerLifecycle],
   );
   const handleTouchEnd = useCallback(
-    (event: ViewerBrushKonvaEvent) => {
+    (event: ViewerKonvaPointerEvent) => {
       if (!context.active) return false;
       const metadata = pointerMetadata(event.evt);
       if (!pointerLifecycle.end(metadata.pointerType, metadata.pointerId)) return true;

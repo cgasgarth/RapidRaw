@@ -146,6 +146,7 @@ const commandNames: Record<
   | 'generateOriginalTransformedPreview'
   | 'generateMaskOverlay'
   | 'generateAiSubjectMask'
+  | 'invokeGenerativeReplaceWithMaskDef'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
@@ -220,6 +221,7 @@ const commandNames: Record<
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateMaskOverlay: Invokes.GenerateMaskOverlay,
   generateAiSubjectMask: Invokes.GenerateAiSubjectMask,
+  invokeGenerativeReplaceWithMaskDef: Invokes.InvokeGenerativeReplaceWithMaskDef,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
@@ -1039,6 +1041,8 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         window.setTimeout(() => resolve(structuredClone(response.value)), response.delayMs),
       );
     }
+    case commandNames.invokeGenerativeReplaceWithMaskDef:
+      return Promise.resolve(JSON.stringify({ browserHarnessQuickErase: true }));
     case commandNames.precomputeAiSubjectMask:
       return Promise.resolve(null);
     case commandNames.generateUncroppedPreview:
