@@ -218,11 +218,6 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: theme("colors.hover-color");
   }
-
-  .macos-window-shell {
-    border-radius: 14px;
-    overflow: hidden;
-  }
 }
 
 @layer components {

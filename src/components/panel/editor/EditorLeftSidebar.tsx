@@ -14,6 +14,7 @@ const EDITOR_LEFT_RESIZER_WIDTH = 8;
 
 interface EditorLeftSidebarProps {
   expandedSections: readonly string[];
+  hasMacWindowOverlay?: boolean;
   isFullScreen: boolean;
   isResizing: boolean;
   isVisible: boolean;
@@ -26,6 +27,7 @@ interface EditorLeftSidebarProps {
 
 export default function EditorLeftSidebar({
   expandedSections,
+  hasMacWindowOverlay = false,
   isFullScreen,
   isResizing,
   isVisible,
@@ -69,7 +71,9 @@ export default function EditorLeftSidebar({
       data-testid="editor-left-region"
       style={{
         opacity: isFullScreen ? 0 : 1,
-        width: isFullScreen ? '0px' : `${isVisible ? width + EDITOR_LEFT_RESIZER_WIDTH : 32}px`,
+        width: isFullScreen
+          ? '0px'
+          : `${isVisible ? width + EDITOR_LEFT_RESIZER_WIDTH : hasMacWindowOverlay ? 80 : 32}px`,
       }}
     >
       {/* i18next-instrument-ignore */}
@@ -78,11 +82,14 @@ export default function EditorLeftSidebar({
         className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-editor-panel"
         data-editor-left-state={isVisible ? 'expanded' : 'collapsed'}
         ref={sidebarRef}
-        style={{ width: `${isVisible ? width : 32}px` }}
+        style={{ width: `${isVisible ? width : hasMacWindowOverlay ? 80 : 32}px` }}
       >
         {isVisible ? (
           <>
-            <header className={professionalInspectorDensityTokens.frame.header}>
+            <header
+              className={cx(professionalInspectorDensityTokens.frame.header, hasMacWindowOverlay && 'pl-20')}
+              data-tauri-drag-region={hasMacWindowOverlay ? 'true' : undefined}
+            >
               {/* i18next-instrument-ignore */}
               <h2 className={professionalInspectorDensityTokens.frame.title}>Develop</h2>
               {/* i18next-instrument-ignore */}

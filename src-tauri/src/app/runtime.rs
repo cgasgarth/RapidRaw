@@ -40,6 +40,18 @@ const fn exit_policy(kind: ExitEventKind) -> ExitPolicy {
     }
 }
 
+const fn resolve_window_decorations(settings_value: Option<bool>, configured_value: bool) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (settings_value, configured_value);
+        true
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        settings_value.unwrap_or(configured_value)
+    }
+}
+
 const DESKTOP_BACKGROUND_SERVICE_PLAN: [BackgroundServiceAction; 6] = [
     BackgroundServiceAction::PreviewWorker,
     BackgroundServiceAction::AnalyticsWorker,
@@ -231,7 +243,7 @@ fn setup_application(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Err
     rapidraw_codecs::register_jxl_decoding_hook();
 
     let window_config = app.config().app.windows.first().unwrap().clone();
-    let decorations = settings.decorations.unwrap_or(window_config.decorations);
+    let decorations = resolve_window_decorations(settings.decorations, window_config.decorations);
     #[cfg(target_os = "android")]
     let _ = decorations;
     let main_window_config = app
@@ -425,6 +437,13 @@ mod tests {
             ExitPolicy::PreventAndTerminate
         );
         assert_eq!(exit_policy(ExitEventKind::Exit), ExitPolicy::Terminate);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_window_always_keeps_native_overlay_controls() {
+        assert!(resolve_window_decorations(Some(false), false));
+        assert!(resolve_window_decorations(Some(true), true));
     }
 
     #[cfg(target_os = "macos")]
