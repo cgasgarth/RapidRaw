@@ -1,5 +1,6 @@
 pub(crate) mod logging;
 pub(crate) mod lut;
+pub(crate) mod negative_lab_dust;
 pub(crate) mod path_preview;
 pub(crate) mod perspective;
 pub(crate) mod source;
