@@ -58,6 +58,13 @@ import {
   reconcileReferenceMatchReceiptsAfterEdit,
 } from '../../utils/referenceMatchTransfer';
 import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
+import {
+  assertResetAdjustmentsResultCoverage,
+  buildResetEditTransaction,
+  captureResetEditCommitIdentity,
+  isCurrentResetEditCommitIdentity,
+  resetAdjustmentsResultsSchema,
+} from '../../utils/resetEditTransaction';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
@@ -261,42 +268,44 @@ export function useEditorActions() {
         toast.error('Select an image before resetting adjustments.');
         return;
       }
+      const resetIdentity = selectedImage
+        ? captureResetEditCommitIdentity(useEditorStore.getState(), selectedImage.path)
+        : null;
 
       pathsToReset.forEach((p) => {
         globalImageCache.delete(p);
       });
       debouncedSetHistory.cancel();
+      beginEditorPersistenceAuthorityBarrier();
 
       try {
-        const results = await invoke<
-          Array<{ path: string; adjustments: Adjustments; revision: string; renderGeneration: number }>
-        >(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset });
+        const results = resetAdjustmentsResultsSchema.parse(
+          await invoke<unknown>(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset }),
+        );
+        assertResetAdjustmentsResultCoverage(results, pathsToReset);
         useProcessStore.getState().invalidateThumbnails(pathsToReset);
         if (libraryActivePath && pathsToReset.includes(libraryActivePath))
           setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
-        if (selectedImage && pathsToReset.includes(selectedImage.path)) {
-          const aspect =
-            selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-          const backend = results.find((result) => result.path === selectedImage.path)?.adjustments;
-          const resetData = { ...INITIAL_ADJUSTMENTS, ...backend, aspectRatio: aspect, aiPatches: [] };
+        if (selectedImage && resetIdentity !== null && pathsToReset.includes(selectedImage.path)) {
           const current = useEditorStore.getState();
-          const imageSessionId = current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`;
-          if (current.selectedImage?.path !== selectedImage.path) return;
-          applyEditTransaction({
-            transactionId: createOperationId(),
-            imageSessionId,
-            baseAdjustmentRevision: current.adjustmentRevision,
-            source: 'reset',
-            operations: [{ type: 'replace-adjustments', adjustments: resetData }],
-            history: 'reset',
-            persistence: 'commit',
-          });
+          if (!isCurrentResetEditCommitIdentity(current, resetIdentity)) return;
+          const result = results.find(({ path }) => path === resetIdentity.sourceIdentity);
+          if (result === undefined) throw new Error('reset_edit_transaction.missing_selected_receipt');
+          applyEditTransaction(
+            buildResetEditTransaction(
+              current,
+              resetIdentity,
+              result,
+              { height: selectedImage.height, width: selectedImage.width },
+              createOperationId(),
+            ),
+          );
         }
       } catch (err) {
         toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`);
       }
     },
-    [applyEditTransaction, setEditor],
+    [applyEditTransaction],
   );
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
