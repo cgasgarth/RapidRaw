@@ -10,6 +10,7 @@ import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   type BatchAutoAdjustSelectionIdentity,
+  type BatchAutoAdjustSuccessorBaseline,
   buildSelectedBatchAutoAdjustTransaction,
   resolveBatchAutoAdjustAcceptanceIdentity,
   resolveBatchAutoAdjustHydrationProtection,
@@ -181,6 +182,35 @@ describe('Batch Auto Adjust transaction boundary', () => {
         result: applied,
       }),
     ).toBeNull();
+  });
+
+  test('accepts only an untouched first-observed cold successor baseline', () => {
+    const successor = { ...identity, adjustmentRevision: 4, imageSessionId: 'successor-a' };
+    const placeholderAdjustments = { ...INITIAL_ADJUSTMENTS, exposure: 0 };
+    const baseline: BatchAutoAdjustSuccessorBaseline = {
+      adjustments: structuredClone(placeholderAdjustments),
+      identity: successor,
+      source: 'cold-load',
+    };
+    const accept = (
+      current: BatchAutoAdjustSelectionIdentity,
+      currentAdjustments = placeholderAdjustments,
+      currentSource: 'cache' | 'cold-load' = 'cold-load',
+    ) =>
+      resolveBatchAutoAdjustAcceptanceIdentity({
+        captured: identity,
+        capturedAdjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.65 },
+        current,
+        currentAdjustments,
+        currentSource,
+        successorBaseline: baseline,
+      });
+
+    expect(accept(successor)).toEqual(successor);
+    expect(accept({ ...successor, adjustmentRevision: 5 })).toBeNull();
+    expect(accept(successor, { ...placeholderAdjustments, exposure: 0.8 })).toBeNull();
+    expect(accept({ ...successor, imageSessionId: 'later-successor-a' })).toBeNull();
+    expect(accept(successor, placeholderAdjustments, 'cache')).toBeNull();
   });
 
   test('distinguishes a path switch from a newer same-path edit before native commit', () => {

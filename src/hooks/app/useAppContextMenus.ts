@@ -75,6 +75,7 @@ import { Invokes } from '../../tauri/commands';
 import { normalizeLoadedAdjustments } from '../../utils/adjustments';
 import {
   type BatchAutoAdjustSelectionIdentity,
+  type BatchAutoAdjustSuccessorBaseline,
   buildSelectedBatchAutoAdjustTransaction,
   resolveBatchAutoAdjustAcceptanceIdentity,
   resolveBatchAutoAdjustHydrationProtection,
@@ -571,6 +572,31 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               }
             : null;
         const capturedAdjustments = capturedSelection === null ? null : structuredClone(editor.adjustments);
+        let successorBaseline: BatchAutoAdjustSuccessorBaseline | null = null;
+        const stopTrackingSuccessor =
+          capturedSelection === null
+            ? () => undefined
+            : useEditorStore.subscribe((state) => {
+                const session = state.imageSession;
+                if (
+                  session === null ||
+                  state.selectedImage?.path !== capturedSelection.path ||
+                  session.path !== capturedSelection.path ||
+                  session.id === capturedSelection.imageSessionId ||
+                  successorBaseline?.identity.imageSessionId === session.id
+                ) {
+                  return;
+                }
+                successorBaseline = {
+                  adjustments: structuredClone(state.adjustments),
+                  identity: {
+                    adjustmentRevision: state.adjustmentRevision,
+                    imageSessionId: session.id,
+                    path: capturedSelection.path,
+                  },
+                  source: session.source,
+                };
+              });
         if (capturedSelection !== null) beginEditorPersistenceAuthorityBarrier();
         let barrierPersisted = capturedSelection === null;
 
@@ -656,6 +682,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     capturedAdjustments,
                     current: latestSelection,
                     currentAdjustments: latest.selectedImage ? latest.adjustments : null,
+                    currentSource: latest.imageSession?.source ?? null,
+                    successorBaseline,
                   });
                   if (acceptanceIdentity !== null) {
                     const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
@@ -686,31 +714,34 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           if (failures.length > 0) {
             toast.error(t('contextMenus.toasts.failedApplyAuto', { err: failures[0]?.errorMessage }));
           }
-        })().catch((err: unknown) => {
-          if (capturedSelection !== null && capturedAdjustments !== null) {
-            const current = useEditorStore.getState();
-            const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
-              ? {
-                  adjustmentRevision: current.adjustmentRevision,
-                  imageSessionId: current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`,
-                  path: current.selectedImage.path,
-                }
-              : null;
-            if (
-              shouldCompensateBatchAutoAdjustPersistence({
-                barrierPersisted,
-                captured: capturedSelection,
-                capturedAdjustments,
-                current: currentSelection,
-                currentAdjustments: current.selectedImage ? current.adjustments : null,
-              })
-            ) {
-              debouncedSave(capturedSelection.path, capturedAdjustments);
+        })()
+          .catch((err: unknown) => {
+            if (capturedSelection !== null && capturedAdjustments !== null) {
+              const current = useEditorStore.getState();
+              const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
+                ? {
+                    adjustmentRevision: current.adjustmentRevision,
+                    imageSessionId:
+                      current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`,
+                    path: current.selectedImage.path,
+                  }
+                : null;
+              if (
+                shouldCompensateBatchAutoAdjustPersistence({
+                  barrierPersisted,
+                  captured: capturedSelection,
+                  capturedAdjustments,
+                  current: currentSelection,
+                  currentAdjustments: current.selectedImage ? current.adjustments : null,
+                })
+              ) {
+                debouncedSave(capturedSelection.path, capturedAdjustments);
+              }
             }
-          }
-          console.error('Failed to apply auto adjustments to paths:', err);
-          toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
-        });
+            console.error('Failed to apply auto adjustments to paths:', err);
+            toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
+          })
+          .finally(stopTrackingSuccessor);
       };
 
       const onExportClick = () => {
