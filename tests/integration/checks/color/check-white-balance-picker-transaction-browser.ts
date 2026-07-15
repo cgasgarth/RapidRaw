@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 
+import { editDocumentV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
 
 const host = '127.0.0.1';
@@ -29,6 +30,7 @@ const persistenceSchema = z
       .strict(),
   })
   .passthrough();
+const previewRequestSchema = z.object({ editDocumentV2: editDocumentV2Schema }).passthrough();
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: {
@@ -175,6 +177,25 @@ try {
   );
   if (persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1) {
     throw new Error(`White Balance picker did not persist one canonical revision: ${JSON.stringify(persisted)}`);
+  }
+  const previewRequest = previewRequestSchema.parse(
+    await page.evaluate(() => {
+      const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'apply_adjustments')
+        .at(-1);
+      return call?.args?.request ?? null;
+    }),
+  );
+  if ('jsAdjustments' in previewRequest) {
+    throw new Error('White Balance picker preview retained the flat adjustments render payload.');
+  }
+  const cameraInput = previewRequest.editDocumentV2.nodes.camera_input?.params;
+  const renderedWhiteBalance = z
+    .object({ mode: z.literal('chromaticity'), source: z.literal('picker') })
+    .passthrough()
+    .safeParse(cameraInput?.whiteBalanceTechnical);
+  if (!renderedWhiteBalance.success) {
+    throw new Error(`White Balance picker did not reach camera_input render authority: ${JSON.stringify(cameraInput)}`);
   }
   const canvas = page.getByTestId('image-canvas');
   if ((await canvas.getAttribute('data-wb-picker-image-path')) !== sourcePath) {

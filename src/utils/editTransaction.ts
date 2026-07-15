@@ -168,7 +168,7 @@ export const buildAdjustmentMutationOperations = (
   after: Adjustments,
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
-  const focusedNodeType = (['scene_global_color_tone', 'geometry'] as const).find((nodeType) => {
+  const focusedNodeType = (['scene_global_color_tone', 'camera_input', 'geometry'] as const).find((nodeType) => {
     const descriptor = getEditDocumentNodeDescriptor(nodeType);
     return (
       descriptor !== undefined &&

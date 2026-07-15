@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused scene-tone and geometry UI changes to node operations and mixed changes to legacy replacement', () => {
+  test('routes focused scene-tone, camera-input, and geometry changes to node operations', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -61,6 +61,19 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'geometry',
         patch: { aspectRatio: 4 / 3, orientationSteps: 1 },
+      },
+    ]);
+
+    const cameraInput = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      cameraProfile: 'camera_neutral',
+      cameraProfileAmount: 65,
+    });
+    expect(cameraInput).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'camera_input',
+        patch: { cameraProfile: 'camera_neutral', cameraProfileAmount: 65 },
       },
     ]);
 

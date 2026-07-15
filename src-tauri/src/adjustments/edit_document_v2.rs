@@ -171,6 +171,213 @@ fn validate_scene_tone_parameter(
     ))
 }
 
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalanceModeV2 {
+    AsShot,
+    Auto,
+    KelvinTint,
+    Chromaticity,
+    Preset,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalanceSourceV2 {
+    AsShot,
+    Auto,
+    Picker,
+    Preset,
+    User,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalancePresetV2 {
+    Tungsten,
+    Daylight,
+    Flash,
+    Cloudy,
+    Shade,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalanceMigrationV2 {
+    NativeV1,
+    LegacyCreativeTemperatureTintV1,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalanceSemanticsV2 {
+    RawSceneLinear,
+    RenderedSceneLinearApproximation,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum CameraInputWhiteBalanceSynchronizationModeV2 {
+    PerImage,
+    LockedReference,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CameraInputWhiteBalanceSynchronizationV2 {
+    mode: CameraInputWhiteBalanceSynchronizationModeV2,
+    reference_source_identity: Option<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CameraInputTechnicalWhiteBalanceV2 {
+    adaptation: String,
+    confidence: Option<f64>,
+    contract: String,
+    duv: f64,
+    input_semantics: CameraInputWhiteBalanceSemanticsV2,
+    kelvin: f64,
+    mode: CameraInputWhiteBalanceModeV2,
+    preset_id: Option<CameraInputWhiteBalancePresetV2>,
+    sample_count: Option<u64>,
+    source: CameraInputWhiteBalanceSourceV2,
+    synchronization: CameraInputWhiteBalanceSynchronizationV2,
+    x: f64,
+    y: f64,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CameraInputV2 {
+    camera_profile: String,
+    camera_profile_amount: f64,
+    creative_temperature: f64,
+    creative_tint: f64,
+    temperature: f64,
+    tint: f64,
+    white_balance: Option<Value>,
+    white_balance_migration: CameraInputWhiteBalanceMigrationV2,
+    white_balance_technical: CameraInputTechnicalWhiteBalanceV2,
+}
+
+impl CameraInputV2 {
+    fn validate(&self) -> Result<(), String> {
+        let built_in_profile = matches!(
+            self.camera_profile.as_str(),
+            "camera_standard"
+                | "camera_neutral"
+                | "camera_portrait"
+                | "camera_landscape"
+                | "linear_raw"
+        );
+        let valid_dcp_profile = self
+            .camera_profile
+            .strip_prefix("dcp:")
+            .is_some_and(|digest| {
+                digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            });
+        if !built_in_profile && !valid_dcp_profile {
+            return Err("EditDocumentV2 camera_input cameraProfile is invalid".to_string());
+        }
+        validate_camera_input_parameter(
+            "cameraProfileAmount",
+            self.camera_profile_amount,
+            0.0,
+            100.0,
+        )?;
+        validate_camera_input_parameter(
+            "creativeTemperature",
+            self.creative_temperature,
+            -100.0,
+            100.0,
+        )?;
+        validate_camera_input_parameter("creativeTint", self.creative_tint, -100.0, 100.0)?;
+        validate_camera_input_parameter("temperature", self.temperature, -100.0, 100.0)?;
+        validate_camera_input_parameter("tint", self.tint, -100.0, 100.0)?;
+        let white_balance = &self.white_balance_technical;
+        validate_camera_input_parameter(
+            "whiteBalanceTechnical.kelvin",
+            white_balance.kelvin,
+            1667.0,
+            25000.0,
+        )?;
+        validate_camera_input_parameter(
+            "whiteBalanceTechnical.duv",
+            white_balance.duv,
+            -0.05,
+            0.05,
+        )?;
+        if !white_balance.x.is_finite()
+            || !white_balance.y.is_finite()
+            || white_balance.x <= 0.0
+            || white_balance.x >= 1.0
+            || white_balance.y <= 0.0
+            || white_balance.y >= 1.0
+            || white_balance.x + white_balance.y >= 1.0
+        {
+            return Err(
+                "EditDocumentV2 camera_input whiteBalanceTechnical chromaticity is invalid"
+                    .to_string(),
+            );
+        }
+        if white_balance.contract != "rapidraw.white_balance.v1"
+            || white_balance.adaptation != "cat16_v1"
+        {
+            return Err(
+                "EditDocumentV2 camera_input whiteBalanceTechnical contract is invalid".to_string(),
+            );
+        }
+        if white_balance
+            .confidence
+            .is_some_and(|confidence| !confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
+        {
+            return Err(
+                "EditDocumentV2 camera_input whiteBalanceTechnical confidence is invalid"
+                    .to_string(),
+            );
+        }
+        if white_balance
+            .synchronization
+            .reference_source_identity
+            .as_ref()
+            .is_some_and(|identity| identity.trim().is_empty())
+        {
+            return Err(
+                "EditDocumentV2 camera_input synchronization identity is invalid".to_string(),
+            );
+        }
+        let _ = (
+            &self.white_balance,
+            &self.white_balance_migration,
+            &white_balance.input_semantics,
+            &white_balance.mode,
+            &white_balance.preset_id,
+            white_balance.sample_count,
+            &white_balance.source,
+            &white_balance.synchronization.mode,
+        );
+        Ok(())
+    }
+}
+
+fn validate_camera_input_parameter(
+    field: &str,
+    value: f64,
+    minimum: f64,
+    maximum: f64,
+) -> Result<(), String> {
+    if value.is_finite() && value >= minimum && value <= maximum {
+        return Ok(());
+    }
+    Err(format!(
+        "EditDocumentV2 camera_input field '{field}' must be finite and within [{minimum}, {maximum}]"
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentMigrationReceiptV2 {
@@ -392,6 +599,10 @@ fn compile_node_params(
     node: &EditNodeEnvelopeV2,
 ) -> Result<Map<String, Value>, String> {
     match node_key {
+        EditNodeTypeV2::CameraInput => {
+            parse_camera_input(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::SceneGlobalColorTone => {
             let params = serde_json::from_value::<SceneGlobalColorToneParamsV2>(Value::Object(
                 node.params.clone(),
@@ -416,6 +627,13 @@ fn compile_node_params(
         }
         _ => Ok(node.params.clone()),
     }
+}
+
+fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, String> {
+    let camera_input: CameraInputV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 camera_input is invalid: {error}"))?;
+    camera_input.validate()?;
+    Ok(camera_input)
 }
 
 fn validate_node_contract(
@@ -641,7 +859,30 @@ mod tests {
                 "camera_input": {
                     "enabled": true,
                     "implementationVersion": 1,
-                    "params": { "cameraProfile": "camera-standard", "temperature": 12, "tint": -3 },
+                    "params": {
+                        "cameraProfile": "camera_standard",
+                        "cameraProfileAmount": 100,
+                        "creativeTemperature": 0,
+                        "creativeTint": 0,
+                        "temperature": 12,
+                        "tint": -3,
+                        "whiteBalanceMigration": "native_v1",
+                        "whiteBalanceTechnical": {
+                            "adaptation": "cat16_v1",
+                            "confidence": null,
+                            "contract": "rapidraw.white_balance.v1",
+                            "duv": 0,
+                            "inputSemantics": "raw_scene_linear",
+                            "kelvin": 6504,
+                            "mode": "as_shot",
+                            "presetId": null,
+                            "sampleCount": null,
+                            "source": "as_shot",
+                            "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                            "x": 0.32168,
+                            "y": 0.33767
+                        }
+                    },
                     "process": "scene_referred_v2",
                     "type": "camera_input"
                 },
@@ -738,12 +979,12 @@ mod tests {
             .into_render_adjustments()
             .expect("compiled document");
 
-        let expected = json!({
+        let mut expected = json!({
             "aiPatches": [],
             "aspectRatio": null,
             "blacks": -4,
             "brightness": 0.1,
-            "cameraProfile": "camera-standard",
+            "cameraProfile": "camera_standard",
             "clarity": 16,
             "contrast": 18,
             "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
@@ -772,6 +1013,25 @@ mod tests {
             "toneMapper": "basic",
             "vibrance": 11,
             "whites": 9
+        });
+        expected["cameraProfileAmount"] = json!(100);
+        expected["creativeTemperature"] = json!(0);
+        expected["creativeTint"] = json!(0);
+        expected["whiteBalanceMigration"] = json!("native_v1");
+        expected["whiteBalanceTechnical"] = json!({
+            "adaptation": "cat16_v1",
+            "confidence": null,
+            "contract": "rapidraw.white_balance.v1",
+            "duv": 0,
+            "inputSemantics": "raw_scene_linear",
+            "kelvin": 6504,
+            "mode": "as_shot",
+            "presetId": null,
+            "sampleCount": null,
+            "source": "as_shot",
+            "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+            "x": 0.32168,
+            "y": 0.33767
         });
         assert_eq!(compiled, expected);
 
@@ -888,6 +1148,44 @@ mod tests {
             .expect_err("out-of-range exposure must fail");
         assert!(error.contains("field 'exposure'"));
         assert!(error.contains("[-5, 5]"));
+    }
+
+    #[test]
+    fn camera_input_compiler_rejects_unowned_and_malformed_render_authority() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["camera_input"]["params"]["futureInput"] = json!(1);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned camera-input field must fail");
+        assert!(error.contains("unknown field `futureInput`"));
+
+        let mut invalid_profile = document_with_legacy(json!({}));
+        invalid_profile["nodes"]["camera_input"]["params"]["cameraProfile"] =
+            json!("unknown_profile");
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_profile)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unknown camera profile must fail");
+        assert!(error.contains("cameraProfile is invalid"));
+
+        let mut invalid_amount = document_with_legacy(json!({}));
+        invalid_amount["nodes"]["camera_input"]["params"]["cameraProfileAmount"] = json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_amount)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range camera profile amount must fail");
+        assert!(error.contains("cameraProfileAmount"));
+        assert!(error.contains("[0, 100]"));
+
+        let mut invalid_chromaticity = document_with_legacy(json!({}));
+        invalid_chromaticity["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["x"] =
+            json!(0.8);
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_chromaticity)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid white-balance chromaticity must fail");
+        assert!(error.contains("chromaticity is invalid"));
     }
 
     #[test]

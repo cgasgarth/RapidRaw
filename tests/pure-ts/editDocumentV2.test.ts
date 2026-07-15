@@ -213,6 +213,66 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('camera input defaults legacy state and rejects malformed render authority', () => {
+    const {
+      cameraProfileAmount: _cameraProfileAmount,
+      whiteBalanceMigration: _whiteBalanceMigration,
+      whiteBalanceTechnical: _whiteBalanceTechnical,
+      ...legacyCameraInput
+    } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyCameraInput);
+    expect(defaulted.nodes.camera_input?.params).toMatchObject({
+      cameraProfile: 'camera_standard',
+      cameraProfileAmount: 100,
+      whiteBalanceMigration: 'native_v1',
+      whiteBalanceTechnical: { contract: 'rapidraw.white_balance.v1', mode: 'as_shot', source: 'as_shot' },
+    });
+    expect(defaulted.migration?.defaulted).toEqual(
+      expect.arrayContaining([
+        'camera_input.cameraProfileAmount',
+        'camera_input.whiteBalanceMigration',
+        'camera_input.whiteBalanceTechnical',
+      ]),
+    );
+
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const cameraNode = document.nodes.camera_input;
+    expect(compileEditDocumentNodeV2(cameraNode).params).toEqual(cameraNode?.params);
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          camera_input: { ...cameraNode, params: { ...cameraNode?.params, cameraProfileAmount: 101 } },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          camera_input: {
+            ...cameraNode,
+            params: {
+              ...cameraNode?.params,
+              whiteBalanceTechnical: { ...INITIAL_ADJUSTMENTS.whiteBalanceTechnical, kelvin: 1200 },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          camera_input: { ...cameraNode, params: { ...cameraNode?.params, futureInput: 1 } },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('geometry is strict, bounded, unit-explicit, and atomically mirrored into its domain', () => {
     const legacyPixelCrop = { height: 1800, width: 2400, x: 400, y: 300 };
     const document = legacyAdjustmentsToEditDocumentV2({
@@ -314,6 +374,29 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.scene_global_color_tone).toBe(authoritative.nodes.scene_global_color_tone);
     expect(renderDocument.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
     expect(renderDocument.nodes.source_artifacts?.params.aiPatches).toEqual([]);
+  });
+
+  test('render preparation overlays the authoritative camera-input envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      cameraProfile: 'camera_neutral',
+      whiteBalanceTechnical: {
+        ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+        mode: 'chromaticity',
+        source: 'picker',
+      },
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['camera_input']);
+
+    expect(renderDocument.nodes.camera_input).toBe(authoritative.nodes.camera_input);
+    expect(renderDocument.nodes.camera_input?.params).toMatchObject({
+      cameraProfile: 'camera_neutral',
+      whiteBalanceTechnical: { mode: 'chromaticity', source: 'picker' },
+    });
+    expect(renderDocument.nodes.geometry).toEqual(preparedDocument.nodes.geometry);
+    expect(renderDocument.nodes.scene_global_color_tone).toEqual(preparedDocument.nodes.scene_global_color_tone);
   });
 
   test('render preparation transfers the layers envelope and explicit domain together', () => {

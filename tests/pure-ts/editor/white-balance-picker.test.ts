@@ -163,6 +163,17 @@ describe('white balance picker runtime command path', () => {
       command.nextAdjustments,
       'white-balance-picker-commit',
     );
+    expect(transaction.operations).toEqual([
+      {
+        nodeType: 'camera_input',
+        patch: {
+          temperature: command.nextAdjustments.temperature,
+          tint: command.nextAdjustments.tint,
+          whiteBalanceTechnical: command.nextAdjustments.whiteBalanceTechnical,
+        },
+        type: 'patch-edit-document-node',
+      },
+    ]);
     const result = editor.applyEditTransaction(transaction);
     editor.setEditor({ isWbPickerActive: false, lastWhiteBalancePickerReceipt: command.receipt });
 
@@ -178,6 +189,11 @@ describe('white balance picker runtime command path', () => {
     expect(state.historyIndex).toBe(1);
     expect(state.adjustments.temperature).toBe(command.receipt.resultingTemperature);
     expect(state.adjustments.tint).toBe(command.receipt.resultingTint);
+    expect(result.afterEditDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical).toMatchObject({
+      mode: 'chromaticity',
+      source: 'picker',
+    });
+    expect(result.afterEditDocumentV2.nodes.geometry).toBe(result.beforeEditDocumentV2.nodes.geometry);
     expect(state.finalPreviewUrl).toBeNull();
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,

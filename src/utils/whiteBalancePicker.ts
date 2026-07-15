@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Adjustments } from './adjustments';
 import { buildTechnicalWhiteBalance, cctToXy, technicalWhiteBalanceSchema } from './color/whiteBalance';
-import type { EditTransactionRequest } from './editTransaction';
+import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
 const sliderMinimum = -100;
@@ -118,12 +118,10 @@ export const buildWhiteBalancePickerEditTransaction = (
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-    operations: [
-      {
-        adjustments: reconcileReferenceMatchReceiptsAfterEdit(state.adjustments, nextAdjustments),
-        type: 'replace-adjustments',
-      },
-    ],
+    operations: buildAdjustmentMutationOperations(
+      state.adjustments,
+      reconcileReferenceMatchReceiptsAfterEdit(state.adjustments, nextAdjustments),
+    ),
     persistence: 'commit',
     source: 'picker',
     transactionId,
