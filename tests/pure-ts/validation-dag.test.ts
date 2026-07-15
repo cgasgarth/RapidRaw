@@ -618,7 +618,7 @@ describe('affected validation DAG', () => {
     await rm(directory, { force: true, recursive: true });
   });
 
-  test('native validation node completes an exact nested clippy wrapper without self-queueing', async () => {
+  test('native validation node uses default host capacity for an exact nested clippy wrapper', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-native-'));
     const root = join(directory, 'worktree');
     const coordinator = join(directory, 'locks');
@@ -657,7 +657,6 @@ describe('affected validation DAG', () => {
           noCache: true,
           verifyCache: false,
           explainCache: false,
-          hostBudgetCapacity: 4,
           root,
           resourceCoordinatorRoot: coordinator,
         }),
