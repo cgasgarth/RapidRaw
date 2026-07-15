@@ -545,6 +545,7 @@ export function useImageProcessing() {
       const scopeSnapshot = interactiveScopeRef.current(normalizedTargetRes, quality.effectiveRoi);
       if (scopeSnapshot === null) return;
       const session = previewSessionIdentity(scopeSnapshot.scope, normalizedTargetRes, scopeSnapshot.roi);
+      dispatchPreviewCoordinator({ session, type: 'image-session-installed' });
       const identity = editedPreviewRunner.request(
         {
           activeWaveformChannel,
@@ -594,6 +595,8 @@ export function useImageProcessing() {
       setEditor,
     ],
   );
+  const applyAdjustmentsRef = useRef(applyAdjustments);
+  applyAdjustmentsRef.current = applyAdjustments;
 
   const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
   const handledScopeRecoveryRequestIdRef = useRef(previewScopeRecoveryRequestId);
@@ -690,6 +693,8 @@ export function useImageProcessing() {
     baseRenderSize,
     originalSize,
   ]);
+  const calculatedTargetResolution = calculateTargetRes();
+  const calculatedRoiFingerprint = fingerprintPreviewRoi(calculateROI());
 
   const requestOriginalPreview = useCallback(
     (targetRes: number, delayMs: number): void => {
@@ -719,19 +724,19 @@ export function useImageProcessing() {
 
   useEffect(() => {
     if (!selectedImage?.isReady) return;
-    const targetRes = calculateTargetRes();
     if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) applyAdjustments(adjustments, true, targetRes);
+      if (appSettings?.enableLivePreviews !== false)
+        applyAdjustmentsRef.current(adjustments, true, calculatedTargetResolution);
       return;
     }
-    applyAdjustments(adjustments, false, targetRes, false, 50);
+    applyAdjustmentsRef.current(adjustments, false, calculatedTargetResolution, false, 50);
   }, [
     adjustments,
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
-    applyAdjustments,
-    calculateTargetRes,
+    calculatedTargetResolution,
+    calculatedRoiFingerprint,
     appSettings?.enableLivePreviews,
   ]);
 
