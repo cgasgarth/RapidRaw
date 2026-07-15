@@ -8,7 +8,7 @@ import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
 import {
-  buildDisplayCreativeEditTransaction,
+  buildDisplayCreativePatchEditTransaction,
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
 } from '../../utils/displayCreativeEditTransaction';
@@ -114,18 +114,22 @@ export default function EffectsPanel({
   const displayCreativeCommitIdentityRef = useRef(displayCreativeCommitIdentity);
   displayCreativeCommitIdentityRef.current = displayCreativeCommitIdentity;
 
+  const commitDisplayCreativePatch = (patch: Parameters<typeof buildDisplayCreativePatchEditTransaction>[2]) => {
+    const identity = displayCreativeCommitIdentityRef.current;
+    if (identity === null) return;
+    const result = applyEditTransaction(
+      buildDisplayCreativePatchEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
+    );
+    displayCreativeCommitIdentityRef.current = {
+      ...identity,
+      adjustmentRevision: result.nextAdjustmentRevision,
+    };
+  };
+
   const handleAdjustmentChange = (key: string, value: number) => {
     const nextValue = Math.trunc(value);
     if (!isForMask && isDisplayCreativeNodeAdjustment(key)) {
-      const identity = displayCreativeCommitIdentityRef.current;
-      if (identity === null) return;
-      const result = applyEditTransaction(
-        buildDisplayCreativeEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
-      );
-      displayCreativeCommitIdentityRef.current = {
-        ...identity,
-        adjustmentRevision: result.nextAdjustmentRevision,
-      };
+      commitDisplayCreativePatch({ [key]: nextValue });
       return;
     }
     setAdjustments((prev: Adjustments) => ({
@@ -171,9 +175,16 @@ export default function EffectsPanel({
   };
 
   const handleFilmGrainPresetApply = (preset: (typeof FILM_GRAIN_UI_PRESETS)[number]) => {
+    const patch = buildFilmGrainPresetAdjustmentPatch(preset);
+    if (!isForMask) {
+      commitDisplayCreativePatch(patch);
+      return;
+    }
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      ...buildFilmGrainPresetAdjustmentPatch(preset),
+      ...patch,
+      filmLookId: null,
+      filmLookStrength: 100,
     }));
   };
 
@@ -326,6 +337,7 @@ export default function EffectsPanel({
             handleAdjustmentChange(CreativeAdjustment.GlowAmount, value);
           }}
           step={1}
+          testId="effects-control-glow-amount"
           value={adjustments.glowAmount}
           onDragStateChange={onDragStateChange}
         />
@@ -339,6 +351,7 @@ export default function EffectsPanel({
             handleAdjustmentChange(CreativeAdjustment.HalationAmount, value);
           }}
           step={1}
+          testId="effects-control-halation-amount"
           value={adjustments.halationAmount}
           onDragStateChange={onDragStateChange}
         />
@@ -510,6 +523,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.GrainAmount, value);
                 }}
                 step={1}
+                testId="effects-control-grain-amount"
                 value={adjustments.grainAmount}
                 onDragStateChange={onDragStateChange}
               />
@@ -523,6 +537,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.GrainSize, value);
                 }}
                 step={1}
+                testId="effects-control-grain-size"
                 value={adjustments.grainSize}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
@@ -537,6 +552,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.GrainRoughness, value);
                 }}
                 step={1}
+                testId="effects-control-grain-roughness"
                 value={adjustments.grainRoughness}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
