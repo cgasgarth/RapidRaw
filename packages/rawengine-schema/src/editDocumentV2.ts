@@ -142,7 +142,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: false, copy: false, paste: false, provenance: 'preserve', reset: false },
-    defaultParams: {},
+    defaultParams: { masks: [] },
     legacyFields: ['masks'],
     nodeType: 'layers',
     process: 'scene_referred_v2',
@@ -211,7 +211,7 @@ export const editDocumentJsonValueSchema: z.ZodType<EditDocumentJsonValue> = z.l
   ]),
 );
 
-const sourceArtifactMaskTypeV2Schema = z.enum([
+export const editDocumentMaskTypeV2Schema = z.enum([
   'ai-depth',
   'ai-foreground',
   'ai-object',
@@ -236,10 +236,56 @@ export const editDocumentSourceArtifactSubMaskV2Schema = z
     name: z.string().optional(),
     opacity: z.number().finite().min(0).max(100),
     parameters: z.record(z.string(), editDocumentJsonValueSchema).optional(),
-    type: sourceArtifactMaskTypeV2Schema,
+    type: editDocumentMaskTypeV2Schema,
     visible: z.boolean(),
   })
   .strict();
+
+export const editDocumentLayerBlendModeV2Schema = z.enum([
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft_light',
+  'hue',
+  'saturation',
+  'luminosity',
+  'color',
+]);
+
+export const editDocumentLayerV2Schema = z
+  .object({
+    adjustments: z.record(z.string(), editDocumentJsonValueSchema),
+    blendMode: editDocumentLayerBlendModeV2Schema.optional(),
+    id: z.string().trim().min(1),
+    invert: z.boolean(),
+    layerGroupId: z.string().trim().min(1).optional(),
+    layerGroupName: z.string().trim().min(1).optional(),
+    name: z.string(),
+    opacity: z.number().finite().min(0).max(100),
+    referenceMatchApplicationReceipt: matchLookApplicationReceiptV1Schema.optional(),
+    retouchCloneSource: z.record(z.string(), editDocumentJsonValueSchema).optional(),
+    retouchRemoveSource: z.record(z.string(), editDocumentJsonValueSchema).optional(),
+    subMasks: z.array(editDocumentSourceArtifactSubMaskV2Schema),
+    visible: z.boolean(),
+  })
+  .strict()
+  .superRefine((layer, context) => {
+    const subMaskIds = layer.subMasks.map(({ id }) => id);
+    if (new Set(subMaskIds).size !== subMaskIds.length) {
+      context.addIssue({ code: 'custom', message: 'Layer sub-mask IDs must be unique.', path: ['subMasks'] });
+    }
+  });
+
+export const editDocumentLayersV2Schema = z
+  .object({ masks: z.array(editDocumentLayerV2Schema) })
+  .strict()
+  .superRefine((layers, context) => {
+    const layerIds = layers.masks.map(({ id }) => id);
+    if (new Set(layerIds).size !== layerIds.length) {
+      context.addIssue({ code: 'custom', message: 'Layer IDs must be unique.', path: ['masks'] });
+    }
+  });
 
 export const editDocumentSourceArtifactAiPatchV2Schema = z
   .object({
@@ -333,6 +379,14 @@ const editDocumentNodesV2Schema = z
           context.addIssue({ code: 'custom', message: "Node 'source_artifacts' contains invalid artifacts." });
         }
       }
+      if (nodeType === 'layers') {
+        const layers = editDocumentLayersV2Schema.safeParse(node.params);
+        if (!layers.success) {
+          for (const issue of layers.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
     }
   });
 
@@ -351,7 +405,7 @@ export const editDocumentV2Schema = z
     extensions: z.record(z.string(), z.unknown()),
     geometry: editDocumentGeometryV2Schema,
     graphProcess: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
-    layers: z.record(z.string(), z.unknown()),
+    layers: editDocumentLayersV2Schema,
     migration: editDocumentMigrationReceiptV2Schema.optional(),
     nodes: editDocumentNodesV2Schema,
     provenance: editDocumentProvenanceV2Schema,
@@ -369,6 +423,11 @@ export const editDocumentV2Schema = z
     const geometryNode = document.nodes['geometry'];
     if (geometryNode !== undefined && !sameJsonValue(geometryNode.params, document.geometry)) {
       context.addIssue({ code: 'custom', message: 'Geometry domain disagrees with its node params.' });
+    }
+    // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
+    const layersNode = document.nodes['layers'];
+    if (layersNode !== undefined && !sameJsonValue(layersNode.params, document.layers)) {
+      context.addIssue({ code: 'custom', message: 'Layers domain disagrees with its node params.' });
     }
   });
 
@@ -400,6 +459,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
+  if (envelope.type === 'layers') editDocumentLayersV2Schema.parse(envelope.params);
   return {
     enabled: envelope.enabled,
     implementationVersion: envelope.implementationVersion,
