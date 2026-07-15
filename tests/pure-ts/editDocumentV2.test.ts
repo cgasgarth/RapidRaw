@@ -489,11 +489,17 @@ describe('EditDocumentV2 legacy adapter', () => {
       denoiseDetail: _denoiseDetail,
       denoiseNaturalGrain: _denoiseNaturalGrain,
       denoiseShadowBias: _denoiseShadowBias,
+      centré: _centré,
+      localContrastHaloGuard: _localContrastHaloGuard,
+      localContrastMidtoneMask: _localContrastMidtoneMask,
+      localContrastRadiusPx: _localContrastRadiusPx,
       lumaNoiseReduction: _lumaNoiseReduction,
+      structure: _structure,
       ...legacyDetail
     } = structuredClone(INITIAL_ADJUSTMENTS);
     const defaulted = legacyAdjustmentsToEditDocumentV2({ ...legacyDetail, sharpness: 24 });
     expect(defaulted.nodes.detail_denoise_dehaze?.params).toEqual({
+      centré: 0,
       clarity: 0,
       colorNoiseReduction: 0,
       deblurEnabled: false,
@@ -504,8 +510,12 @@ describe('EditDocumentV2 legacy adapter', () => {
       denoiseDetail: 50,
       denoiseNaturalGrain: 0,
       denoiseShadowBias: 0,
+      localContrastHaloGuard: 50,
+      localContrastMidtoneMask: 50,
+      localContrastRadiusPx: 24,
       lumaNoiseReduction: 0,
       sharpness: 24,
+      structure: 0,
     });
     expect(defaulted.migration?.defaulted).toEqual(
       expect.arrayContaining([
@@ -515,6 +525,8 @@ describe('EditDocumentV2 legacy adapter', () => {
         'detail_denoise_dehaze.deblurStrength',
         'detail_denoise_dehaze.denoiseContrastProtection',
         'detail_denoise_dehaze.denoiseDetail',
+        'detail_denoise_dehaze.localContrastRadiusPx',
+        'detail_denoise_dehaze.structure',
       ]),
     );
     expect(compileEditDocumentNodeV2(defaulted.nodes.detail_denoise_dehaze).params.sharpness).toBe(24);
@@ -562,6 +574,12 @@ describe('EditDocumentV2 legacy adapter', () => {
       { deblurStrength: 101 },
       { deblurStrength: 32.5 },
       { deblurEnabled: 1 },
+      { centré: -101 },
+      { localContrastHaloGuard: 101 },
+      { localContrastMidtoneMask: -1 },
+      { localContrastRadiusPx: 3.9 },
+      { localContrastRadiusPx: 96.1 },
+      { structure: 101 },
     ]) {
       expect(() =>
         editDocumentV2Schema.parse({
@@ -573,6 +591,60 @@ describe('EditDocumentV2 legacy adapter', () => {
         }),
       ).toThrow();
     }
+  });
+
+  test('promotes pre-local-contrast V2 state and quarantines corrupt legacy values idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      centré: -12,
+      localContrastHaloGuard: 64,
+      localContrastMidtoneMask: 37,
+      localContrastRadiusPx: 42,
+      structure: 28,
+    });
+    const oldV2 = structuredClone(document);
+    const detailParams = oldV2.nodes.detail_denoise_dehaze.params;
+    const legacyAdjustments = oldV2.extensions.legacyAdjustments as Record<string, unknown>;
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    for (const field of [
+      'centré',
+      'localContrastHaloGuard',
+      'localContrastMidtoneMask',
+      'localContrastRadiusPx',
+      'structure',
+    ] as const) {
+      legacyAdjustments[field] = detailParams[field];
+      delete detailParams[field];
+      migration.mapped = migration.mapped.filter((path) => path !== `detail_denoise_dehaze.${field}`);
+      migration.quarantined.push(field);
+    }
+    legacyAdjustments.localContrastRadiusPx = 400;
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.detail_denoise_dehaze.params).toMatchObject({
+      centré: -12,
+      localContrastHaloGuard: 64,
+      localContrastMidtoneMask: 37,
+      localContrastRadiusPx: 24,
+      structure: 28,
+    });
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('structure');
+    expect(reopened.extensions.quarantinedLegacyAdjustments).toEqual({ localContrastRadiusPx: 400 });
+    expect(reopened.migration?.mapped).toContain('detail_denoise_dehaze.structure');
+    expect(reopened.migration?.defaulted).toContain('detail_denoise_dehaze.localContrastRadiusPx');
+    expect(reopened.migration?.quarantined).toContain('localContrastRadiusPx');
+    expect(reopened.migration?.quarantined).not.toContain('structure');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      localContrastRadiusPx: Number.NaN,
+    });
+    expect(corruptFlat.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(24);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ localContrastRadiusPx: Number.NaN });
+    expect(corruptFlat.migration?.defaulted).toContain('detail_denoise_dehaze.localContrastRadiusPx');
+    expect(corruptFlat.migration?.mapped).not.toContain('detail_denoise_dehaze.localContrastRadiusPx');
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {

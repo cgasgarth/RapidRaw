@@ -1,4 +1,5 @@
 import {
+  EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
@@ -12,6 +13,7 @@ import {
   editDocumentDisplayCreativeV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
+  editDocumentLocalContrastV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentPerceptualGradingV2Schema,
   editDocumentPointColorV2Schema,
@@ -26,6 +28,10 @@ import type { Adjustments } from './adjustments';
 
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
+const LOCAL_CONTRAST_FIELDS = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
+
+const isLocalContrastField = (key: string): key is (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number] =>
+  LOCAL_CONTRAST_FIELDS.has(key);
 
 const hasRecordShape = (value: unknown): value is Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -80,6 +86,11 @@ const normalizeLegacyLayers = (params: Readonly<Record<string, unknown>>) =>
 
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
+  const quarantinedDetailEntries = entries.filter(
+    (entry): entry is [(typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number], unknown] =>
+      isLocalContrastField(entry[0]) && !editDocumentLocalContrastV2Schema.shape[entry[0]].safeParse(entry[1]).success,
+  );
+  const quarantinedDetailFields = new Set<string>(quarantinedDetailEntries.map(([key]) => key));
   const effectsEnabled = readEffectsEnabled(adjustments);
   const disabledNodeTypes = new Set<EditDocumentNodeTypeV2>(
     (['basic', 'color', 'curves', 'details'] as const).flatMap((section) =>
@@ -88,7 +99,10 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   );
   const mapped = entries
     .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
-    .filter((entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } => entry.nodeType !== null);
+    .filter(
+      (entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } =>
+        entry.nodeType !== null && !quarantinedDetailFields.has(entry.key),
+    );
   const nodes = Object.fromEntries(
     EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
       const descriptor = descriptorFor(nodeType);
@@ -185,7 +199,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   ).flatMap((nodeType) => {
     const descriptor = descriptorFor(nodeType);
     return Object.keys(descriptor?.defaultParams ?? {})
-      .filter((field) => !Object.hasOwn(adjustments, field))
+      .filter((field) => !Object.hasOwn(adjustments, field) || quarantinedDetailFields.has(field))
       .map((field) => `${nodeType}.${field}`);
   });
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
@@ -194,6 +208,9 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   return editDocumentV2Schema.parse({
     extensions: {
       legacyAdjustments,
+      ...(quarantinedDetailEntries.length > 0
+        ? { quarantinedLegacyAdjustments: Object.fromEntries(quarantinedDetailEntries) }
+        : {}),
       ...(hasRecordShape(adjustments['sectionVisibility'])
         ? { legacyDisclosureMetadata: { sectionVisibility: adjustments['sectionVisibility'] } }
         : {}),
@@ -216,6 +233,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       ].sort(),
       quarantined: [
         ...Object.keys(legacyAdjustments),
+        ...quarantinedDetailFields,
         ...(hasRecordShape(adjustments['sectionVisibility']) ? ['sectionVisibility'] : []),
       ].sort(),
       sourceSchemaVersion: 1,
