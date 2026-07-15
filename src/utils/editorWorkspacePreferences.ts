@@ -1,4 +1,3 @@
-import { EDITING_RIGHT_PANELS } from '../components/panel/right/rightPanelRegistry';
 import { Panel } from '../components/ui/AppProperties';
 import {
   type EditorWorkspacePreferences,
@@ -6,22 +5,12 @@ import {
 } from '../schemas/editorWorkspacePreferencesSchemas';
 
 export const EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY = 'rapidraw.editorWorkspacePreferences.v1';
-export const LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = 'rapidraw.lastEditingRightPanel.v1';
-export const LEGACY_DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY = 'rapidraw.developPanelPinnedControlIds.v1';
 
 export interface EditorWorkspaceViewport {
   height: number;
   isCompactPortrait: boolean;
   isPortrait: boolean;
   width: number;
-}
-
-export interface LegacyEditorWorkspacePreferences {
-  bottomPanelHeight?: unknown;
-  compactEditorPanelHeightOverride?: unknown;
-  leftPanelWidth?: unknown;
-  rightPanelWidth?: unknown;
-  uiVisibility?: { filmstrip?: unknown; folderTree?: unknown };
 }
 
 export interface EffectiveEditorWorkspaceLayout {
@@ -44,19 +33,6 @@ const getStorage = (): Storage | null => {
   }
 };
 
-const isEditingPanel = (value: unknown): value is (typeof EDITING_RIGHT_PANELS)[number] =>
-  EDITING_RIGHT_PANELS.includes(value as (typeof EDITING_RIGHT_PANELS)[number]);
-
-const isFiniteIntegerWithin = (value: unknown, minimum: number, maximum: number): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= minimum && value <= maximum;
-
-const uniqueNonEmptyStrings = (values: unknown, maximum = 32): string[] => {
-  if (!Array.isArray(values)) return [];
-  return [
-    ...new Set(values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)),
-  ].slice(0, maximum);
-};
-
 export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePreferences => ({
   compact: { drawerState: 'expanded', toolsExpanded: true, toolsHeight: null },
   filmstrip: { height: 144, visible: true },
@@ -73,95 +49,13 @@ export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePrefer
   viewer: { compareMode: 'off', defaultZoomMode: 'fit', lightsOutLevel: 'off' },
 });
 
-const readLegacyStorage = () => {
-  const storage = getStorage();
-  if (!storage) return { activePanel: null, pinnedControlIds: [] as string[] };
-
-  try {
-    const activePanel = storage.getItem(LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY);
-    const pinnedControlIds = JSON.parse(storage.getItem(LEGACY_DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY) ?? '[]');
-    return {
-      activePanel: isEditingPanel(activePanel) ? activePanel : null,
-      pinnedControlIds: uniqueNonEmptyStrings(pinnedControlIds),
-    };
-  } catch {
-    return { activePanel: null, pinnedControlIds: [] as string[] };
-  }
-};
-
-const hasLegacyValues = (
-  legacy: LegacyEditorWorkspacePreferences,
-  legacyStorage: ReturnType<typeof readLegacyStorage>,
-) =>
-  legacy.uiVisibility !== undefined ||
-  legacy.leftPanelWidth !== undefined ||
-  legacy.rightPanelWidth !== undefined ||
-  legacy.bottomPanelHeight !== undefined ||
-  legacy.compactEditorPanelHeightOverride !== undefined ||
-  legacyStorage.activePanel !== null ||
-  legacyStorage.pinnedControlIds.length > 0;
-
-export const migrateLegacyEditorWorkspacePreferences = (
-  legacy: LegacyEditorWorkspacePreferences = {},
-): EditorWorkspacePreferences => {
-  const defaults = createDefaultEditorWorkspacePreferences();
-  const legacyStorage = readLegacyStorage();
-
-  return {
-    ...defaults,
-    compact: {
-      ...defaults.compact,
-      toolsHeight: isFiniteIntegerWithin(legacy.compactEditorPanelHeightOverride, 180, 850)
-        ? legacy.compactEditorPanelHeightOverride
-        : defaults.compact.toolsHeight,
-    },
-    filmstrip: {
-      ...defaults.filmstrip,
-      height: isFiniteIntegerWithin(legacy.bottomPanelHeight, 100, 400)
-        ? legacy.bottomPanelHeight
-        : defaults.filmstrip.height,
-      visible:
-        typeof legacy.uiVisibility?.filmstrip === 'boolean'
-          ? legacy.uiVisibility.filmstrip
-          : defaults.filmstrip.visible,
-    },
-    leftSidebar: {
-      ...defaults.leftSidebar,
-      visible:
-        typeof legacy.uiVisibility?.folderTree === 'boolean'
-          ? legacy.uiVisibility.folderTree
-          : defaults.leftSidebar.visible,
-      width: isFiniteIntegerWithin(legacy.leftPanelWidth, 200, 500)
-        ? legacy.leftPanelWidth
-        : defaults.leftSidebar.width,
-    },
-    rightInspector: {
-      ...defaults.rightInspector,
-      activePanel: legacyStorage.activePanel ?? defaults.rightInspector.activePanel,
-      pinnedControlIds: legacyStorage.pinnedControlIds,
-      recentPanels: legacyStorage.activePanel ? [legacyStorage.activePanel] : defaults.rightInspector.recentPanels,
-      width: isFiniteIntegerWithin(legacy.rightPanelWidth, 320, 600)
-        ? legacy.rightPanelWidth
-        : defaults.rightInspector.width,
-    },
-  };
-};
-
-export const readEditorWorkspacePreferences = (
-  legacy: LegacyEditorWorkspacePreferences = {},
-): EditorWorkspacePreferences => {
+export const readEditorWorkspacePreferences = (): EditorWorkspacePreferences => {
   const storage = getStorage();
   if (storage) {
     try {
       const serialized = storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY);
       if (serialized !== null) {
-        const stored = JSON.parse(serialized) as Record<string, unknown>;
-        const compact = stored['compact'];
-        if (compact && typeof compact === 'object' && !('drawerState' in compact)) {
-          const legacyCompact = compact as Record<string, unknown>;
-          legacyCompact['drawerState'] = legacyCompact['toolsExpanded'] === false ? 'collapsed' : 'expanded';
-        }
-        const parsed = editorWorkspacePreferencesSchema.safeParse(stored);
+        const parsed = editorWorkspacePreferencesSchema.safeParse(JSON.parse(serialized));
         if (parsed.success) return parsed.data;
       }
     } catch {
@@ -169,7 +63,7 @@ export const readEditorWorkspacePreferences = (
     }
   }
 
-  return migrateLegacyEditorWorkspacePreferences(legacy);
+  return createDefaultEditorWorkspacePreferences();
 };
 
 export const saveEditorWorkspacePreferences = (preferences: EditorWorkspacePreferences): void => {
@@ -182,9 +76,6 @@ export const saveEditorWorkspacePreferences = (preferences: EditorWorkspacePrefe
     // Quota and privacy-mode failures must not block editor interaction.
   }
 };
-
-export const shouldPersistLegacyWorkspaceMigration = (legacy: LegacyEditorWorkspacePreferences = {}): boolean =>
-  hasLegacyValues(legacy, readLegacyStorage());
 
 export const getEffectiveEditorWorkspaceLayout = (
   preferences: EditorWorkspacePreferences,

@@ -230,10 +230,8 @@ export const useAppInitialization = ({
 
         setTheme(settings.theme);
 
-        hydrateEditorWorkspacePreferences(
-          settings.uiVisibility === undefined ? {} : { uiVisibility: settings.uiVisibility },
-        );
-        hydrateLibraryWorkspacePreferences(settings.uiVisibility?.folderTree);
+        hydrateEditorWorkspacePreferences();
+        hydrateLibraryWorkspacePreferences();
 
         if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
         if (settings.activeWaveformChannel && isDisplayMode(settings.activeWaveformChannel)) {

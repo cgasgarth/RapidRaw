@@ -14,11 +14,11 @@ import { Panel } from '../../../src/components/ui/AppProperties';
 import {
   createRecentRightPanels,
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
-  LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
   MAX_RECENT_RIGHT_PANELS,
   readLastEditingRightPanel,
   useUIStore,
 } from '../../../src/store/useUIStore';
+import { createDefaultEditorWorkspacePreferences } from '../../../src/utils/editorWorkspacePreferences';
 
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 
@@ -95,19 +95,21 @@ describe('editor right panel persistence', () => {
     expect(useUIStore.getState().renderedRightPanel).toBe(Panel.Color);
   });
 
-  test('restores a persisted editing panel and ignores utility panels', () => {
+  test('restores a current persisted editing panel and resets invalid panels', () => {
     const storage = installMemoryStorage();
-
-    storage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, Panel.Masks);
+    const preferences = createDefaultEditorWorkspacePreferences();
+    preferences.rightInspector.activePanel = Panel.Masks;
+    preferences.rightInspector.recentPanels = [Panel.Masks];
+    storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
     expect(readLastEditingRightPanel()).toBe(Panel.Masks);
 
-    storage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, Panel.Export);
-    expect(readLastEditingRightPanel()).toBe(Panel.Color);
-
-    storage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, 'metadata');
-    expect(readLastEditingRightPanel()).toBe(Panel.Color);
-
-    storage.setItem(LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, 'unknown-panel');
+    storage.setItem(
+      EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({
+        ...preferences,
+        rightInspector: { ...preferences.rightInspector, activePanel: 'unknown-panel' },
+      }),
+    );
     expect(readLastEditingRightPanel()).toBe(Panel.Color);
   });
 
