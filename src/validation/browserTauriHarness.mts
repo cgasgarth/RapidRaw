@@ -253,6 +253,35 @@ const harnessSupportedTypes = {
 const harnessPreviewJpegBase64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAAEAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z';
 
+const createHarnessAutoAdjustments = (exposure: number): Record<string, unknown> => ({
+  blacks: -4,
+  brightness: 1.2,
+  clarity: 8,
+  contrast: 18,
+  dehaze: 5,
+  exposure,
+  highlights: -10,
+  sectionVisibility: { basic: true, color: true, effects: true },
+  shadows: 12,
+  vibrance: 16,
+  vignetteAmount: -3,
+  whiteBalanceMigration: 'native_v1',
+  whiteBalanceTechnical: {
+    adaptation: 'cat16_v1',
+    confidence: 0.8,
+    contract: 'rapidraw.white_balance.v1',
+    duv: 0,
+    kelvin: 6504,
+    mode: 'auto',
+    sampleCount: 256,
+    source: 'auto',
+    x: 0.31271,
+    y: 0.32902,
+  },
+  whites: 6,
+  centré: 2,
+});
+
 let callbackId = 0;
 const callbacks = new Map<number, (event: unknown) => void>();
 const eventListeners = new Map<string, Set<number>>();
@@ -376,25 +405,12 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.calculateAutoAdjustments: {
       const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.autoAdjustResponses.shift() ?? {
         delayMs: 0,
-        value: {
-          whiteBalanceTechnical: {
-            adaptation: 'cat16_v1',
-            confidence: 0.82,
-            contract: 'rapidraw.white_balance.v1',
-            duv: 0.006,
-            kelvin: 4725,
-            mode: 'auto',
-            sampleCount: 384,
-            source: 'auto',
-            x: 0.35,
-            y: 0.36,
-          },
-        },
+        value: createHarnessAutoAdjustments(0.35),
       };
       return new Promise((resolve, reject) => {
         window.setTimeout(() => {
           if (response.failure !== undefined) reject(new Error(response.failure));
-          else resolve(response.value);
+          else resolve(structuredClone(response.value));
         }, response.delayMs);
       });
     }
