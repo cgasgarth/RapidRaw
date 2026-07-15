@@ -2548,13 +2548,7 @@ pub fn run() {
             }
 
             if argv.len() > 1 {
-                let path_str = &argv[1];
-                if let Err(e) = app.emit(crate::events::OPEN_WITH_FILE, path_str) {
-                    log::error!(
-                        "Failed to emit open-with-file from single-instance handler: {}",
-                        e
-                    );
-                }
+                crate::app::commands::startup::publish_file_open(app, argv[1].clone());
             }
         }));
     }
@@ -2596,9 +2590,8 @@ pub fn run() {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 if let Some(arg) = std::env::args().nth(1) {
-                     let state = app.state::<AppState>();
-                     log::info!("Windows/Linux initial open: Storing path {} for later.", &arg);
-                     *state.initial_file_path.lock().unwrap() = Some(arg);
+                    log::info!("Windows/Linux initial open: Storing path {} for later.", &arg);
+                    crate::app::commands::startup::publish_file_open(app.handle(), arg);
                 }
             }
 
@@ -3107,9 +3100,11 @@ pub fn run() {
                         && let Ok(path) = url.to_file_path()
                         && let Some(path_str) = path.to_str()
                     {
-                        let state = app_handle.state::<AppState>();
-                        *state.initial_file_path.lock().unwrap() = Some(path_str.to_string());
-                        log::info!("macOS initial open: Stored path {} for later.", path_str);
+                        crate::app::commands::startup::publish_file_open(
+                            app_handle,
+                            path_str.to_string(),
+                        );
+                        log::info!("macOS file open: Published path {}.", path_str);
                     }
                 }
                 tauri::RunEvent::ExitRequested { api, .. } => {

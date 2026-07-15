@@ -2,9 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use tauri::Emitter;
-#[cfg(any(windows, target_os = "linux"))]
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 use crate::AppState;
 #[cfg(any(windows, target_os = "linux"))]
@@ -22,6 +20,17 @@ fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
         && let Err(e) = app_handle.emit(crate::events::OPEN_WITH_FILE, path_str)
     {
         log::error!("Failed to emit open-with-file event: {}", e);
+    }
+}
+
+pub(crate) fn publish_file_open(app_handle: &tauri::AppHandle, path: String) {
+    if let Some(path) = app_handle
+        .state::<AppState>()
+        .services
+        .startup_files
+        .publish(path)
+    {
+        handle_file_open(app_handle, PathBuf::from(path));
     }
 }
 
@@ -125,7 +134,7 @@ fn frontend_ready_impl(
         }
     }
 
-    if let Some(path) = state.initial_file_path.lock().unwrap().take() {
+    if let Some(path) = state.services.startup_files.activate_frontend() {
         log::info!(
             "Frontend is ready, emitting open-with-file for initial path: {}",
             &path
