@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   enableBlackWhiteMixer,
+  enableChannelMixer,
   formatRgbSummary,
   getHueBandSegments,
   getNextAdvancedMixerSelection,
@@ -89,6 +90,13 @@ describe('Advanced mixer view models', () => {
     const resetMixer = resetChannelMixerOutput(mixer, 'red');
     expect(resetMixer.red).toEqual(INITIAL_ADJUSTMENTS.channelMixer.red);
     expect(resetMixer.blue.constant).toBe(-5);
+  });
+
+  test('enables an identity channel mixer with a visible non-identity active row', () => {
+    const enabled = enableChannelMixer(structuredClone(INITIAL_ADJUSTMENTS.channelMixer), 'red');
+    expect(enabled.enabled).toBe(true);
+    expect(enabled.red.red).toBe(110);
+    expect(enabled.green).toEqual(INITIAL_ADJUSTMENTS.channelMixer.green);
   });
 
   test('formats compact signed RGB summaries', () => {

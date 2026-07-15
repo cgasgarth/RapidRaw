@@ -5,6 +5,7 @@ import {
   type EditDocumentV2,
   editDocumentBlackWhiteMixerV2Schema,
   editDocumentCameraInputV2Schema,
+  editDocumentChannelMixerV2Schema,
   editDocumentColorCalibrationV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
@@ -93,19 +94,24 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                             ...(descriptor?.defaultParams ?? {}),
                             ...mappedParams,
                           })
-                        : nodeType === 'perceptual_grading'
-                          ? editDocumentPerceptualGradingV2Schema.parse({
+                        : nodeType === 'channel_mixer'
+                          ? editDocumentChannelMixerV2Schema.parse({
                               ...(descriptor?.defaultParams ?? {}),
                               ...mappedParams,
                             })
-                          : nodeType === 'color_calibration'
-                            ? editDocumentColorCalibrationV2Schema.parse({
+                          : nodeType === 'perceptual_grading'
+                            ? editDocumentPerceptualGradingV2Schema.parse({
                                 ...(descriptor?.defaultParams ?? {}),
                                 ...mappedParams,
                               })
-                            : nodeType === 'layers'
-                              ? { masks: [], ...mappedParams }
-                              : mappedParams;
+                            : nodeType === 'color_calibration'
+                              ? editDocumentColorCalibrationV2Schema.parse({
+                                  ...(descriptor?.defaultParams ?? {}),
+                                  ...mappedParams,
+                                })
+                              : nodeType === 'layers'
+                                ? { masks: [], ...mappedParams }
+                                : mappedParams;
       return [
         nodeType,
         {
@@ -127,6 +133,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     [
       'camera_input',
       'black_white_mixer',
+      'channel_mixer',
       'color_calibration',
       'detail_denoise_dehaze',
       'display_creative',

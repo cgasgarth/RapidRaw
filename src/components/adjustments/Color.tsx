@@ -4,7 +4,7 @@ import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useM
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import type { BlackWhiteMixerChannel, BlackWhiteMixerSettings } from '../../schemas/color/blackWhiteMixerSchemas';
-import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
+import type { ChannelMixerOutput, ChannelMixerSettings } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
@@ -13,6 +13,10 @@ import {
   type BlackWhiteMixerCommitIdentity,
   buildBlackWhiteMixerEditTransaction,
 } from '../../utils/blackWhiteMixerEditTransaction';
+import {
+  buildChannelMixerEditTransaction,
+  type ChannelMixerCommitIdentity,
+} from '../../utils/channelMixerEditTransaction';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -166,6 +170,34 @@ export default function ColorPanel({
         ...identity,
         adjustmentRevision: result.nextAdjustmentRevision,
       };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
+  const channelMixerCommitIdentity = useMemo<ChannelMixerCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const channelMixerCommitIdentityRef = useRef(channelMixerCommitIdentity);
+  channelMixerCommitIdentityRef.current = channelMixerCommitIdentity;
+  const channelMixerRef = useRef(adjustments.channelMixer);
+  channelMixerRef.current = adjustments.channelMixer;
+  const commitChannelMixer = useCallback(
+    (update: (current: ChannelMixerSettings) => ChannelMixerSettings) => {
+      const next = update(channelMixerRef.current);
+      const identity = channelMixerCommitIdentityRef.current;
+      if (isForMask || identity === null) {
+        channelMixerRef.current = next;
+        setAdjustments((previous) => ({ ...previous, channelMixer: next }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildChannelMixerEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+      );
+      channelMixerRef.current = next;
+      channelMixerCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
     },
     [applyEditTransaction, isForMask, setAdjustments],
   );
@@ -347,10 +379,12 @@ export default function ColorPanel({
               adjustmentVisibility={adjustmentVisibility}
               adjustments={adjustments}
               blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
+              channelMixerCommitIdentity={channelMixerCommitIdentity}
               canCreateLocalAdjustmentFromActiveRange={!isForMask && selectedImage !== null}
               appSettings={appSettings}
               isForMask={isForMask}
               commitBlackWhiteMixer={commitBlackWhiteMixer}
+              commitChannelMixer={commitChannelMixer}
               onCreateLocalAdjustmentFromActiveRange={createLocalAdjustmentFromActiveColorRange}
               onDragStateChange={onDragStateChange}
               setActiveChannelMixerOutput={setActiveChannelMixerOutput}
@@ -417,7 +451,9 @@ export default function ColorPanel({
     adjustments,
     appSettings,
     blackWhiteMixerCommitIdentity,
+    channelMixerCommitIdentity,
     commitBlackWhiteMixer,
+    commitChannelMixer,
     currentGamutWarningOverlay,
     isColorCalibrationVisible,
     isForMask,

@@ -20,6 +20,7 @@ enum EditNodeTypeV2 {
     DetailDenoiseDehaze,
     PointColor,
     BlackWhiteMixer,
+    ChannelMixer,
     PerceptualGrading,
     CameraInput,
     LensCorrection,
@@ -40,6 +41,7 @@ impl EditNodeTypeV2 {
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
+            Self::ChannelMixer => ("channel_mixer", "scene_referred_v2", 1),
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
@@ -553,6 +555,75 @@ impl PointColorPlanV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct ChannelMixerRowV2 {
+    blue: f64,
+    constant: f64,
+    green: f64,
+    red: f64,
+}
+
+impl ChannelMixerRowV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("blue", self.blue, -200.0, 200.0),
+            ("constant", self.constant, -100.0, 100.0),
+            ("green", self.green, -200.0, 200.0),
+            ("red", self.red, -200.0, 200.0),
+        ] {
+            if !value.is_finite() || value < minimum || value > maximum {
+                return Err(format!(
+                    "EditDocumentV2 channel_mixer field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ChannelMixerSettingsV2 {
+    blue: ChannelMixerRowV2,
+    enabled: bool,
+    green: ChannelMixerRowV2,
+    preserve_luminance: bool,
+    red: ChannelMixerRowV2,
+}
+
+impl ChannelMixerSettingsV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.red.validate()?;
+        self.green.validate()?;
+        self.blue.validate()?;
+        let identity = [
+            (self.red, [100.0, 0.0, 0.0, 0.0]),
+            (self.green, [0.0, 100.0, 0.0, 0.0]),
+            (self.blue, [0.0, 0.0, 100.0, 0.0]),
+        ]
+        .iter()
+        .all(|(row, expected)| [row.red, row.green, row.blue, row.constant] == *expected);
+        if self.enabled && identity {
+            return Err("EditDocumentV2 enabled channel_mixer must not be identity".to_string());
+        }
+        let _ = self.preserve_luminance;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ChannelMixerV2 {
+    channel_mixer: ChannelMixerSettingsV2,
+}
+
+impl ChannelMixerV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.channel_mixer.validate()
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -1583,6 +1654,10 @@ fn compile_node_params(
             parse_black_white_mixer(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::ChannelMixer => {
+            parse_channel_mixer(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::PerceptualGrading => {
             parse_perceptual_grading(&node.params)?;
             Ok(node.params.clone())
@@ -1657,6 +1732,13 @@ fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixe
             .map_err(|error| format!("EditDocumentV2 black_white_mixer is invalid: {error}"))?;
     black_white_mixer.validate()?;
     Ok(black_white_mixer)
+}
+
+fn parse_channel_mixer(params: &Map<String, Value>) -> Result<ChannelMixerV2, String> {
+    let channel_mixer: ChannelMixerV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 channel_mixer is invalid: {error}"))?;
+    channel_mixer.validate()?;
+    Ok(channel_mixer)
 }
 
 fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGradingV2, String> {
@@ -1851,7 +1933,7 @@ mod tests {
 
     use super::super::parse::get_all_adjustments_from_json;
     use super::EditDocumentV2;
-    use crate::color::mixer_render::apply_black_white_mixer;
+    use crate::color::mixer_render::{apply_black_white_mixer, apply_channel_mixer};
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -2016,6 +2098,18 @@ mod tests {
         })
     }
 
+    fn channel_mixer_params() -> Value {
+        json!({
+            "channelMixer": {
+                "blue": { "blue": 100, "constant": 0, "green": 0, "red": 0 },
+                "enabled": true,
+                "green": { "blue": 0, "constant": 0, "green": 100, "red": 0 },
+                "preserveLuminance": false,
+                "red": { "blue": -8, "constant": 2, "green": 24, "red": 112 }
+            }
+        })
+    }
+
     fn perceptual_grading_params() -> Value {
         let range = json!({
             "brilliance": 0,
@@ -2148,6 +2242,13 @@ mod tests {
                     "params": black_white_mixer_params(),
                     "process": "scene_referred_v2",
                     "type": "black_white_mixer"
+                },
+                "channel_mixer": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": channel_mixer_params(),
+                    "process": "scene_referred_v2",
+                    "type": "channel_mixer"
                 },
                 "perceptual_grading": {
                     "enabled": true,
@@ -2347,6 +2448,7 @@ mod tests {
             "whites": 9
         });
         expected["cameraProfileAmount"] = json!(100);
+        expected["channelMixer"] = channel_mixer_params()["channelMixer"].clone();
         expected["lensCorrectionMode"] = json!("manual");
         expected["lensDistortionAmount"] = json!(100);
         expected["lensDistortionEnabled"] = json!(true);
@@ -2829,6 +2931,72 @@ mod tests {
             .into_render_adjustments()
             .expect_err("unknown point-color process must fail");
         assert!(error.contains("process or point count is invalid"));
+    }
+
+    #[test]
+    fn channel_mixer_compiler_is_strict_and_drives_native_pixel_output() {
+        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
+            .expect("valid channel-mixer document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("channel-mixer document compiles");
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        let output =
+            apply_channel_mixer([0.5, 0.25, 0.75], adjustments.global.channel_mixer, false);
+        assert!(
+            (output[0] - 0.58).abs() <= 1.0e-6,
+            "unexpected red output: {output:?}"
+        );
+        assert!(
+            (output[1] - 0.25).abs() <= 1.0e-6,
+            "unexpected green output: {output:?}"
+        );
+        assert!(
+            (output[2] - 0.75).abs() <= 1.0e-6,
+            "unexpected blue output: {output:?}"
+        );
+
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["channel_mixer"]["params"]["channelMixer"]["futureMatrix"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned channel-mixer field must fail");
+        assert!(error.contains("unknown field `futureMatrix`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["channel_mixer"]["params"]["channelMixer"]["red"]
+            .as_object_mut()
+            .expect("red channel-mixer row")
+            .remove("green");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing channel-mixer coefficient must fail");
+        assert!(error.contains("missing field `green`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["channel_mixer"]["params"]["channelMixer"]["red"]["green"] =
+            json!(201);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range channel-mixer coefficient must fail");
+        assert!(error.contains("channel_mixer field 'green'"));
+
+        let mut identity = document_with_legacy(json!({}));
+        identity["nodes"]["channel_mixer"]["params"]["channelMixer"] = json!({
+            "blue": { "blue": 100, "constant": 0, "green": 0, "red": 0 },
+            "enabled": true,
+            "green": { "blue": 0, "constant": 0, "green": 100, "red": 0 },
+            "preserveLuminance": false,
+            "red": { "blue": 0, "constant": 0, "green": 0, "red": 100 }
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(identity)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("enabled identity channel mixer must fail");
+        assert!(error.contains("must not be identity"));
     }
 
     #[test]

@@ -15,6 +15,7 @@ import type {
 } from '../../../schemas/color/colorBalanceRgbSchemas';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
+import type { ChannelMixerCommitIdentity } from '../../../utils/channelMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
@@ -28,9 +29,11 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   activeColorBalanceRange: ColorBalanceRgbRange;
   adjustmentVisibility: Record<string, boolean>;
   blackWhiteMixerCommitIdentity: BlackWhiteMixerCommitIdentity | null;
+  channelMixerCommitIdentity: ChannelMixerCommitIdentity | null;
   canCreateLocalAdjustmentFromActiveRange?: boolean;
   isForMask: boolean;
   commitBlackWhiteMixer: (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => void;
+  commitChannelMixer: (update: (current: ChannelMixerSettings) => ChannelMixerSettings) => void;
   onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
@@ -109,6 +112,24 @@ export const resetChannelMixerOutput = (
   ...settings,
   [output]: { ...INITIAL_ADJUSTMENTS.channelMixer[output] },
 });
+
+export const enableChannelMixer = (
+  settings: ChannelMixerSettings,
+  activeOutput: ChannelMixerOutput,
+): ChannelMixerSettings => {
+  const hasAdjustment = channelMixerOutputs.some((output) =>
+    channelMixerSources.some((source) => settings[output][source] !== INITIAL_ADJUSTMENTS.channelMixer[output][source]),
+  );
+  if (hasAdjustment) return { ...settings, enabled: true };
+  return {
+    ...settings,
+    enabled: true,
+    [activeOutput]: {
+      ...settings[activeOutput],
+      [activeOutput]: settings[activeOutput][activeOutput] + 10,
+    },
+  };
+};
 
 interface HeaderToggleProps {
   checked: boolean;
@@ -206,8 +227,10 @@ export const ColorMixerControls = ({
   adjustmentVisibility,
   adjustments,
   blackWhiteMixerCommitIdentity,
+  channelMixerCommitIdentity,
   canCreateLocalAdjustmentFromActiveRange = false,
   commitBlackWhiteMixer,
+  commitChannelMixer,
   isForMask,
   onCreateLocalAdjustmentFromActiveRange,
   onDragStateChange,
@@ -575,7 +598,9 @@ export const ColorMixerControls = ({
           adjustmentVisibility={adjustmentVisibility}
           adjustments={adjustments}
           blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
+          channelMixerCommitIdentity={channelMixerCommitIdentity}
           commitBlackWhiteMixer={commitBlackWhiteMixer}
+          commitChannelMixer={commitChannelMixer}
           onDragStateChange={onDragStateChange}
           setActiveChannelMixerOutput={setActiveChannelMixerOutput}
           setActiveColor={setActiveColor}
@@ -594,7 +619,9 @@ type AdvancedMixerControlsProps = Pick<
   | 'activeColorBalanceRange'
   | 'adjustmentVisibility'
   | 'blackWhiteMixerCommitIdentity'
+  | 'channelMixerCommitIdentity'
   | 'commitBlackWhiteMixer'
+  | 'commitChannelMixer'
   | 'setActiveChannelMixerOutput'
   | 'setActiveColor'
   | 'setActiveColorBalanceRange'
@@ -608,7 +635,9 @@ const AdvancedMixerControls = ({
   adjustmentVisibility,
   adjustments,
   blackWhiteMixerCommitIdentity,
+  channelMixerCommitIdentity,
   commitBlackWhiteMixer,
+  commitChannelMixer,
   onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
@@ -655,16 +684,10 @@ const AdvancedMixerControls = ({
     }));
   };
   const resetChannelMixer = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      channelMixer: structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
-    }));
+    commitChannelMixer(() => structuredClone(INITIAL_ADJUSTMENTS.channelMixer));
   };
   const resetActiveOutput = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      channelMixer: resetChannelMixerOutput(previous.channelMixer, activeChannelMixerOutput),
-    }));
+    commitChannelMixer((current) => resetChannelMixerOutput(current, activeChannelMixerOutput));
   };
 
   const handleSelectorKeyDown = <T extends string>(
@@ -1040,10 +1063,11 @@ const AdvancedMixerControls = ({
                     checked={channelMixer.enabled}
                     label={t('adjustments.color.channelMixer.title')}
                     onChange={() =>
-                      setAdjustments((previous) => ({
-                        ...previous,
-                        channelMixer: { ...previous.channelMixer, enabled: !previous.channelMixer.enabled },
-                      }))
+                      commitChannelMixer((current) =>
+                        current.enabled
+                          ? { ...current, enabled: false }
+                          : enableChannelMixer(current, activeChannelMixerOutput),
+                      )
                     }
                     testId="channel-mixer-toggle"
                   />
@@ -1058,6 +1082,9 @@ const AdvancedMixerControls = ({
           </summary>
           <div
             className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
+            data-commit-adjustment-revision={channelMixerCommitIdentity?.adjustmentRevision}
+            data-commit-image-session={channelMixerCommitIdentity?.imageSessionId}
+            data-commit-source-identity={channelMixerCommitIdentity?.sourceIdentity}
             data-enabled={String(channelMixer.enabled)}
             data-testid="channel-mixer-controls"
           >
@@ -1124,18 +1151,16 @@ const AdvancedMixerControls = ({
                   min={source === 'constant' ? -100 : -200}
                   onDragStateChange={onDragStateChange}
                   onValueChange={(value) =>
-                    setAdjustments((previous) => ({
-                      ...previous,
-                      channelMixer: {
-                        ...previous.channelMixer,
-                        [activeChannelMixerOutput]: {
-                          ...previous.channelMixer[activeChannelMixerOutput],
-                          [source]: value,
-                        },
+                    commitChannelMixer((current) => ({
+                      ...current,
+                      [activeChannelMixerOutput]: {
+                        ...current[activeChannelMixerOutput],
+                        [source]: value,
                       },
                     }))
                   }
                   step={1}
+                  testId={`channel-mixer-${source}`}
                   value={activeOutput[source]}
                 />
               ))}
@@ -1144,13 +1169,11 @@ const AdvancedMixerControls = ({
                   <input
                     checked={channelMixer.preserveLuminance}
                     className="accent-editor-primary-active"
+                    data-testid="channel-mixer-preserve-luminance"
                     onChange={() =>
-                      setAdjustments((previous) => ({
-                        ...previous,
-                        channelMixer: {
-                          ...previous.channelMixer,
-                          preserveLuminance: !previous.channelMixer.preserveLuminance,
-                        },
+                      commitChannelMixer((current) => ({
+                        ...current,
+                        preserveLuminance: !current.preserveLuminance,
                       }))
                     }
                     type="checkbox"
