@@ -14,7 +14,10 @@ export interface ImageOpenHydrationState {
 }
 
 interface ImageOpenHydrationContinuationState extends ImageOpenHydrationState {
-  lastEditApplicationReceipt: Pick<EditApplicationReceipt, 'imageSessionId' | 'source'> | null;
+  lastEditApplicationReceipt: Pick<
+    EditApplicationReceipt,
+    'adjustmentRevision' | 'baseAdjustmentRevision' | 'imageSessionId' | 'source'
+  > | null;
 }
 
 export const isImageOpenHydrationIdentityCurrent = <State extends ImageOpenHydrationState>(
@@ -43,7 +46,9 @@ export const canContinueImageOpenHydration = (
     state.imageSession.path === identity.path &&
     state.selectedImage?.path === identity.path &&
     state.lastEditApplicationReceipt?.source === 'hydration' &&
-    state.lastEditApplicationReceipt.imageSessionId === identity.imageSessionId);
+    state.lastEditApplicationReceipt.imageSessionId === identity.imageSessionId &&
+    state.lastEditApplicationReceipt.baseAdjustmentRevision === identity.adjustmentRevision &&
+    state.lastEditApplicationReceipt.adjustmentRevision === state.adjustmentRevision);
 
 export const buildImageOpenHydrationEditTransaction = (
   state: ImageOpenHydrationState,

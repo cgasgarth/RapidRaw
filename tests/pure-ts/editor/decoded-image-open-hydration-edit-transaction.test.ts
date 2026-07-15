@@ -121,6 +121,12 @@ describe('decoded image-open hydration edit transaction', () => {
     });
     const current = useEditorStore.getState();
     expect(canContinueImageOpenHydration(current, originalIdentity)).toBeTrue();
+    expect(
+      canContinueImageOpenHydration(current, {
+        ...originalIdentity,
+        adjustmentRevision: originalIdentity.adjustmentRevision - 1,
+      }),
+    ).toBeFalse();
     expect(canContinueImageOpenHydration(current, { ...originalIdentity, path: '/fixtures/other.NEF' })).toBeFalse();
     const aspectOnly = buildImageOpenHydrationEditTransaction(
       current,
