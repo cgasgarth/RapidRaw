@@ -117,8 +117,41 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
-    legacyFields: ['cameraProfile', 'temperature', 'tint', 'whiteBalance'],
+    defaultParams: {
+      cameraProfile: 'camera_standard',
+      cameraProfileAmount: 100,
+      creativeTemperature: 0,
+      creativeTint: 0,
+      temperature: 0,
+      tint: 0,
+      whiteBalanceMigration: 'native_v1',
+      whiteBalanceTechnical: {
+        adaptation: 'cat16_v1',
+        confidence: null,
+        contract: 'rapidraw.white_balance.v1',
+        duv: 0,
+        inputSemantics: 'raw_scene_linear',
+        kelvin: 6504,
+        mode: 'as_shot',
+        presetId: null,
+        sampleCount: null,
+        source: 'as_shot',
+        synchronization: { mode: 'per_image', referenceSourceIdentity: null },
+        x: 0.32168,
+        y: 0.33767,
+      },
+    },
+    legacyFields: [
+      'cameraProfile',
+      'cameraProfileAmount',
+      'creativeTemperature',
+      'creativeTint',
+      'temperature',
+      'tint',
+      'whiteBalance',
+      'whiteBalanceMigration',
+      'whiteBalanceTechnical',
+    ],
     nodeType: 'camera_input',
     process: 'scene_referred_v2',
     renderStage: 'camera_input',
@@ -210,6 +243,47 @@ export const editDocumentJsonValueSchema: z.ZodType<EditDocumentJsonValue> = z.l
     z.record(z.string(), editDocumentJsonValueSchema),
   ]),
 );
+
+export const editDocumentTechnicalWhiteBalanceV2Schema = z
+  .object({
+    adaptation: z.literal('cat16_v1'),
+    confidence: z.number().finite().min(0).max(1).nullable(),
+    contract: z.literal('rapidraw.white_balance.v1'),
+    duv: z.number().finite().min(-0.05).max(0.05),
+    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']),
+    kelvin: z.number().finite().min(1667).max(25000),
+    mode: z.enum(['as_shot', 'auto', 'kelvin_tint', 'chromaticity', 'preset']),
+    presetId: z.enum(['tungsten', 'daylight', 'flash', 'cloudy', 'shade']).nullable(),
+    sampleCount: z.number().int().nonnegative().nullable(),
+    source: z.enum(['as_shot', 'auto', 'picker', 'preset', 'user']),
+    synchronization: z
+      .object({
+        mode: z.enum(['per_image', 'locked_reference']),
+        referenceSourceIdentity: z.string().trim().min(1).nullable(),
+      })
+      .strict(),
+    x: z.number().finite().gt(0).lt(1),
+    y: z.number().finite().gt(0).lt(1),
+  })
+  .strict()
+  .refine(({ x, y }) => x + y < 1, { message: 'Chromaticity x+y must be below one.' });
+
+export const editDocumentCameraInputV2Schema = z
+  .object({
+    cameraProfile: z.union([
+      z.enum(['camera_standard', 'camera_neutral', 'camera_portrait', 'camera_landscape', 'linear_raw']),
+      z.string().regex(/^dcp:[a-f0-9]{64}$/u),
+    ]),
+    cameraProfileAmount: z.number().finite().min(0).max(100),
+    creativeTemperature: z.number().finite().min(-100).max(100),
+    creativeTint: z.number().finite().min(-100).max(100),
+    temperature: z.number().finite().min(-100).max(100),
+    tint: z.number().finite().min(-100).max(100),
+    whiteBalance: editDocumentJsonValueSchema.optional(),
+    whiteBalanceMigration: z.enum(['native_v1', 'legacy_creative_temperature_tint_v1']),
+    whiteBalanceTechnical: editDocumentTechnicalWhiteBalanceV2Schema,
+  })
+  .strict();
 
 export const editDocumentMaskTypeV2Schema = z.enum([
   'ai-depth',
@@ -365,6 +439,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'camera_input') {
+        const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
+        if (!cameraInput.success) {
+          for (const issue of cameraInput.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'geometry') {
         const geometry = editDocumentGeometryV2Schema.safeParse(node.params);
         if (!geometry.success) {
@@ -435,6 +517,7 @@ export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
+export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 
@@ -457,6 +540,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
+  if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
   if (envelope.type === 'layers') editDocumentLayersV2Schema.parse(envelope.params);
