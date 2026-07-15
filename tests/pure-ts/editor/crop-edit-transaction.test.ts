@@ -74,6 +74,7 @@ describe('crop edit transaction', () => {
       result.beforeEditDocumentV2.nodes.scene_global_color_tone,
     );
     expect(result.afterEditDocumentV2.nodes.geometry.params.crop).toEqual(crop);
+    expect(result.afterEditDocumentV2.geometry).toEqual(result.afterEditDocumentV2.nodes.geometry.params);
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -81,6 +82,7 @@ describe('crop edit transaction', () => {
       persistence: 'commit',
       source: 'geometry-tool',
     });
+    expect(useEditorStore.getState().adjustmentSnapshot.editDocumentV2).toBe(useEditorStore.getState().editDocumentV2);
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.crop).toBeNull();

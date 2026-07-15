@@ -11,9 +11,7 @@ import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -46,7 +44,7 @@ afterEach(() => {
 describe('crop panel workflow', () => {
   test('uses compact controls and restores a canceled live crop through the existing history contract', async () => {
     const initial = { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2 };
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: initial,
       history: [initial],
       historyCheckpoints: [],
@@ -95,7 +93,7 @@ describe('crop panel workflow', () => {
   });
 
   test('keeps invalid custom ratios visible and inaccessible to the crop model', async () => {
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2 },
       history: [{ ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2 }],
       historyCheckpoints: [],
@@ -127,12 +125,9 @@ describe('crop panel workflow', () => {
 
   test('binds the compact groups to crop state and keyboard overlay cycling', async () => {
     const adjustments = { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
-      editDocumentV2,
       history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
@@ -170,7 +165,7 @@ describe('crop panel workflow', () => {
   });
 
   test('keeps an active custom draft through parent renders, discards it on Escape, and keys image switches', async () => {
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: 1.7 },
       history: [{ ...INITIAL_ADJUSTMENTS, aspectRatio: 1.7 }],
       historyCheckpoints: [],
@@ -199,7 +194,7 @@ describe('crop panel workflow', () => {
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').value).toBe('170');
 
     await act(async () => {
-      useEditorStore.setState({
+      useEditorStore.getState().setEditor({
         adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: 0.83 },
         selectedImage: { ...selectedImage, path: '/validation/crop-workflow-b.ARW' },
       });
@@ -211,7 +206,7 @@ describe('crop panel workflow', () => {
 
   test('rotates Original in one canonical history update and clears live rotation on teardown', async () => {
     const initial = { ...INITIAL_ADJUSTMENTS, aspectRatio: 4 / 3, orientationSteps: 0, rotation: 4 };
-    useEditorStore.setState({
+    useEditorStore.getState().setEditor({
       adjustments: initial,
       history: [initial],
       historyCheckpoints: [],
@@ -254,7 +249,7 @@ async function renderCropPanel() {
 }
 
 function resetStores() {
-  useEditorStore.setState({
+  useEditorStore.getState().setEditor({
     adjustments: INITIAL_ADJUSTMENTS,
     history: [INITIAL_ADJUSTMENTS],
     historyCheckpoints: [],

@@ -11,7 +11,7 @@ export interface AdjustmentSnapshot {
   readonly patchRevision: number;
 }
 
-const geometryKeys = ['crop', 'flipHorizontal', 'flipVertical', 'orientationSteps', 'rotation'] as const;
+const geometryKeys = ['aspectRatio', 'crop', 'flipHorizontal', 'flipVertical', 'orientationSteps', 'rotation'] as const;
 
 const shouldFreezeSnapshots = (): boolean =>
   (globalThis as typeof globalThis & { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !==

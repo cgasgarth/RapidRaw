@@ -163,6 +163,48 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('geometry is strict, bounded, unit-explicit, and atomically mirrored into its domain', () => {
+    const legacyPixelCrop = { height: 1800, width: 2400, x: 400, y: 300 };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      crop: legacyPixelCrop,
+    });
+    expect(document.geometry.crop).toEqual({ ...legacyPixelCrop, unit: 'px' });
+    expect(document.migration?.defaulted).toContain('geometry.crop.unit');
+    const reopened = legacyAdjustmentsToEditDocumentV2(editDocumentV2ToLegacyAdjustments(document));
+    expect(reopened.geometry).toEqual(document.geometry);
+    expect(reopened.nodes.geometry).toEqual(document.nodes.geometry);
+
+    const next = updateEditDocumentV2Node(document, 'geometry', (params) => ({
+      ...params,
+      crop: { height: 0.7, width: 0.8, x: 0.1, y: 0.2 },
+      rotation: 2.5,
+    }));
+    expect(next.geometry).toEqual(next.nodes.geometry?.params);
+    expect(next.geometry.crop).toEqual({ height: 0.7, unit: 'normalized', width: 0.8, x: 0.1, y: 0.2 });
+    expect(next.nodes.scene_global_color_tone).toBe(document.nodes.scene_global_color_tone);
+    expect(next.provenance).toBe(document.provenance);
+
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...next,
+        geometry: { ...next.geometry, rotation: 46 },
+        nodes: { ...next.nodes, geometry: { ...next.nodes.geometry, params: { ...next.geometry, rotation: 46 } } },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...next,
+        geometry: { ...next.geometry, unsupported: true },
+        nodes: {
+          ...next.nodes,
+          geometry: { ...next.nodes.geometry, params: { ...next.geometry, unsupported: true } },
+        },
+      }),
+    ).toThrow();
+    expect(() => editDocumentV2Schema.parse({ ...next, geometry: document.geometry })).toThrow('disagrees');
+  });
+
   test('node updates retain unrelated nodes and provenance domains', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     const next = editDocumentV2Schema.parse({
@@ -204,6 +246,7 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('render preparation keeps payload residency while overlaying authoritative migrated nodes', () => {
     const authoritative = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
+      crop: { height: 1800, unit: 'px', width: 2400, x: 400, y: 300 },
       exposure: 1.25,
     });
     const prepared = {
@@ -211,8 +254,13 @@ describe('EditDocumentV2 legacy adapter', () => {
       aiPatches: [],
       exposure: -2,
     };
-    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['scene_global_color_tone']);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, [
+      'geometry',
+      'scene_global_color_tone',
+    ]);
 
+    expect(renderDocument.nodes.geometry).toBe(authoritative.nodes.geometry);
+    expect(renderDocument.geometry).toEqual(authoritative.geometry);
     expect(renderDocument.nodes.scene_global_color_tone).toBe(authoritative.nodes.scene_global_color_tone);
     expect(renderDocument.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
     expect(renderDocument.nodes.source_artifacts?.params.aiPatches).toEqual([]);

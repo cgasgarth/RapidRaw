@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 const EDIT_DOCUMENT_V2_SCHEMA_VERSION: u8 = 2;
@@ -68,6 +68,91 @@ impl SceneGlobalColorToneParamsV2 {
         validate_scene_tone_parameter("saturation", self.saturation, -100.0, 100.0)?;
         validate_scene_tone_parameter("shadows", self.shadows, -100.0, 100.0)?;
         validate_scene_tone_parameter("whites", self.whites, -100.0, 100.0)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+enum GeometryCropUnitV2 {
+    #[serde(rename = "%")]
+    Percent,
+    #[serde(rename = "normalized")]
+    Normalized,
+    #[serde(rename = "px")]
+    Pixels,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GeometryCropV2 {
+    height: f64,
+    unit: GeometryCropUnitV2,
+    width: f64,
+    x: f64,
+    y: f64,
+}
+
+impl GeometryCropV2 {
+    fn validate(&self) -> Result<(), String> {
+        if !self.height.is_finite()
+            || !self.width.is_finite()
+            || !self.x.is_finite()
+            || !self.y.is_finite()
+            || self.height <= 0.0
+            || self.width <= 0.0
+            || self.x < 0.0
+            || self.y < 0.0
+        {
+            return Err(
+                "EditDocumentV2 geometry crop coordinates must be finite and positive within the source"
+                    .to_string(),
+            );
+        }
+        let maximum = match self.unit {
+            GeometryCropUnitV2::Percent => Some(100.0),
+            GeometryCropUnitV2::Normalized => Some(1.0),
+            GeometryCropUnitV2::Pixels => None,
+        };
+        if maximum.is_some_and(|limit| self.x + self.width > limit || self.y + self.height > limit)
+        {
+            return Err("EditDocumentV2 geometry crop exceeds its unit bounds".to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GeometryV2 {
+    aspect_ratio: Option<f64>,
+    crop: Option<GeometryCropV2>,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    orientation_steps: u8,
+    rotation: f64,
+}
+
+impl GeometryV2 {
+    fn validate(&self) -> Result<(), String> {
+        if self
+            .aspect_ratio
+            .is_some_and(|ratio| !ratio.is_finite() || ratio <= 0.0)
+        {
+            return Err(
+                "EditDocumentV2 geometry aspectRatio must be finite and positive".to_string(),
+            );
+        }
+        if self.orientation_steps > 3 {
+            return Err(
+                "EditDocumentV2 geometry orientationSteps must be within 0..=3".to_string(),
+            );
+        }
+        if !self.rotation.is_finite() || !(-45.0..=45.0).contains(&self.rotation) {
+            return Err("EditDocumentV2 geometry rotation must be within -45..=45".to_string());
+        }
+        if let Some(crop) = &self.crop {
+            crop.validate()?;
+        }
         Ok(())
     }
 }
@@ -167,7 +252,7 @@ struct EditDocumentProvenanceV2 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct EditDocumentV2 {
     extensions: Map<String, Value>,
-    geometry: Map<String, Value>,
+    geometry: GeometryV2,
     graph_process: String,
     layers: Map<String, Value>,
     migration: Option<EditDocumentMigrationReceiptV2>,
@@ -247,7 +332,7 @@ impl EditDocumentV2 {
                 &migration.quarantined,
             );
         }
-        validate_explicit_domain(&self.nodes, EditNodeTypeV2::Geometry, &self.geometry)?;
+        validate_geometry_domain(&self.nodes, &self.geometry)?;
         validate_explicit_domain(&self.nodes, EditNodeTypeV2::Layers, &self.layers)?;
         validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
         if self
@@ -277,6 +362,10 @@ fn compile_node_params(
                 format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
             })?;
             params.compile()?;
+            Ok(node.params.clone())
+        }
+        EditNodeTypeV2::Geometry => {
+            parse_geometry(&node.params)?;
             Ok(node.params.clone())
         }
         EditNodeTypeV2::SourceArtifacts => {
@@ -337,6 +426,13 @@ fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifacts
     Ok(artifacts)
 }
 
+fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
+    let geometry: GeometryV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 geometry is invalid: {error}"))?;
+    geometry.validate()?;
+    Ok(geometry)
+}
+
 fn validate_source_artifact_domain(
     nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
     domain: &SourceArtifactsV2,
@@ -348,6 +444,19 @@ fn validate_source_artifact_domain(
         return Ok(());
     }
     Err("EditDocumentV2 source_artifacts domain disagrees with its node params".to_string())
+}
+
+fn validate_geometry_domain(
+    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    domain: &GeometryV2,
+) -> Result<(), String> {
+    let Some(node) = nodes.get(&EditNodeTypeV2::Geometry) else {
+        return Ok(());
+    };
+    if &parse_geometry(&node.params)? == domain {
+        return Ok(());
+    }
+    Err("EditDocumentV2 geometry domain disagrees with its node params".to_string())
 }
 
 fn validate_explicit_domain(
@@ -661,6 +770,41 @@ mod tests {
             .expect_err("out-of-range exposure must fail");
         assert!(error.contains("field 'exposure'"));
         assert!(error.contains("[-5, 5]"));
+    }
+
+    #[test]
+    fn geometry_compiler_rejects_unowned_out_of_range_and_out_of_bounds_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["geometry"]["params"]["futureWarp"] = json!(1);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned geometry field must fail");
+        assert!(error.contains("unknown field `futureWarp`"));
+
+        let mut rotation = document_with_legacy(json!({}));
+        rotation["nodes"]["geometry"]["params"]["rotation"] = json!(46);
+        rotation["geometry"]["rotation"] = json!(46);
+        let error = serde_json::from_value::<EditDocumentV2>(rotation)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range rotation must fail");
+        assert!(error.contains("rotation must be within -45..=45"));
+
+        let invalid_crop =
+            json!({ "height": 0.8, "unit": "normalized", "width": 0.8, "x": 0.3, "y": 0.3 });
+        let mut crop = document_with_legacy(json!({}));
+        crop["nodes"]["geometry"]["params"]["crop"] = invalid_crop.clone();
+        crop["geometry"]["crop"] = invalid_crop;
+        let error = serde_json::from_value::<EditDocumentV2>(crop)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-bounds crop must fail");
+        assert!(error.contains("crop exceeds its unit bounds"));
+
+        let mut unknown_domain = document_with_legacy(json!({}));
+        unknown_domain["geometry"]["futureWarp"] = json!(1);
+        assert!(serde_json::from_value::<EditDocumentV2>(unknown_domain).is_err());
     }
 
     #[test]
