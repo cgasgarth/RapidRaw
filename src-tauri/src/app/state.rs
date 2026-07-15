@@ -193,6 +193,10 @@ impl AppState {
     pub(crate) fn export(&self) -> &crate::export::runtime_services::ExportRuntimeServices {
         self.services.export()
     }
+
+    pub(crate) fn film(&self) -> &crate::render::film_runtime_services::FilmRuntimeServices {
+        self.services.film()
+    }
 }
 
 impl Default for AppState {

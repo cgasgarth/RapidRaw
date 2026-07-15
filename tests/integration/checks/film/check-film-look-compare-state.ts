@@ -42,18 +42,18 @@ for (const [sourceName, source, markers] of [
   [
     'Effects.tsx',
     effectsSource,
-    ['filmLookId: look.id', 'filmLookStrength: strength', 'activeLookId={adjustments.filmLookId}'],
+    ['profileId: look.id', 'mix: strength / 100', 'activeLookId={adjustments.filmLookId}'],
   ],
   [
     'FilmLookBrowser.tsx',
     browserSource,
     [
       'data-testid="film-look-active-state"',
-      'data-testid="film-look-active-render-preview"',
+      'testId="film-look-active-render-preview"',
       'data-testid="film-look-compare-render-preview"',
       'data-color-pipeline-operation-domain="acescg_linear_v1"',
       'data-output-proof="filmLook.applyAbCandidate"',
-      'getFilmLookComparePreviewStyle',
+      'FilmLookNativeThumbnail',
       'data-preview-support={look.runtimeSupport}',
     ],
   ],

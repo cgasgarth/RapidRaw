@@ -1,11 +1,11 @@
 import cx from 'clsx';
 import { ArrowLeftRight, Check, Film, Save, Share2, Star, X } from 'lucide-react';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { handleFilmThumbnailMemoryPressure } from '../../tauri/filmThumbnails';
 import { TextVariants } from '../../types/typography';
+import type { Adjustments } from '../../utils/adjustments';
 import {
-  buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
   type FilmLookBrowserItem,
   type FilmLookCategory,
@@ -16,13 +16,18 @@ import {
 import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../ui/editorChromeTokens';
 import UiText from '../ui/primitives/Text';
+import FilmLookNativeThumbnail from './FilmLookNativeThumbnail';
 
 interface FilmLookBrowserProps {
   activeLookId: string | null;
   activeStrength: number;
+  baseAdjustments: Readonly<Adjustments>;
+  graphRevision: number;
   onApplyLook: (look: FilmLookBrowserItem, strength: number) => void;
   onSaveLook: (look: FilmLookBrowserItem, strength: number) => void;
   onShareLook: (look: FilmLookBrowserItem, strength: number) => void;
+  selectedImageId: string | null;
+  viewOutputSha256: string;
 }
 
 type FilmLookComparisonSlot = 'a' | 'b';
@@ -73,48 +78,6 @@ const getFilmLookSearchText = (look: FilmLookBrowserItem, groupName: string) =>
   ]
     .join(' ')
     .toLocaleLowerCase('en-US');
-const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
-  const warmth = look.adjustmentPatch.temperature ?? 0;
-  const saturation = look.adjustmentPatch.saturation ?? 0;
-  const contrast = look.adjustmentPatch.contrast ?? 0;
-  const hue = warmth >= 0 ? 34 : 210;
-  const secondaryHue = look.category === 'black_and_white' ? 0 : hue + 18;
-  const chroma = Math.max(8, Math.min(80, 38 + saturation));
-  const lift = Math.max(18, Math.min(72, 44 + contrast));
-
-  if (look.category === 'black_and_white') {
-    return {
-      background:
-        'linear-gradient(135deg, hsl(0 0% 18%), hsl(0 0% 54%) 48%, hsl(0 0% 86%)), radial-gradient(circle at 22% 18%, hsl(0 0% 100% / 0.28), transparent 34%)',
-    };
-  }
-
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} ${chroma}% ${lift - 16}%), hsl(${secondaryHue} ${chroma + 8}% ${lift + 6}%) 54%, hsl(${hue + 54} ${Math.max(20, chroma - 8)}% ${lift + 22}%))`,
-  };
-};
-const getFilmLookComparePreviewStyle = (look: FilmLookBrowserItem, strength: number): CSSProperties => {
-  const patch = buildFilmLookAppliedAdjustmentPatch(look, strength);
-  const temperature = patch.temperature ?? 0;
-  const saturation = patch.saturation ?? 0;
-  const contrast = patch.contrast ?? 0;
-  const highlights = patch.highlights ?? 0;
-  const blacks = patch.blacks ?? 0;
-  const hue = temperature >= 0 ? 34 : 210;
-  const warmthOverlay = Math.min(0.42, Math.abs(temperature) / 180);
-  const highlightStop = Math.max(18, Math.min(44, 32 - highlights / 4));
-  const shadowStop = Math.max(42, Math.min(72, 56 + blacks / 4));
-  const contrastScale = Math.max(0.72, Math.min(1.44, 1 + contrast / 160));
-  const saturationScale = Math.max(0, Math.min(1.8, 1 + saturation / 140));
-
-  return {
-    background: [
-      `radial-gradient(circle at 38% ${highlightStop}%, hsl(${hue} 82% 86% / ${warmthOverlay}), transparent 28%)`,
-      `linear-gradient(145deg, hsl(${hue} 30% 20%), hsl(${hue + 36} 38% ${shadowStop}%) 52%, hsl(${hue + 78} 28% 78%))`,
-    ].join(', '),
-    filter: `contrast(${contrastScale}) saturate(${saturationScale})`,
-  };
-};
 const isStringArray = (value: unknown): value is Array<string> =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 const isFilmLookSortMode = (value: string): value is FilmLookSortMode =>
@@ -137,9 +100,13 @@ const readFavoriteLookIds = (): Set<string> => {
 export function FilmLookBrowser({
   activeLookId,
   activeStrength,
+  baseAdjustments,
+  graphRevision,
   onApplyLook,
   onSaveLook,
   onShareLook,
+  selectedImageId,
+  viewOutputSha256,
 }: FilmLookBrowserProps) {
   const { t } = useTranslation();
   const groups = useMemo(() => getFilmLookBrowserGroups(), []);
@@ -158,6 +125,13 @@ export function FilmLookBrowser({
   const [activeCategory, setActiveCategory] = useState<FilmLookCategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<FilmLookSortMode>('catalog');
+
+  useEffect(
+    () => () => {
+      void handleFilmThumbnailMemoryPressure().catch(() => undefined);
+    },
+    [],
+  );
 
   const totalLookCount = useMemo(() => groups.reduce((count, group) => count + group.looks.length, 0), [groups]);
   const favoriteLookCount = useMemo(
@@ -393,10 +367,19 @@ export function FilmLookBrowser({
           data-active-look-strength={clampFilmLookStrength(activeStrength)}
           data-testid="film-look-active-state"
         >
-          <div
+          <FilmLookNativeThumbnail
+            baseAdjustments={baseAdjustments}
             className="h-12 rounded border border-editor-border"
-            data-testid="film-look-active-render-preview"
-            style={getFilmLookComparePreviewStyle(activeLook, activeStrength)}
+            graphRevision={graphRevision}
+            height={96}
+            look={activeLook}
+            pinned
+            retryLabel={t('modals.hdr.retry')}
+            selectedImageId={selectedImageId}
+            strength={activeStrength}
+            testId="film-look-active-render-preview"
+            viewOutputSha256={viewOutputSha256}
+            width={112}
           />
           <div className="min-w-0 self-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
@@ -534,17 +517,26 @@ export function FilmLookBrowser({
                       {look.displayName}
                     </UiText>
                     <div
-                      className="h-14 overflow-hidden rounded border border-editor-border"
+                      className="relative h-14 overflow-hidden rounded border border-editor-border"
                       data-look-id={look.id}
                       data-output-proof="filmLook.applyAbCandidate"
                       data-preview-strength={look.id === selectedLookId ? strengthPercent : look.strengthDefault}
                       data-preview-support={look.runtimeSupport}
                       data-testid="film-look-compare-render-preview"
-                      style={getFilmLookComparePreviewStyle(
-                        look,
-                        look.id === selectedLookId ? strengthPercent : look.strengthDefault,
-                      )}
                     >
+                      <FilmLookNativeThumbnail
+                        baseAdjustments={baseAdjustments}
+                        className="absolute inset-0"
+                        graphRevision={graphRevision}
+                        height={112}
+                        look={look}
+                        pinned
+                        retryLabel={t('modals.hdr.retry')}
+                        selectedImageId={selectedImageId}
+                        strength={look.id === selectedLookId ? strengthPercent : look.strengthDefault}
+                        viewOutputSha256={viewOutputSha256}
+                        width={224}
+                      />
                       <div className="flex h-full items-end justify-between bg-black/10 p-1.5 text-[10px] text-white/90">
                         <span className="rounded bg-black/40 px-1.5 py-0.5">{slotLabel}</span>
                         <span className="rounded bg-black/40 px-1.5 py-0.5">
@@ -778,9 +770,19 @@ export function FilmLookBrowser({
                     >
                       <span className="flex items-center justify-between gap-2">
                         <Film size={16} aria-hidden="true" />
-                        <span
-                          className="h-4 flex-1 rounded-sm border border-editor-border"
-                          style={getFilmLookSwatchStyle(look)}
+                        <FilmLookNativeThumbnail
+                          allowRetry={false}
+                          baseAdjustments={baseAdjustments}
+                          className="h-8 flex-1 rounded-sm border border-editor-border"
+                          graphRevision={graphRevision}
+                          height={64}
+                          look={look}
+                          pinned={isActiveLook || isFavorite}
+                          retryLabel={t('modals.hdr.retry')}
+                          selectedImageId={selectedImageId}
+                          strength={lookStrength}
+                          viewOutputSha256={viewOutputSha256}
+                          width={128}
                         />
                         <span className="flex items-center gap-1">
                           {isFavorite && (
