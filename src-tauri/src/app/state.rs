@@ -3,13 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
-use wgpu::{Texture, TextureView};
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
 use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
-use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
@@ -23,21 +21,6 @@ pub struct WindowState {
     pub y: i32,
     pub maximized: bool,
     pub fullscreen: bool,
-}
-
-pub struct GpuImageCache {
-    pub texture: Texture,
-    pub texture_view: TextureView,
-    pub width: u32,
-    pub height: u32,
-    pub pre_gpu_identity: crate::gpu_processing::PreGpuImageIdentity,
-    pub device_generation: u64,
-}
-
-pub struct GpuProcessorState {
-    pub processor: GpuProcessor,
-    pub width: u32,
-    pub height: u32,
 }
 
 pub struct PreviewJob {
@@ -105,9 +88,6 @@ pub struct AppState {
     pub gpu_context: Mutex<Option<GpuContext>>,
     pub display_target_coordinator:
         Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
-    pub gpu_image_cache: Mutex<Option<GpuImageCache>>,
-    pub gpu_input_cache_counters: Mutex<crate::gpu_processing::GpuInputCacheCounters>,
-    pub gpu_processor: Mutex<Option<GpuProcessorState>>,
     #[cfg(feature = "ai")]
     pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
     #[cfg(feature = "ai")]
@@ -160,11 +140,6 @@ impl AppState {
             window_setup_complete: AtomicBool::new(false),
             gpu_context: Mutex::new(None),
             display_target_coordinator: Mutex::new(None),
-            gpu_image_cache: Mutex::new(None),
-            gpu_input_cache_counters: Mutex::new(
-                crate::gpu_processing::GpuInputCacheCounters::default(),
-            ),
-            gpu_processor: Mutex::new(None),
             #[cfg(feature = "ai")]
             ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
             #[cfg(feature = "ai")]

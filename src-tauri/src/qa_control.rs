@@ -254,17 +254,10 @@ fn scheduler_metrics(app_state: &AppState) -> Value {
 
 fn gpu_execution_receipt(app_state: &AppState) -> Value {
     app_state
-        .gpu_processor
-        .lock()
-        .ok()
-        .and_then(|processor| {
-            processor.as_ref().and_then(|processor| {
-                processor
-                    .processor
-                    .last_execution_receipt()
-                    .map(|receipt| receipt)
-            })
-        })
+        .services
+        .gpu_processing
+        .current_processor_snapshot()
+        .and_then(|processor| processor.processor.last_execution_receipt())
         .map(|receipt| {
             json!({
                 "executionSequence": receipt.execution_sequence,
