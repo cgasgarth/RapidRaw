@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import type { BasicToneCommandEnvelope } from '../../basicToneCommandBridge';
+import { buildHistoryNavigationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
 export const AGENT_HISTORY_ROLLBACK_TOOL_NAME = 'rawengine.agent.history.rollback';
@@ -113,18 +114,38 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   ) {
     throw new Error('Agent history rollback rejected stale preview recipe hash.');
   }
+  if (checkpoint.activeImagePath !== currentSnapshot.activeImagePath) {
+    throw new Error('Agent history rollback rejected checkpoint for a different image.');
+  }
+  if (checkpoint.graphRevision !== `history_${String(checkpoint.historyIndex)}`) {
+    throw new Error('Agent history rollback rejected inconsistent checkpoint graph revision.');
+  }
 
-  useEditorStore.setState((state) => ({
-    adjustments: checkpoint.adjustments,
+  const state = useEditorStore.getState();
+  const history =
+    checkpoint.history.length === 0
+      ? [...state.history.slice(0, checkpoint.historyIndex), structuredClone(checkpoint.adjustments)]
+      : structuredClone(checkpoint.history);
+  if (
+    checkpoint.historyIndex >= history.length ||
+    JSON.stringify(history[checkpoint.historyIndex]) !== JSON.stringify(checkpoint.adjustments)
+  ) {
+    throw new Error('Agent history rollback rejected inconsistent checkpoint history target.');
+  }
+  useEditorStore.setState({ history });
+  const navigationState = useEditorStore.getState();
+  navigationState.applyEditTransaction(
+    buildHistoryNavigationEditTransaction(
+      navigationState,
+      checkpoint.historyIndex,
+      `agent-history:${parsedRequest.sessionId}:${parsedRequest.scope}:${parsedRequest.requestId}`,
+    ),
+  );
+  useEditorStore.setState({
     finalPreviewUrl: checkpoint.previewRef,
-    history:
-      checkpoint.history.length === 0
-        ? state.history.slice(0, checkpoint.historyIndex + 1)
-        : structuredClone(checkpoint.history),
-    historyIndex: checkpoint.historyIndex,
     lastBasicToneCommand: checkpoint.lastBasicToneCommand,
     uncroppedAdjustedPreviewUrl: checkpoint.uncroppedPreviewRef,
-  }));
+  });
 
   const restoredSnapshot = buildAgentImageContextSnapshot();
   const restoredState = useEditorStore.getState();
