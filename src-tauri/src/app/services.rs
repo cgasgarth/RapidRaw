@@ -128,9 +128,7 @@ pub struct AppServices {
     computational: crate::computational::runtime_services::ComputationalRuntimeServices,
     pub(crate) payload_residency:
         Arc<crate::color::payload_residency_service::PayloadResidencyService>,
-    pub(crate) gpu_crash_marker: Arc<crate::gpu::crash_marker_service::GpuCrashMarkerService>,
-    pub(crate) gpu_processing: Arc<crate::gpu::gpu_processing_service::GpuProcessingService>,
-    pub(crate) gpu_context: Arc<crate::gpu::gpu_context_service::GpuContextService>,
+    gpu: crate::gpu::runtime_services::GpuRuntimeServices,
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     export: crate::export::runtime_services::ExportRuntimeServices,
     film: crate::render::film_runtime_services::FilmRuntimeServices,
@@ -169,9 +167,7 @@ impl AppServices {
             startup_files: Arc::default(),
             computational: Default::default(),
             payload_residency: Arc::default(),
-            gpu_crash_marker: Arc::default(),
-            gpu_processing: Arc::default(),
-            gpu_context: Arc::default(),
+            gpu: Default::default(),
             lens_database: Arc::default(),
             export: Default::default(),
             film: Default::default(),
@@ -210,6 +206,10 @@ impl AppServices {
 
     pub(crate) fn film(&self) -> &crate::render::film_runtime_services::FilmRuntimeServices {
         &self.film
+    }
+
+    pub(crate) fn gpu(&self) -> &crate::gpu::runtime_services::GpuRuntimeServices {
+        &self.gpu
     }
 }
 

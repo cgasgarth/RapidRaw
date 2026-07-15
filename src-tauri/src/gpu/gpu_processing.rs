@@ -91,14 +91,14 @@ pub fn gpu_input_cache_counters() -> GpuInputCacheCounters {
 
 #[cfg(test)]
 pub fn gpu_input_cache_counters_for_state(state: &AppState) -> GpuInputCacheCounters {
-    state.services.gpu_processing.counters()
+    state.gpu().processing().counters()
 }
 
 fn update_state_gpu_input_cache_counters(
     state: &AppState,
     update: impl FnOnce(&mut GpuInputCacheCounters),
 ) {
-    state.services.gpu_processing.update_counters(update);
+    state.gpu().processing().update_counters(update);
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -3622,8 +3622,8 @@ mod blur_pass_tests {
 
         assert_eq!(rendered.dimensions(), source.dimensions());
         let processor_state = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .expect("GPU processor is initialized");
         let processor = &processor_state.processor;
@@ -3744,8 +3744,8 @@ mod blur_pass_tests {
         }
         assert!(
             state
-                .services
-                .gpu_processing
+                .gpu()
+                .processing()
                 .current_processor_snapshot()
                 .is_some()
         );
@@ -3933,8 +3933,8 @@ mod blur_pass_tests {
         assert!(scene_referred > legacy + 0.05);
         assert_eq!(scene_referred, scene_referred_warm);
         let processor = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let receipt = processor
@@ -4011,8 +4011,8 @@ mod blur_pass_tests {
         .unwrap();
         assert_eq!(rendered.width(), 2049);
         let receipt = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap()
             .processor
@@ -4680,8 +4680,8 @@ mod blur_pass_tests {
         assert_eq!(render_clear(0.0), render_clear(0.12));
 
         let processor_state = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let processor = &processor_state.processor;
@@ -4836,7 +4836,7 @@ mod blur_pass_tests {
         let cold_started = Instant::now();
         let cold = render();
         let cold_elapsed = cold_started.elapsed();
-        state.services.gpu_processing.clear_processor();
+        state.gpu().processing().clear_processor();
 
         let mut warm_elapsed = Vec::new();
         let mut warm_output = None;
@@ -4844,7 +4844,7 @@ mod blur_pass_tests {
             let started = Instant::now();
             warm_output = Some(render());
             warm_elapsed.push(started.elapsed());
-            state.services.gpu_processing.clear_processor();
+            state.gpu().processing().clear_processor();
         }
         warm_elapsed.sort_unstable();
         let warm_median = warm_elapsed[warm_elapsed.len() / 2];
@@ -4860,8 +4860,8 @@ mod blur_pass_tests {
         let no_flare = render();
         assert!(
             state
-                .services
-                .gpu_processing
+                .gpu()
+                .processing()
                 .current_processor_snapshot()
                 .is_some_and(|state| state.processor.flare_resources.get().is_none()),
             "ordinary editor render must not construct optional flare pipelines"
@@ -4885,8 +4885,8 @@ mod blur_pass_tests {
         .expect("optional flare render succeeds");
         assert!(
             state
-                .services
-                .gpu_processing
+                .gpu()
+                .processing()
                 .current_processor_snapshot()
                 .is_some_and(|state| state.processor.flare_resources.get().is_some()),
             "first flare request must demand-create its optional pipelines"
@@ -4978,8 +4978,8 @@ mod blur_pass_tests {
         assert_eq!(counters.hits, 999);
         assert_eq!(counters.uploaded_bytes, 16 * 16 * 8);
         let processor = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let blur = processor
@@ -5209,8 +5209,8 @@ mod blur_pass_tests {
             render(index as f32 / 20.0);
         }
         let processor_state = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let processor = &processor_state.processor;
@@ -5281,8 +5281,8 @@ mod blur_pass_tests {
         render(&[first_mask, second_mask.clone()], adjustments);
         let changed = render(&[changed_mask.clone(), second_mask], adjustments);
         let processor_state = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let processor = &processor_state.processor;
@@ -5315,8 +5315,8 @@ mod blur_pass_tests {
         adjustments.mask_count = 1;
         let removed = render(std::slice::from_ref(&changed_mask), adjustments);
         let processor_state = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .unwrap();
         let processor = &processor_state.processor;
@@ -5466,7 +5466,7 @@ fn process_and_get_dynamic_image_inner(
         .map_err(str::to_owned);
     }
 
-    let gpu_processing = &state.services.gpu_processing;
+    let gpu_processing = state.gpu().processing();
     let processing_permit = gpu_processing.acquire_render();
     let processing_lease = processing_permit.lease();
     let existing_processor = gpu_processing.processor_snapshot(processing_lease);

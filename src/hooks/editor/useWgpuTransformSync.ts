@@ -1,10 +1,7 @@
 import { type RefObject, useEffect, useRef } from 'react';
-import { z } from 'zod';
 import type { TransformState } from '../../components/ui/AppProperties';
-import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
-import { Invokes } from '../../tauri/commands';
+import { flushWgpuPresentation, submitWgpuTransform } from '../../tauri/wgpuPresentation';
 import type { EditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
-import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
   buildHiddenWgpuTransformPayload,
   buildVisibleWgpuTransformPayload,
@@ -47,8 +44,6 @@ interface UseWgpuTransformSyncOptions {
 const MIN_VISIBLE_CONTAINER_PX = 10;
 const DEFAULT_BG_PRIMARY = 'rgb(24, 24, 24)';
 const DEFAULT_BG_SECONDARY = 'rgb(35, 35, 35)';
-const wgpuPresentationSequenceSchema = z.number().int().nonnegative();
-
 export function useWgpuTransformSync({
   finalPreviewUrl: _finalPreviewUrl,
   hasRenderedFirstFrame,
@@ -157,13 +152,13 @@ export function useWgpuTransformSync({
         lastWgpuTransformRef.current = currentTransform;
         isInvoking = true;
 
-        invokeWithSchema(Invokes.UpdateWgpuTransform, { payload }, wgpuPresentationSequenceSchema)
+        submitWgpuTransform(payload)
           .then(async (sequence) => {
             if (sequence === 0) {
               lastWgpuTransformRef.current = null;
               return;
             }
-            await invokeWithSchema(Invokes.FlushWgpuPresentation, { sequence }, emptyTauriResponseSchema);
+            await flushWgpuPresentation(sequence);
             if (state.useWgpuRenderer === true && state.isReady && state.hasRenderedFirstFrame) {
               onWgpuFrameCommitted?.();
             }

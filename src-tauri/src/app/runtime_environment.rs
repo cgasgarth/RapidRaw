@@ -40,10 +40,7 @@ pub(crate) fn configure(
         .app_config_dir()
         .expect("Failed to get config dir");
     let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
-    state
-        .services
-        .gpu_crash_marker
-        .configure(crash_flag_path.clone());
+    state.gpu().configure_crash_marker(crash_flag_path.clone());
 
     if apply_gpu_crash_recovery(&mut settings, crash_flag_path.exists()) {
         log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");

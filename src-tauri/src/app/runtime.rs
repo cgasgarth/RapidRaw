@@ -269,10 +269,7 @@ fn setup_application(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Err
                 }
             },
         );
-        let context = state
-            .services
-            .gpu_context
-            .install_coordinator(Arc::clone(&coordinator));
+        let context = state.gpu().install_coordinator(Arc::clone(&coordinator));
         coordinator.request_refresh(context.map_or(0, |context| context.generation));
         #[cfg(feature = "validation-harness")]
         crate::app::display_target::start_validation_benchmark(app.handle().clone());

@@ -197,6 +197,10 @@ impl AppState {
     pub(crate) fn film(&self) -> &crate::render::film_runtime_services::FilmRuntimeServices {
         self.services.film()
     }
+
+    pub(crate) fn gpu(&self) -> &crate::gpu::runtime_services::GpuRuntimeServices {
+        self.services.gpu()
+    }
 }
 
 impl Default for AppState {
