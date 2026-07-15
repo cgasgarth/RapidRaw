@@ -84,7 +84,7 @@ for (const marker of [
   'adjustments.effects.filmLookBrowser.resultCount',
   'film-look-result-count',
   'FILM_LOOK_FAVORITES_STORAGE_KEY',
-  'getFilmLookSwatchStyle',
+  'FilmLookNativeThumbnail',
   'searchQuery',
   'adjustments.effects.filmLookBrowser.search',
   'adjustments.effects.filmLookBrowser.searchClear',

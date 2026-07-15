@@ -8,13 +8,13 @@ use crate::AppState;
 use crate::app::settings::load_settings_or_default;
 use crate::color::adjustment_fields;
 use crate::community_presets::CommunityPreset;
-use crate::editor::preview_geometry_service::generate_transformed_preview;
+use crate::editor::preview_geometry_service::generate_transformed_preview_cancellable;
 use crate::geometry::Crop;
 use crate::gpu::gpu_context::get_or_init_gpu_context;
 use crate::gpu::gpu_processing::RenderRequest;
 use crate::io::cache_utils::calculate_transform_hash;
 use crate::io::formats::is_raw_file;
-use crate::io::image_codecs::encode_jpeg_response;
+use crate::io::image_codecs::encode_jpeg_bytes;
 use crate::library::file_management::parse_virtual_path;
 use crate::render::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::render::image_processing::{
@@ -74,7 +74,21 @@ pub(crate) fn generate_preset_preview(
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    render_preset_preview_bytes(js_adjustments, &state, &app_handle, 400, None, None)
+        .map(Response::new)
+}
+
+pub(crate) fn render_preset_preview_bytes(
+    js_adjustments: serde_json::Value,
+    state: &tauri::State<AppState>,
+    app_handle: &tauri::AppHandle,
+    preview_dim: u32,
+    output_dimensions: Option<(u32, u32)>,
+    cancellation: Option<&dyn Fn() -> Result<(), String>>,
+) -> Result<Vec<u8>, String> {
+    let checkpoint = || cancellation.map_or(Ok(()), |check| check());
+    checkpoint()?;
+    let context = get_or_init_gpu_context(state, app_handle)?;
 
     let loaded_image = state
         .services
@@ -83,10 +97,15 @@ pub(crate) fn generate_preset_preview(
         .ok_or("No original image loaded for preset preview")?;
     let is_raw = loaded_image.is_raw;
 
-    const PRESET_PREVIEW_DIM: u32 = 400;
-
     let (preview_image, scale_for_gpu, unscaled_crop_offset) =
-        generate_transformed_preview(&state, &loaded_image, &js_adjustments, PRESET_PREVIEW_DIM)?;
+        generate_transformed_preview_cancellable(
+            state,
+            &loaded_image,
+            &js_adjustments,
+            preview_dim,
+            cancellation,
+        )?;
+    checkpoint()?;
 
     let (img_w, img_h) = preview_image.dimensions();
 
@@ -104,7 +123,7 @@ pub(crate) fn generate_preset_preview(
         .iter()
         .filter_map(|def| {
             get_cached_or_generate_mask(
-                &state,
+                state,
                 def,
                 img_w,
                 img_h,
@@ -114,8 +133,9 @@ pub(crate) fn generate_preset_preview(
             )
         })
         .collect();
+    checkpoint()?;
 
-    let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
+    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
@@ -140,7 +160,7 @@ pub(crate) fn generate_preset_preview(
     );
     let processed_image = process_and_get_dynamic_image(
         &context,
-        &state,
+        state,
         detail_stage.image.as_ref(),
         crate::gpu_processing::PreGpuImageIdentity::for_stage(
             detail_stage.image.as_ref(),
@@ -159,8 +179,31 @@ pub(crate) fn generate_preset_preview(
         },
         "generate_preset_preview",
     )?;
+    checkpoint()?;
+    let encoded = encode_preset_preview_output(processed_image, output_dimensions)?;
+    checkpoint()?;
+    Ok(encoded)
+}
 
-    encode_jpeg_response(&processed_image, 80)
+fn encode_preset_preview_output(
+    processed_image: DynamicImage,
+    output_dimensions: Option<(u32, u32)>,
+) -> Result<Vec<u8>, String> {
+    let output_image = match output_dimensions {
+        Some((width, height)) => {
+            let side = processed_image.width().min(processed_image.height());
+            processed_image
+                .crop_imm(
+                    (processed_image.width() - side) / 2,
+                    (processed_image.height() - side) / 2,
+                    side,
+                    side,
+                )
+                .resize_exact(width, height, image::imageops::FilterType::Lanczos3)
+        }
+        None => processed_image,
+    };
+    encode_jpeg_bytes(&output_image, 80)
 }
 
 #[tauri::command]
@@ -329,9 +372,9 @@ pub(crate) async fn generate_all_community_previews(
 
 #[cfg(test)]
 mod tests {
-    use image::{Rgb, RgbImage};
+    use image::{DynamicImage, GenericImageView, Rgb, RgbImage};
 
-    use super::{compose_community_tiles, scale_crop_adjustment};
+    use super::{compose_community_tiles, encode_preset_preview_output, scale_crop_adjustment};
     use crate::color::adjustment_fields;
     use crate::geometry::Crop;
 
@@ -380,5 +423,18 @@ mod tests {
         let tile = RgbImage::new(2, 2);
         assert!(compose_community_tiles(Vec::new(), 2).is_none());
         assert!(compose_community_tiles(vec![tile.clone(), tile.clone(), tile], 2).is_none());
+    }
+
+    #[test]
+    fn production_card_output_is_a_decodable_exact_dimension_jpeg() {
+        let source = DynamicImage::ImageRgb8(RgbImage::from_fn(240, 120, |x, y| {
+            Rgb([(x % 255) as u8, (y % 255) as u8, ((x + y) % 255) as u8])
+        }));
+        let encoded = encode_preset_preview_output(source, Some((128, 64))).unwrap();
+        assert_eq!(
+            image::load_from_memory(&encoded).unwrap().dimensions(),
+            (128, 64)
+        );
+        assert_eq!(&encoded[..2], &[0xff, 0xd8]);
     }
 }
