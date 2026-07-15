@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  buildPointColorPickerPoint,
   createViewerAdjustmentCommandServices,
   updateRetouchCloneInAdjustments,
   updateRetouchRemoveInAdjustments,
@@ -54,39 +53,6 @@ const withMask = (mask: MaskContainer): Adjustments => ({
 });
 
 describe('viewer adjustment command authority', () => {
-  test('builds and commits a sampled point through a semantic command', () => {
-    const ids = ['point-7', 'sample-7'];
-    const result = {
-      chroma: 0.3,
-      confidence: 0.92,
-      graphFingerprint: 'graph-fp',
-      graphRevision: 'graph:7',
-      hueDegrees: 210,
-      lightness: 0.4,
-      sampleRadiusPx: 8,
-      sourceFingerprint: 'source-fp',
-      sourceIdentity: 'image-a',
-    };
-    const point = buildPointColorPickerPoint(result, 7, () => ids.shift() ?? 'unexpected');
-    expect(point).toMatchObject({
-      id: 'point-7',
-      name: 'Point 7',
-      samples: [{ id: 'sample-7', sourceColor: { chroma: 0.3, hueDegrees: 210, lightness: 0.4 } }],
-    });
-
-    let state = structuredClone(INITIAL_ADJUSTMENTS);
-    const serviceIds = ['point-1', 'sample-1'];
-    const services = createViewerAdjustmentCommandServices(
-      (updater) => {
-        state = updater(state);
-      },
-      () => serviceIds.shift() ?? 'unexpected',
-    );
-    services.commitPointColorPicker(result, 1);
-    expect(state.pointColor).toMatchObject({ enabled: true, selectedPointId: 'point-1' });
-    expect(state.pointColor.points[0]).toMatchObject({ id: 'point-1', samples: [{ id: 'sample-1' }] });
-  });
-
   test('updates one sub-mask through a pure command transformation', () => {
     const state = withMask(makeMask());
     const next = updateSubMaskInAdjustments(state, 'radial-1', { opacity: 42 });
@@ -132,29 +98,12 @@ describe('viewer adjustment command authority', () => {
     expect(next.masks[0]?.subMasks[0]?.parameters).toEqual({ centerX: 300, centerY: 200 });
   });
 
-  test('dispatches point-color and mask commands through one authority', () => {
+  test('keeps generic dispatch limited to non-picker compatibility commands', () => {
     let state = structuredClone(INITIAL_ADJUSTMENTS);
     const services = createViewerAdjustmentCommandServices((updater) => {
       state = updater(state);
     });
     services.updateSubMask(null, { opacity: 1 });
-    services.appendPointColorSample({
-      chromaRadius: 0.1,
-      chromaShift: 0,
-      enabled: true,
-      feather: 0.2,
-      hueRadiusDegrees: 20,
-      hueShiftDegrees: 0,
-      id: 'point-1',
-      lightnessRadius: 0.2,
-      lightnessShift: 0,
-      name: 'Point 1',
-      opacity: 1,
-      samples: [],
-      saturationShift: 0,
-      variance: 1,
-    });
-    expect(state.pointColor.selectedPointId).toBe('point-1');
-    expect(state.pointColor.points).toHaveLength(1);
+    expect(state).toEqual(INITIAL_ADJUSTMENTS);
   });
 });

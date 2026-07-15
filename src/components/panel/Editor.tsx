@@ -88,8 +88,8 @@ import {
   buildSubMaskInteractionEditTransaction,
   type SubMaskInteractionIdentity,
 } from '../../utils/subMaskInteractionEditTransaction';
-import { debounce } from '../../utils/timing';
 import { buildViewerBrushEditTransaction } from '../../utils/viewerBrushEditTransaction';
+import { buildViewerPickerEditTransaction } from '../../utils/viewerPickerEditTransaction';
 import {
   applyWhiteBalancePickerHoverPreview,
   buildWhiteBalancePickerEditTransaction,
@@ -123,6 +123,7 @@ import {
   type ViewerObjectPromptCommand,
 } from './editor/viewerObjectPromptInteractionController';
 import type { ViewerParametricMaskTargetCommand } from './editor/viewerParametricMaskTargetInteractionController';
+import type { ViewerPickerCommitResult } from './editor/viewerPickerInteractionControllers';
 import {
   getNextViewerLightsOutLevel,
   getViewerLightsOutLabel,
@@ -298,34 +299,11 @@ export default function Editor({
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const pushHistory = useEditorStore((s) => s.pushHistory);
   const canUndo = adjustmentsHistoryIndex > 0;
   const canRedo = adjustmentsHistoryIndex < adjustmentsHistory.length - 1;
 
   const isAndroid = osPlatform === 'android';
 
-  const debouncedSetHistory = useMemo(
-    () =>
-      debounce((newAdj: Adjustments, expected: { adjustmentRevision: number; imageSessionId: string }) => {
-        pushHistory(newAdj, expected);
-      }, 500),
-    [pushHistory],
-  );
-
-  const setAdjustments = useCallback(
-    (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
-      setEditor((state) => {
-        const prevAdjustments = state.adjustments;
-        const newAdjustments = typeof value === 'function' ? value(prevAdjustments) : { ...prevAdjustments, ...value };
-        debouncedSetHistory(newAdjustments, {
-          adjustmentRevision: state.adjustmentRevision + 1,
-          imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-        });
-        return { adjustments: newAdjustments };
-      });
-    },
-    [debouncedSetHistory, setEditor],
-  );
   const { handleGenerateAiMask, handleQuickErase } = useAiMasking();
   const [cropInteraction, setCropInteraction] = useState<CropInteraction>({ kind: 'idle' });
   const [objectPromptController] = useState(createViewerObjectPromptInteractionController);
@@ -778,6 +756,23 @@ export default function Editor({
           },
           command,
           `viewer-brush:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
+  const handlePickerCommit = useCallback(
+    (command: ViewerPickerCommitResult) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildViewerPickerEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command,
+          `viewer-picker:${command.kind}:${crypto.randomUUID()}`,
         ),
       );
     },
@@ -2319,6 +2314,10 @@ export default function Editor({
           data-editor-transform-position-y={String(transformState.positionY)}
           data-editor-transform-scale={String(transformState.scale)}
           data-editor-zoom-mode={zoomMode.kind}
+          data-editor-adjustment-revision={String(committedAdjustmentRevision)}
+          data-last-edit-adjustment-revision={lastEditApplicationReceipt?.adjustmentRevision ?? ''}
+          data-last-edit-image-session={lastEditApplicationReceipt?.imageSessionId ?? ''}
+          data-last-edit-persistence={lastEditApplicationReceipt?.persistence ?? ''}
           data-last-edit-source={lastEditApplicationReceipt?.source ?? ''}
           data-last-edit-transaction-id={lastEditApplicationReceipt?.transactionId ?? ''}
           data-is-generating-ai={String(isGeneratingAi)}
@@ -2382,6 +2381,7 @@ export default function Editor({
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
                 onLiveMaskPreview={handleLiveMaskPreview}
                 onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
+                onPickerCommit={handlePickerCommit}
                 onRetouchCommand={handleRetouchCommand}
                 onSelectAiSubMask={(id) => {
                   setEditor({ activeAiSubMaskId: id });
@@ -2415,7 +2415,9 @@ export default function Editor({
                 onWbPreview={handleWbPreview}
                 onWbPreviewCancel={handleWbPreviewCancel}
                 wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
-                setAdjustments={setAdjustments}
+                pickerImageSessionId={
+                  editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`
+                }
                 overlayRotation={overlayRotation}
                 overlayMode={overlayMode}
                 cursorStyle={cursorStyle}

@@ -2516,7 +2516,6 @@ function BrushMaskCanvasVisualSmoke() {
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
                 selectedImage={brushMaskCanvasImage}
-                setAdjustments={() => {}}
                 setCrop={() => {}}
                 setIsMaskHovered={() => {}}
                 setIsMaskTouchInteracting={() => {}}
@@ -2721,9 +2720,6 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 overlayMode={overlayMode}
                 overlayRotation={overlayRotation}
                 selectedImage={cropTransformSmokeImage}
-                setAdjustments={(updater) => {
-                  useEditorStore.getState().setEditor((state) => ({ adjustments: updater(state.adjustments) }));
-                }}
                 setCrop={(nextCrop: Crop, _percentageCrop: PercentCrop) => {
                   setCropState(nextCrop);
                 }}
@@ -2922,7 +2918,6 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     onSelectMask: () => {},
     onStraighten: () => {},
     selectedImage: brushMaskCanvasImage,
-    setAdjustments: () => {},
     setCrop: () => {},
     setIsMaskHovered: () => {},
     setIsMaskTouchInteracting: () => {},
@@ -3028,7 +3023,6 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isCropping={false}
                 isMasking
                 maskOverlayUrl={null}
-                setAdjustments={setRetouchAdjustments}
               />
             </div>
             <div

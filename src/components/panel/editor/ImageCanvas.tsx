@@ -13,7 +13,6 @@ import {
   type InteractivePatch,
   useEditorStore,
 } from '../../../store/useEditorStore';
-import { useUIStore } from '../../../store/useUIStore';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
@@ -51,7 +50,6 @@ import {
   buildViewerSamplerIdentity,
   isViewerSampleResultCurrent,
   LatestViewerSampleScheduler,
-  mapViewerPointToImage,
   type ViewerSampleRequest,
   type ViewerSampleResult,
   type ViewerSampleTarget,
@@ -124,6 +122,7 @@ import {
   type ViewerParametricMaskTargetCommand,
   type ViewerParametricMaskTargetCurrentContext,
 } from './viewerParametricMaskTargetInteractionController';
+import type { ViewerPickerCommitResult } from './viewerPickerInteractionControllers';
 import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
@@ -197,14 +196,7 @@ const viewerBrushPointerMetadata = (event: MouseEvent | TouchEvent | PointerEven
   } as const;
 };
 
-const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
-  if (stage) {
-    stage.container().style.cursor = cursor;
-  }
-};
-
 const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
-const cssPercent = (value: number): string => `${String(value)}%`;
 const svgNumber = (value: number): string => String(value);
 const canvasOverlayShadowProps = {
   shadowBlur: canvasOverlayTokens.shadow.blur,
@@ -250,6 +242,7 @@ interface ImageCanvasProps {
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
+  onPickerCommit?: (command: ViewerPickerCommitResult) => void;
   onRetouchCommand: (command: ViewerRetouchCommand) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
@@ -276,7 +269,7 @@ interface ImageCanvasProps {
   onWbPreview?: (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => void;
   onWbPreviewCancel?: () => void;
   wbPickerBaseAdjustments?: Adjustments;
-  setAdjustments: (fn: (prev: Adjustments) => Adjustments) => void;
+  pickerImageSessionId?: string;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
   cursorStyle: string;
@@ -291,6 +284,8 @@ interface ImageCanvasProps {
   viewerSampleGraphRevision?: string;
   onViewerSamplerStateChange?: (state: ViewerSamplerState) => void;
 }
+
+const ignoreViewerPickerCommit = (): void => undefined;
 
 export const ImageCanvas = memo(
   ({
@@ -333,6 +328,7 @@ export const ImageCanvas = memo(
     onInitialMaskDrawCommit,
     onLiveMaskPreview,
     onParametricMaskTargetCommit,
+    onPickerCommit = ignoreViewerPickerCommit,
     onRetouchCommand,
     onSelectAiSubMask,
     onSelectMask,
@@ -358,7 +354,7 @@ export const ImageCanvas = memo(
     onWbPreview,
     onWbPreviewCancel,
     wbPickerBaseAdjustments = adjustments,
-    setAdjustments,
+    pickerImageSessionId = imageSessionId ?? `viewer-source:${selectedImage.path}`,
     overlayRotation,
     overlayMode,
     cursorStyle,
@@ -374,7 +370,6 @@ export const ImageCanvas = memo(
     onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
-    const setUI = useUIStore((state) => state.setUI);
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
@@ -518,10 +513,12 @@ export const ImageCanvas = memo(
       ],
     );
     const pickerControllers = useViewerPickerControllers({
+      adjustmentRevision,
       adjustments,
       geometry: overlayGeometry,
+      imageSessionId: pickerImageSessionId,
+      onCommit: onPickerCommit,
       presentation: presentationDescriptor,
-      setAdjustments,
     });
     const focusRetouchController = useViewerFocusRetouchController({
       geometry: overlayGeometry,

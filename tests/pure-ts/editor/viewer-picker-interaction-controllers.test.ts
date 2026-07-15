@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  createViewerPickerInteractionController,
   createViewerPickerContextSynchronizer,
+  createViewerPickerInteractionController,
   isViewerPickerSessionCurrent,
   resolveViewerPickerPoint,
   type ViewerPickerCurrentContext,
@@ -13,8 +13,10 @@ import type { ToneEqualizerPickerResponse } from '../../../src/utils/toneEqualiz
 
 const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
 const toneKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: 'tone-equalizer' } => ({
+  adjustmentRevision: 2,
   geometryEpoch: 4,
   imageSessionId: 'image-session:12:a',
+  normalizedImagePoint: { x: 0.25, y: 0.75 },
   operationGeneration,
   sourceIdentity: '/private/image-a.arw',
   sourceRevision: 'graph:9',
@@ -26,6 +28,7 @@ const pointKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: '
 });
 const current = (tool: 'point-color' | 'tone-equalizer' | null = 'tone-equalizer'): ViewerPickerCurrentContext => ({
   activeTool: tool,
+  adjustmentRevision: 2,
   geometryEpoch: 4,
   imageSessionId: 'image-session:12:a',
   sourceIdentity: '/private/image-a.arw',
@@ -111,6 +114,7 @@ describe('viewer picker interaction controllers', () => {
       { ...current(), imageSessionId: 'image-session:14:a' },
       { ...current(), sourceIdentity: '/private/image-c.arw' },
       { ...current(), sourceRevision: 'graph:10' },
+      { ...current(), adjustmentRevision: 3 },
       { ...current(), geometryEpoch: 5 },
       { ...current(), activeTool: 'point-color' },
       { ...current(), activeTool: null },
@@ -131,11 +135,13 @@ describe('viewer picker interaction controllers', () => {
       kind: 'sample-point-color',
       normalizedImagePoint: { x: 0.25, y: 0.75 },
     });
-    expect(controller.receivePointColor(pointKey(), pointResult, current('point-color'))).toMatchObject([
-      { kind: 'commit-point-color', ordinal: 1, result: pointResult },
+    const commit = controller.receivePointColor(pointKey(), pointResult, current('point-color'));
+    expect(commit).toMatchObject([
+      { key: pointKey(), kind: 'commit-point-color', ordinal: 1, result: pointResult },
       { kind: 'deactivate-point-color' },
       { kind: 'publish-point-color-receipt', result: pointResult },
     ]);
+    expect(controller.overlays()).toEqual([]);
   });
 
   test('uses the exact command coordinate for its declarative overlay at any geometry', () => {
