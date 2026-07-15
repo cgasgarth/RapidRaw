@@ -9,6 +9,17 @@ export interface ToneEqualizerEditTransactionState {
   selectedImage: { path: string } | null;
 }
 
+export const isCurrentToneEqualizerAsyncRequest = (
+  state: ToneEqualizerEditTransactionState,
+  identity: BasicToneCommitIdentity,
+  requestGeneration: number,
+  currentRequestGeneration: number,
+): boolean =>
+  requestGeneration === currentRequestGeneration &&
+  state.selectedImage?.path === identity.sourceIdentity &&
+  state.imageSession?.id === identity.imageSessionId &&
+  state.adjustmentRevision === identity.adjustmentRevision;
+
 export const buildToneEqualizerEditTransaction = (
   state: ToneEqualizerEditTransactionState,
   identity: BasicToneCommitIdentity,
