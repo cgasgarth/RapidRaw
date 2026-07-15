@@ -889,8 +889,7 @@ pub async fn analyze_auto_edit(
 ) -> Result<AutoEditProposalV1, String> {
     let generation = ANALYSIS_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
     let loaded = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     if loaded.path != request.expected_image_path {
@@ -960,8 +959,7 @@ pub fn preview_auto_edit_proposal(
     state: tauri::State<AppState>,
 ) -> Result<AutoEditPreviewV1, String> {
     let loaded = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     let source_revision = loaded.artifact_source.revision.identity();
@@ -974,8 +972,7 @@ pub fn apply_auto_edit_proposal(
     state: tauri::State<AppState>,
 ) -> Result<AppliedAutoEditV1, String> {
     let loaded = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     let source_revision = loaded.artifact_source.revision.identity();

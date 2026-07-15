@@ -74,11 +74,7 @@ pub(crate) async fn preview_geometry_transform(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let (loaded_image_path, loaded_source_revision, is_raw) = {
-        let loaded = state
-            .services
-            .editor
-            .image_snapshot()
-            .ok_or("No image loaded")?;
+        let loaded = state.editor().image_snapshot().ok_or("No image loaded")?;
         (
             loaded.path.clone(),
             loaded.artifact_source.source_fingerprint(),
@@ -104,8 +100,7 @@ pub(crate) async fn preview_geometry_transform(
             let context = get_or_init_gpu_context(&state, &app_handle)?;
 
             let original_image = state
-                .services
-                .editor
+                .editor()
                 .image_snapshot()
                 .ok_or("No image loaded")?
                 .image;

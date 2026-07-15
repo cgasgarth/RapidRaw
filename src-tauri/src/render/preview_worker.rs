@@ -167,8 +167,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     cancellation_checkpoint(cancellation, PreviewStage::Source)?;
 
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     state
@@ -607,9 +606,8 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             viewer_identity,
         );
         state
-            .services
-            .viewer_sampling
-            .publish(ViewerSampleCacheSlot::Edited, frame);
+            .editor()
+            .publish_viewer_sample(ViewerSampleCacheSlot::Edited, frame);
     }
     Ok(bytes)
 }

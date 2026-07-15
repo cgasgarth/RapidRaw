@@ -25,7 +25,7 @@ impl<'a> RenderCaches<'a> {
             self.state.render().native_caches().budget_usage();
         let (total_soft_limit_bytes, total_hard_limit_bytes) = limits;
         let mut caches = self.state.render().native_caches().stats();
-        caches.push(self.state.services.viewer_sampling.stats());
+        caches.push(self.state.editor().viewer_sample_stats());
         if let Some(patch_stats) = crate::patch_assets::patch_asset_cache_stats() {
             caches.extend(patch_stats);
         }
@@ -52,7 +52,7 @@ impl<'a> RenderCaches<'a> {
 
     /// Drops display/view-output frames without invalidating decoded or scene-linear inputs.
     pub fn clear_display_encoded_artifacts(&self) {
-        self.state.services.viewer_sampling.clear_frames();
+        self.state.editor().clear_viewer_frames();
         self.clear_gpu_image_cache();
     }
 
@@ -87,16 +87,15 @@ impl<'a> RenderCaches<'a> {
             .render()
             .native_caches()
             .clear_session_derivatives();
-        self.state.services.viewer_sampling.clear_frames();
+        self.state.editor().clear_viewer_frames();
         if let Ok(report) = serde_json::to_string(&self.native_cache_report()) {
             log::debug!("native_cache_report={report}");
         }
     }
 
     pub fn clear_active_image_render_state(&self) {
-        self.state.services.editor.clear_image();
+        self.state.editor().clear_active_image();
         self.state.render().full_warp_cache().clear_session();
-        self.state.services.viewer_sampling.clear_session();
         self.clear_gpu_dependent_preview();
         self.clear_session_caches();
     }

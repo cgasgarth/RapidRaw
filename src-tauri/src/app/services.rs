@@ -56,27 +56,34 @@ impl OperationRegistry {
     }
 }
 
-#[derive(Clone, Default)]
 pub struct EditorRuntimeService {
-    operations: Arc<OperationRegistry>,
     image: Arc<crate::editor::image_service::EditorImageService>,
+    viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
 }
 
 impl EditorRuntimeService {
-    pub fn begin_operation(&self) -> OperationId {
-        self.operations.begin()
-    }
-    pub fn cancel(&self, id: OperationId) -> bool {
-        self.operations.transition(id, OperationState::Cancelled)
-    }
-    pub fn complete(&self, id: OperationId) -> bool {
-        self.operations.transition(id, OperationState::Completed)
-    }
-    pub fn is_current(&self, id: OperationId) -> bool {
-        self.operations.is_current(id)
+    fn new(cache_budget: Arc<crate::render::native_cache::CacheBudgetCoordinator>) -> Self {
+        Self {
+            image: Arc::default(),
+            viewer_sampling: Arc::new(
+                crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
+            ),
+        }
     }
 
+    #[cfg(all(test, feature = "tauri-test"))]
     pub(crate) fn install_image(&self, image: crate::editor::image_service::LoadedImage) {
+        self.image.install(image);
+    }
+
+    pub(crate) fn install_active_image(
+        &self,
+        image_session: u64,
+        image_identity: &str,
+        image: crate::editor::image_service::LoadedImage,
+    ) {
+        self.viewer_sampling
+            .install_session(image_session, image_identity);
         self.image.install(image);
     }
 
@@ -93,8 +100,39 @@ impl EditorRuntimeService {
         self.image.clone_pixels()
     }
 
-    pub(crate) fn clear_image(&self) {
+    pub(crate) fn clear_active_image(&self) {
         self.image.clear();
+        self.viewer_sampling.clear_session();
+    }
+
+    pub(crate) fn clear_viewer_frames(&self) {
+        self.viewer_sampling.clear_frames();
+    }
+
+    pub(crate) fn viewer_sample_stats(&self) -> crate::render::native_cache::CacheStats {
+        self.viewer_sampling.stats()
+    }
+
+    pub(crate) fn publish_viewer_sample(
+        &self,
+        slot: crate::editor::viewer_sampling_service::ViewerSampleCacheSlot,
+        frame: crate::editor::viewer_sampling_service::CachedViewerSampleFrame,
+    ) -> crate::editor::viewer_sampling_service::ViewerSamplePublishDisposition {
+        self.viewer_sampling.publish(slot, frame)
+    }
+
+    pub(crate) fn viewer_sample_frame(
+        &self,
+        key: &str,
+    ) -> Option<Arc<crate::editor::viewer_sampling_service::CachedViewerSampleFrame>> {
+        self.viewer_sampling.frame_for_key(key)
+    }
+
+    pub(crate) fn sample_viewer_pixel(
+        &self,
+        request: crate::editor::viewer_sampling_service::ViewerSampleRequest,
+    ) -> crate::editor::viewer_sampling_service::ViewerSampleResponse {
+        self.viewer_sampling.sample(request)
     }
 }
 
@@ -120,7 +158,7 @@ impl JobCoordinator {
 
 #[derive(Clone)]
 pub struct AppServices {
-    pub editor: Arc<EditorRuntimeService>,
+    editor: Arc<EditorRuntimeService>,
     pub(crate) display_profile:
         Arc<crate::app::display_profile_service::DisplayProfileRuntimeService>,
     pub(crate) startup: Arc<crate::app::startup::StartupRuntimeService>,
@@ -138,7 +176,6 @@ pub struct AppServices {
     pub(crate) ai: Arc<crate::ai::runtime_service::AiRuntimeService>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
     pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
-    pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub jobs: Arc<JobCoordinator>,
 }
 
@@ -152,7 +189,7 @@ impl AppServices {
         ));
         crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
         Self {
-            editor: Arc::default(),
+            editor: Arc::new(EditorRuntimeService::new(Arc::clone(&cache_budget))),
             display_profile: Arc::default(),
             startup: Arc::default(),
             startup_files: Arc::default(),
@@ -168,15 +205,16 @@ impl AppServices {
             ai,
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             image_open: Arc::default(),
-            viewer_sampling: Arc::new(
-                crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
-            ),
             jobs: Arc::default(),
         }
     }
 
     pub(crate) fn library(&self) -> &crate::library::runtime_services::LibraryRuntimeServices {
         &self.library
+    }
+
+    pub(crate) fn editor(&self) -> &Arc<EditorRuntimeService> {
+        &self.editor
     }
 
     pub(crate) fn computational(
@@ -205,25 +243,101 @@ impl AppServices {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::editor::image_service::LoadedImage;
+    use crate::editor::viewer_sampling_service::{
+        CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
+        ViewerSamplePublishDisposition,
+    };
     use crate::library::smart_preview_scheduler::SmartPreviewDemandClass;
     use crate::merge::computational_job::{
         ComputationalMergeFamily, ComputationalMergeJobId, ComputationalMergeJobStatus,
     };
     use crate::source_revision::SourceRevision;
+    use image::{DynamicImage, ImageBuffer};
     use std::sync::Barrier;
     use std::thread;
 
+    fn editor_service() -> EditorRuntimeService {
+        EditorRuntimeService::new(crate::render::native_cache::CacheBudgetCoordinator::new(
+            256 * 1024 * 1024,
+            512 * 1024 * 1024,
+        ))
+    }
+
+    fn loaded(path: &str, value: u8) -> LoadedImage {
+        LoadedImage {
+            path: path.to_string(),
+            image: Arc::new(DynamicImage::ImageRgb8(ImageBuffer::from_pixel(
+                1,
+                1,
+                image::Rgb([value; 3]),
+            ))),
+            is_raw: true,
+            artifact_source: crate::render::artifact_identity::tests_support::source(path),
+        }
+    }
+
+    fn sample_frame(path: &str, image_session: u64, value: u8) -> CachedViewerSampleFrame {
+        CachedViewerSampleFrame {
+            artifact_identity:
+                crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
+                    &crate::render::artifact_identity::tests_support::source(path),
+                    image_session,
+                    1,
+                    1,
+                    1,
+                    1,
+                    1,
+                ),
+            graph_revision: "graph-current".to_string(),
+            pixels: SampleablePixels::native(Arc::new(DynamicImage::ImageRgb8(
+                ImageBuffer::from_pixel(1, 1, image::Rgb([value; 3])),
+            ))),
+            image_identity: path.to_string(),
+            space_label: "Display encoded sRGB".to_string(),
+        }
+    }
+
     #[test]
-    fn operation_handles_reject_stale_completion_and_cancellation() {
-        let service = EditorRuntimeService::default();
-        let first = service.begin_operation();
-        let second = service.begin_operation();
-        assert!(service.is_current(first));
-        assert!(service.cancel(first));
-        assert!(!service.is_current(first));
-        assert!(!service.complete(first));
-        assert!(service.complete(second));
-        assert!(!service.complete(second));
+    fn editor_runtime_rejects_stale_sample_publication_after_active_image_switch() {
+        let service = Arc::new(editor_service());
+        service.install_active_image(1, "a.raw", loaded("a.raw", 10));
+
+        let publish_barrier = Arc::new(Barrier::new(2));
+        let stale_publisher = {
+            let service = Arc::clone(&service);
+            let publish_barrier = Arc::clone(&publish_barrier);
+            thread::spawn(move || {
+                publish_barrier.wait();
+                service.publish_viewer_sample(
+                    ViewerSampleCacheSlot::Edited,
+                    sample_frame("a.raw", 1, 20),
+                )
+            })
+        };
+
+        service.install_active_image(2, "b.raw", loaded("b.raw", 30));
+        publish_barrier.wait();
+        assert_eq!(
+            stale_publisher.join().unwrap(),
+            ViewerSamplePublishDisposition::RejectedStaleSession
+        );
+        assert_eq!(
+            service.publish_viewer_sample(
+                ViewerSampleCacheSlot::Edited,
+                sample_frame("b.raw", 2, 40),
+            ),
+            ViewerSamplePublishDisposition::Published
+        );
+
+        assert_eq!(service.image_snapshot().unwrap().path, "b.raw");
+        let frame = service.viewer_sample_frame("edited").unwrap();
+        assert_eq!(frame.image_identity, "b.raw");
+        assert_eq!(frame.artifact_identity.image_session, 2);
+
+        service.clear_active_image();
+        assert!(service.image_snapshot().is_none());
+        assert!(service.viewer_sample_frame("edited").is_none());
     }
 
     #[test]

@@ -166,9 +166,8 @@ pub(crate) fn current_frame(
     request: &SingleImageX2PreviewRequest,
 ) -> Result<crate::editor::viewer_sampling_service::CachedViewerSampleFrame, String> {
     let frame = state
-        .services
-        .viewer_sampling
-        .frame_for_key(&request.graph_revision)
+        .editor()
+        .viewer_sample_frame(&request.graph_revision)
         .ok_or_else(|| "single_image_x2_stale_graph_revision".to_string())?;
     if frame.image_identity != request.source_path || frame.graph_revision != request.graph_revision
     {

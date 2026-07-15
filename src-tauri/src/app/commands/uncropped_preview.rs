@@ -30,8 +30,7 @@ pub(crate) fn generate_uncropped_preview(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     let request = state
@@ -167,13 +166,7 @@ pub(crate) fn generate_uncropped_preview(
                 Ok(data_url) => {
                     if !state.render().preview_session().publish_if_current(
                         &request,
-                        || {
-                            state
-                                .services
-                                .editor
-                                .image_snapshot()
-                                .map(|image| image.path)
-                        },
+                        || state.editor().image_snapshot().map(|image| image.path),
                         || {
                             let _ =
                                 app_handle.emit(crate::events::PREVIEW_UPDATE_UNCROPPED, data_url);

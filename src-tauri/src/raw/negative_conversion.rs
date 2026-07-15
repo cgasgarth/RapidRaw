@@ -4222,7 +4222,7 @@ fn load_negative_lab_preview_processing_image(
     }
 
     let image_to_downscale = {
-        let original_image = state.services.editor.image_snapshot();
+        let original_image = state.editor().image_snapshot();
         if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
@@ -4664,7 +4664,7 @@ pub async fn estimate_negative_base_fog(
     let source_path_str = source_path.to_string_lossy().to_string();
 
     let image = {
-        let original_image = state.services.editor.image_snapshot();
+        let original_image = state.editor().image_snapshot();
         if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
@@ -4734,7 +4734,7 @@ pub async fn suggest_negative_lab_highlight_patch_exposure(
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let image = {
-        let original_image = state.services.editor.image_snapshot();
+        let original_image = state.editor().image_snapshot();
         if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
@@ -4789,7 +4789,7 @@ pub async fn suggest_negative_lab_shadow_patch_black_point(
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let image = {
-        let original_image = state.services.editor.image_snapshot();
+        let original_image = state.editor().image_snapshot();
         if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()

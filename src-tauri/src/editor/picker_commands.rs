@@ -27,8 +27,7 @@ pub(crate) fn analyze_tone_equalizer_placement(
 ) -> Result<ToneEqualizerPlacementResponse, String> {
     let (image, source_identity, source_fingerprint, is_raw) = {
         let loaded = state
-            .services
-            .editor
+            .editor()
             .image_snapshot()
             .ok_or("tone_equalizer.no_source")?;
         if loaded.path != expected_source_identity {
@@ -56,8 +55,7 @@ pub(crate) fn analyze_tone_equalizer_placement(
         .ok_or("tone_equalizer.insufficient_scene_samples")?;
     let histogram = tone_equalizer_histogram(luminance);
     let current_source = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .map(|loaded| (loaded.path, loaded.artifact_source.source_fingerprint()));
     if current_source != Some((source_identity.clone(), source_fingerprint)) {
@@ -127,8 +125,7 @@ pub(crate) fn sample_tone_equalizer_picker(
         return Err("tone_equalizer.picker_missing_graph_revision".to_string());
     }
     let loaded = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("tone_equalizer.no_source")?;
     if loaded.path != request.source_identity {
@@ -202,8 +199,7 @@ pub(crate) fn sample_point_color_picker(
         return Err("point_color.picker_missing_graph_revision".to_string());
     }
     let loaded = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("point_color.no_source")?;
     if loaded.path != request.source_identity {
@@ -244,7 +240,7 @@ fn ensure_current_source(
     expected_fingerprint: u64,
     error_prefix: &str,
 ) -> Result<(), String> {
-    let current_source = state.services.editor.image_snapshot().map(|current| {
+    let current_source = state.editor().image_snapshot().map(|current| {
         (
             current.path.clone(),
             current.artifact_source.source_fingerprint(),

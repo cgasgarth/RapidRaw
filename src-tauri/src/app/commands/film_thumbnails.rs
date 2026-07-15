@@ -156,7 +156,7 @@ fn render_film_profile_thumbnail_blocking(
     app_handle: tauri::AppHandle,
 ) -> Result<FilmThumbnailResultV1, String> {
     validate_request(&request)?;
-    let Some(source) = state.services.editor.image_snapshot() else {
+    let Some(source) = state.editor().image_snapshot() else {
         return Ok(FilmThumbnailResultV1::terminal(
             request.request_id,
             FilmThumbnailStatusV1::Unavailable,
@@ -220,7 +220,7 @@ fn render_film_profile_thumbnail_blocking(
 
     let runtime = state.film().clone();
     let cancellation_lease = lease.clone();
-    let editor = Arc::clone(&state.services.editor);
+    let editor = Arc::clone(state.editor());
     let cancellation = || {
         if cancellation_lease.is_cancelled() || !runtime.is_current(&cancellation_lease) {
             return Err("film_thumbnail_cancelled".to_string());
