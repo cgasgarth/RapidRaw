@@ -7,6 +7,9 @@ export interface AdjustmentSliderProps {
   max: number;
   min: number;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  onInteractionCancel?: (() => void) | undefined;
+  onInteractionCommit?: (() => void) | undefined;
+  onInteractionStart?: (() => void) | undefined;
   onValueChange: (value: number) => void;
   step: number;
   value: number;

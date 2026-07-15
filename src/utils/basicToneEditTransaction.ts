@@ -31,7 +31,7 @@ export const captureBasicToneCommitIdentity = (state: BasicToneEditTransactionSt
         sourceIdentity: state.selectedImage.path,
       };
 
-const assertBasicToneCommitIdentity = (
+export const assertBasicToneCommitIdentity = (
   state: BasicToneEditTransactionState,
   identity: BasicToneCommitIdentity,
 ): void => {

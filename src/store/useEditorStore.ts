@@ -15,13 +15,26 @@ import {
   PatchResidencyTracker,
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
-import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
+import {
+  type Adjustments,
+  type BasicAdjustment,
+  DisplayMode,
+  INITIAL_ADJUSTMENTS,
+  type MaskContainer,
+} from '../utils/adjustments';
 import { areAdjustmentsEqual } from '../utils/adjustmentsSnapshot';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
 import { BasicToneApprovalClass, type BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { type BasicToneCommitIdentity, buildBasicToneCommandEditTransaction } from '../utils/basicToneEditTransaction';
+import {
+  type BasicToneSliderInteraction,
+  beginBasicToneSliderInteraction,
+  buildBasicToneSliderInteractionRequest,
+  isBasicToneSliderInteractionCurrent,
+  reduceBasicToneSliderInteractionPreview,
+} from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
 import {
@@ -176,6 +189,7 @@ interface EditorState {
   previewViewportTransform: PreviewViewportTransformSnapshot;
   proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
+  basicToneSliderInteraction: BasicToneSliderInteraction | null;
 
   // History State
   history: Adjustments[];
@@ -263,6 +277,14 @@ interface EditorState {
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
   publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
+  beginBasicToneSliderInteraction: (
+    identity: BasicToneCommitIdentity,
+    key: BasicAdjustment,
+    interactionId: string,
+  ) => boolean;
+  updateBasicToneSliderInteraction: (interactionId: string, value: number) => void;
+  commitBasicToneSliderInteraction: (interactionId: string) => EditTransactionResult | null;
+  cancelBasicToneSliderInteraction: (interactionId: string) => void;
   applyEditorTeardownTransaction: (request: EditorTeardownTransactionRequest) => EditorTeardownTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
@@ -401,6 +423,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
   proofRevision: 1,
   lastBasicToneCommand: null,
+  basicToneSliderInteraction: null,
   history: [initialAdjustments],
   historyCheckpoints: [],
   historyIndex: 0,
@@ -499,6 +522,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
       const update: Partial<EditorState> = { ...rawUpdate };
+
+      if (
+        state.basicToneSliderInteraction !== null &&
+        (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
+          ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
+          ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
+          'adjustments' in update ||
+          ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
+      ) {
+        update.basicToneSliderInteraction = null;
+        update.isSliderDragging = false;
+      }
 
       if ('adjustments' in update && update.adjustments !== undefined) {
         if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
@@ -631,6 +666,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeMaskId: null,
         adjustmentRevision,
         autoEditPreviewSession: null,
+        basicToneSliderInteraction: null,
         compare: DEFAULT_EDITOR_COMPARE_STATE,
         gamutWarningOverlay: null,
         hasRenderedFirstFrame: false,
@@ -642,6 +678,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         imageSessionId,
         isMaskControlHovered: false,
         isWbPickerActive: false,
+        isSliderDragging: false,
         lastBasicToneCommand: null,
         lastEditApplicationReceipt: null,
         lastReferenceMatchApplicationReceipt: null,
@@ -805,6 +842,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
+        basicToneSliderInteraction: null,
+        isSliderDragging: false,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
@@ -814,6 +853,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
     if (!result) throw new Error('edit_transaction.not_applied');
     return result;
+  },
+
+  beginBasicToneSliderInteraction: (identity, key, interactionId) => {
+    try {
+      const interaction = beginBasicToneSliderInteraction(get(), identity, key, interactionId);
+      set({ basicToneSliderInteraction: interaction, isSliderDragging: true });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  updateBasicToneSliderInteraction: (interactionId, value) => {
+    set((state) => {
+      const interaction = state.basicToneSliderInteraction;
+      if (interaction?.interactionId !== interactionId) return {};
+      if (!isBasicToneSliderInteractionCurrent(state, interaction)) {
+        return { basicToneSliderInteraction: null, isSliderDragging: false };
+      }
+      const result = reduceBasicToneSliderInteractionPreview(interaction, value);
+      return {
+        basicToneSliderInteraction: {
+          ...interaction,
+          latestValue: value,
+          previewSnapshot: publishAdjustmentSnapshot(
+            interaction.previewSnapshot ?? state.adjustmentSnapshot,
+            result.after,
+            result.afterEditDocumentV2,
+          ),
+        },
+      };
+    });
+  },
+
+  commitBasicToneSliderInteraction: (interactionId) => {
+    const interaction = get().basicToneSliderInteraction;
+    if (interaction?.interactionId !== interactionId) return null;
+    if (!isBasicToneSliderInteractionCurrent(get(), interaction)) {
+      set({ basicToneSliderInteraction: null, isSliderDragging: false });
+      return null;
+    }
+    set({ basicToneSliderInteraction: null });
+    try {
+      return get().applyEditTransaction(
+        buildBasicToneSliderInteractionRequest(interaction, interaction.latestValue, 'commit'),
+      );
+    } finally {
+      set({ isSliderDragging: false });
+    }
+  },
+
+  cancelBasicToneSliderInteraction: (interactionId) => {
+    set((state) =>
+      state.basicToneSliderInteraction?.interactionId === interactionId
+        ? { basicToneSliderInteraction: null, isSliderDragging: false }
+        : {},
+    );
   },
 
   applyAiEditCommand: (command) => {
