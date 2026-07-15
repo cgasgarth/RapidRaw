@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
   ApprovalClass,
@@ -10,7 +11,7 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -65,14 +66,14 @@ export const agentLensProfileApplyRequestSchema = z
 
 export const agentLensProfileApplyResponseSchema = z
   .object({
-    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
-    changedPixelCount: z.number().int().positive(),
+    changedPixelCount: z.number().int().nonnegative(),
     receipt: z
       .object({
-        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        adjustedFields: z.array(z.string().trim().min(1)),
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
@@ -87,7 +88,8 @@ export const agentLensProfileApplyResponseSchema = z
             provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
             sourceGraphRevision: z.string().trim().min(1),
           })
-          .strict(),
+          .strict()
+          .optional(),
         undoGraphRevision: z.string().trim().min(1),
       })
       .strict(),
@@ -145,7 +147,7 @@ const estimateChangedPixels = ({
   const changedFieldCount = LENS_PROFILE_PATCH_KEYS.filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   ).length;
-  return Math.max(1, Math.round((imageArea / 448) * Math.max(1, changedFieldCount)));
+  return changedFieldCount === 0 ? 0 : Math.max(1, Math.round((imageArea / 448) * changedFieldCount));
 };
 
 const buildAgentLensProfileCommand = ({
@@ -193,16 +195,18 @@ const buildAgentLensProfileCommand = ({
     },
   }) as LensProfileCommandEnvelopeV1;
 
-const dispatchTypedLensProfileApply = async ({
-  expectedGraphRevision,
-  imagePath,
-  request,
-}: {
-  expectedGraphRevision: string;
-  imagePath: string;
-  request: AgentLensProfileApplyRequest;
-}): Promise<LensProfileMutationResultV1> => {
-  const bridge = createLiveEditorAppServerBridge();
+const dispatchTypedLensProfileApply = async (
+  {
+    expectedGraphRevision,
+    imagePath,
+    request,
+  }: {
+    expectedGraphRevision: string;
+    imagePath: string;
+    request: AgentLensProfileApplyRequest;
+  },
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
+): Promise<LensProfileMutationResultV1> => {
   const dryRunCommand = buildAgentLensProfileCommand({
     approval: {
       approvalClass: ApprovalClass.PreviewOnly,
@@ -249,6 +253,7 @@ const dispatchTypedLensProfileApply = async ({
 
 export const applyAgentLensProfile = async (
   request: AgentLensProfileApplyRequest,
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
 ): Promise<AgentLensProfileApplyResponse> => {
   const parsedRequest = agentLensProfileApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
@@ -259,24 +264,33 @@ export const applyAgentLensProfile = async (
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent lens/profile apply requires a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Agent lens/profile apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const typedMutation = await dispatchTypedLensProfileApply({
-    expectedGraphRevision: undoGraphRevision,
-    imagePath: selectedImage.path,
-    request: parsedRequest,
-  });
   const nextAdjustments = applyLensProfilePatchToAdjustments(state.adjustments, parsedRequest.lensProfile);
-  const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-  useEditorStore.setState({
-    adjustments: nextAdjustments,
-    history: history.history,
-    historyIndex: history.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  });
+  const adjustedFields = LENS_PROFILE_PATCH_KEYS.filter(
+    (key) =>
+      parsedRequest.lensProfile[key] !== undefined &&
+      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+  );
+  const typedMutation =
+    adjustedFields.length === 0
+      ? undefined
+      : await dispatchTypedLensProfileApply(
+          {
+            expectedGraphRevision: undoGraphRevision,
+            imagePath: selectedImage.path,
+            request: parsedRequest,
+          },
+          bridge,
+        );
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+  );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
-  const adjustedFields = LENS_PROFILE_PATCH_KEYS.filter((key) => parsedRequest.lensProfile[key] !== undefined);
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
   return agentLensProfileApplyResponseSchema.parse({
@@ -294,16 +308,20 @@ export const applyAgentLensProfile = async (
       appliedGraphRevision,
       operationId: parsedRequest.operationId,
       sessionId: parsedRequest.sessionId,
-      typedCommand: {
-        appliedGraphRevision: typedMutation.appliedGraphRevision,
-        changedNodeIds: typedMutation.changedNodeIds,
-        commandId: typedMutation.commandId,
-        commandType: typedMutation.commandType,
-        dryRunPlanHash: typedMutation.dryRunPlanHash,
-        dryRunPlanId: typedMutation.dryRunPlanId,
-        provenanceEntryIds: typedMutation.provenanceEntryIds,
-        sourceGraphRevision: typedMutation.sourceGraphRevision,
-      },
+      ...(typedMutation === undefined
+        ? {}
+        : {
+            typedCommand: {
+              appliedGraphRevision: typedMutation.appliedGraphRevision,
+              changedNodeIds: typedMutation.changedNodeIds,
+              commandId: typedMutation.commandId,
+              commandType: typedMutation.commandType,
+              dryRunPlanHash: typedMutation.dryRunPlanHash,
+              dryRunPlanId: typedMutation.dryRunPlanId,
+              provenanceEntryIds: typedMutation.provenanceEntryIds,
+              sourceGraphRevision: typedMutation.sourceGraphRevision,
+            },
+          }),
       undoGraphRevision,
     },
     requestId: parsedRequest.requestId,
