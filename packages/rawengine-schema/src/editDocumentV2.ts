@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
@@ -54,6 +55,30 @@ export const editDocumentDisplayCreativeV2Schema = z
 
 export const editDocumentToneEqualizerV2Schema = z.object({ toneEqualizer: toneEqualizerSettingsV1Schema }).strict();
 export const editDocumentPointColorV2Schema = z.object({ pointColor: pointColorPlanV1Schema }).strict();
+
+const legacyColorGradingRangeV2Schema = z
+  .object({
+    hue: z.number().finite().min(0).max(360),
+    luminance: z.number().finite().min(-100).max(100),
+    saturation: z.number().finite().min(0).max(100),
+  })
+  .strict();
+
+export const editDocumentPerceptualGradingV2Schema = z
+  .object({
+    colorGrading: z
+      .object({
+        balance: z.number().finite().min(-100).max(100),
+        blending: z.number().finite().min(0).max(100),
+        global: legacyColorGradingRangeV2Schema,
+        highlights: legacyColorGradingRangeV2Schema,
+        midtones: legacyColorGradingRangeV2Schema,
+        shadows: legacyColorGradingRangeV2Schema,
+      })
+      .strict(),
+    perceptualGradingV1: perceptualGradingSettingsV1Schema,
+  })
+  .strict();
 
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
@@ -455,6 +480,38 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
     defaultParams: {
+      colorGrading: {
+        balance: 0,
+        blending: 50,
+        global: { hue: 0, luminance: 0, saturation: 0 },
+        highlights: { hue: 0, luminance: 0, saturation: 0 },
+        midtones: { hue: 0, luminance: 0, saturation: 0 },
+        shadows: { hue: 0, luminance: 0, saturation: 0 },
+      },
+      perceptualGradingV1: {
+        balance: 0,
+        blending: 0.5,
+        falloff: 1,
+        global: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+        highlightFulcrumEv: 2,
+        highlights: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+        midtones: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+        neutralProtection: 0.5,
+        perceptualModel: 'oklab_d65_from_acescg_v1',
+        shadowFulcrumEv: -2,
+        shadows: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+        skinProtection: 0,
+      },
+    },
+    legacyFields: ['colorGrading', 'perceptualGradingV1'],
+    nodeType: 'perceptual_grading',
+    process: 'scene_referred_v2',
+    renderStage: 'perceptual_grading',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
       creativeTemperature: 0,
@@ -816,6 +873,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'perceptual_grading') {
+        const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
+        if (!perceptualGrading.success) {
+          for (const issue of perceptualGrading.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -899,6 +964,7 @@ export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetai
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
+export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
@@ -927,6 +993,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
+  if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);

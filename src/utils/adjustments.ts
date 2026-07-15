@@ -752,6 +752,21 @@ const INITIAL_COLOR_GRADING: ColorGradingProps = {
   shadows: { hue: 0, saturation: 0, luminance: 0 },
 };
 
+export const INITIAL_PERCEPTUAL_GRADING: PerceptualGradingSettingsV1 = {
+  balance: 0,
+  blending: 0.5,
+  falloff: 1,
+  global: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+  highlightFulcrumEv: 2,
+  highlights: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+  midtones: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+  neutralProtection: 0.5,
+  perceptualModel: 'oklab_d65_from_acescg_v1',
+  shadowFulcrumEv: -2,
+  shadows: { brilliance: 0, chroma: 0, hueDegrees: 0, luminanceEv: 0, saturation: 0 },
+  skinProtection: 0,
+};
+
 const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
   shadowsTint: 0,
   redHue: 0,
@@ -875,6 +890,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   brightness: 0,
   clarity: 0,
   colorGrading: { ...INITIAL_COLOR_GRADING },
+  perceptualGradingV1: structuredClone(INITIAL_PERCEPTUAL_GRADING),
   colorNoiseReduction: 0,
   contrast: 0,
   curves: getDefaultCurves(),
@@ -946,6 +962,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   channelMixer: structuredClone(INITIAL_CHANNEL_MIXER),
   colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
   colorGrading: { ...INITIAL_COLOR_GRADING },
+  perceptualGradingV1: structuredClone(INITIAL_PERCEPTUAL_GRADING),
   colorNoiseReduction: 0,
   contrast: 0,
   crop: null,

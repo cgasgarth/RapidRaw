@@ -8,6 +8,7 @@ import {
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
 import {
   batchUpdateEditDocumentV2Nodes,
   buildEditDocumentV2Diagnostics,
@@ -75,6 +76,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'display_creative',
       'detail_denoise_dehaze',
       'point_color',
+      'perceptual_grading',
       'camera_input',
       'geometry',
       'layers',
@@ -497,6 +499,54 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('perceptual grading defaults legacy state and rejects malformed render authority', () => {
+    const {
+      colorGrading: _colorGrading,
+      perceptualGradingV1: _perceptualGradingV1,
+      ...legacyGrading
+    } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyGrading);
+    expect(defaulted.nodes.perceptual_grading?.params).toEqual({
+      colorGrading: INITIAL_ADJUSTMENTS.colorGrading,
+      perceptualGradingV1: perceptualGradingFromWheelSurface(INITIAL_ADJUSTMENTS.colorGrading),
+    });
+    expect(defaulted.migration?.defaulted).toEqual(
+      expect.arrayContaining(['perceptual_grading.colorGrading', 'perceptual_grading.perceptualGradingV1']),
+    );
+    expect(compileEditDocumentNodeV2(defaulted.nodes.perceptual_grading).params).toEqual(
+      defaulted.nodes.perceptual_grading?.params,
+    );
+
+    const node = defaulted.nodes.perceptual_grading;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          perceptual_grading: {
+            ...node,
+            params: { ...node?.params, futureGrading: true },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          perceptual_grading: {
+            ...node,
+            params: {
+              ...node?.params,
+              perceptualGradingV1: { ...node?.params.perceptualGradingV1, highlightFulcrumEv: -3 },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -839,6 +889,29 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays the authoritative perceptual-grading envelope', () => {
+    const colorGrading = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading),
+      balance: 20,
+      midtones: { hue: 35, luminance: 5, saturation: 24 },
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      colorGrading,
+      perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['perceptual_grading']);
+
+    expect(renderDocument.nodes.perceptual_grading).toBe(authoritative.nodes.perceptual_grading);
+    expect(renderDocument.nodes.perceptual_grading?.params).toMatchObject({
+      colorGrading: { balance: 20, midtones: { hue: 35, luminance: 5, saturation: 24 } },
+      perceptualGradingV1: { balance: 0.2, perceptualModel: 'oklab_d65_from_acescg_v1' },
+    });
+    expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
   });
 
   test('render preparation transfers the layers envelope and explicit domain together', () => {
