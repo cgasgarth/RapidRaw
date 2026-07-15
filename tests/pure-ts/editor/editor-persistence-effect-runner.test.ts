@@ -81,7 +81,6 @@ const editReceipt = (
 const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersistenceInput => ({
   adjustmentRevision: 1,
   adjustments: adjustments(1),
-  baselineHint: { adjustments: adjustments(0), path: '/fixtures/a.raw' },
   imageSessionId: 'session-a',
   interactionActive: false,
   multiSelection: null,
@@ -90,6 +89,18 @@ const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersisten
   sessionGeneration: 1,
   ...overrides,
 });
+
+const prime = (runner: EditorPersistenceEffectRunner, overrides: Partial<EditorPersistenceInput> = {}): void => {
+  runner.submit(
+    input({
+      adjustmentRevision: 0,
+      adjustments: adjustments(0),
+      receipt: null,
+      ...overrides,
+    }),
+    0,
+  );
+};
 
 function harness(
   execute: (value: EditorPersistenceExecution, signal: AbortSignal) => Promise<EditorPersistenceReceipt> = async (
@@ -137,10 +148,10 @@ describe('editor persistence effect runner', () => {
       executions += 1;
       return receipt(value.path);
     });
-    const primed = input({ baselineHint: null });
+    const primed = input({ adjustmentRevision: 0, adjustments: adjustments(0), receipt: null });
 
     runner.submit(primed);
-    runner.submit({ ...primed, baselineHint: { adjustments: primed.adjustments, path: primed.path } });
+    runner.submit(primed);
     clock.advance(100);
 
     expect(executions).toBe(0);
@@ -154,6 +165,7 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
 
+    prime(runner);
     runner.submit(input({ interactionActive: true }));
     expect(clock.pending()).toBe(0);
     runner.submit(input({ interactionActive: false }));
@@ -166,6 +178,29 @@ describe('editor persistence effect runner', () => {
     expect(accepted).toHaveLength(1);
   });
 
+  test('owns the multi-selection baseline and projects only included changed keys', async () => {
+    const executions: EditorPersistenceExecution[] = [];
+    const { clock, runner } = harness(async (value) => {
+      executions.push(value);
+      return receipt(value.path);
+    });
+    prime(runner);
+    runner.submit(
+      input({
+        adjustments: { ...adjustments(1), contrast: 25 },
+        multiSelection: { includedAdjustments: ['exposure'], paths: ['/fixtures/b.raw'] },
+      }),
+      0,
+    );
+    clock.advance(0);
+    await flush();
+
+    expect(executions[0]?.multiSelection).toEqual({
+      adjustments: { exposure: 1, referenceMatchApplicationReceipt: null },
+      paths: ['/fixtures/b.raw'],
+    });
+  });
+
   test('passes transaction authority only for an exact receipt and skips native-committed work', async () => {
     const executions: EditorPersistenceExecution[] = [];
     const { clock, runner, snapshots } = harness(async (value) => {
@@ -173,6 +208,7 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
 
+    prime(runner);
     runner.submit(input({ receipt: editReceipt('stale-session', 1) }), 0);
     clock.advance(0);
     await flush();
@@ -217,6 +253,7 @@ describe('editor persistence effect runner', () => {
       return pending.shift() ?? Promise.reject(new Error('unexpected execution'));
     });
 
+    prime(runner);
     runner.submit(input(), 0);
     clock.advance(0);
     runner.submit(
@@ -245,11 +282,12 @@ describe('editor persistence effect runner', () => {
       async () => pending.shift() ?? Promise.reject(new Error('unexpected execution')),
     );
 
+    prime(runner);
     runner.submit(input(), 0);
     clock.advance(0);
+    prime(runner, { imageSessionId: 'session-b', path: '/fixtures/b.raw', sessionGeneration: 2 });
     runner.submit(
       input({
-        baselineHint: { adjustments: adjustments(0), path: '/fixtures/b.raw' },
         imageSessionId: 'session-b',
         path: '/fixtures/b.raw',
         receipt: editReceipt('session-b', 1),
@@ -258,6 +296,7 @@ describe('editor persistence effect runner', () => {
       0,
     );
     clock.advance(0);
+    prime(runner, { imageSessionId: 'session-a-successor', sessionGeneration: 3 });
     runner.submit(
       input({
         imageSessionId: 'session-a-successor',
@@ -286,6 +325,7 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path, attempts);
     });
 
+    prime(runner);
     runner.submit(input(), 0);
     clock.advance(0);
     await flush();
@@ -313,11 +353,13 @@ describe('editor persistence effect runner', () => {
       return running.promise;
     });
 
+    prime(runner);
     runner.submit(input(), 25);
     runner.cancel();
     clock.advance(25);
     expect(executions).toBe(0);
 
+    prime(runner);
     runner.submit(input(), 0);
     clock.advance(0);
     runner.cancel();
@@ -330,6 +372,7 @@ describe('editor persistence effect runner', () => {
 
   test('a persistence barrier cancels queued work without aborting an already-running matching save', () => {
     const queued = harness();
+    prime(queued.runner);
     queued.runner.submit(input(), 50);
     queued.runner.cancelQueuedForBarrier();
     queued.clock.advance(50);
@@ -339,6 +382,7 @@ describe('editor persistence effect runner', () => {
       expect(signal.aborted).toBe(false);
       return receipt(value.path);
     });
+    prime(running.runner);
     running.runner.submit(input(), 0);
     running.clock.advance(0);
     running.runner.cancelQueuedForBarrier();

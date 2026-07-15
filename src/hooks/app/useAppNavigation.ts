@@ -15,7 +15,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
-import { type Adjustments, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
   cancelBackgroundIndexingWithSchema,
@@ -51,11 +51,6 @@ interface PreloadedNavigationData {
   images?: Promise<ImageFile[]> | undefined;
   rootPaths?: string[];
   trees?: Promise<FolderTree[]> | undefined;
-}
-
-interface PreviousAdjustments {
-  adjustments: Adjustments;
-  path: string;
 }
 
 interface CatalogImageProjection extends ImageFile {
@@ -99,9 +94,6 @@ export interface AppNavigationProps {
   refs: {
     transformWrapperRef: RefObject<TransformController | null>;
     preloadedDataRef: RefObject<PreloadedNavigationData>;
-    isBackendReadyRef: RefObject<boolean>;
-    currentResRef: RefObject<number>;
-    prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
   };
 }
 
@@ -149,7 +141,7 @@ export function useAppNavigation({
   requestThumbnails,
   refs,
 }: AppNavigationProps) {
-  const { transformWrapperRef, preloadedDataRef, isBackendReadyRef, currentResRef, prevAdjustmentsRef } = refs;
+  const { transformWrapperRef, preloadedDataRef } = refs;
   const collectionRequestRef = useRef(0);
 
   const handleGoHome = useCallback(() => {
@@ -204,9 +196,7 @@ export function useAppNavigation({
 
     setLibrary({ libraryActivePath: lastActivePath });
     setUI({ slideDirection: 1 });
-
-    isBackendReadyRef.current = true;
-  }, [isBackendReadyRef, transformWrapperRef]);
+  }, [transformWrapperRef]);
 
   const handleImageSelect = useCallback(
     async (path: string) => {
@@ -335,12 +325,7 @@ export function useAppNavigation({
           imageSessionId: session.id,
           path,
         };
-        prevAdjustmentsRef.current = { path, adjustments: cachedReadyEntry.adjustments };
-
         setLibrary({ isViewLoading: false });
-
-        isBackendReadyRef.current = false;
-        currentResRef.current = Infinity;
 
         const library = useLibraryStore.getState();
         const projection = library.imageList.find((image) => image.path === path) as
@@ -404,10 +389,7 @@ export function useAppNavigation({
                   width: result.width,
                 },
               });
-              isBackendReadyRef.current = true;
-              currentResRef.current = 0;
               const currentAdjustments = useEditorStore.getState().adjustments;
-              prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
               globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
               consumePendingNegativeConversionDustHealLayers(path);
               consumePendingNegativeConversionSavedPositiveHandoff(path);
@@ -417,14 +399,10 @@ export function useAppNavigation({
             if (!isEditorImageSessionCurrent(session.id)) return;
             if (String(err).includes('cancelled')) return;
             console.error('Background image-open session failed on cache hit:', err);
-            isBackendReadyRef.current = true;
-            currentResRef.current = 0;
           });
 
         return;
       }
-
-      isBackendReadyRef.current = true;
 
       setEditor({
         imageSession: session,
@@ -457,7 +435,7 @@ export function useAppNavigation({
 
       setLibrary({ isViewLoading: true });
     },
-    [currentResRef, isBackendReadyRef, prevAdjustmentsRef, requestThumbnails],
+    [requestThumbnails],
   );
 
   const handleSelectSubfolder = useCallback(

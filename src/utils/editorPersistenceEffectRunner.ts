@@ -4,6 +4,7 @@ import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
 import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
+import { acceptReferenceMatchAdjustmentTransfer } from './referenceMatchTransfer';
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
 export const editorPersistenceReceiptSchema = z
@@ -31,11 +32,10 @@ export interface EditorPersistenceSnapshot {
 export interface EditorPersistenceInput {
   adjustmentRevision: number;
   adjustments: Adjustments;
-  baselineHint: EditorPersistenceSnapshot | null;
   imageSessionId: string;
   interactionActive: boolean;
   multiSelection: {
-    adjustments: Partial<Adjustments>;
+    includedAdjustments: readonly string[];
     paths: readonly string[];
   } | null;
   path: string;
@@ -47,7 +47,10 @@ export interface EditorPersistenceExecution {
   adjustments: Adjustments;
   authorityKey: string;
   imageSessionId: string;
-  multiSelection: EditorPersistenceInput['multiSelection'];
+  multiSelection: {
+    adjustments: Partial<Adjustments>;
+    paths: readonly string[];
+  } | null;
   path: string;
   revision: number;
   transaction?: EditTransactionPersistenceContext;
@@ -68,7 +71,7 @@ export interface EditorPersistenceEffectRunnerOptions {
   execute?: EditorPersistenceExecutor;
   onAccepted: (input: EditorPersistenceExecution, receipt: EditorPersistenceReceipt) => void;
   onCurrentFailure?: (error: unknown, input: EditorPersistenceExecution) => void;
-  onSnapshot: (snapshot: EditorPersistenceSnapshot) => void;
+  onSnapshot?: (snapshot: EditorPersistenceSnapshot) => void;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
 }
 
@@ -109,7 +112,7 @@ export class EditorPersistenceEffectRunner {
   private readonly execute: EditorPersistenceExecutor;
   private readonly onAccepted: EditorPersistenceEffectRunnerOptions['onAccepted'];
   private readonly onCurrentFailure: NonNullable<EditorPersistenceEffectRunnerOptions['onCurrentFailure']>;
-  private readonly onSnapshot: EditorPersistenceEffectRunnerOptions['onSnapshot'];
+  private readonly onSnapshot: NonNullable<EditorPersistenceEffectRunnerOptions['onSnapshot']>;
   private readonly setTimer: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   private sessionKey: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -119,7 +122,7 @@ export class EditorPersistenceEffectRunner {
     this.execute = options.execute ?? executeEditorPersistence;
     this.onAccepted = options.onAccepted;
     this.onCurrentFailure = options.onCurrentFailure ?? (() => {});
-    this.onSnapshot = options.onSnapshot;
+    this.onSnapshot = options.onSnapshot ?? (() => {});
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
   }
 
@@ -130,9 +133,7 @@ export class EditorPersistenceEffectRunner {
       this.cancelPending();
       this.activeToken += 1;
       this.sessionKey = nextSessionKey;
-      this.baseline = input.baselineHint?.path === input.path ? input.baselineHint : null;
-    } else if (input.baselineHint?.path === input.path && this.baseline === null) {
-      this.baseline = input.baselineHint;
+      this.baseline = null;
     }
 
     if (this.baseline === null) {
@@ -158,7 +159,7 @@ export class EditorPersistenceEffectRunner {
       adjustments: input.adjustments,
       authorityKey: nextSessionKey,
       imageSessionId: input.imageSessionId,
-      multiSelection: input.multiSelection,
+      multiSelection: this.resolveMultiSelection(input),
       path: input.path,
       revision: input.adjustmentRevision,
       ...(receipt === null
@@ -232,5 +233,27 @@ export class EditorPersistenceEffectRunner {
   private publishSnapshot(path: string, adjustments: Adjustments): void {
     this.baseline = { adjustments, path };
     this.onSnapshot(this.baseline);
+  }
+
+  private resolveMultiSelection(input: EditorPersistenceInput): EditorPersistenceExecution['multiSelection'] {
+    const request = input.multiSelection;
+    if (request === null || this.baseline?.path !== input.path || request.paths.length === 0) return null;
+    const delta: Partial<Adjustments> = {};
+    for (const key of Object.keys(input.adjustments) as Array<keyof Adjustments>) {
+      if (
+        request.includedAdjustments.includes(key as string) &&
+        JSON.stringify(input.adjustments[key]) !== JSON.stringify(this.baseline.adjustments[key])
+      ) {
+        Object.assign(delta, { [key]: input.adjustments[key] });
+      }
+    }
+    if (Object.keys(delta).length === 0) return null;
+    return {
+      adjustments: acceptReferenceMatchAdjustmentTransfer({
+        adjustments: delta,
+        transferMode: 'batch-sync',
+      }).adjustments,
+      paths: request.paths,
+    };
   }
 }
