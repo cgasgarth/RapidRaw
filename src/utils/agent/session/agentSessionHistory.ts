@@ -5,6 +5,7 @@ import type { Adjustments } from '../../adjustments';
 import type { BasicToneCommandEnvelope } from '../../basicToneCommandBridge';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../editDocumentV2';
 import type { EditHistoryCheckpoint } from '../../editHistory';
+import { areEditDocumentsEqual } from '../../editTransaction';
 import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
@@ -87,6 +88,12 @@ export const agentHistoryRollbackResponseSchema = z
 
 export type AgentHistoryRollbackRequest = z.infer<typeof agentHistoryRollbackRequestSchema>;
 export type AgentHistoryRollbackResponse = z.infer<typeof agentHistoryRollbackResponseSchema>;
+
+export const areEditDocumentHistoriesEqual = (
+  left: readonly EditDocumentV2[],
+  right: readonly EditDocumentV2[],
+): boolean =>
+  left.length === right.length && left.every((document, index) => areEditDocumentsEqual(document, right[index]));
 
 export const createAgentSessionCheckpoint = (sessionId: string): AgentSessionCheckpoint => {
   const state = useEditorStore.getState();
@@ -188,7 +195,7 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
     throw new Error('Agent history rollback failed to restore basic-tone provenance.');
   }
   if (
-    JSON.stringify(restoredState.editDocumentHistory) !== JSON.stringify(editDocumentHistory) ||
+    !areEditDocumentHistoriesEqual(restoredState.editDocumentHistory, editDocumentHistory) ||
     JSON.stringify(restoredState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints)
   ) {
     throw new Error('Agent history rollback failed to restore typed history authority.');

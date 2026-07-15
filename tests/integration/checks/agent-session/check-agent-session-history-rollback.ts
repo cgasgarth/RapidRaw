@@ -7,6 +7,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjust
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  areEditDocumentHistoriesEqual,
   createAgentSessionCheckpoint,
   rollbackAgentSessionHistory,
 } from '../../../../src/utils/agent/session/agentSessionHistory.ts';
@@ -207,7 +208,7 @@ if (rollback.previewRecipeHash !== beforeRecipeHash) {
   throw new Error('Agent history rollback did not restore the original recipe hash.');
 }
 if (
-  JSON.stringify(restoredState.editDocumentHistory) !== JSON.stringify(checkpoint.editDocumentHistory) ||
+  !areEditDocumentHistoriesEqual(restoredState.editDocumentHistory, checkpoint.editDocumentHistory) ||
   JSON.stringify(restoredState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints) ||
   restoredState.editDocumentV2.nodes.tone_equalizer?.enabled !== false
 ) {
@@ -286,8 +287,10 @@ const restoredFullHistoryState = useEditorStore.getState();
 if (
   restoredFullHistoryState.historyIndex !== fullHistoryCheckpoint.historyIndex ||
   restoredFullHistoryState.history.length !== fullHistoryCheckpoint.history.length ||
-  JSON.stringify(restoredFullHistoryState.editDocumentHistory) !==
-    JSON.stringify(fullHistoryCheckpoint.editDocumentHistory) ||
+  !areEditDocumentHistoriesEqual(
+    restoredFullHistoryState.editDocumentHistory,
+    fullHistoryCheckpoint.editDocumentHistory,
+  ) ||
   JSON.stringify(restoredFullHistoryState.historyCheckpoints) !==
     JSON.stringify(fullHistoryCheckpoint.historyCheckpoints) ||
   restoredFullHistoryState.adjustments.exposure !== 0.6 ||

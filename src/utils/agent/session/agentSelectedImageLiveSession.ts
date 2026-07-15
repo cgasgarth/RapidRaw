@@ -65,6 +65,7 @@ import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   type AgentSessionCheckpoint,
   agentHistoryRollbackResponseSchema,
+  areEditDocumentHistoriesEqual,
   createAgentSessionCheckpoint,
   rollbackAgentSessionHistory,
 } from './agentSessionHistory';
@@ -1689,7 +1690,7 @@ export const runAgentSelectedImageApplyTransaction = (
       mutationStarted ||=
         currentState.historyIndex !== checkpoint.historyIndex ||
         currentState.history.length !== checkpoint.history.length ||
-        JSON.stringify(currentState.editDocumentHistory) !== JSON.stringify(checkpoint.editDocumentHistory) ||
+        !areEditDocumentHistoriesEqual(currentState.editDocumentHistory, checkpoint.editDocumentHistory) ||
         JSON.stringify(currentState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints);
       if (mutationStarted) {
         rollbackAgentSessionHistory({
@@ -1703,7 +1704,7 @@ export const runAgentSelectedImageApplyTransaction = (
         if (
           restored.historyIndex !== checkpoint.historyIndex ||
           JSON.stringify(restored.history) !== JSON.stringify(checkpoint.history) ||
-          JSON.stringify(restored.editDocumentHistory) !== JSON.stringify(checkpoint.editDocumentHistory) ||
+          !areEditDocumentHistoriesEqual(restored.editDocumentHistory, checkpoint.editDocumentHistory) ||
           JSON.stringify(restored.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints) ||
           restoredSnapshot.graphRevision !== checkpoint.graphRevision ||
           restoredSnapshot.recipeHash !== checkpoint.previewRecipeHash

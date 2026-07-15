@@ -73,6 +73,15 @@ describe('editor render-authority boundary', () => {
     expect(hydrated.editDocumentHistory[0]?.nodes.tone_equalizer?.enabled).toBe(false);
     expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
     expect(hydrated.adjustmentSnapshot.value.exposure).toBe(0.4);
+
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustmentRevision: 8,
+      adjustments,
+      editDocumentV2,
+      history: [adjustments],
+      historyIndex: 0,
+    });
+    expect(useEditorStore.getState().editDocumentHistory[0]?.nodes.tone_equalizer?.enabled).toBe(false);
   });
 
   test('generic non-render UI updates remain available', () => {
