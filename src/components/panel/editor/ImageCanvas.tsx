@@ -2082,6 +2082,8 @@ const ImageCanvas = memo(
               compareOrientation={compareOrientation}
               compareOverlayDisabled={compareOverlayDisabled}
               editedImageRect={imageRenderSize}
+              geometryEpoch={overlayGeometry.geometryEpoch}
+              imageSessionId={imageSessionId ?? `viewer-source:${selectedImage.path}`}
               isCompareModeActive={isCompareModeActive}
               onDividerPositionChange={onCompareDividerPositionChange}
               onDividerReset={onCompareDividerReset}
@@ -2089,6 +2091,8 @@ const ImageCanvas = memo(
               originalStatus={originalLoadFailed ? 'error' : canShowOriginalCompare ? 'ready' : 'loading'}
               showSideBySideCompare={showSideBySideCompare}
               showSplitCompare={showSplitCompare}
+              sourceIdentity={presentationDescriptor.sourceIdentity}
+              sourceRevision={presentationDescriptor.graphRevision}
             />
             <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
             <ViewerFocusRetouchOverlay descriptors={focusRetouchController.overlays} geometry={overlayGeometry} />
