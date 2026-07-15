@@ -50,7 +50,8 @@ pub(crate) async fn plan_hdr(
 pub(crate) async fn cancel_hdr_plan(state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.services.hdr.cancel();
     let _ = state
-        .computational_merge_jobs
+        .services
+        .computational_jobs
         .cancel_active_family(crate::merge::computational_job::ComputationalMergeFamily::Hdr);
     Ok(())
 }

@@ -74,7 +74,6 @@ pub struct AppState {
     #[cfg(feature = "ai")]
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     export_jobs: crate::export::job_registry::ExportJobRegistry,
-    pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
@@ -121,8 +120,6 @@ impl AppState {
                 Arc::clone(&cache_budget),
             ),
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
-            computational_merge_jobs:
-                crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
             interactive_gpu_pressure: Arc::default(),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),

@@ -91,7 +91,7 @@ pub(crate) async fn apply_request(
         let source = frame.pixels.image().to_rgb32f();
         let tiles = tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
         let total_units = tiles.saturating_add(3);
-        let job = state.computational_merge_jobs.begin(
+        let job = state.services.computational_jobs.begin(
             ComputationalMergeFamily::SuperResolution,
             "rendering",
             total_units,
@@ -115,18 +115,18 @@ pub(crate) async fn apply_request(
         let (baseline, output, review) = match rendered {
             Ok(value) => value,
             Err(error) => {
-                let _ = state.computational_merge_jobs.fail(&job.job_id);
+                let _ = state.services.computational_jobs.fail(&job.job_id);
                 return Err(error);
             }
         };
         job.cancellation_token.checkpoint()?;
         current_frame(state, &preview_request)?;
         if review.decision != "preview_only_manual_review" {
-            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            let _ = state.services.computational_jobs.fail(&job.job_id);
             return Err("single_image_x2_review_blocked".to_string());
         }
         if review.output_hash != request.accepted_review_hash {
-            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            let _ = state.services.computational_jobs.fail(&job.job_id);
             return Err("single_image_x2_stale_review".to_string());
         }
 
@@ -171,7 +171,7 @@ pub(crate) async fn apply_request(
             .join("payload.tiff")
             .to_string_lossy()
             .into_owned();
-        if !state.computational_merge_jobs.finish(&job.job_id)? {
+        if !state.services.computational_jobs.finish(&job.job_id)? {
             return Err("single_image_x2_cancelled_before_registration".to_string());
         }
         Ok(SingleImageX2ApplyReceipt {

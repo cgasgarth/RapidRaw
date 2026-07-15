@@ -582,7 +582,7 @@ pub async fn plan_super_resolution(
     if !(2..=8).contains(&paths.len()) {
         return Err("super_resolution_source_count_out_of_range".to_string());
     }
-    let job = state.computational_merge_jobs.begin(
+    let job = state.services.computational_jobs.begin(
         ComputationalMergeFamily::SuperResolution,
         "registration",
         paths.len() as u64,
@@ -612,7 +612,7 @@ pub async fn plan_super_resolution(
         .and_then(|result| result);
     if let Ok(plan) = &result {
         if !service.is_current(plan_handle) {
-            let _ = state.computational_merge_jobs.fail(&job.job_id);
+            let _ = state.services.computational_jobs.fail(&job.job_id);
             return Err("super_resolution_registration_stale_completion".to_string());
         }
         let accepted = if plan.accepted {
@@ -649,14 +649,14 @@ pub async fn plan_super_resolution(
         } else {
             None
         };
-        if !state.computational_merge_jobs.finish(&job.job_id)? {
+        if !state.services.computational_jobs.finish(&job.job_id)? {
             return Err("super_resolution_registration_cancelled".to_string());
         }
         service
             .complete_plan(plan_handle, accepted)
             .map_err(str::to_string)?;
     } else {
-        state.computational_merge_jobs.fail(&job.job_id)?;
+        state.services.computational_jobs.fail(&job.job_id)?;
     }
     result
 }
@@ -666,7 +666,8 @@ pub fn cancel_super_resolution_registration(
 ) -> Result<(), String> {
     state.services.burst_sr.cancel();
     state
-        .computational_merge_jobs
+        .services
+        .computational_jobs
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)
         .map(|_| ())
 }
