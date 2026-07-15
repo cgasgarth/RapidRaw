@@ -182,6 +182,68 @@ if (restoredState.lastBasicToneCommand !== null) {
 if (rollback.previewRecipeHash !== beforeRecipeHash) {
   throw new Error('Agent history rollback did not restore the original recipe hash.');
 }
+
+const firstCheckpointEditState = useEditorStore.getState();
+if (firstCheckpointEditState.imageSession === null)
+  throw new Error('Expected image session for branch rollback proof.');
+firstCheckpointEditState.applyEditTransaction({
+  baseAdjustmentRevision: firstCheckpointEditState.adjustmentRevision,
+  history: 'single-entry',
+  imageSessionId: firstCheckpointEditState.imageSession.id,
+  operations: [{ patch: { exposure: 0.6 }, type: 'patch-adjustments' }],
+  persistence: 'commit',
+  source: 'agent-command',
+  transactionId: 'agent-history-checkpoint-first-edit',
+});
+const secondCheckpointEditState = useEditorStore.getState();
+if (secondCheckpointEditState.imageSession === null)
+  throw new Error('Expected image session for branch rollback proof.');
+secondCheckpointEditState.applyEditTransaction({
+  baseAdjustmentRevision: secondCheckpointEditState.adjustmentRevision,
+  history: 'single-entry',
+  imageSessionId: secondCheckpointEditState.imageSession.id,
+  operations: [{ patch: { contrast: 18 }, type: 'patch-adjustments' }],
+  persistence: 'commit',
+  source: 'agent-command',
+  transactionId: 'agent-history-checkpoint-second-edit',
+});
+const fullHistoryCheckpoint = createAgentSessionCheckpoint('agent-history-branch-3163');
+if (fullHistoryCheckpoint.historyIndex !== 2 || fullHistoryCheckpoint.history.length !== 3) {
+  throw new Error('Branch rollback proof did not capture the expected full checkpoint history.');
+}
+
+useEditorStore.getState().goToHistoryIndex(0);
+const divergentEditState = useEditorStore.getState();
+if (divergentEditState.imageSession === null) throw new Error('Expected image session for divergent branch proof.');
+divergentEditState.applyEditTransaction({
+  baseAdjustmentRevision: divergentEditState.adjustmentRevision,
+  history: 'single-entry',
+  imageSessionId: divergentEditState.imageSession.id,
+  operations: [{ patch: { saturation: -12 }, type: 'patch-adjustments' }],
+  persistence: 'commit',
+  source: 'agent-command',
+  transactionId: 'agent-history-divergent-edit',
+});
+const truncatedState = useEditorStore.getState();
+if (truncatedState.history.length !== 2 || fullHistoryCheckpoint.historyIndex < truncatedState.history.length) {
+  throw new Error('Branch rollback proof did not truncate current history below the valid checkpoint target.');
+}
+
+rollbackAgentSessionHistory({
+  checkpoint: fullHistoryCheckpoint,
+  requestId: 'agent-history-rollback-full-checkpoint',
+  scope: 'session_start',
+  sessionId: fullHistoryCheckpoint.sessionId,
+});
+const restoredFullHistoryState = useEditorStore.getState();
+if (
+  restoredFullHistoryState.historyIndex !== fullHistoryCheckpoint.historyIndex ||
+  restoredFullHistoryState.history.length !== fullHistoryCheckpoint.history.length ||
+  restoredFullHistoryState.adjustments.exposure !== 0.6 ||
+  restoredFullHistoryState.adjustments.contrast !== 18
+) {
+  throw new Error('Agent history rollback did not restore a valid target beyond truncated current history.');
+}
 expectRejects(() =>
   rollbackAgentSessionHistory({
     checkpoint,

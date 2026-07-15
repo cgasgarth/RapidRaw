@@ -122,9 +122,6 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   }
 
   const state = useEditorStore.getState();
-  if (checkpoint.historyIndex >= state.history.length) {
-    throw new Error('Agent history rollback rejected checkpoint outside current history.');
-  }
   const history =
     checkpoint.history.length === 0
       ? [...state.history.slice(0, checkpoint.historyIndex), structuredClone(checkpoint.adjustments)]
