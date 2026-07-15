@@ -1,0 +1,172 @@
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { calculateCenteredCrop } from '../../../src/utils/cropUtils';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  buildOrientationRotateEditTransaction,
+  captureOrientationRotateCommitIdentity,
+  type OrientationRotateCommitIdentity,
+} from '../../../src/utils/orientationRotateEditTransaction';
+
+const sourcePath = '/fixture/orientation-rotate.ARW';
+const session = createEditorImageSession({ generation: 41, path: sourcePath, source: 'cache' });
+const selectedImage = {
+  exif: null,
+  height: 3000,
+  isRaw: true,
+  isReady: true,
+  metadata: null,
+  originalUrl: null,
+  path: sourcePath,
+  rawDevelopmentReport: null,
+  thumbnailUrl: '',
+  width: 4000,
+};
+
+const identity = (overrides: Partial<OrientationRotateCommitIdentity> = {}): OrientationRotateCommitIdentity => ({
+  adjustmentRevision: 0,
+  imageSessionId: session.id,
+  sourceIdentity: sourcePath,
+  ...overrides,
+});
+
+describe('orientation rotate edit transaction', () => {
+  beforeEach(() => {
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aspectRatio: 4 / 3,
+      crop: { height: 1800, unit: 'px' as const, width: 2400, x: 800, y: 600 },
+      exposure: 0.35,
+      rotation: 2.5,
+    };
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    useEditorStore.setState({
+      adjustmentRevision: 0,
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+      adjustments,
+      editDocumentV2,
+      finalPreviewUrl: 'blob:orientation-before-final',
+      history: [adjustments],
+      historyCheckpoints: [],
+      historyIndex: 0,
+      imageSession: session,
+      imageSessionId: session.generation,
+      lastEditApplicationReceipt: null,
+      navigatorPreviewArtifact: {
+        graphIdentity: 'orientation-before-graph',
+        id: 'orientation-before-navigator',
+        imageSessionId: session.id,
+        url: 'blob:orientation-before-navigator',
+      },
+      selectedImage,
+    });
+  });
+
+  test('captures exact authority and commits clockwise geometry with one history entry and Undo', () => {
+    const state = useEditorStore.getState();
+    expect(captureOrientationRotateCommitIdentity(state)).toEqual(identity());
+    const request = buildOrientationRotateEditTransaction(state, identity(), 90, 'rotate-cw');
+    expect(request.operations).toEqual([
+      {
+        nodeType: 'geometry',
+        patch: {
+          aspectRatio: 3 / 4,
+          crop: calculateCenteredCrop(4000, 3000, 1, 3 / 4),
+          orientationSteps: 1,
+          rotation: 0,
+        },
+        type: 'patch-edit-document-node',
+      },
+    ]);
+    const result = state.applyEditTransaction(request);
+    const after = useEditorStore.getState();
+
+    expect(result).toMatchObject({
+      changedKeys: ['aspectRatio', 'crop', 'orientationSteps', 'rotation'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+      source: 'geometry-tool',
+    });
+    expect(after.history).toHaveLength(2);
+    expect(after.lastEditApplicationReceipt).toMatchObject({
+      adjustmentRevision: 1,
+      persistence: 'commit',
+      source: 'geometry-tool',
+      transactionId: 'rotate-cw',
+    });
+    expect(after.finalPreviewUrl).toBeNull();
+    expect(after.navigatorPreviewArtifact).toBeNull();
+    expect(result.afterEditDocumentV2.nodes.geometry.params).toMatchObject({
+      aspectRatio: 3 / 4,
+      orientationSteps: 1,
+      rotation: 0,
+    });
+
+    after.undo();
+    expect(useEditorStore.getState().adjustments).toMatchObject({
+      aspectRatio: 4 / 3,
+      exposure: 0.35,
+      orientationSteps: 0,
+      rotation: 2.5,
+    });
+  });
+
+  test('supports counterclockwise and half-turn geometry semantics', () => {
+    const state = useEditorStore.getState();
+    const counterclockwise = buildOrientationRotateEditTransaction(state, identity(), -90, 'rotate-ccw');
+    expect(counterclockwise.operations[0]).toMatchObject({
+      nodeType: 'geometry',
+      patch: { aspectRatio: 3 / 4, orientationSteps: 3, rotation: 0 },
+    });
+    const halfTurn = buildOrientationRotateEditTransaction(state, identity(), 180, 'rotate-half');
+    expect(halfTurn.operations[0]).toMatchObject({
+      nodeType: 'geometry',
+      patch: { aspectRatio: 4 / 3, orientationSteps: 2, rotation: 0 },
+    });
+  });
+
+  test('keeps a full-cycle rotation an exact no-op without history, receipt, or output invalidation', () => {
+    const before = useEditorStore.getState();
+    const result = before.applyEditTransaction(
+      buildOrientationRotateEditTransaction(before, identity(), 360, 'rotate-full-cycle'),
+    );
+    const after = useEditorStore.getState();
+
+    expect(result).toMatchObject({ changedKeys: [], nextAdjustmentRevision: 0, noOp: true });
+    expect(after.adjustments).toBe(before.adjustments);
+    expect(after.history).toBe(before.history);
+    expect(after.lastEditApplicationReceipt).toBeNull();
+    expect(after.finalPreviewUrl).toBe('blob:orientation-before-final');
+    expect(after.navigatorPreviewArtifact).toBe(before.navigatorPreviewArtifact);
+  });
+
+  test('rejects stale source, session, and revision with zero editor mutation', () => {
+    const before = useEditorStore.getState();
+    expect(() =>
+      buildOrientationRotateEditTransaction(before, identity({ sourceIdentity: '/fixture/other.ARW' }), 90, 'stale'),
+    ).toThrow('orientation_rotate_transaction.stale_source');
+    expect(() =>
+      buildOrientationRotateEditTransaction(before, identity({ imageSessionId: 'successor-session' }), 90, 'stale'),
+    ).toThrow('orientation_rotate_transaction.stale_session');
+    expect(() =>
+      buildOrientationRotateEditTransaction(before, identity({ adjustmentRevision: 1 }), 90, 'stale'),
+    ).toThrow('orientation_rotate_transaction.stale_revision');
+    expect(useEditorStore.getState().adjustments).toBe(before.adjustments);
+    expect(useEditorStore.getState().history).toBe(before.history);
+    expect(useEditorStore.getState().adjustmentRevision).toBe(0);
+  });
+
+  test('rejects malformed angles and requires a selected image session', () => {
+    const state = useEditorStore.getState();
+    expect(() => buildOrientationRotateEditTransaction(state, identity(), 45, 'invalid')).toThrow(
+      'orientation_rotate_transaction.invalid_degrees',
+    );
+    expect(() => buildOrientationRotateEditTransaction(state, identity(), Number.NaN, 'invalid')).toThrow(
+      'orientation_rotate_transaction.invalid_degrees',
+    );
+    expect(captureOrientationRotateCommitIdentity({ ...state, selectedImage: null })).toBeNull();
+    expect(captureOrientationRotateCommitIdentity({ ...state, imageSession: null })).toBeNull();
+  });
+});
