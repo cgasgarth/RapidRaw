@@ -6,6 +6,7 @@ pub(crate) mod motion;
 pub(crate) mod planning_service;
 pub(crate) mod radiance;
 pub(crate) mod runtime;
+pub(crate) mod runtime_commands;
 pub(crate) mod source_frame;
 pub(crate) mod source_ownership;
 pub(crate) mod static_merge;
