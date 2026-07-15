@@ -34,34 +34,19 @@ pub struct ResolvedDisplayTarget {
     pub color_contract: String,
     pub hdr_capability: HdrDisplayCapabilityV1,
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
-    capture: Result<(Option<u32>, Vec<u8>), String>,
-    #[cfg(not(any(target_os = "android", target_os = "linux")))]
-    snapshot: Option<Arc<crate::display_profile::DisplayPreviewTransformSnapshot>>,
+    snapshot: Arc<crate::display_profile::DisplayPreviewTransformSnapshot>,
 }
 
 impl ResolvedDisplayTarget {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
-    fn materialize(mut self) -> Result<Self, String> {
+    fn materialize(self) -> Result<Self, String> {
         validate_hdr_capability_contract(&self.identity, &self.hdr_capability)?;
-        if let Some(snapshot) = &self.snapshot {
-            validate_color_contract(
-                &self.identity.profile_sha256,
-                &snapshot.icc_sha256,
-                snapshot.encoding_contract,
-            )?;
-            return Ok(self);
-        }
-        let snapshot = Arc::new(
-            crate::display_profile::display_preview_transform_snapshot_from_capture(
-                self.capture.clone(),
-            ),
-        );
+        validate_display_snapshot_identity(&self.snapshot)?;
         validate_color_contract(
             &self.identity.profile_sha256,
-            &snapshot.icc_sha256,
-            snapshot.encoding_contract,
+            &self.snapshot.icc_sha256,
+            self.snapshot.encoding_contract,
         )?;
-        self.snapshot = Some(snapshot);
         Ok(self)
     }
 
@@ -210,7 +195,7 @@ impl DisplayTargetCoordinator {
             .unwrap()
             .current
             .as_ref()
-            .and_then(|resources| resources.target.snapshot.as_ref().map(Arc::clone))
+            .map(|resources| Arc::clone(&resources.target.snapshot))
     }
 
     #[cfg(any(test, feature = "validation-harness"))]
@@ -377,19 +362,15 @@ fn resolver_loop(shared: Arc<CoordinatorShared>) {
 }
 
 #[cfg(target_os = "macos")]
-pub fn resolve_for_app(app: &tauri::AppHandle) -> Result<ResolvedDisplayTarget, String> {
+pub fn resolve_for_app(
+    app: &tauri::AppHandle,
+    display_profile: &crate::app::display_profile_service::DisplayProfileRuntimeService,
+) -> Result<ResolvedDisplayTarget, String> {
     use tauri::Manager;
 
-    let capture = crate::display_profile::display_preview_transform_capture_for_app(app);
-    let (display_id, profile_sha256) = match &capture {
-        Ok((display_id, bytes)) => (*display_id, crate::display_profile::sha256_hex(bytes)),
-        Err(_) => {
-            let bytes = moxcms::ColorProfile::new_srgb()
-                .encode()
-                .map_err(|error| format!("display_fallback_profile_encode_failed:{error}"))?;
-            (None, crate::display_profile::sha256_hex(&bytes))
-        }
-    };
+    let snapshot = display_profile.preview_transform_snapshot_for_app(app);
+    let display_id = snapshot.profile.display_id;
+    let profile_sha256 = snapshot.icc_sha256.clone();
     let scale_factor = app
         .get_webview_window("main")
         .and_then(|window| window.scale_factor().ok())
@@ -414,9 +395,21 @@ pub fn resolve_for_app(app: &tauri::AppHandle) -> Result<ResolvedDisplayTarget, 
         identity,
         color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
         hdr_capability,
-        capture,
-        snapshot: None,
+        snapshot,
     })
+}
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+fn validate_display_snapshot_identity(
+    snapshot: &crate::display_profile::DisplayPreviewTransformSnapshot,
+) -> Result<(), String> {
+    if snapshot.profile.icc_sha256.as_deref() != Some(snapshot.icc_sha256.as_str())
+        || snapshot.lut.profile.icc_sha256.as_deref() != Some(snapshot.icc_sha256.as_str())
+        || snapshot.profile.profile_byte_count != Some(snapshot.icc_bytes.len())
+    {
+        return Err("display_snapshot_pixel_icc_identity_mismatch".to_string());
+    }
+    Ok(())
 }
 
 #[cfg(any(test, not(any(target_os = "android", target_os = "linux"))))]
@@ -466,6 +459,9 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
     let started_at = Instant::now();
     let transition = Arc::new(AtomicU64::new(0));
     let resolver_transition = Arc::clone(&transition);
+    let display_profile =
+        Arc::new(crate::app::display_profile_service::DisplayProfileRuntimeService::default());
+    let resolver_display_profile = Arc::clone(&display_profile);
     let (published_tx, published_rx) = mpsc::channel();
     let coordinator = DisplayTargetCoordinator::new_with_publisher(
         Duration::ZERO,
@@ -483,6 +479,8 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
                 EdrHeadroomSample::default(),
                 false,
             );
+            let snapshot = resolver_display_profile
+                .preview_transform_snapshot_from_capture(Ok((Some(display_id), bytes)));
             Ok(ResolvedDisplayTarget {
                 identity: DisplayTargetIdentity {
                     display_id: Some(display_id),
@@ -493,8 +491,7 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
                 },
                 color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
                 hdr_capability,
-                capture: Ok((Some(display_id), bytes)),
-                snapshot: None,
+                snapshot,
             })
         },
         move |change| {
@@ -531,11 +528,13 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
             && report.in_flight_jobs_cancelled_from_display_events == 0;
     }
 
-    let bad_snapshot =
-        crate::display_profile::display_preview_transform_snapshot_from_capture(Ok((
+    let bad_snapshot = crate::display_profile::display_preview_transform_snapshot_from_capture(
+        Ok((
             Some(303),
             moxcms::ColorProfile::new_srgb().encode().unwrap(),
-        )));
+        )),
+        0,
+    );
     let bad_hdr_capability = compile_hdr_display_capability(
         "mismatched-profile-hash".to_string(),
         EdrHeadroomSample::default(),
@@ -551,8 +550,7 @@ fn validate_injected_cross_display_transition(report: &mut DisplayTargetReport) 
         },
         color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
         hdr_capability: bad_hdr_capability,
-        capture: Err("unused".to_string()),
-        snapshot: Some(Arc::new(bad_snapshot)),
+        snapshot: Arc::new(bad_snapshot),
     };
     report.mismatched_publish_excluded = bad.materialize().is_err();
     report.interaction_churn_duration_micros = started_at.elapsed().as_micros() as u64;
@@ -611,10 +609,13 @@ mod tests {
         #[cfg(not(any(target_os = "android", target_os = "linux")))]
         let snapshot = {
             let mut snapshot =
-                crate::display_profile::display_preview_transform_snapshot_from_capture(Err(
-                    "synthetic_test_fallback".to_string(),
-                ));
+                crate::display_profile::display_preview_transform_snapshot_from_capture(
+                    Err("synthetic_test_fallback".to_string()),
+                    0,
+                );
             snapshot.icc_sha256 = profile.to_string();
+            snapshot.profile.icc_sha256 = Some(profile.to_string());
+            snapshot.lut.profile.icc_sha256 = Some(profile.to_string());
             Arc::new(snapshot)
         };
         let hdr_capability = compile_hdr_display_capability(
@@ -633,9 +634,7 @@ mod tests {
             color_contract: "pixels_and_jpeg_icc_from_same_snapshot".to_string(),
             hdr_capability,
             #[cfg(not(any(target_os = "android", target_os = "linux")))]
-            capture: Err("synthetic_test_fallback".to_string()),
-            #[cfg(not(any(target_os = "android", target_os = "linux")))]
-            snapshot: Some(snapshot),
+            snapshot,
         }
     }
 
@@ -802,6 +801,21 @@ mod tests {
         assert_eq!(
             validate_color_contract("profile-a", "profile-a", "independent_profile_lookup"),
             Err("display_target_color_contract_mismatch".to_string())
+        );
+    }
+
+    #[cfg(not(any(target_os = "android", target_os = "linux")))]
+    #[test]
+    fn display_snapshot_contract_rejects_pixel_or_tag_profile_divergence() {
+        let service = crate::app::display_profile_service::DisplayProfileRuntimeService::default();
+        let snapshot = service.preview_transform_snapshot_from_capture(Err("fallback".into()));
+        assert!(validate_display_snapshot_identity(&snapshot).is_ok());
+
+        let mut mismatched = (*snapshot).clone();
+        mismatched.lut.profile.icc_sha256 = Some("sha256:wrong".to_string());
+        assert_eq!(
+            validate_display_snapshot_identity(&mismatched),
+            Err("display_snapshot_pixel_icc_identity_mismatch".to_string())
         );
     }
 

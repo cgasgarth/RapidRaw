@@ -1,5 +1,6 @@
 pub(crate) mod collage;
 pub(crate) mod community_presets;
+pub(crate) mod display_profile;
 pub(crate) mod logging;
 pub(crate) mod lut;
 pub(crate) mod negative_lab_dust;

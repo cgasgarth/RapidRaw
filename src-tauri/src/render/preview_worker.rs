@@ -642,13 +642,15 @@ fn encode_preview_response(
 ) -> Result<Vec<u8>, String> {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_snapshot = app_handle.map(|app| {
-        app.state::<AppState>()
-            .services
+        let services = &app.state::<AppState>().services;
+        services
             .gpu_context
             .coordinator_snapshot()
             .and_then(|coordinator| coordinator.current_snapshot())
             .unwrap_or_else(|| {
-                Arc::new(crate::display_profile::display_preview_transform_snapshot_for_app(app))
+                services
+                    .display_profile
+                    .preview_transform_snapshot_for_app(app)
             })
     });
     #[cfg(not(any(target_os = "android", target_os = "linux")))]

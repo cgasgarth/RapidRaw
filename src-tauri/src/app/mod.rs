@@ -2,6 +2,7 @@ pub(crate) mod capabilities;
 pub(crate) mod commands;
 #[cfg(not(feature = "ai"))]
 pub(crate) mod disabled_commands;
+pub(crate) mod display_profile_service;
 pub(crate) mod display_target;
 pub(crate) mod events;
 pub(crate) mod hdr_display_capability;
