@@ -11,17 +11,21 @@ export interface AgentEditGraphEditTransactionState {
   adjustmentRevision: number;
   adjustments: Adjustments;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: AgentEditGraphEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const captureAgentEditGraphCommitIdentity = (
   state: AgentEditGraphEditTransactionState,
 ): AgentEditGraphCommitIdentity | null =>
-  state.selectedImage === null || state.imageSession === null
+  state.selectedImage === null
     ? null
     : {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       };
 
@@ -36,9 +40,9 @@ export const buildAgentEditGraphEditTransaction = (
       `agent_editgraph_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `agent_editgraph_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `agent_editgraph_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

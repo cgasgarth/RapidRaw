@@ -136,4 +136,42 @@ describe('agent core command bundle transaction', () => {
       ),
     ).toThrow('agent_tool_transaction.stale_session');
   });
+
+  test('publishes through fallback session authority and rejects same-path reopen identities', async () => {
+    useEditorStore.setState({ imageSession: null, imageSessionId: 71 });
+    const result = await runAgentCoreEditCommandBundle({
+      bridge: new RawEngineLocalAppServerBridge(),
+      operationId: 'fallback-core-bundle',
+      sessionId: 'core-bundle-test',
+      steps: [{ kind: 'basic_tone', payload: { ...INITIAL_ADJUSTMENTS, exposure: 0.4 } }],
+    });
+    expect(result.changedPixelCount).toBeGreaterThan(0);
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 1,
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: 'editor-image-session:71',
+        transactionId: 'fallback-core-bundle_apply',
+      },
+    });
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+
+    useEditorStore.setState({ adjustmentRevision: 0, imageSessionId: 81 });
+    const fallbackState = useEditorStore.getState();
+    const identity = captureAgentToolCommitIdentity(fallbackState);
+    if (identity === null) throw new Error('Expected fallback bundle identity.');
+    expect(identity.imageSessionId).toBe('editor-image-session:81');
+    expect(() =>
+      buildAgentToolEditTransaction(
+        { ...fallbackState, imageSessionId: 83 },
+        identity,
+        { ...fallbackState.adjustments, exposure: 0.2 },
+        'stale-reopened-a',
+      ),
+    ).toThrow('agent_tool_transaction.stale_session:editor-image-session:81:editor-image-session:83');
+  });
 });
