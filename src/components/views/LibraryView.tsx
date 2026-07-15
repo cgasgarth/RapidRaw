@@ -185,7 +185,7 @@ export default function LibraryView({
             isExportDisabled={multiSelectedPaths.length === 0}
             isLibraryView={true}
             isPasted={isPasted}
-            isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
+            isPasteDisabled={useEditorStore.getState().copiedEditDocumentV2 === null || multiSelectedPaths.length === 0}
             isRatingDisabled={multiSelectedPaths.length === 0}
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}

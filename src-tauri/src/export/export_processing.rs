@@ -44,7 +44,8 @@ pub use crate::export::export_postprocess::{
 };
 use crate::export::export_postprocess::{apply_export_postprocess, calculate_resize_target};
 pub use crate::export::job_registry::ExportCancellationAck;
-use crate::export::job_registry::{ExportJobHandle, ExportJobRegistry};
+use crate::export::job_registry::ExportJobHandle;
+use crate::export::runtime_services::ExportRuntimeServices;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
@@ -559,7 +560,8 @@ fn decode_export_item(
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
                 state
-                    .source_fingerprint_cache
+                    .services
+                    .source_fingerprints
                     .fingerprint(&revision, &bytes);
                 load_and_composite_with_report(
                     &bytes,
@@ -577,7 +579,10 @@ fn decode_export_item(
             Ok(mmap) => {
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
-                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
+                state
+                    .services
+                    .source_fingerprints
+                    .fingerprint(&revision, &mmap);
                 load_and_composite_with_report(
                     &mmap,
                     &plan.source_path,
@@ -593,7 +598,8 @@ fn decode_export_item(
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
                 state
-                    .source_fingerprint_cache
+                    .services
+                    .source_fingerprints
                     .fingerprint(&revision, &bytes);
                 load_and_composite_with_report(
                     &bytes,
@@ -629,11 +635,12 @@ fn verified_source_digest(
     {
         return Err("source_changed_during_export".to_string());
     }
-    let (sha256, provenance) = match state.source_fingerprint_cache.verified_sha256(revision) {
+    let (sha256, provenance) = match state.services.source_fingerprints.verified_sha256(revision) {
         Some(digest) => (digest, "verifiedRevisionCache"),
         None => (
             state
-                .source_fingerprint_cache
+                .services
+                .source_fingerprints
                 .fingerprint_streaming(revision, Path::new(&item.plan.source_path))?
                 .sha256,
             "boundedStreamingFallback",
@@ -661,21 +668,22 @@ fn export_terminal_receipt(
 
 async fn admit_export_job<R: tauri::Runtime>(
     total_paths: usize,
-    registry: &ExportJobRegistry,
+    runtime: &ExportRuntimeServices,
     app_handle: &tauri::AppHandle<R>,
 ) -> Result<Option<ExportJobHandle>, String> {
-    let job_identity = registry.admit()?;
+    let job_identity = runtime.admit()?;
     let cancellation = job_identity.cancellation();
 
     // Keep a small asynchronous admission window so the cancel command can
     // linearize before GPU initialization or worker scheduling begins.
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     if cancellation.is_cancelled() {
-        let _ = app_handle.emit(
-            crate::events::EXPORT_CANCELLED,
-            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
-        );
-        registry.complete(&job_identity);
+        let _ = runtime.publish_result(&job_identity, || {
+            app_handle.emit(
+                crate::events::EXPORT_CANCELLED,
+                export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
+            )
+        });
         return Ok(None);
     }
 
@@ -691,14 +699,60 @@ async fn export_images_cancellation_boundary(
     app_handle: tauri::AppHandle<tauri::test::MockRuntime>,
 ) -> Result<(), String> {
     let _output_folder_or_file = output_folder_or_file;
-    let Some(job_identity) =
-        admit_export_job(paths.len(), state.export_jobs(), &app_handle).await?
+    let Some(job_identity) = admit_export_job(paths.len(), state.export(), &app_handle).await?
     else {
         return Ok(());
     };
 
-    state.export_jobs().complete(&job_identity);
+    state.export().complete(&job_identity);
     Err("cancellation boundary test reached runnable export work".to_string())
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+#[tauri::command]
+async fn export_verified_output_boundary(
+    output_path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle<tauri::test::MockRuntime>,
+) -> Result<(), String> {
+    let Some(job_identity) = admit_export_job(1, state.export(), &app_handle).await? else {
+        return Err("verified export was cancelled before output commit".to_string());
+    };
+    let cancellation = job_identity.cancellation();
+    let output_path = PathBuf::from(output_path);
+    let bytes = b"rawengine-verified-export-output";
+    let digest =
+        write_final_output_bytes(&output_path, bytes, Some(cancellation.token().as_ref()))?
+            .ok_or_else(|| "verified export output commit cancelled".to_string())?;
+    let commit = OutputCommitReceipt {
+        path: output_path.clone(),
+        digest,
+        color_policy: None,
+    };
+    let output = export_receipt_output(
+        &output_path,
+        "synthetic://verified-export",
+        "bin",
+        ExportReceiptContext {
+            metadata: None,
+            output_commit: Some(&commit),
+            source_digest: None,
+            raw_development_report: None,
+            edit_graph_revision: None,
+            export_elapsed_ms: None,
+            hdr_receipt: None,
+        },
+    )?;
+    state
+        .export()
+        .publish_result(&job_identity, || {
+            app_handle.emit(
+                crate::events::EXPORT_COMPLETE,
+                export_terminal_receipt(ExportTerminalStatus::Completed, vec![output], 1),
+            )
+        })
+        .ok_or_else(|| "verified export result publication became stale".to_string())?
+        .map_err(|error| error.to_string())
 }
 
 fn commit_export_output<T>(
@@ -796,10 +850,11 @@ impl<W: Write> Write for DigestingWriter<W> {
         self.inner.flush()
     }
 }
+use crate::mask_generation::{get_cached_or_generate_mask, resolve_warped_image_for_masks};
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
-    apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    get_or_load_lut, hydrate_adjustments, load_settings_or_default, resolve_warped_image_for_masks,
+    apply_all_transformations, generate_transformed_preview, hydrate_adjustments,
+    load_settings_or_default,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -915,7 +970,7 @@ fn prepare_export_render_inputs(
         .insert("showClipping".into(), Value::Bool(false));
     let lut = effective_adjustments["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let revision = content_revision(
         &effective_adjustments,
         0,
@@ -1391,7 +1446,7 @@ fn export_masks_for_image(
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("jpg");
-        let pre_gpu_revision = crate::calculate_transform_hash(js_adjustments);
+        let pre_gpu_revision = crate::cache_utils::calculate_transform_hash(js_adjustments);
         let settings = crate::load_settings_or_default(app_handle);
         let effective_settings = raw_processing_settings_for_adjustments(&settings, js_adjustments);
         let source_revision = crate::render::artifact_identity::stable_hash(&(
@@ -1618,8 +1673,12 @@ async fn run_batch_export_pipeline(
         report.current_stage = Some(ExportStage::Planned);
     });
     let resources = PipelineResources::new(budget, diagnostics.clone());
-    let interactive_gpu_pressure =
-        Arc::clone(&app_handle.state::<AppState>().interactive_gpu_pressure);
+    let interactive_gpu_pressure = Arc::clone(
+        &app_handle
+            .state::<AppState>()
+            .services
+            .interactive_gpu_pressure,
+    );
     let gpu_lane = CooperativeGpuLane::with_interactive_gpu_pressure(
         budget.gpu_slots,
         diagnostics.clone(),
@@ -2383,8 +2442,7 @@ pub async fn export_images(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let total_paths = paths.len();
-    let Some(job_identity) =
-        admit_export_job(total_paths, state.export_jobs(), &app_handle).await?
+    let Some(job_identity) = admit_export_job(total_paths, state.export(), &app_handle).await?
     else {
         return Ok(());
     };
@@ -2392,7 +2450,7 @@ pub async fn export_images(
     let context = match get_or_init_gpu_context(&state, &app_handle) {
         Ok(context) => Arc::new(context),
         Err(error) => {
-            state.export_jobs().complete(&job_identity);
+            state.export().complete(&job_identity);
             return Err(error);
         }
     };
@@ -2409,6 +2467,7 @@ pub async fn export_images(
     );
     let task_cancellation = cancellation;
     let task_app_handle = app_handle;
+    let task_export = state.export().clone();
     let task_identity = job_identity.clone();
     let task = tokio::spawn(async move {
         let started = Instant::now();
@@ -2446,45 +2505,46 @@ pub async fn export_images(
                 }
             }
         }
-        if task_cancellation.is_cancelled() {
-            report.cancellation_latency_ms = Some(started.elapsed().as_millis() as u64);
-            let _ = task_app_handle.emit(
-                crate::events::EXPORT_CANCELLED,
-                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
-            );
-        } else if !errors.is_empty() {
-            for error in &errors {
-                log::error!("Export error: {error}");
-            }
-            if total_paths == 1 {
-                let _ = task_app_handle.emit(crate::events::EXPORT_ERROR, &errors[0]);
+        let published = task_export.publish_result(&task_identity, || {
+            if task_cancellation.is_cancelled() {
+                report.cancellation_latency_ms = Some(started.elapsed().as_millis() as u64);
+                let _ = task_app_handle.emit(
+                    crate::events::EXPORT_CANCELLED,
+                    export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
+                );
+            } else if !errors.is_empty() {
+                for error in &errors {
+                    log::error!("Export error: {error}");
+                }
+                if total_paths == 1 {
+                    let _ = task_app_handle.emit(crate::events::EXPORT_ERROR, &errors[0]);
+                } else {
+                    let _ = task_app_handle.emit(
+                        crate::events::EXPORT_COMPLETE_WITH_ERRORS,
+                        serde_json::json!({
+                            "errors": errors.len(),
+                            "total": total_paths,
+                            "outputs": outputs,
+                            "pipeline": report
+                        }),
+                    );
+                }
             } else {
                 let _ = task_app_handle.emit(
-                    crate::events::EXPORT_COMPLETE_WITH_ERRORS,
-                    serde_json::json!({
-                        "errors": errors.len(),
-                        "total": total_paths,
-                        "outputs": outputs,
-                        "pipeline": report
-                    }),
+                    crate::events::EXPORT_COMPLETE,
+                    export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
                 );
             }
-        } else {
-            let _ = task_app_handle.emit(
-                crate::events::EXPORT_COMPLETE,
-                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
-            );
+        });
+        if published.is_none() {
+            log::warn!("stale export job attempted terminal result publication");
         }
         log::info!(
             "batch export pipeline report: {:?}",
             serde_json::to_value(&report)
         );
-        task_app_handle
-            .state::<AppState>()
-            .export_jobs()
-            .complete(&task_identity);
     });
-    state.export_jobs().attach_task(&job_identity, task);
+    state.export().attach_task(&job_identity, task);
     Ok(())
 }
 
@@ -2508,11 +2568,11 @@ pub async fn resume_export(
         .iter()
         .map(|artifact| artifact.output_path.clone())
         .collect::<std::collections::HashSet<_>>();
-    let job_identity = state.export_jobs().admit()?;
+    let job_identity = state.export().admit()?;
     let cancellation = job_identity.cancellation();
     let context = Arc::new(
         get_or_init_gpu_context(&state, &app_handle).inspect_err(|_| {
-            state.export_jobs().complete(&job_identity);
+            state.export().complete(&job_identity);
         })?,
     );
     let available_cores = std::thread::available_parallelism()
@@ -2528,6 +2588,7 @@ pub async fn resume_export(
     );
     let task_identity = job_identity.clone();
     let task_app_handle = app_handle;
+    let task_export = state.export().clone();
     let task_cancellation = cancellation;
     let task = tokio::spawn(async move {
         let (results, report) = run_batch_export_pipeline(
@@ -2564,577 +2625,34 @@ pub async fn resume_export(
                 }
             }
         }
-        if task_cancellation.is_cancelled() {
-            let _ = task_app_handle.emit(
-                crate::events::EXPORT_CANCELLED,
-                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
-            );
-        } else if !errors.is_empty() {
-            let _ = task_app_handle.emit(
-                crate::events::EXPORT_COMPLETE_WITH_ERRORS,
-                serde_json::json!({
-                    "errors": errors.len(),
-                    "total": total_paths,
-                    "outputs": outputs,
-                    "pipeline": report
-                }),
-            );
-        } else {
-            let _ = task_app_handle.emit(
-                crate::events::EXPORT_COMPLETE,
-                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
-            );
-        }
-        task_app_handle
-            .state::<AppState>()
-            .export_jobs()
-            .complete(&task_identity);
-    });
-    state.export_jobs().attach_task(&job_identity, task);
-    Ok(())
-}
-
-#[cfg(any())]
-#[allow(clippy::too_many_arguments)]
-async fn export_images_legacy(
-    paths: Vec<String>,
-    output_folder_or_file: String,
-    is_explicit_file_path: bool,
-    base_origin_folders: Vec<String>,
-    export_settings: ExportSettings,
-    output_format: String,
-    current_edit_path: Option<String>,
-    current_edit_adjustments: Option<Value>,
-    state: tauri::State<'_, AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<(), String> {
-    let total_paths = paths.len();
-    let job_identity = state.export_jobs().admit()?;
-    let cancellation = job_identity.cancellation();
-    let cancellation_token = Arc::clone(cancellation.token());
-    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    if cancellation_token.load(Ordering::SeqCst) {
-        let _ = app_handle.emit(
-            crate::events::EXPORT_CANCELLED,
-            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
-        );
-        state.export_jobs().complete(&job_identity);
-        return Ok(());
-    };
-    let cancellation_token = Arc::clone(cancellation.token());
-
-    let context = match get_or_init_gpu_context(&state, &app_handle) {
-        Ok(context) => context,
-        Err(error) => {
-            if cancellation_token.load(Ordering::SeqCst) {
-                let _ = app_handle.emit(
+        let published = task_export.publish_result(&task_identity, || {
+            if task_cancellation.is_cancelled() {
+                let _ = task_app_handle.emit(
                     crate::events::EXPORT_CANCELLED,
-                    export_terminal_receipt(
-                        ExportTerminalStatus::Cancelled,
-                        Vec::new(),
-                        total_paths,
-                    ),
+                    export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
                 );
-                state.export_jobs().complete(&job_identity);
-                return Ok(());
-            }
-            state.export_jobs().complete(&job_identity);
-            return Err(error);
-        }
-    };
-    if cancellation_token.load(Ordering::SeqCst) {
-        let _ = app_handle.emit(
-            crate::events::EXPORT_CANCELLED,
-            export_terminal_receipt(ExportTerminalStatus::Cancelled, Vec::new(), total_paths),
-        );
-        state.export_jobs().complete(&job_identity);
-        return Ok(());
-    }
-    let context = Arc::new(context);
-    let progress_counter = Arc::new(AtomicUsize::new(0));
-
-    let available_cores = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
-
-    let mut sys = sysinfo::System::new();
-    sys.refresh_memory();
-
-    let available_memory = sys.available_memory();
-    let available_ram_gb = available_memory as f64 / 1024.0 / 1024.0 / 1024.0;
-    let resource_budget = ExportResourceBudget::conservative(available_memory, available_cores);
-    let num_threads = if paths.len() == 1 {
-        1
-    } else {
-        resource_budget.cpu_slots
-    };
-
-    log::info!(
-        "Batch Export: {} cores, {:.1} GB free RAM -> {} threads",
-        available_cores,
-        available_ram_gb,
-        num_threads
-    );
-
-    let task_cancellation_token = Arc::clone(&cancellation_token);
-    let task_job_identity = job_identity.clone();
-    let task = tokio::spawn(async move {
-        let cancellation_token = task_cancellation_token;
-        let job_identity = task_job_identity;
-        let output_folder_path = std::path::Path::new(&output_folder_or_file);
-        let total_paths = total_paths;
-        let settings = load_settings_or_default(&app_handle);
-
-        let mut base_path_counts: HashMap<String, usize> = HashMap::new();
-        let mut export_items = Vec::with_capacity(total_paths);
-
-        for (i, path_str) in paths.into_iter().enumerate() {
-            let (source_path, _) = parse_virtual_path(&path_str);
-            let source_str = source_path.to_string_lossy().to_string();
-            let count = base_path_counts.entry(source_str.clone()).or_insert(0);
-            *count += 1;
-
-            let mut explicit_vc = None;
-            if let Some(idx) = path_str.rfind("vc=") {
-                let id_str = path_str[idx + 3..].split('&').next().unwrap_or("");
-                if let Ok(id) = id_str.parse::<u32>() {
-                    explicit_vc = Some(id);
-                }
-            }
-            if explicit_vc.is_none() {
-                let lower = path_str.to_lowercase();
-                if let Some(idx) = lower.rfind("_vc") {
-                    let id_str: String = lower[idx + 3..]
-                        .chars()
-                        .take_while(|c| c.is_ascii_digit())
-                        .collect();
-                    if let Ok(id) = id_str.parse::<u32>() {
-                        explicit_vc = Some(id);
-                    }
-                }
-            }
-            export_items.push((i, path_str, *count, explicit_vc));
-        }
-
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
-        let mut workers = tokio::task::JoinSet::new();
-        let mut results = Vec::new();
-
-        for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
-            if cancellation_token.load(Ordering::SeqCst) {
-                break;
-            }
-
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
-
-            if cancellation_token.load(Ordering::SeqCst) {
-                break;
-            }
-
-            let app_handle_clone = app_handle.clone();
-            let context_clone = Arc::clone(&context);
-            let cancellation_token = Arc::clone(&cancellation_token);
-            let progress_counter_clone = Arc::clone(&progress_counter);
-            let output_folder_path = output_folder_path.to_path_buf();
-            let base_origin_folders = base_origin_folders.clone();
-            let export_settings = export_settings.clone();
-            let output_format = output_format.clone();
-            let current_edit_path = current_edit_path.clone();
-            let current_edit_adjustments = current_edit_adjustments.clone();
-            let settings = settings.clone();
-
-            workers.spawn_blocking(move || {
-                if cancellation_token.load(Ordering::SeqCst) {
-                    return ExportItemResult::Cancelled(None);
-                }
-
-                let state = app_handle_clone.state::<AppState>();
-                let filename_template = export_settings
-                    .filename_template
-                    .as_deref()
-                    .unwrap_or("{original_filename}_edited");
-                let target = resolve_export_output_target(ExportOutputTargetRequest {
-                    image_path: &image_path_str,
-                    output_folder_path: &output_folder_path,
-                    is_explicit_file_path,
-                    base_origin_folders: &base_origin_folders,
-                    filename_template,
-                    preserve_folders: export_settings.preserve_folders,
-                    output_format: &output_format,
-                    total_paths,
-                    global_index,
-                    appearance_count,
-                    explicit_virtual_copy: explicit_vc,
-                });
-                let sidecar_path = target.sidecar_path;
-                let source_path_str = target.source_path_str;
-                let output_path = target.output_path;
-                let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
-
-                let mut js_adjustments = match (is_current_edit, current_edit_adjustments) {
-                    (true, Some(adjustments)) => adjustments,
-                    _ => {
-                        let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-                        adjustments_with_raw_engine_artifacts(metadata)
-                    }
-                };
-
-                hydrate_adjustments(&state, &mut js_adjustments);
-                let effective_settings =
-                    raw_processing_settings_for_adjustments(&settings, &js_adjustments);
-                let is_raw = is_raw_file(&source_path_str);
-                let source_revision = if is_raw {
-                    Some(
-                        SourceRevision::from_path(Path::new(&source_path_str))
-                            .map_err(|error| error.to_string()),
-                    )
-                } else {
-                    None
-                };
-
-                let extension = output_format.to_lowercase();
-
-                let mut committed_primary_output = None;
-                let result: Result<ExportItemResult, String> = (|| {
-                    let source_revision = source_revision.transpose()?;
-                    if extension == "cube" {
-                        let cube_bytes = export_adjustments_as_lut(
-                            &js_adjustments,
-                            &source_path_str,
-                            &context_clone,
-                            &state,
-                            &app_handle_clone,
-                        )?;
-                        if cancellation_token.load(Ordering::SeqCst) {
-                            return Ok(ExportItemResult::Cancelled(None));
-                        }
-                        let wrote_lut = commit_export_output(cancellation_token.as_ref(), || {
-                            #[cfg(target_os = "android")]
-                            {
-                                let file_name = output_path
-                                    .file_name()
-                                    .and_then(|name| name.to_str())
-                                    .ok_or_else(|| "Missing Android LUT file name".to_string())?;
-                                crate::android_integration::save_file_bytes_to_android_downloads(
-                                    file_name,
-                                    "application/octet-stream",
-                                    &cube_bytes,
-                                )?;
-                            }
-                            #[cfg(not(target_os = "android"))]
-                            fs::write(&output_path, &cube_bytes).map_err(|e| e.to_string())?;
-                            Ok(())
-                        })?;
-                        if wrote_lut.is_none() {
-                            return Ok(ExportItemResult::Cancelled(None));
-                        }
-                        return Ok(ExportItemResult::Completed(export_receipt_output(
-                            &output_path,
-                            &source_path_str,
-                            &extension,
-                            ExportReceiptContext {
-                                metadata: None,
-                                output_commit: None,
-                                source_digest: None,
-                                raw_development_report: None,
-                                edit_graph_revision: None,
-                                export_elapsed_ms: None,
-                                hdr_receipt: None,
-                            },
-                        )?));
-                    }
-
-                    let export_started = Instant::now();
-                    if cancellation_token.load(Ordering::SeqCst) {
-                        return Ok(ExportItemResult::Cancelled(None));
-                    }
-                    let (base_image, raw_development_report) = if is_current_edit {
-                        match state.services.editor.clone_image_pixels() {
-                            Ok((orig_data, _)) => {
-                                let image = composite_patches_on_image(&orig_data, &js_adjustments)
-                                    .map_err(|e| format!("Failed to composite AI patches: {}", e))?
-                                    .into_owned();
-                                (image, None)
-                            }
-                            Err(_) => {
-                                let bytes =
-                                    fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                let revision =
-                                    SourceRevision::from_path(Path::new(&source_path_str))
-                                        .map_err(|error| error.to_string())?;
-                                state
-                                    .source_fingerprint_cache
-                                    .fingerprint(&revision, &bytes);
-                                load_and_composite_with_report(
-                                    &bytes,
-                                    &source_path_str,
-                                    &js_adjustments,
-                                    false,
-                                    &effective_settings,
-                                    None,
-                                )
-                                .map_err(|e| format!("Failed to load fallback image: {}", e))?
-                            }
-                        }
-                    } else {
-                        match read_file_mapped(Path::new(&source_path_str)) {
-                            Ok(mmap) => {
-                                let revision =
-                                    SourceRevision::from_path(Path::new(&source_path_str))
-                                        .map_err(|error| error.to_string())?;
-                                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
-                                load_and_composite_with_report(
-                                    &mmap,
-                                    &source_path_str,
-                                    &js_adjustments,
-                                    false,
-                                    &effective_settings,
-                                    None,
-                                )
-                                .map_err(|e| format!("Failed to load from mmap: {}", e))?
-                            }
-                            Err(_) => {
-                                let bytes =
-                                    fs::read(&source_path_str).map_err(|e| e.to_string())?;
-                                let revision =
-                                    SourceRevision::from_path(Path::new(&source_path_str))
-                                        .map_err(|error| error.to_string())?;
-                                state
-                                    .source_fingerprint_cache
-                                    .fingerprint(&revision, &bytes);
-                                load_and_composite_with_report(
-                                    &bytes,
-                                    &source_path_str,
-                                    &js_adjustments,
-                                    false,
-                                    &effective_settings,
-                                    None,
-                                )
-                                .map_err(|e| format!("Failed to load from bytes: {}", e))?
-                            }
-                        }
-                    };
-
-                    let mut main_export_adjustments = js_adjustments.clone();
-                    if export_settings.export_masks
-                        && let Some(obj) = main_export_adjustments.as_object_mut()
-                    {
-                        obj.insert("masks".to_string(), serde_json::json!([]));
-                    }
-
-                    let final_image = process_image_for_export(
-                        &source_path_str,
-                        &base_image,
-                        &main_export_adjustments,
-                        &export_settings,
-                        &context_clone,
-                        &state,
-                        is_raw,
-                        &app_handle_clone,
-                    )?;
-                    if cancellation_token.load(Ordering::SeqCst) {
-                        return Ok(ExportItemResult::Cancelled(None));
-                    }
-                    let source_digest = match source_revision.as_ref() {
-                        Some(revision) => {
-                            if SourceRevision::from_path(Path::new(&source_path_str))
-                                .map_err(|error| error.to_string())?
-                                != *revision
-                            {
-                                return Err("source_changed_during_export".to_string());
-                            }
-                            let (sha256, provenance) =
-                                match state.source_fingerprint_cache.verified_sha256(revision) {
-                                    Some(digest) => (digest, "verifiedRevisionCache"),
-                                    None => (
-                                        state
-                                            .source_fingerprint_cache
-                                            .fingerprint_streaming(
-                                                revision,
-                                                Path::new(&source_path_str),
-                                            )?
-                                            .sha256,
-                                        "boundedStreamingFallback",
-                                    ),
-                                };
-                            Some(VerifiedSourceDigestReceipt {
-                                revision: revision.clone(),
-                                sha256,
-                                provenance,
-                            })
-                        }
-                        None => None,
-                    };
-                    let Some(output_commit) = save_image_with_metadata_commit(
-                        &final_image,
-                        if is_raw {
-                            WorkingColorState::AcesCgLinearV1
-                        } else {
-                            WorkingColorState::EncodedSrgbV1
-                        },
-                        &output_path,
-                        &source_path_str,
-                        &export_settings,
-                        Some(cancellation_token.as_ref()),
-                    )?
-                    else {
-                        return Ok(ExportItemResult::Cancelled(None));
-                    };
-
-                    if export_settings.preserve_timestamps {
-                        set_timestamps_from_exif(Path::new(&source_path_str), &output_path);
-                    }
-
-                    let mut primary_output = export_receipt_output(
-                        &output_path,
-                        &source_path_str,
-                        &extension,
-                        ExportReceiptContext {
-                            metadata: output_commit.color_policy.clone(),
-                            output_commit: Some(&output_commit),
-                            source_digest: source_digest.as_ref(),
-                            raw_development_report,
-                            edit_graph_revision: Some(format!(
-                                "export_job:{:016x}",
-                                export_execution_fingerprint(&source_path_str, &js_adjustments)
-                            )),
-                            export_elapsed_ms: Some(export_started.elapsed().as_millis()),
-                            hdr_receipt: None,
-                        },
-                    )?;
-                    committed_primary_output = Some(primary_output.clone());
-
-                    if cancellation_token.load(Ordering::SeqCst) {
-                        return Ok(ExportItemResult::Cancelled(
-                            committed_primary_output.clone(),
-                        ));
-                    }
-
-                    if export_settings.export_masks {
-                        match export_masks_for_image(
-                            &base_image,
-                            &js_adjustments,
-                            &export_settings,
-                            &output_path,
-                            &source_path_str,
-                            &context_clone,
-                            &state,
-                            is_raw,
-                            &app_handle_clone,
-                            cancellation_token.as_ref(),
-                        )? {
-                            ExportMasksResult::Cancelled(committed_paths) => {
-                                primary_output
-                                    .auxiliary_output_paths
-                                    .extend(committed_paths);
-                                return Ok(ExportItemResult::Cancelled(Some(primary_output)));
-                            }
-                            ExportMasksResult::Completed(committed_paths) => {
-                                primary_output
-                                    .auxiliary_output_paths
-                                    .extend(committed_paths);
-                            }
-                        }
-                    }
-
-                    committed_primary_output = Some(primary_output.clone());
-                    if cancellation_token.load(Ordering::SeqCst) {
-                        return Ok(ExportItemResult::Cancelled(
-                            committed_primary_output.clone(),
-                        ));
-                    }
-
-                    Ok(ExportItemResult::Completed(primary_output))
-                })();
-
-                let result = match result {
-                    Ok(result) => result,
-                    Err(_error) if cancellation_token.load(Ordering::SeqCst) => {
-                        ExportItemResult::Cancelled(committed_primary_output)
-                    }
-                    Err(error) => ExportItemResult::Failed(error),
-                };
-
-                let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                let _ = app_handle_clone.emit(
-                    crate::events::BATCH_EXPORT_PROGRESS,
+            } else if !errors.is_empty() {
+                let _ = task_app_handle.emit(
+                    crate::events::EXPORT_COMPLETE_WITH_ERRORS,
                     serde_json::json!({
-                        "current": current_progress,
+                        "errors": errors.len(),
                         "total": total_paths,
-                        "path": &image_path_str
+                        "outputs": outputs,
+                        "pipeline": report
                     }),
                 );
-
-                drop(permit);
-                result
-            });
-
-            if workers.len() >= num_threads
-                && let Some(result) = workers.join_next().await
-            {
-                match result {
-                    Ok(result) => results.push(result),
-                    Err(error) => results.push(ExportItemResult::Failed(format!(
-                        "Export worker crashed: {error}"
-                    ))),
-                }
+            } else {
+                let _ = task_app_handle.emit(
+                    crate::events::EXPORT_COMPLETE,
+                    export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
+                );
             }
+        });
+        if published.is_none() {
+            log::warn!("stale resumed export attempted terminal result publication");
         }
-
-        while let Some(result) = workers.join_next().await {
-            match result {
-                Ok(result) => results.push(result),
-                Err(error) => results.push(ExportItemResult::Failed(format!(
-                    "Export worker crashed: {error}"
-                ))),
-            }
-        }
-
-        let mut error_count = 0;
-        let mut outputs = Vec::new();
-        for result in results {
-            match result {
-                ExportItemResult::Completed(output) => outputs.push(output),
-                ExportItemResult::Cancelled(Some(output)) => outputs.push(output),
-                ExportItemResult::Cancelled(None) => {}
-                ExportItemResult::Failed(error) => {
-                    error_count += 1;
-                    log::error!("Export error: {error}");
-                    if total_paths == 1 {
-                        let _ = app_handle.emit(crate::events::EXPORT_ERROR, error);
-                    }
-                }
-            }
-        }
-
-        if cancellation_token.load(Ordering::SeqCst) {
-            let _ = app_handle.emit(
-                crate::events::EXPORT_CANCELLED,
-                export_terminal_receipt(ExportTerminalStatus::Cancelled, outputs, total_paths),
-            );
-        } else if error_count > 0 && total_paths > 1 {
-            let _ = app_handle.emit(
-                crate::events::EXPORT_COMPLETE_WITH_ERRORS,
-                serde_json::json!({ "errors": error_count, "total": total_paths }),
-            );
-        } else if error_count == 0 {
-            let _ = app_handle.emit(
-                crate::events::BATCH_EXPORT_PROGRESS,
-                serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
-            );
-            let _ = app_handle.emit(
-                crate::events::EXPORT_COMPLETE,
-                export_terminal_receipt(ExportTerminalStatus::Completed, outputs, total_paths),
-            );
-        }
-
-        app_handle
-            .state::<AppState>()
-            .export_jobs()
-            .complete(&job_identity);
     });
-
-    state.export_jobs().attach_task(&job_identity, task);
+    state.export().attach_task(&job_identity, task);
     Ok(())
 }
 
@@ -3321,9 +2839,9 @@ fn write_raw_export_provenance_sidecar(
 pub async fn cancel_export(
     state: tauri::State<'_, AppState>,
 ) -> Result<ExportCancellationAck, String> {
-    let acknowledgement = state.export_jobs().request_cancellation()?;
+    let acknowledgement = state.export().request_cancellation()?;
     let active_generation = state
-        .export_jobs()
+        .export()
         .snapshot()
         .filter(|snapshot| snapshot.job_id == acknowledgement.active_job_id)
         .map(|snapshot| snapshot.generation);
@@ -3653,7 +3171,7 @@ mod tests {
     #[cfg(feature = "tauri-test")]
     use super::{
         ExportCancellationAck, cancel_export, export_images_cancellation_boundary,
-        prepare_export_render_inputs,
+        export_verified_output_boundary, prepare_export_render_inputs,
     };
     use crate::color::working_to_output_transform::WorkingColorState;
     use crate::export::export_encoders::{
@@ -3992,7 +3510,7 @@ mod tests {
             .build()
             .unwrap();
         let state = app.state::<crate::app_state::AppState>();
-        let identity = state.export_jobs().admit().unwrap();
+        let identity = state.export().admit().unwrap();
         let task_token = Arc::clone(identity.cancellation().token());
         let (observed_tx, observed_rx) = std::sync::mpsc::sync_channel(1);
         let task_runtime = tokio::runtime::Builder::new_multi_thread()
@@ -4009,7 +3527,7 @@ mod tests {
                 tokio::task::yield_now().await;
             }
         });
-        assert!(state.export_jobs().attach_task(&identity, task));
+        assert!(state.export().attach_task(&identity, task));
 
         let response = tauri::test::get_ipc_response(
             &webview,
@@ -4034,7 +3552,7 @@ mod tests {
         observed_rx
             .recv_timeout(std::time::Duration::from_secs(1))
             .expect("the concurrently running task must observe cancellation");
-        assert!(state.export_jobs().complete(&identity));
+        assert!(state.export().complete(&identity));
     }
 
     #[cfg(feature = "tauri-test")]
@@ -4085,7 +3603,7 @@ mod tests {
             .find_map(|_| {
                 let active_job_id = app
                     .state::<crate::app_state::AppState>()
-                    .export_jobs()
+                    .export()
                     .snapshot()
                     .map(|job| job.job_id);
                 if active_job_id.is_none() {
@@ -4130,12 +3648,77 @@ mod tests {
         assert!(fs::read_dir(output_dir.path()).unwrap().next().is_none());
         assert!(
             app.state::<crate::app_state::AppState>()
-                .export_jobs()
+                .export()
                 .snapshot()
                 .is_none(),
             "terminal receipt must release the exact acknowledged job"
         );
         let _ = fs::remove_file(source);
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn tauri_ipc_verified_export_output_matches_digest_receipt_and_releases_generation() {
+        let app = tauri::test::mock_builder()
+            .manage(crate::app_state::AppState::new())
+            .invoke_handler(tauri::generate_handler![export_verified_output_boundary])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+        let directory = tempfile::tempdir().expect("temporary export directory should exist");
+        let output_path = directory.path().join("verified-output.bin");
+        let (receipt_sender, receipt_receiver) = std::sync::mpsc::sync_channel(1);
+        let _listener = app.listen(crate::events::EXPORT_COMPLETE, move |event| {
+            let _ = receipt_sender.send(event.payload().to_string());
+        });
+
+        tauri::test::get_ipc_response(
+            &webview,
+            InvokeRequest {
+                cmd: "export_verified_output_boundary".into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: "tauri://localhost".parse().unwrap(),
+                body: serde_json::json!({
+                    "outputPath": output_path.to_string_lossy(),
+                })
+                .into(),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        )
+        .expect("verified export command should complete");
+
+        let expected_bytes = b"rawengine-verified-export-output";
+        assert_eq!(fs::read(&output_path).unwrap(), expected_bytes);
+        let receipt = receipt_receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("verified export must emit a terminal receipt");
+        let receipt: serde_json::Value = serde_json::from_str(&receipt).unwrap();
+        let output = &receipt["outputs"][0];
+        assert_eq!(receipt["terminalStatus"], "completed");
+        assert_eq!(receipt["total"], 1);
+        assert_eq!(output["outputPath"], output_path.to_string_lossy().as_ref());
+        assert_eq!(output["byteSize"], expected_bytes.len());
+        assert_eq!(output["outputDigest"]["algorithm"], "sha256");
+        assert_eq!(output["outputDigest"]["byteLen"], expected_bytes.len());
+        assert_eq!(
+            output["outputDigest"]["provenance"],
+            "finalByteAtomicWriter"
+        );
+        assert_eq!(
+            output["outputDigest"]["value"],
+            format!("sha256:{}", hex::encode(Sha256::digest(expected_bytes)))
+        );
+        assert!(
+            app.state::<crate::app_state::AppState>()
+                .export()
+                .snapshot()
+                .is_none(),
+            "terminal receipt publication must release its exact job generation"
+        );
     }
 
     #[test]

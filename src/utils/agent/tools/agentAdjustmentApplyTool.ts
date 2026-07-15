@@ -417,36 +417,20 @@ export const applyAgentGlobalAdjustments = async (
 
   const initialState = useEditorStore.getState();
   const undoGraphRevision = parsedRequest.expectedGraphRevision;
+  const additionalAdjustmentPatch: Partial<Adjustments> = {};
+  for (const key of EXTRA_ADJUSTMENT_KEYS) {
+    const value = parsedRequest.adjustments[key];
+    if (value !== undefined) additionalAdjustmentPatch[key] = value;
+  }
   const basicToneResult = await applyBasicToneToLiveEditor({
     acceptedPlanHash: acceptedReceipt.basicTonePlanHash,
     acceptedPlanId: acceptedReceipt.basicTonePlanId,
+    additionalAdjustmentPatch,
     expectedGraphRevision: parsedRequest.expectedGraphRevision,
     operationId: parsedRequest.operationId,
     requestedAdjustments: buildRequestedBasicTone(initialState.adjustments, parsedRequest.adjustments),
     sessionId: parsedRequest.sessionId,
   });
-
-  const extraEntries = EXTRA_ADJUSTMENT_KEYS.flatMap((key) => {
-    const value = parsedRequest.adjustments[key];
-    return value === undefined ? [] : [{ key, value }];
-  });
-
-  if (extraEntries.length > 0) {
-    useEditorStore.setState((state) => {
-      const adjustments = { ...state.adjustments };
-      for (const entry of extraEntries) {
-        adjustments[entry.key] = entry.value;
-      }
-      const history = [...state.history];
-      history[state.historyIndex] = adjustments;
-      return {
-        adjustments,
-        history,
-        historyIndex: state.historyIndex,
-        uncroppedAdjustedPreviewUrl: null,
-      };
-    });
-  }
 
   const adjustedFields = getAdjustedFields(parsedRequest.adjustments);
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;

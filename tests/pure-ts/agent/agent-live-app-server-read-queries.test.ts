@@ -49,7 +49,7 @@ const seedStores = (activePath = firstPath) => {
     sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
   });
 
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.25 },
     finalPreviewUrl: `blob:rawengine-issue-4794-${activePath === firstPath ? 'a' : 'b'}`,
     hasRenderedFirstFrame: true,

@@ -21,7 +21,7 @@ import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEn
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 18 : 3));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 48, size: 96, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-layer-before',
@@ -47,6 +47,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-layer-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentLayerCreateRequestSchema.safeParse({
@@ -201,6 +202,14 @@ if (createdLayer.adjustments.exposure !== 0.45 || createdLayer.adjustments.shado
 }
 if (afterLayerState.historyIndex !== 1 || afterLayerState.history.length !== 2) {
   throw new Error('agent.layer.create must create one undoable history entry.');
+}
+if (
+  afterLayerState.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  afterLayerState.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  afterLayerState.lastEditApplicationReceipt.transactionId !== 'agent_subject_lift_apply' ||
+  afterLayerState.editDocumentV2.nodes.layers?.params.masks[0]?.id !== 'agent_subject_lift'
+) {
+  throw new Error('agent.layer.create did not publish one canonical EditTransaction receipt.');
 }
 if (afterLayerState.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.layer.create must invalidate stale preview output.');

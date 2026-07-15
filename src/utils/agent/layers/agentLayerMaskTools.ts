@@ -14,12 +14,13 @@ import {
 import { Mask, type SubMask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskAdjustments,
   type MaskContainer,
 } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { applyLayerStackCommandBridgeOperation } from '../../layers/layerStackCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
@@ -392,6 +393,8 @@ const buildRollbackTarget = (
 const makeLayer = (request: z.infer<typeof agentLayerCreateRequestSchema>): MaskContainer => ({
   adjustments: toMaskAdjustments(request.adjustments),
   blendMode: request.blendMode,
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: request.layerId ?? `agent_layer_${toIdSegment(request.operationId)}`,
   invert: false,
   name: request.name,
@@ -400,20 +403,14 @@ const makeLayer = (request: z.infer<typeof agentLayerCreateRequestSchema>): Mask
   visible: request.visible,
 });
 
-const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): { historyIndex: number } => {
-  let nextHistoryIndex = 0;
-  useEditorStore.setState((state) => {
-    const adjustments = { ...state.adjustments, masks: [...masks] };
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-    nextHistoryIndex = history.historyIndex;
-    return {
-      adjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
-  return { historyIndex: nextHistoryIndex };
+const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>, operationId: string): { historyIndex: number } => {
+  const state = useEditorStore.getState();
+  const identity = captureAgentToolCommitIdentity(state);
+  if (identity === null) throw new Error('Agent layer/mask apply requires a selected image session.');
+  state.applyEditTransaction(
+    buildAgentToolEditTransaction(state, identity, { ...state.adjustments, masks: [...masks] }, `${operationId}_apply`),
+  );
+  return { historyIndex: useEditorStore.getState().historyIndex };
 };
 
 const buildOverlayArtifact = ({
@@ -529,7 +526,7 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
       sessionId: parsedRequest.sessionId,
     },
   );
-  pushMaskHistory(result.masks);
+  pushMaskHistory(result.masks, parsedRequest.operationId);
   const layerId = result.commandResult.changedLayerIds[0] ?? result.masks[0]?.id;
   if (layerId === undefined) throw new Error('Agent layer create did not return a layer id.');
   useEditorStore.setState({ activeMaskContainerId: layerId });
@@ -754,7 +751,7 @@ export const applyAgentBrushMaskCreateOrUpdate = (
   );
 
   const undoGraphRevision = beforeSnapshot.graphRevision;
-  pushMaskHistory(nextMasks);
+  pushMaskHistory(nextMasks, parsedRequest.operationId);
   useEditorStore.setState({ activeMaskContainerId: parsedRequest.layerId, activeMaskId: maskId });
   const afterSnapshot = buildAgentImageContextSnapshot();
   const overlayLayer = nextMasks.find((mask) => mask.id === parsedRequest.layerId);
@@ -874,7 +871,7 @@ export const applyAgentLayerScopedAdjustments = (
       sessionId: parsedRequest.sessionId,
     },
   );
-  pushMaskHistory(result.masks);
+  pushMaskHistory(result.masks, parsedRequest.operationId);
   useEditorStore.setState({ activeMaskContainerId: parsedRequest.layerId });
   const afterSnapshot = buildAgentImageContextSnapshot();
   const overlayLayer = result.masks.find((mask) => mask.id === parsedRequest.layerId);
@@ -963,6 +960,8 @@ export const applyAgentObjectSelection = (
   const layer: MaskContainer = {
     adjustments: toMaskAdjustments(parsedRequest.adjustments),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name: parsedRequest.layerName,
@@ -994,7 +993,7 @@ export const applyAgentObjectSelection = (
   );
   const undoGraphRevision = beforeSnapshot.graphRevision;
   const rollbackTarget = buildRollbackTarget(undoGraphRevision, state);
-  pushMaskHistory(result.masks);
+  pushMaskHistory(result.masks, parsedRequest.operationId);
   useEditorStore.setState({ activeMaskContainerId: layerId, activeMaskId: maskId });
   const afterSnapshot = buildAgentImageContextSnapshot();
   const overlayLayer = result.masks.find((mask) => mask.id === layerId);

@@ -147,8 +147,9 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
   expect(triggerHash).toContain('"featherPx":12');
 });
 
-test('mask overlay request identity tracks selected image, render size, and trigger hash', () => {
+test('mask overlay request identity tracks image session, source, render size, and trigger hash', () => {
   const identity = buildMaskOverlayRequestIdentity({
+    imageSessionId: 'image-session:a:1',
     renderSize: { height: 240.4, scale: 0.3333333, width: 319.6 },
     selectedImagePath: '/photos/_DSC7505.ARW',
     triggerHash: 'mask-trigger-a',
@@ -156,6 +157,7 @@ test('mask overlay request identity tracks selected image, render size, and trig
 
   expect(identity).toBe(
     JSON.stringify({
+      imageSessionId: 'image-session:a:1',
       renderSize: { h: 240, scale: 0.3333, w: 320 },
       selectedImagePath: '/photos/_DSC7505.ARW',
       triggerHash: 'mask-trigger-a',
@@ -165,11 +167,13 @@ test('mask overlay request identity tracks selected image, render size, and trig
 
 test('mask overlay stale responses are rejected when a newer request is active', () => {
   const first = buildMaskOverlayRequestIdentity({
+    imageSessionId: 'image-session:a:1',
     renderSize: { height: 240, scale: 0.5, width: 320 },
     selectedImagePath: '/photos/_DSC7505.ARW',
     triggerHash: 'mask-trigger-a',
   });
   const latest = buildMaskOverlayRequestIdentity({
+    imageSessionId: 'image-session:a:1',
     renderSize: { height: 240, scale: 0.5, width: 320 },
     selectedImagePath: '/photos/_DSC7505.ARW',
     triggerHash: 'mask-trigger-b',
@@ -177,4 +181,21 @@ test('mask overlay stale responses are rejected when a newer request is active',
 
   expect(isMaskOverlayResponseCurrent(latest, first)).toBe(false);
   expect(isMaskOverlayResponseCurrent(latest, latest)).toBe(true);
+});
+
+test('mask overlay identity never revives after an A to B to successor-A session replacement', () => {
+  const request = (imageSessionId: string, selectedImagePath: string) =>
+    buildMaskOverlayRequestIdentity({
+      imageSessionId,
+      renderSize: { height: 240, scale: 0.5, width: 320 },
+      selectedImagePath,
+      triggerHash: 'same-mask-content',
+    });
+  const sourceA = request('image-session:a:1', '/photos/a.ARW');
+  const sourceB = request('image-session:b:1', '/photos/b.ARW');
+  const successorA = request('image-session:a:2', '/photos/a.ARW');
+
+  expect(isMaskOverlayResponseCurrent(sourceB, sourceA)).toBe(false);
+  expect(isMaskOverlayResponseCurrent(successorA, sourceA)).toBe(false);
+  expect(isMaskOverlayResponseCurrent(successorA, successorA)).toBe(true);
 });

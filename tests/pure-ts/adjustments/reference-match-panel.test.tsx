@@ -49,7 +49,7 @@ const histogram = (luma: number, red: number, green: number, blue: number) => {
 test('reference tray survives navigation, proposal inspection is non-mutating, and Apply is one history entry', async () => {
   installDom();
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
     adjustments: initial,
     finalPreviewUrl: null,

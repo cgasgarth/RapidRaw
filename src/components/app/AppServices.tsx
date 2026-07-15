@@ -1,23 +1,16 @@
-import { type ComponentProps, memo } from 'react';
+import { memo } from 'react';
 import EditorPersistenceManager from '../managers/EditorPersistenceManager';
 import ImageLoaderManager from '../managers/ImageLoaderManager';
 import ImageProcessingManager from '../managers/ImageProcessingManager';
 
-interface AppServicesProps {
-  persistence: ComponentProps<typeof EditorPersistenceManager>;
-}
-
-function AppServicesComponent({ persistence }: AppServicesProps) {
+function AppServicesComponent() {
   return (
     <>
       <ImageProcessingManager />
-      <EditorPersistenceManager {...persistence} />
+      <EditorPersistenceManager />
       <ImageLoaderManager />
     </>
   );
 }
 
-export const AppServices = memo(
-  AppServicesComponent,
-  (previous, next) => previous.persistence.prevAdjustmentsRef === next.persistence.prevAdjustmentsRef,
-);
+export const AppServices = memo(AppServicesComponent);

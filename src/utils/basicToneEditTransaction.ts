@@ -11,6 +11,7 @@ export interface BasicToneCommitIdentity {
 export interface BasicToneEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
 
@@ -18,16 +19,19 @@ export interface BasicToneCommandEditTransactionState extends BasicToneEditTrans
   adjustments: Adjustments;
 }
 
+const currentImageSessionId = (state: BasicToneEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
 export const captureBasicToneCommitIdentity = (state: BasicToneEditTransactionState): BasicToneCommitIdentity | null =>
-  state.selectedImage === null || state.imageSession === null
+  state.selectedImage === null
     ? null
     : {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       };
 
-const assertBasicToneCommitIdentity = (
+export const assertBasicToneCommitIdentity = (
   state: BasicToneEditTransactionState,
   identity: BasicToneCommitIdentity,
 ): void => {
@@ -36,10 +40,8 @@ const assertBasicToneCommitIdentity = (
       `basic_tone_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(
-      `basic_tone_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
-    );
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`basic_tone_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(

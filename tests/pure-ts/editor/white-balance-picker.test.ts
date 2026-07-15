@@ -31,7 +31,7 @@ const selectedImageFor = (path: string) => ({
 describe('white balance picker runtime command path', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
       adjustments,
@@ -136,7 +136,7 @@ describe('white balance picker runtime command path', () => {
 
   test('commits one undoable picker adjustment and preserves receipt data for QA', () => {
     const initial = { ...INITIAL_ADJUSTMENTS, temperature: 3, tint: -2 };
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
       adjustments: initial,
@@ -276,7 +276,7 @@ describe('white balance picker runtime command path', () => {
       whiteBalanceTechnical: buildTechnicalWhiteBalance('chromaticity', 4100, 0.01),
     };
     let session = createWhiteBalancePickerPreviewSession(base, 'source:a');
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, base),
       adjustments: base,

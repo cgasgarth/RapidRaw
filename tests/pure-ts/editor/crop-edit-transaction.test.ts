@@ -44,7 +44,7 @@ describe('crop edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -90,10 +90,11 @@ describe('crop edit transaction', () => {
   });
 
   test('preserves exact no-ops and rejects stale source, session, graph, generation, tool, and revision', () => {
-    useEditorStore.setState((state) => {
+    useEditorStore.getState().hydrateEditorRenderAuthority((state) => {
       const adjustments = { ...state.adjustments, crop };
       const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
       return {
+        adjustmentRevision: state.adjustmentRevision,
         adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments, editDocumentV2),
         adjustments,
         editDocumentV2,

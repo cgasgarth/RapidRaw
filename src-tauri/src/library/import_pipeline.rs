@@ -1573,7 +1573,8 @@ mod tests {
             },
         )
         .unwrap();
-        let import_jobs = Arc::clone(&app_handle.state::<crate::AppState>().services.import_jobs);
+        let state = app_handle.state::<crate::AppState>();
+        let import_jobs = Arc::clone(state.library().import_jobs());
         let reservation = import_jobs.reserve_resume(job_id.clone()).unwrap();
         let prepared = ImportPipeline::prepare_resume(&app_handle, &job_id).unwrap();
         let start = reservation.start().unwrap();
@@ -1690,8 +1691,8 @@ mod tests {
         assert!(
             app_handle
                 .state::<crate::AppState>()
-                .services
-                .import_jobs
+                .library()
+                .import_jobs()
                 .cancel(&authority)
                 .unwrap()
         );
@@ -1825,8 +1826,8 @@ mod tests {
             loop {
                 if app_handle
                     .state::<crate::AppState>()
-                    .services
-                    .import_jobs
+                    .library()
+                    .import_jobs()
                     .status()
                     .is_none()
                 {

@@ -11,8 +11,20 @@ export interface PointColorEditTransactionState {
   adjustmentRevision: number;
   adjustments: Pick<Adjustments, 'pointColor'>;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: PointColorEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const isCurrentPointColorIdentity = (
+  state: PointColorEditTransactionState,
+  identity: PointColorCommitIdentity,
+): boolean =>
+  state.adjustmentRevision === identity.adjustmentRevision &&
+  currentImageSessionId(state) === identity.imageSessionId &&
+  state.selectedImage?.path === identity.sourceIdentity;
 
 export const buildPointColorEditTransaction = (
   state: PointColorEditTransactionState,
@@ -25,10 +37,8 @@ export const buildPointColorEditTransaction = (
       `point_color_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(
-      `point_color_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
-    );
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`point_color_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(

@@ -39,13 +39,19 @@ if (receipt === undefined) throw new Error('Expected Reset receipt fixture');
 
 describe('Reset edit transaction', () => {
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      effectsEnabled: false,
+      exposure: 1.25,
+      sectionVisibility: { basic: true, color: true, curves: true, details: false },
+    };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 4,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
       history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
       historyCheckpoints: [],
       historyIndex: 1,
@@ -63,7 +69,13 @@ describe('Reset edit transaction', () => {
     const result = state.applyEditTransaction(request);
 
     expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed', source: 'reset' });
-    expect(result.after).toMatchObject({ aiPatches: [], aspectRatio: 1.5, exposure: 0 });
+    expect(result.after).toMatchObject({
+      aiPatches: [],
+      aspectRatio: 1.5,
+      effectsEnabled: false,
+      exposure: 0,
+    });
+    expect(result.after).not.toHaveProperty('sectionVisibility');
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 5,
       baseAdjustmentRevision: 4,
@@ -129,7 +141,7 @@ describe('Reset edit transaction', () => {
     expect(() => assertResetAdjustmentsResultCoverage([receipt], [sourcePath, '/fixture/B.ARW'])).toThrow(
       'reset_edit_transaction.receipt_coverage',
     );
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustments: structuredClone(INITIAL_ADJUSTMENTS),
       editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
@@ -150,5 +162,49 @@ describe('Reset edit transaction', () => {
     );
     expect(result.noOp).toBeTrue();
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 0, historyIndex: 0 });
+  });
+
+  test('commits a native fallback Reset and rejects A to B to A reopen', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-reset-before',
+      imageSession: null,
+      imageSessionId: 124,
+    });
+    const state = useEditorStore.getState();
+    const identity = captureResetEditCommitIdentity(state, sourcePath);
+    if (identity === null) throw new Error('Expected fallback Reset identity');
+    expect(identity.imageSessionId).toBe('editor-image-session:124');
+    expect(isCurrentResetEditCommitIdentity(state, identity)).toBeTrue();
+    expect(
+      isCurrentResetEditCommitIdentity(
+        { ...state, imageSessionId: 125, selectedImage: { isReady: true, path: '/fixture/B.ARW' } },
+        identity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentResetEditCommitIdentity({ ...state, imageSessionId: 126 }, identity)).toBeFalse();
+    expect(isCurrentResetEditCommitIdentity({ ...state, adjustmentRevision: 5 }, identity)).toBeFalse();
+
+    const request = buildResetEditTransaction(state, identity, receipt, selectedImage, 'fallback-reset-native');
+    const result = state.applyEditTransaction(request);
+    expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed' });
+    expect(result).toMatchObject({ nextAdjustmentRevision: 5, noOp: false, source: 'reset' });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 0,
+      lastEditApplicationReceipt: {
+        imageSessionId: identity.imageSessionId,
+        transactionId: 'fallback-reset-native',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(1);
+    expect(() =>
+      buildResetEditTransaction(
+        { ...state, imageSessionId: 126 },
+        identity,
+        receipt,
+        selectedImage,
+        'stale-reopened-a',
+      ),
+    ).toThrow('reset_edit_transaction.stale_session');
   });
 });

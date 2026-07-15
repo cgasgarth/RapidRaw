@@ -8,7 +8,6 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import cx from 'clsx';
 import {
@@ -55,21 +54,27 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
-import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { PresetListType, type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
 import type { ColorStylePreset } from '../../../../schemas/color/colorStylePresetSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { Invokes } from '../../../../tauri/commands';
-import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import type { Adjustments } from '../../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../../utils/blobUtils';
 import {
   BUILT_IN_COLOR_STYLE_PRESETS,
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../../utils/color/style/colorStylePresetCatalog';
-import { buildReceiptSafePresetApplication } from '../../../../utils/referenceMatchTransfer';
+import {
+  buildPresetEditTransaction,
+  buildPresetPreviewAdjustments,
+  resolveEditDocumentPresetPayload,
+} from '../../../../utils/editDocumentPreset';
+import { areEditDocumentsEqual } from '../../../../utils/editTransaction';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
@@ -420,10 +425,11 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
+  const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const appliedPreset = useEditorStore((state) => state.presetApplication);
   const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const activePanel = useUIStore((state) => state.activeRightPanel);
-  const { setAdjustments } = useEditorActions();
   const {
     addFolder,
     addPreset,
@@ -443,7 +449,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     reorderItems,
     sortAllPresetsAlphabetically,
     storageError,
-  } = usePresets(adjustments);
+  } = usePresets(adjustments, editDocumentV2);
   const { showContextMenu } = useContextMenu();
   const density = professionalInspectorDensityTokens;
   const [query, setQuery] = useState('');
@@ -537,8 +543,9 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     () =>
       appliedPreset !== null &&
       appliedPreset.imagePath === (selectedImage?.path ?? null) &&
-      !areAdjustmentsEqual(adjustments, appliedPreset.expected),
-    [adjustments, appliedPreset, selectedImage?.path],
+      (!areAdjustmentsEqual(adjustments, appliedPreset.expected) ||
+        !areEditDocumentsEqual(editDocumentV2, appliedPreset.expectedEditDocumentV2)),
+    [adjustments, appliedPreset, editDocumentV2, selectedImage?.path],
   );
   const previewedPreset = previewedPresetId ? (allPresetMap.get(previewedPresetId) ?? null) : null;
   const hasUserPresets = rootPresets.length > 0 || folders.some((entry) => entry.folder.children.length > 0);
@@ -567,12 +574,13 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       if (!item || previewsRef.current[item.preset.id] !== undefined) continue;
 
       try {
-        const imageData = await invoke<Uint8Array>(Invokes.GeneratePresetPreview, {
-          jsAdjustments: {
-            ...INITIAL_ADJUSTMENTS,
-            ...bindTypedCurveGraphVersion(item.preset.adjustments),
-          },
-        });
+        const previewAdjustments = buildPresetPreviewAdjustments(item.preset);
+        if (previewAdjustments === null) throw new Error('Preset has invalid edit-document preview authority.');
+        const imageData = await invokeWithSchema(
+          Invokes.GeneratePresetPreview,
+          { jsAdjustments: previewAdjustments },
+          z.instanceof(Uint8Array),
+        );
         if (imagePathAtStart !== currentImagePathRef.current) break;
         const previewUrl = URL.createObjectURL(createBlobFromUint8Array(imageData, 'image/jpeg'));
         setPreviews((current) => {
@@ -659,14 +667,20 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         return;
       }
       try {
-        const before = structuredClone(adjustments);
-        const expected = buildReceiptSafePresetApplication(adjustments, bindTypedCurveGraphVersion(preset.adjustments));
-        setAdjustments(() => expected);
+        const state = useEditorStore.getState();
+        const payload = resolveEditDocumentPresetPayload(preset, state.editDocumentV2);
+        if (payload === null) throw new Error('Preset has no descriptor-approved edit nodes.');
+        const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
+        if (request === null) throw new Error('Preset has no applicable edit nodes.');
+        const result = applyEditTransaction(request);
         setActionError(null);
         setSelectedPresetId(preset.id);
+        if (result.noOp) return;
         setAppliedPreset({
-          before,
-          expected,
+          before: result.before,
+          beforeEditDocumentV2: result.beforeEditDocumentV2,
+          expected: result.after,
+          expectedEditDocumentV2: result.afterEditDocumentV2,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,
@@ -676,19 +690,28 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
+    [applyEditTransaction, selectedImage?.path, setAppliedPreset, t],
   );
 
   const applyColorStyle = useCallback(
     (preset: ColorStylePreset) => {
       try {
-        const before = structuredClone(adjustments);
-        const expected = buildReceiptSafePresetApplication(adjustments, preset.adjustmentPatch);
-        setAdjustments(() => expected);
+        const state = useEditorStore.getState();
+        const payload = resolveEditDocumentPresetPayload(
+          { adjustments: preset.adjustmentPatch, includeCropTransform: false },
+          state.editDocumentV2,
+        );
+        if (payload === null) throw new Error('Color style has no descriptor-approved edit nodes.');
+        const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
+        if (request === null) throw new Error('Color style has no applicable edit nodes.');
+        const result = applyEditTransaction(request);
         setActionError(null);
+        if (result.noOp) return;
         setAppliedPreset({
-          before,
-          expected,
+          before: result.before,
+          beforeEditDocumentV2: result.beforeEditDocumentV2,
+          expected: result.after,
+          expectedEditDocumentV2: result.afterEditDocumentV2,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,
@@ -698,15 +721,31 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [adjustments, selectedImage?.path, setAdjustments, setAppliedPreset, t],
+    [applyEditTransaction, selectedImage?.path, setAppliedPreset, t],
   );
 
   const revertAppliedPreset = useCallback(() => {
     if (!appliedPreset) return;
-    setAdjustments(() => structuredClone(appliedPreset.before));
+    const state = useEditorStore.getState();
+    const result = applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+      operations: [
+        {
+          adjustments: structuredClone(appliedPreset.before),
+          editDocumentV2: structuredClone(appliedPreset.beforeEditDocumentV2),
+          type: 'replace-edit-authority',
+        },
+      ],
+      persistence: 'commit',
+      source: 'preset',
+      transactionId: crypto.randomUUID(),
+    });
+    if (result.noOp) return;
     setAppliedPreset(null);
     setActionError(null);
-  }, [appliedPreset, setAdjustments]);
+  }, [appliedPreset, applyEditTransaction, setAppliedPreset]);
 
   const handlePresetKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLButtonElement>, preset: Preset) => {
@@ -817,6 +856,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const handleContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => {
       event.preventDefault();
+      event.stopPropagation();
       const options: Option[] = isFolderEntry(item)
         ? [
             {

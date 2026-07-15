@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from './adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
 
 const resetAdjustmentDocumentSchema = z.custom<Partial<Adjustments>>(
@@ -40,18 +41,23 @@ export interface ResetEditCommitIdentity {
 
 export interface ResetEditTransactionState {
   adjustmentRevision: number;
+  adjustments: Adjustments;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { isReady: boolean; path: string } | null;
 }
+
+const currentImageSessionId = (state: ResetEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const captureResetEditCommitIdentity = (
   state: ResetEditTransactionState,
   targetPath: string,
 ): ResetEditCommitIdentity | null =>
-  state.selectedImage?.isReady === true && state.selectedImage.path === targetPath && state.imageSession !== null
+  state.selectedImage?.isReady === true && state.selectedImage.path === targetPath
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: targetPath,
       }
     : null;
@@ -61,7 +67,7 @@ export const isCurrentResetEditCommitIdentity = (
   identity: ResetEditCommitIdentity,
 ): boolean =>
   state.selectedImage?.path === identity.sourceIdentity &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.adjustmentRevision === identity.adjustmentRevision;
 
 export const buildResetEditTransaction = (
@@ -79,10 +85,8 @@ export const buildResetEditTransaction = (
       `reset_edit_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(
-      `reset_edit_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
-    );
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`reset_edit_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(
@@ -91,6 +95,14 @@ export const buildResetEditTransaction = (
   }
 
   const normalized = normalizeLoadedAdjustments(result.adjustments);
+  const resultVisibility = result.adjustments['sectionVisibility'];
+  const legacyEffectsEnabled =
+    resultVisibility !== null && typeof resultVisibility === 'object' && !Array.isArray(resultVisibility)
+      ? (resultVisibility as Readonly<Record<string, unknown>>)['effects']
+      : undefined;
+  if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && legacyEffectsEnabled === undefined) {
+    normalized.effectsEnabled = state.adjustments.effectsEnabled;
+  }
   const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : null;
   const resetAdjustments: Adjustments = {
     ...structuredClone(INITIAL_ADJUSTMENTS),
@@ -102,7 +114,13 @@ export const buildResetEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'reset',
     imageSessionId: identity.imageSessionId,
-    operations: [{ adjustments: resetAdjustments, type: 'replace-adjustments' }],
+    operations: [
+      {
+        adjustments: resetAdjustments,
+        editDocumentV2: legacyAdjustmentsToEditDocumentV2(resetAdjustments),
+        type: 'replace-edit-authority',
+      },
+    ],
     persistence: 'native-committed',
     source: 'reset',
     transactionId,

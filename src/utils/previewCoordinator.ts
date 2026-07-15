@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { AdaptivePreviewQualityController } from './adaptivePreviewQuality';
+import type { OriginalPreviewRequest } from './originalPreviewEffectRunner';
+import type { PreparedPreviewRequestIntent } from './previewRequestIntentAdapter';
 
 /** Creates the stateful quality policy owned by preview coordination. */
 export const createPreviewQualityPolicy = (): AdaptivePreviewQualityController =>
@@ -169,6 +171,31 @@ export interface PreviewQualitySnapshot {
   tier: string;
 }
 
+export interface PreviewSchedulingOriginalRequest {
+  readonly request: OriginalPreviewRequest;
+  readonly session: PreviewSessionIdentity;
+  readonly viewport: PreviewViewportSnapshot;
+}
+
+export interface PreviewSchedulingInputSnapshot {
+  readonly compareActive: boolean;
+  readonly devicePixelRatio: number;
+  readonly displayHeight: number;
+  readonly displayWidth: number;
+  readonly edited: PreparedPreviewRequestIntent | null;
+  readonly enableLivePreviews: boolean;
+  readonly original: PreviewSchedulingOriginalRequest | null;
+  readonly ready: boolean;
+}
+
+export interface PreviewInvalidationRequest {
+  readonly displayGeneration: number;
+  readonly reason: 'display-generation-changed' | 'scope-recovery-requested';
+  readonly requestId: number | null;
+  readonly sessionFingerprint: string;
+  readonly targetResolution: number;
+}
+
 export interface PreviewTransitionReceipt {
   event: PreviewCoordinatorEvent['type'];
   operationId?: number;
@@ -176,19 +203,36 @@ export interface PreviewTransitionReceipt {
   staleCompletion: boolean;
 }
 
+export interface PreviewAnalyticsIntent {
+  readonly identity: PreviewOperationIdentity;
+  readonly receiptId: number;
+}
+
+export interface PreviewAnalyticsTransitionReceipt {
+  readonly action: 'buffered' | 'cleared' | 'discarded' | 'published';
+  readonly operationId: number | null;
+  readonly reason: string;
+  readonly receiptId: number | null;
+}
+
 export interface PreviewCoordinatorState {
   analytics: PreviewOperationState;
+  analyticsTransitions: readonly PreviewAnalyticsTransitionReceipt[];
   desired: PreviewIntent | null;
   displayGeneration: number;
   interactive: PreviewOperationState;
   interactionGeneration: number;
   interactionActive: boolean;
+  invalidationSourceFingerprint: string | null;
+  handledScopeRecoveryRequestId: number | null;
   lastTransition: PreviewTransitionReceipt | null;
   nextOperationId: number;
   original: PreviewOperationState;
   originalArtifact: PreviewArtifact | null;
   persistence: PreviewOperationState;
+  pendingAnalytics: readonly PreviewAnalyticsIntent[];
   quality: PreviewQualitySnapshot | null;
+  schedulingInputs: PreviewSchedulingInputSnapshot | null;
   settled: PreviewOperationState;
   session: PreviewSessionIdentity | null;
   staleCompletionCount: number;
@@ -197,16 +241,25 @@ export interface PreviewCoordinatorState {
 }
 
 export type PreviewCoordinatorEffect =
+  | { type: 'capture-invalidation'; invalidation: PreviewInvalidationRequest; scopeRecovery: boolean }
+  | { type: 'clear-analytics'; reason: string }
+  | { type: 'discard-analytics'; receiptId: number; reason: string }
+  | { type: 'publish-analytics'; identity: PreviewOperationIdentity; receiptId: number; reason: string }
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
+  | { type: 'clear-original'; reason: string }
   | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'publish'; artifact: PreviewArtifact; identity: PreviewOperationIdentity; reason: string }
   | { type: 'release-url'; url: string; reason: string }
+  | { type: 'schedule-edited'; delayMs: number; prepared: PreparedPreviewRequestIntent; reason: string }
+  | { type: 'schedule-original'; delayMs: number; prepared: PreviewSchedulingOriginalRequest; reason: string }
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
 
 export type PreviewCoordinatorEvent =
+  | { type: 'analytics-result-received'; identity: PreviewOperationIdentity; receiptId: number }
   | { type: 'cancel-session'; reason?: string }
   | { type: 'display-generation-changed'; generation: number }
   | { type: 'image-session-installed'; session: PreviewSessionIdentity }
+  | { type: 'invalidation-source-installed'; scopeRecoveryRequestId: number; session: PreviewSessionIdentity }
   | { type: 'interaction-ended'; settledIdentity?: PreviewSessionIdentity }
   | { type: 'interaction-started' }
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
@@ -214,6 +267,13 @@ export type PreviewCoordinatorEvent =
   | { type: 'original-preview-cleared'; reason: string }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
   | { type: 'quality-decision-changed'; quality: PreviewQualitySnapshot }
+  | {
+      type: 'preview-invalidation-captured';
+      inputs: PreviewSchedulingInputSnapshot;
+      invalidation: PreviewInvalidationRequest;
+    }
+  | { type: 'preview-invalidation-requested'; invalidation: PreviewInvalidationRequest }
+  | { type: 'scheduling-inputs-changed'; inputs: PreviewSchedulingInputSnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
   | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
 
@@ -227,17 +287,22 @@ const idleOperation = (): PreviewOperationState => ({ status: 'idle' });
 export function createPreviewCoordinatorState(): PreviewCoordinatorState {
   return {
     analytics: idleOperation(),
+    analyticsTransitions: [],
     desired: null,
     displayGeneration: 1,
     interactive: idleOperation(),
     interactionGeneration: 1,
     interactionActive: false,
+    invalidationSourceFingerprint: null,
+    handledScopeRecoveryRequestId: null,
     lastTransition: null,
     nextOperationId: 1,
     original: idleOperation(),
     originalArtifact: null,
     persistence: idleOperation(),
+    pendingAnalytics: [],
     quality: null,
+    schedulingInputs: null,
     settled: idleOperation(),
     session: null,
     staleCompletionCount: 0,
@@ -302,6 +367,37 @@ function withReceipt(
   };
 }
 
+const withAnalyticsReceipt = (
+  state: PreviewCoordinatorState,
+  receipt: PreviewAnalyticsTransitionReceipt,
+): PreviewCoordinatorState => ({
+  ...state,
+  analyticsTransitions: [...state.analyticsTransitions, receipt].slice(-32),
+});
+
+const discardPendingAnalytics = (
+  state: PreviewCoordinatorState,
+  effects: PreviewCoordinatorEffect[],
+  reason: string,
+  predicate: (intent: PreviewAnalyticsIntent) => boolean = () => true,
+): PreviewCoordinatorState => {
+  const discarded = state.pendingAnalytics.filter(predicate);
+  let next = state;
+  for (const intent of discarded) {
+    effects.push({ receiptId: intent.receiptId, reason, type: 'discard-analytics' });
+    next = withAnalyticsReceipt(next, {
+      action: 'discarded',
+      operationId: intent.identity.operationId,
+      reason,
+      receiptId: intent.receiptId,
+    });
+  }
+  return {
+    ...next,
+    pendingAnalytics: state.pendingAnalytics.filter((intent) => !predicate(intent)),
+  };
+};
+
 function cancelActiveOperations(
   state: PreviewCoordinatorState,
   effects: PreviewCoordinatorEffect[],
@@ -313,7 +409,9 @@ function cancelActiveOperations(
   for (const kind of previewOperationKindSchema.options) {
     const operation = operationForKind(next, kind);
     if (operation.identity === undefined || !['queued', 'running'].includes(operation.status)) continue;
-    effects.push({ type: 'cancel', identity: operation.identity, reason });
+    const identity = operation.identity;
+    effects.push({ type: 'cancel', identity, reason });
+    next = discardPendingAnalytics(next, effects, reason, (intent) => sameOperation(intent.identity, identity));
     next = updateOperation(next, kind, { ...operation, status: 'cancelled' });
   }
   if (releaseVisibleArtifact && next.visibleArtifact !== null) {
@@ -326,6 +424,14 @@ function cancelActiveOperations(
       effects.push({ type: 'release-url', url: next.originalArtifact.url, reason });
     }
     next = { ...next, originalArtifact: null };
+  }
+  if (releaseVisibleArtifact) {
+    next = discardPendingAnalytics(next, effects, reason);
+    if (next.analytics.status !== 'idle' || state.visibleArtifact !== null) {
+      effects.push({ reason, type: 'clear-analytics' });
+      next = withAnalyticsReceipt(next, { action: 'cleared', operationId: null, reason, receiptId: null });
+    }
+    next = { ...next, analytics: idleOperation() };
   }
   return next;
 }
@@ -343,12 +449,373 @@ function makeOperationIdentity(
   });
 }
 
+const editedSchedulingFingerprint = (inputs: PreviewSchedulingInputSnapshot | null): string | null => {
+  if (inputs === null || inputs.edited === null) return null;
+  const request = inputs.edited.request;
+  return JSON.stringify({
+    activeWaveformChannel: request.activeWaveformChannel,
+    computeWaveform: request.computeWaveform,
+    devicePixelRatio: inputs.devicePixelRatio,
+    kind: request.kind,
+    proof: request.proof,
+    quality: request.quality,
+    roi: request.roi,
+    scopeRecovery: request.scopeRecovery,
+    session: fingerprintPreviewSessionIdentity(request.session),
+    targetResolution: request.targetResolution,
+  });
+};
+
+const originalSchedulingFingerprint = (inputs: PreviewSchedulingInputSnapshot | null): string | null => {
+  if (inputs === null || inputs.original === null) return null;
+  const session = inputs.original.session;
+  return JSON.stringify({
+    devicePixelRatio: inputs.devicePixelRatio,
+    displayHeight: inputs.displayHeight,
+    displayWidth: inputs.displayWidth,
+    geometryRevision: session.geometryRevision,
+    imageSessionId: session.imageSessionId,
+    sourceImagePath: session.sourceImagePath,
+    sourceRevision: session.sourceRevision,
+    targetHeight: session.targetHeight,
+    targetWidth: session.targetWidth,
+  });
+};
+
+const schedulingSession = (inputs: PreviewSchedulingInputSnapshot | null): PreviewSessionIdentity | null =>
+  inputs?.edited?.request.session ?? inputs?.original?.session ?? null;
+
+const sameSchedulingSource = (a: PreviewSessionIdentity, b: PreviewSessionIdentity): boolean =>
+  a.imageSessionId === b.imageSessionId &&
+  a.sourceImagePath === b.sourceImagePath &&
+  a.sourceRevision === b.sourceRevision;
+
+const fingerprintInvalidationSource = (session: PreviewSessionIdentity): string =>
+  JSON.stringify({
+    imageSessionId: session.imageSessionId,
+    sourceImagePath: session.sourceImagePath,
+    sourceRevision: session.sourceRevision,
+  });
+
+const sameInvalidationAuthority = (current: PreviewSessionIdentity, captured: PreviewSessionIdentity): boolean =>
+  current.adjustmentRevision === captured.adjustmentRevision &&
+  current.backend === captured.backend &&
+  current.displayGeneration === captured.displayGeneration &&
+  current.geometryRevision === captured.geometryRevision &&
+  current.graphRevision === captured.graphRevision &&
+  current.imageSessionId === captured.imageSessionId &&
+  current.maskRevision === captured.maskRevision &&
+  current.patchRevision === captured.patchRevision &&
+  current.proofRevision === captured.proofRevision &&
+  current.sourceImagePath === captured.sourceImagePath &&
+  current.sourceRevision === captured.sourceRevision;
+
+const clearScheduledOriginal = (
+  state: PreviewCoordinatorState,
+  effects: PreviewCoordinatorEffect[],
+  reason: string,
+): PreviewCoordinatorState => {
+  const original = state.original;
+  if (
+    original.identity !== undefined &&
+    ['queued', 'running'].includes(original.status) &&
+    !effects.some(
+      (effect) => effect.type === 'cancel' && effect.identity.operationId === original.identity?.operationId,
+    )
+  ) {
+    effects.push({ type: 'cancel', identity: original.identity, reason });
+  }
+  if (state.originalArtifact !== null && state.originalArtifact.url !== state.visibleArtifact?.url) {
+    effects.push({ type: 'release-url', url: state.originalArtifact.url, reason });
+  }
+  effects.push({ type: 'clear-original', reason });
+  return { ...state, original: idleOperation(), originalArtifact: null };
+};
+
 export function reducePreviewCoordinator(
   input: PreviewCoordinatorState,
   event: PreviewCoordinatorEvent,
 ): PreviewCoordinatorTransition {
   let state = input;
   const effects: PreviewCoordinatorEffect[] = [];
+
+  if (event.type === 'invalidation-source-installed') {
+    const installedSession = previewSessionIdentitySchema.parse(event.session);
+    const scopeRecoveryRequestId = revisionSchema.parse(event.scopeRecoveryRequestId);
+    const sourceFingerprint = fingerprintInvalidationSource(installedSession);
+    const installed = reducePreviewCoordinator(state, {
+      session: installedSession,
+      type: 'image-session-installed',
+    });
+    state = {
+      ...installed.state,
+      handledScopeRecoveryRequestId:
+        sourceFingerprint === state.invalidationSourceFingerprint
+          ? state.handledScopeRecoveryRequestId
+          : scopeRecoveryRequestId,
+      invalidationSourceFingerprint: sourceFingerprint,
+    };
+    return {
+      effects: installed.effects,
+      state: withReceipt(state, event, 'invalidation-source-installed'),
+    };
+  }
+
+  if (event.type === 'preview-invalidation-requested') {
+    const invalidation: PreviewInvalidationRequest = {
+      ...event.invalidation,
+      displayGeneration: positiveRevisionSchema.parse(event.invalidation.displayGeneration),
+      requestId: event.invalidation.requestId === null ? null : revisionSchema.parse(event.invalidation.requestId),
+      targetResolution: positiveRevisionSchema.parse(event.invalidation.targetResolution),
+    };
+    const currentSession = state.session;
+    if (
+      currentSession === null ||
+      fingerprintPreviewSessionIdentity(currentSession) !== invalidation.sessionFingerprint
+    ) {
+      return { effects, state: withReceipt(state, event, 'preview-invalidation-stale') };
+    }
+
+    if (invalidation.reason === 'scope-recovery-requested') {
+      if (
+        invalidation.requestId === null ||
+        (state.handledScopeRecoveryRequestId !== null && invalidation.requestId <= state.handledScopeRecoveryRequestId)
+      ) {
+        return { effects, state: withReceipt(state, event, 'scope-recovery-duplicate') };
+      }
+      state = { ...state, handledScopeRecoveryRequestId: invalidation.requestId };
+    } else {
+      if (invalidation.requestId !== null || invalidation.displayGeneration <= state.displayGeneration) {
+        return { effects, state: withReceipt(state, event, 'display-generation-stale') };
+      }
+      const invalidated = reducePreviewCoordinator(state, {
+        generation: invalidation.displayGeneration,
+        type: 'display-generation-changed',
+      });
+      state = invalidated.state;
+      effects.push(...invalidated.effects);
+    }
+
+    effects.push({
+      invalidation,
+      scopeRecovery: invalidation.reason === 'scope-recovery-requested',
+      type: 'capture-invalidation',
+    });
+    return { effects, state: withReceipt(state, event, 'preview-invalidation-current') };
+  }
+
+  if (event.type === 'preview-invalidation-captured') {
+    const invalidation = event.invalidation;
+    const currentSession = state.session;
+    const capturedSession = schedulingSession(event.inputs);
+    const displayAdjustedSession =
+      currentSession === null ? null : { ...currentSession, displayGeneration: state.displayGeneration };
+    const tokenCurrent =
+      currentSession !== null &&
+      state.displayGeneration === invalidation.displayGeneration &&
+      fingerprintPreviewSessionIdentity(currentSession) === invalidation.sessionFingerprint &&
+      (invalidation.reason !== 'scope-recovery-requested' ||
+        state.handledScopeRecoveryRequestId === invalidation.requestId);
+    if (
+      !tokenCurrent ||
+      capturedSession === null ||
+      displayAdjustedSession === null ||
+      !sameInvalidationAuthority(displayAdjustedSession, capturedSession)
+    ) {
+      return { effects, state: withReceipt(state, event, 'captured-invalidation-stale') };
+    }
+    const scheduled = reducePreviewCoordinator(state, {
+      inputs: event.inputs,
+      type: 'scheduling-inputs-changed',
+    });
+    return {
+      effects: scheduled.effects,
+      state: withReceipt(scheduled.state, event, 'captured-invalidation-scheduled'),
+    };
+  }
+
+  if (event.type === 'analytics-result-received') {
+    const identity = previewOperationIdentitySchema.parse(event.identity);
+    const receiptId = positiveRevisionSchema.parse(event.receiptId);
+    const visibleCurrent = state.visibleArtifact !== null && sameOperation(state.visibleArtifact.identity, identity);
+    const alreadyPublished =
+      state.analytics.status === 'presented' && sameOperation(state.analytics.identity, identity);
+    const operation = operationForKind(state, identity.kind);
+    const operationCurrent =
+      identity.kind !== 'original' &&
+      identity.kind !== 'analytics' &&
+      sameOperation(operation.identity, identity) &&
+      ['queued', 'running', 'presented'].includes(operation.status);
+
+    if (alreadyPublished || state.pendingAnalytics.some((intent) => sameOperation(intent.identity, identity))) {
+      effects.push({ receiptId, reason: 'duplicate-analytics-result', type: 'discard-analytics' });
+      state = withAnalyticsReceipt(state, {
+        action: 'discarded',
+        operationId: identity.operationId,
+        reason: 'duplicate-analytics-result',
+        receiptId,
+      });
+      return { effects, state: withReceipt(state, event, 'duplicate-analytics-result', identity.operationId) };
+    }
+    if (visibleCurrent) {
+      effects.push({ identity, receiptId, reason: 'presented-artifact-analytics', type: 'publish-analytics' });
+      state = withAnalyticsReceipt(
+        { ...state, analytics: { identity, status: 'presented' } },
+        {
+          action: 'published',
+          operationId: identity.operationId,
+          reason: 'presented-artifact-analytics',
+          receiptId,
+        },
+      );
+      return { effects, state: withReceipt(state, event, 'analytics-published', identity.operationId) };
+    }
+    if (operationCurrent) {
+      if (state.pendingAnalytics.length >= 4) {
+        const oldest = state.pendingAnalytics[0];
+        if (oldest !== undefined) {
+          state = discardPendingAnalytics(state, effects, 'analytics-buffer-bounded', (intent) => intent === oldest);
+        }
+      }
+      state = withAnalyticsReceipt(
+        { ...state, pendingAnalytics: [...state.pendingAnalytics, { identity, receiptId }] },
+        { action: 'buffered', operationId: identity.operationId, reason: 'analytics-before-presentation', receiptId },
+      );
+      return { effects, state: withReceipt(state, event, 'analytics-buffered', identity.operationId) };
+    }
+    effects.push({ receiptId, reason: 'stale-analytics-result', type: 'discard-analytics' });
+    state = withAnalyticsReceipt(state, {
+      action: 'discarded',
+      operationId: identity.operationId,
+      reason: 'stale-analytics-result',
+      receiptId,
+    });
+    return { effects, state: withReceipt(state, event, 'stale-analytics-result', identity.operationId, true) };
+  }
+
+  if (event.type === 'scheduling-inputs-changed') {
+    const inputs = event.inputs;
+    if (
+      !Number.isFinite(inputs.devicePixelRatio) ||
+      inputs.devicePixelRatio <= 0 ||
+      !Number.isFinite(inputs.displayHeight) ||
+      inputs.displayHeight < 0 ||
+      !Number.isFinite(inputs.displayWidth) ||
+      inputs.displayWidth < 0
+    ) {
+      throw new Error('preview_coordinator.invalid_scheduling_inputs');
+    }
+    const previous = state.schedulingInputs;
+    const previousSession = schedulingSession(previous);
+    const nextSession = schedulingSession(inputs);
+    const sourceChanged =
+      previousSession !== null && (nextSession === null || !sameSchedulingSource(previousSession, nextSession));
+    const geometryChanged =
+      previousSession !== null &&
+      nextSession !== null &&
+      previousSession.geometryRevision !== nextSession.geometryRevision;
+    const previousInteraction = previous?.edited?.request.kind === 'interactive';
+    const nextInteraction = inputs.edited?.request.kind === 'interactive';
+    const interactionStarted = !previousInteraction && nextInteraction;
+    const interactionEnded = previousInteraction && !nextInteraction;
+
+    if (!inputs.ready || inputs.edited === null || nextSession === null) {
+      const shouldClearOriginal =
+        previous?.compareActive === true || state.original.identity !== undefined || state.originalArtifact !== null;
+      state = cancelActiveOperations(state, effects, 'preview-inputs-not-ready');
+      if (shouldClearOriginal) state = clearScheduledOriginal(state, effects, 'preview-inputs-not-ready');
+      state = {
+        ...state,
+        desired: null,
+        interactionActive: false,
+        interactive: idleOperation(),
+        original: idleOperation(),
+        schedulingInputs: inputs,
+        session: null,
+        settled: idleOperation(),
+        viewport: null,
+      };
+      return { effects, state: withReceipt(state, event, 'preview-inputs-not-ready') };
+    }
+
+    if (sourceChanged) {
+      state = cancelActiveOperations(state, effects, 'scheduling-source-changed');
+      state = clearScheduledOriginal(state, effects, 'scheduling-source-changed');
+      state = {
+        ...state,
+        desired: null,
+        interactive: idleOperation(),
+        original: idleOperation(),
+        session: null,
+        settled: idleOperation(),
+        viewport: null,
+      };
+    } else if (geometryChanged || (previous?.compareActive === true && !inputs.compareActive)) {
+      state = clearScheduledOriginal(
+        state,
+        effects,
+        geometryChanged ? 'original-geometry-changed' : 'compare-disabled',
+      );
+    }
+
+    if (interactionStarted || interactionEnded) {
+      state = {
+        ...state,
+        interactionActive: nextInteraction,
+        interactionGeneration: state.interactionGeneration + 1,
+      };
+    }
+
+    const editedChanged =
+      sourceChanged ||
+      editedSchedulingFingerprint(previous) !== editedSchedulingFingerprint(inputs) ||
+      previous?.enableLivePreviews !== inputs.enableLivePreviews;
+    if (editedChanged && (!nextInteraction || inputs.enableLivePreviews)) {
+      effects.push({
+        delayMs: nextInteraction ? 0 : 50,
+        prepared: inputs.edited,
+        reason: interactionEnded
+          ? 'interaction-settled-successor'
+          : nextInteraction
+            ? 'interactive-inputs-changed'
+            : 'settled-inputs-changed',
+        type: 'schedule-edited',
+      });
+    }
+
+    const originalReady =
+      inputs.compareActive &&
+      !nextInteraction &&
+      inputs.displayWidth > 0 &&
+      inputs.displayHeight > 0 &&
+      inputs.original !== null;
+    const originalChanged =
+      sourceChanged ||
+      geometryChanged ||
+      interactionEnded ||
+      previous?.compareActive !== inputs.compareActive ||
+      originalSchedulingFingerprint(previous) !== originalSchedulingFingerprint(inputs);
+    if (originalReady && originalChanged && inputs.original !== null) {
+      effects.push({
+        delayMs: state.originalArtifact === null ? 0 : 200,
+        prepared: inputs.original,
+        reason: 'compare-original-inputs-changed',
+        type: 'schedule-original',
+      });
+    }
+
+    state = { ...state, schedulingInputs: inputs };
+    return {
+      effects,
+      state: withReceipt(
+        state,
+        event,
+        editedChanged || (originalReady && originalChanged)
+          ? 'scheduling-inputs-applied'
+          : 'scheduling-inputs-unchanged',
+      ),
+    };
+  }
 
   if (event.type === 'image-session-installed') {
     const sessionChanged = state.session !== null && !sameSession(state.session, event.session);
@@ -373,8 +840,11 @@ export function reducePreviewCoordinator(
     state = {
       ...state,
       desired: null,
+      handledScopeRecoveryRequestId: null,
+      invalidationSourceFingerprint: null,
       interactive: idleOperation(),
       original: idleOperation(),
+      schedulingInputs: null,
       settled: idleOperation(),
       session: null,
       viewport: null,
@@ -436,6 +906,7 @@ export function reducePreviewCoordinator(
       interactive: idleOperation(),
       original: idleOperation(),
       quality: null,
+      schedulingInputs: null,
       settled: idleOperation(),
       viewport: null,
     };
@@ -532,6 +1003,9 @@ export function reducePreviewCoordinator(
     }
 
     if (event.type === 'operation-failed') {
+      state = discardPendingAnalytics(state, effects, 'analytics-operation-failed', (intent) =>
+        sameOperation(intent.identity, identity),
+      );
       state = updateOperation(state, identity.kind, { error: event.error, identity, status: 'failed' });
       return { effects, state: withReceipt(state, event, 'operation-failed', identity.operationId) };
     }
@@ -574,8 +1048,48 @@ export function reducePreviewCoordinator(
       if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
         effects.push({ type: 'release-url', url: previousUrl, reason: 'artifact-replaced' });
       }
+      if (state.visibleArtifact !== null && !sameOperation(state.visibleArtifact.identity, identity)) {
+        effects.push({ reason: 'presented-artifact-replaced', type: 'clear-analytics' });
+        state = withAnalyticsReceipt(
+          { ...state, analytics: idleOperation() },
+          {
+            action: 'cleared',
+            operationId: state.visibleArtifact.identity.operationId,
+            reason: 'presented-artifact-replaced',
+            receiptId: null,
+          },
+        );
+      }
       effects.push({ type: 'publish', artifact: event.artifact, identity, reason: 'operation-presented' });
       state = { ...state, visibleArtifact: event.artifact };
+      const pending = state.pendingAnalytics.find((intent) => sameOperation(intent.identity, identity));
+      state = discardPendingAnalytics(
+        state,
+        effects,
+        'analytics-artifact-superseded',
+        (intent) => !sameOperation(intent.identity, identity),
+      );
+      if (pending !== undefined) {
+        effects.push({
+          identity,
+          receiptId: pending.receiptId,
+          reason: 'buffered-analytics-presented',
+          type: 'publish-analytics',
+        });
+        state = withAnalyticsReceipt(
+          {
+            ...state,
+            analytics: { identity, status: 'presented' },
+            pendingAnalytics: state.pendingAnalytics.filter((intent) => intent.receiptId !== pending.receiptId),
+          },
+          {
+            action: 'published',
+            operationId: identity.operationId,
+            reason: 'buffered-analytics-presented',
+            receiptId: pending.receiptId,
+          },
+        );
+      }
     }
     return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
   }

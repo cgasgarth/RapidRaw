@@ -16,9 +16,13 @@ export interface ViewerBrushLine {
 }
 
 export interface ViewerBrushSessionIdentity {
+  readonly adjustmentRevision: number;
+  readonly containerId: string;
+  readonly containerKind: 'aiPatches' | 'masks';
   readonly geometryEpoch: number;
   readonly imageSessionId: string;
   readonly maskId: string;
+  readonly sourceIdentity: string;
   readonly sourceRevision: string;
   readonly toolId: 'brush';
 }
@@ -91,9 +95,13 @@ export interface ViewerBrushInteractionController {
 
 const sameIdentity = (key: ViewerBrushSessionIdentity, context: ViewerBrushCurrentContext): boolean =>
   context.active &&
+  key.adjustmentRevision === context.adjustmentRevision &&
+  key.containerId === context.containerId &&
+  key.containerKind === context.containerKind &&
   key.geometryEpoch === context.geometryEpoch &&
   key.imageSessionId === context.imageSessionId &&
   key.maskId === context.maskId &&
+  key.sourceIdentity === context.sourceIdentity &&
   key.sourceRevision === context.sourceRevision &&
   key.toolId === context.toolId;
 
@@ -151,14 +159,22 @@ export const createViewerBrushInteractionController = (): ViewerBrushInteraction
     const commands = cancel('session-invalidated');
     const identityChanged =
       identity === null ||
+      identity.adjustmentRevision !== context.adjustmentRevision ||
+      identity.containerId !== context.containerId ||
+      identity.containerKind !== context.containerKind ||
       identity.imageSessionId !== context.imageSessionId ||
       identity.maskId !== context.maskId ||
+      identity.sourceIdentity !== context.sourceIdentity ||
       identity.sourceRevision !== context.sourceRevision;
     if (identityChanged) lastCommittedPoint = null;
     identity = {
+      adjustmentRevision: context.adjustmentRevision,
+      containerId: context.containerId,
+      containerKind: context.containerKind,
       geometryEpoch: context.geometryEpoch,
       imageSessionId: context.imageSessionId,
       maskId: context.maskId,
+      sourceIdentity: context.sourceIdentity,
       sourceRevision: context.sourceRevision,
       toolId: context.toolId,
     };

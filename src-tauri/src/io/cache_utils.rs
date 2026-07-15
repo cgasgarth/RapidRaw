@@ -103,8 +103,7 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
     }
     adjustments
-        .get("sectionVisibility")
-        .and_then(|visibility| visibility.get("color"))
+        .get("effectsEnabled")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(true)
         .hash(&mut hasher);
@@ -199,12 +198,31 @@ mod tests {
             "a native color edit must rebuild the preview and zoom source image"
         );
 
-        let mut hidden = base.clone();
-        hidden["sectionVisibility"]["color"] = json!(false);
+        let mut collapsed = base.clone();
+        collapsed["sectionVisibility"]["color"] = json!(false);
+        assert_eq!(
+            calculate_transform_hash(&base),
+            calculate_transform_hash(&collapsed),
+            "workspace disclosure must not participate in render fingerprints"
+        );
+
+        let disabled = json!({});
         assert_ne!(
             calculate_transform_hash(&base),
-            calculate_transform_hash(&hidden),
-            "hiding the color section must invalidate baked mixer pixels"
+            calculate_transform_hash(&disabled),
+            "compiled disabled color nodes omit their render fields"
+        );
+    }
+
+    #[test]
+    fn effects_enablement_invalidates_the_transformed_preview_cache() {
+        let enabled = json!({ "effectsEnabled": true, "grainAmount": 42 });
+        let disabled = json!({ "effectsEnabled": false, "grainAmount": 42 });
+
+        assert_ne!(
+            calculate_transform_hash(&enabled),
+            calculate_transform_hash(&disabled),
+            "enabling or disabling latent Effects parameters must rebuild preview pixels"
         );
     }
 }

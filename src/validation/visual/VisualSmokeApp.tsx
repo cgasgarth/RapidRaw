@@ -40,6 +40,7 @@ import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import ViewerFooter from '../../components/panel/editor/ViewerFooter';
 import type { ViewerInitialMaskDrawCommand } from '../../components/panel/editor/viewerInitialMaskDrawInteractionController';
 import type { ViewerParametricMaskTargetCommand } from '../../components/panel/editor/viewerParametricMaskTargetInteractionController';
+import type { ViewerRetouchCommand } from '../../components/panel/editor/viewerRetouchHandlesController';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { AgentPanel } from '../../components/panel/right/ai/AgentPanel';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
@@ -110,6 +111,7 @@ import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import {
   ActiveChannel,
   type Adjustments,
+  createDefaultMaskEditNodes,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -117,6 +119,7 @@ import {
 import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
+import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import {
@@ -132,6 +135,7 @@ import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmok
 
 const ignoreInitialMaskDrawCommit = (_command: ViewerInitialMaskDrawCommand): void => {};
 const ignoreParametricMaskTargetCommit = (_command: ViewerParametricMaskTargetCommand): void => {};
+const ignoreRetouchCommand = (_command: ViewerRetouchCommand): void => {};
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -337,17 +341,14 @@ function useAdjustmentPanelSmokeState() {
       clarity: 18,
       contrast: 12,
       glowAmount: 16,
+      effectsEnabled: false,
       levels: {
         ...INITIAL_ADJUSTMENTS.levels,
         inputBlack: 0.06,
         inputWhite: 0.92,
       },
-      sectionVisibility: {
-        ...INITIAL_ADJUSTMENTS.sectionVisibility,
-        effects: false,
-      },
     };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       copiedSectionAdjustments: {
         section: 'basic',
@@ -1174,7 +1175,7 @@ function useProfessionalEditorToolbarSmokeState() {
       },
       osPlatform: 'macos',
     });
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: masks,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform: {
@@ -1203,7 +1204,7 @@ function useProfessionalEditorToolbarSmokeState() {
 function useProfessionalEditorSmokeState() {
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       displaySize: { height: 540, width: 810 },
       histogram: null,
@@ -1231,9 +1232,9 @@ function useProfessionalFilmstripContextSmokeState() {
       highlights: -28,
       shadows: 18,
     };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
-      copiedAdjustments: { contrast: adjustments.contrast, exposure: adjustments.exposure },
+      copiedEditDocumentV2: copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2(adjustments)),
       displaySize: { height: 680, width: 1020 },
       histogram: null,
       history: [adjustments],
@@ -1486,7 +1487,7 @@ function useProfessionalEditorStatusChipsSmokeState() {
       width: 240,
     };
 
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform,
@@ -2391,6 +2392,8 @@ const createBrushMaskCanvasSubMask = (): SubMask => ({
 const createBrushMaskCanvasContainer = (subMask: SubMask): MaskContainer => ({
   adjustments: INITIAL_ADJUSTMENTS,
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: brushMaskCanvasContainerId,
   invert: false,
   name: 'Brush canvas proof',
@@ -2457,6 +2460,7 @@ function BrushMaskCanvasVisualSmoke() {
           <div className="grid place-items-center bg-[#0b0d10] p-8">
             <div className="relative h-[360px] w-[640px] overflow-hidden rounded border border-white/10 bg-black">
               <ImageCanvas
+                adjustmentRevision={0}
                 activeAiPatchContainerId={null}
                 activeAiSubMaskId={null}
                 activeMaskContainerId={brushMaskCanvasContainerId}
@@ -2464,6 +2468,7 @@ function BrushMaskCanvasVisualSmoke() {
                 adjustments={adjustments}
                 appSettings={null}
                 brushSettings={brushSettings}
+                brushImageSessionId="editor-image-session:51"
                 crop={null}
                 cursorStyle="crosshair"
                 exportSoftProofRecipeId={null}
@@ -2472,7 +2477,7 @@ function BrushMaskCanvasVisualSmoke() {
                 gamutWarningOverlay={null}
                 handleCropComplete={() => {}}
                 hasRenderedFirstFrame
-                imageSessionId="visual-smoke:brush-mask-canvas"
+                imageSessionId={null}
                 imageRenderSize={{
                   height: brushMaskCanvasImageHeight,
                   offsetX: 0,
@@ -2491,28 +2496,27 @@ function BrushMaskCanvasVisualSmoke() {
                 isSliderDragging={false}
                 isStraightenActive={false}
                 maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
-                onGenerateAiMask={() => {}}
+                onAiMaskBoxCommit={() => {}}
+                onBrushCommit={(command) => {
+                  if (
+                    command.key.containerId !== brushMaskCanvasContainerId ||
+                    command.key.maskId !== brushMaskCanvasSubMaskId
+                  ) {
+                    return;
+                  }
+                  setSubMask((current) => ({ ...current, parameters: command.parameters }));
+                  setLivePreview(null);
+                }}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
+                onRetouchCommand={ignoreRetouchCommand}
                 onLiveMaskPreview={(preview) => {
                   if (isMaskContainer(preview)) setLivePreview(preview);
                 }}
-                onQuickErase={() => {}}
                 onSelectAiSubMask={() => {}}
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
                 selectedImage={brushMaskCanvasImage}
-                setAdjustments={(updater) => {
-                  setSubMask((current) => {
-                    const previous: Adjustments = {
-                      ...INITIAL_ADJUSTMENTS,
-                      aiPatches: [],
-                      masks: [createBrushMaskCanvasContainer(current)],
-                    };
-                    const next = updater(previous);
-                    return next.masks[0]?.subMasks[0] ?? current;
-                  });
-                }}
                 setCrop={() => {}}
                 setIsMaskHovered={() => {}}
                 setIsMaskTouchInteracting={() => {}}
@@ -2613,7 +2617,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
       rotation: 2.4,
     };
 
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: nextAdjustments,
       displaySize: { height: 405, width: 720 },
       finalPreviewUrl: brushMaskCanvasImageDataUrl,
@@ -2673,6 +2677,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
               style={{ maxHeight: 520, maxWidth: 920 }}
             >
               <ImageCanvas
+                adjustmentRevision={0}
                 activeAiPatchContainerId={null}
                 activeAiSubMaskId={null}
                 activeMaskContainerId={null}
@@ -2680,6 +2685,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 adjustments={adjustments}
                 appSettings={null}
                 brushSettings={null}
+                brushImageSessionId="visual-smoke:crop-transform"
                 crop={crop}
                 cursorStyle="default"
                 exportSoftProofRecipeId={null}
@@ -2704,19 +2710,17 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 isStraightenActive={isStraightenActive}
                 liveRotation={liveRotation}
                 maskOverlayUrl={null}
-                onGenerateAiMask={() => {}}
+                onAiMaskBoxCommit={() => {}}
+                onBrushCommit={() => {}}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
-                onQuickErase={() => {}}
+                onRetouchCommand={ignoreRetouchCommand}
                 onSelectAiSubMask={() => {}}
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
                 overlayMode={overlayMode}
                 overlayRotation={overlayRotation}
                 selectedImage={cropTransformSmokeImage}
-                setAdjustments={(updater) => {
-                  useEditorStore.getState().setEditor((state) => ({ adjustments: updater(state.adjustments) }));
-                }}
                 setCrop={(nextCrop: Crop, _percentageCrop: PercentCrop) => {
                   setCropState(nextCrop);
                 }}
@@ -2787,6 +2791,8 @@ const professionalCanvasRetouchMask: SubMask = {
 const professionalCanvasRetouchContainer: MaskContainer = {
   adjustments: INITIAL_ADJUSTMENTS,
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: professionalCanvasRetouchLayerId,
   invert: false,
   name: 'Retouch canvas proof',
@@ -2886,7 +2892,9 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
   const brushOverlayUrl = buildBrushMaskCanvasOverlayUrl(professionalCanvasBrushSubMask);
 
   const baseCanvasProps = {
+    adjustmentRevision: 0,
     appSettings: professionalCanvasAppSettings,
+    brushImageSessionId: 'visual-smoke:professional-canvas',
     cursorStyle: 'default',
     exportSoftProofRecipeId: null,
     exportSoftProofTransform: null,
@@ -2904,15 +2912,15 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     isSliderDragging: false,
     isStraightenActive: false,
     liveRotation: null,
-    onGenerateAiMask: () => {},
+    onAiMaskBoxCommit: () => {},
+    onBrushCommit: () => {},
     onInitialMaskDrawCommit: ignoreInitialMaskDrawCommit,
     onParametricMaskTargetCommit: ignoreParametricMaskTargetCommit,
-    onQuickErase: () => {},
+    onRetouchCommand: ignoreRetouchCommand,
     onSelectAiSubMask: () => {},
     onSelectMask: () => {},
     onStraighten: () => {},
     selectedImage: brushMaskCanvasImage,
-    setAdjustments: () => {},
     setCrop: () => {},
     setIsMaskHovered: () => {},
     setIsMaskTouchInteracting: () => {},
@@ -3018,7 +3026,6 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isCropping={false}
                 isMasking
                 maskOverlayUrl={null}
-                setAdjustments={setRetouchAdjustments}
               />
             </div>
             <div
@@ -3130,7 +3137,7 @@ function WorkflowRailVisualSmoke() {
 
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       histogram: null,
       history: [adjustments],
@@ -3365,7 +3372,7 @@ function AgentChatVisualSmoke() {
       rootPaths: ['/Users/cgas/Pictures/Capture One'],
       sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
     });
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
       hasRenderedFirstFrame: true,
@@ -3495,7 +3502,7 @@ function ProfessionalAgentReviewVisualSmoke() {
 
 function ProfessionalAgentReviewWorkspaceVisualSmoke() {
   useEffect(() => {
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
       hasRenderedFirstFrame: true,
@@ -7801,6 +7808,8 @@ function NegativeLabEditorLayerHandoffVisualSmoke() {
   const layer: MaskContainer = {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: 'normal',
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: 'negative-lab-print-grade',
     invert: false,
     name: 'Print grade',
@@ -8158,7 +8167,7 @@ function FilmEmulationWorkspaceVisualSmoke() {
 
   useEffect(() => {
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustments: initial,
       exportSoftProofTransform: {

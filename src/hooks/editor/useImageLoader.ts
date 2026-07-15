@@ -10,7 +10,11 @@ import { useUIStore } from '../../store/useUIStore';
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
-import { hydrateImageOpenAdjustments } from '../../utils/imageOpenAdjustmentHydration';
+import { hydrateImageOpenAdjustments, hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
+import {
+  buildImageOpenHydrationEditTransaction,
+  canContinueImageOpenHydration,
+} from '../../utils/imageOpenHydrationEditTransaction';
 import { beginImageOpenWithSchema } from '../../utils/imageOpenInvokes';
 import { isImageOpenUpdateCurrent } from '../../utils/imageOpenPhaseCurrentness';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
@@ -30,7 +34,6 @@ export function useImageLoader() {
   const selectedImageIsReady = selectedImage?.isReady;
 
   const setEditor = useEditorStore((s) => s.setEditor);
-  const resetHistory = useEditorStore((s) => s.resetHistory);
   const setLibrary = useLibraryStore((s) => s.setLibrary);
   const appSettings = useSettingsStore((s) => s.appSettings);
 
@@ -45,8 +48,16 @@ export function useImageLoader() {
         if (isNativeCommittedHydrationSession(sessionId)) return;
         acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
         const hydratedAdjustments = hydrateImageOpenAdjustments(metadata.metadata, selectedImagePath);
-        setEditor({ adjustments: hydratedAdjustments });
-        resetHistory(hydratedAdjustments);
+        const state = useEditorStore.getState();
+        state.applyEditTransaction(
+          buildImageOpenHydrationEditTransaction(
+            state,
+            { adjustmentRevision: state.adjustmentRevision, imageSessionId: sessionId, path: selectedImagePath },
+            hydratedAdjustments,
+            `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
+            hydrateImageOpenEditDocumentV2(metadata.metadata, hydratedAdjustments),
+          ),
+        );
       };
 
       const loadImageSession = async () => {
@@ -90,6 +101,11 @@ export function useImageLoader() {
           }
           const editor = useEditorStore.getState();
           editor.patchResidency.reset(editor.imageSessionId);
+          const decodedHydrationIdentity = {
+            adjustmentRevision: editor.adjustmentRevision,
+            imageSessionId: sessionId,
+            path: selectedImagePath,
+          };
           const library = useLibraryStore.getState();
           const projection = library.imageList.find((image) => image.path === selectedImagePath) as
             | ((typeof library.imageList)[number] & { entityRevision?: number; imageId?: string })
@@ -143,14 +159,45 @@ export function useImageLoader() {
             }
           }
 
+          const current = useEditorStore.getState();
+          const canHydrateDecodedAdjustments =
+            decodedAdjustments !== null && current.adjustmentRevision === decodedHydrationIdentity.adjustmentRevision;
+          const canHydrateAspectRatio =
+            !current.adjustments.aspectRatio &&
+            !current.adjustments.crop &&
+            canContinueImageOpenHydration(current, decodedHydrationIdentity);
+          const hydrationBase = canHydrateDecodedAdjustments
+            ? decodedAdjustments
+            : canHydrateAspectRatio
+              ? current.adjustments
+              : null;
+          if (hydrationBase !== null) {
+            const hydratedAdjustments =
+              !hydrationBase.aspectRatio && !hydrationBase.crop
+                ? { ...hydrationBase, aspectRatio: width / height }
+                : hydrationBase;
+            current.applyEditTransaction(
+              buildImageOpenHydrationEditTransaction(
+                current,
+                {
+                  adjustmentRevision: current.adjustmentRevision,
+                  imageSessionId: sessionId,
+                  path: selectedImagePath,
+                },
+                hydratedAdjustments,
+                canHydrateDecodedAdjustments
+                  ? `decoded-open:${sessionId}:${openResult.metadataFingerprint}`
+                  : `decoded-aspect:${sessionId}`,
+                canHydrateDecodedAdjustments
+                  ? hydrateImageOpenEditDocumentV2(loadedMetadata, hydratedAdjustments)
+                  : undefined,
+              ),
+            );
+          }
+
           setEditor((state) => {
             if (state.imageSession?.id === sessionId && state.selectedImage?.path === selectedImagePath) {
               return {
-                adjustments:
-                  decodedAdjustments ??
-                  (!state.adjustments.aspectRatio && !state.adjustments.crop
-                    ? { ...state.adjustments, aspectRatio: loadImageResult.width / loadImageResult.height }
-                    : state.adjustments),
                 imageSession: { ...state.imageSession, status: 'ready' },
                 originalSize: { width, height },
                 previewSize,
@@ -171,7 +218,6 @@ export function useImageLoader() {
             }
             return state;
           });
-          if (decodedAdjustments !== null && isEditorImageSessionCurrent(sessionId)) resetHistory(decodedAdjustments);
           if (!isEditorImageSessionCurrent(sessionId)) return;
           const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(selectedImagePath);
           if (savedPositiveHandoff !== null) {
@@ -225,7 +271,6 @@ export function useImageLoader() {
     selectedImageIsReady,
     imageSession?.id,
     appSettings?.editorPreviewResolution,
-    resetHistory,
     setEditor,
     setLibrary,
   ]);

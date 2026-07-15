@@ -23,7 +23,7 @@ const selectedPath = '/fixtures/pure-ts/agent-stale-apply-guards/DSC_4845.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-stale-apply-guards-before',
@@ -99,7 +99,7 @@ describe('agent stale apply guards', () => {
     const draft = await startApprovedSession('issue-4845-manual-slider-edit');
     const historyIndexBeforeApply = useEditorStore.getState().historyIndex;
 
-    useEditorStore.setState((state) => ({
+    useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
       adjustments: { ...state.adjustments, exposure: state.adjustments.exposure + 0.35 },
       uncroppedAdjustedPreviewUrl: null,
     }));

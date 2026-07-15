@@ -5006,7 +5006,7 @@ mod blur_pass_tests {
             None,
         )
         .expect("decode private RAW");
-        let preview = crate::downscale_f32_image(&decoded, 256, 256);
+        let preview = crate::image_processing::downscale_f32_image(&decoded, 256, 256);
         let revision = PixelBufferRevision::constructed(
             PreGpuImageIdentity::source_revision(&source_path),
             stable_revision_hash(&("private-raw-preview", preview.dimensions())),
@@ -5778,6 +5778,9 @@ fn process_and_get_dynamic_image_inner(
                         let _ = analytics.service.submit(crate::AnalyticsJob {
                             path: analytics.path,
                             frame_id: analytics.frame_id,
+                            preview_operation_identity: Box::new(
+                                analytics.preview_operation_identity,
+                            ),
                             image: std::sync::Arc::new(dynamic_img),
                             products: analytics.products,
                             active_waveform_channel: analytics.active_waveform_channel,
@@ -5795,6 +5798,7 @@ fn process_and_get_dynamic_image_inner(
                     let _ = analytics.service.submit(crate::AnalyticsJob {
                         path: analytics.path,
                         frame_id: analytics.frame_id,
+                        preview_operation_identity: Box::new(analytics.preview_operation_identity),
                         image: std::sync::Arc::new(dynamic_img),
                         products: analytics.products,
                         active_waveform_channel: analytics.active_waveform_channel,

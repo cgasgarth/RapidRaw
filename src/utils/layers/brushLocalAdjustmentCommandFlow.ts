@@ -6,7 +6,12 @@ import {
   type LayerScopedToneAdjustmentV1,
 } from '../../../packages/rawengine-schema/src';
 import { Mask, type SubMask, SubMaskMode } from '../../components/panel/right/layers/Masks';
-import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../adjustments';
+import {
+  createDefaultMaskEditNodes,
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../adjustments';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -123,6 +128,8 @@ export function createBrushLocalAdjustmentLayerDraft({
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name,

@@ -99,8 +99,8 @@ test('prepared payload cache is revision-keyed, ROI-independent, bounded, and se
 test('preview dispatch contains no defensive clone or whole-object identity serialization', () => {
   const source = readFileSync(new URL('../../../src/hooks/editor/useImageProcessing.ts', import.meta.url), 'utf8');
   const schedulingPath = source.slice(
-    source.indexOf('const applyAdjustments'),
-    source.indexOf('const generateUncroppedPreview'),
+    source.indexOf('const captureSchedulingSnapshot'),
+    source.indexOf('const originalScope'),
   );
   expect(schedulingPath).not.toContain('structuredClone');
   expect(schedulingPath).not.toContain('JSON.stringify');

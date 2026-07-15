@@ -15,7 +15,12 @@ import {
   type ColorRangeMaskParameters,
   colorRangeMaskParametersSchema,
 } from '../../schemas/masks/maskParameterSchemas';
-import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../adjustments';
+import {
+  createDefaultMaskEditNodes,
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../adjustments';
 import { getSelectiveColorRange, type SelectiveColorRangeKey } from '../selectiveColorRanges';
 import {
   applyLayerStackCommandBridgeOperation,
@@ -150,6 +155,8 @@ export function createColorRangeLocalAdjustmentLayerDraft({
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name,

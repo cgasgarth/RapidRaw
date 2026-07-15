@@ -171,7 +171,6 @@ pub struct DecodedImageKey {
 
 #[derive(Clone, Debug)]
 pub struct VerifiedSourceFingerprint {
-    pub revision: SourceRevision,
     pub blake3: blake3::Hash,
     pub sha256: [u8; 32],
 }
@@ -223,7 +222,6 @@ impl FingerprintCache {
                     touch(&mut inner.lru, revision);
                     log::trace!("source_fingerprint_cache_hit bytes={}", bytes.len());
                     return VerifiedSourceFingerprint {
-                        revision: revision.clone(),
                         blake3: digests.blake3,
                         sha256: digests.sha256,
                     };
@@ -266,7 +264,6 @@ impl FingerprintCache {
         }
         self.ready.notify_all();
         VerifiedSourceFingerprint {
-            revision: revision.clone(),
             blake3: digests.blake3,
             sha256: digests.sha256,
         }
@@ -294,7 +291,6 @@ impl FingerprintCache {
                     let digests = digests.clone();
                     touch(&mut inner.lru, revision);
                     return Ok(VerifiedSourceFingerprint {
-                        revision: revision.clone(),
                         blake3: digests.blake3,
                         sha256: digests.sha256,
                     });
@@ -350,7 +346,6 @@ impl FingerprintCache {
                 touch(&mut inner.lru, revision);
                 self.ready.notify_all();
                 Ok(VerifiedSourceFingerprint {
-                    revision: revision.clone(),
                     blake3: digests.blake3,
                     sha256: digests.sha256,
                 })
@@ -426,7 +421,6 @@ mod tests {
         let after = fingerprint_metrics();
         assert_eq!(first.blake3, second.blake3);
         assert_eq!(first.sha256, Sha256::digest(b"payload").as_slice());
-        assert_eq!(first.revision, revision);
         assert_eq!(after.strong_hash_count - before.strong_hash_count, 1);
         assert_eq!(after.strong_hash_bytes - before.strong_hash_bytes, 7);
     }

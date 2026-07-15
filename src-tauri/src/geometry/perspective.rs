@@ -1074,8 +1074,8 @@ mod tests {
         let off = serde_json::json!({ "perspectiveCorrection": PerspectiveCorrectionSettingsV1::default() });
         let guided = serde_json::json!({ "perspectiveCorrection": converging_settings(100.0) });
         assert_ne!(
-            crate::calculate_geometry_hash(&off),
-            crate::calculate_geometry_hash(&guided)
+            crate::cache_utils::calculate_geometry_hash(&off),
+            crate::cache_utils::calculate_geometry_hash(&guided)
         );
         let off_params = crate::geometry::get_geometry_params_from_json(&off);
         let guided_params = crate::geometry::get_geometry_params_from_json(&guided);

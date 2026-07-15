@@ -12,7 +12,7 @@ pub(crate) async fn plan_hdr(
         return Err("Please select at least two images to merge.".to_string());
     }
 
-    let service = &state.services.hdr;
+    let service = state.computational().hdr();
     let handle = service.begin();
     let response = build_alignment_plan(&paths, || !service.is_current(handle))?;
     let plan = PendingHdrMergePlan {
@@ -48,9 +48,10 @@ pub(crate) async fn plan_hdr(
 
 #[tauri::command]
 pub(crate) async fn cancel_hdr_plan(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.services.hdr.cancel();
+    state.computational().hdr().cancel();
     let _ = state
-        .computational_merge_jobs
+        .computational()
+        .jobs()
         .cancel_active_family(crate::merge::computational_job::ComputationalMergeFamily::Hdr);
     Ok(())
 }
@@ -75,7 +76,7 @@ mod tests {
             .build()
             .unwrap();
         let state = app.state::<AppState>();
-        let handle = state.services.hdr.begin();
+        let handle = state.computational().hdr().begin();
 
         tauri::test::get_ipc_response(
             &webview,
@@ -91,7 +92,7 @@ mod tests {
         )
         .expect("HDR cancellation IPC response");
 
-        assert!(!state.services.hdr.is_current(handle));
-        assert!(state.services.hdr.accepted_plan().is_err());
+        assert!(!state.computational().hdr().is_current(handle));
+        assert!(state.computational().hdr().accepted_plan().is_err());
     }
 }

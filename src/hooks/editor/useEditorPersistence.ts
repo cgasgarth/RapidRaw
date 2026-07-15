@@ -1,4 +1,3 @@
-import type React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'react-toastify';
 
@@ -6,21 +5,19 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../../utils/adjustments';
+import {
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  getEditDocumentV2CopyableLegacyFieldsForSelection,
+} from '../../utils/editDocumentV2';
 import { EditorPersistenceEffectRunner } from '../../utils/editorPersistenceEffectRunner';
 import { registerEditorPersistenceBarrierAdapter } from '../../utils/editorPersistenceService';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import { acceptReferenceMatchAdjustmentTransfer } from '../../utils/referenceMatchTransfer';
 
-export interface PreviousAdjustments {
-  adjustments: Adjustments;
-  path: string;
-}
-
-export function useEditorPersistence(prevAdjustmentsRef: React.RefObject<PreviousAdjustments | null>): void {
+export function useEditorPersistence(): void {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
+  const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const imageSession = useEditorStore((state) => state.imageSession);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
@@ -28,7 +25,7 @@ export function useEditorPersistence(prevAdjustmentsRef: React.RefObject<Previou
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const includedAdjustments = useSettingsStore(
-    (state) => state.appSettings?.copyPasteSettings?.includedAdjustments ?? COPYABLE_ADJUSTMENT_KEYS,
+    (state) => state.appSettings?.copyPasteSettings?.includedAdjustments ?? EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
   );
   const runnerRef = useRef<EditorPersistenceEffectRunner | null>(null);
   const runner =
@@ -43,42 +40,23 @@ export function useEditorPersistence(prevAdjustmentsRef: React.RefObject<Previou
         console.error('Auto-save failed:', error);
         toast.error(`Failed to save changes: ${formatUnknownError(error)}`);
       },
-      onSnapshot: (snapshot) => {
-        prevAdjustmentsRef.current = snapshot;
-      },
     });
   runnerRef.current = runner;
 
   const multiSelection = useMemo(() => {
     if (!selectedImage?.path) return null;
     const paths = multiSelectedPaths.filter((path) => path !== selectedImage.path);
-    const previous = prevAdjustmentsRef.current;
-    if (paths.length === 0 || previous?.path !== selectedImage.path) return null;
-    const delta: Partial<Adjustments> = {};
-    for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
-      if (
-        includedAdjustments.includes(key as string) &&
-        JSON.stringify(adjustments[key]) !== JSON.stringify(previous.adjustments[key])
-      ) {
-        Object.assign(delta, { [key]: adjustments[key] });
-      }
-    }
-    if (Object.keys(delta).length === 0) return null;
-    return {
-      adjustments: acceptReferenceMatchAdjustmentTransfer({
-        adjustments: delta,
-        transferMode: 'batch-sync',
-      }).adjustments,
-      paths,
-    };
-  }, [adjustments, includedAdjustments, multiSelectedPaths, prevAdjustmentsRef, selectedImage?.path]);
+    return paths.length === 0
+      ? null
+      : { includedAdjustments: getEditDocumentV2CopyableLegacyFieldsForSelection(includedAdjustments), paths };
+  }, [includedAdjustments, multiSelectedPaths, selectedImage?.path]);
 
   useEffect(() => {
     if (!selectedImage?.isReady || imageSession === null) return;
     runner.submit({
       adjustmentRevision,
       adjustments,
-      baselineHint: prevAdjustmentsRef.current,
+      editDocumentV2,
       imageSessionId: imageSession.id,
       interactionActive,
       multiSelection,
@@ -89,11 +67,11 @@ export function useEditorPersistence(prevAdjustmentsRef: React.RefObject<Previou
   }, [
     adjustmentRevision,
     adjustments,
+    editDocumentV2,
     imageSession,
     imageSessionId,
     interactionActive,
     multiSelection,
-    prevAdjustmentsRef,
     receipt,
     runner,
     selectedImage?.isReady,

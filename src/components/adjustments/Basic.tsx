@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -128,17 +128,24 @@ export default function BasicAdjustments({
   const setUI = useUIStore((state) => state.setUI);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const beginBasicToneSliderInteraction = useEditorStore((state) => state.beginBasicToneSliderInteraction);
+  const updateBasicToneSliderInteraction = useEditorStore((state) => state.updateBasicToneSliderInteraction);
+  const commitBasicToneSliderInteraction = useEditorStore((state) => state.commitBasicToneSliderInteraction);
+  const cancelBasicToneSliderInteraction = useEditorStore((state) => state.cancelBasicToneSliderInteraction);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const basicToneCommitIdentity = useMemo<BasicToneCommitIdentity | null>(
     () =>
-      !isForMask && selectedImagePath !== null && imageSessionId !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
   );
   const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
   basicToneCommitIdentityRef.current = basicToneCommitIdentity;
+  const basicToneSliderInteractionIdsRef = useRef<Partial<Record<BasicAdjustment, string>>>({});
   const tonePlacementRequestGenerationRef = useRef(0);
   const toneHistogramPath = useMemo(() => {
     if (toneHistogram.length === 0) return '';
@@ -153,6 +160,11 @@ export default function BasicAdjustments({
 
   const handleAdjustmentChange = (key: BasicAdjustment, value: number) => {
     if (!isForMask) {
+      const activeInteractionId = basicToneSliderInteractionIdsRef.current[key];
+      if (activeInteractionId !== undefined) {
+        updateBasicToneSliderInteraction(activeInteractionId, value);
+        return;
+      }
       const identity = basicToneCommitIdentityRef.current;
       if (identity === null) return;
       const result = applyEditTransaction(
@@ -166,6 +178,57 @@ export default function BasicAdjustments({
     }
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
+
+  const beginBasicSliderInteraction = (key: BasicAdjustment) => {
+    if (isForMask) {
+      onDragStateChange?.(true);
+      return;
+    }
+    const identity = basicToneCommitIdentityRef.current;
+    if (identity === null) return;
+    const interactionId = crypto.randomUUID();
+    if (beginBasicToneSliderInteraction(identity, key, interactionId)) {
+      basicToneSliderInteractionIdsRef.current[key] = interactionId;
+    }
+  };
+
+  const commitBasicSliderInteraction = (key: BasicAdjustment) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interactionId = basicToneSliderInteractionIdsRef.current[key];
+    if (interactionId === undefined) return;
+    delete basicToneSliderInteractionIdsRef.current[key];
+    const result = commitBasicToneSliderInteraction(interactionId);
+    if (result !== null) {
+      const identity = basicToneCommitIdentityRef.current;
+      if (identity !== null) {
+        basicToneCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+      }
+    }
+  };
+
+  const cancelBasicSliderInteraction = (key: BasicAdjustment) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interactionId = basicToneSliderInteractionIdsRef.current[key];
+    if (interactionId === undefined) return;
+    delete basicToneSliderInteractionIdsRef.current[key];
+    cancelBasicToneSliderInteraction(interactionId);
+  };
+
+  useEffect(
+    () => () => {
+      for (const interactionId of Object.values(basicToneSliderInteractionIdsRef.current)) {
+        if (interactionId !== undefined) cancelBasicToneSliderInteraction(interactionId);
+      }
+      basicToneSliderInteractionIdsRef.current = {};
+    },
+    [adjustmentRevision, cancelBasicToneSliderInteraction, imageSessionId, selectedImagePath],
+  );
 
   const handleToneMapperChange = (mapper: Adjustments['toneMapper']) => {
     setAdjustments((prev: Adjustments) => ({
@@ -302,7 +365,9 @@ export default function BasicAdjustments({
       label={label}
       max={range.max}
       min={range.min}
-      onDragStateChange={onDragStateChange}
+      onInteractionCancel={() => cancelBasicSliderInteraction(key)}
+      onInteractionCommit={() => commitBasicSliderInteraction(key)}
+      onInteractionStart={() => beginBasicSliderInteraction(key)}
       onValueChange={(value) => {
         handleAdjustmentChange(key, value);
       }}

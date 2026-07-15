@@ -6,8 +6,12 @@ export interface ToneEqualizerEditTransactionState {
   adjustmentRevision: number;
   adjustments: Pick<Adjustments, 'toneEqualizer'>;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: ToneEqualizerEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const isCurrentToneEqualizerAsyncRequest = (
   state: ToneEqualizerEditTransactionState,
@@ -17,7 +21,7 @@ export const isCurrentToneEqualizerAsyncRequest = (
 ): boolean =>
   requestGeneration === currentRequestGeneration &&
   state.selectedImage?.path === identity.sourceIdentity &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.adjustmentRevision === identity.adjustmentRevision;
 
 export const buildToneEqualizerEditTransaction = (
@@ -31,9 +35,9 @@ export const buildToneEqualizerEditTransaction = (
       `tone_equalizer_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `tone_equalizer_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `tone_equalizer_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

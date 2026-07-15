@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -12,7 +13,7 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
 import { invokeWithSchema } from '../../tauriSchemaInvoke';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
@@ -144,10 +145,10 @@ export const agentToneAdjustmentDryRunResponseSchema = z
 
 export const agentToneAdjustmentApplyResponseSchema = z
   .object({
-    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
-    auditEventIds: z.array(z.string().trim().min(1)).min(2),
+    auditEventIds: z.array(z.string().trim().min(1)).min(1),
     beforePreviewHash: z.string().trim().min(1),
     editRevision: z
       .object({
@@ -162,10 +163,10 @@ export const agentToneAdjustmentApplyResponseSchema = z
       .object({
         acceptedPlanHash: z.string().trim().min(1),
         acceptedPlanId: z.string().trim().min(1),
-        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        adjustedFields: z.array(z.string().trim().min(1)),
         afterPreviewHash: z.string().trim().min(1),
         appliedGraphRevision: z.string().trim().min(1),
-        auditEventIds: z.array(z.string().trim().min(1)).min(2),
+        auditEventIds: z.array(z.string().trim().min(1)).min(1),
         beforePreviewHash: z.string().trim().min(1),
         expectedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
@@ -540,6 +541,7 @@ export const dryRunAgentToneAdjustment = async (
 
 export const applyAgentToneAdjustment = async (
   request: AgentToneAdjustmentApplyRequest,
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
 ): Promise<AgentToneAdjustmentApplyResponse> => {
   const parsedRequest = agentToneAdjustmentApplyRequestSchema.parse(request);
   const stale = assertExpectedEditorState(parsedRequest);
@@ -562,6 +564,8 @@ export const applyAgentToneAdjustment = async (
   const initialState = useEditorStore.getState();
   const imagePath = initialState.selectedImage?.path;
   if (imagePath === undefined) throw new Error('Cannot apply agent tone adjustment without a selected image.');
+  const commitIdentity = captureBasicToneCommitIdentity(initialState);
+  if (commitIdentity === null) throw new Error('Cannot apply agent tone adjustment without a selected image session.');
 
   const context = buildBasicToneImageCommandContext({
     expectedGraphRevision: parsedRequest.expectedGraphRevision,
@@ -576,51 +580,49 @@ export const applyAgentToneAdjustment = async (
     acceptedDryRunPlanId: acceptedReceipt.basicTonePlanId,
     dryRun: false,
   });
-  const bridge = createLiveEditorAppServerBridge();
-  const dryRun = await bridge.dispatch(dryRunCommand, {
-    now: () => new Date(),
-    requestId: `${parsedRequest.requestId}:preflight`,
-  });
-  if (!dryRun.ok) throw new Error(`Agent tone adjustment apply preflight failed: ${dryRun.message}`);
-  const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
-  if (
-    dryRunResult.dryRunPlanHash !== acceptedReceipt.basicTonePlanHash ||
-    dryRunResult.dryRunPlanId !== acceptedReceipt.basicTonePlanId
-  ) {
-    throw new Error('Agent tone adjustment apply rejected a mismatched dry-run plan identity.');
-  }
+  const nextAdjustments = setPatchedToneAdjustments(initialState.adjustments, parsedRequest.adjustments);
+  const adjustedFields = getAdjustedFields(parsedRequest.adjustments).filter(
+    (key) => initialState.adjustments[key] !== nextAdjustments[key],
+  );
+  let mutation: z.infer<typeof toneColorMutationResultV1Schema> | undefined;
+  if (adjustedFields.length > 0) {
+    const dryRun = await bridge.dispatch(dryRunCommand, {
+      now: () => new Date(),
+      requestId: `${parsedRequest.requestId}:preflight`,
+    });
+    if (!dryRun.ok) throw new Error(`Agent tone adjustment apply preflight failed: ${dryRun.message}`);
+    const dryRunResult = toneColorDryRunResultV1Schema.parse(dryRun.result);
+    if (
+      dryRunResult.dryRunPlanHash !== acceptedReceipt.basicTonePlanHash ||
+      dryRunResult.dryRunPlanId !== acceptedReceipt.basicTonePlanId
+    ) {
+      throw new Error('Agent tone adjustment apply rejected a mismatched dry-run plan identity.');
+    }
 
-  const apply = await bridge.dispatch(applyCommand, { now: () => new Date(), requestId: parsedRequest.requestId });
-  if (!apply.ok) throw new Error(`Agent tone adjustment apply failed: ${apply.message}`);
-  const mutation = toneColorMutationResultV1Schema.parse(apply.result);
+    const apply = await bridge.dispatch(applyCommand, { now: () => new Date(), requestId: parsedRequest.requestId });
+    if (!apply.ok) throw new Error(`Agent tone adjustment apply failed: ${apply.message}`);
+    mutation = toneColorMutationResultV1Schema.parse(apply.result);
+  }
 
   const beforePreviewHash = hashBasicTonePreviewPixels(PREVIEW_PROOF_PIXELS);
   const afterPreviewHash = hashBasicTonePreviewPixels(renderBasicTonePreviewPixels(PREVIEW_PROOF_PIXELS, applyCommand));
-  if (beforePreviewHash === afterPreviewHash) {
+  if (adjustedFields.length > 0 && beforePreviewHash === afterPreviewHash) {
     throw new Error('Agent tone adjustment apply did not change preview-after proof pixels.');
   }
 
-  useEditorStore.setState((state) => {
-    const adjustments = setPatchedToneAdjustments(state.adjustments, parsedRequest.adjustments);
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-    return {
-      adjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      lastBasicToneCommand: applyCommand,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
+  if (adjustedFields.length > 0) useEditorStore.getState().applyBasicToneCommand(applyCommand, commitIdentity);
 
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
-  const adjustedFields = getAdjustedFields(parsedRequest.adjustments);
-  const auditEventIds = bridge.listAuditEvents().map((event) => event.eventId);
+  const auditEventIds =
+    adjustedFields.length === 0
+      ? acceptedReceipt.auditEventIds
+      : bridge.listAuditEvents().map((event) => event.eventId);
   const previewAfter = buildPreviewAfter({
     commandId: applyCommand.commandId,
     graphRevision: appliedGraphRevision,
     renderHash: afterPreviewHash,
     sessionId: parsedRequest.sessionId,
-    sourceGraphRevision: mutation.sourceGraphRevision,
+    sourceGraphRevision: mutation?.sourceGraphRevision ?? parsedRequest.expectedGraphRevision,
   });
 
   return agentToneAdjustmentApplyResponseSchema.parse({
@@ -654,6 +656,6 @@ export const applyAgentToneAdjustment = async (
     stale,
     toolName: AGENT_TONE_ADJUSTMENT_APPLY_TOOL_NAME,
     undoGraphRevision: parsedRequest.expectedGraphRevision,
-    warnings: mutation.warnings,
+    warnings: mutation?.warnings ?? [],
   });
 };

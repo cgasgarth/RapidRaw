@@ -24,7 +24,7 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
-  useEditorStore.setState(initialEditorState, true);
+  useEditorStore.getState().hydrateEditorRenderAuthority(initialEditorState);
 });
 
 test('routes every compact zoom mode through the canonical zoom command callback', async () => {
@@ -85,7 +85,7 @@ test('does not reload a coherent artifact when equivalent adjustments are reallo
   const image = required<HTMLImageElement>(container, 'img[src="blob:coherent"]');
 
   await act(async () => {
-    useEditorStore.setState((state) => ({
+    useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
       adjustments: { ...state.adjustments },
     }));
     await flushPromises();

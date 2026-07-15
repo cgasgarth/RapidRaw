@@ -323,7 +323,7 @@ async function rerenderFooter(
 }
 
 function setProofState(isConsistent: boolean) {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     exportSoftProofRecipeId: isConsistent ? proofPreset.id : null,
     exportSoftProofTransform: isConsistent ? consistentProofTransform : null,
@@ -336,7 +336,7 @@ function setProofState(isConsistent: boolean) {
 }
 
 function resetEditorState() {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     exportSoftProofRecipeId: null,
     exportSoftProofTransform: null,

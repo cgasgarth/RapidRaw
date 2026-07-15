@@ -39,10 +39,12 @@ jobs:
           bunx knip --config knip.jsonc --dependencies --reporter compact
           bun tests/integration/checks/check-script-extension-policy.ts
           bun tests/integration/checks/check-unsafe-casts.ts
+          bun tests/integration/checks/editor/check-editor-render-authority-boundary.ts
           bun packages/rawengine-schema/scripts/check-edit-command-bus.ts
           bun scripts/checks/ci/check-schema-contract-gate.ts
           bun run check:docs
           bun run check:browser-harness
+          bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts
 
       - name: Run browser visual smoke
         run: bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library

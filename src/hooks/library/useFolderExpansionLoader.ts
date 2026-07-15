@@ -1,12 +1,16 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
 
 import { folderTreeListSchema } from '../../schemas/library/folderTreeSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
 import { insertChildrenIntoTree } from '../../utils/folderTreeUtils';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+
+const libraryFolderAggregateListSchema = z.array(
+  z.object({ path: z.string().min(1), recursiveImageCount: z.number().int().nonnegative() }).strict(),
+);
 
 export const useFolderExpansionLoader = (showImageCounts: boolean) => {
   const setLibrary = useLibraryStore((state) => state.setLibrary);
@@ -38,9 +42,11 @@ export const useFolderExpansionLoader = (showImageCounts: boolean) => {
         );
 
         const aggregates = showImageCounts
-          ? await invoke<Array<{ path: string; recursiveImageCount: number }>>(Invokes.GetLibraryFolderAggregates, {
-              paths: children.map((child) => child.path),
-            })
+          ? await invokeWithSchema(
+              Invokes.GetLibraryFolderAggregates,
+              { paths: children.map((child) => child.path) },
+              libraryFolderAggregateListSchema,
+            )
           : [];
         const counts = new Map(aggregates.map((aggregate) => [aggregate.path, aggregate.recursiveImageCount]));
         const countedChildren = children.map((child) => ({

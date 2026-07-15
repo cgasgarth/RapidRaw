@@ -44,8 +44,8 @@ export interface MaskParameters {
   targetY: number;
 }
 
-interface MaskInteractionEvent {
-  evt?: { type?: string };
+export interface MaskInteractionEvent {
+  evt?: MouseEvent | PointerEvent | TouchEvent;
 }
 type CanvasKonvaEvent = KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>;
 type EditableKonvaEllipse = KonvaEllipse & { lastValidScaleX?: number; lastValidScaleY?: number };
@@ -121,15 +121,17 @@ export const translateLinearMask = (parameters: MaskParameters, dx: number, dy: 
   });
 interface MaskOverlay {
   geometry: EditorOverlayGeometry;
+  interactionResetEpoch: number;
+  onMaskInteractionCancel: (reason: string) => void;
   onMaskInteractionEnd: () => void;
-  onMaskInteractionStart: (event?: MaskInteractionEvent) => void;
+  onMaskInteractionStart: (event?: MaskInteractionEvent) => boolean;
   isToolActive: boolean;
   isSelected: boolean;
   onMaskMouseEnter: () => void;
   onMaskMouseLeave: () => void;
-  onPreviewUpdate?: (id: string, subMask: Partial<SubMask>) => void;
+  onPreviewUpdate?: (id: string, subMask: Partial<SubMask>) => boolean;
   onSelect: () => void;
-  onUpdate: (id: string, subMask: Partial<SubMask>) => void;
+  onUpdate: (id: string, subMask: Partial<SubMask>) => boolean;
   subMask: SubMask;
   offsetX: number;
   offsetY: number;
@@ -179,6 +181,8 @@ OptimizedBrushLine.displayName = 'OptimizedBrushLine';
 export const MaskOverlay = memo(
   ({
     geometry,
+    interactionResetEpoch,
+    onMaskInteractionCancel,
     onMaskInteractionEnd,
     onMaskInteractionStart,
     isToolActive,
@@ -211,6 +215,7 @@ export const MaskOverlay = memo(
     const [p, setP] = useState<MaskParameters>(() => toMaskParameters(subMask.parameters));
     const pRef = useRef(p);
     const isDragging = useRef(false);
+    const previousInteractionResetEpochRef = useRef(interactionResetEpoch);
     const dragGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
 
     const dragStartPointer = useRef<Coord | null>(null);
@@ -227,12 +232,20 @@ export const MaskOverlay = memo(
     );
 
     useEffect(() => {
-      if (!isDragging.current) {
+      const interactionWasReset = previousInteractionResetEpochRef.current !== interactionResetEpoch;
+      previousInteractionResetEpochRef.current = interactionResetEpoch;
+      if (!isDragging.current || interactionWasReset) {
         const nextParameters = toMaskParameters(subMask.parameters);
         setP(nextParameters);
         pRef.current = nextParameters;
+        isDragging.current = false;
+        dragGeometryEpochRef.current = null;
+        dragStartPointer.current = null;
+        dragStartParams.current = null;
+        rotateStartRef.current = null;
+        shapeRef.current?.scale({ x: 1, y: 1 });
       }
-    }, [subMask.parameters]);
+    }, [interactionResetEpoch, subMask.parameters]);
 
     const updateP = useCallback((newP: MaskParameters) => {
       setP(newP);
@@ -240,17 +253,21 @@ export const MaskOverlay = memo(
     }, []);
     const commitUpdate = useCallback(
       (id: string, patch: Partial<SubMask>) => {
-        if (isDragging.current && !isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry)) return;
-        onUpdate(id, patch);
+        if (isDragging.current && !isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry)) return false;
+        return onUpdate(id, patch);
       },
       [geometry, onUpdate],
+    );
+    const previewUpdate = useCallback(
+      (id: string, patch: Partial<SubMask>): boolean => onPreviewUpdate?.(id, patch) ?? true,
+      [onPreviewUpdate],
     );
 
     const handleMaskTouchStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
 
-        onMaskInteractionStart(e);
+        if (!onMaskInteractionStart(e)) return;
         if (e.evt.cancelable) e.evt.preventDefault();
         e.evt.stopPropagation();
       },
@@ -277,9 +294,9 @@ export const MaskOverlay = memo(
     const handleRadialDragStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
+        if (!onMaskInteractionStart(e)) return;
         isDragging.current = true;
         dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
-        onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
         dragStartParams.current = { ...pRef.current };
       },
@@ -298,27 +315,31 @@ export const MaskOverlay = memo(
 
         const newP = translateRadialMask(dragStartParams.current, dx, dy);
 
+        if (!previewUpdate(subMask.id, { parameters: newP })) return;
         updateP(newP);
-        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-
-        commitUpdate(subMask.id, { parameters: newP });
       },
-      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
+      [viewToOriented, updateP, subMask.id, getPointer, previewUpdate],
     );
 
     const handleRadialDragEnd = useCallback(() => {
       const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
       isDragging.current = false;
+      if (!geometryIsCurrent) {
+        onMaskInteractionCancel('geometry-invalidated');
+        return;
+      }
+      if (!commitUpdate(subMask.id, { parameters: pRef.current })) {
+        onMaskInteractionCancel('commit-rejected');
+        return;
+      }
       onMaskInteractionEnd();
-      if (!geometryIsCurrent) return;
-      commitUpdate(subMask.id, { parameters: pRef.current });
-    }, [subMask.id, geometry, onMaskInteractionEnd, commitUpdate]);
+    }, [subMask.id, geometry, onMaskInteractionCancel, onMaskInteractionEnd, commitUpdate]);
 
     const handleRadialTransformStart = useCallback(
       (e: CanvasKonvaEvent) => {
+        if (!onMaskInteractionStart(e)) return;
         isDragging.current = true;
         dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
-        onMaskInteractionStart(e);
       },
       [geometry, onMaskInteractionStart],
     );
@@ -351,12 +372,8 @@ export const MaskOverlay = memo(
         rotation: node.rotation() - geometry.rotationDegrees,
       });
 
-      if (onPreviewUpdate) {
-        onPreviewUpdate(subMask.id, { parameters: newP });
-      }
-
-      commitUpdate(subMask.id, { parameters: newP });
-    }, [onPreviewUpdate, geometry.rotationDegrees, subMask.id, viewToOriented, commitUpdate]);
+      if (!previewUpdate(subMask.id, { parameters: newP })) return;
+    }, [geometry.rotationDegrees, subMask.id, viewToOriented, previewUpdate]);
 
     const handleRadialTransformEnd = useCallback(() => {
       const node = shapeRef.current;
@@ -384,10 +401,16 @@ export const MaskOverlay = memo(
       const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
       updateP(newP);
       isDragging.current = false;
+      if (!geometryIsCurrent) {
+        onMaskInteractionCancel('geometry-invalidated');
+        return;
+      }
+      if (!commitUpdate(subMask.id, { parameters: newP })) {
+        onMaskInteractionCancel('commit-rejected');
+        return;
+      }
       onMaskInteractionEnd();
-      if (!geometryIsCurrent) return;
-      commitUpdate(subMask.id, { parameters: newP });
-    }, [updateP, geometry, onMaskInteractionEnd, commitUpdate, subMask.id, viewToOriented]);
+    }, [updateP, geometry, onMaskInteractionCancel, onMaskInteractionEnd, commitUpdate, subMask.id, viewToOriented]);
 
     const setRotateCursor = useCallback(
       (stage: KonvaStage, pointerPos: Coord) => {
@@ -413,9 +436,9 @@ export const MaskOverlay = memo(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
 
+        if (!onMaskInteractionStart(e)) return;
         isDragging.current = true;
         dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
-        onMaskInteractionStart(e);
         e.cancelBubble = true;
         if (e.evt.cancelable) e.evt.preventDefault();
 
@@ -460,11 +483,10 @@ export const MaskOverlay = memo(
           rotation: newRotation,
         });
 
+        if (!previewUpdate(subMask.id, { parameters: newP })) return;
         updateP(newP);
-        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        commitUpdate(subMask.id, { parameters: newP });
       },
-      [updateP, onPreviewUpdate, subMask.id, setRotateCursor, getPointer, orientedToView, commitUpdate],
+      [updateP, subMask.id, setRotateCursor, getPointer, orientedToView, previewUpdate],
     );
 
     const handleRotateEnd = useCallback(
@@ -472,13 +494,19 @@ export const MaskOverlay = memo(
         const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         rotateStartRef.current = null;
+        if (!geometryIsCurrent) {
+          onMaskInteractionCancel('geometry-invalidated');
+          return;
+        }
+        if (!commitUpdate(subMask.id, { parameters: pRef.current })) {
+          onMaskInteractionCancel('commit-rejected');
+          return;
+        }
         onMaskInteractionEnd();
-        if (!geometryIsCurrent) return;
-        commitUpdate(subMask.id, { parameters: pRef.current });
 
         setStageCursor(e.target.getStage(), '');
       },
-      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
+      [geometry, subMask.id, onMaskInteractionCancel, onMaskInteractionEnd, commitUpdate],
     );
 
     const handleRotateHoverMove = useCallback(
@@ -516,9 +544,9 @@ export const MaskOverlay = memo(
     const handleLinearGroupDragStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
+        if (!onMaskInteractionStart(e)) return;
         isDragging.current = true;
         dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
-        onMaskInteractionStart(e);
         dragStartPointer.current = getPointer(e.target.getStage());
         dragStartParams.current = { ...pRef.current };
         e.cancelBubble = true;
@@ -538,11 +566,10 @@ export const MaskOverlay = memo(
 
         const newP = translateLinearMask(dragStartParams.current, dx, dy);
 
+        if (!previewUpdate(subMask.id, { parameters: newP })) return;
         updateP(newP);
-        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        commitUpdate(subMask.id, { parameters: newP });
       },
-      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
+      [viewToOriented, updateP, subMask.id, getPointer, previewUpdate],
     );
 
     const handleLinearGroupDragEnd = useCallback(
@@ -550,19 +577,25 @@ export const MaskOverlay = memo(
         const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         e.cancelBubble = true;
+        if (!geometryIsCurrent) {
+          onMaskInteractionCancel('geometry-invalidated');
+          return;
+        }
+        if (!commitUpdate(subMask.id, { parameters: pRef.current })) {
+          onMaskInteractionCancel('commit-rejected');
+          return;
+        }
         onMaskInteractionEnd();
-        if (!geometryIsCurrent) return;
-        commitUpdate(subMask.id, { parameters: pRef.current });
       },
-      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
+      [geometry, subMask.id, onMaskInteractionCancel, onMaskInteractionEnd, commitUpdate],
     );
 
     const handleLinearPointDragStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) return;
+        if (!onMaskInteractionStart(e)) return;
         isDragging.current = true;
         dragGeometryEpochRef.current = captureGeometryEpoch(geometry);
-        onMaskInteractionStart(e);
         e.cancelBubble = true;
       },
       [geometry, onMaskInteractionStart],
@@ -587,11 +620,10 @@ export const MaskOverlay = memo(
           nextP.endY = newY;
         }
         const newP = normalizeLinearMaskParametersForLiveHandle(nextP);
+        if (!previewUpdate(subMask.id, { parameters: newP })) return;
         updateP(newP);
-        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-        commitUpdate(subMask.id, { parameters: newP });
       },
-      [viewToOriented, updateP, onPreviewUpdate, subMask.id, getPointer, commitUpdate],
+      [viewToOriented, updateP, subMask.id, getPointer, previewUpdate],
     );
 
     const handleLinearRangeDragMove = useCallback(
@@ -619,12 +651,10 @@ export const MaskOverlay = memo(
         }
 
         const newP = normalizeLinearMaskParametersForLiveHandle({ ...pRef.current, range: newRange });
+        if (!previewUpdate(subMask.id, { parameters: newP })) return;
         updateP(newP);
-        if (onPreviewUpdate) onPreviewUpdate(subMask.id, { parameters: newP });
-
-        commitUpdate(subMask.id, { parameters: newP });
       },
-      [scale, updateP, onPreviewUpdate, subMask.id, getPointer, orientedToView, commitUpdate],
+      [scale, updateP, subMask.id, getPointer, orientedToView, previewUpdate],
     );
 
     const handleLinearPointDragEnd = useCallback(
@@ -632,11 +662,17 @@ export const MaskOverlay = memo(
         const geometryIsCurrent = isGeometryEpochCurrent(dragGeometryEpochRef.current, geometry);
         isDragging.current = false;
         e.cancelBubble = true;
+        if (!geometryIsCurrent) {
+          onMaskInteractionCancel('geometry-invalidated');
+          return;
+        }
+        if (!commitUpdate(subMask.id, { parameters: pRef.current })) {
+          onMaskInteractionCancel('commit-rejected');
+          return;
+        }
         onMaskInteractionEnd();
-        if (!geometryIsCurrent) return;
-        commitUpdate(subMask.id, { parameters: pRef.current });
       },
-      [geometry, subMask.id, onMaskInteractionEnd, commitUpdate],
+      [geometry, subMask.id, onMaskInteractionCancel, onMaskInteractionEnd, commitUpdate],
     );
 
     if (!subMask.visible) {
@@ -655,6 +691,7 @@ export const MaskOverlay = memo(
 
     if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
       const { startX, startY, endX, endY } = p;
+      if (![startX, startY, endX, endY].every(Number.isFinite)) return null;
       const start = orientedToView(startX, startY);
       const end = orientedToView(endX, endY);
       const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;
@@ -736,31 +773,54 @@ export const MaskOverlay = memo(
             {...commonProps}
             ref={shapeRef}
             fill="transparent"
-            draggable={!isToolActive}
-            dragBoundFunc={lockDragBoundFunc}
-            onDragStart={handleRadialDragStart}
-            onDragMove={handleRadialDragMove}
-            onDragEnd={handleRadialDragEnd}
-            onMouseEnter={(e: CanvasKonvaEvent) => {
-              onMaskMouseEnter();
-              if (!isToolActive && !isDragging.current) {
-                setStageCursor(e.target.getStage(), 'move');
-              }
-            }}
-            onMouseLeave={(e: CanvasKonvaEvent) => {
-              onMaskMouseLeave();
-              if (!isDragging.current) {
-                setStageCursor(e.target.getStage(), '');
-              }
-            }}
-            onTouchEnd={handleMaskTouchEnd}
-            onTouchStart={handleMaskTouchStart}
+            listening={false}
             radiusX={Math.max(0.1, radiusX * scale)}
             radiusY={Math.max(0.1, radiusY * scale)}
             rotation={rotation + geometry.rotationDegrees}
             x={center.x}
             y={center.y}
           />
+          {!isToolActive && (
+            <Ellipse
+              {...selectHandlers}
+              x={center.x}
+              y={center.y}
+              radiusX={Math.max(0.1, radiusX * scale)}
+              radiusY={Math.max(0.1, radiusY * scale)}
+              rotation={rotation + geometry.rotationDegrees}
+              fill="black"
+              sceneFunc={() => undefined}
+              hitFunc={(context, shape) => {
+                context.beginPath();
+                context.ellipse(
+                  0,
+                  0,
+                  Math.max(0.1, radiusX * scale),
+                  Math.max(0.1, radiusY * scale),
+                  0,
+                  0,
+                  Math.PI * 2,
+                );
+                context.closePath();
+                context.fillShape(shape);
+              }}
+              draggable
+              dragBoundFunc={lockDragBoundFunc}
+              onDragStart={handleRadialDragStart}
+              onDragMove={handleRadialDragMove}
+              onDragEnd={handleRadialDragEnd}
+              onMouseMove={handleRadialDragMove}
+              onTouchMove={handleRadialDragMove}
+              onMouseEnter={(e: CanvasKonvaEvent) => {
+                onMaskMouseEnter();
+                if (!isDragging.current) setStageCursor(e.target.getStage(), 'move');
+              }}
+              onMouseLeave={(e: CanvasKonvaEvent) => {
+                onMaskMouseLeave();
+                if (!isDragging.current) setStageCursor(e.target.getStage(), '');
+              }}
+            />
+          )}
           {isSelected && !isToolActive && (
             <Transformer
               ref={trRef}

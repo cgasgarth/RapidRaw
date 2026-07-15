@@ -58,8 +58,8 @@ pub fn apply_burst_sr_candidate(
 ) -> Result<BurstSrApplyReceipt, String> {
     validate_request(&request)?;
     let accepted = state
-        .services
-        .burst_sr
+        .computational()
+        .burst_sr()
         .accepted_for_apply()
         .map_err(str::to_string)?;
     let cache_root = app_handle
@@ -68,7 +68,7 @@ pub fn apply_burst_sr_candidate(
         .map_err(|error| format!("invalid_candidate_cache_unavailable:{error}"))?
         .join("burst-sr-candidates");
     apply(&request, &accepted.runtime, &cache_root, || {
-        state.services.burst_sr.authorize(&accepted)
+        state.computational().burst_sr().authorize(&accepted)
     })
 }
 

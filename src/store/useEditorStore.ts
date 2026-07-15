@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi } from 'zustand';
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import type { ChannelConfig } from '../components/adjustments/Curves';
@@ -15,15 +15,28 @@ import {
   PatchResidencyTracker,
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
-import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
+import {
+  type Adjustments,
+  type BasicAdjustment,
+  DisplayMode,
+  INITIAL_ADJUSTMENTS,
+  type MaskContainer,
+} from '../utils/adjustments';
 import { areAdjustmentsEqual } from '../utils/adjustmentsSnapshot';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
 import { BasicToneApprovalClass, type BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 import { type BasicToneCommitIdentity, buildBasicToneCommandEditTransaction } from '../utils/basicToneEditTransaction';
+import {
+  type BasicToneSliderInteraction,
+  beginBasicToneSliderInteraction,
+  buildBasicToneSliderInteractionRequest,
+  isBasicToneSliderInteractionCurrent,
+  reduceBasicToneSliderInteractionPreview,
+} from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
+import { type EditDocumentV2CopyPayload, legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -39,8 +52,14 @@ import {
   type EditorCompareState,
   reduceEditorCompare,
 } from '../utils/editorCompare';
+import {
+  type EditorTeardownTransactionRequest,
+  type EditorTeardownTransactionResult,
+  isEditorTeardownIdentityCurrent,
+} from '../utils/editorTeardownTransaction';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import {
+  areEditDocumentsEqual,
   type EditApplicationReceipt,
   type EditTransactionRequest,
   type EditTransactionResult,
@@ -48,7 +67,7 @@ import {
 } from '../utils/editTransaction';
 import { buildHistoryNavigationEditTransaction } from '../utils/historyNavigationEditTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
-import type { PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
+import type { PreviewArtifact, PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
@@ -75,7 +94,9 @@ export interface CopiedSectionAdjustments {
 
 export interface PresetApplication {
   before: Adjustments;
+  beforeEditDocumentV2: EditDocumentV2;
   expected: Adjustments;
+  expectedEditDocumentV2: EditDocumentV2;
   id: string;
   imagePath: string | null;
   name: string;
@@ -171,14 +192,17 @@ interface EditorState {
   previewViewportTransform: PreviewViewportTransformSnapshot;
   proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
+  basicToneSliderInteraction: BasicToneSliderInteraction | null;
 
   // History State
   history: Adjustments[];
+  editDocumentHistory: EditDocumentV2[];
   historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
 
   // Previews & Overlays
   finalPreviewUrl: string | null;
+  presentedPreviewArtifact: PreviewArtifact | null;
   provisionalPreviewFrame: ProvisionalPreviewFrame | null;
   navigatorPreviewArtifact: NavigatorPreviewArtifact | null;
   uncroppedAdjustedPreviewUrl: string | null;
@@ -249,14 +273,24 @@ interface EditorState {
   // Clipboard
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
   copiedMask: MaskContainer | null;
-  copiedAdjustments: Partial<Adjustments> | null;
+  copiedEditDocumentV2: EditDocumentV2CopyPayload | null;
   presetApplication: PresetApplication | null;
 
   // Actions
   publishPreviewViewportTransform: (transform: PreviewViewportTransformSnapshot) => void;
-  setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  setEditor: (updater: EditorStateUpdater) => void;
+  hydrateEditorRenderAuthority: (updater: EditorRenderAuthorityHydrationUpdater) => void;
   publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
+  beginBasicToneSliderInteraction: (
+    identity: BasicToneCommitIdentity,
+    key: BasicAdjustment,
+    interactionId: string,
+  ) => boolean;
+  updateBasicToneSliderInteraction: (interactionId: string, value: number) => void;
+  commitBasicToneSliderInteraction: (interactionId: string) => EditTransactionResult | null;
+  cancelBasicToneSliderInteraction: (interactionId: string) => void;
+  applyEditorTeardownTransaction: (request: EditorTeardownTransactionRequest) => EditorTeardownTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
   setReferenceMatchReferences: (
@@ -275,6 +309,37 @@ interface EditorState {
   resetHistory: (initialState: Adjustments) => void;
   goToHistoryIndex: (index: number) => void;
 }
+
+const editorRenderAuthorityKeys = [
+  'adjustments',
+  'adjustmentRevision',
+  'adjustmentSnapshot',
+  'editDocumentHistory',
+  'editDocumentV2',
+  'history',
+  'historyCheckpoints',
+  'historyIndex',
+] as const;
+
+type EditorRenderAuthorityKey = (typeof editorRenderAuthorityKeys)[number];
+export type EditorStateUpdate = Omit<Partial<EditorState>, EditorRenderAuthorityKey>;
+export type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => EditorStateUpdate);
+export type EditorRenderAuthorityHydration = EditorStateUpdate &
+  Pick<EditorState, 'adjustments'> &
+  Partial<
+    Pick<
+      EditorState,
+      | 'adjustmentRevision'
+      | 'editDocumentHistory'
+      | 'editDocumentV2'
+      | 'history'
+      | 'historyCheckpoints'
+      | 'historyIndex'
+    >
+  >;
+export type EditorRenderAuthorityHydrationUpdater =
+  | EditorRenderAuthorityHydration
+  | ((state: EditorState) => EditorRenderAuthorityHydration);
 
 const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): boolean =>
   'selectedImage' in update ||
@@ -307,6 +372,7 @@ const createSessionCheckpointId = (historyIndex: number): string => {
 const historyNavigationPreviewInvalidation = {
   exportSoftProofTransform: null,
   finalPreviewUrl: null,
+  presentedPreviewArtifact: null,
   provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   gamutWarningOverlay: null,
@@ -380,6 +446,167 @@ const viewportRevisionKeys: Array<keyof EditorState> = [
   'zoomMode',
 ];
 
+const applyEditorStateUpdate = (
+  set: StoreApi<EditorState>['setState'],
+  updater: EditorStateUpdater | EditorRenderAuthorityHydrationUpdater,
+  allowRenderAuthority: boolean,
+): void => {
+  set((state) => {
+    const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
+    const forbiddenKey = allowRenderAuthority ? undefined : editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+    if (forbiddenKey !== undefined) {
+      throw new Error(`editor.setEditor.render_authority_forbidden:${forbiddenKey}`);
+    }
+    if (allowRenderAuthority && !('adjustments' in rawUpdate)) {
+      throw new Error('editor.hydration.adjustments_required');
+    }
+    const update: Partial<EditorState> = { ...rawUpdate };
+
+    if (
+      state.basicToneSliderInteraction !== null &&
+      (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
+        ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
+        ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
+        'adjustments' in update ||
+        ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
+    ) {
+      update.basicToneSliderInteraction = null;
+      update.isSliderDragging = false;
+    }
+
+    if ('adjustments' in update && update.adjustments !== undefined) {
+      if (!('adjustmentRevision' in update)) {
+        update.adjustmentRevision = allowRenderAuthority ? state.adjustmentRevision : state.adjustmentRevision + 1;
+      }
+      update.referenceMatchPreview = null;
+      update.autoEditPreviewSession = null;
+      update.editDocumentV2 = update.editDocumentV2 ?? legacyAdjustmentsToEditDocumentV2(update.adjustments);
+      if (allowRenderAuthority) {
+        const history = update.history ?? state.history;
+        const historyIndex = update.historyIndex ?? state.historyIndex;
+        if (!Number.isInteger(historyIndex) || historyIndex < 0 || historyIndex >= history.length) {
+          throw new Error('editor.hydration.invalid_history_index');
+        }
+        const editDocumentHistory =
+          update.editDocumentHistory?.map((entry) => structuredClone(entry)) ??
+          history.map((entry, index) =>
+            index === historyIndex
+              ? structuredClone(update.editDocumentV2 as EditDocumentV2)
+              : legacyAdjustmentsToEditDocumentV2(entry),
+          );
+        if (
+          editDocumentHistory.length !== history.length ||
+          !areEditDocumentsEqual(editDocumentHistory[historyIndex], update.editDocumentV2)
+        ) {
+          throw new Error('editor.hydration.inconsistent_edit_document_history');
+        }
+        update.editDocumentHistory = editDocumentHistory;
+      }
+      update.adjustmentSnapshot = publishAdjustmentSnapshot(
+        state.adjustmentSnapshot,
+        update.adjustments,
+        update.editDocumentV2,
+      );
+      update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+      update.lastEditApplicationReceipt = null;
+      Object.assign(
+        update,
+        resolveAiSelectionState(state, update.adjustments, {
+          containerId:
+            'activeAiPatchContainerId' in update
+              ? (update.activeAiPatchContainerId ?? null)
+              : state.activeAiPatchContainerId,
+          subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+        }),
+      );
+    } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
+      Object.assign(
+        update,
+        resolveAiSelectionState(state, state.adjustments, {
+          containerId:
+            'activeAiPatchContainerId' in update
+              ? (update.activeAiPatchContainerId ?? null)
+              : state.activeAiPatchContainerId,
+          subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+        }),
+      );
+    }
+    if ('imageSession' in update) {
+      update.imageSessionId =
+        update.imageSession?.generation ??
+        (allowRenderAuthority && typeof update.imageSessionId === 'number'
+          ? update.imageSessionId
+          : state.imageSessionId + 1);
+      update.navigatorPreviewArtifact = null;
+      update.presentedPreviewArtifact = null;
+      update.provisionalPreviewFrame = null;
+      state.patchResidency.reset(update.imageSessionId);
+    } else if (
+      'selectedImage' in update &&
+      update.selectedImage?.path !== state.selectedImage?.path &&
+      state.imageSession?.path !== update.selectedImage?.path
+    ) {
+      update.imageSessionId =
+        allowRenderAuthority && 'imageSessionId' in update ? update.imageSessionId : state.imageSessionId + 1;
+      update.imageSession =
+        update.selectedImage === null
+          ? null
+          : createEditorImageSession({
+              generation: update.imageSessionId,
+              path: update.selectedImage?.path ?? '',
+              source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
+            });
+      update.navigatorPreviewArtifact = null;
+      update.presentedPreviewArtifact = null;
+      state.patchResidency.reset(update.imageSessionId);
+    }
+    if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
+      update.navigatorPreviewArtifact = null;
+    }
+    if ('finalPreviewUrl' in update && !('presentedPreviewArtifact' in update)) {
+      update.presentedPreviewArtifact = null;
+    }
+    if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+      update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
+    }
+    if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
+      update.viewportRevision = state.viewportRevision + 1;
+    }
+    if (
+      ('isExportSoftProofEnabled' in update && update.isExportSoftProofEnabled !== state.isExportSoftProofEnabled) ||
+      ('exportSoftProofRecipeId' in update && update.exportSoftProofRecipeId !== state.exportSoftProofRecipeId)
+    ) {
+      update.proofRevision = state.proofRevision + 1;
+    }
+
+    normalizeCompareStateUpdate(state, update);
+
+    if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+      update.presetApplication = null;
+      update.autoEditPreviewSession = null;
+    }
+
+    if (!shouldRevalidateGamutWarningOverlay(update)) return update;
+
+    const nextState = { ...state, ...update };
+    const nextOverlay = 'gamutWarningOverlay' in update ? update.gamutWarningOverlay : state.gamutWarningOverlay;
+
+    if (
+      nextOverlay &&
+      isPendingExportSoftProofGamutWarningOverlay(nextOverlay, {
+        exportSoftProofRecipeId: nextState.exportSoftProofRecipeId,
+        exportSoftProofTransform: nextState.exportSoftProofTransform,
+        isExportSoftProofEnabled: nextState.isExportSoftProofEnabled,
+        selectedImagePath: nextState.selectedImage?.path ?? null,
+      })
+    ) {
+      return update;
+    }
+
+    return { ...update, gamutWarningOverlay: null };
+  });
+};
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   selectedImage: null,
   adjustments: initialAdjustments,
@@ -393,11 +620,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
   proofRevision: 1,
   lastBasicToneCommand: null,
+  basicToneSliderInteraction: null,
   history: [initialAdjustments],
+  editDocumentHistory: [initialEditDocumentV2],
   historyCheckpoints: [],
   historyIndex: 0,
 
   finalPreviewUrl: null,
+  presentedPreviewArtifact: null,
   provisionalPreviewFrame: null,
   navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
@@ -454,7 +684,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   copiedSectionAdjustments: null,
   copiedMask: null,
   brushSettings: { size: 50, feather: 50, tool: ToolType.Brush },
-  copiedAdjustments: null,
+  copiedEditDocumentV2: null,
   presetApplication: null,
 
   isGeneratingAiMask: false,
@@ -486,116 +716,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     });
   },
-  setEditor: (updater) => {
-    set((state) => {
-      const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
-      const update: Partial<EditorState> = { ...rawUpdate };
-
-      if ('adjustments' in update && update.adjustments !== undefined) {
-        if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
-        update.referenceMatchPreview = null;
-        update.autoEditPreviewSession = null;
-        update.editDocumentV2 = legacyAdjustmentsToEditDocumentV2(update.adjustments);
-        update.adjustmentSnapshot = publishAdjustmentSnapshot(
-          state.adjustmentSnapshot,
-          update.adjustments,
-          update.editDocumentV2,
-        );
-        update.adjustments = update.adjustmentSnapshot.value as Adjustments;
-        update.lastEditApplicationReceipt = null;
-        Object.assign(
-          update,
-          resolveAiSelectionState(state, update.adjustments, {
-            containerId:
-              'activeAiPatchContainerId' in update
-                ? (update.activeAiPatchContainerId ?? null)
-                : state.activeAiPatchContainerId,
-            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
-          }),
-        );
-      } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
-        Object.assign(
-          update,
-          resolveAiSelectionState(state, state.adjustments, {
-            containerId:
-              'activeAiPatchContainerId' in update
-                ? (update.activeAiPatchContainerId ?? null)
-                : state.activeAiPatchContainerId,
-            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
-          }),
-        );
-      }
-      if ('imageSession' in update) {
-        update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
-        update.navigatorPreviewArtifact = null;
-        update.provisionalPreviewFrame = null;
-        state.patchResidency.reset(update.imageSessionId);
-      } else if (
-        'selectedImage' in update &&
-        update.selectedImage?.path !== state.selectedImage?.path &&
-        state.imageSession?.path !== update.selectedImage?.path
-      ) {
-        update.imageSessionId = state.imageSessionId + 1;
-        update.imageSession =
-          update.selectedImage === null
-            ? null
-            : createEditorImageSession({
-                generation: update.imageSessionId,
-                path: update.selectedImage?.path ?? '',
-                source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
-              });
-        update.navigatorPreviewArtifact = null;
-        state.patchResidency.reset(update.imageSessionId);
-      }
-      if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
-        update.navigatorPreviewArtifact = null;
-      }
-      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-        update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
-      }
-      if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
-        update.viewportRevision = state.viewportRevision + 1;
-      }
-      if (
-        ('isExportSoftProofEnabled' in update && update.isExportSoftProofEnabled !== state.isExportSoftProofEnabled) ||
-        ('exportSoftProofRecipeId' in update && update.exportSoftProofRecipeId !== state.exportSoftProofRecipeId)
-      ) {
-        update.proofRevision = state.proofRevision + 1;
-      }
-
-      normalizeCompareStateUpdate(state, update);
-
-      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-        update.presetApplication = null;
-        update.autoEditPreviewSession = null;
-      }
-
-      if (!shouldRevalidateGamutWarningOverlay(update)) return update;
-
-      const nextState = { ...state, ...update };
-      const nextOverlay = 'gamutWarningOverlay' in update ? update.gamutWarningOverlay : state.gamutWarningOverlay;
-
-      if (
-        nextOverlay &&
-        isPendingExportSoftProofGamutWarningOverlay(nextOverlay, {
-          exportSoftProofRecipeId: nextState.exportSoftProofRecipeId,
-          exportSoftProofTransform: nextState.exportSoftProofTransform,
-          isExportSoftProofEnabled: nextState.isExportSoftProofEnabled,
-          selectedImagePath: nextState.selectedImage?.path ?? null,
-        })
-      ) {
-        return update;
-      }
-
-      return { ...update, gamutWarningOverlay: null };
-    });
-  },
+  setEditor: (updater) => applyEditorStateUpdate(set, updater, false),
+  hydrateEditorRenderAuthority: (updater) => applyEditorStateUpdate(set, updater, true),
 
   publishWhiteBalancePickerPreview: (adjustments) =>
     set((state) => ({
       ...historyNavigationPreviewInvalidation,
       ...publishAdjustmentState(state, adjustments),
     })),
+
+  applyEditorTeardownTransaction: (request) => {
+    let result: EditorTeardownTransactionResult | null = null;
+    set((state) => {
+      if (!isEditorTeardownIdentityCurrent(state, request)) throw new Error('editor_teardown.stale_identity');
+      const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+      const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+      const adjustmentsChanged = !areAdjustmentsEqual(state.adjustments, adjustments);
+      const adjustmentRevision = state.adjustmentRevision + (adjustmentsChanged ? 1 : 0);
+      const imageSessionId = state.imageSessionId + 1;
+      state.patchResidency.reset(imageSessionId);
+      result = { adjustmentRevision, adjustmentsChanged, transactionId: request.transactionId };
+      return {
+        ...historyNavigationPreviewInvalidation,
+        ...publishAdjustmentState(state, adjustments, editDocumentV2),
+        activeAiPatchContainerId: null,
+        activeAiSubMaskId: null,
+        activeMaskContainerId: null,
+        activeMaskId: null,
+        adjustmentRevision,
+        autoEditPreviewSession: null,
+        basicToneSliderInteraction: null,
+        compare: DEFAULT_EDITOR_COMPARE_STATE,
+        gamutWarningOverlay: null,
+        hasRenderedFirstFrame: false,
+        histogram: null,
+        history: [structuredClone(adjustments)],
+        editDocumentHistory: [structuredClone(editDocumentV2)],
+        historyCheckpoints: [],
+        historyIndex: 0,
+        imageSession: null,
+        imageSessionId,
+        isMaskControlHovered: false,
+        isWbPickerActive: false,
+        isSliderDragging: false,
+        lastBasicToneCommand: null,
+        lastEditApplicationReceipt: null,
+        lastReferenceMatchApplicationReceipt: null,
+        lastWhiteBalancePickerReceipt: null,
+        presetApplication: null,
+        referenceMatchSpatialAnalysis: null,
+        referenceMatchPreview: null,
+        selectedImage: null,
+        viewportRevision: state.viewportRevision + 1,
+        previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
+        waveform: null,
+      };
+    });
+    if (result === null) throw new Error('editor_teardown.not_applied');
+    return result;
+  },
 
   applyEditTransaction: (request) => {
     let result: EditTransactionResult | null = null;
@@ -604,7 +783,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.preview_requires_proposal');
       }
       const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
+      const nativeEditDocumentHistoryBaseline = request.nativeCommittedEditDocumentHistoryBaseline;
       const historyTargetIndex = request.history === 'navigation' ? request.historyTargetIndex : undefined;
+      const compensationHistory =
+        request.history === 'compensation' && request.compensationHistory !== undefined
+          ? {
+              checkpoints: structuredClone([...request.compensationHistory.checkpoints]),
+              editDocumentEntries: structuredClone([...request.compensationHistory.editDocumentEntries]),
+              entries: structuredClone([...request.compensationHistory.entries]),
+              historyIndex: request.compensationHistory.historyIndex,
+            }
+          : undefined;
+      const currentEditDocumentHistory = state.history.map((entry, index) => {
+        const existing = state.editDocumentHistory[index];
+        if (index === state.historyIndex && !areEditDocumentsEqual(existing, state.editDocumentV2)) {
+          return state.editDocumentV2;
+        }
+        return existing ?? legacyAdjustmentsToEditDocumentV2(entry);
+      });
       if (request.history === 'navigation') {
         if (
           historyTargetIndex === undefined ||
@@ -617,9 +813,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else if (request.historyTargetIndex !== undefined) {
         throw new Error('edit_transaction.history_target_requires_navigation');
       }
+      if (request.history === 'compensation') {
+        if (
+          compensationHistory === undefined ||
+          !Number.isInteger(compensationHistory.historyIndex) ||
+          compensationHistory.historyIndex < 0 ||
+          compensationHistory.historyIndex >= compensationHistory.entries.length ||
+          compensationHistory.editDocumentEntries.length !== compensationHistory.entries.length ||
+          compensationHistory.checkpoints.some(
+            (checkpoint) =>
+              !Number.isInteger(checkpoint.historyIndex) ||
+              checkpoint.historyIndex < 0 ||
+              checkpoint.historyIndex >= compensationHistory.entries.length,
+          )
+        ) {
+          throw new Error('edit_transaction.invalid_compensation_history');
+        }
+      } else if (request.compensationHistory !== undefined) {
+        throw new Error('edit_transaction.compensation_history_requires_compensation');
+      }
       if (
-        nativeHistoryBaseline !== undefined &&
-        (request.persistence !== 'native-committed' || request.history !== 'single-entry')
+        (nativeHistoryBaseline !== undefined || nativeEditDocumentHistoryBaseline !== undefined) &&
+        (nativeHistoryBaseline === undefined ||
+          nativeEditDocumentHistoryBaseline === undefined ||
+          request.persistence !== 'native-committed' ||
+          request.history !== 'single-entry')
       ) {
         throw new Error('edit_transaction.native_history_baseline_requires_native_single_entry');
       }
@@ -629,9 +847,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         state.adjustmentRevision,
         request,
         currentImageSessionId,
-        nativeHistoryBaseline === undefined
-          ? state.editDocumentV2
-          : legacyAdjustmentsToEditDocumentV2(nativeHistoryBaseline),
+        nativeHistoryBaseline === undefined ? state.editDocumentV2 : nativeEditDocumentHistoryBaseline,
       );
       const reconcilesHydratedNativeCommit =
         nativeHistoryBaseline !== undefined && !areAdjustmentsEqual(state.adjustments, nativeHistoryBaseline);
@@ -643,6 +859,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         !areAdjustmentsEqual(state.history[historyTargetIndex] ?? state.adjustments, nextResult.after)
       ) {
         throw new Error('edit_transaction.history_target_mismatch');
+      }
+      if (
+        compensationHistory !== undefined &&
+        !areAdjustmentsEqual(
+          compensationHistory.entries[compensationHistory.historyIndex] ?? state.adjustments,
+          nextResult.after,
+        )
+      ) {
+        throw new Error('edit_transaction.compensation_history_target_mismatch');
+      }
+      if (
+        compensationHistory !== undefined &&
+        !areEditDocumentsEqual(
+          compensationHistory.editDocumentEntries[compensationHistory.historyIndex],
+          nextResult.afterEditDocumentV2,
+        )
+      ) {
+        throw new Error('edit_transaction.compensation_edit_document_history_target_mismatch');
       }
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
@@ -664,36 +898,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         : nextResult;
       result = publishedResult;
-      if (nextResult.noOp) return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
+      if (nextResult.noOp) {
+        if (request.history === 'reset') {
+          return {
+            ...historyNavigationPreviewInvalidation,
+            history: [structuredClone(nextResult.after)],
+            editDocumentHistory: [structuredClone(nextResult.afterEditDocumentV2)],
+            historyCheckpoints: [],
+            historyIndex: 0,
+          };
+        }
+        return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
+      }
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
-          : request.history === 'reset'
-            ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
-            : coalescedReceipt
-              ? {
-                  history: state.history.map((entry, index) =>
-                    index === state.historyIndex ? nextResult.after : entry,
-                  ),
-                  checkpoints: state.historyCheckpoints,
-                  historyIndex: state.historyIndex,
-                }
-              : pushEditHistoryEntryWithCheckpoints(
-                  reconcilesHydratedNativeCommit
-                    ? state.history.map((entry, index) =>
-                        index === state.historyIndex ? nativeHistoryBaseline : entry,
-                      )
-                    : state.history,
-                  state.historyIndex,
-                  nextResult.after,
-                  state.historyCheckpoints,
-                );
+          : compensationHistory !== undefined
+            ? {
+                history: structuredClone(compensationHistory.entries),
+                checkpoints: structuredClone(compensationHistory.checkpoints),
+                historyIndex: compensationHistory.historyIndex,
+              }
+            : request.history === 'reset'
+              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
+              : coalescedReceipt
+                ? {
+                    history: state.history.map((entry, index) =>
+                      index === state.historyIndex ? nextResult.after : entry,
+                    ),
+                    checkpoints: state.historyCheckpoints,
+                    historyIndex: state.historyIndex,
+                  }
+                : pushEditHistoryEntryWithCheckpoints(
+                    reconcilesHydratedNativeCommit
+                      ? state.history.map((entry, index) =>
+                          index === state.historyIndex ? nativeHistoryBaseline : entry,
+                        )
+                      : state.history,
+                    state.historyIndex,
+                    nextResult.after,
+                    state.historyCheckpoints,
+                  );
+      const nextEditDocumentHistory =
+        request.history === 'none' || request.history === 'navigation'
+          ? currentEditDocumentHistory
+          : request.history === 'compensation'
+            ? structuredClone(compensationHistory?.editDocumentEntries ?? [])
+            : request.history === 'reset'
+              ? [nextResult.afterEditDocumentV2]
+              : coalescedReceipt
+                ? currentEditDocumentHistory.map((entry, index) =>
+                    index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
+                  )
+                : [
+                    ...(reconcilesHydratedNativeCommit && nativeEditDocumentHistoryBaseline !== undefined
+                      ? currentEditDocumentHistory.map((entry, index) =>
+                          index === state.historyIndex ? nativeEditDocumentHistoryBaseline : entry,
+                        )
+                      : currentEditDocumentHistory
+                    ).slice(0, state.historyIndex + 1),
+                    nextResult.afterEditDocumentV2,
+                  ].slice(-nextHistory.history.length);
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
+        basicToneSliderInteraction: null,
+        isSliderDragging: false,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
+        editDocumentHistory: nextEditDocumentHistory,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
         ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
@@ -701,6 +975,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
     if (!result) throw new Error('edit_transaction.not_applied');
     return result;
+  },
+
+  beginBasicToneSliderInteraction: (identity, key, interactionId) => {
+    try {
+      const interaction = beginBasicToneSliderInteraction(get(), identity, key, interactionId);
+      set({ basicToneSliderInteraction: interaction, isSliderDragging: true });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  updateBasicToneSliderInteraction: (interactionId, value) => {
+    set((state) => {
+      const interaction = state.basicToneSliderInteraction;
+      if (interaction?.interactionId !== interactionId) return {};
+      if (!isBasicToneSliderInteractionCurrent(state, interaction)) {
+        return { basicToneSliderInteraction: null, isSliderDragging: false };
+      }
+      const result = reduceBasicToneSliderInteractionPreview(interaction, value);
+      return {
+        basicToneSliderInteraction: {
+          ...interaction,
+          latestValue: value,
+          previewSnapshot: publishAdjustmentSnapshot(
+            interaction.previewSnapshot ?? state.adjustmentSnapshot,
+            result.after,
+            result.afterEditDocumentV2,
+          ),
+        },
+      };
+    });
+  },
+
+  commitBasicToneSliderInteraction: (interactionId) => {
+    const interaction = get().basicToneSliderInteraction;
+    if (interaction?.interactionId !== interactionId) return null;
+    if (!isBasicToneSliderInteractionCurrent(get(), interaction)) {
+      set({ basicToneSliderInteraction: null, isSliderDragging: false });
+      return null;
+    }
+    set({ basicToneSliderInteraction: null });
+    try {
+      return get().applyEditTransaction(
+        buildBasicToneSliderInteractionRequest(interaction, interaction.latestValue, 'commit'),
+      );
+    } finally {
+      set({ isSliderDragging: false });
+    }
+  },
+
+  cancelBasicToneSliderInteraction: (interactionId) => {
+    set((state) =>
+      state.basicToneSliderInteraction?.interactionId === interactionId
+        ? { basicToneSliderInteraction: null, isSliderDragging: false }
+        : {},
+    );
   },
 
   applyAiEditCommand: (command) => {
@@ -781,6 +1112,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       return {
         history: nextHistory.history,
+        editDocumentHistory: [
+          ...state.editDocumentHistory.slice(0, state.historyIndex + 1),
+          state.editDocumentV2,
+        ].slice(-nextHistory.history.length),
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,
       };
@@ -820,11 +1155,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   resetHistory: (initialState) => {
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initialState);
     set((state) => ({
       history: [initialState],
+      editDocumentHistory: [editDocumentV2],
       historyCheckpoints: [],
       historyIndex: 0,
-      ...publishAdjustmentState(state, initialState),
+      ...publishAdjustmentState(state, initialState, editDocumentV2),
       ...resolveAiSelectionState(state, initialState),
     }));
   },
@@ -842,6 +1179,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 }));
+
+const directEditorStoreSetState = useEditorStore.setState;
+useEditorStore.setState = (updater, replace) => {
+  if (replace === true) throw new Error('editor.setState.replace_forbidden');
+  const rawUpdate = typeof updater === 'function' ? updater(useEditorStore.getState()) : updater;
+  const forbiddenKey = editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+  if (forbiddenKey !== undefined) {
+    throw new Error(`editor.setState.render_authority_forbidden:${forbiddenKey}`);
+  }
+  directEditorStoreSetState(rawUpdate);
+};
 
 export const isEditorImageSessionCurrent = (sessionId: string): boolean =>
   useEditorStore.getState().imageSession?.id === sessionId;

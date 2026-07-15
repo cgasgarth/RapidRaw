@@ -67,8 +67,8 @@ pub fn prepare_burst_sr_candidate(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<BurstSrCandidateJobHandle, String> {
     let accepted = state
-        .services
-        .burst_sr
+        .computational()
+        .burst_sr()
         .accepted(&accepted_review_id)
         .map_err(str::to_string)?;
     let plan = super::tiles::plan(
@@ -79,7 +79,7 @@ pub fn prepare_burst_sr_candidate(
         requested_tile_size.unwrap_or(super::tiles::DEFAULT_CORE),
     )?;
     let total_units = plan.stage_work_units.iter().map(|stage| stage.units).sum();
-    let job = state.computational_merge_jobs.begin(
+    let job = state.computational().jobs().begin(
         crate::merge::computational_job::ComputationalMergeFamily::SuperResolution,
         STAGES[0],
         total_units,
@@ -87,8 +87,12 @@ pub fn prepare_burst_sr_candidate(
     )?;
     let id = job.job_id.to_string();
     let result_id = id.clone();
-    if let Err(error) = state.services.burst_sr.register_job(&accepted, id.clone()) {
-        let _ = state.computational_merge_jobs.cancel(&job.job_id);
+    if let Err(error) = state
+        .computational()
+        .burst_sr()
+        .register_job(&accepted, id.clone())
+    {
+        let _ = state.computational().jobs().cancel(&job.job_id);
         return Err(error.to_string());
     }
     std::thread::Builder::new()
@@ -109,14 +113,15 @@ pub fn prepare_burst_sr_candidate(
                     &plan,
                     &job.job_id,
                     &job.cancellation_token,
-                    &state.computational_merge_jobs,
+                    state.computational().jobs(),
                 )
             })();
             let mut candidate_path = None;
             let (status, error_code, candidate) = match outcome {
                 Ok(output)
                     if state
-                        .computational_merge_jobs
+                        .computational()
+                        .jobs()
                         .finish(&job.job_id)
                         .unwrap_or(false) =>
                 {
@@ -132,7 +137,7 @@ pub fn prepare_burst_sr_candidate(
                     )
                 }
                 Err(error) => {
-                    let _ = state.computational_merge_jobs.fail(&job.job_id);
+                    let _ = state.computational().jobs().fail(&job.job_id);
                     let status = if error == "computational_merge_cancelled" {
                         "cancelled"
                     } else {
@@ -142,7 +147,8 @@ pub fn prepare_burst_sr_candidate(
                 }
             };
             let published = state
-                .computational_merge_jobs
+                .computational()
+                .jobs()
                 .progress(&job.job_id)
                 .is_some_and(|progress| {
                     let result = BurstSrCandidateJobResult {
@@ -153,8 +159,8 @@ pub fn prepare_burst_sr_candidate(
                         progress,
                     };
                     state
-                        .services
-                        .burst_sr
+                        .computational()
+                        .burst_sr()
                         .publish_job_result(&accepted, result_id, result)
                         .is_ok()
                 });
@@ -175,14 +181,15 @@ pub fn read_burst_sr_candidate_job(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<BurstSrCandidateJobResult, String> {
     let id = ComputationalMergeJobId::from_string(job_id.clone());
-    if let Some(result) = state.services.burst_sr.read_job_result(&job_id) {
+    if let Some(result) = state.computational().burst_sr().read_job_result(&job_id) {
         return Ok(result);
     }
-    if !state.services.burst_sr.job_current(&job_id) {
+    if !state.computational().burst_sr().job_current(&job_id) {
         return Err("computational_merge_job_not_found".to_string());
     }
     let progress = state
-        .computational_merge_jobs
+        .computational()
+        .jobs()
         .progress(&id)
         .ok_or("computational_merge_job_not_found")?;
     Ok(BurstSrCandidateJobResult {

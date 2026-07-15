@@ -76,7 +76,7 @@ pub fn apply_denoising(
         return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
     }
 
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let operation = denoise.begin(&path, &plan)?;
     Ok(operation.handle())
 }
@@ -90,7 +90,7 @@ pub fn execute_denoising(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let preparation = (|| {
         let (source_path, _) = parse_virtual_path(&path);
         let path_str = source_path.to_string_lossy().to_string();
@@ -126,12 +126,11 @@ pub fn execute_denoising(
         if method == "ai" {
             let lease_result = {
                 let managed_state = app_handle.state::<AppState>();
-                crate::ai::ai_processing::acquire_ort_model(
-                    &app_handle,
-                    &managed_state.ai_model_registry,
-                    crate::ai::model_registry::AiModelId::Denoise,
-                )
-                .await
+                managed_state
+                    .services
+                    .ai
+                    .acquire_ort_model(&app_handle, crate::ai::model_registry::AiModelId::Denoise)
+                    .await
             };
             let lease = match lease_result {
                 Ok(lease) => lease,
@@ -204,7 +203,7 @@ pub fn cancel_denoising(
     operation: DenoiseOperationHandle,
     state: tauri::State<'_, AppState>,
 ) -> super::denoise_service::DenoiseCancelReceipt {
-    state.services.denoise.cancel(operation)
+    state.computational().denoise().cancel(operation)
 }
 
 #[tauri::command]
@@ -228,19 +227,18 @@ pub async fn batch_denoise_images(
         return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
         #[cfg(feature = "ai")]
         {
-            let lease = crate::ai::ai_processing::acquire_ort_model(
-                &app_handle,
-                &state.ai_model_registry,
-                crate::ai::model_registry::AiModelId::Denoise,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
+            let lease = state
+                .services
+                .ai
+                .acquire_ort_model(&app_handle, crate::ai::model_registry::AiModelId::Denoise)
+                .await
+                .map_err(|e| e.to_string())?;
             ai_session = Some(lease.ort()?);
             ai_lease = Some(lease);
         }
     }
 
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let cache_root = enhanced_cache_root(&app_handle)?;
     tokio::task::spawn_blocking(move || {
         let _ai_lease = ai_lease;
@@ -351,8 +349,8 @@ pub async fn save_denoised_image(
         crate::file_management::parse_virtual_path(&original_path_str);
     let requested_source = super::denoise_artifact::PhysicalSourceRevision::from_path(&first_path)?;
     let artifact = state
-        .services
-        .denoise
+        .computational()
+        .denoise()
         .current_artifact(&original_path_str, &requested_source)
         .ok_or_else(|| {
             "No enhanced denoise artifact is active for the current image and source revision."

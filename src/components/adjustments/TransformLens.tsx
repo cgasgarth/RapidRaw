@@ -1,8 +1,8 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Aperture, CircleDashed, Grid3X3, Loader, Plus, SquareDashed, Trash2, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import {
   type PerspectiveCorrectionMode,
   type PerspectiveCropPolicy,
@@ -28,6 +28,7 @@ import {
   isCurrentPerspectiveAnalysisRequest,
   type PerspectiveCorrectionCommitIdentity,
 } from '../../utils/perspectiveCorrectionEditTransaction';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
   getLensCorrectionAvailability,
   hasSupportedLensCorrections,
@@ -54,6 +55,27 @@ interface TransformLensProps {
 }
 
 const DEFAULT_FOCAL_LENGTH_MM = 50;
+const lensfunNameListSchema = z.array(z.string().min(1));
+const finiteNumberSchema = z.number().finite();
+const lensDistortionParamsSchema = z
+  .object({
+    k1: finiteNumberSchema,
+    k2: finiteNumberSchema,
+    k3: finiteNumberSchema,
+    model: finiteNumberSchema,
+    tca_vb: finiteNumberSchema,
+    tca_vr: finiteNumberSchema,
+    vig_k1: finiteNumberSchema,
+    vig_k2: finiteNumberSchema,
+    vig_k3: finiteNumberSchema,
+  })
+  .strict();
+const autodetectLensResultSchema = z
+  .union([
+    z.tuple([z.string().min(1), z.string().min(1)]),
+    z.object({ maker: z.string().min(1), model: z.string().min(1) }).strict(),
+  ])
+  .nullable();
 const statusChipClassName =
   'inline-flex items-center gap-1 rounded border border-editor-border px-1.5 py-0.5 text-[10px]';
 const copy = {
@@ -121,13 +143,13 @@ export default function TransformLens({
   const [perspectiveMessage, setPerspectiveMessage] = useState<string | null>(null);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const lensCorrectionCommitIdentity = useMemo<LensCorrectionCommitIdentity | null>(
     () =>
-      selectedImagePath !== null && imageSessionId !== null
-        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
-        : null,
+      selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,
     [adjustmentRevision, imageSessionId, selectedImagePath],
   );
   const lensCorrectionCommitIdentityRef = useRef(lensCorrectionCommitIdentity);
@@ -135,9 +157,7 @@ export default function TransformLens({
   const lensProfileRequestGenerationRef = useRef(0);
   const perspectiveCommitIdentity = useMemo<PerspectiveCorrectionCommitIdentity | null>(
     () =>
-      selectedImagePath !== null && imageSessionId !== null
-        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
-        : null,
+      selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,
     [adjustmentRevision, imageSessionId, selectedImagePath],
   );
   const perspectiveCommitIdentityRef = useRef(perspectiveCommitIdentity);
@@ -163,7 +183,7 @@ export default function TransformLens({
 
   useEffect(() => {
     let isMounted = true;
-    void invoke<string[]>(Invokes.GetLensfunMakers)
+    void invokeWithSchema(Invokes.GetLensfunMakers, {}, lensfunNameListSchema)
       .then((nextMakers) => {
         if (isMounted) setMakers(nextMakers);
       })
@@ -182,7 +202,7 @@ export default function TransformLens({
     }
 
     let isMounted = true;
-    void invoke<string[]>(Invokes.GetLensfunLensesForMaker, { maker: adjustments.lensMaker })
+    void invokeWithSchema(Invokes.GetLensfunLensesForMaker, { maker: adjustments.lensMaker }, lensfunNameListSchema)
       .then((nextLenses) => {
         if (isMounted) setLenses(nextLenses);
       })
@@ -237,13 +257,17 @@ export default function TransformLens({
   };
 
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> =>
-    invoke<LensDistortionParams | null>(Invokes.GetLensDistortionParams, {
-      aperture,
-      distance,
-      focalLength: focalLength ?? DEFAULT_FOCAL_LENGTH_MM,
-      maker,
-      model,
-    });
+    invokeWithSchema(
+      Invokes.GetLensDistortionParams,
+      {
+        aperture,
+        distance,
+        focalLength: focalLength ?? DEFAULT_FOCAL_LENGTH_MM,
+        maker,
+        model,
+      },
+      lensDistortionParamsSchema.nullable(),
+    );
 
   const applyLensProfile = async (
     maker: string,
@@ -299,10 +323,11 @@ export default function TransformLens({
     setDetectionStatus('detecting');
     try {
       const detected = normalizeAutodetectLensResult(
-        await invoke<AutodetectLensResult | null>(Invokes.AutodetectLens, {
-          maker: exifMaker,
-          model: exifModel,
-        }),
+        await invokeWithSchema(
+          Invokes.AutodetectLens,
+          { maker: exifMaker, model: exifModel },
+          autodetectLensResultSchema,
+        ),
       );
       if (!lensProfileRequestIsCurrent(identity, requestGeneration)) return;
       if (detected === null) {
@@ -394,11 +419,14 @@ export default function TransformLens({
     const analysisAdjustments = structuredClone(state.adjustments);
     setPerspectiveStatus('analyzing');
     try {
-      const raw = await invoke<unknown>(Invokes.AnalyzePerspectiveCorrection, {
-        adjustments: analysisAdjustments,
-        settings: { ...analysisAdjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
-      });
-      const result = perspectiveAnalysisResultSchema.parse(raw);
+      const result = await invokeWithSchema(
+        Invokes.AnalyzePerspectiveCorrection,
+        {
+          adjustments: analysisAdjustments,
+          settings: { ...analysisAdjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
+        },
+        perspectiveAnalysisResultSchema,
+      );
       const current = useEditorStore.getState();
       if (
         !isCurrentPerspectiveAnalysisRequest(

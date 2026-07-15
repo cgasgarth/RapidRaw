@@ -13,7 +13,7 @@ pub(crate) async fn plan_focus_stack(
     settings: FocusStackReadinessSettings,
     state: tauri::State<'_, AppState>,
 ) -> Result<FocusStackInputPlan, String> {
-    let service = &state.services.focus_stack;
+    let service = state.computational().focus_stack();
     let generation = service.begin();
     let resolved_paths = paths
         .iter()
@@ -48,7 +48,7 @@ pub(crate) async fn plan_focus_stack(
 pub(crate) async fn cancel_focus_stack_plan(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    state.services.focus_stack.cancel();
+    state.computational().focus_stack().cancel();
     Ok(())
 }
 
@@ -72,7 +72,7 @@ mod tests {
             .build()
             .unwrap();
         let state = app.state::<AppState>();
-        let generation = state.services.focus_stack.begin();
+        let generation = state.computational().focus_stack().begin();
 
         tauri::test::get_ipc_response(
             &webview,
@@ -88,11 +88,11 @@ mod tests {
         )
         .expect("focus cancellation IPC response");
 
-        assert!(!state.services.focus_stack.is_current(generation));
+        assert!(!state.computational().focus_stack().is_current(generation));
         assert!(
             state
-                .services
-                .focus_stack
+                .computational()
+                .focus_stack()
                 .accepted_plan()
                 .unwrap()
                 .is_none()

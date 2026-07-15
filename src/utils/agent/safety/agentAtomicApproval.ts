@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
+import type { EditHistoryCheckpoint } from '../../editHistory';
+import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   type AgentCoreEditCommandBundleStep,
@@ -23,7 +26,10 @@ export interface AgentAtomicApplyResult {
   approvalId: string;
   rollbackTarget: {
     adjustments: Adjustments;
+    editDocumentHistory: EditDocumentV2[];
     graphRevision: string;
+    history: Adjustments[];
+    historyCheckpoints: EditHistoryCheckpoint[];
     historyIndex: number;
     previewUrl: string | null;
   };
@@ -73,7 +79,10 @@ export const applyApprovedAgentPlanAtomically = async (plan: AgentApprovedPlan):
 
   const rollbackTarget = {
     adjustments: state.adjustments,
+    editDocumentHistory: structuredClone(state.editDocumentHistory),
     graphRevision: currentGraphRevision,
+    history: structuredClone(state.history),
+    historyCheckpoints: structuredClone(state.historyCheckpoints),
     historyIndex: state.historyIndex,
     previewUrl: state.finalPreviewUrl,
   };
@@ -92,12 +101,19 @@ export const applyApprovedAgentPlanAtomically = async (plan: AgentApprovedPlan):
 };
 
 export const rollbackApprovedAgentPlan = (rollbackTarget: AgentAtomicApplyResult['rollbackTarget']): string => {
-  useEditorStore.setState((state) => ({
-    adjustments: rollbackTarget.adjustments,
-    finalPreviewUrl: rollbackTarget.previewUrl,
-    history: state.history.slice(0, rollbackTarget.historyIndex + 1),
-    historyIndex: rollbackTarget.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  }));
+  const state = useEditorStore.getState();
+  state.applyEditTransaction(
+    buildHistoryRestorationEditTransaction(
+      state,
+      rollbackTarget.history,
+      rollbackTarget.editDocumentHistory,
+      rollbackTarget.historyCheckpoints,
+      rollbackTarget.historyIndex,
+      `agent-approval-rollback:${rollbackTarget.graphRevision}:${String(state.adjustmentRevision)}`,
+    ),
+  );
+  useEditorStore
+    .getState()
+    .setEditor({ finalPreviewUrl: rollbackTarget.previewUrl, uncroppedAdjustedPreviewUrl: null });
   return rollbackTarget.graphRevision;
 };

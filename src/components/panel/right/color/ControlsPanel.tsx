@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import {
@@ -26,6 +25,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
+import { getEditDocumentNodeTypesForEditorSection } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
+
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import {
@@ -37,6 +38,7 @@ import {
   autoEditPreviewV1Schema,
   autoEditProposalV1Schema,
 } from '../../../../schemas/autoEditSchemas';
+import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../../store/useUIStore';
@@ -61,13 +63,15 @@ import {
 import {
   type AutoEditProposalBase,
   buildAutoEditTransactionRequest,
+  captureAutoEditProposalBase,
   clearAutoEditPreviewSession,
   createAutoEditPreviewSession,
+  currentAutoEditImageSessionId,
+  isCurrentAutoEditProposalRequest,
   setAutoEditPreviewBypass,
 } from '../../../../utils/autoEditTransaction';
 import {
   highConfidenceAutoEditGroups,
-  isCurrentAutoEditCompletion,
   mergeAutoEditAdjustments,
   recommendedAutoEditGroups,
   toggleAutoEditGroup,
@@ -75,6 +79,7 @@ import {
 import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
@@ -208,7 +213,7 @@ export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
-  const { setAdjustments, handleLutSelect } = useEditorActions();
+  const { setAdjustments, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
   const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
   const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
@@ -246,6 +251,7 @@ export default function Controls() {
   const {
     adjustmentRevision,
     adjustments,
+    editDocumentV2,
     copiedSectionAdjustments,
     histogram,
     selectedImage,
@@ -255,10 +261,11 @@ export default function Controls() {
     useShallow((state) => ({
       adjustmentRevision: state.adjustmentRevision,
       adjustments: state.adjustments,
+      editDocumentV2: state.editDocumentV2,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
       selectedImage: state.selectedImage,
-      selectedImageSessionId: state.imageSession?.id ?? null,
+      selectedImageSessionId: currentAutoEditImageSessionId(state),
       setEditor: state.setEditor,
     })),
   );
@@ -278,29 +285,24 @@ export default function Controls() {
       if (!base) return;
       const serial = ++autoEditRequestSerial.current;
       try {
-        const rawPreview = await invoke<unknown>(Invokes.PreviewAutoEditProposal, {
-          request: {
-            expectedImagePath: base.path,
-            expectedImageSessionId: base.imageSessionId,
-            expectedGraphRevision: base.graphRevision,
-            resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
-            currentAdjustments: base.adjustments,
-            proposal,
-            selectedGroups: [...groups],
-            impact,
+        const preview: AutoEditPreviewV1 = await invokeWithSchema(
+          Invokes.PreviewAutoEditProposal,
+          {
+            request: {
+              expectedImagePath: base.path,
+              expectedImageSessionId: base.imageSessionId,
+              expectedGraphRevision: base.graphRevision,
+              resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
+              currentAdjustments: base.adjustments,
+              proposal,
+              selectedGroups: [...groups],
+              impact,
+            },
           },
-        });
-        const preview: AutoEditPreviewV1 = autoEditPreviewV1Schema.parse(rawPreview);
+          autoEditPreviewV1Schema,
+        );
         const state = useEditorStore.getState();
-        if (
-          serial !== autoEditRequestSerial.current ||
-          !isCurrentAutoEditCompletion(
-            base.imageSessionId,
-            base.graphRevision,
-            state.imageSession?.id ?? null,
-            `history_${String(state.historyIndex)}`,
-          )
-        ) {
+        if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
         const previewAdjustments = mergeAutoEditAdjustments(base.adjustments, preview.adjustments);
@@ -324,16 +326,8 @@ export default function Controls() {
   const beginAutoEdit = useCallback(async () => {
     const state = useEditorStore.getState();
     const image = state.selectedImage;
-    const imageSessionId = state.imageSession?.id;
-    if (!image?.isReady || !imageSessionId) return;
-    const graphRevision = `history_${String(state.historyIndex)}`;
-    const base = {
-      adjustmentRevision: state.adjustmentRevision,
-      adjustments: state.adjustments,
-      graphRevision,
-      imageSessionId,
-      path: image.path,
-    };
+    const base = captureAutoEditProposalBase(state);
+    if (image === null || base === null) return;
     autoEditBaseRef.current = base;
     autoEditPreviewKeyRef.current = null;
     setIsAutoEditOpen(true);
@@ -342,26 +336,21 @@ export default function Controls() {
     setAutoEditProposal(null);
     const serial = ++autoEditRequestSerial.current;
     try {
-      const rawProposal = await invoke<unknown>(Invokes.AnalyzeAutoEdit, {
-        request: {
-          expectedImagePath: image.path,
-          imageSessionId,
-          graphRevision,
-          currentAdjustments: base.adjustments,
-          cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
+      const proposal = await invokeWithSchema(
+        Invokes.AnalyzeAutoEdit,
+        {
+          request: {
+            expectedImagePath: image.path,
+            imageSessionId: base.imageSessionId,
+            graphRevision: base.graphRevision,
+            currentAdjustments: base.adjustments,
+            cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
+          },
         },
-      });
-      const proposal = autoEditProposalV1Schema.parse(rawProposal);
+        autoEditProposalV1Schema,
+      );
       const current = useEditorStore.getState();
-      if (
-        serial !== autoEditRequestSerial.current ||
-        !isCurrentAutoEditCompletion(
-          imageSessionId,
-          graphRevision,
-          current.imageSession?.id ?? null,
-          `history_${String(current.historyIndex)}`,
-        )
-      ) {
+      if (!isCurrentAutoEditProposalRequest(current, base, serial, autoEditRequestSerial.current)) {
         return;
       }
       const groups = recommendedAutoEditGroups(proposal);
@@ -378,7 +367,7 @@ export default function Controls() {
 
   const cancelAutoEdit = useCallback(() => {
     autoEditRequestSerial.current += 1;
-    void invoke(Invokes.CancelAutoEditAnalysis);
+    void invokeWithSchema(Invokes.CancelAutoEditAnalysis, {}, emptyTauriResponseSchema);
     clearCurrentAutoEditPreview();
     autoEditBaseRef.current = null;
     setAutoEditProposal(null);
@@ -399,29 +388,24 @@ export default function Controls() {
       const serial = ++autoEditRequestSerial.current;
       try {
         const resultingGraphRevision = `history_${String(useEditorStore.getState().historyIndex + 1)}`;
-        const rawApplied = await invoke<unknown>(Invokes.ApplyAutoEditProposal, {
-          request: {
-            expectedImagePath: base.path,
-            expectedImageSessionId: base.imageSessionId,
-            expectedGraphRevision: base.graphRevision,
-            resultingGraphRevision,
-            currentAdjustments: base.adjustments,
-            proposal,
-            selectedGroups: [...groups],
-            impact: autoEditImpact,
+        const applied: AppliedAutoEditV1 = await invokeWithSchema(
+          Invokes.ApplyAutoEditProposal,
+          {
+            request: {
+              expectedImagePath: base.path,
+              expectedImageSessionId: base.imageSessionId,
+              expectedGraphRevision: base.graphRevision,
+              resultingGraphRevision,
+              currentAdjustments: base.adjustments,
+              proposal,
+              selectedGroups: [...groups],
+              impact: autoEditImpact,
+            },
           },
-        });
-        const applied: AppliedAutoEditV1 = appliedAutoEditV1Schema.parse(rawApplied);
+          appliedAutoEditV1Schema,
+        );
         const state = useEditorStore.getState();
-        if (
-          serial !== autoEditRequestSerial.current ||
-          !isCurrentAutoEditCompletion(
-            base.imageSessionId,
-            base.graphRevision,
-            state.imageSession?.id ?? null,
-            `history_${String(state.historyIndex)}`,
-          )
-        ) {
+        if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
         const nextAdjustments = mergeAutoEditAdjustments(base.adjustments, applied.adjustments);
@@ -470,7 +454,8 @@ export default function Controls() {
   useEffect(
     () => () => {
       autoEditRequestSerial.current += 1;
-      if (autoEditBaseRef.current !== null) void invoke(Invokes.CancelAutoEditAnalysis);
+      if (autoEditBaseRef.current !== null)
+        void invokeWithSchema(Invokes.CancelAutoEditAnalysis, {}, emptyTauriResponseSchema);
       clearCurrentAutoEditPreview();
       autoEditBaseRef.current = null;
     },
@@ -1245,16 +1230,10 @@ export default function Controls() {
   );
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
-    setAdjustments((prev: Adjustments) => {
-      const currentVisibility = prev.sectionVisibility;
-      return {
-        ...prev,
-        sectionVisibility: {
-          ...currentVisibility,
-          [sectionName]: !currentVisibility[sectionName],
-        },
-      };
-    });
+    if (sectionName === 'transformLens') return;
+    const nodeTypes = getEditDocumentNodeTypesForEditorSection(sectionName);
+    const enabled = nodeTypes.every((nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false);
+    setEditorSectionEnabled(sectionName, !enabled);
   };
 
   const handleResetAdjustments = () => {
@@ -1263,7 +1242,6 @@ export default function Controls() {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...resetValues,
-      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
     }));
   };
 
@@ -1309,10 +1287,6 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...copiedSection.values,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -1321,10 +1295,6 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...resetValues,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -1710,10 +1680,13 @@ export default function Controls() {
           }
 
           const title = getAdjustmentSectionLabel(t, sectionName);
-          const sectionVisibility = adjustments.sectionVisibility;
           const sectionActions = buildSectionActions(sectionName);
           const canToggleVisibility = sectionName !== 'transformLens';
-          const isContentVisible = canToggleVisibility ? sectionVisibility[sectionName] : true;
+          const isContentVisible = canToggleVisibility
+            ? getEditDocumentNodeTypesForEditorSection(sectionName).every(
+                (nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false,
+              )
+            : true;
 
           return (
             <div className="shrink-0 group" data-testid={`adjustments-section-${sectionName}`} key={sectionName}>

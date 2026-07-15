@@ -1,11 +1,13 @@
 pub(crate) mod catalog;
 pub(crate) mod catalog_indexing_service;
 pub(crate) mod changefeed;
+pub(crate) mod command_registration;
 pub(crate) mod delete_plan;
 pub(crate) mod file_management;
 pub(crate) mod import_job_service;
 pub(crate) mod import_pipeline;
 pub(crate) mod library_identity;
+pub(crate) mod runtime_services;
 pub(crate) mod smart_preview_scheduler;
 pub(crate) mod tethering;
 pub(crate) mod thumbnail_generation_service;

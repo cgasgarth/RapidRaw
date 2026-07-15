@@ -45,7 +45,7 @@ class DeferredColorBridge extends RawEngineLocalAppServerBridge {
 }
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-color-apply-before',

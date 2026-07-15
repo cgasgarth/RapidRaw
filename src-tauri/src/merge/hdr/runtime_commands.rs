@@ -6,7 +6,7 @@ use image::DynamicImage;
 use serde::Serialize;
 use tauri::Emitter;
 
-use crate::ImageDimensions;
+use crate::app::commands::source::ImageDimensions;
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
@@ -151,7 +151,11 @@ pub(crate) async fn merge_hdr(
     if paths.len() < 2 {
         return Err("Please select at least two images to merge.".to_string());
     }
-    let accepted = state.services.hdr.accepted_plan().map_err(str::to_string)?;
+    let accepted = state
+        .computational()
+        .hdr()
+        .accepted_plan()
+        .map_err(str::to_string)?;
     let mut accepted_plan = accepted.plan.clone();
     if accepted_plan.alignment_policy_id != ALIGNMENT_POLICY_ID
         || accepted_dry_run_plan_hash.as_ref() != Some(&accepted_plan.accepted_dry_run_plan_hash)
@@ -166,7 +170,7 @@ pub(crate) async fn merge_hdr(
     {
         return Err("hdr_apply_blocked_unresolved_deghost_ownership".to_string());
     }
-    let job = state.computational_merge_jobs.begin(
+    let job = state.computational().jobs().begin(
         crate::merge::computational_job::ComputationalMergeFamily::Hdr,
         "decode",
         3,
@@ -181,7 +185,7 @@ pub(crate) async fn merge_hdr(
 
         let loaded_items = load_hdr_merge_items(&paths, &app_handle, true)?;
         job.cancellation_token.checkpoint()?;
-        state.computational_merge_jobs.publish_progress(
+        state.computational().jobs().publish_progress(
             &job.job_id,
             "merge",
             1,
@@ -213,7 +217,7 @@ pub(crate) async fn merge_hdr(
         )?;
         let hdr_merged = native.scene_linear;
         job.cancellation_token.checkpoint()?;
-        state.computational_merge_jobs.publish_progress(
+        state.computational().jobs().publish_progress(
             &job.job_id,
             "preview",
             2,
@@ -275,11 +279,11 @@ pub(crate) async fn merge_hdr(
         let _ = app_handle.emit(crate::events::HDR_PROGRESS, "Creating preview...");
 
         state
-            .services
-            .hdr
+            .computational()
+            .hdr()
             .publish_merge(&accepted, runtime_plan, source_refs, hdr_merged)
             .map_err(str::to_string)?;
-        state.computational_merge_jobs.publish_progress(
+        state.computational().jobs().publish_progress(
             &job.job_id,
             "ready_to_publish",
             3,
@@ -297,7 +301,7 @@ pub(crate) async fn merge_hdr(
         Ok(())
     }
     .await;
-    state.computational_merge_jobs.settle(&job.job_id, result)
+    state.computational().jobs().settle(&job.job_id, result)
 }
 
 fn build_hdr_apply_source_roles(source_refs: &[PendingHdrSourceRef]) -> Vec<HdrApplySourceRole> {
@@ -329,8 +333,8 @@ pub(crate) async fn save_hdr(
         plan: mut runtime_plan,
         source_refs,
     } = state
-        .services
-        .hdr
+        .computational()
+        .hdr()
         .acquire_save_payload()
         .map_err(str::to_string)?;
 

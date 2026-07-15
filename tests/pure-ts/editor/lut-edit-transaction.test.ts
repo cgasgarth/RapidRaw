@@ -37,10 +37,10 @@ describe('LUT edit transaction', () => {
     const adjustments = {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       exposure: 0.4,
-      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility, effects: false },
+      effectsEnabled: false,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -54,7 +54,7 @@ describe('LUT edit transaction', () => {
     });
   });
 
-  test('loads complete LUT identity, enables Effects, and restores the prior state on Undo', () => {
+  test('loads complete LUT identity without changing Effects enablement and restores the prior state on Undo', () => {
     const state = useEditorStore.getState();
     const request = buildLutLoadEditTransaction(
       state,
@@ -76,13 +76,10 @@ describe('LUT edit transaction', () => {
         },
         type: 'patch-edit-document-node',
       },
-      {
-        patch: { sectionVisibility: { ...state.adjustments.sectionVisibility, effects: true } },
-        type: 'patch-adjustments',
-      },
     ]);
     expect(result.after).toMatchObject({ lutName: 'warm.cube', lutPath: '/luts/warm.cube', lutSize: 33 });
-    expect(result.after.sectionVisibility.effects).toBeTrue();
+    expect(result.after.effectsEnabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
     expect(result.afterEditDocumentV2.nodes.display_creative.params).toMatchObject({
       lutIntensity: 100,
       lutName: 'warm.cube',
@@ -97,7 +94,7 @@ describe('LUT edit transaction', () => {
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments).toMatchObject({ lutName: null, lutPath: null, lutSize: 0 });
-    expect(useEditorStore.getState().adjustments.sectionVisibility.effects).toBeFalse();
+    expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
   });
 
   test('clears complete LUT identity in one node revision and Undo restores it', () => {
@@ -109,7 +106,7 @@ describe('LUT edit transaction', () => {
       lutSize: 17,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(loaded);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, loaded, editDocumentV2),
       adjustments: loaded,
       editDocumentV2,

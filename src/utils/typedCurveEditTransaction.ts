@@ -11,6 +11,7 @@ export interface TypedCurveEditTransactionState {
   adjustmentRevision: number;
   adjustments: Pick<Adjustments, 'rawEngineEditGraphVersion'>;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
 
@@ -18,13 +19,16 @@ export type TypedCurveCommit =
   | { domain: 'scene'; curve: SceneCurveSettingsV1 }
   | { domain: 'output'; curve: OutputCurveSettingsV1 };
 
+const currentImageSessionId = (state: TypedCurveEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
 export const captureTypedCurveCommitIdentity = (
   state: TypedCurveEditTransactionState,
 ): TypedCurveCommitIdentity | null =>
-  state.selectedImage?.path !== undefined && state.imageSession !== null
+  state.selectedImage?.path !== undefined
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       }
     : null;
@@ -35,10 +39,8 @@ const assertCurrentIdentity = (state: TypedCurveEditTransactionState, identity: 
       `typed_curve_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(
-      `typed_curve_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
-    );
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`typed_curve_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(

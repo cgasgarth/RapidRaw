@@ -7,20 +7,25 @@ import {
   parseEditDocumentV2WithQuarantine,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
 import {
   batchUpdateEditDocumentV2Nodes,
   buildEditDocumentV2Diagnostics,
   copyEditDocumentV2Node,
+  copyEditDocumentV2Nodes,
+  EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS,
   editDocumentV2NodeInventory,
   editDocumentV2ToLegacyAdjustments,
   getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
+  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   pasteEditDocumentV2Node,
   prepareEditDocumentV2ForRender,
   replaceEditDocumentV2SourceArtifacts,
   resetEditDocumentV2Node,
+  selectEditDocumentV2CopyPayload,
+  setEditDocumentV2NodeEnabled,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
@@ -89,7 +94,8 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.nodes.scene_global_color_tone?.params.exposure).toBe(0.75);
     expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
-    expect(document.migration?.quarantined).toContain('sectionVisibility');
+    expect(document.migration?.quarantined).not.toContain('sectionVisibility');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('sectionVisibility');
   });
 
   test('owns strict black-and-white mixer state and excludes it from quarantined legacy fields', () => {
@@ -214,6 +220,26 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(editDocumentV2ToLegacyAdjustments(first).customFutureField).toEqual({ enabled: true });
   });
 
+  test('migrates legacy Effects visibility into render node enablement without losing latent parameters', () => {
+    const legacy = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      effectsEnabled: undefined,
+      grainAmount: 42,
+      sectionVisibility: { basic: true, color: true, curves: true, details: true, effects: false },
+    });
+
+    expect(legacy.nodes.display_creative.enabled).toBeFalse();
+    expect(legacy.nodes.display_creative.params.grainAmount).toBe(42);
+    expect(legacy.migration).toMatchObject({ disabled: ['display_creative'] });
+    expect(legacy.migration?.mapped).toContain('display_creative.enabled');
+    expect(legacy.extensions.legacyAdjustments).not.toHaveProperty('effectsEnabled');
+
+    const reenabled = setEditDocumentV2NodeEnabled(legacy, 'display_creative', true);
+    expect(reenabled.nodes.display_creative.enabled).toBeTrue();
+    expect(reenabled.nodes.display_creative.params).toEqual(legacy.nodes.display_creative.params);
+    expect(editDocumentV2ToLegacyAdjustments(reenabled)).toMatchObject({ effectsEnabled: true, grainAmount: 42 });
+  });
+
   test('separates strict source artifacts from provenance and round-trips idempotently', () => {
     const adjustments = {
       ...structuredClone(INITIAL_ADJUSTMENTS),
@@ -262,7 +288,8 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       masks: [layer],
     });
-    expect(document.layers.masks).toEqual([layer]);
+    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
+    expect(document.layers.masks).toEqual([migratedLayer]);
     expect(compileEditDocumentNodeV2(document.nodes.layers).params).toEqual(document.layers);
 
     expect(() =>
@@ -280,6 +307,66 @@ describe('EditDocumentV2 legacy adapter', () => {
       }),
     ).toThrow();
     expect(() => editDocumentV2Schema.parse({ ...document, layers: { masks: [] } })).toThrow('disagrees');
+  });
+
+  test('reopens pre-envelope V2 layers losslessly and quarantines corrupt edit nodes idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      masks: [
+        {
+          adjustments: { exposure: 0.4 },
+          id: 'legacy-v2-layer',
+          invert: false,
+          name: 'Legacy V2 layer',
+          opacity: 72,
+          subMasks: [],
+          visible: true,
+        },
+      ],
+    });
+    const {
+      editNodes: _editNodes,
+      editNodeSchemaVersion: _editNodeSchemaVersion,
+      ...legacyLayerEnvelope
+    } = document.layers.masks[0] ?? {};
+    const legacyLayer = {
+      ...legacyLayerEnvelope,
+      adjustments: { exposure: 0.4, sectionVisibility: { basic: false, color: true, curves: false, details: true } },
+    };
+    const reopened = editDocumentV2Schema.parse({
+      ...document,
+      layers: { masks: [legacyLayer] },
+      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [legacyLayer] } } },
+    });
+    expect(reopened.layers.masks[0]).toMatchObject({
+      adjustments: { exposure: 0.4 },
+      editNodeSchemaVersion: 1,
+      editNodes: {
+        basic: { enabled: false },
+        color: { enabled: true },
+        curves: { enabled: false },
+        details: { enabled: true },
+      },
+    });
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptLayer = { ...legacyLayer, editNodes: { basic: { enabled: 'not-boolean' } } };
+    const quarantined = editDocumentV2Schema.parse({
+      ...document,
+      layers: { masks: [corruptLayer] },
+      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [corruptLayer] } } },
+    });
+    expect(quarantined.layers.masks[0]).toMatchObject({
+      adjustments: { exposure: 0.4 },
+      editNodeQuarantine: { invalidEditNodes: corruptLayer.editNodes },
+      editNodes: {
+        basic: { enabled: false },
+        color: { enabled: true },
+        curves: { enabled: false },
+        details: { enabled: true },
+      },
+    });
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
   });
 
   test('rejects malformed, duplicate, and ambiguous source artifacts', () => {
@@ -917,6 +1004,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       batch: false,
       copy: false,
       paste: false,
+      preset: 'exclude',
       provenance: 'regenerate',
       reset: false,
     });
@@ -1163,9 +1251,10 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     const prepared = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] };
     const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['layers']);
+    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
 
     expect(renderDocument.nodes.layers).toBe(authoritative.nodes.layers);
-    expect(renderDocument.layers).toEqual({ masks: [layer] });
+    expect(renderDocument.layers).toEqual({ masks: [migratedLayer] });
     expect(renderDocument.nodes.layers?.params).toEqual(renderDocument.layers);
   });
 
@@ -1293,9 +1382,67 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     const pasted = pasteEditDocumentV2Node(document, 'scene_global_color_tone', clipboard);
     expect(pasted.nodes.scene_global_color_tone?.params.exposure).toBe(2);
-    expect(pasted.nodes.geometry).toEqual(document.nodes.geometry);
-    expect(pasted.provenance).toEqual(document.provenance);
+    expect(pasted.nodes.geometry).toBe(document.nodes.geometry);
+    expect(pasted.provenance).toBe(document.provenance);
     expect(copyEditDocumentV2Node(document, 'source_artifacts')).toBeNull();
+  });
+
+  test('builds a descriptor-only multi-node clipboard and lowers only approved compatibility fields', () => {
+    const withArtifacts = replaceEditDocumentV2SourceArtifacts(
+      legacyAdjustmentsToEditDocumentV2({
+        ...structuredClone(INITIAL_ADJUSTMENTS),
+        exposure: 1.25,
+        referenceMatchApplicationReceipt: referenceMatchReceipt,
+      }),
+      { aiPatches: [sourcePatch] },
+    );
+    const source = setEditDocumentV2NodeEnabled(withArtifacts, 'scene_global_color_tone', false);
+    const clipboard = copyEditDocumentV2Nodes(source);
+
+    expect(Object.keys(clipboard.nodes)).toContain('scene_global_color_tone');
+    expect(clipboard.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
+    expect(clipboard.nodes).not.toHaveProperty('layers');
+    expect(clipboard.nodes).not.toHaveProperty('source_artifacts');
+    expect(clipboard).not.toHaveProperty('provenance');
+    expect(clipboard).not.toHaveProperty('sourceArtifacts');
+    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('masks');
+    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('aiPatches');
+
+    const selected = selectEditDocumentV2CopyPayload(clipboard, ['exposure'], true);
+    expect(Object.keys(selected.nodes)).toEqual(['scene_global_color_tone']);
+    expect(selected.nodes.scene_global_color_tone?.enabled).toBeFalse();
+    expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).toMatchObject({ exposure: 1.25 });
+    expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).not.toHaveProperty(
+      'referenceMatchApplicationReceipt',
+    );
+  });
+
+  test('preserves disabled state and unrelated structural identity across paste and reopen authority', () => {
+    const source = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 2 }),
+      'scene_global_color_tone',
+      false,
+    );
+    const clipboard = copyEditDocumentV2Nodes(source, ['exposure']);
+    const destination = replaceEditDocumentV2SourceArtifacts(
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: -1 }),
+      { aiPatches: [sourcePatch] },
+    );
+    const pasted = pasteEditDocumentV2Node(
+      destination,
+      'scene_global_color_tone',
+      clipboard.nodes.scene_global_color_tone,
+    );
+
+    expect(pasted.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 2 } });
+    expect(pasted.nodes.geometry).toBe(destination.nodes.geometry);
+    expect(pasted.nodes.layers).toBe(destination.nodes.layers);
+    expect(pasted.nodes.source_artifacts).toBe(destination.nodes.source_artifacts);
+    expect(pasted.sourceArtifacts).toBe(destination.sourceArtifacts);
+    expect(editDocumentV2Schema.parse(structuredClone(pasted))).toEqual(pasted);
+    expect(
+      prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, pasted, ['scene_global_color_tone']).nodes,
+    ).toHaveProperty('scene_global_color_tone.enabled', false);
   });
 
   test('rejects malformed or cross-node clipboard payloads without mutation', () => {

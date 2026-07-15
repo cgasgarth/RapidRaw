@@ -65,6 +65,7 @@ import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
   type AgentSessionCheckpoint,
   agentHistoryRollbackResponseSchema,
+  areEditDocumentHistoriesEqual,
   createAgentSessionCheckpoint,
   rollbackAgentSessionHistory,
 } from './agentSessionHistory';
@@ -1575,7 +1576,8 @@ export const runAgentSelectedImageApplyTransaction = (
       const current = buildSnapshot();
       if (
         state.historyIndex !== checkpoint.historyIndex + 1 ||
-        state.history.length !== checkpoint.history.length + 1
+        state.history.length !== checkpoint.history.length + 1 ||
+        state.editDocumentHistory.length !== checkpoint.editDocumentHistory.length + 1
       ) {
         throw new Error('Selected-image commit parity rejected a non-atomic history transaction.');
       }
@@ -1687,7 +1689,9 @@ export const runAgentSelectedImageApplyTransaction = (
       const currentState = useEditorStore.getState();
       mutationStarted ||=
         currentState.historyIndex !== checkpoint.historyIndex ||
-        currentState.history.length !== checkpoint.history.length;
+        currentState.history.length !== checkpoint.history.length ||
+        !areEditDocumentHistoriesEqual(currentState.editDocumentHistory, checkpoint.editDocumentHistory) ||
+        JSON.stringify(currentState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints);
       if (mutationStarted) {
         rollbackAgentSessionHistory({
           checkpoint,
@@ -1700,6 +1704,8 @@ export const runAgentSelectedImageApplyTransaction = (
         if (
           restored.historyIndex !== checkpoint.historyIndex ||
           JSON.stringify(restored.history) !== JSON.stringify(checkpoint.history) ||
+          !areEditDocumentHistoriesEqual(restored.editDocumentHistory, checkpoint.editDocumentHistory) ||
+          JSON.stringify(restored.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints) ||
           restoredSnapshot.graphRevision !== checkpoint.graphRevision ||
           restoredSnapshot.recipeHash !== checkpoint.previewRecipeHash
         ) {

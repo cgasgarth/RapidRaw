@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import {
   type AutoEditProposalBase,
   buildAutoEditTransactionRequest,
+  captureAutoEditProposalBase,
   clearAutoEditPreviewSession,
   createAutoEditPreviewSession,
+  isCurrentAutoEditProposalBase,
+  isCurrentAutoEditProposalRequest,
   resolveAutoEditRenderSnapshot,
   setAutoEditPreviewBypass,
 } from '../../src/utils/autoEditTransaction';
@@ -36,7 +39,7 @@ const preview = (exposure = 0.75) =>
 
 beforeEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
     adjustments,
@@ -150,5 +153,80 @@ describe('Auto Edit preview transaction authority', () => {
     expect(after.historyIndex).toBe(before.historyIndex);
     expect(after.lastEditApplicationReceipt).toBeNull();
     expect(after.autoEditPreviewSession).toBeNull();
+  });
+
+  test('fallback proposal stays preview-only, cancels cleanly, and rejects delayed A to B to A completion', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-auto-edit-before',
+      imageSession: null,
+      imageSessionId: 127,
+      selectedImage: {
+        exif: null,
+        height: 3000,
+        isRaw: true,
+        isReady: true,
+        metadata: null,
+        originalUrl: null,
+        path,
+        rawDevelopmentReport: null,
+        thumbnailUrl: '',
+        width: 4000,
+      },
+    });
+    const state = useEditorStore.getState();
+    const fallbackBase = captureAutoEditProposalBase(state);
+    if (fallbackBase === null) throw new Error('Expected fallback Auto Edit base');
+    expect(fallbackBase.imageSessionId).toBe('editor-image-session:127');
+    expect(isCurrentAutoEditProposalBase(state, fallbackBase)).toBeTrue();
+    expect(isCurrentAutoEditProposalRequest(state, fallbackBase, 5, 5)).toBeTrue();
+    expect(isCurrentAutoEditProposalRequest(state, fallbackBase, 4, 5)).toBeFalse();
+    expect(
+      isCurrentAutoEditProposalBase(
+        {
+          ...state,
+          imageSessionId: 128,
+          selectedImage: { isReady: true, path: '/fixtures/B.raw' },
+        },
+        fallbackBase,
+      ),
+    ).toBeFalse();
+    expect(isCurrentAutoEditProposalBase({ ...state, imageSessionId: 129 }, fallbackBase)).toBeFalse();
+    expect(isCurrentAutoEditProposalBase({ ...state, adjustmentRevision: 1 }, fallbackBase)).toBeFalse();
+
+    const proposal = createAutoEditPreviewSession({
+      adjustments: { ...state.adjustments, exposure: 0.9 },
+      base: fallbackBase,
+      committedSnapshot: state.adjustmentSnapshot,
+      currentAdjustmentRevision: state.adjustmentRevision,
+      previewIdentity: 'blake3:fallback-preview',
+      proposalId: 'blake3:fallback-proposal',
+    });
+    useEditorStore.setState({ autoEditPreviewSession: proposal });
+    const previewState = useEditorStore.getState();
+    expect(previewState.adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(previewState.history).toHaveLength(1);
+    expect(previewState.adjustmentRevision).toBe(0);
+    expect(previewState.finalPreviewUrl).toBe('blob:fallback-auto-edit-before');
+    useEditorStore.setState((current) => ({
+      autoEditPreviewSession: clearAutoEditPreviewSession(current.autoEditPreviewSession, proposal.key),
+    }));
+    expect(useEditorStore.getState().autoEditPreviewSession).toBeNull();
+
+    const result = useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildAutoEditTransactionRequest(fallbackBase, proposal.snapshot.value as Adjustments, 'fallback-auto-apply'),
+      );
+    expect(result).toMatchObject({ changedKeys: ['exposure'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackBase.imageSessionId,
+        transactionId: 'fallback-auto-apply',
+      },
+    });
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
   });
 });

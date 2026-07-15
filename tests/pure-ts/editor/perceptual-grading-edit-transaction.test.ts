@@ -7,6 +7,7 @@ import { perceptualGradingFromWheelSurface } from '../../../src/utils/color/perc
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildPerceptualGradingEditTransaction,
+  isCurrentPerceptualGradingIdentity,
   type PerceptualGradingCommitIdentity,
 } from '../../../src/utils/perceptualGradingEditTransaction';
 
@@ -35,7 +36,7 @@ describe('perceptual grading edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -108,5 +109,77 @@ describe('perceptual grading edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('perceptual_grading_transaction.stale_revision');
+  });
+
+  test('commits through fallback authority and rejects stale A to B to A identities', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-grading-before',
+      imageSession: null,
+      imageSessionId: 104,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: PerceptualGradingCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:104',
+      sourceIdentity: sourcePath,
+    };
+    const initialPerceptual = perceptualGradingFromWheelSurface(INITIAL_ADJUSTMENTS.colorGrading);
+    const noOp = state.applyEditTransaction(
+      buildPerceptualGradingEditTransaction(
+        state,
+        fallbackIdentity,
+        structuredClone(INITIAL_ADJUSTMENTS.colorGrading),
+        initialPerceptual,
+        'fallback-grading-no-op',
+      ),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-grading-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const next = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 25 };
+    const nextPerceptual = perceptualGradingFromWheelSurface(next);
+    const result = state.applyEditTransaction(
+      buildPerceptualGradingEditTransaction(state, fallbackIdentity, next, nextPerceptual, 'fallback-grading'),
+    );
+    expect(result).toMatchObject({
+      changedKeys: ['colorGrading', 'perceptualGradingV1'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-grading',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
+
+    expect(isCurrentPerceptualGradingIdentity(state, fallbackIdentity)).toBeTrue();
+    expect(
+      isCurrentPerceptualGradingIdentity(
+        { ...state, imageSessionId: 105, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentPerceptualGradingIdentity({ ...state, imageSessionId: 106 }, fallbackIdentity)).toBeFalse();
+    expect(isCurrentPerceptualGradingIdentity({ ...state, adjustmentRevision: 1 }, fallbackIdentity)).toBeFalse();
+    expect(() =>
+      buildPerceptualGradingEditTransaction(
+        { ...state, imageSessionId: 106 },
+        fallbackIdentity,
+        next,
+        nextPerceptual,
+        'stale-reopened-a',
+      ),
+    ).toThrow('perceptual_grading_transaction.stale_session');
   });
 });

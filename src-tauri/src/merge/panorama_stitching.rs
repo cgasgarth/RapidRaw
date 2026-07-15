@@ -474,7 +474,7 @@ pub async fn plan_panorama(
 
     let cancellation_id = cancellation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
     let cancellation = Arc::new(alignment_plan::AlignmentCancellation::default());
-    let service = Arc::clone(&state.services.panorama);
+    let service = Arc::clone(state.computational().panorama());
     let handle = service.begin_plan(
         source_paths.clone(),
         cancellation_id.clone(),
@@ -525,7 +525,7 @@ pub fn cancel_panorama_alignment(
     cancellation_id: String,
     state: tauri::State<'_, AppState>,
 ) -> bool {
-    state.services.panorama.cancel(&cancellation_id)
+    state.computational().panorama().cancel(&cancellation_id)
 }
 
 #[tauri::command]
@@ -545,7 +545,7 @@ pub async fn stitch_panorama(
         .iter()
         .map(|p| parse_virtual_path(p).0.to_string_lossy().into_owned())
         .collect();
-    let service = Arc::clone(&state.services.panorama);
+    let service = Arc::clone(state.computational().panorama());
     let accepted = service.accepted(&source_paths).map_err(str::to_string)?;
     let stitch_options = options.unwrap_or_default();
     validate_panorama_stitch_options(&stitch_options)?;
@@ -955,7 +955,7 @@ pub async fn save_panorama(
     source_paths: Option<Vec<String>>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let service = Arc::clone(&state.services.panorama);
+    let service = Arc::clone(state.computational().panorama());
     let payload = service.acquire_save().map_err(str::to_string)?;
     let pending_panorama = &payload.pending;
 
@@ -3586,6 +3586,7 @@ mod tests {
             version: 1,
             rating: 0,
             adjustments: serde_json::Value::Null,
+            edit_document_v2: None,
             tags: None,
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {

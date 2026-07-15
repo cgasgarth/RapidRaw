@@ -91,10 +91,16 @@ const brushMaskCanvasDatasetSchema = z
 
 const brushCaptureDatasetSchema = z
   .object({
+    brushCommandAdjustmentRevision: z.literal('0'),
     brushCommandCoordinateSpace: z.literal(BRUSH_MASK_COMMAND_COORDINATE_SPACE),
+    brushCommandContainerId: z.literal('brush-mask-canvas-container'),
+    brushCommandContainerKind: z.literal('masks'),
     brushCommandId: z.string().min(1),
     brushCommandLastMode: z.enum(['paint', 'erase']),
     brushCommandLastPointCount: z.string().regex(/^\d+$/u),
+    brushCommandImageSessionId: z.literal('editor-image-session:51'),
+    brushCommandPressurePointCount: z.string().regex(/^[1-9]\d*$/u),
+    brushCommandSourceIdentity: z.literal('/validation/brush-mask-canvas-ui.jpg'),
     brushCommandStrokeCount: z.string().regex(/^\d+$/u),
     brushCommandType: z.literal('layerMask.createBrushMask'),
   })
@@ -200,10 +206,8 @@ async function writeBrushMaskCanvasProof(page): Promise<void> {
   if (lines[0]?.brushSize !== Number(proofDataset.refineBrushSize) || lines[0]?.feather !== 0.64) {
     throw new Error('Brush refine controls did not update the live canvas stroke parameters.');
   }
-  for (const stroke of dryRunCommand.parameters.strokes) {
-    for (const point of stroke.points) {
-      if ('pressure' in point) throw new Error('Mouse brush proof must not synthesize pressure.');
-    }
+  if (!lines[0]?.points.some((point) => point.pressure !== undefined)) {
+    throw new Error('Pen brush proof did not preserve pointer pressure through the rendered canvas path.');
   }
 
   const reportJson = await format(
@@ -1496,6 +1500,7 @@ export async function prepareScenario(page, mode) {
     const capture = page.getByTestId('image-canvas-brush-command-capture');
     await capture.waitFor({ timeout: 10_000 });
     const canvas = capture.locator('canvas');
+    const penSurface = capture.locator('.konvajs-content');
     const canvasCount = await canvas.count();
     if (canvasCount !== 1) throw new Error(`Expected one brush Konva canvas, found ${canvasCount}.`);
     const box = await canvas.boundingBox();
@@ -1511,15 +1516,52 @@ export async function prepareScenario(page, mode) {
       startY: number,
       endX: number,
       endY: number,
-      options: { alt?: boolean; expectLivePreview?: boolean } = {},
+      options: { alt?: boolean; expectLivePreview?: boolean; pointerType?: 'mouse' | 'pen' } = {},
     ) => {
       const start = toCanvasPoint(startX, startY);
       const middle = toCanvasPoint((startX + endX) / 2, (startY + endY) / 2);
       const end = toCanvasPoint(endX, endY);
+      const dispatchPen = async (
+        type: 'pointerdown' | 'pointermove' | 'pointerup',
+        point: { x: number; y: number },
+        pressure: number,
+      ) => {
+        await penSurface.evaluate(
+          (element, event) => {
+            element.addEventListener(event.type, (nativeEvent) => nativeEvent.stopPropagation(), { once: true });
+            element.dispatchEvent(new PointerEvent(event.type, event));
+          },
+          {
+            bubbles: true,
+            button: type === 'pointermove' ? -1 : 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX: box.x + point.x,
+            clientY: box.y + point.y,
+            isPrimary: true,
+            pointerId: 77,
+            pointerType: 'pen',
+            pressure,
+            type,
+          },
+        );
+      };
       if (options.alt === true) await page.keyboard.down('Alt');
-      await page.mouse.move(box.x + start.x, box.y + start.y);
-      await page.mouse.down();
-      await page.mouse.move(box.x + middle.x, box.y + middle.y, { steps: 8 });
+      if (options.pointerType === 'pen') {
+        await dispatchPen('pointermove', start, 0);
+        await dispatchPen('pointerdown', start, 0.25);
+        for (let step = 1; step <= 8; step += 1) {
+          const progress = step / 8;
+          await dispatchPen(
+            'pointermove',
+            { x: start.x + (middle.x - start.x) * progress, y: start.y + (middle.y - start.y) * progress },
+            0.25 + 0.35 * progress,
+          );
+        }
+      } else {
+        await page.mouse.move(box.x + start.x, box.y + start.y);
+        await page.mouse.down();
+        await page.mouse.move(box.x + middle.x, box.y + middle.y, { steps: 8 });
+      }
       if (options.expectLivePreview === true) {
         await page.waitForFunction(
           () => {
@@ -1530,12 +1572,24 @@ export async function prepareScenario(page, mode) {
           { timeout: 10_000 },
         );
       }
-      await page.mouse.move(box.x + end.x, box.y + end.y, { steps: 8 });
-      await page.mouse.up();
+      if (options.pointerType === 'pen') {
+        for (let step = 1; step <= 8; step += 1) {
+          const progress = step / 8;
+          await dispatchPen(
+            'pointermove',
+            { x: middle.x + (end.x - middle.x) * progress, y: middle.y + (end.y - middle.y) * progress },
+            0.6 + 0.3 * progress,
+          );
+        }
+        await dispatchPen('pointerup', end, 0);
+      } else {
+        await page.mouse.move(box.x + end.x, box.y + end.y, { steps: 8 });
+        await page.mouse.up();
+      }
       if (options.alt === true) await page.keyboard.up('Alt');
     };
 
-    await drag(130, 170, 430, 170, { expectLivePreview: true });
+    await drag(130, 170, 430, 170, { expectLivePreview: true, pointerType: 'pen' });
     await page.waitForFunction(
       () =>
         document

@@ -292,11 +292,6 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
             "sampleCount": results.wb_accepted_samples
         },
         "whiteBalanceMigration": "native_v1",
-        "sectionVisibility": {
-            "basic": true,
-            "color": true,
-            "effects": true
-        },
         "whites": results.whites,
         "blacks": results.blacks
     })
@@ -450,7 +445,7 @@ mod tests {
             json["whiteBalanceTechnical"]["sampleCount"],
             serde_json::json!(128)
         );
-        assert_eq!(json["sectionVisibility"]["basic"], serde_json::json!(true));
+        assert!(json.get("sectionVisibility").is_none());
         assert_eq!(
             json,
             serde_json::json!({
@@ -477,7 +472,6 @@ mod tests {
                     "sampleCount": 128
                 },
                 "whiteBalanceMigration": "native_v1",
-                "sectionVisibility": {"basic": true, "color": true, "effects": true},
                 "whites": 1.5,
                 "blacks": -1.0
             })

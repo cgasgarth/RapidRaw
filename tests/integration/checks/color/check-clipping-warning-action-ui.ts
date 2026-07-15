@@ -72,7 +72,7 @@ async function validateClippingWarningAction() {
       transformLens: false,
     },
   });
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: {
       ...INITIAL_ADJUSTMENTS,
       levels: {

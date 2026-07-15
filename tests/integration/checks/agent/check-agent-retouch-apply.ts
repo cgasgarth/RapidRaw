@@ -16,7 +16,7 @@ const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 12 : 4));
 
 const resetEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 42, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-retouch-before',
@@ -45,6 +45,7 @@ const resetEditor = () => {
 };
 
 resetEditor();
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentRetouchApplyRequestSchema.safeParse({
@@ -151,6 +152,14 @@ if (
   cloneState.uncroppedAdjustedPreviewUrl !== null
 ) {
   throw new Error('agent.retouch.apply did not create undoable history and invalidate preview.');
+}
+if (
+  cloneState.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  cloneState.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  cloneState.lastEditApplicationReceipt.transactionId !== 'agent_clone_spot_apply' ||
+  cloneState.editDocumentV2.nodes.layers?.params.masks[0]?.id !== 'agent_clone_spot'
+) {
+  throw new Error('agent.retouch.apply did not publish one canonical EditTransaction receipt.');
 }
 if (cloneResult.beforePreviewHash === cloneResult.afterPreviewHash) {
   throw new Error('agent.retouch.apply clone did not change preview identity.');

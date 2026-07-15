@@ -1,6 +1,8 @@
 import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
+import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
+import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
 type BrowserTauriEventCallback = (event: unknown) => void;
@@ -63,6 +65,12 @@ interface BrowserHarnessTonePlacementResponse {
   value: unknown;
 }
 
+interface BrowserHarnessViewerSampleResponse {
+  delayMs: number;
+  rgb?: [number, number, number];
+  status?: 'available' | 'unavailable';
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -89,9 +97,11 @@ declare global {
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
+      aiSubjectMaskResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
       perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
       tonePlacementResponses: Array<BrowserHarnessTonePlacementResponse>;
+      viewerSampleResponses: Array<BrowserHarnessViewerSampleResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -136,6 +146,8 @@ const commandNames: Record<
   | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
   | 'generateMaskOverlay'
+  | 'generateAiSubjectMask'
+  | 'invokeGenerativeReplaceWithMaskDef'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
@@ -167,6 +179,7 @@ const commandNames: Record<
   | 'loadSettings'
   | 'mergeHdr'
   | 'previewNegativeConversion'
+  | 'precomputeAiSubjectMask'
   | 'previewAutoEditProposal'
   | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
@@ -178,6 +191,7 @@ const commandNames: Record<
   | 'saveMetadataAndUpdateThumbnail'
   | 'samplePointColorPicker'
   | 'sampleToneEqualizerPicker'
+  | 'sampleViewerPixel'
   | 'scheduleImagePrefetch'
   | 'startBackgroundIndexing'
   | 'testAiConnectorConnection'
@@ -207,6 +221,8 @@ const commandNames: Record<
   recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateMaskOverlay: Invokes.GenerateMaskOverlay,
+  generateAiSubjectMask: Invokes.GenerateAiSubjectMask,
+  invokeGenerativeReplaceWithMaskDef: Invokes.InvokeGenerativeReplaceWithMaskDef,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
@@ -234,6 +250,7 @@ const commandNames: Record<
   loadSettings: Invokes.LoadSettings,
   mergeHdr: Invokes.MergeHdr,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  precomputeAiSubjectMask: Invokes.PrecomputeAiSubjectMask,
   previewAutoEditProposal: Invokes.PreviewAutoEditProposal,
   planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
@@ -245,6 +262,7 @@ const commandNames: Record<
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
   samplePointColorPicker: Invokes.SamplePointColorPicker,
   sampleToneEqualizerPicker: Invokes.SampleToneEqualizerPicker,
+  sampleViewerPixel: Invokes.SampleViewerPixel,
   scheduleImagePrefetch: Invokes.ScheduleImagePrefetch,
   startBackgroundIndexing: Invokes.StartBackgroundIndexing,
   testAiConnectorConnection: Invokes.TestAIConnectorConnection,
@@ -276,7 +294,7 @@ const createHarnessAutoAdjustments = (exposure: number): Record<string, unknown>
   dehaze: 5,
   exposure,
   highlights: -10,
-  sectionVisibility: { basic: true, color: true, effects: true },
+  effectsEnabled: true,
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
@@ -339,6 +357,8 @@ let harnessImages: BrowserHarnessImage[] = [
 
 const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';
 
+const roundTripTauriJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
 export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
 
@@ -364,6 +384,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    aiSubjectMaskResponses: [],
     applyAdjustmentsToPathsDelayMs: 0,
     applyPreviewResponses: [],
     autoAdjustResponses: [],
@@ -381,6 +402,7 @@ export const installBrowserTauriHarness = (): void => {
     perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
     tonePlacementResponses: [],
+    viewerSampleResponses: [],
     setAdjustmentsForPath: (path, adjustments) => {
       harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
     },
@@ -708,7 +730,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.cancelThumbnailGeneration:
       return Promise.resolve(true);
     case commandNames.applyAdjustmentsToPaths: {
-      const adjustments = args?.['adjustments'] ?? null;
+      const adjustments = roundTripTauriJson(args?.['adjustments'] ?? null);
       const paths = getStringArrayArg(args, 'paths');
       for (const path of paths) harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
       return new Promise((resolve) => {
@@ -743,7 +765,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           }
           if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
           resolve({
-            adjustments: args?.['adjustments'] ?? null,
+            adjustments: roundTripTauriJson(args?.['adjustments'] ?? null),
             adjustmentRevision:
               (args?.['transaction'] as { nextAdjustmentRevision?: unknown } | undefined)?.nextAdjustmentRevision ??
               null,
@@ -765,10 +787,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.importFiles: {
       const sourcePaths = getStringArrayArg(args, 'sourcePaths');
       const destinationFolder = getStringArg(args, 'destinationFolder') ?? browserHarnessRoot;
-      const jobId = 'browser-harness-import-job';
-      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', { jobId, total: sourcePaths.length }), 0);
+      const lifecycle = createBrowserHarnessImportLifecycle({
+        destinationFolder,
+        generation: 1,
+        jobId: 'browser-harness-import-job',
+        sourcePaths,
+      });
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', lifecycle.start), 0);
       sourcePaths.forEach((sourcePath, index) => {
-        const importedPath = `${destinationFolder}/${sourcePath.split('/').at(-1) ?? `import-${index + 1}.ARW`}`;
+        const importedPath = lifecycle.destinations[index];
+        if (importedPath === undefined) return;
         if (!harnessImages.some(({ path }) => path === importedPath)) {
           harnessImages.push({
             exif: null,
@@ -781,22 +809,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           });
         }
         window.setTimeout(
-          () =>
-            dispatchBrowserHarnessEvent('import-progress', {
-              bytesCopied: (index + 1) * 24_000_000,
-              committedPath: importedPath,
-              current: index + 1,
-              path: importedPath,
-              stage: 'copy',
-              total: sourcePaths.length,
-              totalBytes: sourcePaths.length * 24_000_000,
-            }),
+          () => dispatchBrowserHarnessEvent('import-progress', lifecycle.progress[index]),
           20 * (index + 1),
         );
       });
       folderRevision += sourcePaths.length;
-      window.setTimeout(() => dispatchBrowserHarnessEvent('import-complete', { jobId }), 20 * (sourcePaths.length + 1));
-      return Promise.resolve(jobId);
+      window.setTimeout(
+        () => dispatchBrowserHarnessEvent('import-complete', lifecycle.terminal),
+        20 * (sourcePaths.length + 1),
+      );
+      return Promise.resolve(lifecycle.authority);
     }
     case commandNames.planHdr: {
       const paths = getStringArrayArg(args, 'paths');
@@ -956,6 +978,48 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         );
       });
     }
+    case commandNames.sampleViewerPixel: {
+      const request = args?.['request'] as
+        | {
+            normalizedImagePoint?: { x?: number; y?: number };
+            requestIdentity?: string;
+            sourceImageSize?: { height?: number; width?: number };
+          }
+        | undefined;
+      const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.viewerSampleResponses.shift();
+      const delayMs = injected?.delayMs ?? 20;
+      return new Promise((resolve) => {
+        window.setTimeout(() => {
+          const requestIdentity = request?.requestIdentity ?? 'browser-harness-viewer-sample';
+          if (injected?.status === 'unavailable') {
+            resolve({
+              reason: 'frameUnavailable',
+              requestIdentity,
+              spaceLabel: 'Unavailable',
+              status: 'unavailable',
+            });
+            return;
+          }
+          const normalizedX = request?.normalizedImagePoint?.x ?? 0.5;
+          const normalizedY = request?.normalizedImagePoint?.y ?? 0.5;
+          const width = request?.sourceImageSize?.width ?? 1600;
+          const height = request?.sourceImageSize?.height ?? 1200;
+          const rgb = injected?.rgb ?? [normalizedX, normalizedY, 0.25];
+          resolve({
+            clippedChannels: [],
+            imagePointPx: {
+              x: Math.max(0, Math.round(normalizedX * Math.max(0, width - 1))),
+              y: Math.max(0, Math.round(normalizedY * Math.max(0, height - 1))),
+            },
+            luma: rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722,
+            requestIdentity,
+            rgb,
+            spaceLabel: 'Display encoded browser harness',
+            status: 'available',
+          });
+        }, delayMs);
+      });
+    }
     case commandNames.configureLibraryChangefeed:
       return Promise.resolve(1);
     case commandNames.generateOriginalTransformedPreview: {
@@ -965,6 +1029,22 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     }
     case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
+    case commandNames.generateAiSubjectMask: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.aiSubjectMaskResponses.shift() ?? {
+        delayMs: 0,
+        value: {
+          generatedMaskArtifactId: 'browser-harness-ai-subject-mask',
+          generatedMaskCoverage: 0.42,
+        },
+      };
+      return new Promise((resolve) =>
+        window.setTimeout(() => resolve(structuredClone(response.value)), response.delayMs),
+      );
+    }
+    case commandNames.invokeGenerativeReplaceWithMaskDef:
+      return Promise.resolve(JSON.stringify({ browserHarnessQuickErase: true }));
+    case commandNames.precomputeAiSubjectMask:
+      return Promise.resolve(null);
     case commandNames.generateUncroppedPreview:
       window.setTimeout(() => {
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(
@@ -1071,7 +1151,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         storage: 'temp_cache',
       });
     case commandNames.checkAiConnectorStatus:
-      return Promise.resolve({ connected: false });
+      return Promise.resolve(null);
     case commandNames.testAiConnectorConnection:
       return Promise.resolve(null);
     case commandNames.getSupportedFileTypes:
@@ -1385,7 +1465,10 @@ const decodeHarnessApplyPreview = (): ArrayBuffer => {
 };
 
 interface HarnessApplyPreviewRequest {
+  computeWaveform: boolean;
+  expectedImagePath: string;
   isInteractive: boolean;
+  previewOperationIdentity: PreviewOperationIdentity;
   roi: [number, number, number, number] | null;
   targetResolution: number;
 }
@@ -1404,13 +1487,73 @@ const normalizeHarnessApplyPreviewRequest = (args: Record<string, unknown> | und
       : null;
   const requestedResolution = request['targetResolution'];
   return {
+    computeWaveform: request['computeWaveform'] === true,
+    expectedImagePath:
+      typeof request['expectedImagePath'] === 'string'
+        ? request['expectedImagePath']
+        : `${browserHarnessRoot}/browser-harness.ARW`,
     isInteractive: request['isInteractive'] === true,
+    previewOperationIdentity: previewOperationIdentitySchema.parse(request['previewOperationIdentity']),
     roi,
     targetResolution:
       typeof requestedResolution === 'number' && Number.isFinite(requestedResolution)
         ? Math.min(4096, Math.max(1, Math.round(requestedResolution)))
         : 1024,
   };
+};
+
+const emitHarnessPreviewAnalytics = (request: HarnessApplyPreviewRequest): void => {
+  const resource = (kind: string) => ({
+    byteLen: 256,
+    mimeType: 'application/x-rapidraw-rgba8',
+    resourceId: kind === 'luma' ? 'a'.repeat(64) : 'b'.repeat(64),
+    url: `/__browser-harness-analytics/${kind}`,
+  });
+  dispatchBrowserHarnessEvent('analytics-result', {
+    frameId: {
+      graphRevision: request.previewOperationIdentity.operationId,
+      imageSession: request.previewOperationIdentity.session.imageSessionId,
+      previewGeneration: request.previewOperationIdentity.generation,
+    },
+    gamut: null,
+    histogram: {
+      blue: [0.1, 0.2, 0.3],
+      green: [0.2, 0.3, 0.4],
+      luma: [0.3, 0.4, 0.5],
+      red: [0.4, 0.5, 0.6],
+    },
+    path: request.expectedImagePath,
+    previewOperationIdentity: request.previewOperationIdentity,
+    requestedProducts: request.computeWaveform ? 31 : 1,
+    scopes: request.computeWaveform
+      ? {
+          height: 256,
+          luma: resource('luma'),
+          parade: resource('parade'),
+          rgb: resource('rgb'),
+          vectorscope: resource('vectorscope'),
+          width: 256,
+        }
+      : null,
+    spatial: {
+      gridHeight: 1,
+      gridWidth: 1,
+      tiles: [
+        {
+          blueMean: 0.3,
+          clippedFraction: 0,
+          greenMean: 0.4,
+          lumaMean: 0.5,
+          lumaSpread: 0.1,
+          redMean: 0.6,
+          sampleCount: 64,
+          x: 0,
+          y: 0,
+        },
+      ],
+    },
+    timing: { finishingMs: 0.2, fullImageConversions: 0, samplingMs: 0.5, sourcePixelsRead: 64 },
+  });
 };
 
 const encodeHarnessPreviewJpeg = async (
@@ -1441,6 +1584,7 @@ const encodeHarnessPreviewJpeg = async (
 
 const createHarnessApplyPreview = async (args: Record<string, unknown> | undefined): Promise<ArrayBuffer> => {
   const request = normalizeHarnessApplyPreviewRequest(args);
+  if (request.roi === null) emitHarnessPreviewAnalytics(request);
   const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.shift();
   if (injected !== undefined) {
     const canvas = document.createElement('canvas');

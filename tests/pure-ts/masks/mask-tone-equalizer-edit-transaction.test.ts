@@ -18,7 +18,7 @@ const layer: MaskContainer = {
 
 const seedStore = () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [structuredClone(layer)] };
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
     adjustments,

@@ -17,7 +17,7 @@ import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEn
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3161.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 16 : 2));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-adjustments-before',
@@ -43,6 +43,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-stale-uncropped',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentAdjustmentsApplyRequestSchema.safeParse({
@@ -192,6 +193,23 @@ if (state.adjustments.tint !== -4 || state.adjustments.vibrance !== 10) {
 }
 if (state.historyIndex !== 1 || state.history.length !== 2) {
   throw new Error('agent.adjustments.apply must create one undoable history entry.');
+}
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.adjustments.apply did not publish one atomic EditTransaction receipt.');
+}
+if (
+  state.history[state.historyIndex]?.temperature !== 12 ||
+  state.history[state.historyIndex]?.tint !== -4 ||
+  state.history[state.historyIndex]?.vibrance !== 10 ||
+  state.editDocumentV2.nodes.camera_input?.params.temperature !== 12 ||
+  state.editDocumentV2.nodes.camera_input.params.tint !== -4
+) {
+  throw new Error('agent.adjustments.apply did not atomically persist extra global color fields in history and graph.');
 }
 if (state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.adjustments.apply must invalidate stale preview output.');

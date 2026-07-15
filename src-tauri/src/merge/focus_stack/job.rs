@@ -127,8 +127,8 @@ pub fn prepare_focus_stack_candidate(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<FocusStackCandidateJobHandle, String> {
     let accepted = state
-        .services
-        .focus_stack
+        .computational()
+        .focus_stack()
         .accepted_runtime()?
         .ok_or("focus_candidate_requires_accepted_preview")?;
     if accepted.identity.plan_id != accepted_preview_id {
@@ -151,7 +151,7 @@ pub fn prepare_focus_stack_candidate(
         .iter()
         .map(|stage| stage.weight)
         .sum();
-    let job = state.computational_merge_jobs.begin(
+    let job = state.computational().jobs().begin(
         crate::merge::computational_job::ComputationalMergeFamily::FocusStack,
         STAGES[0],
         total_units,
@@ -178,13 +178,14 @@ pub fn prepare_focus_stack_candidate(
                     &tile_plan,
                     &job.job_id,
                     &job.cancellation_token,
-                    &state.computational_merge_jobs,
+                    state.computational().jobs(),
                 )
             })();
             let (status, error_code, candidate) = match outcome {
                 Ok(output) => {
                     if state
-                        .computational_merge_jobs
+                        .computational()
+                        .jobs()
                         .finish(&job.job_id)
                         .unwrap_or(false)
                     {
@@ -199,7 +200,7 @@ pub fn prepare_focus_stack_candidate(
                     }
                 }
                 Err(error) => {
-                    let _ = state.computational_merge_jobs.fail(&job.job_id);
+                    let _ = state.computational().jobs().fail(&job.job_id);
                     let status = if error == "computational_merge_cancelled" {
                         "cancelled"
                     } else {
@@ -208,7 +209,7 @@ pub fn prepare_focus_stack_candidate(
                     (status, Some(error), None)
                 }
             };
-            if let Some(progress) = state.computational_merge_jobs.progress(&job.job_id) {
+            if let Some(progress) = state.computational().jobs().progress(&job.job_id) {
                 let result = FocusStackCandidateJobResult {
                     job_id: thread_id.clone(),
                     status: status.into(),
@@ -216,7 +217,7 @@ pub fn prepare_focus_stack_candidate(
                     candidate,
                     progress,
                 };
-                state.services.focus_stack_results.publish(result);
+                state.computational().focus_stack_results().publish(result);
             }
         })
         .map_err(|e| format!("focus_candidate_job_spawn_failed:{e}"))?;
@@ -232,11 +233,12 @@ pub fn read_focus_stack_job(
     state: tauri::State<'_, crate::app_state::AppState>,
 ) -> Result<FocusStackCandidateJobResult, String> {
     let id = ComputationalMergeJobId::from_string(job_id.clone());
-    if let Some(result) = state.services.focus_stack_results.read(&id) {
+    if let Some(result) = state.computational().focus_stack_results().read(&id) {
         return Ok(result);
     }
     let progress = state
-        .computational_merge_jobs
+        .computational()
+        .jobs()
         .progress(&id)
         .ok_or("computational_merge_job_not_found")?;
     Ok(FocusStackCandidateJobResult {

@@ -40,7 +40,9 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
     exposure: 0.75,
     referenceMatchApplicationReceipt: receipt,
   };
-  useEditorStore.setState({ adjustments: applied, history: [applied], historyIndex: 0, selectedImage: null });
+  useEditorStore
+    .getState()
+    .hydrateEditorRenderAuthority({ adjustments: applied, history: [applied], historyIndex: 0, selectedImage: null });
   let setAdjustments: ReturnType<typeof useEditorActions>['setAdjustments'] | null = null;
   const Harness = () => {
     setAdjustments = useEditorActions().setAdjustments;

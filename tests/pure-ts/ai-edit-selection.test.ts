@@ -49,7 +49,7 @@ const patch = (id: string, subMaskIds: Array<string> = []): AiPatch => ({
 
 const seedEditor = (adjustments = structuredClone(INITIAL_ADJUSTMENTS)): void => {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
     adjustmentRevision: 0,
@@ -293,7 +293,7 @@ describe('AI edit store command', () => {
 
   test('normalizes selection synchronously for reset, navigation, and history snapshots', () => {
     const populated = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [patch('first', ['child'])] };
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: populated,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: 'child',
@@ -301,11 +301,11 @@ describe('AI edit store command', () => {
       historyIndex: 0,
     });
 
-    useEditorStore.getState().setEditor({ adjustments: structuredClone(INITIAL_ADJUSTMENTS) });
+    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: structuredClone(INITIAL_ADJUSTMENTS) });
     expect(useEditorStore.getState().activeAiPatchContainerId).toBeNull();
     expect(useEditorStore.getState().activeAiSubMaskId).toBeNull();
 
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: populated,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: 'child',

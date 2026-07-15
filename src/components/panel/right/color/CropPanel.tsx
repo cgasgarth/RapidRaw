@@ -23,6 +23,13 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import {
+  buildLensModalEditTransaction,
+  buildTransformModalEditTransaction,
+  type CropModalEditIdentity,
+  captureCropModalEditIdentity,
+  isCurrentCropModalEditIdentity,
+} from '../../../../utils/cropModalEditTransaction';
 import { resolveCropForGeometryTransaction } from '../../../../utils/cropUtils';
 import {
   buildOrientationFlipEditTransaction,
@@ -167,6 +174,18 @@ export function CropEditSession() {
   const localRotationRef = useRef<number | null>(null);
   const [sessionSnapshot] = useState(() => buildCropEditSessionSnapshot(adjustments, activeOverlay, overlayRotation));
   const cancelCustomBlur = useRef(false);
+  const lensModalEditIdentityRef = useRef<CropModalEditIdentity | null>(null);
+  const transformModalEditIdentityRef = useRef<CropModalEditIdentity | null>(null);
+
+  useEffect(() => {
+    transformModalEditIdentityRef.current = isTransformModalOpen
+      ? captureCropModalEditIdentity(useEditorStore.getState())
+      : null;
+  }, [isTransformModalOpen]);
+
+  useEffect(() => {
+    lensModalEditIdentityRef.current = isLensModalOpen ? captureCropModalEditIdentity(useEditorStore.getState()) : null;
+  }, [isLensModalOpen]);
 
   const PRESETS = useMemo<Array<CropPreset>>(
     () => [
@@ -1108,17 +1127,10 @@ export function CropEditSession() {
           setUI({ isTransformModalOpen: false });
         }}
         onApply={(newParams) => {
-          setAdjustments((prev: Adjustments) => ({
-            ...prev,
-            transformDistortion: newParams.distortion,
-            transformVertical: newParams.vertical,
-            transformHorizontal: newParams.horizontal,
-            transformRotate: newParams.rotate,
-            transformAspect: newParams.aspect,
-            transformScale: newParams.scale,
-            transformXOffset: newParams.x_offset,
-            transformYOffset: newParams.y_offset,
-          }));
+          const state = useEditorStore.getState();
+          const identity = transformModalEditIdentityRef.current;
+          if (identity === null || !isCurrentCropModalEditIdentity(state, identity)) return;
+          applyEditTransaction(buildTransformModalEditTransaction(state, identity, newParams, crypto.randomUUID()));
         }}
         currentAdjustments={adjustments}
         sourceKey={selectedImage?.path ?? 'no-image'}
@@ -1130,10 +1142,10 @@ export function CropEditSession() {
           setUI({ isLensCorrectionModalOpen: false });
         }}
         onApply={(newParams) => {
-          setAdjustments((prev: Adjustments) => ({
-            ...prev,
-            ...newParams,
-          }));
+          const state = useEditorStore.getState();
+          const identity = lensModalEditIdentityRef.current;
+          if (identity === null || !isCurrentCropModalEditIdentity(state, identity)) return;
+          applyEditTransaction(buildLensModalEditTransaction(state, identity, newParams, crypto.randomUUID()));
         }}
         currentAdjustments={adjustments}
         selectedImage={selectedImage}

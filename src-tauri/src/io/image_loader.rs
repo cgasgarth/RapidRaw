@@ -1,4 +1,3 @@
-use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::color::white_balance::{
@@ -29,6 +28,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Cursor;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -886,7 +886,10 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
     let Ok(revision) = SourceRevision::from_path(&source_path) else {
         return false;
     };
-    state.decoded_image_cache.contains_revision(&revision)
+    state
+        .services
+        .native_caches
+        .contains_decoded_revision(&revision)
 }
 
 #[tauri::command]
@@ -1105,9 +1108,9 @@ pub(crate) async fn load_image_prepared(
     if install_active {
         RenderCaches::new(state).clear_active_image_render_state();
 
-        state.services.denoise.activate_image(&path);
-        state.services.hdr.cancel();
-        state.services.panorama.reset();
+        state.computational().denoise().activate_image(&path);
+        state.computational().hdr().cancel();
+        state.computational().panorama().reset();
     }
 
     let (source_path, _) = parse_virtual_path(&path);
@@ -1141,9 +1144,12 @@ pub(crate) async fn load_image_prepared(
 
     let path_clone = source_path_str.clone();
     let expected_revision = raw_processing_cache_key.source_revision.clone();
-    let fingerprint_cache = state.source_fingerprint_cache.clone();
+    let fingerprint_cache = Arc::clone(&state.services.source_fingerprints);
 
-    let cached_data = state.decoded_image_cache.get(&raw_processing_cache_key);
+    let cached_data = state
+        .services
+        .native_caches
+        .decoded(&raw_processing_cache_key);
 
     let mut is_offline_smart_preview = false;
 
@@ -1368,7 +1374,7 @@ pub(crate) async fn load_image_prepared(
 
             let arc_img = Arc::new(pristine_img);
 
-            state.decoded_image_cache.insert(
+            state.services.native_caches.insert_decoded(
                 raw_processing_cache_key,
                 arc_img.clone(),
                 exif_data_loaded.clone(),

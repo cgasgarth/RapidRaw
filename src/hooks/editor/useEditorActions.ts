@@ -1,7 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
 
+import type { EditDocumentEditorSection } from '../../../packages/rawengine-schema/src/editDocumentV2';
+
+import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -10,12 +13,9 @@ import { Invokes } from '../../tauri/commands';
 import {
   type Adjustments,
   bindTypedCurveGraphVersion,
-  COPYABLE_ADJUSTMENT_KEYS,
   INITIAL_ADJUSTMENTS,
-  LensAdjustment,
   normalizeLoadedAdjustments,
   PasteMode,
-  pickAdjustmentValues,
 } from '../../utils/adjustments';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from '../../utils/appEventLogger';
 import {
@@ -30,8 +30,24 @@ import {
   contextAutoAdjustPatchSchema,
   isCurrentContextAutoAdjustRequest,
 } from '../../utils/contextAutoAdjustEditTransaction';
-import { buildCopyPasteEditTransaction, classifyCopyPasteNativeCompletion } from '../../utils/copyPasteEditTransaction';
-import { calculateCenteredCrop } from '../../utils/cropUtils';
+import {
+  buildCopyPasteEditTransaction,
+  buildCopyPastePersistenceCompensation,
+  type CopyPasteCompensationTarget,
+  captureCopyPasteCompensationTarget,
+  classifyCopyPasteNativeCompletion,
+} from '../../utils/copyPasteEditTransaction';
+import {
+  copyEditDocumentV2Nodes,
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  legacyAdjustmentsToEditDocumentV2,
+  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
+  selectEditDocumentV2CopyPayload,
+} from '../../utils/editDocumentV2';
+import {
+  editorPersistenceReceiptArraySchema,
+  editorPersistenceReceiptSchema,
+} from '../../utils/editorPersistenceEffectRunner';
 import {
   awaitMatchingEditorPersistence,
   beginEditorPersistenceBarrier,
@@ -46,6 +62,7 @@ import {
 } from '../../utils/editorZoom';
 import {
   buildAdjustmentMutationOperations,
+  buildEditorSectionNodeEnablementOperations,
   buildEditTransactionPersistenceContext,
   type EditTransactionPersistenceContext,
   type EditTransactionRequest,
@@ -53,6 +70,10 @@ import {
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { buildLutLoadEditTransaction, captureLutCommitIdentity } from '../../utils/lutEditTransaction';
+import {
+  buildOrientationRotateEditTransaction,
+  captureOrientationRotateCommitIdentity,
+} from '../../utils/orientationRotateEditTransaction';
 import {
   acceptReferenceMatchAdjustmentTransfer,
   reconcileReferenceMatchReceiptsAfterEdit,
@@ -65,6 +86,7 @@ import {
   isCurrentResetEditCommitIdentity,
   resetAdjustmentsResultsSchema,
 } from '../../utils/resetEditTransaction';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
@@ -80,11 +102,11 @@ export const debouncedSave = debounce(
     void trackEditorPersistence(
       path,
       adjustmentsToSave,
-      invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
-        path,
-        adjustments: adjustmentsToSave,
-        transaction,
-      }),
+      invokeWithSchema(
+        Invokes.SaveMetadataAndUpdateThumbnail,
+        { path, adjustments: adjustmentsToSave, transaction },
+        editorPersistenceReceiptSchema,
+      ),
     ).catch((err: unknown) => {
       console.error('Auto-save failed:', err);
       toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
@@ -103,13 +125,9 @@ export const awaitMatchingEditorSave = async (
   adjustments: Adjustments,
 ): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, adjustments);
 
-type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
-
-interface MetadataResponse {
-  adjustments?: LoadedMetadataAdjustments | null;
-}
-
 const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
+const lutLoadResponseSchema = z.object({ size: z.number().int().positive() }).strict();
+const androidContentUriNameSchema = z.string().min(1);
 let contextAutoAdjustRequestGeneration = 0;
 
 const createOperationId = (): string => crypto.randomUUID();
@@ -181,27 +199,32 @@ export function useEditorActions() {
     [applyEditTransaction, setEditor],
   );
 
+  const setEditorSectionEnabled = useCallback(
+    (section: EditDocumentEditorSection, enabled: boolean) => {
+      const state = useEditorStore.getState();
+      const operations = buildEditorSectionNodeEnablementOperations(state.editDocumentV2, section, enabled);
+      if (operations.length === 0) return;
+      applyEditTransaction({
+        baseAdjustmentRevision: state.adjustmentRevision,
+        history: 'single-entry',
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        operations,
+        persistence: 'commit',
+        source: 'manual-control',
+        transactionId: createOperationId(),
+      });
+    },
+    [applyEditTransaction],
+  );
+
   const handleRotate = useCallback(
     (degrees: number) => {
-      const { selectedImage, adjustments } = useEditorStore.getState();
-      const increment = degrees > 0 ? 1 : 3;
-      const newAspectRatio =
-        adjustments.aspectRatio && adjustments.aspectRatio !== 0 ? 1 / adjustments.aspectRatio : null;
-      const newOrientationSteps = ((adjustments.orientationSteps || 0) + increment) % 4;
-      const newCrop =
-        selectedImage?.width && selectedImage.height
-          ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio)
-          : null;
-
-      setAdjustments((prev) => ({
-        ...prev,
-        aspectRatio: newAspectRatio,
-        orientationSteps: newOrientationSteps,
-        rotation: 0,
-        crop: newCrop,
-      }));
+      const state = useEditorStore.getState();
+      const identity = captureOrientationRotateCommitIdentity(state);
+      if (identity === null) return;
+      applyEditTransaction(buildOrientationRotateEditTransaction(state, identity, degrees, createOperationId()));
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleAutoAdjustments = useCallback(async () => {
@@ -209,7 +232,7 @@ export function useEditorActions() {
     if (base === null) return;
     const requestGeneration = ++contextAutoAdjustRequestGeneration;
     try {
-      const patch = contextAutoAdjustPatchSchema.parse(await invoke<unknown>(Invokes.CalculateAutoAdjustments));
+      const patch = await invokeWithSchema(Invokes.CalculateAutoAdjustments, {}, contextAutoAdjustPatchSchema);
       const state = useEditorStore.getState();
       if (!isCurrentContextAutoAdjustRequest(state, base, requestGeneration, contextAutoAdjustRequestGeneration))
         return;
@@ -234,9 +257,9 @@ export function useEditorActions() {
       const identity = captureLutCommitIdentity(useEditorStore.getState());
       if (identity === null) return;
       try {
-        const result: { size: number } = await invoke(Invokes.LoadAndParseLut, { path });
+        const result = await invokeWithSchema(Invokes.LoadAndParseLut, { path }, lutLoadResponseSchema);
         const name = isAndroid
-          ? await invoke<string>(Invokes.ResolveAndroidContentUriName, { uriStr: path })
+          ? await invokeWithSchema(Invokes.ResolveAndroidContentUriName, { uriStr: path }, androidContentUriNameSchema)
           : path.split(/[\\/]/).pop() || 'LUT';
         const state = useEditorStore.getState();
         applyEditTransaction(
@@ -279,8 +302,10 @@ export function useEditorActions() {
       beginEditorPersistenceAuthorityBarrier();
 
       try {
-        const results = resetAdjustmentsResultsSchema.parse(
-          await invoke<unknown>(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset }),
+        const results = await invokeWithSchema(
+          Invokes.ResetAdjustmentsForPaths,
+          { paths: pathsToReset },
+          resetAdjustmentsResultsSchema,
         );
         assertResetAdjustmentsResultCoverage(results, pathsToReset);
         useProcessStore.getState().invalidateThumbnails(pathsToReset);
@@ -310,9 +335,10 @@ export function useEditorActions() {
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
-    const { selectedImage, adjustments } = useEditorStore.getState();
+    const { selectedImage, adjustments, editDocumentV2 } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
     let sourceAdjustments: Adjustments | null = null;
+    let sourceDocument = selectedImage ? editDocumentV2 : null;
 
     if (selectedImage) {
       sourceAdjustments = adjustments;
@@ -320,12 +346,13 @@ export function useEditorActions() {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
         try {
-          const meta = await invoke<MetadataResponse>(Invokes.LoadMetadata, { path: pathToCopyFrom });
+          const meta = await invokeWithSchema(Invokes.LoadMetadata, { path: pathToCopyFrom }, loadedMetadataSchema);
           if (meta.adjustments && !meta.adjustments.is_null) {
             sourceAdjustments = normalizeLoadedAdjustments(meta.adjustments);
           } else {
             sourceAdjustments = INITIAL_ADJUSTMENTS;
           }
+          sourceDocument = legacyAdjustmentsToEditDocumentV2(sourceAdjustments);
         } catch (err) {
           toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
@@ -333,46 +360,41 @@ export function useEditorActions() {
       }
     }
 
-    if (!sourceAdjustments) return;
+    if (!sourceAdjustments || sourceDocument === null) return;
 
-    const adjustmentsToCopy = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, sourceAdjustments, {
-      requireExistingKey: true,
+    const copiedEditDocumentV2 = copyEditDocumentV2Nodes(sourceDocument);
+    useEditorStore.getState().setEditor({
+      copiedEditDocumentV2,
     });
-    useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
     useProcessStore.getState().setProcess({ isCopied: true });
   }, []);
 
   const handlePasteAdjustments = useCallback(
     (paths?: string[]) => {
-      const { copiedAdjustments, selectedImage } = useEditorStore.getState();
+      const { copiedEditDocumentV2, selectedImage } = useEditorStore.getState();
       const { multiSelectedPaths } = useLibraryStore.getState();
       const { appSettings } = useSettingsStore.getState();
       const { setProcess } = useProcessStore.getState();
 
-      if (!copiedAdjustments || !appSettings) return;
+      if (!copiedEditDocumentV2 || !appSettings) return;
 
       const { mode, includedAdjustments } = appSettings.copyPasteSettings ?? {
         mode: PasteMode.Merge,
-        includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+        includedAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
       };
-      const selectedAdjustmentsToApply = pickAdjustmentValues(includedAdjustments, copiedAdjustments, {
-        requireExistingKey: true,
-        skipDefaultValues: mode === PasteMode.Merge,
-      });
+      const selectedPayload = selectEditDocumentV2CopyPayload(
+        copiedEditDocumentV2,
+        includedAdjustments,
+        mode === PasteMode.Merge,
+      );
       const adjustmentsToApply = bindTypedCurveGraphVersion(
         acceptReferenceMatchAdjustmentTransfer({
-          adjustments: selectedAdjustmentsToApply,
+          adjustments: lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selectedPayload),
           transferMode: 'copy-paste',
         }).adjustments,
       );
 
-      if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
-        if (!adjustmentsToApply[LensAdjustment.LensMaker]) {
-          adjustmentsToApply[LensAdjustment.LensDistortionParams] = null;
-        }
-      }
-
-      if (Object.keys(adjustmentsToApply).length === 0) {
+      if (Object.keys(selectedPayload.nodes).length === 0) {
         setProcess({ isPasted: true });
         return;
       }
@@ -390,27 +412,31 @@ export function useEditorActions() {
         baseAdjustmentRevision,
         nextAdjustmentRevision: baseAdjustmentRevision + 1,
       };
+      let compensationTarget: CopyPasteCompensationTarget | null = null;
+      let selectedPasteWasNoOp = false;
+
+      if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+        compensationTarget = captureCopyPasteCompensationTarget(editorState, selectedImage.path);
+        const request = buildCopyPasteEditTransaction(editorState, selectedImage.path, selectedPayload, transactionId);
+        const result = applyEditTransaction(request);
+        selectedPasteWasNoOp = result.noOp;
+        transaction = buildEditTransactionPersistenceContext(request, result);
+      }
+
+      if (selectedPasteWasNoOp && pathsToUpdate.length === 1 && pathsToUpdate[0] === selectedImage?.path) {
+        setProcess({ isPasted: true });
+        return;
+      }
 
       pathsToUpdate.forEach((p) => {
         globalImageCache.delete(p);
       });
 
-      if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-        const request = buildCopyPasteEditTransaction(
-          editorState,
-          selectedImage.path,
-          adjustmentsToApply,
-          transactionId,
-        );
-        const result = applyEditTransaction(request);
-        transaction = buildEditTransactionPersistenceContext(request, result);
-      }
-
-      invoke<Array<{ adjustments?: Adjustments; path: string }>>(Invokes.ApplyAdjustmentsToPaths, {
-        adjustments: adjustmentsToApply,
-        paths: pathsToUpdate,
-        transaction,
-      })
+      invokeWithSchema(
+        Invokes.ApplyAdjustmentsToPaths,
+        { adjustments: adjustmentsToApply, paths: pathsToUpdate, transaction },
+        editorPersistenceReceiptArraySchema,
+      )
         .then((receipts) => {
           const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
           if (selectedReceipt?.adjustments && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
@@ -423,7 +449,14 @@ export function useEditorActions() {
             // The native receipt confirms disk/catalog side effects; EditTransaction remains the canonical document.
           }
         })
-        .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
+        .catch((err: unknown) => {
+          if (compensationTarget !== null) {
+            const current = useEditorStore.getState();
+            const compensation = buildCopyPastePersistenceCompensation(current, transaction, compensationTarget);
+            if (compensation !== null) current.applyEditTransaction(compensation);
+          }
+          toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`);
+        });
 
       setProcess({ isPasted: true });
     },
@@ -457,6 +490,7 @@ export function useEditorActions() {
 
   return {
     setAdjustments,
+    setEditorSectionEnabled,
     handleRotate,
     handleAutoAdjustments,
     handleLutSelect,

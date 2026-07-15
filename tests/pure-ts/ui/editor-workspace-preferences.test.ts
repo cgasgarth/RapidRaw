@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { Panel } from '../../../src/components/ui/AppProperties';
 import { editorWorkspacePreferencesSchema } from '../../../src/schemas/editorWorkspacePreferencesSchemas';
+import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   createDefaultEditorWorkspacePreferences,
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
@@ -220,6 +224,34 @@ describe('editor workspace preferences', () => {
     });
     expect(persisted.rightInspector.expandedSectionsByPanel.adjustments).toContain('details');
     expect(persisted.isCommandPaletteOpen).toBeUndefined();
+  });
+
+  test('collapses Effects as a workspace-only preference with zero edit side effects', () => {
+    const storage = new MemoryStorage();
+    installStorage(storage);
+    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, grainAmount: 42 };
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustmentRevision: 7,
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+      adjustments,
+      editDocumentV2,
+      history: [adjustments],
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+    const before = useEditorStore.getState();
+
+    useUIStore.getState().setEditorSectionExpanded(Panel.Adjustments, 'effects', false);
+
+    const after = useEditorStore.getState();
+    expect(after.adjustmentRevision).toBe(7);
+    expect(after.adjustments).toBe(before.adjustments);
+    expect(after.editDocumentV2).toBe(before.editDocumentV2);
+    expect(after.history).toBe(before.history);
+    expect(after.lastEditApplicationReceipt).toBeNull();
+    const persisted = JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}');
+    expect(persisted.rightInspector.expandedSectionsByPanel.adjustments).not.toContain('effects');
   });
 
   test('tolerates unavailable storage without blocking preference updates', () => {

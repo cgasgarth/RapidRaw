@@ -1070,7 +1070,7 @@ fn generate_thumbnail_data_with_target(
         let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
         let lut = meta.adjustments["lutPath"]
             .as_str()
-            .and_then(|path| crate::get_or_load_lut(&state, path).ok());
+            .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
         let revision = content_revision(
             &meta.adjustments,
             0,
@@ -1093,7 +1093,7 @@ fn generate_thumbnail_data_with_target(
         let crop_data = render_plan.crop;
 
         let cached_base: Option<(DynamicImage, f32)> = {
-            if let Some(entry) = state.thumbnail_geometry_cache.get(&path_str.to_string()) {
+            if let Some(entry) = state.services.native_caches.thumbnail_geometry(path_str) {
                 let (cached_hash, img, scale) = entry.as_ref();
                 let mut sufficient_resolution = true;
                 if let Some(c) = &crop_data
@@ -1208,10 +1208,9 @@ fn generate_thumbnail_data_with_target(
 
             let total_scale = gpu_scale * raw_scale_factor;
 
-            state.thumbnail_geometry_cache.insert(
+            state.services.native_caches.insert_thumbnail_geometry(
                 path_str.to_string(),
                 Arc::new((geometry_cache_hash, Arc::new(base.clone()), total_scale)),
-                base.as_bytes().len() as u64,
             );
 
             (base, total_scale)
@@ -1246,7 +1245,7 @@ fn generate_thumbnail_data_with_target(
             .masks
             .iter()
             .filter_map(|def| {
-                crate::get_cached_or_generate_mask(
+                crate::mask_generation::get_cached_or_generate_mask(
                     &state,
                     def,
                     preview_w,
@@ -1603,7 +1602,7 @@ fn schedule_smart_preview(
     demand_class: SmartPreviewDemandClass,
 ) {
     let state = app_handle.state::<AppState>();
-    let generation = state.smart_preview_scheduler.enqueue(
+    let generation = state.library().smart_previews().enqueue(
         path.to_string(),
         request.source_revision,
         request.adjustments,
@@ -1615,7 +1614,7 @@ fn schedule_smart_preview(
     );
     let _ = app_handle.emit(
         "smart-preview-progress",
-        state.smart_preview_scheduler.progress(),
+        state.library().smart_previews().progress(),
     );
 }
 
@@ -1640,7 +1639,7 @@ pub(crate) fn emit_thumbnail_lifecycle(
 
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
-    let thumbnails = Arc::clone(&state.services.thumbnails);
+    let thumbnails = Arc::clone(state.library().thumbnails());
     let settings = load_settings_or_default(&app_handle);
     let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
@@ -1688,7 +1687,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let smart_app = app_handle;
     let smart_scheduler = smart_app
         .state::<crate::AppState>()
-        .smart_preview_scheduler
+        .library()
+        .smart_previews()
         .clone();
     std::thread::spawn(move || {
         loop {
@@ -1762,8 +1762,8 @@ pub fn update_thumbnail_queue(
 ) -> Result<ThumbnailOperationAuthority, String> {
     let state = app_handle.state::<crate::AppState>();
     let (authority, emission) = state
-        .services
-        .thumbnails
+        .library()
+        .thumbnails()
         .update(request)
         .map_err(str::to_string)?;
     emit_thumbnail_lifecycle(&app_handle, &emission);
@@ -2293,8 +2293,8 @@ fn submit_thumbnail_invalidation(
     receipt: &MetadataSaveReceipt,
 ) {
     let (outcome, progress) = match state
-        .services
-        .thumbnails
+        .library()
+        .thumbnails()
         .invalidate_if_demanded(&receipt.path, receipt.thumbnail_revision.clone())
     {
         Ok(result) => result,
@@ -2325,6 +2325,7 @@ fn submit_thumbnail_invalidation(
 pub fn save_metadata_and_update_thumbnail(
     path: String,
     adjustments: Value,
+    edit_document_v2: Option<Value>,
     transaction: Option<EditTransactionPersistenceContext>,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
@@ -2338,6 +2339,9 @@ pub fn save_metadata_and_update_thumbnail(
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
         let mut final_adjustments = adjustments;
+        if let Some(document) = edit_document_v2.as_ref() {
+            crate::adjustments::edit_document_v2::validate_edit_document_v2(document)?;
+        }
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
             &metadata.exif,
@@ -2354,6 +2358,7 @@ pub fn save_metadata_and_update_thumbnail(
         }
 
         metadata.adjustments = final_adjustments;
+        metadata.edit_document_v2 = edit_document_v2;
         save_metadata_sidecar(&sidecar_path, &metadata)?;
         metadata
     };
@@ -2496,7 +2501,7 @@ pub async fn reset_adjustments_for_paths(
         return Err("Reset requires at least one image path".to_string());
     }
     let state = app_handle.state::<AppState>();
-    let thumbnails = Arc::clone(&state.services.thumbnails);
+    let thumbnails = Arc::clone(state.library().thumbnails());
     let (batch, start) = thumbnails
         .begin_explicit(paths.len())
         .map_err(str::to_string)?;
@@ -2536,7 +2541,7 @@ pub async fn reset_adjustments_for_paths(
 
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
-        state.decoded_image_cache.clear();
+        state.services.native_caches.clear_decoded();
         let render_generation = state.services.preview_runtime.invalidate_current();
         for result in &mut results {
             result.render_generation = render_generation;
@@ -2645,7 +2650,23 @@ fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
 }
 
 fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
-    metadata.adjustments = serde_json::json!({});
+    let effects_enabled = metadata
+        .adjustments
+        .get("effectsEnabled")
+        .and_then(Value::as_bool)
+        .or_else(|| {
+            metadata
+                .adjustments
+                .get("sectionVisibility")
+                .and_then(|visibility| visibility.get("effects"))
+                .and_then(Value::as_bool)
+        });
+    let mut reset_adjustments = serde_json::Map::new();
+    if let Some(enabled) = effects_enabled {
+        reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
+    }
+    metadata.adjustments = Value::Object(reset_adjustments);
+    metadata.edit_document_v2 = None;
     if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
         artifacts.hdr_merge_artifacts.clear();
         artifacts.negative_lab_artifacts.clear();
@@ -2708,16 +2729,9 @@ fn merge_auto_adjustment_document(
     let auto_map = auto_adjustments
         .as_object()
         .ok_or_else(|| "auto_adjust_invalid_analysis_document".to_string())?;
+    existing_map.remove("sectionVisibility");
     for (key, value) in auto_map {
-        if key == "sectionVisibility"
-            && let Some(existing_visibility) = existing_map.get_mut(key)
-            && let (Some(existing_visibility), Some(auto_visibility)) =
-                (existing_visibility.as_object_mut(), value.as_object())
-        {
-            for (visibility_key, visibility_value) in auto_visibility {
-                existing_visibility.insert(visibility_key.clone(), visibility_value.clone());
-            }
-        } else {
+        if key != "sectionVisibility" {
             existing_map.insert(key.clone(), value.clone());
         }
     }
@@ -3153,7 +3167,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         );
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
-        state.decoded_image_cache.clear();
+        state.services.native_caches.clear_decoded();
         state.services.preview_runtime.invalidate_current();
     }
     let mut metadata = persisted.metadata;
@@ -3436,7 +3450,8 @@ pub(super) async fn import_files_for_runtime<R: Runtime>(
         return Err("Import destination is not a directory".to_string());
     }
     let job_id = super::import_pipeline::new_job_id();
-    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let state = app_handle.state::<AppState>();
+    let import_jobs = Arc::clone(state.library().import_jobs());
     let start = import_jobs.begin_new(job_id).map_err(str::to_string)?;
     let cancellation = Arc::clone(&start.cancellation);
     emit_import_start(&app_handle, &start.authority, total_files);
@@ -3487,8 +3502,8 @@ pub fn cancel_import(
     state: tauri::State<'_, AppState>,
 ) -> Result<bool, String> {
     state
-        .services
-        .import_jobs
+        .library()
+        .import_jobs()
         .cancel(&super::import_job_service::ImportJobAuthority { generation, job_id })
         .map_err(str::to_string)
 }
@@ -3497,7 +3512,7 @@ pub fn cancel_import(
 pub fn get_active_import_job_status(
     state: tauri::State<'_, AppState>,
 ) -> Option<super::import_job_service::ImportJobStatus> {
-    state.services.import_jobs.status()
+    state.library().import_jobs().status()
 }
 
 #[tauri::command]
@@ -3515,8 +3530,8 @@ pub fn validate_import_job_resume(
 ) -> Result<super::import_pipeline::ImportResumeValidation, String> {
     app_handle
         .state::<AppState>()
-        .services
-        .import_jobs
+        .library()
+        .import_jobs()
         .ensure_resume_available()
         .map_err(str::to_string)?;
     super::import_pipeline::validate_job_resume(&app_handle, &job_id)
@@ -3534,7 +3549,8 @@ pub(super) async fn resume_import_job_for_runtime<R: Runtime>(
     job_id: String,
     app_handle: AppHandle<R>,
 ) -> Result<super::import_job_service::ImportJobAuthority, String> {
-    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let state = app_handle.state::<AppState>();
+    let import_jobs = Arc::clone(state.library().import_jobs());
     let reservation = import_jobs
         .reserve_resume(job_id.clone())
         .map_err(str::to_string)?;
@@ -4472,7 +4488,7 @@ mod tests {
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
 
     #[test]
-    fn batch_auto_adjust_merge_is_idempotent_and_preserves_visibility_members() {
+    fn batch_auto_adjust_merge_is_idempotent_and_discards_disclosure_metadata() {
         let auto = serde_json::json!({
             "exposure": 0.5,
             "sectionVisibility": {"basic": true}
@@ -4489,8 +4505,7 @@ mod tests {
         assert_eq!(existing, accepted);
         assert_eq!(existing["contrast"], 8);
         assert_eq!(existing["exposure"], 0.5);
-        assert_eq!(existing["sectionVisibility"]["basic"], true);
-        assert_eq!(existing["sectionVisibility"]["details"], false);
+        assert!(existing.get("sectionVisibility").is_none());
     }
 
     #[test]
@@ -5303,7 +5318,12 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
             "Camera".to_string(),
             "Control".to_string(),
         )])),
-        adjustments: serde_json::json!({"exposure": 1, "lutPath": "/tmp/cast.cube"}),
+        adjustments: serde_json::json!({
+            "effectsEnabled": false,
+            "exposure": 1,
+            "lutPath": "/tmp/cast.cube",
+            "sectionVisibility": { "basic": false, "effects": false }
+        }),
         raw_engine_artifacts: Some(RawEngineArtifacts {
             ai_provenance_entries: vec![serde_json::json!({"receipt": "keep"})],
             layer_stack_sidecars: vec![serde_json::json!({"layers": [{"exposure": 2}]})],
@@ -5316,7 +5336,13 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
 
     clear_render_authority_for_reset(&mut metadata);
 
-    assert_eq!(metadata.adjustments, serde_json::json!({}));
+    assert_eq!(
+        metadata.adjustments,
+        serde_json::json!({
+            "effectsEnabled": false,
+            "sectionVisibility": { "basic": false }
+        })
+    );
     assert_eq!(metadata.rating, 4);
     assert_eq!(
         metadata.tags.as_deref(),

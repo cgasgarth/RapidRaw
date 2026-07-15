@@ -1,6 +1,6 @@
 import { z } from 'zod';
-
 import { rawInputTransformReceiptV2Schema } from '../../packages/rawengine-schema/src/color/rawInputTransformSchemas';
+import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from '../utils/adjustments';
 
 const legacyAdjustmentSnapshotSchema = z.custom<Partial<Adjustments>>(
@@ -307,6 +307,7 @@ export const rawCameraProfileProvenanceReceiptSchema = z
 export const loadedMetadataSchema = z
   .object({
     adjustments: z.union([legacyAdjustmentSnapshotSchema, nullAdjustmentSnapshotSchema]).nullable().optional(),
+    editDocumentV2: editDocumentV2Schema.nullable().optional(),
   })
   .loose();
 

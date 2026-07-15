@@ -7,6 +7,9 @@ import { chromium, type Locator, type Page } from '@playwright/test';
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
+import { Invokes } from '../../../src/tauri/commands';
+import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
+import { DISPLAY_TARGET_CHANGED_EVENT } from '../../../src/utils/tauriEventNames';
 
 const host = '127.0.0.1';
 const portOverride =
@@ -48,6 +51,270 @@ interface BoundsReport {
 }
 
 const boundsSamples: BoundsSample[] = [];
+
+async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
+  const exposureValue = page.getByTestId('basic-control-exposure-value');
+  const applyBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [200, 40, 40], delayMs: 20 },
+      { color: [40, 40, 200], delayMs: 20 },
+      { color: [40, 200, 40], delayMs: 20 },
+    );
+  });
+  for (const [index, exposure] of ['0.15', '0.35', '0.55'].entries()) {
+    await exposureValue.click();
+    const input = page.getByTestId('basic-control-exposure-input');
+    await input.fill(exposure);
+    await input.press('Enter');
+    await page.waitForFunction(
+      (expected) =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+          .length ?? 0) >= expected,
+      applyBaseline + index + 1,
+      { timeout: 10_000 },
+    );
+  }
+  await page.waitForTimeout(800);
+
+  const overflow = page.getByTestId('editor-command-overflow-trigger');
+  await overflow.click();
+  const splitCompare = page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u });
+  await splitCompare.click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length > 0,
+    { timeout: 10_000 },
+  );
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('1');
+  await page.waitForTimeout(500);
+
+  const proof = await page.evaluate(async () => {
+    const audit = Reflect.get(window, '__RAWENGINE_PREVIEW_URL_AUDIT__') as
+      | { created: string[]; imageErrors: string[]; revoked: string[] }
+      | undefined;
+    if (!audit) throw new Error('Preview URL audit was not installed.');
+    const visibleHrefs = [...document.querySelectorAll<SVGImageElement>('[data-preview-layer-id]')]
+      .filter((layer) => Number.parseFloat(getComputedStyle(layer).opacity) > 0.99)
+      .map((layer) => layer.getAttribute('href'))
+      .filter((href): href is string => href !== null);
+    const decodeFailures: string[] = [];
+    for (const href of visibleHrefs) {
+      const image = new Image();
+      image.src = href;
+      try {
+        await image.decode();
+      } catch {
+        decodeFailures.push(href);
+      }
+    }
+    return { ...audit, decodeFailures, visibleHrefs };
+  });
+  if (proof.created.length < 3) {
+    throw new Error(`Preview URL proof created too few edited artifacts: ${JSON.stringify(proof)}.`);
+  }
+  if (proof.revoked.length === 0) {
+    throw new Error(`Preview URL proof did not retire any replaced artifacts: ${JSON.stringify(proof)}.`);
+  }
+  const revokeCounts = Map.groupBy(proof.revoked, (url) => url);
+  const duplicateRevokes = [...revokeCounts].filter(([, urls]) => urls.length > 1).map(([url]) => url);
+  if (duplicateRevokes.length > 0) {
+    throw new Error(`Preview URLs were revoked more than once: ${duplicateRevokes.join(', ')}.`);
+  }
+  const revokedVisible = proof.visibleHrefs.filter((url) => proof.revoked.includes(url));
+  if (revokedVisible.length > 0 || proof.decodeFailures.length > 0 || proof.imageErrors.length > 0) {
+    throw new Error(`Visible preview ownership broke: ${JSON.stringify(proof)}.`);
+  }
+
+  await overflow.click();
+  await splitCompare.click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length === 0,
+    { timeout: 10_000 },
+  );
+}
+
+async function verifySchemaOwnedTauriTransport(page: Page): Promise<void> {
+  const proof = await page.evaluate(
+    async ({ checkStatusCommand, saveMetadataCommand }) => {
+      const invoke = window.__TAURI_INTERNALS__?.invoke;
+      if (invoke === undefined) throw new Error('Browser Tauri transport is unavailable.');
+      const status = await invoke(checkStatusCommand);
+      const receipt = await invoke(saveMetadataCommand, {
+        adjustments: {
+          exposure: 0.5,
+          omittedByJsonTransport: undefined,
+          rawEngineArtifacts: { schemaVersion: 1 },
+        },
+        path: '/tmp/rawengine-browser-harness/schema-boundary.ARW',
+        transaction: null,
+      });
+      const adjustments = typeof receipt === 'object' && receipt !== null ? Reflect.get(receipt, 'adjustments') : null;
+      return {
+        artifactSchemaVersion:
+          typeof adjustments === 'object' && adjustments !== null
+            ? Reflect.get(Reflect.get(adjustments, 'rawEngineArtifacts') ?? {}, 'schemaVersion')
+            : null,
+        hasOmittedProperty:
+          typeof adjustments === 'object' && adjustments !== null
+            ? Object.hasOwn(adjustments, 'omittedByJsonTransport')
+            : true,
+        status,
+      };
+    },
+    {
+      checkStatusCommand: Invokes.CheckAIConnectorStatus,
+      saveMetadataCommand: Invokes.SaveMetadataAndUpdateThumbnail,
+    },
+  );
+  if (proof.status !== null) throw new Error('AI connector status command did not preserve its native unit response.');
+  if (proof.hasOmittedProperty || proof.artifactSchemaVersion !== 1) {
+    throw new Error(`Persistence receipt did not preserve native JSON transport semantics: ${JSON.stringify(proof)}`);
+  }
+}
+
+async function verifyEditorRenderAuthorityBoundary(page: Page): Promise<void> {
+  const proof = await page.evaluate(async () => {
+    const module = await import(/* @vite-ignore */ `/src/${'store/useEditorStore.ts'}`);
+    const state = module.useEditorStore.getState();
+    const capture = (operation: () => void): string => {
+      try {
+        operation();
+        return 'accepted';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    };
+    const setEditorError = capture(() =>
+      Reflect.apply(state.setEditor, undefined, [{ adjustments: structuredClone(state.adjustments) }]),
+    );
+    const setStateError = capture(() =>
+      Reflect.apply(module.useEditorStore.setState, module.useEditorStore, [{ history: [...state.history] }]),
+    );
+    state.setEditor({ isWaveformVisible: true });
+    const uiUpdateAccepted = module.useEditorStore.getState().isWaveformVisible;
+    module.useEditorStore.getState().setEditor({ isWaveformVisible: false });
+    return { setEditorError, setStateError, uiUpdateAccepted };
+  });
+  if (
+    proof.setEditorError !== 'editor.setEditor.render_authority_forbidden:adjustments' ||
+    proof.setStateError !== 'editor.setState.render_authority_forbidden:history' ||
+    !proof.uiUpdateAccepted
+  ) {
+    throw new Error(`Editor render-authority browser boundary failed: ${JSON.stringify(proof)}`);
+  }
+}
+
+async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
+  await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
+  const recover = page.locator('[data-testid$="-analytics-header-recover-scopes"]').first();
+  if ((await recover.count()) > 0 && (await recover.isEnabled())) await recover.click();
+  await page.waitForFunction(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return calls.some(({ args, command }) => {
+      const request = command === 'apply_adjustments' ? args?.['request'] : null;
+      return (
+        typeof request === 'object' &&
+        request !== null &&
+        Reflect.get(request, 'computeWaveform') === true &&
+        typeof Reflect.get(request, 'previewOperationIdentity') === 'object'
+      );
+    });
+  });
+
+  const status = page.getByTestId('preview-scope-status');
+  await status.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="preview-scope-status"]')?.getAttribute('data-preview-scope-ready') ===
+      'true',
+  );
+  await page.waitForTimeout(250);
+  const acceptedAt = await status.getAttribute('data-preview-scope-updated-at');
+  if (!acceptedAt) throw new Error('Exact presented preview analytics did not publish scope status.');
+
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    const request = harness?.calls
+      .filter(
+        ({ args, command }) =>
+          command === 'apply_adjustments' && Reflect.get(args?.['request'] ?? {}, 'computeWaveform') === true,
+      )
+      .at(-1)?.args?.['request'];
+    if (!harness || typeof request !== 'object' || request === null)
+      throw new Error('Missing preview request authority.');
+    const current = structuredClone(Reflect.get(request, 'previewOperationIdentity')) as {
+      generation: number;
+      operationId: number;
+      session: { imageSessionId: number; sourceImagePath: string };
+    };
+    current.generation += 1000;
+    current.operationId += 1000;
+    harness.emitEvent('analytics-result', {
+      frameId: {
+        graphRevision: current.operationId,
+        imageSession: current.session.imageSessionId,
+        previewGeneration: current.generation,
+      },
+      gamut: null,
+      histogram: { blue: [9], green: [9], luma: [9], red: [9] },
+      path: current.session.sourceImagePath,
+      previewOperationIdentity: current,
+      requestedProducts: 1,
+      scopes: null,
+      spatial: null,
+      timing: { finishingMs: 0, fullImageConversions: 0, samplingMs: 0, sourcePixelsRead: 1 },
+    });
+  });
+  await page.waitForTimeout(150);
+  if ((await status.getAttribute('data-preview-scope-updated-at')) !== acceptedAt) {
+    throw new Error('A non-presented preview operation replaced exact-current scope output.');
+  }
+
+  const displayInvalidationBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate((eventName) => {
+    const payload = {
+      deviceGeneration: 10_000,
+      displayResourceGeneration: 10_000,
+      target: {
+        colorSpace: 'display_encoded_srgb',
+        displayId: 1,
+        profileSha256: 'sha256:browser-harness-display',
+        scaleFactorBits: 4_607_182_418_800_017_400,
+      },
+    };
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(eventName, payload);
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(eventName, payload);
+  }, DISPLAY_TARGET_CHANGED_EVENT);
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0) >=
+      baseline + 1,
+    displayInvalidationBaseline,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(250);
+  const displayInvalidationCount = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  if (displayInvalidationCount !== displayInvalidationBaseline + 1) {
+    throw new Error(
+      `Duplicate display invalidation scheduled ${String(displayInvalidationCount - displayInvalidationBaseline)} previews.`,
+    );
+  }
+}
 
 async function verifyCompareDividerController(page: Page): Promise<void> {
   const divider = page.getByTestId('editor-compare-split-divider');
@@ -167,19 +434,20 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   };
   const waitForGeometryIdle = async (): Promise<void> => {
     await page.evaluate(async () => {
-      const readGeometry = () =>
-        document
-          .querySelector('[data-testid="image-canvas"]')
-          ?.getAttribute('data-initial-mask-draw-context-geometry') ?? null;
-      let previous = readGeometry();
+      const readAuthority = () => {
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        return `${canvas?.getAttribute('data-initial-mask-draw-context-geometry') ?? ''}|${canvas?.getAttribute('data-initial-mask-draw-context-revision') ?? ''}`;
+      };
+      let previous = readAuthority();
       let stableFrames = 0;
       for (let frame = 0; frame < 120 && stableFrames < 30; frame += 1) {
         await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
-        const current = readGeometry();
+        const current = readAuthority();
         stableFrames = current === previous ? stableFrames + 1 : 0;
         previous = current;
       }
-      if (stableFrames < 30) throw new Error('Initial mask geometry did not become idle before pointer input.');
+      if (stableFrames < 30)
+        throw new Error('Initial mask geometry/source authority did not become idle before pointer input.');
     });
   };
   const waitForPersistedMask = async (type: 'linear' | 'radial', initial: boolean, label: string): Promise<void> => {
@@ -254,7 +522,85 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       throw new Error(`Timed out waiting for ${label} persistence: ${JSON.stringify(latest)}.`);
     }
   };
-
+  const assertCurrentOverlayMatchesPersisted = async (label: string, overlayCallsBefore: number): Promise<void> => {
+    try {
+      await page.waitForFunction(
+        ({ minimumOverlayCalls }) => {
+          const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+          const overlays = calls.filter(({ command }) => command === 'generate_mask_overlay');
+          if (overlays.length <= minimumOverlayCalls) return false;
+          const canvas = document.querySelector('[data-testid="image-canvas"]');
+          const workspace = document.querySelector('[data-testid="editor-workspace"]');
+          const maskId = canvas?.getAttribute('data-initial-mask-draw-context-mask');
+          const sourcePath = workspace?.getAttribute('data-selected-image-path');
+          const imageSessionId = canvas?.getAttribute('data-initial-mask-draw-context-session');
+          const identityText = canvas?.getAttribute('data-mask-overlay-identity');
+          if (
+            maskId === null ||
+            maskId === undefined ||
+            sourcePath === null ||
+            sourcePath === undefined ||
+            imageSessionId === null ||
+            imageSessionId === undefined ||
+            identityText === null ||
+            identityText === undefined ||
+            canvas?.getAttribute('data-mask-overlay-status') !== 'current'
+          )
+            return false;
+          const latestSave = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(-1);
+          const masks = latestSave?.args?.['adjustments']?.['masks'];
+          const persisted = Array.isArray(masks)
+            ? masks.flatMap((mask) => mask['subMasks']).find((subMask) => subMask['id'] === maskId)?.['parameters']
+            : null;
+          const native = overlays
+            .at(-1)
+            ?.args?.['maskDef']?.['subMasks']?.find((subMask: Record<string, unknown>) => subMask['id'] === maskId)?.[
+            'parameters'
+          ];
+          const identity = JSON.parse(identityText) as {
+            imageSessionId?: unknown;
+            selectedImagePath?: unknown;
+            triggerHash?: unknown;
+          };
+          if (
+            typeof identity.triggerHash !== 'string' ||
+            identity.imageSessionId !== imageSessionId ||
+            identity.selectedImagePath !== sourcePath
+          )
+            return false;
+          const trigger = JSON.parse(identity.triggerHash) as { subMasks?: Array<Record<string, unknown>> };
+          const identified = trigger.subMasks?.find((subMask) => subMask['id'] === maskId)?.['parameters'];
+          return (
+            typeof persisted === 'object' &&
+            persisted !== null &&
+            JSON.stringify(persisted) === JSON.stringify(native) &&
+            JSON.stringify(persisted) === JSON.stringify(identified)
+          );
+        },
+        { minimumOverlayCalls: overlayCallsBefore },
+        { timeout: 10_000 },
+      );
+    } catch {
+      const diagnostics = await page.evaluate(() => {
+        const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        const latestOverlay = calls.filter(({ command }) => command === 'generate_mask_overlay').at(-1);
+        return {
+          active: canvas?.getAttribute('data-initial-mask-draw-context-active'),
+          identity: canvas?.getAttribute('data-mask-overlay-identity'),
+          mask: canvas?.getAttribute('data-initial-mask-draw-context-mask'),
+          overlayCalls: calls.filter(({ command }) => command === 'generate_mask_overlay').length,
+          overlayMask: latestOverlay?.args?.['maskDef'] ?? null,
+          source: document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path'),
+          status: canvas?.getAttribute('data-mask-overlay-status'),
+          tool: canvas?.getAttribute('data-initial-mask-draw-context-tool'),
+        };
+      });
+      throw new Error(
+        `Timed out waiting for ${label} native overlay rollback/currentness: ${JSON.stringify(diagnostics)}.`,
+      );
+    }
+  };
   await page.getByTestId('right-panel-switcher-button-masks').click();
   const createMask = async (type: 'linear' | 'radial'): Promise<void> => {
     const contextual = page.getByTestId(`mask-contextual-create-${type}`);
@@ -289,6 +635,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   const end = { x: start.x + 110, y: start.y + 80 };
 
   const saveBeforeCancel = await readCallCount('save_metadata_and_update_thumbnail');
+  const overlayBeforeCancel = await readCallCount('generate_mask_overlay');
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
@@ -329,8 +676,36 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeCancel) {
     throw new Error('A cancelled initial-mask pointer persisted a mask commit.');
   }
+  await assertCurrentOverlayMatchesPersisted('pointercancel radial', overlayBeforeCancel);
+  for (const cancellation of ['lostpointercapture', 'escape'] as const) {
+    const saveBeforeLifecycleCancel = await readCallCount('save_metadata_and_update_thumbnail');
+    const overlayBeforeLifecycleCancel = await readCallCount('generate_mask_overlay');
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y);
+    if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+      throw new Error(`Radial ${cancellation} proof did not begin a keyed draft.`);
+    }
+    if (cancellation === 'lostpointercapture') {
+      await imageCanvas.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse' });
+    } else {
+      await imageCanvas.focus();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-active') ===
+        'false',
+    );
+    await page.mouse.up();
+    if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeLifecycleCancel) {
+      throw new Error(`Radial ${cancellation} cancellation persisted a semantic commit.`);
+    }
+    await assertCurrentOverlayMatchesPersisted(`${cancellation} radial`, overlayBeforeLifecycleCancel);
+  }
 
   const saveBeforeGeometry = await readCallCount('save_metadata_and_update_thumbnail');
+  const overlayBeforeGeometry = await readCallCount('generate_mask_overlay');
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y);
@@ -346,6 +721,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   const narrowGeometry = await imageCanvas.getAttribute('data-initial-mask-draw-context-geometry');
   await page.setViewportSize(viewport);
   await waitForStableGeometry(narrowGeometry);
+  await assertCurrentOverlayMatchesPersisted('geometry-successor radial', overlayBeforeGeometry);
 
   const radialBaseline = {
     overlays: await readCallCount('generate_mask_overlay'),
@@ -402,7 +778,188 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
     { timeout: 10_000 },
   );
 
+  await waitForGeometryIdle();
+  const maskShapeStart = start;
+  const maskShapeSceneAlpha = await toolStage.evaluate((element, point) => {
+    let centerAlpha = 0;
+    for (const canvas of element.querySelectorAll('canvas')) {
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (context === null) continue;
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.max(
+        0,
+        Math.min(canvas.width - 1, Math.round(((point.x - rect.left) / rect.width) * canvas.width)),
+      );
+      const y = Math.max(
+        0,
+        Math.min(canvas.height - 1, Math.round(((point.y - rect.top) / rect.height) * canvas.height)),
+      );
+      centerAlpha = Math.max(centerAlpha, context.getImageData(x, y, 1, 1).data[3]);
+    }
+    return centerAlpha;
+  }, maskShapeStart);
+  if (maskShapeSceneAlpha !== 0) {
+    throw new Error(`Mask-shape hit-only fill changed scene pixels: alpha=${String(maskShapeSceneAlpha)}.`);
+  }
+  const maskShapeActivation = { x: maskShapeStart.x + 8, y: maskShapeStart.y + 6 };
+  const maskShapeEnd = { x: maskShapeStart.x + 34, y: maskShapeStart.y + 26 };
+  const shapeCommitBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(maskShapeStart.x, maskShapeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(maskShapeActivation.x, maskShapeActivation.y, { steps: 3 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active') ===
+      'true',
+  );
+  await page.mouse.move(maskShapeEnd.x, maskShapeEnd.y, { steps: 6 });
+  await page.waitForTimeout(250);
+  const shapePreviewProof = await page.evaluate(() => ({
+    active: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active'),
+    overlays:
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_mask_overlay')
+        .length ?? 0,
+    saves:
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+    pointerId: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-pointer-id'),
+    pointerType: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-pointer-type'),
+    transition: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-transition'),
+  }));
+  if (
+    shapePreviewProof.active !== 'true' ||
+    shapePreviewProof.overlays <= shapeCommitBaseline.overlays ||
+    shapePreviewProof.saves !== shapeCommitBaseline.saves
+  ) {
+    throw new Error(`Mask-shape body drag did not publish a draft: ${JSON.stringify(shapePreviewProof)}.`);
+  }
+  await page.mouse.up();
+  await page.evaluate(() => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+  await page.waitForTimeout(250);
+  const shapeCommitProof = await page.evaluate(() => ({
+    active: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active'),
+    saves:
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+    pointerId: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-pointer-id'),
+    pointerType: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-pointer-type'),
+    transactionId: document
+      .querySelector('[data-testid="editor-image-preview-panel"]')
+      ?.getAttribute('data-last-edit-transaction-id'),
+    transition: document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-transition'),
+  }));
+  if (
+    shapeCommitProof.active !== 'false' ||
+    shapeCommitProof.saves !== shapeCommitBaseline.saves + 1 ||
+    shapeCommitProof.transactionId?.startsWith('mask-shape:') !== true
+  ) {
+    throw new Error(`Mask-shape drag did not commit exactly once: ${JSON.stringify(shapeCommitProof)}.`);
+  }
+  await assertCurrentOverlayMatchesPersisted('mask-shape commit', shapeCommitBaseline.overlays);
+  await page.mouse.move(maskShapeEnd.x + 12, maskShapeEnd.y + 8);
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== shapeCommitBaseline.saves + 1) {
+    throw new Error('A late mask-shape move/release emitted a duplicate semantic save.');
+  }
+
+  const shapeCancelStart = maskShapeEnd;
+  const shapeCancelEnd = { x: shapeCancelStart.x + 31, y: shapeCancelStart.y + 18 };
+  const shapeCancelBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(shapeCancelStart.x, shapeCancelStart.y);
+  await page.mouse.down();
+  await page.mouse.move(shapeCancelStart.x + 8, shapeCancelStart.y + 6, { steps: 3 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active') ===
+      'true',
+  );
+  await page.mouse.move(shapeCancelEnd.x, shapeCancelEnd.y, { steps: 6 });
+  await page.waitForFunction(
+    (minimum) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_mask_overlay')
+        .length ?? 0) > minimum,
+    shapeCancelBaseline.overlays,
+  );
+  await imageCanvas.focus();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-transition') === 'escape',
+  );
+  await page.mouse.up();
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== shapeCancelBaseline.saves) {
+    throw new Error('Escape persisted a cancelled mask-shape draft.');
+  }
+  await assertCurrentOverlayMatchesPersisted('mask-shape escape rollback', shapeCancelBaseline.overlays);
+
+  const maskShapeCdp = await page.context().newCDPSession(page);
+  const touchCommitBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await maskShapeCdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 41, radiusX: 1, radiusY: 1, x: shapeCancelStart.x, y: shapeCancelStart.y }],
+    type: 'touchStart',
+  });
+  await maskShapeCdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 41, radiusX: 1, radiusY: 1, x: shapeCancelStart.x + 8, y: shapeCancelStart.y + 6 }],
+    type: 'touchMove',
+  });
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('[data-testid="image-canvas"]');
+    return (
+      canvas?.getAttribute('data-mask-shape-controller-active') === 'true' &&
+      canvas.getAttribute('data-mask-shape-pointer-type') === 'touch'
+    );
+  });
+  await maskShapeCdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 41, radiusX: 1, radiusY: 1, x: shapeCancelStart.x + 18, y: shapeCancelStart.y + 12 }],
+    type: 'touchMove',
+  });
+  await page.waitForFunction((minimum) => {
+    const canvas = document.querySelector('[data-testid="image-canvas"]');
+    return (
+      canvas?.getAttribute('data-mask-shape-controller-active') === 'true' &&
+      canvas.getAttribute('data-mask-shape-pointer-type') === 'touch' &&
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_mask_overlay')
+        .length ?? 0) > minimum
+    );
+  }, touchCommitBaseline.overlays);
+  await maskShapeCdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  await page.waitForFunction(
+    ({ saves }) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) ===
+      saves + 1,
+    touchCommitBaseline,
+    { timeout: 10_000 },
+  );
+  await assertCurrentOverlayMatchesPersisted('mask-shape touch commit', touchCommitBaseline.overlays);
+
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  for (const label of ['touch shape edit', 'mouse shape edit']) {
+    const savesBeforeUndo = await readCallCount('save_metadata_and_update_thumbnail');
+    await undo.click();
+    await page.waitForFunction(
+      (minimum) =>
+        (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'save_metadata_and_update_thumbnail',
+        ).length ?? 0) > minimum,
+      savesBeforeUndo,
+      { timeout: 10_000 },
+    );
+    await waitForPersistedMask('radial', false, `undone ${label}`);
+  }
   await undo.click();
   await waitForPersistedMask('radial', true, 'undone radial');
   await page.waitForFunction(
@@ -622,6 +1179,271 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       `Tool replacement persisted the stale radial draft or did not persist the new linear mask once: ${JSON.stringify({ saveBeforeToolReplacement, savesAfterToolReplacement, toolReplacementProof })}.`,
     );
   }
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+
+  const sourceReplacementBaseline = await readCallCount('save_metadata_and_update_thumbnail');
+  const sourceReplacementOverlayBaseline = await readCallCount('generate_mask_overlay');
+  const sourceA = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  if (sourceA === null) throw new Error('Initial mask A→B→A proof could not resolve source A.');
+  await page.mouse.move(replacementStart.x, replacementStart.y);
+  await page.mouse.down();
+  await page.mouse.move(replacementEnd.x, replacementEnd.y);
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    throw new Error(`Initial mask A→B→A proof did not begin source A draft: ${JSON.stringify(await readContext())}.`);
+  }
+  const sourceBThumbnail = page
+    .locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${sourceA}"])`)
+    .first();
+  const sourceB = await sourceBThumbnail.getAttribute('data-image-path');
+  if (sourceB === null) throw new Error('Initial mask A→B→A proof requires source B.');
+  await sourceBThumbnail.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source B thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceB,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourceA}"]`).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source A thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceA,
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline) {
+    throw new Error('A source-A draft revived and persisted after an A→B→A image-session replacement.');
+  }
+  const sourceInvalidation = await imageCanvas.evaluate((element) => {
+    const identityText = element.getAttribute('data-mask-overlay-identity');
+    return {
+      contextSession: element.getAttribute('data-initial-mask-draw-context-session'),
+      identity: identityText === null ? null : JSON.parse(identityText),
+      status: element.getAttribute('data-mask-overlay-status'),
+      urlPresent: element.getAttribute('data-mask-overlay-url-present'),
+    };
+  });
+  if (
+    sourceInvalidation.status !== 'none' ||
+    sourceInvalidation.urlPresent !== 'false' ||
+    sourceInvalidation.identity?.['status'] !== 'session-invalidated' ||
+    sourceInvalidation.identity?.['imageSessionId'] !== sourceInvalidation.contextSession
+  ) {
+    throw new Error(
+      `A→B→A did not invalidate the stale native overlay authority: ${JSON.stringify(sourceInvalidation)}.`,
+    );
+  }
+
+  await createMask('radial');
+  await waitForPersistedMask('radial', true, 'unmount radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+  await assertCurrentOverlayMatchesPersisted('successor-A radial', sourceReplacementOverlayBaseline);
+  const successorMaskId = await imageCanvas.getAttribute('data-initial-mask-draw-context-mask');
+  if (successorMaskId === null) throw new Error('Successor-A radial proof could not resolve the active mask id.');
+  const unmountStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const unmountBox = await unmountStage.boundingBox();
+  if (unmountBox === null) throw new Error('Initial mask unmount proof could not resolve the input surface.');
+  let successorShapeStart = {
+    x: unmountBox.x + unmountBox.width * 0.32,
+    y: unmountBox.y + unmountBox.height * 0.36,
+  };
+  const successorShapeEnd = {
+    x: unmountBox.x + unmountBox.width * 0.63,
+    y: unmountBox.y + unmountBox.height * 0.64,
+  };
+  await page.mouse.move(successorShapeStart.x, successorShapeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(successorShapeEnd.x, successorShapeEnd.y);
+  await page.mouse.up();
+  await page.waitForFunction(
+    (maskId) => {
+      const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .at(-1);
+      const masks = call?.args?.['adjustments']?.['masks'];
+      const subMask = Array.isArray(masks)
+        ? masks.flatMap((mask) => mask['subMasks']).find((candidate) => candidate['id'] === maskId)
+        : null;
+      const parameters = subMask?.['parameters'];
+      return (
+        call?.endedAtMs !== null &&
+        typeof parameters === 'object' &&
+        parameters !== null &&
+        !('isInitialDraw' in parameters) &&
+        typeof parameters['radiusX'] === 'number' &&
+        parameters['radiusX'] > 10
+      );
+    },
+    successorMaskId,
+    { timeout: 10_000 },
+  );
+
+  const shapeSourceReplacementBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(successorShapeStart.x, successorShapeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(successorShapeStart.x + 8, successorShapeStart.y + 6, { steps: 3 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active') ===
+      'true',
+  );
+  await page.mouse.move(successorShapeStart.x + 27, successorShapeStart.y + 19, { steps: 4 });
+  await page.waitForFunction(
+    (minimum) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_mask_overlay')
+        .length ?? 0) > minimum,
+    shapeSourceReplacementBaseline.overlays,
+  );
+  await sourceBThumbnail.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source B thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceB,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourceA}"]`).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source A thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceA,
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== shapeSourceReplacementBaseline.saves) {
+    throw new Error('A mask-shape draft revived and persisted after an A→B→successor-A session replacement.');
+  }
+  if ((await imageCanvas.getAttribute('data-mask-shape-controller-active')) !== 'false') {
+    throw new Error('A mask-shape controller remained active after an A→B→successor-A session replacement.');
+  }
+  const successorMaskRow = page.getByTestId(`mask-submask-row-${successorMaskId}`);
+  await successorMaskRow.scrollIntoViewIfNeeded();
+  await successorMaskRow.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-context-active') === 'true',
+  );
+  await waitForGeometryIdle();
+  const successorBoxAfterReturn = await toolStage.boundingBox();
+  if (successorBoxAfterReturn === null) {
+    throw new Error('Successor-A mask-shape proof could not resolve the replaced input surface.');
+  }
+  const successorVisibleBottom = Math.min(
+    successorBoxAfterReturn.y + successorBoxAfterReturn.height,
+    viewport.height - 48,
+  );
+  const successorVisibleHeight = successorVisibleBottom - successorBoxAfterReturn.y;
+  successorShapeStart = {
+    x: successorBoxAfterReturn.x + successorBoxAfterReturn.width * 0.32,
+    y: successorBoxAfterReturn.y + successorVisibleHeight * 0.35,
+  };
+
+  const successorCommitBaseline = {
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(successorShapeStart.x, successorShapeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(successorShapeStart.x + 8, successorShapeStart.y + 6, { steps: 3 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active') ===
+      'true',
+  );
+  const successorCommittedCenter = { x: successorShapeStart.x + 23, y: successorShapeStart.y + 17 };
+  await page.mouse.move(successorCommittedCenter.x, successorCommittedCenter.y, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    successorCommitBaseline.saves + 1,
+    { timeout: 10_000 },
+  );
+  await assertCurrentOverlayMatchesPersisted('successor-A mask-shape commit', successorCommitBaseline.overlays);
+
+  const unmountBaseline = {
+    maskId: await imageCanvas.getAttribute('data-initial-mask-draw-context-mask'),
+    overlays: await readCallCount('generate_mask_overlay'),
+    saves: await readCallCount('save_metadata_and_update_thumbnail'),
+  };
+  if (unmountBaseline.maskId === null) throw new Error('Mask-shape unmount proof could not resolve the mask id.');
+  await page.mouse.move(successorCommittedCenter.x, successorCommittedCenter.y);
+  await page.mouse.down();
+  await page.mouse.move(successorCommittedCenter.x + 8, successorCommittedCenter.y + 6, { steps: 3 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-mask-shape-controller-active') ===
+      'true',
+  );
+  await page.mouse.move(successorCommittedCenter.x + 29, successorCommittedCenter.y + 21, { steps: 4 });
+  await page.waitForFunction(
+    (minimum) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_mask_overlay')
+        .length ?? 0) > minimum,
+    unmountBaseline.overlays,
+  );
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== unmountBaseline.saves) {
+    throw new Error('Mask-shape controller published a semantic commit after ImageCanvas unmount.');
+  }
+  const unmountOutput = await page.evaluate((maskId) => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latestOverlay = calls.filter(({ command }) => command === 'generate_mask_overlay').at(-1);
+    const latestSave = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(-1);
+    const persistedMasks = latestSave?.args?.['adjustments']?.['masks'];
+    return {
+      native: latestOverlay?.args?.['maskDef']?.['subMasks']?.find(
+        (subMask: Record<string, unknown>) => subMask['id'] === maskId,
+      )?.['parameters'],
+      overlays: calls.filter(({ command }) => command === 'generate_mask_overlay').length,
+      persisted: Array.isArray(persistedMasks)
+        ? persistedMasks.flatMap((mask) => mask['subMasks']).find((subMask) => subMask['id'] === maskId)?.['parameters']
+        : null,
+    };
+  }, unmountBaseline.maskId);
+  if (
+    unmountOutput.overlays <= unmountBaseline.overlays ||
+    typeof unmountOutput.native !== 'object' ||
+    unmountOutput.native === null ||
+    JSON.stringify(unmountOutput.native) !== JSON.stringify(unmountOutput.persisted)
+  ) {
+    throw new Error(
+      `Mask-shape unmount left a live draft in native output: ${JSON.stringify({ unmountBaseline, unmountOutput })}.`,
+    );
+  }
 }
 
 async function verifyParametricMaskTargetController(page: Page): Promise<void> {
@@ -634,6 +1456,7 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
         0,
       command,
     );
+  const touchCdp = await page.context().newCDPSession(page);
   const createMask = async (type: 'color' | 'luminance'): Promise<void> => {
     const contextual = page.getByTestId(`mask-contextual-create-${type}`);
     if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
@@ -680,20 +1503,44 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       { timeout: 10_000 },
     );
   };
-  const clickTarget = async (pointerType: 'mouse' | 'touch'): Promise<void> => {
+  const targetPoint = async (): Promise<{ x: number; y: number }> => {
     const box = await toolStage.boundingBox();
-    if (box === null) throw new Error(`Parametric ${pointerType} proof could not resolve the Konva stage.`);
-    const point = { x: box.x + box.width * 0.43, y: Math.min(box.y + box.height * 0.47, viewport.height - 48) };
+    if (box === null) throw new Error('Parametric target proof could not resolve the Konva stage.');
+    return { x: box.x + box.width * 0.43, y: Math.min(box.y + box.height * 0.47, viewport.height - 48) };
+  };
+  const waitForParametricAuthorityIdle = () =>
+    page.evaluate(async () => {
+      const readAuthority = () => {
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        return `${canvas?.getAttribute('data-parametric-mask-context-geometry') ?? ''}|${canvas?.getAttribute('data-parametric-mask-context-revision') ?? ''}|${canvas?.getAttribute('data-parametric-mask-context-session') ?? ''}`;
+      };
+      let previous = readAuthority();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 120 && stableFrames < 30; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = readAuthority();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      if (stableFrames < 30) throw new Error('Parametric target authority did not stabilize before pointer input.');
+    });
+  const pointerDown = async (pointerType: 'mouse' | 'touch', point: { x: number; y: number }): Promise<void> => {
     if (pointerType === 'mouse') {
-      await page.mouse.click(point.x, point.y);
+      await page.mouse.move(point.x, point.y);
+      await page.mouse.down();
       return;
     }
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Input.dispatchTouchEvent', {
+    await touchCdp.send('Input.dispatchTouchEvent', {
       touchPoints: [{ ...point, force: 1, id: 31, radiusX: 1, radiusY: 1 }],
       type: 'touchStart',
     });
-    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  };
+  const pointerUp = async (pointerType: 'mouse' | 'touch'): Promise<void> => {
+    if (pointerType === 'mouse') {
+      await page.mouse.up();
+      return;
+    }
+    await touchCdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
   };
 
   await page.getByTestId('right-panel-switcher-button-masks').click();
@@ -718,7 +1565,93 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       renders: await callCount('apply_adjustments'),
       saves: await callCount('save_metadata_and_update_thumbnail'),
     };
-    await clickTarget(index === 0 ? 'mouse' : 'touch');
+    await waitForParametricAuthorityIdle();
+    const pointerType = index === 0 ? 'mouse' : 'touch';
+    const point = await targetPoint();
+    await pointerDown(pointerType, point);
+    await page.waitForFunction((expectedPointerType) => {
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return (
+        canvas?.getAttribute('data-parametric-mask-controller-active') === 'true' &&
+        canvas.getAttribute('data-parametric-mask-pointer-type') === expectedPointerType &&
+        Number(canvas.getAttribute('data-parametric-mask-operation')) > 0
+      );
+    }, pointerType);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} pointer-down persisted before its owned release.`);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-parametric-mask-controller-active') === 'false',
+      undefined,
+      { timeout: 5_000 },
+    );
+    const cancellationTransition = await imageCanvas.getAttribute('data-parametric-mask-transition');
+    if (cancellationTransition !== 'escape') {
+      throw new Error(`Parametric ${type} Escape resolved as ${String(cancellationTransition)}.`);
+    }
+    await pointerUp(pointerType);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} Escape cancellation persisted a semantic target.`);
+    }
+
+    if (pointerType === 'touch') {
+      await waitForParametricAuthorityIdle();
+      await pointerDown(pointerType, point);
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[data-testid="image-canvas"]')
+            ?.getAttribute('data-parametric-mask-controller-active') === 'true',
+      );
+      await page.evaluate(({ x, y }) => {
+        const touch = new Touch({ clientX: x, clientY: y, identifier: 31, target: document.body });
+        window.dispatchEvent(
+          new TouchEvent('touchcancel', { bubbles: true, cancelable: true, changedTouches: [touch], touches: [] }),
+        );
+      }, point);
+      await page.waitForFunction(() => {
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        return (
+          canvas?.getAttribute('data-parametric-mask-controller-active') === 'false' &&
+          canvas.getAttribute('data-parametric-mask-transition') === 'touchcancel'
+        );
+      });
+      await pointerUp(pointerType);
+      await page.waitForTimeout(50);
+      if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+        throw new Error('Parametric luminance touchcancel/late touchend persisted a semantic target.');
+      }
+    }
+
+    await waitForParametricAuthorityIdle();
+    await pointerDown(pointerType, point);
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="image-canvas"]')
+          ?.getAttribute('data-parametric-mask-controller-active') === 'true',
+    );
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves) {
+      throw new Error(`Parametric ${type} draft persisted before the second owned release.`);
+    }
+    await pointerUp(pointerType);
+    await page.waitForTimeout(150);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves + 1) {
+      const diagnostics = await imageCanvas.evaluate((element) => ({
+        active: element.getAttribute('data-parametric-mask-controller-active'),
+        contextGeometry: element.getAttribute('data-parametric-mask-context-geometry'),
+        contextRevision: element.getAttribute('data-parametric-mask-context-revision'),
+        operation: element.getAttribute('data-parametric-mask-operation'),
+        pointerId: element.getAttribute('data-parametric-mask-pointer-id'),
+        pointerType: element.getAttribute('data-parametric-mask-pointer-type'),
+        transition: element.getAttribute('data-parametric-mask-transition'),
+      }));
+      throw new Error(`Parametric ${type} release did not commit: ${JSON.stringify(diagnostics)}.`);
+    }
     await waitForPersistedTarget(type, false);
     await page.waitForFunction(
       ({ overlays, renders, saves }) => {
@@ -732,6 +1665,20 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       baseline,
       { timeout: 10_000 },
     );
+    if (pointerType === 'mouse') {
+      await pointerUp(pointerType);
+    } else {
+      await page.evaluate(() => {
+        const touch = new Touch({ clientX: 0, clientY: 0, identifier: 31, target: document.body });
+        window.dispatchEvent(
+          new TouchEvent('touchend', { bubbles: true, cancelable: true, changedTouches: [touch], touches: [] }),
+        );
+      });
+    }
+    await page.waitForTimeout(50);
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves + 1) {
+      throw new Error(`Parametric ${type} late release duplicated its semantic transaction.`);
+    }
     const proof = await page.evaluate((maskType) => {
       const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
       const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
@@ -798,6 +1745,920 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
       await page.getByTestId('mask-creation-others').waitFor({ state: 'visible', timeout: 10_000 });
     }
   }
+
+  const sourceReplacementBaseline = await callCount('save_metadata_and_update_thumbnail');
+  const sourceA = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  const activeMaskId = await imageCanvas.getAttribute('data-parametric-mask-context-id');
+  if (sourceA === null || activeMaskId === null) {
+    throw new Error('Parametric A→B→successor-A proof could not resolve source/mask identity.');
+  }
+  const stalePoint = await targetPoint();
+  await pointerDown('mouse', stalePoint);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  const sourceBThumbnail = page
+    .locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${sourceA}"])`)
+    .first();
+  const sourceB = await sourceBThumbnail.getAttribute('data-image-path');
+  if (sourceB === null) throw new Error('Parametric A→B→successor-A proof requires source B.');
+  await sourceBThumbnail.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source B thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceB,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourceA}"]`).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source A thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceA,
+  );
+  await pointerUp('mouse');
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline ||
+    (await imageCanvas.getAttribute('data-parametric-mask-controller-active')) !== 'false'
+  ) {
+    throw new Error('A stale parametric target revived after A→B→successor-A session replacement.');
+  }
+
+  const activeMaskRow = page.getByTestId(`mask-submask-row-${activeMaskId}`);
+  await activeMaskRow.scrollIntoViewIfNeeded();
+  await activeMaskRow.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-context-active') ===
+      'true',
+  );
+  const successorPoint = await targetPoint();
+  const successorBaseline = await callCount('save_metadata_and_update_thumbnail');
+  await pointerDown('mouse', successorPoint);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  await pointerUp('mouse');
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    successorBaseline + 1,
+    { timeout: 10_000 },
+  );
+
+  const unmountBaseline = await callCount('save_metadata_and_update_thumbnail');
+  await pointerDown('mouse', { x: successorPoint.x + 24, y: successorPoint.y + 18 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-parametric-mask-controller-active') ===
+      'true',
+  );
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await pointerUp('mouse');
+  await page.waitForTimeout(100);
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== unmountBaseline) {
+    throw new Error('Parametric target controller committed after ImageCanvas unmount.');
+  }
+}
+
+async function verifyAiMaskBoxController(page: Page): Promise<void> {
+  const imageCanvas = page.getByTestId('image-canvas');
+  const toolStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const callCount = (command: string) =>
+    page.evaluate(
+      (expected) =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expected).length ?? 0,
+      command,
+    );
+
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  const contextual = page.getByTestId('mask-contextual-create-ai-subject');
+  if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
+    await contextual.click();
+  } else {
+    await page.getByTestId('mask-creation-ai-subject').click();
+  }
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-ai-mask-box-context-active') ===
+        'true' &&
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-ai-mask-box-context-tool') ===
+        'ai-subject',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(650);
+
+  const box = await toolStage.boundingBox();
+  if (box === null) throw new Error('AI mask box proof could not resolve the Konva input surface.');
+  const start = { x: box.x + box.width * 0.28, y: box.y + box.height * 0.32 };
+  const end = { x: box.x + box.width * 0.7, y: box.y + box.height * 0.68 };
+
+  const saveBeforeCancel = await callCount('save_metadata_and_update_thumbnail');
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  if ((await imageCanvas.getAttribute('data-ai-mask-box-active')) !== 'true') {
+    throw new Error('AI Subject mouse gesture did not publish its declarative box overlay.');
+  }
+  await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true })));
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-ai-mask-box-active') === 'false',
+  );
+  await page.mouse.up();
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== saveBeforeCancel) {
+    throw new Error('A cancelled AI mask box gesture persisted a semantic transaction.');
+  }
+  for (const cancellation of ['lostpointercapture', 'escape'] as const) {
+    const saveBeforeLifecycleCancel = await callCount('save_metadata_and_update_thumbnail');
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y);
+    if ((await imageCanvas.getAttribute('data-ai-mask-box-active')) !== 'true') {
+      throw new Error(`AI Subject ${cancellation} proof did not begin a box gesture.`);
+    }
+    if (cancellation === 'lostpointercapture') {
+      await imageCanvas.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse' });
+    } else {
+      await imageCanvas.focus();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForFunction(
+      () => document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-ai-mask-box-active') === 'false',
+    );
+    await page.mouse.up();
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== saveBeforeLifecycleCancel) {
+      throw new Error(`AI Subject ${cancellation} cancellation persisted a semantic transaction.`);
+    }
+  }
+
+  const staleWithoutSuccessor = {
+    native: await callCount('generate_ai_subject_mask'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (harness === undefined) throw new Error('AI mask box proof could not configure a stale native response.');
+    harness.aiSubjectMaskResponses.push({
+      delayMs: 500,
+      value: { generatedMaskArtifactId: 'stale-without-successor', generatedMaskCoverage: 0.2 },
+    });
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.up();
+  await page.waitForFunction((nativeBefore) => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return (
+      calls.filter(({ command }) => command === 'generate_ai_subject_mask').length === nativeBefore + 1 &&
+      document
+        .querySelector('[data-testid="editor-image-preview-panel"]')
+        ?.getAttribute('data-is-generating-ai-mask') === 'true'
+    );
+  }, staleWithoutSuccessor.native);
+  await page.setViewportSize({ height: viewport.height, width: viewport.width - 24 });
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="editor-image-preview-panel"]')
+        ?.getAttribute('data-is-generating-ai-mask') === 'false',
+    undefined,
+    { timeout: 5_000 },
+  );
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== staleWithoutSuccessor.saves) {
+    throw new Error('A geometry-stale AI mask generation persisted without a successor request.');
+  }
+  await page.setViewportSize(viewport);
+  await page.waitForTimeout(300);
+
+  const baseline = {
+    native: await callCount('generate_ai_subject_mask'),
+    overlays: await callCount('generate_mask_overlay'),
+    renders: await callCount('apply_adjustments'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (harness === undefined) throw new Error('AI mask box proof could not configure native responses.');
+    harness.aiSubjectMaskResponses.push(
+      { delayMs: 700, value: { generatedMaskArtifactId: 'stale-generation', generatedMaskCoverage: 0.1 } },
+      { delayMs: 0, value: { generatedMaskArtifactId: 'current-generation', generatedMaskCoverage: 0.8 } },
+    );
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.up();
+  const successorStart = { x: start.x + 24, y: start.y + 18 };
+  const successorEnd = { x: end.x - 18, y: end.y - 14 };
+  await page.mouse.move(successorStart.x, successorStart.y);
+  await page.mouse.down();
+  await page.mouse.move(successorEnd.x, successorEnd.y);
+  await page.mouse.up();
+  try {
+    await page.waitForFunction(
+      ({ native, overlays, renders, saves }) => {
+        const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+        const receipt = document.querySelector('[data-testid="editor-image-preview-panel"]');
+        return (
+          receipt?.getAttribute('data-last-edit-source') === 'layer-command' &&
+          receipt.getAttribute('data-last-edit-transaction-id')?.startsWith('ai-mask-box:') === true &&
+          calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+          calls.filter(({ command }) => command === 'apply_adjustments').length > renders &&
+          calls.filter(({ command }) => command === 'generate_mask_overlay').length > overlays &&
+          calls.filter(({ command }) => command === 'generate_ai_subject_mask').length === native + 2
+        );
+      },
+      baseline,
+      { timeout: 10_000 },
+    );
+  } catch {
+    const diagnostics = await page.evaluate(() => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const receipt = document.querySelector('[data-testid="editor-image-preview-panel"]');
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return {
+        active: canvas?.getAttribute('data-ai-mask-box-active'),
+        callCounts: Object.fromEntries(
+          [
+            'save_metadata_and_update_thumbnail',
+            'apply_adjustments',
+            'generate_mask_overlay',
+            'generate_ai_subject_mask',
+          ].map((command) => [command, calls.filter((call) => call.command === command).length]),
+        ),
+        receipt: {
+          source: receipt?.getAttribute('data-last-edit-source'),
+          transactionId: receipt?.getAttribute('data-last-edit-transaction-id'),
+        },
+        transition: canvas?.getAttribute('data-ai-mask-box-transition'),
+      };
+    });
+    throw new Error(`AI mask box command output timed out: ${JSON.stringify({ baseline, diagnostics })}.`);
+  }
+
+  const proof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      native: latest('generate_ai_subject_mask'),
+      overlay: latest('generate_mask_overlay'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persisted = proof.persistence?.['adjustments']?.['masks']
+    ?.flatMap((container: Record<string, unknown>) => container['subMasks'])
+    .find((subMask: Record<string, unknown>) => subMask['type'] === 'ai-subject')?.['parameters'];
+  const overlay = proof.overlay?.['maskDef']?.['subMasks']?.find(
+    (subMask: Record<string, unknown>) => subMask['type'] === 'ai-subject',
+  )?.['parameters'];
+  const renderDocument = editDocumentV2Schema.parse(proof.render?.['request']?.['editDocumentV2']);
+  const rendered = renderDocument.layers.masks
+    .flatMap((container) => container.subMasks)
+    .find((subMask) => subMask.type === 'ai-subject')?.parameters;
+  const nativeStart = proof.native?.['startPoint'];
+  const nativeEnd = proof.native?.['endPoint'];
+  if (
+    typeof persisted !== 'object' ||
+    persisted === null ||
+    JSON.stringify(persisted) !== JSON.stringify(overlay) ||
+    JSON.stringify(persisted) !== JSON.stringify(rendered) ||
+    !Array.isArray(nativeStart) ||
+    !Array.isArray(nativeEnd) ||
+    persisted['startX'] !== nativeStart[0] ||
+    persisted['startY'] !== nativeStart[1] ||
+    persisted['endX'] !== nativeEnd[0] ||
+    persisted['endY'] !== nativeEnd[1]
+  ) {
+    throw new Error(
+      `AI mask box persistence, native request, overlay, and render diverged: ${JSON.stringify({ nativeEnd, nativeStart, overlay, persisted, rendered })}.`,
+    );
+  }
+  if (persisted['generatedMaskArtifactId'] !== 'current-generation') {
+    throw new Error(`The successor AI mask generation did not own the committed output: ${JSON.stringify(persisted)}.`);
+  }
+  await page.waitForTimeout(850);
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== baseline.saves + 1) {
+    throw new Error('A delayed stale AI mask generation persisted after its successor generation.');
+  }
+  if ((await page.getByTestId('editor-image-preview-panel').getAttribute('data-is-generating-ai-mask')) !== 'false') {
+    throw new Error('The latest AI mask generation left the busy UI owned after completion.');
+  }
+
+  const sourceReplacementBaseline = {
+    native: await callCount('generate_ai_subject_mask'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  const activePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  if (activePath === null) throw new Error('AI mask A→B→A proof could not resolve source A.');
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (harness === undefined) throw new Error('AI mask A→B→A proof could not configure native delay.');
+    harness.aiSubjectMaskResponses.push({
+      delayMs: 500,
+      value: { generatedMaskArtifactId: 'stale-after-source-return', generatedMaskCoverage: 0.3 },
+    });
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.up();
+  await page.waitForFunction(
+    (nativeBefore) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'generate_ai_subject_mask')
+        .length ?? 0) ===
+      nativeBefore + 1,
+    sourceReplacementBaseline.native,
+  );
+  const other = page.locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${activePath}"])`).first();
+  const otherPath = await other.getAttribute('data-image-path');
+  if (otherPath === null) throw new Error('AI mask A→B→A proof requires source B.');
+  await other.click();
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    otherPath,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${activePath}"]`).click();
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    activePath,
+  );
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="editor-image-preview-panel"]')
+        ?.getAttribute('data-is-generating-ai-mask') === 'false',
+    undefined,
+    { timeout: 5_000 },
+  );
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline.saves) {
+    throw new Error('A delayed source-A result persisted after an A→B→A image-session replacement.');
+  }
+
+  await page.getByTestId('right-panel-switcher-button-ai').click();
+  await page.getByTestId('inpaint-workspace-panel').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.getByRole('button', { name: /Create New Quick Erase Edit/iu }).click();
+  await page.waitForFunction(
+    () => {
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return (
+        canvas?.getAttribute('data-ai-mask-box-context-active') === 'true' &&
+        canvas.getAttribute('data-ai-mask-box-context-tool') === 'quick-eraser'
+      );
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
+  const quickEraseStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const quickEraseBox = await quickEraseStage.boundingBox();
+  if (quickEraseBox === null) throw new Error('Quick Eraser proof could not resolve the Konva input surface.');
+  const quickEraseStart = {
+    x: quickEraseBox.x + quickEraseBox.width * 0.31,
+    y: quickEraseBox.y + quickEraseBox.height * 0.34,
+  };
+  const quickEraseEnd = {
+    x: quickEraseBox.x + quickEraseBox.width * 0.66,
+    y: quickEraseBox.y + quickEraseBox.height * 0.64,
+  };
+  const quickEraseBaseline = {
+    generation: await callCount('generate_ai_subject_mask'),
+    inpaint: await callCount('invoke_generative_replace_with_mask_def'),
+    renders: await callCount('apply_adjustments'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(quickEraseStart.x, quickEraseStart.y);
+  await page.mouse.down();
+  await page.mouse.move(quickEraseEnd.x, quickEraseEnd.y);
+  if (
+    (await imageCanvas.getAttribute('data-ai-mask-box-active')) !== 'true' ||
+    (await imageCanvas.getAttribute('data-ai-mask-box-context-tool')) !== 'quick-eraser'
+  ) {
+    throw new Error('Quick Eraser did not publish a declarative box overlay in its keyed tool context.');
+  }
+  await page.mouse.up();
+  await page.waitForFunction(
+    ({ generation, inpaint, renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const receipt = document.querySelector('[data-testid="editor-image-preview-panel"]');
+      return (
+        receipt?.getAttribute('data-last-edit-source') === 'ai-edit' &&
+        calls.filter(({ command }) => command === 'generate_ai_subject_mask').length === generation + 1 &&
+        calls.filter(({ command }) => command === 'invoke_generative_replace_with_mask_def').length === inpaint + 1 &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders
+      );
+    },
+    quickEraseBaseline,
+    { timeout: 10_000 },
+  );
+  const quickEraseProof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      generation: latest('generate_ai_subject_mask'),
+      inpaint: latest('invoke_generative_replace_with_mask_def'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      render: latest('apply_adjustments'),
+    };
+  });
+  const quickErasePersistedPatch = quickEraseProof.persistence?.['adjustments']?.['aiPatches']?.find(
+    (patch: Record<string, unknown>) =>
+      Array.isArray(patch['subMasks']) &&
+      patch['subMasks'].some((subMask: Record<string, unknown>) => subMask['type'] === 'quick-eraser'),
+  );
+  const quickErasePersisted = quickErasePersistedPatch?.['subMasks']?.find(
+    (subMask: Record<string, unknown>) => subMask['type'] === 'quick-eraser',
+  )?.['parameters'];
+  const quickEraseDocument = editDocumentV2Schema.parse(quickEraseProof.render?.['request']?.['editDocumentV2']);
+  const quickEraseRenderedPatch = quickEraseDocument.sourceArtifacts.aiPatches.find((patch) =>
+    patch.subMasks.some((subMask) => subMask.type === 'quick-eraser'),
+  );
+  const quickEraseRendered = quickEraseRenderedPatch?.subMasks.find(
+    (subMask) => subMask.type === 'quick-eraser',
+  )?.parameters;
+  const quickEraseNativeStart = quickEraseProof.generation?.['startPoint'];
+  const quickEraseNativeEnd = quickEraseProof.generation?.['endPoint'];
+  if (
+    typeof quickErasePersisted !== 'object' ||
+    quickErasePersisted === null ||
+    JSON.stringify(quickErasePersisted) !== JSON.stringify(quickEraseRendered) ||
+    JSON.stringify(quickErasePersistedPatch?.['patchData']) !== JSON.stringify(quickEraseRenderedPatch?.patchData) ||
+    quickErasePersistedPatch?.['patchData']?.['browserHarnessQuickErase'] !== true ||
+    !Array.isArray(quickEraseNativeStart) ||
+    !Array.isArray(quickEraseNativeEnd) ||
+    quickErasePersisted['startX'] !== quickEraseNativeStart[0] ||
+    quickErasePersisted['startY'] !== quickEraseNativeStart[1] ||
+    quickErasePersisted['endX'] !== quickEraseNativeEnd[0] ||
+    quickErasePersisted['endY'] !== quickEraseNativeEnd[1] ||
+    quickEraseProof.inpaint?.['useFastInpaint'] !== true
+  ) {
+    throw new Error(
+      `Quick Eraser native, semantic persistence, and rendered output diverged: ${JSON.stringify({
+        nativeEnd: quickEraseNativeEnd,
+        nativeStart: quickEraseNativeStart,
+        persisted: quickErasePersisted,
+        rendered: quickEraseRendered,
+      })}.`,
+    );
+  }
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('generate_ai_subject_mask')) !== quickEraseBaseline.generation + 1 ||
+    (await callCount('invoke_generative_replace_with_mask_def')) !== quickEraseBaseline.inpaint + 1 ||
+    (await callCount('save_metadata_and_update_thumbnail')) !== quickEraseBaseline.saves + 1
+  ) {
+    throw new Error('Quick Eraser box release produced more than one native or semantic commit.');
+  }
+
+  const unmountBaseline = {
+    native: await callCount('generate_ai_subject_mask'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  const currentStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const currentBox = await currentStage.boundingBox();
+  if (currentBox === null) throw new Error('AI mask unmount proof could not resolve the input surface.');
+  await page.mouse.move(currentBox.x + currentBox.width * 0.3, currentBox.y + currentBox.height * 0.35);
+  await page.mouse.down();
+  await page.mouse.move(currentBox.x + currentBox.width * 0.65, currentBox.y + currentBox.height * 0.62);
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('generate_ai_subject_mask')) !== unmountBaseline.native ||
+    (await callCount('save_metadata_and_update_thumbnail')) !== unmountBaseline.saves
+  ) {
+    throw new Error('AI mask box published a native or persistence command after ImageCanvas unmount.');
+  }
+}
+
+async function verifyObjectPromptController(page: Page): Promise<void> {
+  const callCount = (command: string) =>
+    page.evaluate(
+      (expected) =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expected).length ?? 0,
+      command,
+    );
+  const persistedPrompt = () =>
+    page.evaluate(() => {
+      const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(
+          ({ command, endedAtMs }) => command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+        )
+        .at(-1);
+      const masks = latest?.args?.['adjustments']?.['masks'];
+      return Array.isArray(masks)
+        ? (masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters'] ?? null)
+        : null;
+    });
+  const waitForPrompt = async (expected: { box: boolean; pending: boolean; points: number }): Promise<void> => {
+    try {
+      await page.waitForFunction(
+        ({ box, pending, points }) => {
+          const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+            .filter(
+              ({ command, endedAtMs }) =>
+                command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+            )
+            .at(-1);
+          const masks = latest?.args?.['adjustments']?.['masks'];
+          if (!Array.isArray(masks)) return false;
+          const parameters = masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters'];
+          return (
+            typeof parameters === 'object' &&
+            parameters !== null &&
+            Array.isArray(parameters['pointPrompts']) &&
+            parameters['pointPrompts'].length === points &&
+            (parameters['boxPrompt'] != null) === box &&
+            (parameters['pendingBoxAnchor'] != null) === pending
+          );
+        },
+        expected,
+        { timeout: 10_000 },
+      );
+    } catch {
+      const actual = await persistedPrompt();
+      const ui = await page.evaluate(() => ({
+        boxReady: document
+          .querySelector('[data-testid="object-prompt-controls"]')
+          ?.getAttribute('data-object-prompt-box-ready'),
+        mode: document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode'),
+        points: document
+          .querySelector('[data-testid="object-prompt-controls"]')
+          ?.getAttribute('data-object-prompt-point-count'),
+        receipt: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-transaction-id'),
+        saves: (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .map((call) => ({ ended: call.endedAtMs, keys: Object.keys(call.args ?? {}) })),
+      }));
+      throw new Error(
+        `Object Prompt state timed out: expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)} ui=${JSON.stringify(ui)}.`,
+      );
+    }
+  };
+  const waitForPromptMode = (mode: 'background_point' | 'box') =>
+    page.waitForFunction(
+      (expectedMode) => {
+        const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(
+            ({ command, endedAtMs }) =>
+              command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+          )
+          .at(-1);
+        const masks = latest?.args?.['adjustments']?.['masks'];
+        return (
+          Array.isArray(masks) &&
+          masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters']?.['promptMode'] === expectedMode
+        );
+      },
+      mode,
+      { timeout: 10_000 },
+    );
+  const restoreViewerScroll = () =>
+    page.getByTestId('editor-image-preview-panel').evaluate((element) => {
+      let ancestor: HTMLElement | null = element;
+      while (ancestor !== null) {
+        ancestor.scrollTop = 0;
+        ancestor = ancestor.parentElement;
+      }
+      window.scrollTo(0, 0);
+    });
+
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  const contextual = page.getByTestId('mask-contextual-create-ai-object');
+  if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
+    await contextual.click();
+  } else {
+    await page.getByTestId('mask-creation-ai-object').click();
+  }
+  const controls = page.getByTestId('object-prompt-controls');
+  await controls.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForTimeout(600);
+
+  const pointAt = (x: number, y: number) =>
+    page.getByTestId('editor-image-preview-panel').evaluate(
+      (element, point) => {
+        const bounds = element.getBoundingClientRect();
+        const left = Number(element.getAttribute('data-editor-image-rect-left'));
+        const top = Number(element.getAttribute('data-editor-image-rect-top'));
+        const width = Number(element.getAttribute('data-editor-image-rect-width'));
+        const height = Number(element.getAttribute('data-editor-image-rect-height'));
+        if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+          throw new Error('Object Prompt surface omitted canonical image geometry.');
+        }
+        const targetY = bounds.top + top + height * point.y;
+        if (targetY < 120 || targetY > window.innerHeight - 120) {
+          window.scrollBy(0, targetY - window.innerHeight / 2);
+        }
+        const visibleBounds = element.getBoundingClientRect();
+        return { x: visibleBounds.left + left + width * point.x, y: visibleBounds.top + top + height * point.y };
+      },
+      { x, y },
+    );
+  const clickPrompt = (point: { x: number; y: number }) =>
+    page.getByTestId('editor-image-preview-panel').dispatchEvent('click', {
+      bubbles: true,
+      button: 0,
+      clientX: point.x,
+      clientY: point.y,
+      detail: 1,
+    });
+
+  const foregroundBaseline = {
+    overlays: await callCount('generate_mask_overlay'),
+    renders: await callCount('apply_adjustments'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  const foreground = await pointAt(0.3, 0.4);
+  await page.getByTestId('editor-image-preview-panel').dispatchEvent('pointerup', {
+    bubbles: true,
+    button: 0,
+    clientX: foreground.x,
+    clientY: foreground.y,
+    pointerId: 41,
+    pointerType: 'touch',
+  });
+  await clickPrompt(foreground);
+  await waitForPrompt({ box: false, pending: false, points: 1 });
+  await page.waitForFunction(
+    ({ overlays, renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return (
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders &&
+        calls.filter(({ command }) => command === 'generate_mask_overlay').length > overlays
+      );
+    },
+    foregroundBaseline,
+    { timeout: 10_000 },
+  );
+  const foregroundOverlay = page.locator('[data-object-prompt-label="foreground"]');
+  await foregroundOverlay.waitFor({ state: 'visible', timeout: 10_000 });
+  if ((await callCount('save_metadata_and_update_thumbnail')) !== foregroundBaseline.saves + 1) {
+    throw new Error('A synthesized touch compatibility click duplicated the Object Prompt transaction.');
+  }
+
+  await page.getByTestId('object-prompt-mode-background_point').click();
+  await restoreViewerScroll();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode') ===
+      'background_point',
+  );
+  await waitForPromptMode('background_point');
+  await page.waitForTimeout(650);
+  const background = await pointAt(0.68, 0.62);
+  await clickPrompt(background);
+  await waitForPrompt({ box: false, pending: false, points: 2 });
+  await page.locator('[data-object-prompt-label="background"]').waitFor({ state: 'visible', timeout: 10_000 });
+
+  await page.getByTestId('object-prompt-mode-box').click();
+  await restoreViewerScroll();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode') ===
+      'box',
+  );
+  await waitForPromptMode('box');
+  await page.waitForTimeout(650);
+  const anchor = await pointAt(0.2, 0.25);
+  const end = await pointAt(0.76, 0.72);
+  await clickPrompt(anchor);
+  await waitForPrompt({ box: false, pending: true, points: 2 });
+  await page.getByTestId('object-prompt-pending-box-anchor').waitFor({ state: 'visible', timeout: 10_000 });
+  await clickPrompt(end);
+  await waitForPrompt({ box: true, pending: false, points: 2 });
+  await page.getByTestId('object-prompt-box').waitFor({ state: 'visible', timeout: 10_000 });
+
+  const proof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      overlay: latest('generate_mask_overlay'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      receipt: {
+        source: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-source'),
+        transactionId: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-transaction-id'),
+      },
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persisted = await persistedPrompt();
+  const overlayPrompt = proof.overlay?.['maskDef']?.['subMasks']?.find(
+    (candidate: Record<string, unknown>) => candidate['type'] === 'ai-object',
+  )?.['parameters'];
+  const renderDocument = editDocumentV2Schema.parse(proof.render?.['request']?.['editDocumentV2']);
+  const rendered = renderDocument.layers.masks
+    .flatMap((container) => container.subMasks)
+    .find((candidate) => candidate.type === 'ai-object')?.parameters;
+  if (
+    proof.receipt.source !== 'layer-command' ||
+    !proof.receipt.transactionId?.startsWith('object-prompt:') ||
+    persisted === null ||
+    JSON.stringify(persisted) !== JSON.stringify(overlayPrompt) ||
+    JSON.stringify(persisted) !== JSON.stringify(rendered)
+  ) {
+    throw new Error(
+      `Object Prompt persistence, overlay, render, and command receipt diverged: ${JSON.stringify(proof.receipt)}.`,
+    );
+  }
+
+  await page.locator('button[data-command-id="undo"]:visible').first().click();
+  await waitForPrompt({ box: false, pending: true, points: 2 });
+  await page.getByTestId('object-prompt-pending-box-anchor').waitFor({ state: 'visible', timeout: 10_000 });
+}
+
+async function verifyRetouchController(page: Page): Promise<void> {
+  const settledCallCount = (command: string) =>
+    page.evaluate(async (expected) => {
+      const read = () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expected).length ?? 0;
+      let previous = read();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 60 && stableFrames < 8; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = read();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      return previous;
+    }, command);
+  await page.setViewportSize({ height: 2000, width: viewport.width });
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  await page.getByTestId('layer-create-clone-layer').click();
+  const handles = page.getByTestId('image-canvas-retouch-handles');
+  await handles.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > 0,
+  );
+
+  const imageCanvas = page.getByTestId('image-canvas');
+  const pointAt = (x: number, y: number) =>
+    page.getByTestId('editor-image-preview-panel').evaluate(
+      (element, point) => {
+        const bounds = element.getBoundingClientRect();
+        const left = Number(element.getAttribute('data-editor-image-rect-left'));
+        const top = Number(element.getAttribute('data-editor-image-rect-top'));
+        const width = Number(element.getAttribute('data-editor-image-rect-width'));
+        const height = Number(element.getAttribute('data-editor-image-rect-height'));
+        if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+          throw new Error('Retouch surface omitted canonical image geometry.');
+        }
+        return { x: bounds.left + left + width * point.x, y: bounds.top + top + height * point.y };
+      },
+      { x, y },
+    );
+  const readHandlePoint = async (handle: 'source' | 'target') => ({
+    x: Number(await handles.getAttribute(`data-retouch-handle-${handle}-x`)),
+    y: Number(await handles.getAttribute(`data-retouch-handle-${handle}-y`)),
+  });
+
+  const mouseTarget = await pointAt(0.68, 0.62);
+  const savesBeforeMouse = await settledCallCount('save_metadata_and_update_thumbnail');
+  await page.mouse.move(mouseTarget.x, mouseTarget.y);
+  await page.mouse.down();
+  const capturedPointerId = await imageCanvas.evaluate((element) => {
+    for (let pointerId = 1; pointerId <= 32; pointerId += 1) {
+      if (element.hasPointerCapture(pointerId)) return pointerId;
+    }
+    return null;
+  });
+  if (capturedPointerId === null) {
+    const context = await imageCanvas.evaluate((element) => ({
+      activeTool: element.getAttribute('data-viewer-active-tool'),
+      canvasTool: element.getAttribute('data-canvas-overlay-tool'),
+      owner: element.getAttribute('data-viewer-input-owner'),
+    }));
+    throw new Error(`Retouch gesture did not use canonical pointer capture: ${JSON.stringify(context)}.`);
+  }
+  await page.mouse.up();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-retouch-last-commit-status') !==
+      'none',
+  );
+  const mouseCommitStatus = await imageCanvas.getAttribute('data-retouch-last-commit-status');
+  if (!mouseCommitStatus?.startsWith('committed:')) {
+    throw new Error(`Mouse retouch command was rejected: ${String(mouseCommitStatus)}.`);
+  }
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > baseline,
+    savesBeforeMouse,
+    { timeout: 10_000 },
+  );
+  const mouseCommittedTarget = await readHandlePoint('target');
+
+  const touchTarget = await pointAt(0.76, 0.7);
+  const savesBeforeTouch = await settledCallCount('save_metadata_and_update_thumbnail');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 19, radiusX: 1, radiusY: 1, x: touchTarget.x, y: touchTarget.y }],
+    type: 'touchStart',
+  });
+  await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > baseline,
+    savesBeforeTouch,
+    { timeout: 10_000 },
+  );
+
+  const proof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    const handles = document.querySelector('[data-testid="image-canvas-retouch-handles"]');
+    const preview = document.querySelector('[data-testid="editor-image-preview-panel"]');
+    return {
+      overlay: {
+        sourceX: Number(handles?.getAttribute('data-retouch-handle-source-x')),
+        sourceY: Number(handles?.getAttribute('data-retouch-handle-source-y')),
+        targetX: Number(handles?.getAttribute('data-retouch-handle-target-x')),
+        targetY: Number(handles?.getAttribute('data-retouch-handle-target-y')),
+      },
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      receipt: {
+        source: preview?.getAttribute('data-last-edit-source'),
+        transactionId: preview?.getAttribute('data-last-edit-transaction-id'),
+      },
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persistedAdjustments = proof.persistence?.['adjustments'];
+  const persistedLayer = persistedAdjustments?.['masks']?.find(
+    (layer: Record<string, unknown>) => typeof layer['retouchCloneSource'] === 'object',
+  );
+  const persistedSource = persistedLayer?.['retouchCloneSource'];
+  const renderDocument = editDocumentV2Schema.parse(proof.render?.['request']?.['editDocumentV2']);
+  const renderedLayer = renderDocument.layers.masks.find((layer) => layer.retouchCloneSource !== undefined);
+  if (
+    proof.receipt.source !== 'layer-command' ||
+    !proof.receipt.transactionId?.startsWith('retouch-handle:') ||
+    typeof persistedSource !== 'object' ||
+    persistedSource === null ||
+    renderedLayer?.retouchCloneSource === undefined ||
+    JSON.stringify(persistedSource['targetPoint']) !== JSON.stringify(renderedLayer.retouchCloneSource.targetPoint) ||
+    proof.overlay.targetX !== renderedLayer.retouchCloneSource.targetPoint.x ||
+    proof.overlay.targetY !== renderedLayer.retouchCloneSource.targetPoint.y
+  ) {
+    throw new Error(`Retouch persistence, render, overlay, and command receipt diverged: ${JSON.stringify(proof)}.`);
+  }
+
+  await page.locator('button[data-command-id="undo"]:visible').first().click();
+  await page.waitForFunction(({ x, y }) => {
+    const handles = document.querySelector('[data-testid="image-canvas-retouch-handles"]');
+    return (
+      Number(handles?.getAttribute('data-retouch-handle-target-x')) === x &&
+      Number(handles?.getAttribute('data-retouch-handle-target-y')) === y
+    );
+  }, mouseCommittedTarget);
 }
 
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
@@ -863,7 +2724,11 @@ try {
   browser = await chromium.launch({ headless: true });
   page = await browser.newPage({
     hasTouch:
-      browserScenario === 'initial-mask-draw-controller' || browserScenario === 'parametric-mask-target-controller',
+      browserScenario === 'initial-mask-draw-controller' ||
+      browserScenario === 'ai-mask-box-controller' ||
+      browserScenario === 'object-prompt-controller' ||
+      browserScenario === 'parametric-mask-target-controller' ||
+      browserScenario === 'retouch-controller',
     viewport,
   });
   const consoleErrors: string[] = [];
@@ -879,6 +2744,35 @@ try {
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
   });
+  if (browserScenario === 'preview-url-lifetime') {
+    await page.addInitScript(() => {
+      const created: string[] = [];
+      const imageErrors: string[] = [];
+      const revoked: string[] = [];
+      const createObjectURL = URL.createObjectURL.bind(URL);
+      const revokeObjectURL = URL.revokeObjectURL.bind(URL);
+      URL.createObjectURL = (blob: Blob): string => {
+        const url = createObjectURL(blob);
+        created.push(url);
+        return url;
+      };
+      URL.revokeObjectURL = (url: string): void => {
+        revoked.push(url);
+        revokeObjectURL(url);
+      };
+      window.addEventListener(
+        'error',
+        (event) => {
+          const target = event.target;
+          if (target instanceof HTMLImageElement || target instanceof SVGImageElement) {
+            imageErrors.push(target.getAttribute('src') ?? target.getAttribute('href') ?? 'unknown-image');
+          }
+        },
+        true,
+      );
+      Reflect.set(window, '__RAWENGINE_PREVIEW_URL_AUDIT__', { created, imageErrors, revoked });
+    });
+  }
   await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -892,6 +2786,8 @@ try {
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
+  await verifySchemaOwnedTauriTransport(page);
+  await verifyEditorRenderAuthorityBoundary(page);
   await page.getByRole('button', { name: /Open Folder/u }).click();
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
@@ -912,6 +2808,28 @@ try {
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
+  if (browserScenario === 'preview-url-lifetime') {
+    await verifyPreviewUrlLifetime(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected preview URL lifetime browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('preview URL lifetime browser proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'analytics-artifact-authority') {
+    await verifyPreviewAnalyticsArtifactAuthority(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected analytics-authority browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('preview analytics artifact authority browser proof passed');
+    process.exit(0);
+  }
   if (browserScenario === 'initial-mask-draw-controller') {
     await verifyInitialMaskDrawController(page);
     if (consoleErrors.length > 0) {
@@ -938,6 +2856,48 @@ try {
     browser = undefined;
     await stopServer(server);
     console.log('parametric mask target browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'object-prompt-controller') {
+    await verifyObjectPromptController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected Object Prompt browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected Object Prompt browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('Object Prompt browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'ai-mask-box-controller') {
+    await verifyAiMaskBoxController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected AI mask box browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected AI mask box browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('AI mask box browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'retouch-controller') {
+    await verifyRetouchController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected retouch browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected retouch browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('retouch browser controller proof passed');
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
@@ -1294,9 +3254,14 @@ try {
   await commandPaletteForCopyPaste.getByRole('button', { name: /Copy and paste settings/u }).click();
   const copyPasteDialog = page.getByRole('dialog', { name: /Copy & Paste Settings/u });
   await copyPasteDialog.waitFor({ timeout: 10_000 });
-  await copyPasteDialog.getByText('Dust Spot Visualization').waitFor({ timeout: 10_000 });
-  if ((await copyPasteDialog.getByText('DustSpotVisualization').count()) > 0) {
-    throw new Error('Copy & Paste Settings leaked the dust spot internal identifier.');
+  if (
+    (await copyPasteDialog.getByRole('checkbox').count()) !== EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES.length ||
+    (await copyPasteDialog.getByText('Tone', { exact: true }).count()) !== 1 ||
+    (await copyPasteDialog.getByText('Profile & Tone', { exact: true }).count()) !== 1 ||
+    (await copyPasteDialog.getByText('Masks', { exact: true }).count()) !== 0 ||
+    (await copyPasteDialog.getByText('Dust Spot Visualization', { exact: true }).count()) !== 0
+  ) {
+    throw new Error('Copy & Paste Settings diverged from descriptor-approved node availability.');
   }
   const saveButton = copyPasteDialog.getByRole('button', { name: 'Save' });
   await saveButton.waitFor({ timeout: 10_000 });

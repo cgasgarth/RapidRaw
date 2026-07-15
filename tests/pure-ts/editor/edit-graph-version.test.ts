@@ -22,6 +22,21 @@ describe('persisted edit graph version', () => {
     expect(reopened.exposure).toBe(14);
   });
 
+  test('migrates legacy Effects visibility once while preserving latent effect values', () => {
+    const normalized = normalizeLoadedAdjustments({
+      grainAmount: 37,
+      sectionVisibility: { basic: false, color: true, curves: true, details: false, effects: false },
+    });
+
+    expect(normalized.effectsEnabled).toBeFalse();
+    expect(normalized.grainAmount).toBe(37);
+    expect(normalized).not.toHaveProperty('sectionVisibility');
+    expect(normalizeLoadedAdjustments(JSON.parse(JSON.stringify(normalized)))).toMatchObject({
+      effectsEnabled: false,
+      grainAmount: 37,
+    });
+  });
+
   test('round-trips typed curve domains without retaining mutable sidecar aliases', () => {
     const loaded = {
       rawEngineEditGraphVersion: 2,

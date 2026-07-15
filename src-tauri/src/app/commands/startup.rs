@@ -4,13 +4,13 @@ use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 use crate::AppState;
-#[cfg(any(windows, target_os = "linux"))]
-use crate::WindowState;
 use crate::app::startup::{FrontendStartupPhase, frontend_ready_manages_native_window};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
     InitializationPriority, request_gpu_initialization, request_lens_initialization,
 };
+#[cfg(any(windows, target_os = "linux"))]
+use crate::app::window_lifecycle::WindowState;
 
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str()

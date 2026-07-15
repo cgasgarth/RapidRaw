@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import type {
+  EditCommandBusContext,
+  EditCommandDispatchResult,
+} from '../../../packages/rawengine-schema/src/editCommandBus';
+import { RawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
@@ -16,8 +21,38 @@ import {
 
 const selectedPath = '/fixtures/agent-tone-adjustment/DSC_4799.ARW';
 
+class DeferredToneAdjustmentBridge extends RawEngineLocalAppServerBridge {
+  private releaseApplyGate: () => void = () => undefined;
+  private signalApplyEntered: () => void = () => undefined;
+  readonly applyEntered = new Promise<void>((resolve) => {
+    this.signalApplyEntered = resolve;
+  });
+  private readonly applyGate = new Promise<void>((resolve) => {
+    this.releaseApplyGate = resolve;
+  });
+
+  releaseApply(): void {
+    this.releaseApplyGate();
+  }
+
+  override async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
+    if (
+      typeof command === 'object' &&
+      command !== null &&
+      'commandType' in command &&
+      command.commandType === 'toneColor.setBasicTone' &&
+      'dryRun' in command &&
+      command.dryRun === false
+    ) {
+      this.signalApplyEntered();
+      await this.applyGate;
+    }
+    return super.dispatch(command, context);
+  }
+}
+
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-tone-adjustment-before',
     history: [INITIAL_ADJUSTMENTS],
@@ -114,5 +149,76 @@ describe('agent live typed basic-tone adjustment', () => {
     expect(draft.reason).toContain('Only basic tone prompts');
     expect(useEditorStore.getState().historyIndex).toBe(0);
     expect(useEditorStore.getState().adjustments).toEqual(before.adjustments);
+  });
+
+  test('rejects accepted tone pixels after an intervening editor revision', async () => {
+    const snapshot = buildAgentImageContextSnapshot();
+    const request = {
+      adjustments: { exposure: 0.42 },
+      expectedGraphRevision: snapshot.graphRevision,
+      expectedRecipeHash: snapshot.initialPreview.recipeHash,
+      operationId: 'agent-tone-delayed',
+      requestId: 'agent-tone-delayed-dry-run',
+      sessionId: 'agent-tone-delayed',
+    };
+    const dryRun = await dryRunAgentToneAdjustment(request);
+    const bridge = new DeferredToneAdjustmentBridge();
+    const pending = applyAgentToneAdjustment(
+      {
+        ...request,
+        acceptedPlanHash: dryRun.dryRunPlanHash,
+        acceptedPlanId: dryRun.dryRunPlanId,
+        requestId: 'agent-tone-delayed-apply',
+      },
+      bridge,
+    );
+    await bridge.applyEntered;
+    const state = useEditorStore.getState();
+    if (state.imageSession === null) throw new Error('Expected seeded image session.');
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: state.imageSession.id,
+      operations: [{ patch: { vibrance: 4 }, type: 'patch-adjustments' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'intervening-tone-edit',
+    });
+    bridge.releaseApply();
+
+    await expect(pending).rejects.toThrow('Editor basic-tone apply rejected stale graph revision.');
+    const after = useEditorStore.getState();
+    expect(after.adjustments.vibrance).toBe(4);
+    expect(after.adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-tone-edit');
+  });
+
+  test('skips typed apply and editor work for an exact repeat', async () => {
+    const snapshot = buildAgentImageContextSnapshot();
+    const request = {
+      adjustments: { exposure: INITIAL_ADJUSTMENTS.exposure },
+      expectedGraphRevision: snapshot.graphRevision,
+      expectedRecipeHash: snapshot.initialPreview.recipeHash,
+      operationId: 'agent-tone-no-op',
+      requestId: 'agent-tone-no-op-dry-run',
+      sessionId: 'agent-tone-no-op',
+    };
+    const dryRun = await dryRunAgentToneAdjustment(request);
+    const before = useEditorStore.getState();
+    const result = await applyAgentToneAdjustment({
+      ...request,
+      acceptedPlanHash: dryRun.dryRunPlanHash,
+      acceptedPlanId: dryRun.dryRunPlanId,
+      requestId: 'agent-tone-no-op-apply',
+    });
+    const after = useEditorStore.getState();
+
+    expect(result.adjustedFields).toEqual([]);
+    expect(result.beforePreviewHash).toBe(result.afterPreviewHash);
+    expect(result.auditEventIds).toHaveLength(1);
+    expect(after.adjustmentRevision).toBe(before.adjustmentRevision);
+    expect(after.historyIndex).toBe(before.historyIndex);
+    expect(after.lastBasicToneCommand).toBe(before.lastBasicToneCommand);
+    expect(after.lastEditApplicationReceipt).toBe(before.lastEditApplicationReceipt);
   });
 });

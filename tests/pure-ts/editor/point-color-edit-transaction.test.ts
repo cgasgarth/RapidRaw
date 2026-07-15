@@ -6,6 +6,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildPointColorEditTransaction,
+  isCurrentPointColorIdentity,
   type PointColorCommitIdentity,
 } from '../../../src/utils/pointColorEditTransaction';
 
@@ -34,7 +35,7 @@ describe('point color edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -90,5 +91,63 @@ describe('point color edit transaction', () => {
     expect(() =>
       buildPointColorEditTransaction(state, identity({ adjustmentRevision: 1 }), { enabled: true }, 'stale-revision'),
     ).toThrow('point_color_transaction.stale_revision');
+  });
+
+  test('commits through fallback authority and rejects stale A to B to A identities', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-point-color-before',
+      imageSession: null,
+      imageSessionId: 101,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: PointColorCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:101',
+      sourceIdentity: sourcePath,
+    };
+    const noOp = state.applyEditTransaction(
+      buildPointColorEditTransaction(state, fallbackIdentity, {}, 'fallback-point-color-no-op'),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-point-color-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const result = state.applyEditTransaction(
+      buildPointColorEditTransaction(state, fallbackIdentity, { enabled: true }, 'fallback-point-color'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['pointColor'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-point-color',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.pointColor.enabled).toBeFalse();
+
+    expect(isCurrentPointColorIdentity(state, fallbackIdentity)).toBeTrue();
+    expect(
+      isCurrentPointColorIdentity(
+        { ...state, imageSessionId: 102, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentPointColorIdentity({ ...state, imageSessionId: 103 }, fallbackIdentity)).toBeFalse();
+    expect(isCurrentPointColorIdentity({ ...state, adjustmentRevision: 1 }, fallbackIdentity)).toBeFalse();
+    expect(() =>
+      buildPointColorEditTransaction(
+        { ...state, imageSessionId: 103 },
+        fallbackIdentity,
+        { enabled: true },
+        'stale-reopened-a',
+      ),
+    ).toThrow('point_color_transaction.stale_session');
   });
 });

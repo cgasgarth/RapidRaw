@@ -14,6 +14,7 @@ export interface ViewerRetouchCurrentContext {
   readonly layerId: string;
   readonly layerRevision: string;
   readonly mode: ViewerRetouchMode;
+  readonly sourceIdentity: string;
   readonly sourceRevision: string;
   readonly toolId: 'retouch-handles';
 }
@@ -86,6 +87,7 @@ export const isViewerRetouchSessionCurrent = (
   key.layerId === context.layerId &&
   key.layerRevision === context.layerRevision &&
   key.mode === context.mode &&
+  key.sourceIdentity === context.sourceIdentity &&
   key.sourceRevision === context.sourceRevision &&
   key.toolId === context.toolId;
 
@@ -96,6 +98,7 @@ const sameContext = (left: ViewerRetouchCurrentContext, right: ViewerRetouchCurr
   left.layerId === right.layerId &&
   left.layerRevision === right.layerRevision &&
   left.mode === right.mode &&
+  left.sourceIdentity === right.sourceIdentity &&
   left.sourceRevision === right.sourceRevision &&
   left.toolId === right.toolId;
 
@@ -106,6 +109,7 @@ const keyFrom = (context: ViewerRetouchCurrentContext, operationGeneration: numb
   layerRevision: context.layerRevision,
   mode: context.mode,
   operationGeneration,
+  sourceIdentity: context.sourceIdentity,
   sourceRevision: context.sourceRevision,
   toolId: context.toolId,
 });

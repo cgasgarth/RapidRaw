@@ -9,18 +9,18 @@ use tauri::State;
 
 use crate::app::settings::load_settings_or_default;
 use crate::app_state::AppState;
+use crate::cache_utils::{calculate_transform_hash, calculate_visual_hash};
 use crate::color::adjustment_fields;
 use crate::color::adjustment_utils::hydrate_adjustments;
 use crate::geometry::GeometryParams;
 use crate::gpu::gpu_context::get_or_init_gpu_context;
 use crate::gpu::gpu_processing::{EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest};
+use crate::image_processing::resolve_tonemapper_override_from_handle;
 use crate::image_processing::{
     apply_coarse_rotation, apply_flip, downscale_f32_image, warp_image_geometry,
 };
 use crate::render::render_caches;
 use crate::render::render_plan::compile_consumer_render_plan;
-use crate::{calculate_transform_hash, calculate_visual_hash};
-use crate::{get_or_load_lut, resolve_tonemapper_override_from_handle};
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -96,7 +96,7 @@ pub(crate) async fn preview_geometry_transform(
         .wrapping_add(u64::from(target_dim));
 
     let base_image_to_warp = {
-        let maybe_cached_image = state.geometry_cache.get(&visual_hash);
+        let maybe_cached_image = state.services.native_caches.geometry(visual_hash);
 
         if let Some(cached_image) = maybe_cached_image {
             cached_image.as_ref().clone()
@@ -164,7 +164,8 @@ pub(crate) async fn preview_geometry_transform(
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
             let lut_path = temp_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut =
+                lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
                 &temp_adjustments,
                 &loaded_image_path,

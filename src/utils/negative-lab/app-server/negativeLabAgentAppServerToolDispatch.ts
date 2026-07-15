@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import {
   type AcceptedNegativeLabDryRunPlanV1,
   NegativeLabAppServerRuntimeToolBusV1,
@@ -17,6 +16,7 @@ import {
   negativeConversionSavedPositiveHandoffsSchema,
 } from '../../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import { Invokes } from '../../../tauri/commands';
+import { invokeWithSchema } from '../../tauriSchemaInvoke';
 
 export const NEGATIVE_LAB_AGENT_PREVIEW_TOOL_NAME = 'negativelab.preview_conversion';
 export const NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME = 'negativelab.apply_planned_command';
@@ -82,12 +82,15 @@ const negativeLabNativeApplyExecutor = async (
     acceptedDryRunPlanHash: request.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: request.dryRunPlanId,
   };
-  const rawHandoffs = await invoke<unknown>(Invokes.ConvertNegatives, {
-    options: nativeOptions,
-    params: nativeCommit.params,
-    paths: nativeCommit.paths,
-  });
-  const handoffs = negativeConversionSavedPositiveHandoffsSchema.parse(rawHandoffs);
+  const handoffs = await invokeWithSchema(
+    Invokes.ConvertNegatives,
+    {
+      options: nativeOptions,
+      params: nativeCommit.params,
+      paths: nativeCommit.paths,
+    },
+    negativeConversionSavedPositiveHandoffsSchema,
+  );
   if (handoffs.length !== nativeCommit.paths.length) {
     throw new Error(`${NEGATIVE_LAB_AGENT_APPLY_TOOL_NAME} native save returned an incomplete source set.`);
   }

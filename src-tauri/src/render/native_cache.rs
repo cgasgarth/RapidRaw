@@ -4,22 +4,6 @@ use std::hash::Hash;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-pub trait CacheWeight {
-    fn retained_bytes(&self) -> u64;
-}
-
-impl CacheWeight for image::DynamicImage {
-    fn retained_bytes(&self) -> u64 {
-        self.as_bytes().len() as u64
-    }
-}
-
-impl CacheWeight for image::GrayImage {
-    fn retained_bytes(&self) -> u64 {
-        self.as_raw().capacity() as u64
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct CachePolicy {
     pub name: &'static str,
@@ -142,14 +126,6 @@ impl<K: Eq + Hash + Clone, V> MemoryLruCache<K, V> {
         inner.stats.hits += 1;
         Self::touch(&mut inner, index);
         Some(Arc::clone(&inner.nodes[index].as_ref().unwrap().value))
-    }
-
-    pub fn peek(&self, key: &K) -> Option<Arc<V>> {
-        let inner = self.inner.lock().unwrap();
-        inner
-            .map
-            .get(key)
-            .map(|&i| Arc::clone(&inner.nodes[i].as_ref().unwrap().value))
     }
 
     pub fn insert(&self, key: K, value: Arc<V>, weight: u64) -> InsertOutcome {
@@ -328,13 +304,6 @@ impl<K: Eq + Hash + Clone, V> MemoryLruCache<K, V> {
     }
 }
 
-impl<K: Eq + Hash + Clone, V: CacheWeight> MemoryLruCache<K, V> {
-    pub fn insert_weighted(&self, key: K, value: Arc<V>) -> InsertOutcome {
-        let weight = value.retained_bytes();
-        self.insert(key, value, weight)
-    }
-}
-
 impl<K, V> Drop for MemoryLruCache<K, V> {
     fn drop(&mut self) {
         if let Ok(inner) = self.inner.lock() {
@@ -364,8 +333,8 @@ mod tests {
         c.insert(2, Arc::new("two".into()), 4);
         c.get(&1);
         c.insert(3, Arc::new("three".into()), 4);
-        assert!(c.peek(&2).is_none());
-        assert!(c.peek(&1).is_some());
+        assert!(c.get(&2).is_none());
+        assert!(c.get(&1).is_some());
     }
     #[test]
     fn replacement_is_accounted_exactly() {
@@ -384,7 +353,7 @@ mod tests {
             c.insert(1, Arc::new("large".into()), 11),
             InsertOutcome::RejectedOversized
         );
-        assert!(c.peek(&1).is_none());
+        assert!(c.get(&1).is_none());
     }
     #[test]
     fn eviction_does_not_invalidate_in_flight_arcs() {
@@ -394,7 +363,7 @@ mod tests {
         c.insert(2, Arc::new("new".into()), 4);
         c.insert(3, Arc::new("newer".into()), 4);
         assert_eq!(held.as_str(), "held");
-        assert!(c.peek(&1).is_none());
+        assert!(c.get(&1).is_none());
     }
 
     #[test]

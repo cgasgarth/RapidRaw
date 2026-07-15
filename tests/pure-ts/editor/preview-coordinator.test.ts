@@ -1,3 +1,5 @@
+import { type AdjustmentSnapshot, publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   createPreviewCoordinatorState,
   createPreviewQualityPolicy,
@@ -7,11 +9,17 @@ import {
   fingerprintPreviewSessionIdentity,
   type PreviewArtifact,
   PreviewCoordinator,
+  type PreviewSchedulingInputSnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
   reducePreviewCoordinator,
   resolvePreviewViewportRoi,
 } from '../../../src/utils/previewCoordinator';
+import { PreviewRequestIntentAdapter } from '../../../src/utils/previewRequestIntentAdapter';
+import {
+  PreviewRequestScopeAdapter,
+  type PreviewRequestScopeInput,
+} from '../../../src/utils/previewRequestScopeAdapter';
 
 const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessionIdentity => {
   const values = {
@@ -61,6 +69,267 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
+const schedulingInputHarness = () => {
+  const scopeAdapter = new PreviewRequestScopeAdapter({ getDisplayGeneration: () => 1 });
+  let previousSnapshot: AdjustmentSnapshot | null = null;
+  const snapshot = (exposure: number, advance: boolean): AdjustmentSnapshot => {
+    if (!advance && previousSnapshot !== null) return previousSnapshot;
+    previousSnapshot = publishAdjustmentSnapshot(previousSnapshot, {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      exposure,
+    });
+    return previousSnapshot;
+  };
+  const prepare = ({
+    advanceAdjustment = true,
+    compareActive = false,
+    devicePixelRatio = 1,
+    dragging = false,
+    exposure = 0,
+    imageSessionId = 1,
+    path = '/fixtures/a.raw',
+    ready = true,
+    roi = null,
+    targetResolution = 1200,
+  }: {
+    advanceAdjustment?: boolean;
+    compareActive?: boolean;
+    devicePixelRatio?: number;
+    dragging?: boolean;
+    exposure?: number;
+    imageSessionId?: number;
+    path?: string;
+    ready?: boolean;
+    roi?: [number, number, number, number] | null;
+    targetResolution?: number;
+  } = {}): PreviewSchedulingInputSnapshot => {
+    if (!ready) {
+      return {
+        compareActive,
+        devicePixelRatio,
+        displayHeight: 800,
+        displayWidth: 1200,
+        edited: null,
+        enableLivePreviews: true,
+        original: null,
+        ready: false,
+      };
+    }
+    const adjustmentSnapshot = snapshot(exposure, advanceAdjustment);
+    const source: PreviewRequestScopeInput = {
+      adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+      adjustmentSnapshot,
+      autoEditPreviewSession: null,
+      baseRenderSize: {
+        containerHeight: 800,
+        containerWidth: 1200,
+        height: 800,
+        offsetX: 0,
+        offsetY: 0,
+        width: 1200,
+      },
+      basicToneSliderInteraction: null,
+      finalPreviewUrl: `blob:${path}`,
+      hasRenderedFirstFrame: false,
+      imageSession: { id: `session:${String(imageSessionId)}:${path}` },
+      imageSessionId,
+      previewViewportTransform: { positionX: 0, positionY: 0, scale: roi === null ? 1 : 2 },
+      proofRevision: 1,
+      referenceMatchPreview: null,
+      selectedImage: { isReady: true, path, thumbnailUrl: `blob:thumb:${path}` },
+      settings: { editorPreviewResolution: 1200, enableZoomHifi: true, useWgpuRenderer: false },
+      zoomMode: { kind: 'fit' },
+    };
+    const adapter = new PreviewRequestIntentAdapter({
+      captureScope: (resolution, effectiveRoi) =>
+        scopeAdapter.capture(source, resolution, effectiveRoi, devicePixelRatio),
+      decideQuality: (resolution, interacting) => ({
+        backend: 'cpu',
+        effectiveRoi: roi,
+        effectiveTargetResolution: resolution,
+        estimatedWorkingBytes: 1,
+        limitedBy: null,
+        reason: interacting ? 'interactive viewport' : 'settled viewport',
+        requestedTargetResolution: resolution,
+        sufficientForSemanticZoom: true,
+        tier: interacting ? 'interaction_balanced' : 'settled_full',
+      }),
+      dispatch: () => undefined,
+      installSession: () => undefined,
+      publish: () => undefined,
+      schedule: () => {
+        throw new Error('Scheduling must remain coordinator-owned in this harness.');
+      },
+    });
+    const edited = adapter.prepare({
+      activeWaveformChannel: null,
+      delayMs: 0,
+      dragging,
+      isWaveformVisible: false,
+      proofRecipe: null,
+      requestedTargetResolution: targetResolution,
+      scopeRecovery: false,
+    });
+    if (edited === null) throw new Error('Expected immutable scheduling input.');
+    const original = compareActive
+      ? {
+          request: {
+            expectedImagePath: edited.scope.session.sourceImagePath,
+            jsAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+            targetResolution: edited.scope.session.targetWidth,
+            viewerSampleGraphRevision: edited.scope.session.graphRevision,
+          },
+          session: edited.scope.session,
+          viewport: edited.scope.viewport.coordinator,
+        }
+      : null;
+    return {
+      compareActive,
+      devicePixelRatio,
+      displayHeight: 800,
+      displayWidth: 1200,
+      edited,
+      enableLivePreviews: true,
+      original,
+      ready: true,
+    };
+  };
+  return { prepare };
+};
+
+test('session-owned scheduling emits interactive work and exactly one settled successor', () => {
+  const { prepare } = schedulingInputHarness();
+  let state = createPreviewCoordinatorState();
+  const initialInputs = prepare();
+  const initial = transition(state, { inputs: initialInputs, type: 'scheduling-inputs-changed' });
+  expect(initial.effects).toMatchObject([{ delayMs: 50, reason: 'settled-inputs-changed', type: 'schedule-edited' }]);
+  state = initial.state;
+  expect(transition(state, { inputs: initialInputs, type: 'scheduling-inputs-changed' }).effects).toEqual([]);
+
+  const firstDrag = transition(state, {
+    inputs: prepare({ dragging: true, exposure: 0.1 }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(firstDrag.effects).toMatchObject([
+    { delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
+  ]);
+  const secondDrag = transition(firstDrag.state, {
+    inputs: prepare({ dragging: true, exposure: 0.2 }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(secondDrag.effects).toMatchObject([
+    { delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
+  ]);
+
+  const settledInputs = prepare({ dragging: false, exposure: 0.2 });
+  const settled = transition(secondDrag.state, {
+    inputs: settledInputs,
+    type: 'scheduling-inputs-changed',
+  });
+  expect(settled.effects).toMatchObject([
+    { delayMs: 50, reason: 'interaction-settled-successor', type: 'schedule-edited' },
+  ]);
+  expect(transition(settled.state, { inputs: settledInputs, type: 'scheduling-inputs-changed' }).effects).toEqual([]);
+});
+
+test('compare, target, ROI, zoom, and DPR snapshots causally schedule their successors', () => {
+  const { prepare } = schedulingInputHarness();
+  let state = transition(createPreviewCoordinatorState(), {
+    inputs: prepare(),
+    type: 'scheduling-inputs-changed',
+  }).state;
+
+  const compare = transition(state, {
+    inputs: prepare({ advanceAdjustment: false, compareActive: true }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(compare.effects).toMatchObject([
+    { delayMs: 0, reason: 'compare-original-inputs-changed', type: 'schedule-original' },
+  ]);
+  state = compare.state;
+
+  const targetChanged = transition(state, {
+    inputs: prepare({ advanceAdjustment: false, compareActive: true, targetResolution: 1800 }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(targetChanged.effects.some((effect) => effect.type === 'schedule-edited')).toBe(true);
+  expect(targetChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(true);
+  state = targetChanged.state;
+
+  const roiChanged = transition(state, {
+    inputs: prepare({
+      advanceAdjustment: false,
+      compareActive: true,
+      roi: [0.1, 0.1, 0.5, 0.5],
+      targetResolution: 1800,
+    }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(roiChanged.effects.some((effect) => effect.type === 'schedule-edited')).toBe(true);
+  expect(roiChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(false);
+  state = roiChanged.state;
+
+  const dprChanged = transition(state, {
+    inputs: prepare({
+      advanceAdjustment: false,
+      compareActive: true,
+      devicePixelRatio: 2,
+      roi: [0.1, 0.1, 0.5, 0.5],
+      targetResolution: 1800,
+    }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(dprChanged.effects.some((effect) => effect.type === 'schedule-edited')).toBe(true);
+  expect(dprChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(true);
+  state = dprChanged.state;
+
+  const disabled = transition(state, {
+    inputs: prepare({ advanceAdjustment: false, compareActive: false, devicePixelRatio: 2 }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(disabled.effects).toContainEqual({ reason: 'compare-disabled', type: 'clear-original' });
+  expect(disabled.effects.some((effect) => effect.type === 'schedule-original')).toBe(false);
+});
+
+test('not-ready and unmount reset scheduling authority and release stale output exactly once', () => {
+  const { prepare } = schedulingInputHarness();
+  const coordinator = new PreviewCoordinator();
+  const scheduled = coordinator.dispatch({
+    inputs: prepare({ compareActive: true }),
+    type: 'scheduling-inputs-changed',
+  });
+  const preparedEdited = scheduled.effects.find((effect) => effect.type === 'schedule-edited');
+  if (preparedEdited?.type !== 'schedule-edited') throw new Error('Expected edited scheduling effect.');
+  const queued = coordinator.dispatch({
+    identity: preparedEdited.prepared.request.session,
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const identity = required(queued.state.settled.identity);
+  coordinator.dispatch({ identity, type: 'operation-started' });
+
+  const notReady = coordinator.dispatch({ inputs: prepare({ ready: false }), type: 'scheduling-inputs-changed' });
+  expect(notReady.effects).toContainEqual({ identity, reason: 'preview-inputs-not-ready', type: 'cancel' });
+  expect(notReady.state.schedulingInputs?.ready).toBe(false);
+  expect(
+    coordinator.dispatch({ inputs: prepare({ ready: false }), type: 'scheduling-inputs-changed' }).effects,
+  ).toEqual([]);
+
+  const late = coordinator.dispatch({
+    artifact: artifact(identity, 'blob:stale-after-not-ready'),
+    identity,
+    type: 'operation-completed',
+  });
+  expect(late.effects).toEqual([
+    { reason: 'artifact-not-presented', type: 'release-url', url: 'blob:stale-after-not-ready' },
+  ]);
+  expect(late.state.visibleArtifact).toBeNull();
+
+  const unmounted = coordinator.dispatch({ reason: 'editor-unmounted', type: 'cancel-session' });
+  expect(unmounted.state.schedulingInputs).toBeNull();
+  expect(unmounted.effects).toEqual([]);
+});
+
 test('fingerprints are canonical and distinguish typed source identity changes', () => {
   expect(fingerprintPreviewSessionIdentity(session())).toBe(fingerprintPreviewSessionIdentity(session()));
   expect(fingerprintPreviewSessionIdentity(session())).not.toBe(
@@ -106,6 +375,82 @@ test('graph revisions canonically distinguish proposal and render-authoritative 
   expect(fingerprintPreviewGraphRevision(committed)).not.toBe(
     fingerprintPreviewGraphRevision({ ...committed, maskRevision: committed.maskRevision + 1 }),
   );
+});
+
+test('early analytics publishes only when its exact artifact is presented and duplicates are discarded', () => {
+  let state = createPreviewCoordinatorState();
+  const queued = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  const identity = required(queued.state.settled.identity);
+  state = transition(queued.state, { identity, type: 'operation-started' }).state;
+  const early = transition(state, { identity, receiptId: 1, type: 'analytics-result-received' });
+  expect(early.effects).toEqual([]);
+  expect(early.state.pendingAnalytics).toEqual([{ identity, receiptId: 1 }]);
+
+  const presented = transition(early.state, {
+    artifact: artifact(identity, 'blob:analytics-current'),
+    identity,
+    type: 'operation-completed',
+  });
+  expect(presented.effects).toContainEqual({
+    identity,
+    reason: 'buffered-analytics-presented',
+    receiptId: 1,
+    type: 'publish-analytics',
+  });
+  expect(presented.state.analytics).toEqual({ identity, status: 'presented' });
+  expect(presented.state.pendingAnalytics).toEqual([]);
+
+  const duplicate = transition(presented.state, { identity, receiptId: 2, type: 'analytics-result-received' });
+  expect(duplicate.effects).toEqual([
+    { reason: 'duplicate-analytics-result', receiptId: 2, type: 'discard-analytics' },
+  ]);
+});
+
+test('analytics rejects A to B to successor-A reordering and keeps bounded transition receipts', () => {
+  let state = createPreviewCoordinatorState();
+  const firstA = transition(state, {
+    identity: session({ sourceImagePath: '/fixtures/a.raw' }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const firstIdentity = required(firstA.state.settled.identity);
+  state = transition(firstA.state, { identity: firstIdentity, type: 'operation-started' }).state;
+  state = transition(state, { identity: firstIdentity, receiptId: 1, type: 'analytics-result-received' }).state;
+  const b = session({ imageSessionId: 2, sourceImagePath: '/fixtures/b.raw', sourceRevision: 2 });
+  const switched = transition(state, { session: b, type: 'image-session-installed' });
+  expect(switched.effects).toContainEqual({
+    reason: 'image-session-replaced',
+    receiptId: 1,
+    type: 'discard-analytics',
+  });
+
+  const successor = transition(switched.state, {
+    identity: session({ imageSessionId: 3, sourceImagePath: '/fixtures/a.raw', sourceRevision: 3 }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const successorIdentity = required(successor.state.settled.identity);
+  const stale = transition(successor.state, {
+    identity: firstIdentity,
+    receiptId: 2,
+    type: 'analytics-result-received',
+  });
+  expect(stale.effects).toEqual([{ reason: 'stale-analytics-result', receiptId: 2, type: 'discard-analytics' }]);
+
+  state = stale.state;
+  for (let receiptId = 3; receiptId <= 40; receiptId += 1) {
+    state = transition(state, { identity: firstIdentity, receiptId, type: 'analytics-result-received' }).state;
+  }
+  expect(state.analyticsTransitions).toHaveLength(32);
+  expect(state.analyticsTransitions.at(-1)).toMatchObject({ action: 'discarded', receiptId: 40 });
+
+  state = transition(state, { identity: successorIdentity, type: 'operation-started' }).state;
+  const current = transition(state, {
+    identity: successorIdentity,
+    receiptId: 41,
+    type: 'analytics-result-received',
+  });
+  expect(current.state.pendingAnalytics).toEqual([{ identity: successorIdentity, receiptId: 41 }]);
 });
 
 test('new render inputs cancel the previous operation and start newest work', () => {
@@ -320,6 +665,7 @@ test('original compare publishes independently without replacing the edited arti
   expect(cancelled.effects).toEqual([
     { reason: 'editor-unmounted', type: 'release-url', url: 'blob:edited' },
     { reason: 'editor-unmounted', type: 'release-url', url: 'blob:original' },
+    { reason: 'editor-unmounted', type: 'clear-analytics' },
   ]);
 });
 
@@ -494,6 +840,7 @@ test('display generation accepts only newer identities and releases reordered co
       type: 'release-url',
       url: 'blob:display-old',
     },
+    { reason: 'display-generation-changed', type: 'clear-analytics' },
   ]);
   expect(invalidated.state.visibleArtifact).toBeNull();
   expect(invalidated.state.displayGeneration).toBe(3);

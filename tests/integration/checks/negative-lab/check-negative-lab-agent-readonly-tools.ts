@@ -26,7 +26,7 @@ const targetPaths = ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'];
 const includedPaths = ['/roll/001.CR3', '/roll/002.CR3'];
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 3));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:negative-lab-agent-readonly-before',

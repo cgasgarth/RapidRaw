@@ -18,6 +18,8 @@ const identity = (overrides: Partial<ViewerParametricMaskTargetKey> = {}): Viewe
   imageSessionId: session.id,
   maskId: colorId,
   operationGeneration: 1,
+  pointerId: 1,
+  pointerType: 'mouse',
   sourceIdentity: sourcePath,
   sourceRevision,
   tool: 'color',
@@ -65,7 +67,7 @@ describe('parametric mask target edit transaction', () => {
       ],
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,

@@ -1,65 +1,36 @@
-import { listen } from '@tauri-apps/api/event';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Panel } from '../../components/ui/AppProperties';
-import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
-import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
-import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
+import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import {
-  getPreviewReadyPhase,
-  type PreviewOperationClass,
-  type PreviewQualityStatus,
-  type PreviewRoi,
-} from '../../utils/adaptivePreviewQuality';
+import type { PreviewOperationClass, PreviewRoi } from '../../utils/adaptivePreviewQuality';
 import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
-import {
-  EditedPreviewEffectRunner,
-  type EditedPreviewExecutionContext,
-  type ExecutedEditedPreview,
-  type MaterializedEditedPreview,
-} from '../../utils/editedPreviewEffectRunner';
-import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
+import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
+import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import {
-  decodeInteractivePreviewUrl,
-  type InteractivePreviewScope,
-  parseInteractivePreviewPatchPayload,
-} from '../../utils/interactivePreviewPatch';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
-import { presentedPreviewReleaseCoordinator } from '../../utils/presentedPreviewReleaseCoordinator';
+import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
 import {
   createPreviewQualityPolicy,
-  fingerprintPreviewGraphRevision,
   fingerprintPreviewRoi,
   PreviewCoordinator,
+  type PreviewCoordinatorEffect,
   type PreviewCoordinatorEvent,
-  type PreviewQualitySnapshot,
-  type PreviewSessionIdentity,
-  quantizePreviewRoi,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
+import { PreviewInvalidationEffectRunner } from '../../utils/previewInvalidationEffectRunner';
+import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
+import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
+import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
+import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
+import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
-import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-
-interface InteractivePreviewScopeSnapshot {
-  roi: [number, number, number, number] | null;
-  scope: InteractivePreviewScope;
-}
-
-type ParsedInteractivePatch = ReturnType<typeof parseInteractivePreviewPatchPayload>;
-type ReadyInteractivePatch = Extract<ParsedInteractivePatch, { ok: true }>;
-type MaterializedEditedPreviewValue =
-  | { kind: 'empty' }
-  | { kind: 'wgpu' }
-  | { kind: 'limited'; reason: string }
-  | { kind: 'patch'; patch: ReadyInteractivePatch; url: string }
-  | { kind: 'full'; transform: ExportSoftProofTransformState | null; url: string };
 
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
@@ -75,8 +46,17 @@ export function useImageProcessing() {
   const previewViewportTransform = useEditorStore((state) => state.previewViewportTransform);
   const originalSize = useEditorStore((state) => state.originalSize);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
+  const committedAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const basicToneSliderInteraction = useEditorStore((state) => state.basicToneSliderInteraction);
   const editorImageSession = useEditorStore((state) => state.imageSession);
-  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
+  const imageSessionId = useEditorStore((state) => state.imageSessionId);
+  const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
+    adjustmentRevision: committedAdjustmentRevision,
+    imageSession: editorImageSession,
+    imageSessionId,
+    selectedImage,
+  });
+  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
     imageSessionId: editorImageSession?.id ?? null,
     path: selectedImage?.path ?? null,
   });
@@ -90,12 +70,11 @@ export function useImageProcessing() {
     renderAdjustmentSnapshot === adjustmentSnapshot
       ? referenceMatchAdjustments
       : (renderAdjustmentSnapshot.value as Adjustments);
-  const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
-  const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
+  const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
   const setEditor = useEditorStore((state) => state.setEditor);
   const isCompareActive = compare.mode !== 'off' || compare.isOriginalHeld;
 
@@ -108,53 +87,115 @@ export function useImageProcessing() {
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const viewportScopeRevisionRef = useRef<{ inputs: readonly unknown[]; revision: number }>({
-    inputs: [],
-    revision: 1,
-  });
-  const interactiveScopeRef = useRef<
-    (targetRes: number, roi: PreviewRoi | null) => InteractivePreviewScopeSnapshot | null
-  >(() => null);
   const previewQualityControllerRef = useRef(createPreviewQualityPolicy());
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
+    getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+  );
+  const [analyticsListenerReady, setAnalyticsListenerReady] = useState(false);
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
-  const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<MaterializedEditedPreviewValue> | null>(null);
+  const previewRequestScopeAdapterRef = useRef<PreviewRequestScopeAdapter | null>(null);
+  const previewRequestScopeAdapter =
+    previewRequestScopeAdapterRef.current ??
+    new PreviewRequestScopeAdapter({
+      getDisplayGeneration: () => previewCoordinator.snapshot().displayGeneration,
+    });
+  previewRequestScopeAdapterRef.current = previewRequestScopeAdapter;
+  const previewUrlReleaseAuthorityRef = useRef<PreviewUrlReleaseAuthority | null>(null);
+  const previewUrlReleaseAuthority =
+    previewUrlReleaseAuthorityRef.current ??
+    new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) });
+  previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
+  const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
+  const previewInvalidationRunnerRef = useRef<PreviewInvalidationEffectRunner | null>(null);
+  const previewAnalyticsRunnerRef = useRef<PreviewAnalyticsEffectRunner | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
+  const schedulingEffectExecutorRef = useRef<((effect: PreviewCoordinatorEffect) => void) | null>(null);
 
   const dispatchPreviewCoordinator = useCallback(
     (event: PreviewCoordinatorEvent) => {
       const previous = previewCoordinator.snapshot();
       const transition = previewCoordinator.dispatch(event);
+      previewAnalyticsRunnerRef.current?.consume(transition.effects);
       editedPreviewRunnerRef.current?.consume(transition.effects);
+      previewInvalidationRunnerRef.current?.consume(transition.effects);
       originalPreviewRunnerRef.current?.consume(transition.effects);
       for (const effect of transition.effects) {
+        schedulingEffectExecutorRef.current?.(effect);
+        if (effect.type === 'clear-original') {
+          setEditor({ transformedOriginalUrl: null });
+          continue;
+        }
         if (effect.type !== 'publish') continue;
         if (effect.identity.kind === 'settled') {
-          setEditor({ finalPreviewUrl: effect.artifact.url });
+          setEditor({ finalPreviewUrl: effect.artifact.url, presentedPreviewArtifact: effect.artifact });
+        } else if (effect.identity.kind === 'interactive') {
+          setEditor({ presentedPreviewArtifact: effect.artifact });
         } else if (effect.identity.kind === 'original') {
           setEditor({ transformedOriginalUrl: effect.artifact.url });
         }
       }
-      for (const effect of transition.effects) {
-        if (effect.type !== 'release-url' || !effect.url.startsWith('blob:')) continue;
-        const channel =
-          previous.originalArtifact?.url === effect.url && previous.visibleArtifact?.url !== effect.url
-            ? 'original'
-            : 'base';
-        const successor =
-          channel === 'original' ? transition.state.originalArtifact?.url : transition.state.visibleArtifact?.url;
-        const surfaceCancelled =
-          effect.reason === 'editor-unmounted' ||
-          effect.reason === 'compare-disabled' ||
-          (channel === 'original' && effect.reason === 'image-session-replaced');
-        const neverPresented =
-          effect.reason === 'artifact-not-presented' || effect.reason === 'stale-original-artifact';
-        if (surfaceCancelled || neverPresented) URL.revokeObjectURL(effect.url);
-        else presentedPreviewReleaseCoordinator.defer(effect.url, channel, successor ?? null);
-      }
+      previewUrlReleaseAuthority.consume(previous, transition);
       return transition;
     },
+    [previewCoordinator, previewUrlReleaseAuthority, setEditor],
+  );
+  const previewAnalyticsRunner = useMemo(
+    () =>
+      new PreviewAnalyticsEffectRunner({
+        dispatch: dispatchPreviewCoordinator,
+        getPresentationState: () => {
+          const editor = useEditorStore.getState();
+          return {
+            exportSoftProofTransform: editor.exportSoftProofTransform,
+            isExportSoftProofEnabled: editor.isExportSoftProofEnabled,
+            selectedImagePath: editor.selectedImage?.path ?? null,
+          };
+        },
+        publish: setEditor,
+      }),
+    [dispatchPreviewCoordinator, setEditor],
+  );
+  previewAnalyticsRunnerRef.current = previewAnalyticsRunner;
+  const previewInvalidationRunner = useMemo(
+    () =>
+      new PreviewInvalidationEffectRunner({
+        dispatch: dispatchPreviewCoordinator,
+        getState: () => previewCoordinator.snapshot(),
+      }),
+    [dispatchPreviewCoordinator, previewCoordinator],
+  );
+  previewInvalidationRunnerRef.current = previewInvalidationRunner;
+  const previewPresentationAdapter = useMemo(
+    () =>
+      new PreviewPresentationAdapter({
+        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getPresentationState: () => {
+          const editor = useEditorStore.getState();
+          return {
+            imageSessionId: editor.imageSession?.id ?? null,
+            previewScopeStatus: editor.previewScopeStatus,
+          };
+        },
+        publish: setEditor,
+        recordTiming: (sample) => previewQualityControllerRef.current.record(sample),
+      }),
+    [previewCoordinator, setEditor],
+  );
+  const previewMaterializationAdapter = useMemo(
+    () =>
+      new PreviewMaterializationAdapter({
+        releaseUrl: (url) => previewUrlReleaseAuthority.release(url),
+      }),
+    [previewUrlReleaseAuthority],
+  );
+  const previewFailureAdapter = useMemo(
+    () =>
+      new PreviewFailureAdapter({
+        getCoordinatorState: () => previewCoordinator.snapshot(),
+        publish: setEditor,
+      }),
     [previewCoordinator, setEditor],
   );
 
@@ -169,285 +210,60 @@ export function useImageProcessing() {
     });
   originalPreviewRunnerRef.current = originalPreviewRunner;
 
-  const materializeEditedPreview = useCallback(
-    async (
-      result: ExecutedEditedPreview,
-      context: EditedPreviewExecutionContext,
-    ): Promise<MaterializedEditedPreview<MaterializedEditedPreviewValue>> => {
-      const { buffer, transform } = result;
-      if (buffer.byteLength === 0) return { value: { kind: 'empty' } };
-      const prefix = new TextDecoder().decode(buffer.slice(0, 11));
-      if (prefix === 'WGPU_RENDER') return { value: { kind: 'wgpu' } };
-
-      const positioned = context.request.kind === 'interactive' || context.request.roi !== null;
-      const patch = positioned ? parseInteractivePreviewPatchPayload(buffer) : null;
-      if (patch !== null && !patch.ok) return { value: { kind: 'limited', reason: patch.reason } };
-
-      const blob = new Blob([patch?.ok ? patch.imageBuffer : buffer], { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
-      const decodeStartedAt = previewNow();
-      try {
-        await decodeInteractivePreviewUrl(url);
-      } catch (error) {
-        URL.revokeObjectURL(url);
-        throw error;
-      }
-      const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
-      return patch?.ok
-        ? { decodeMs, value: { kind: 'patch', patch, url } }
-        : { artifactUrl: url, decodeMs, value: { kind: 'full', transform, url } };
-    },
-    [],
-  );
-
-  const onEditedPreviewPresented = useCallback(
-    (
-      result: MaterializedEditedPreview<MaterializedEditedPreviewValue>,
-      context: EditedPreviewExecutionContext,
-    ): void => {
-      const { interactiveIdentity, quality, scopeRecovery, targetResolution } = context.request;
-      const requestId = context.identity.operationId;
-      const commitStartedAt = previewNow();
-      const recordTiming = (): void => {
-        previewQualityControllerRef.current.record({
-          commitMs: Math.max(0, previewNow() - commitStartedAt),
-          decodeMs: result.decodeMs ?? 0,
-          displayedAgeMs: Math.max(0, previewNow() - context.request.createdAt),
-          inputToDispatchMs: context.inputToDispatchMs,
-          renderMs: context.renderMs,
-          tier: quality.tier,
-        });
-      };
-      const readyStatus: PreviewQualityStatus = {
-        ...quality,
-        generation: interactiveIdentity.generation,
-        phase: getPreviewReadyPhase(quality),
-        requestId,
-      };
-      const value = result.value;
-      if (value.kind === 'empty' || value.kind === 'limited') {
-        setEditor({
-          previewQualityStatus: {
-            ...quality,
-            generation: interactiveIdentity.generation,
-            limitedBy: 'backend',
-            phase: 'degraded_limited',
-            reason: value.kind === 'empty' ? 'empty_render_buffer' : value.reason,
-            requestId,
-            sufficientForSemanticZoom: false,
-          },
-        });
-        recordTiming();
-        return;
-      }
-      if (value.kind === 'wgpu') {
-        setEditor({
-          interactivePatch: null,
-          previewQualityStatus: readyStatus,
-          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-        });
-        recordTiming();
-        return;
-      }
-      if (value.kind === 'patch') {
-        setEditor({
-          interactivePatch: {
-            basePreviewUrl: interactiveIdentity.basePreviewUrl,
-            fullHeight: value.patch.fullHeight,
-            fullWidth: value.patch.fullWidth,
-            geometryIdentity: interactiveIdentity.geometryIdentity,
-            normH: value.patch.normH,
-            normW: value.patch.normW,
-            normX: value.patch.normX,
-            normY: value.patch.normY,
-            pixelHeight: value.patch.pixelHeight,
-            pixelWidth: value.patch.pixelWidth,
-            sourceImagePath: interactiveIdentity.sourceImagePath,
-            url: value.url,
-          },
-          previewQualityStatus: readyStatus,
-          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-        });
-        recordTiming();
-        return;
-      }
-
-      const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
-      const transform = value.transform;
-      setEditor({
-        exportSoftProofTransform: transform,
-        interactivePatch: null,
-        navigatorPreviewArtifact: {
-          graphIdentity: interactiveIdentity.graphIdentity,
-          id: `${interactiveIdentity.graphIdentity}:${String(interactiveIdentity.generation)}:${String(requestId)}`,
-          imageSessionId: useEditorStore.getState().imageSession?.id ?? String(interactiveIdentity.imageSessionId),
-          url: value.url,
-        },
-        previewScopeStatus:
-          transform &&
-          completedScopeStatus?.path === interactiveIdentity.sourceImagePath &&
-          completedScopeStatus.histogramReady &&
-          completedScopeStatus.waveformReady
-            ? {
-                ...completedScopeStatus,
-                displayTransformLabel: transform.colorManagedTransform ?? 'Display preview transform',
-                exportProfileLabel: transform.effectiveColorProfile,
-                exportRenderingIntentLabel: transform.effectiveRenderingIntent,
-                renderBasis: 'export_preview',
-                softProofTransformApplied: transform.transformApplied === true,
-                sourceLabel: 'Export preview',
-                warningCodes: [
-                  transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
-                  'render_target_matches_export_recipe',
-                ],
-              }
-            : completedScopeStatus,
-        previewQualityStatus: readyStatus,
-        renderedPreviewResolution: targetResolution,
-      });
-      if (scopeRecovery) setEditor({ previewScopeRecoveryError: null });
-      recordTiming();
-    },
-    [setEditor],
-  );
-
   const editedPreviewRunner =
     editedPreviewRunnerRef.current ??
-    new EditedPreviewEffectRunner<MaterializedEditedPreviewValue>({
+    new EditedPreviewEffectRunner<PreviewPresentationValue>({
       dispatch: dispatchPreviewCoordinator,
       getPatchResidency: () => useEditorStore.getState().patchResidency.snapshot(),
       markPatchesResident: (sessionId, patchIds) => {
         useEditorStore.getState().patchResidency.markResident(sessionId, patchIds);
       },
-      materialize: materializeEditedPreview,
+      materialize: (result, context) =>
+        previewMaterializationAdapter.materialize(result, {
+          kind: context.request.kind,
+          roi: context.request.roi,
+        }),
       onCurrentFailure: (error, context) => {
-        const expectedSupersession = String(error).includes('preview_superseded');
-        if (!expectedSupersession) console.error('Failed to apply adjustments:', error);
-        if (expectedSupersession) return;
-        const { interactiveIdentity, quality, scopeRecovery } = context.request;
-        setEditor({
-          previewQualityStatus: {
-            ...quality,
-            generation: interactiveIdentity.generation,
-            limitedBy: 'error',
-            phase: 'degraded_limited',
-            reason: 'render_error',
-            requestId: context.identity.operationId,
-            sufficientForSemanticZoom: false,
-          },
-          ...(scopeRecovery
-            ? {
-                previewScopeRecoveryError: error instanceof Error ? error.message : String(error),
-                previewScopeRecoveryState: 'error' as const,
-              }
-            : {}),
+        previewFailureAdapter.fail(error, {
+          identity: context.identity,
+          interactiveIdentity: context.request.interactiveIdentity,
+          quality: context.request.quality,
+          scopeRecovery: context.request.scopeRecovery,
         });
       },
-      onPresented: onEditedPreviewPresented,
+      onPresented: (result, context) => {
+        previewPresentationAdapter.present(result, {
+          createdAt: context.request.createdAt,
+          identity: context.identity,
+          inputToDispatchMs: context.inputToDispatchMs,
+          interactiveIdentity: context.request.interactiveIdentity,
+          quality: context.request.quality,
+          renderMs: context.renderMs,
+          scopeRecovery: context.request.scopeRecovery,
+          targetResolution: context.request.targetResolution,
+        });
+      },
       releaseMaterialized: (result) => {
-        if (result.value.kind === 'patch' || result.value.kind === 'full') URL.revokeObjectURL(result.value.url);
+        if (result.value.kind === 'patch' || result.value.kind === 'full') {
+          previewUrlReleaseAuthority.release(result.value.url);
+        }
       },
     });
   editedPreviewRunnerRef.current = editedPreviewRunner;
-
-  const previewSessionIdentity = useCallback(
-    (scope: InteractivePreviewScope, targetRes: number, roi: PreviewRoi | null): PreviewSessionIdentity => {
-      const positive = (value: number): number => Math.max(1, Math.round(value));
-      return {
-        adjustmentRevision: positive(scope.adjustmentRevision),
-        backend: scope.backend,
-        displayGeneration: positive(previewCoordinator.snapshot().displayGeneration),
-        geometryRevision: positive(Number(scope.geometryIdentity)),
-        graphRevision: scope.graphIdentity,
-        imageSessionId: positive(scope.imageSessionId),
-        maskRevision: positive(scope.maskRevision),
-        patchRevision: positive(scope.patchRevision),
-        proofRevision: positive(scope.proofRevision),
-        roiFingerprint: fingerprintPreviewRoi(roi),
-        sourceImagePath: scope.sourceImagePath,
-        sourceRevision: positive(scope.imageSessionId),
-        targetHeight: positive(targetRes),
-        targetWidth: positive(targetRes),
-        viewportRevision: positive(scope.viewportIdentity),
-      };
-    },
-    [previewCoordinator],
-  );
 
   const calculateROI = useCallback((): PreviewRoi | null => {
     const roi = resolvePreviewViewportRoi(baseRenderSize, previewViewportTransform);
     return roi === null ? null : [...roi];
   }, [baseRenderSize, previewViewportTransform]);
 
-  interactiveScopeRef.current = (targetRes, roi) => {
-    const editor = useEditorStore.getState();
-    const settings = useSettingsStore.getState().appSettings;
-    const selectedImage = editor.selectedImage;
-    if (!selectedImage) return null;
-    const sourceImagePath = selectedImage.path;
-    const scopeAdjustmentSnapshot = resolveAutoEditRenderSnapshot(
-      editor.adjustmentSnapshot,
-      editor.autoEditPreviewSession,
-      { imageSessionId: editor.imageSession?.id ?? null, path: sourceImagePath },
-    );
-    const autoEditPreviewActive = scopeAdjustmentSnapshot !== editor.adjustmentSnapshot;
-
-    const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-    const normalizedTargetRes = Math.max(1, Math.round(targetRes));
-    const viewportInputs = [
-      editor.viewportRevision,
-      settings?.editorPreviewResolution ?? 1920,
-      settings?.enableZoomHifi ?? true,
-      settings?.highResZoomMultiplier ?? 1,
-      settings?.useFullDpiRendering ?? false,
-    ] as const;
-    if (
-      viewportInputs.length !== viewportScopeRevisionRef.current.inputs.length ||
-      viewportInputs.some((value, index) => value !== viewportScopeRevisionRef.current.inputs[index])
-    ) {
-      viewportScopeRevisionRef.current = {
-        inputs: viewportInputs,
-        revision: viewportScopeRevisionRef.current.revision + 1,
-      };
-    }
-    const quantizedRoi = quantizePreviewRoi(roi, normalizedTargetRes);
-    return {
-      roi,
-      scope: {
-        backend: settings?.useWgpuRenderer !== false && editor.hasRenderedFirstFrame ? 'wgpu' : 'cpu',
-        basePreviewUrl: resolveEditorPreviewSource({
-          finalPreviewUrl: editor.finalPreviewUrl,
-          isReady: selectedImage.isReady,
-          thumbnailUrl: selectedImage.thumbnailUrl,
-        }),
-        devicePixelRatio: dpr,
-        adjustmentRevision: scopeAdjustmentSnapshot.adjustmentRevision,
-        geometryIdentity: scopeAdjustmentSnapshot.geometryRevision,
-        graphIdentity: fingerprintPreviewGraphRevision({
-          adjustmentRevision: scopeAdjustmentSnapshot.adjustmentRevision,
-          geometryRevision: scopeAdjustmentSnapshot.geometryRevision,
-          imageSessionId: editor.imageSessionId,
-          maskRevision: scopeAdjustmentSnapshot.maskRevision,
-          patchRevision: scopeAdjustmentSnapshot.patchRevision,
-          proofRevision: editor.proofRevision,
-          proposalFingerprint: autoEditPreviewActive
-            ? (editor.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
-            : (editor.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
-        }),
-        imageSessionId: editor.imageSessionId,
-        maskRevision: scopeAdjustmentSnapshot.maskRevision,
-        patchRevision: scopeAdjustmentSnapshot.patchRevision,
-        proofRevision: editor.proofRevision,
-        roiX: quantizedRoi?.[0] ?? null,
-        roiY: quantizedRoi?.[1] ?? null,
-        roiW: quantizedRoi?.[2] ?? null,
-        roiH: quantizedRoi?.[3] ?? null,
-        sourceImagePath,
-        targetResolution: normalizedTargetRes,
-        viewportIdentity: viewportScopeRevisionRef.current.revision,
-      },
-    };
-  };
+  const capturePreviewRequestScope = useCallback(
+    (targetResolution: number, roi: PreviewRoi | null) => {
+      const editor = useEditorStore.getState();
+      const settings = useSettingsStore.getState().appSettings;
+      return previewRequestScopeAdapter.capture({ ...editor, settings }, targetResolution, roi, devicePixelRatio);
+    },
+    [devicePixelRatio, previewRequestScopeAdapter],
+  );
 
   const resolveQualityDecision = useCallback(
     (requestedTargetResolution: number, interacting: boolean) => {
@@ -474,7 +290,7 @@ export function useImageProcessing() {
       if (interacting) previewQualityControllerRef.current.noteInput(previewNow());
       return previewQualityControllerRef.current.decide({
         backend,
-        devicePixelRatio: typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+        devicePixelRatio,
         interacting,
         operationClass,
         requestedTargetResolution,
@@ -484,154 +300,65 @@ export function useImageProcessing() {
         visibleRoi: calculateROI(),
       });
     },
-    [activeRightPanel, calculateROI],
+    [activeRightPanel, calculateROI, devicePixelRatio],
   );
-
-  useEffect(
-    () => () => {
-      dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
-      editedPreviewRunner.cancel();
-      originalPreviewRunner.dispose();
-      presentedPreviewReleaseCoordinator.cancel((url) => {
-        if (!globalImageCache.isProtected(url)) URL.revokeObjectURL(url);
-      });
-    },
-    [dispatchPreviewCoordinator, editedPreviewRunner, originalPreviewRunner],
+  const previewRequestIntentAdapter = useMemo(
+    () =>
+      new PreviewRequestIntentAdapter({
+        captureScope: capturePreviewRequestScope,
+        decideQuality: resolveQualityDecision,
+        dispatch: dispatchPreviewCoordinator,
+        installSession: (scope) => {
+          previewInvalidationRunner.installSession(
+            scope.session,
+            useEditorStore.getState().previewScopeRecoveryRequestId,
+          );
+        },
+        publish: setEditor,
+        schedule: (request, delayMs) => editedPreviewRunner.request(request, delayMs),
+      }),
+    [
+      capturePreviewRequestScope,
+      dispatchPreviewCoordinator,
+      editedPreviewRunner,
+      previewInvalidationRunner,
+      resolveQualityDecision,
+      setEditor,
+    ],
   );
 
   useEffect(() => {
-    if (!selectedImage?.isReady) {
-      dispatchPreviewCoordinator({ reason: 'image-not-ready', type: 'cancel-session' });
-      return;
-    }
-    const scopeSnapshot = interactiveScopeRef.current(appSettings?.editorPreviewResolution ?? 1920, null);
-    if (scopeSnapshot === null) return;
-    dispatchPreviewCoordinator({
-      session: previewSessionIdentity(scopeSnapshot.scope, scopeSnapshot.scope.targetResolution, scopeSnapshot.roi),
-      type: 'image-session-installed',
-    });
-  }, [
-    appSettings?.editorPreviewResolution,
-    dispatchPreviewCoordinator,
-    previewSessionIdentity,
-    selectedImage?.path,
-    selectedImage?.isReady,
-    imageSessionId,
-  ]);
+    let mounted = true;
+    void previewAnalyticsRunner
+      .start()
+      .catch((error: unknown) => {
+        console.error('Failed to subscribe to preview analytics:', error);
+      })
+      .finally(() => {
+        if (mounted) {
+          previewInvalidationRunner.start();
+          setAnalyticsListenerReady(true);
+        }
+      });
+    return () => {
+      mounted = false;
+      previewInvalidationRunner.stop('editor-unmounted');
+      previewAnalyticsRunner.stop();
+      editedPreviewRunner.cancel();
+      originalPreviewRunner.dispose();
+    };
+  }, [editedPreviewRunner, originalPreviewRunner, previewAnalyticsRunner, previewInvalidationRunner]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const updateDevicePixelRatio = () => setDevicePixelRatio(getEditorZoomDpr(window.devicePixelRatio));
+    window.addEventListener('resize', updateDevicePixelRatio);
+    return () => window.removeEventListener('resize', updateDevicePixelRatio);
+  }, []);
 
   useEffect(() => {
     previewQualityControllerRef.current.reset();
   }, [selectedImage?.path]);
-
-  const applyAdjustments = useCallback(
-    (
-      _currentAdjustments: Adjustments,
-      dragging: boolean = false,
-      targetRes?: number,
-      scopeRecovery = false,
-      delayMs = 0,
-    ) => {
-      if (!selectedImage?.isReady) return;
-
-      const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
-      const quality = resolveQualityDecision(requestedTargetRes, dragging);
-      const qualitySnapshot: PreviewQualitySnapshot = {
-        effectiveTargetResolution: quality.effectiveTargetResolution,
-        interacting: dragging,
-        reason: quality.reason,
-        requestedTargetResolution: quality.requestedTargetResolution,
-        roiFingerprint: fingerprintPreviewRoi(quality.effectiveRoi),
-        sufficientForSemanticZoom: quality.sufficientForSemanticZoom,
-        tier: quality.tier,
-      };
-      dispatchPreviewCoordinator({ quality: qualitySnapshot, type: 'quality-decision-changed' });
-      const normalizedTargetRes = quality.effectiveTargetResolution;
-      const scopeSnapshot = interactiveScopeRef.current(normalizedTargetRes, quality.effectiveRoi);
-      if (scopeSnapshot === null) return;
-      const session = previewSessionIdentity(scopeSnapshot.scope, normalizedTargetRes, scopeSnapshot.roi);
-      dispatchPreviewCoordinator({ session, type: 'image-session-installed' });
-      const identity = editedPreviewRunner.request(
-        {
-          activeWaveformChannel,
-          computeWaveform: isWaveformVisible || scopeRecovery,
-          createdAt: previewNow(),
-          kind: dragging ? 'interactive' : 'settled',
-          proof:
-            !dragging && selectedProofRecipe
-              ? {
-                  blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
-                  colorProfile: selectedProofRecipe.colorProfile ?? ExportColorProfile.Srgb,
-                  exportSoftProofRecipeId: selectedProofRecipe.id,
-                  renderingIntent: selectedProofRecipe.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
-                }
-              : null,
-          quality,
-          roi: scopeSnapshot.roi,
-          scopeRecovery,
-          session,
-          snapshot: renderAdjustmentSnapshot,
-          targetResolution: normalizedTargetRes,
-          viewerScope: scopeSnapshot.scope,
-        },
-        delayMs,
-      );
-      setEditor({
-        ...(!dragging ? { requestedPreviewResolution: quality.requestedTargetResolution } : {}),
-        previewQualityStatus: {
-          ...quality,
-          generation: identity.generation,
-          phase: dragging ? 'rendering_interaction' : 'refining_current_view',
-          requestId: identity.operationId,
-        },
-      });
-    },
-    [
-      activeWaveformChannel,
-      appSettings?.editorPreviewResolution,
-      dispatchPreviewCoordinator,
-      editedPreviewRunner,
-      isWaveformVisible,
-      resolveQualityDecision,
-      renderAdjustmentSnapshot,
-      selectedProofRecipe,
-      previewSessionIdentity,
-      selectedImage?.isReady,
-      setEditor,
-    ],
-  );
-  const applyAdjustmentsRef = useRef(applyAdjustments);
-  applyAdjustmentsRef.current = applyAdjustments;
-
-  const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
-  const handledScopeRecoveryRequestIdRef = useRef(previewScopeRecoveryRequestId);
-  useEffect(() => {
-    if (previewScopeRecoveryRequestId === handledScopeRecoveryRequestIdRef.current) return;
-    handledScopeRecoveryRequestIdRef.current = previewScopeRecoveryRequestId;
-    applyAdjustments(adjustments, false, undefined, true);
-  }, [adjustments, applyAdjustments, previewScopeRecoveryRequestId]);
-
-  useEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | undefined;
-    void listen<unknown>(DISPLAY_TARGET_CHANGED_EVENT, (event) => {
-      if (!active) return;
-      const parsed = displayTargetChangePayloadSchema.safeParse(event.payload);
-      if (!parsed.success) return;
-      const transition = dispatchPreviewCoordinator({
-        generation: parsed.data.displayResourceGeneration,
-        type: 'display-generation-changed',
-      });
-      if (transition.state.lastTransition?.reason !== 'display-generation-changed') return;
-      applyAdjustments(useEditorStore.getState().adjustments, false);
-    }).then((stop) => {
-      if (active) unlisten = stop;
-      else stop();
-    });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
-  }, [applyAdjustments, dispatchPreviewCoordinator]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
@@ -661,7 +388,7 @@ export function useImageProcessing() {
       originalSize,
     });
     const resolvedZoom = resolveEditorZoom({
-      devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
+      devicePixelRatio,
       mode: useEditorStore.getState().zoomMode,
       renderSize: {
         height: baseRenderSize.height,
@@ -695,30 +422,20 @@ export function useImageProcessing() {
     adjustments.crop,
     adjustments.orientationSteps,
     baseRenderSize,
+    devicePixelRatio,
     originalSize,
   ]);
   const calculatedTargetResolution = calculateTargetRes();
   const calculatedRoiFingerprint = fingerprintPreviewRoi(calculateROI());
 
-  const requestOriginalPreview = useCallback(
-    (targetRes: number, delayMs: number): void => {
-      const scopeSnapshot = interactiveScopeRef.current(targetRes, null);
-      if (scopeSnapshot === null) return;
-      const session = previewSessionIdentity(scopeSnapshot.scope, targetRes, null);
-      if (!originalPreviewRunner.needsRequest(session, targetRes)) return;
-      originalPreviewRunner.request(
-        session,
-        {
-          expectedImagePath: session.sourceImagePath,
-          jsAdjustments: structuredClone(adjustments),
-          targetResolution: targetRes,
-          viewerSampleGraphRevision: session.graphRevision,
-        },
-        delayMs,
-      );
-    },
-    [adjustments, originalPreviewRunner, previewSessionIdentity],
-  );
+  schedulingEffectExecutorRef.current = (effect) => {
+    if (effect.type === 'schedule-edited') {
+      previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
+    } else if (effect.type === 'schedule-original') {
+      dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
+      originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
+    }
+  };
 
   useEffect(() => {
     if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {
@@ -726,53 +443,89 @@ export function useImageProcessing() {
     }
   }, [adjustments, activeRightPanel, selectedImage?.isReady, generateUncroppedPreview]);
 
+  const captureSchedulingSnapshot = useCallback(
+    (scopeRecovery = false, requestedTargetResolution = calculatedTargetResolution) => {
+      const ready = selectedImage?.isReady === true;
+      const edited = ready
+        ? previewRequestIntentAdapter.prepare({
+            activeWaveformChannel,
+            delayMs: 0,
+            dragging: isSliderDragging,
+            isWaveformVisible,
+            proofRecipe: selectedProofRecipe ?? null,
+            requestedTargetResolution,
+            scopeRecovery,
+          })
+        : null;
+      const originalScope =
+        ready && isCompareActive ? capturePreviewRequestScope(requestedTargetResolution, null) : null;
+      const original =
+        originalScope === null
+          ? null
+          : {
+              request: {
+                expectedImagePath: originalScope.session.sourceImagePath,
+                jsAdjustments: structuredClone(originalScope.renderSnapshot.value as Adjustments),
+                targetResolution: originalScope.session.targetWidth,
+                viewerSampleGraphRevision: originalScope.session.graphRevision,
+              },
+              session: originalScope.session,
+              viewport: originalScope.viewport.coordinator,
+            };
+      return {
+        compareActive: isCompareActive,
+        devicePixelRatio,
+        displayHeight: displaySize.height,
+        displayWidth: displaySize.width,
+        edited,
+        enableLivePreviews: appSettings?.enableLivePreviews !== false,
+        original,
+        ready,
+      };
+    },
+    [
+      activeWaveformChannel,
+      adjustments,
+      adjustmentSnapshot.adjustmentRevision,
+      adjustmentSnapshot.geometryRevision,
+      appSettings?.enableLivePreviews,
+      calculatedRoiFingerprint,
+      calculatedTargetResolution,
+      capturePreviewRequestScope,
+      devicePixelRatio,
+      displaySize.height,
+      displaySize.width,
+      imageSessionId,
+      isCompareActive,
+      isSliderDragging,
+      isWaveformVisible,
+      previewRequestIntentAdapter,
+      selectedImage?.isReady,
+      selectedImage?.path,
+      selectedProofRecipe,
+    ],
+  );
+
   useEffect(() => {
-    if (!selectedImage?.isReady) return;
-    if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false)
-        applyAdjustmentsRef.current(adjustments, true, calculatedTargetResolution);
-      return;
-    }
-    applyAdjustmentsRef.current(adjustments, false, calculatedTargetResolution, false, 50);
+    if (!analyticsListenerReady) return;
+    dispatchPreviewCoordinator({
+      inputs: captureSchedulingSnapshot(),
+      type: 'scheduling-inputs-changed',
+    });
+  }, [analyticsListenerReady, captureSchedulingSnapshot, dispatchPreviewCoordinator]);
+
+  useEffect(() => {
+    previewInvalidationRunner.updateSource({
+      capture: captureSchedulingSnapshot,
+      scopeRecoveryRequestId: previewScopeRecoveryRequestId,
+      targetResolution: appSettings?.editorPreviewResolution ?? 1920,
+    });
   }, [
-    adjustments,
-    selectedImage?.path,
-    selectedImage?.isReady,
-    isSliderDragging,
-    calculatedTargetResolution,
-    calculatedRoiFingerprint,
-    appSettings?.enableLivePreviews,
+    appSettings?.editorPreviewResolution,
+    captureSchedulingSnapshot,
+    previewInvalidationRunner,
+    previewScopeRecoveryRequestId,
   ]);
 
-  useEffect(() => {
-    originalPreviewRunner.cancel('original-identity-changed');
-    setEditor({ transformedOriginalUrl: null });
-  }, [adjustmentSnapshot.geometryRevision, originalPreviewRunner, selectedImage?.path, setEditor]);
-
-  useEffect(() => {
-    if (isCompareActive) return;
-    originalPreviewRunner.cancel('compare-disabled');
-    setEditor({ transformedOriginalUrl: null });
-  }, [isCompareActive, originalPreviewRunner, setEditor]);
-
-  useEffect(() => {
-    if (isCompareActive && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      const targetRes = calculateTargetRes();
-      requestOriginalPreview(targetRes, transformedOriginalUrl ? 200 : 0);
-    }
-  }, [
-    isCompareActive,
-    displaySize.width,
-    displaySize.height,
-    calculateTargetRes,
-    selectedImage?.isReady,
-    isSliderDragging,
-    requestOriginalPreview,
-    transformedOriginalUrl,
-    originalSize,
-  ]);
-
-  return {
-    applyAdjustments,
-  };
+  return undefined;
 }

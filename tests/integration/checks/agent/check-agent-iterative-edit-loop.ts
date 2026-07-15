@@ -21,7 +21,7 @@ const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3162.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 2));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-loop-before',

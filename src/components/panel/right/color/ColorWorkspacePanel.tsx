@@ -1,7 +1,9 @@
-import { Palette, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, Palette, RotateCcw } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+
+import { getEditDocumentNodeTypesForEditorSection } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
@@ -26,20 +28,24 @@ const PANEL_ACTION_ICON_SIZE = 15;
 export default function ColorWorkspacePanel() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
-  const { setAdjustments } = useEditorActions();
+  const { setAdjustments, setEditorSectionEnabled } = useEditorActions();
   const appSettings = useSettingsStore((state) => state.appSettings);
   const colorLabel = t('editor.adjustments.sections.color', { defaultValue: 'Color' });
   const resetColorLabel = t('editor.adjustments.actions.resetSectionSettings', {
     defaultValue: 'Reset Color settings',
     section: colorLabel,
   });
-  const { adjustments, isWbPickerActive, selectedImage, setEditor } = useEditorStore(
+  const { adjustments, editDocumentV2, isWbPickerActive, selectedImage, setEditor } = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustments,
+      editDocumentV2: state.editDocumentV2,
       isWbPickerActive: state.isWbPickerActive,
       selectedImage: state.selectedImage,
       setEditor: state.setEditor,
     })),
+  );
+  const isColorEnabled = getEditDocumentNodeTypesForEditorSection('color').every(
+    (nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false,
   );
   const panelStatus: InspectorPanelStatus | undefined = hasAdjustmentValueChanges(
     ADJUSTMENT_SECTIONS.color,
@@ -80,10 +86,6 @@ export default function ColorWorkspacePanel() {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...resetValues,
-      sectionVisibility: {
-        ...prev.sectionVisibility,
-        color: true,
-      },
     }));
   }, [setAdjustments]);
 
@@ -91,6 +93,23 @@ export default function ColorWorkspacePanel() {
     <InspectorPanelFrame
       actions={
         <>
+          <button
+            aria-label={
+              isColorEnabled ? t('ui.collapsibleSection.disableSection') : t('ui.collapsibleSection.enableSection')
+            }
+            aria-pressed={!isColorEnabled}
+            className={density.frame.actionButton}
+            data-testid="color-workspace-enable-toggle"
+            data-tooltip={
+              isColorEnabled ? t('ui.collapsibleSection.disableSection') : t('ui.collapsibleSection.enableSection')
+            }
+            onClick={() => {
+              setEditorSectionEnabled('color', !isColorEnabled);
+            }}
+            type="button"
+          >
+            {isColorEnabled ? <Eye size={PANEL_ACTION_ICON_SIZE} /> : <EyeOff size={PANEL_ACTION_ICON_SIZE} />}
+          </button>
           <button
             aria-label={resetColorLabel}
             className={density.frame.actionButton}

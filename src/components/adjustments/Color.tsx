@@ -18,6 +18,10 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
+import {
+  buildColorBalanceRgbEditTransaction,
+  type ColorBalanceRgbCommitIdentity,
+} from '../../utils/colorBalanceRgbEditTransaction';
 import { COLOR_OUTPUT_FOCUS_EVENT, COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../utils/colorWorkspaceNavigation';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
@@ -27,6 +31,11 @@ import {
 import { buildLayerEditTransactionRequest } from '../../utils/layers/layerEditTransaction';
 import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerStackSidecarAdjustments';
 import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
+import {
+  buildSelectiveColorEditTransaction,
+  type SelectiveColorCommitIdentity,
+  type SelectiveColorMixerSettings,
+} from '../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
@@ -124,7 +133,9 @@ export default function ColorPanel({
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -139,7 +150,7 @@ export default function ColorPanel({
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
   const blackWhiteMixerCommitIdentity = useMemo<BlackWhiteMixerCommitIdentity | null>(
     () =>
-      !isForMask && selectedImagePath !== null && imageSessionId !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
@@ -170,7 +181,7 @@ export default function ColorPanel({
   );
   const channelMixerCommitIdentity = useMemo<ChannelMixerCommitIdentity | null>(
     () =>
-      !isForMask && selectedImagePath !== null && imageSessionId !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
@@ -193,6 +204,82 @@ export default function ColorPanel({
       );
       channelMixerRef.current = next;
       channelMixerCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
+  const colorBalanceRgbCommitIdentity = useMemo<ColorBalanceRgbCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const colorBalanceRgbCommitIdentityRef = useRef(colorBalanceRgbCommitIdentity);
+  colorBalanceRgbCommitIdentityRef.current = colorBalanceRgbCommitIdentity;
+  const colorBalanceRgbRef = useRef(adjustments.colorBalanceRgb);
+  colorBalanceRgbRef.current = adjustments.colorBalanceRgb;
+  const commitColorBalanceRgb = useCallback(
+    (update: (current: Adjustments['colorBalanceRgb']) => Adjustments['colorBalanceRgb']) => {
+      const next = update(colorBalanceRgbRef.current);
+      const identity = colorBalanceRgbCommitIdentityRef.current;
+      if (isForMask) {
+        colorBalanceRgbRef.current = next;
+        setAdjustments((previous) => ({ ...previous, colorBalanceRgb: next }));
+        return;
+      }
+      if (identity === null) return;
+
+      const result = applyEditTransaction(
+        buildColorBalanceRgbEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+      );
+      colorBalanceRgbRef.current = next;
+      colorBalanceRgbCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
+  const selectiveColorCommitIdentity = useMemo<SelectiveColorCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const selectiveColorCommitIdentityRef = useRef(selectiveColorCommitIdentity);
+  selectiveColorCommitIdentityRef.current = selectiveColorCommitIdentity;
+  const selectiveColorMixerRef = useRef<SelectiveColorMixerSettings>({
+    hsl: adjustments.hsl,
+    selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
+  });
+  selectiveColorMixerRef.current = {
+    hsl: adjustments.hsl,
+    selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
+  };
+  const commitSelectiveColorMixer = useCallback(
+    (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => {
+      const next = update(selectiveColorMixerRef.current);
+      const identity = selectiveColorCommitIdentityRef.current;
+      if (isForMask) {
+        selectiveColorMixerRef.current = next;
+        setAdjustments((previous) => ({
+          ...previous,
+          hsl: next.hsl,
+          selectiveColorRangeControls: next.selectiveColorRangeControls,
+        }));
+        return;
+      }
+      if (identity === null) return;
+
+      const result = applyEditTransaction(
+        buildSelectiveColorEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+      );
+      selectiveColorMixerRef.current = next;
+      selectiveColorCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
     },
     [applyEditTransaction, isForMask, setAdjustments],
   );
@@ -360,6 +447,8 @@ export default function ColorPanel({
               isForMask={isForMask}
               commitBlackWhiteMixer={commitBlackWhiteMixer}
               commitChannelMixer={commitChannelMixer}
+              commitColorBalanceRgb={commitColorBalanceRgb}
+              commitSelectiveColorMixer={commitSelectiveColorMixer}
               onCreateLocalAdjustmentFromActiveRange={createLocalAdjustmentFromActiveColorRange}
               onDragStateChange={onDragStateChange}
               setActiveChannelMixerOutput={setActiveChannelMixerOutput}
@@ -429,6 +518,8 @@ export default function ColorPanel({
     channelMixerCommitIdentity,
     commitBlackWhiteMixer,
     commitChannelMixer,
+    commitColorBalanceRgb,
+    commitSelectiveColorMixer,
     currentGamutWarningOverlay,
     isColorCalibrationVisible,
     isForMask,

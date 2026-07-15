@@ -12,7 +12,9 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import type { Adjustments } from '../../adjustments';
 import {
+  applyBasicToneCommandEnvelopeToAdjustments,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
   type BasicToneCommandEnvelope,
@@ -20,7 +22,8 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
-import { captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
+import { buildBasicToneCommandEditTransaction, captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
+import { buildAdjustmentMutationOperations } from '../../editTransaction';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorCoreState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
@@ -28,6 +31,7 @@ export type AgentLiveBasicTonePixel = readonly [number, number, number];
 export interface AgentLiveBasicToneApplyOptions {
   acceptedPlanHash?: string;
   acceptedPlanId?: string;
+  additionalAdjustmentPatch?: Partial<Adjustments>;
   expectedGraphRevision?: string;
   operationId: string;
   requestedAdjustments: LegacyBasicToneAdjustmentPayload;
@@ -314,6 +318,7 @@ export const applyBasicToneCommandToLiveEditor = async (
 export const applyBasicToneToLiveEditor = async ({
   acceptedPlanHash,
   acceptedPlanId,
+  additionalAdjustmentPatch,
   expectedGraphRevision: requestedExpectedGraphRevision,
   operationId,
   requestedAdjustments,
@@ -363,7 +368,23 @@ export const applyBasicToneToLiveEditor = async ({
     throw new Error('Agent basic-tone apply did not change rendered preview pixels.');
   }
 
-  useEditorStore.getState().applyBasicToneCommand(applyCommand, commitIdentity);
+  const currentState = useEditorStore.getState();
+  if (additionalAdjustmentPatch === undefined || Object.keys(additionalAdjustmentPatch).length === 0) {
+    currentState.applyBasicToneCommand(applyCommand, commitIdentity);
+  } else {
+    const baseTransaction = buildBasicToneCommandEditTransaction(currentState, commitIdentity, applyCommand);
+    const commandAdjustments = applyBasicToneCommandEnvelopeToAdjustments(currentState.adjustments, applyCommand);
+    const nextAdjustments = { ...commandAdjustments, ...additionalAdjustmentPatch };
+    const result = currentState.applyEditTransaction({
+      ...baseTransaction,
+      operations: buildAdjustmentMutationOperations(currentState.adjustments, nextAdjustments),
+    });
+    useEditorStore
+      .getState()
+      .setEditor((state) =>
+        state.adjustmentRevision === result.nextAdjustmentRevision ? { lastBasicToneCommand: applyCommand } : {},
+      );
+  }
 
   return {
     afterPreviewHash,

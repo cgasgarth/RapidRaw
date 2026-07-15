@@ -40,7 +40,7 @@ describe('detail edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -136,5 +136,34 @@ describe('detail edit transaction', () => {
     expect(() =>
       buildDetailEditTransaction(state, identity({ adjustmentRevision: 1 }), 'sharpness', 1, 'stale-revision'),
     ).toThrow('detail_transaction.stale_revision');
+  });
+
+  test('commits through the canonical selected-image fallback session', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-detail-before',
+      imageSession: null,
+      imageSessionId: 24,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: DetailCommitIdentity = {
+      adjustmentRevision: state.adjustmentRevision,
+      imageSessionId: 'editor-image-session:24',
+      sourceIdentity: sourcePath,
+    };
+    const result = state.applyEditTransaction(
+      buildDetailEditTransaction(state, fallbackIdentity, 'sharpness', 18, 'fallback-detail'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['sharpness'], noOp: false });
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      imageSessionId: fallbackIdentity.imageSessionId,
+      transactionId: 'fallback-detail',
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.sharpness).toBe(0);
+    expect(() =>
+      buildDetailEditTransaction({ ...state, imageSessionId: 25 }, fallbackIdentity, 'sharpness', 20, 'stale-fallback'),
+    ).toThrow('detail_transaction.stale_session');
   });
 });

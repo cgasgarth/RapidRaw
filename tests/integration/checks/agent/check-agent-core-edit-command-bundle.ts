@@ -33,7 +33,7 @@ useLibraryStore.getState().setLibrary({
   sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
 });
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   finalPreviewUrl: 'blob:rawengine-core-before',
   hasRenderedFirstFrame: true,
@@ -50,6 +50,7 @@ useEditorStore.getState().setEditor({
     width: 6000,
   },
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 const result = await runAgentCoreEditCommandBundle({
   operationId: 'core_bundle_3158',
@@ -99,11 +100,20 @@ if (state.adjustments.exposure !== 0.3 || state.adjustments.hsl.oranges.saturati
 if (state.historyIndex !== 1 || state.history.length !== 2) {
   throw new Error('Agent core command bundle did not commit one history entry.');
 }
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'core_bundle_3158_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('Agent core command bundle did not publish one source-bound EditTransaction receipt.');
+}
 if (result.changedPixelCount < 4) {
   throw new Error('Agent core command bundle did not prove changed preview output.');
 }
-if (state.finalPreviewUrl !== 'blob:rawengine-core-before') {
-  throw new Error('Agent core command bundle must preserve visible preview until native render completes.');
+if (state.finalPreviewUrl !== null) {
+  throw new Error('Agent core command bundle must invalidate stale final preview output.');
 }
 if (state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('Agent core command bundle must invalidate stale uncropped preview output.');

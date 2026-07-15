@@ -88,7 +88,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -185,5 +185,44 @@ describe('agent EditGraph EditTransaction bridge', () => {
         'stale-session',
       ),
     ).toThrow(`agent_editgraph_transaction.stale_session:${session.id}:other-session`);
+  });
+
+  test('applies through fallback session authority and rejects same-path reopen identities', async () => {
+    useEditorStore.setState({ imageSession: null, imageSessionId: 71 });
+    const bridge = new RawEngineLocalAppServerBridge();
+    await dryRunEditGraphCommandInLiveEditor(buildCommand(true), bridge, 'fallback-editgraph-dry-run');
+    await applyEditGraphCommandToLiveEditor(buildCommand(false), bridge, 'fallback-editgraph-apply');
+
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 1,
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: 'editor-image-session:71',
+        transactionId: 'agent-editgraph-apply',
+      },
+    });
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0.6);
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
+      adjustmentRevision: 0,
+      imageSessionId: 81,
+    });
+    const fallbackState = useEditorStore.getState();
+    const identity = captureAgentEditGraphCommitIdentity(fallbackState);
+    if (identity === null) throw new Error('Expected fallback EditGraph identity.');
+    expect(identity.imageSessionId).toBe('editor-image-session:81');
+    expect(() =>
+      buildAgentEditGraphEditTransaction(
+        { ...fallbackState, imageSessionId: 83 },
+        identity,
+        { ...fallbackState.adjustments, exposure: 0.2 },
+        'stale-reopened-a',
+      ),
+    ).toThrow('agent_editgraph_transaction.stale_session:editor-image-session:81:editor-image-session:83');
   });
 });

@@ -1,12 +1,6 @@
-import type { RefObject } from 'react';
+import { useEditorPersistence } from '../../hooks/editor/useEditorPersistence';
 
-import { type PreviousAdjustments, useEditorPersistence } from '../../hooks/editor/useEditorPersistence';
-
-interface Props {
-  prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
-}
-
-export default function EditorPersistenceManager({ prevAdjustmentsRef }: Props) {
-  useEditorPersistence(prevAdjustmentsRef);
+export default function EditorPersistenceManager() {
+  useEditorPersistence();
   return null;
 }

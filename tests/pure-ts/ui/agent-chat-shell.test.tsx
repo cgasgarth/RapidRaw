@@ -88,7 +88,7 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
@@ -272,7 +272,7 @@ async function render(element: ReturnType<typeof createElement>) {
 }
 
 function seedEditor() {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-chat-shell-before',
     hasRenderedFirstFrame: true,

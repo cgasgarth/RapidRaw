@@ -19,7 +19,6 @@ const autoAdjustments = (exposure: number) => ({
   dehaze: 5,
   exposure,
   highlights: -10,
-  sectionVisibility: { basic: true, color: true, effects: true },
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,

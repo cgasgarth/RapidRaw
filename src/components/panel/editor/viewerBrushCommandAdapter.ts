@@ -9,15 +9,20 @@ import {
   type ViewerBrushCommand,
   type ViewerBrushCurrentContext,
   type ViewerBrushLine,
+  type ViewerBrushSessionKey,
 } from './viewerBrushInteractionController';
 
 export interface ViewerBrushCommandCaptureSummary {
+  readonly adjustmentRevision: number;
   readonly commandHash: string;
   readonly commandId: string;
   readonly commandType: 'layerMask.createBrushMask';
+  readonly containerId: string;
+  readonly containerKind: 'aiPatches' | 'masks';
   readonly coordinateSpace: typeof BRUSH_MASK_COMMAND_COORDINATE_SPACE;
   readonly expectedGraphRevision: string;
   readonly imagePath: string;
+  readonly imageSessionId: string;
   readonly lastPointCount: number;
   readonly lastStrokeMode: 'erase' | 'paint';
   readonly maskId: string;
@@ -25,6 +30,7 @@ export interface ViewerBrushCommandCaptureSummary {
   readonly pressurePointCount: number;
   readonly receiptVersion: BrushMaskCommandReceipt['receiptVersion'];
   readonly schemaVersion: BrushMaskCommandReceipt['schemaVersion'];
+  readonly sourceIdentity: string;
   readonly strokeCount: number;
   readonly validationStatus: BrushMaskCommandReceipt['validationStatus'];
 }
@@ -43,6 +49,7 @@ export interface ViewerBrushCommitContext {
 }
 
 export interface ViewerBrushCommitResult {
+  readonly key: ViewerBrushSessionKey;
   readonly parameters: ViewerBrushParameters;
   readonly summary: ViewerBrushCommandCaptureSummary;
 }
@@ -56,12 +63,20 @@ export interface ViewerBrushCommandAdapter {
 }
 
 const identity = (context: ViewerBrushCurrentContext): string =>
-  [context.imageSessionId, context.sourceRevision, context.geometryEpoch, context.maskId, context.toolId].join(':');
+  [
+    context.imageSessionId,
+    context.sourceIdentity,
+    context.sourceRevision,
+    context.adjustmentRevision,
+    context.geometryEpoch,
+    context.containerKind,
+    context.containerId,
+    context.maskId,
+    context.toolId,
+  ].join(':');
 
 /** Typed semantic-command boundary for receipt-bearing brush mutations. */
-export const createViewerBrushCommandAdapter = (
-  updateSubMask: (id: string | null, patch: Partial<SubMask>) => void,
-): ViewerBrushCommandAdapter => {
+export const createViewerBrushCommandAdapter = (): ViewerBrushCommandAdapter => {
   let cached: { readonly identity: string; readonly parameters: ViewerBrushParameters } | null = null;
 
   const synchronize = (context: ViewerBrushCommitContext): void => {
@@ -106,16 +121,20 @@ export const createViewerBrushCommandAdapter = (
         },
       };
       cached = { identity: identity(context.current), parameters: committed };
-      updateSubMask(context.current.maskId, { parameters: committed });
       return {
+        key: command.key,
         parameters: committed,
         summary: {
+          adjustmentRevision: command.key.adjustmentRevision,
           commandHash: receipt.commandHash,
           commandId: receipt.commandId,
           commandType: receipt.commandType,
+          containerId: command.key.containerId,
+          containerKind: command.key.containerKind,
           coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
           expectedGraphRevision: receipt.expectedGraphRevision,
           imagePath: receipt.imagePath,
+          imageSessionId: command.key.imageSessionId,
           lastPointCount: receipt.lastPointCount,
           lastStrokeMode: receipt.lastStrokeMode,
           maskId: receipt.maskId,
@@ -123,6 +142,7 @@ export const createViewerBrushCommandAdapter = (
           pressurePointCount: receipt.pressurePointCount,
           receiptVersion: receipt.receiptVersion,
           schemaVersion: receipt.schemaVersion,
+          sourceIdentity: command.key.sourceIdentity,
           strokeCount: receipt.strokeCount,
           validationStatus: receipt.validationStatus,
         },

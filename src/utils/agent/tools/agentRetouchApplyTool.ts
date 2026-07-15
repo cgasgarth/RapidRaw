@@ -10,6 +10,7 @@ import {
 import { Mask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -17,7 +18,7 @@ import {
   type RetouchLayerRuntimeProvenance,
   type RetouchRemoveSource,
 } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { applyLayerStackCommandBridgeOperation } from '../../layers/layerStackCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
@@ -191,6 +192,8 @@ const buildRetouchLayer = (
   const baseLayer: MaskContainer = {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name: `Agent ${request.mode}`,
@@ -212,7 +215,7 @@ const buildRetouchLayer = (
     if (sourcePoint === undefined) throw new Error('Clone/heal retouch requires a sourcePoint.');
     const source: RetouchCloneSource = {
       alignmentErrorPx: 0,
-      featherRadiusPx: request.featherRadiusPx,
+      ...(request.featherRadiusPx === undefined ? {} : { featherRadiusPx: request.featherRadiusPx }),
       radiusPx: request.radiusPx,
       retouchMode: request.mode,
       rotationDegrees: 0,
@@ -224,12 +227,12 @@ const buildRetouchLayer = (
   }
 
   const removeSource: RetouchRemoveSource = {
-    featherRadiusPx: request.featherRadiusPx,
+    ...(request.featherRadiusPx === undefined ? {} : { featherRadiusPx: request.featherRadiusPx }),
     generator: 'local_patch_fill_v1',
     generatorVersion: 1,
     radiusPx: request.radiusPx,
-    searchRadiusMultiplier: request.searchRadiusMultiplier,
-    seed: request.seed,
+    searchRadiusMultiplier: request.searchRadiusMultiplier ?? 4,
+    seed: request.seed ?? 0,
     status: 'needs_regeneration',
     targetMaskId: overlayMaskId,
   };
@@ -432,19 +435,6 @@ const attachRuntimeProvenanceToRetouchLayer = (
   return layer;
 };
 
-const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>): void => {
-  useEditorStore.setState((state) => {
-    const adjustments = { ...state.adjustments, masks: [...masks] };
-    const history = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-    return {
-      adjustments,
-      history: history.history,
-      historyIndex: history.historyIndex,
-      uncroppedAdjustedPreviewUrl: null,
-    };
-  });
-};
-
 const buildOverlayArtifact = ({
   contentSeed,
   height,
@@ -515,6 +505,8 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent retouch apply requires a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Agent retouch apply requires a selected image session.');
 
   const draftLayer = buildRetouchLayer(parsedRequest, selectedImage.width, selectedImage.height);
   const outputProof = buildRetouchOutputProof(parsedRequest, draftLayer);
@@ -536,7 +528,15 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     },
   );
 
-  pushMaskHistory(result.masks);
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      { ...state.adjustments, masks: [...result.masks] },
+      `${parsedRequest.operationId}_apply`,
+    ),
+  );
   const overlayMaskId = layer.subMasks[0]?.id;
   if (overlayMaskId === undefined) throw new Error('Agent retouch apply did not create an overlay mask.');
   useEditorStore.setState({ activeMaskContainerId: layer.id, activeMaskId: overlayMaskId });

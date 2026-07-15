@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { lazy, Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -19,6 +18,7 @@ import {
   focusStackCandidateJobResultSchema,
 } from '../../schemas/focus-stack/focusStackCandidateRuntimeSchemas';
 import { focusStackNativeInputPlanSchema } from '../../schemas/focus-stack/focusStackNativePlanSchemas';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -267,9 +267,11 @@ export default function AppModals(props: AppModalsProps) {
             }
             onClose={() => {
               if (panoramaModalState.alignmentCancellationId !== null) {
-                void invoke(Invokes.CancelPanoramaAlignment, {
-                  cancellationId: panoramaModalState.alignmentCancellationId,
-                });
+                void invokeWithSchema(
+                  Invokes.CancelPanoramaAlignment,
+                  { cancellationId: panoramaModalState.alignmentCancellationId },
+                  z.boolean(),
+                );
               }
               const launchId = useOperationLaunchStore.getState().launches.panorama?.launchId;
               if (launchId !== undefined) useOperationLaunchStore.getState().close('panorama', launchId);
@@ -371,9 +373,11 @@ export default function AppModals(props: AppModalsProps) {
                 superResolutionModalState.candidateJobId !== null &&
                 superResolutionModalState.candidateJobId !== undefined
               )
-                void invoke(Invokes.CancelComputationalMergeJob, {
-                  jobId: superResolutionModalState.candidateJobId,
-                });
+                void invokeWithSchema(
+                  Invokes.CancelComputationalMergeJob,
+                  { jobId: superResolutionModalState.candidateJobId },
+                  z.boolean(),
+                );
               setUI((state) => ({
                 superResolutionModalState: createDefaultSuperResolutionModalState(
                   state.superResolutionModalState.settings,
@@ -483,7 +487,8 @@ export default function AppModals(props: AppModalsProps) {
             }}
             onCancelCandidate={() => {
               const jobId = superResolutionModalState.candidateJobId;
-              if (jobId !== null && jobId !== undefined) void invoke(Invokes.CancelComputationalMergeJob, { jobId });
+              if (jobId !== null && jobId !== undefined)
+                void invokeWithSchema(Invokes.CancelComputationalMergeJob, { jobId }, z.boolean());
             }}
             candidateJob={superResolutionModalState.candidateJob ?? null}
             onPreviewPlan={() => {
@@ -623,10 +628,12 @@ export default function AppModals(props: AppModalsProps) {
             onClose={() => {
               focusStackPlanRequestId.current += 1;
               if (focusStackModalState.candidateJobId !== undefined && focusStackModalState.candidateJobId !== null)
-                void invoke(Invokes.CancelComputationalMergeJob, {
-                  jobId: focusStackModalState.candidateJobId,
-                });
-              void invoke(Invokes.CancelFocusStackPlan);
+                void invokeWithSchema(
+                  Invokes.CancelComputationalMergeJob,
+                  { jobId: focusStackModalState.candidateJobId },
+                  z.boolean(),
+                );
+              void invokeWithSchema(Invokes.CancelFocusStackPlan, {}, emptyTauriResponseSchema);
               setUI((state) => ({
                 focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
               }));
@@ -798,7 +805,7 @@ export default function AppModals(props: AppModalsProps) {
                 settings.maxPreviewDimensionPx !== focusStackModalState.settings.maxPreviewDimensionPx;
               if (invalidatesAlignment) {
                 focusStackPlanRequestId.current += 1;
-                void invoke(Invokes.CancelFocusStackPlan);
+                void invokeWithSchema(Invokes.CancelFocusStackPlan, {}, emptyTauriResponseSchema);
               }
               setUI((state) => {
                 const {

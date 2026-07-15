@@ -34,7 +34,7 @@ const viewportLayout = {
 };
 
 afterEach(() => {
-  useEditorStore.setState(originalEditorState, true);
+  useEditorStore.getState().hydrateEditorRenderAuthority(originalEditorState);
 });
 
 describe('editor image session ownership', () => {

@@ -32,6 +32,53 @@ export const importItemFailureSchema = z
   })
   .strict();
 
+export const importArtifactReceiptSchema = z
+  .object({
+    destination: fileOperationPathSchema,
+    byteSize: z.number().int().nonnegative().safe(),
+    blake3: z.string().trim().min(1),
+  })
+  .strict();
+
+export const importItemReceiptSchema = z
+  .object({
+    itemId: z.number().int().nonnegative().safe(),
+    source: fileOperationPathSchema,
+    destination: fileOperationPathSchema,
+    artifacts: z.array(importArtifactReceiptSchema),
+    sourceDeleted: z.boolean(),
+    sourceDeleteError: z.string().nullable(),
+    committedAtMillis: z.number().int().nonnegative().safe(),
+  })
+  .strict();
+
+export const importDiagnosticsSchema = z
+  .object({
+    preflightMillis: z.number().int().nonnegative().safe(),
+    timeToFirstCommitMillis: z.number().int().nonnegative().safe().nullable(),
+    cancellationLatencyMillis: z.number().int().nonnegative().safe().nullable(),
+    metadataConcurrency: z.number().int().nonnegative().safe(),
+    copyConcurrency: z.number().int().nonnegative().safe(),
+    maxCopyInFlight: z.number().int().nonnegative().safe(),
+    maxBufferedBytes: z.number().int().nonnegative().safe(),
+    progressEvents: z.number().int().nonnegative().safe(),
+    fullRefreshes: z.number().int().nonnegative().safe(),
+  })
+  .strict();
+
+export const importJobReceiptSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    jobId: importJobIdSchema,
+    completed: z.array(importItemReceiptSchema),
+    failed: z.array(importItemFailureSchema),
+    cancelled: z.array(z.number().int().nonnegative().safe()),
+    totalBytes: z.number().int().nonnegative().safe(),
+    diagnostics: importDiagnosticsSchema,
+    terminalStage: importStageSchema,
+  })
+  .strict();
+
 export const importResumeValidationSchema = z
   .object({
     jobId: importJobIdSchema,
@@ -101,6 +148,7 @@ export type CreateFolderRequest = z.infer<typeof createFolderRequestSchema>;
 export type DeleteFilesRequest = z.infer<typeof deleteFilesRequestSchema>;
 export type ImportFilesRequest = z.infer<typeof importFilesRequestSchema>;
 export type ImportJobAuthority = z.infer<typeof importJobAuthoritySchema>;
+export type ImportJobReceipt = z.infer<typeof importJobReceiptSchema>;
 export type ImportResumeValidation = z.infer<typeof importResumeValidationSchema>;
 export type RenameFilesRequest = z.infer<typeof renameFilesRequestSchema>;
 export type RenameFolderRequest = z.infer<typeof renameFolderRequestSchema>;

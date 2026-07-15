@@ -4,16 +4,27 @@ use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage};
 use tauri::ipc::Response;
 
-use crate::render::render_plan::compile_consumer_render_plan;
-
-use crate::{
-    AppState, CommunityPreset, Crop, MaskDefinition, RenderRequest, adjustment_fields,
-    calculate_transform_hash, downscale_f32_image, encode_jpeg_response, generate_mask_bitmap,
-    generate_transformed_preview, get_cached_or_generate_mask, get_or_init_gpu_context,
-    get_or_load_lut, is_raw_file, load_settings_or_default,
-    normalize_film_look_adjustments_for_render, parse_virtual_path, process_and_get_dynamic_image,
-    render_pipeline, resolve_tonemapper_override_from_handle,
+use crate::AppState;
+use crate::app::settings::load_settings_or_default;
+use crate::color::adjustment_fields;
+use crate::community_presets::CommunityPreset;
+use crate::editor::preview_geometry_service::generate_transformed_preview;
+use crate::geometry::Crop;
+use crate::gpu::gpu_context::get_or_init_gpu_context;
+use crate::gpu::gpu_processing::RenderRequest;
+use crate::io::cache_utils::calculate_transform_hash;
+use crate::io::formats::is_raw_file;
+use crate::io::image_codecs::encode_jpeg_response;
+use crate::library::file_management::parse_virtual_path;
+use crate::render::film_look_render::normalize_film_look_adjustments_for_render;
+use crate::render::image_processing::{
+    downscale_f32_image, process_and_get_dynamic_image, resolve_tonemapper_override_from_handle,
 };
+use crate::render::mask_generation::{
+    MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
+};
+use crate::render::render_pipeline;
+use crate::render::render_plan::compile_consumer_render_plan;
 
 fn scale_crop_adjustment(adjustments: &serde_json::Value, scale: f32) -> serde_json::Value {
     let mut scaled = adjustments.clone();
@@ -107,7 +118,7 @@ pub(crate) fn generate_preset_preview(
     let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+    let lut = lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         render_adjustments.as_ref(),
         &loaded_image.path,
@@ -245,7 +256,8 @@ pub(crate) async fn generate_all_community_previews(
             let render_adjustments =
                 normalize_film_look_adjustments_for_render(&scaled_adjustments);
             let lut_path = render_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
+            let lut =
+                lut_path.and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
                 render_adjustments.as_ref(),
                 &preset.name,
@@ -320,7 +332,8 @@ mod tests {
     use image::{Rgb, RgbImage};
 
     use super::{compose_community_tiles, scale_crop_adjustment};
-    use crate::{Crop, adjustment_fields};
+    use crate::color::adjustment_fields;
+    use crate::geometry::Crop;
 
     #[test]
     fn crop_geometry_scales_with_the_thumbnail() {

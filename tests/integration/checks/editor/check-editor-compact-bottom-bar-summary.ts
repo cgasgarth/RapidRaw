@@ -108,7 +108,7 @@ function setupStores() {
     rightPanelWidth: 320,
     uiVisibility: { filmstrip: true, folderTree: true },
   });
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,

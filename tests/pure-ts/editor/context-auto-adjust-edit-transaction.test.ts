@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildContextAutoAdjustEditTransaction,
@@ -10,7 +9,7 @@ import {
   contextAutoAdjustPatchSchema,
   isCurrentContextAutoAdjustRequest,
 } from '../../../src/utils/contextAutoAdjustEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/context-auto-adjust.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
@@ -28,7 +27,6 @@ const patch = {
   dehaze: 5,
   exposure: 0.35,
   highlights: -10,
-  sectionVisibility: { basic: true, color: true, effects: true },
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
@@ -47,13 +45,17 @@ const patch = {
 describe('context Auto Adjust edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    adjustments.sectionVisibility.curves = false;
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    adjustments.effectsEnabled = false;
+    const editDocumentV2 = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2(adjustments),
+      'scene_curve',
+      false,
+    );
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [editDocumentV2],
       history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
@@ -73,7 +75,10 @@ describe('context Auto Adjust edit transaction', () => {
 
     expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35, whiteBalanceMigration: 'native_v1' });
     expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
-    expect(result.after.sectionVisibility).toMatchObject({ basic: true, color: true, curves: false, effects: true });
+    expect(result.after).not.toHaveProperty('sectionVisibility');
+    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
+    expect(result.after.effectsEnabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',
@@ -117,6 +122,9 @@ describe('context Auto Adjust edit transaction', () => {
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, exposure: Number.NaN }).success).toBe(false);
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, brightness: 5.01 }).success).toBe(false);
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, unexpected: true }).success).toBe(false);
+    expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, sectionVisibility: { effects: true } }).success).toBe(
+      false,
+    );
     const state = useEditorStore.getState();
     const base = captureContextAutoAdjustBase(state);
     if (base === null) throw new Error('Expected context Auto Adjust base');
@@ -142,5 +150,52 @@ describe('context Auto Adjust edit transaction', () => {
     );
     expect(result.noOp).toBe(true);
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 0, historyIndex: 0 });
+  });
+
+  test('commits through fallback authority and rejects delayed A to B to A requests', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-context-auto-before',
+      imageSession: null,
+      imageSessionId: 121,
+    });
+    const state = useEditorStore.getState();
+    const base = captureContextAutoAdjustBase(state);
+    if (base === null) throw new Error('Expected fallback context Auto Adjust base');
+    expect(base.imageSessionId).toBe('editor-image-session:121');
+    expect(isCurrentContextAutoAdjustRequest(state, base, 4, 4)).toBeTrue();
+    expect(isCurrentContextAutoAdjustRequest(state, base, 3, 4)).toBeFalse();
+    expect(
+      isCurrentContextAutoAdjustRequest(
+        {
+          ...state,
+          imageSessionId: 122,
+          selectedImage: { isReady: true, path: '/fixture/B.ARW', rawDevelopmentReport: null },
+        },
+        base,
+        4,
+        4,
+      ),
+    ).toBeFalse();
+    expect(isCurrentContextAutoAdjustRequest({ ...state, imageSessionId: 123 }, base, 4, 4)).toBeFalse();
+    expect(isCurrentContextAutoAdjustRequest({ ...state, adjustmentRevision: 1 }, base, 4, 4)).toBeFalse();
+
+    const result = state.applyEditTransaction(
+      buildContextAutoAdjustEditTransaction(state, base, patch, 'fallback-context-auto'),
+    );
+    expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'auto-edit' });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: base.imageSessionId,
+        transactionId: 'fallback-context-auto',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(() =>
+      buildContextAutoAdjustEditTransaction({ ...state, imageSessionId: 123 }, base, patch, 'stale-reopened-a'),
+    ).toThrow('context_auto_adjust_transaction.stale_session');
   });
 });

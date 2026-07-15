@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, RotateCcw } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -13,6 +13,7 @@ import {
   buildColorCalibrationEditTransaction,
   type ColorCalibrationCommitIdentity,
 } from '../../../utils/colorCalibrationEditTransaction';
+import { buildLevelsEditTransaction, type LevelsCommitIdentity } from '../../../utils/levelsEditTransaction';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -42,13 +43,13 @@ export const ColorAdvancedControls = ({
   const [activePrimary, setActivePrimary] = useState('red');
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const commitIdentity = useMemo<ColorCalibrationCommitIdentity | null>(
     () =>
-      imageSessionId !== null && selectedImagePath !== null
-        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
-        : null,
+      selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,
     [adjustmentRevision, imageSessionId, selectedImagePath],
   );
   const commitIdentityRef = useRef(commitIdentity);
@@ -57,6 +58,15 @@ export const ColorAdvancedControls = ({
   const colorCalibrationRef = useRef(colorCalibration);
   colorCalibrationRef.current = colorCalibration;
   const levels = adjustments.levels;
+  const levelsCommitIdentity = useMemo<LevelsCommitIdentity | null>(
+    () =>
+      selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,
+    [adjustmentRevision, imageSessionId, selectedImagePath],
+  );
+  const levelsCommitIdentityRef = useRef(levelsCommitIdentity);
+  levelsCommitIdentityRef.current = levelsCommitIdentity;
+  const levelsRef = useRef(levels);
+  levelsRef.current = levels;
   const isLevelsVisible = mode !== 'calibration' && adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isCalibrationVisible = mode !== 'levels' && isColorCalibrationVisible;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
@@ -102,23 +112,25 @@ export const ColorAdvancedControls = ({
   };
 
   const handleLevelsToggle = () => {
-    setAdjustments((prev) => ({
-      ...prev,
-      levels: {
-        ...prev.levels,
-        enabled: !prev.levels.enabled,
-      },
-    }));
+    commitLevels({ ...levelsRef.current, enabled: !levelsRef.current.enabled });
   };
 
   const handleLevelsChange = (key: LevelsNumericKey, value: number) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      levels: {
-        ...prev.levels,
-        [key]: value,
-      },
-    }));
+    commitLevels({ ...levelsRef.current, [key]: value });
+  };
+
+  const commitLevels = (nextLevels: Adjustments['levels']) => {
+    const identity = levelsCommitIdentityRef.current;
+    if (identity === null) return;
+    const result = applyEditTransaction(
+      buildLevelsEditTransaction(useEditorStore.getState(), identity, nextLevels, crypto.randomUUID()),
+    );
+    levelsRef.current = nextLevels;
+    levelsCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+  };
+
+  const resetLevels = () => {
+    commitLevels(structuredClone(INITIAL_ADJUSTMENTS.levels));
   };
 
   const currentValues = {
@@ -180,17 +192,31 @@ export const ColorAdvancedControls = ({
           <section className="py-1.5" data-testid="color-levels-controls">
             <CompactInspectorSectionHeader
               actions={
-                <button
-                  aria-pressed={levels.enabled}
-                  className={cx(
-                    density.actionButton.base,
-                    levels.enabled ? density.actionButton.active : density.actionButton.inactive,
-                  )}
-                  onClick={handleLevelsToggle}
-                  type="button"
-                >
-                  {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    aria-label={t('adjustments.basic.reset')}
+                    className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                    data-testid="color-levels-reset"
+                    disabled={!isLevelsModified}
+                    onClick={resetLevels}
+                    title={t('adjustments.basic.reset')}
+                    type="button"
+                  >
+                    <RotateCcw aria-hidden="true" size={13} />
+                  </button>
+                  <button
+                    aria-pressed={levels.enabled}
+                    className={cx(
+                      density.actionButton.base,
+                      levels.enabled ? density.actionButton.active : density.actionButton.inactive,
+                    )}
+                    data-testid="color-levels-toggle"
+                    onClick={handleLevelsToggle}
+                    type="button"
+                  >
+                    {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
+                  </button>
+                </div>
               }
               modified={isLevelsModified}
               modifiedLabel={modifiedLabel}

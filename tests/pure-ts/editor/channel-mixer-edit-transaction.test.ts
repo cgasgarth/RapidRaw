@@ -6,6 +6,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildChannelMixerEditTransaction,
   type ChannelMixerCommitIdentity,
+  isCurrentChannelMixerIdentity,
 } from '../../../src/utils/channelMixerEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -34,7 +35,7 @@ describe('channel mixer edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -123,5 +124,68 @@ describe('channel mixer edit transaction', () => {
     expect(useEditorStore.getState().adjustments.channelMixer).toEqual(enabled);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+  });
+
+  test('commits through fallback authority and rejects stale A to B to A identities', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-channel-before',
+      imageSession: null,
+      imageSessionId: 84,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: ChannelMixerCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:84',
+      sourceIdentity: sourcePath,
+    };
+    const noOp = state.applyEditTransaction(
+      buildChannelMixerEditTransaction(
+        state,
+        fallbackIdentity,
+        structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+        'fallback-channel-no-op',
+      ),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-channel-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const next = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      enabled: true,
+      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 18 },
+    };
+    const result = state.applyEditTransaction(
+      buildChannelMixerEditTransaction(state, fallbackIdentity, next, 'fallback-channel'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['channelMixer'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-channel',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+
+    expect(isCurrentChannelMixerIdentity(state, fallbackIdentity)).toBeTrue();
+    expect(
+      isCurrentChannelMixerIdentity(
+        { ...state, imageSessionId: 85, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentChannelMixerIdentity({ ...state, imageSessionId: 86 }, fallbackIdentity)).toBeFalse();
+    expect(isCurrentChannelMixerIdentity({ ...state, adjustmentRevision: 1 }, fallbackIdentity)).toBeFalse();
+    expect(() =>
+      buildChannelMixerEditTransaction({ ...state, imageSessionId: 86 }, fallbackIdentity, next, 'stale-reopened-a'),
+    ).toThrow('channel_mixer_transaction.stale_session');
   });
 });

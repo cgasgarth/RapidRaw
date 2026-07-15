@@ -19,6 +19,7 @@ import {
 } from '../../../packages/rawengine-schema/src';
 import { Mask, SubMaskMode } from '../../components/panel/right/layers/Masks';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -632,6 +633,8 @@ function cloneSourceForOperation(
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: 'layer-stack-command-placeholder',
     invert: false,
     name: 'Layer',

@@ -8,6 +8,7 @@ use tauri::{Emitter, ipc::Response};
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_state::{
     AnalyticsFrameId, AnalyticsJob, AnalyticsProducts, AnalyticsSamplingPolicy, AppState,
+    FrontendPreviewOperationIdentity,
 };
 use crate::cache_utils::{calculate_geometry_hash, calculate_transform_hash};
 use crate::editor::image_service::LoadedImage;
@@ -22,8 +23,8 @@ use crate::lut_processing::Lut;
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
 use crate::render::render_plan::compile_consumer_render_plan;
 use crate::{
-    color, export, generate_transformed_preview, get_or_load_lut, hydrate_adjustments,
-    image_analytics, render_pipeline,
+    color, export, generate_transformed_preview, hydrate_adjustments, image_analytics,
+    render_pipeline,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -50,7 +51,7 @@ fn validate_current_source(
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ExportSoftProofPreviewRequest {
     active_waveform_channel: Option<String>,
     black_point_compensation: bool,
@@ -59,6 +60,7 @@ pub(crate) struct ExportSoftProofPreviewRequest {
     expected_image_path: Option<String>,
     export_soft_proof_recipe_id: Option<String>,
     js_adjustments: serde_json::Value,
+    preview_operation_identity: FrontendPreviewOperationIdentity,
     rendering_intent: export::export_processing::ExportRenderingIntent,
     target_resolution: Option<u32>,
     viewer_sample_graph_revision: Option<String>,
@@ -82,6 +84,14 @@ pub(crate) fn generate_export_soft_proof_preview(
         validate_expected_preview_image(&loaded_image.path, expected_image_path)
             .map_err(|error| error.to_string())?;
     }
+    request
+        .preview_operation_identity
+        .validate_for_render(
+            &loaded_image.path,
+            request.viewer_sample_graph_revision.as_deref(),
+            false,
+        )
+        .map_err(str::to_string)?;
     let session = SoftProofPreviewSession {
         generation: state.services.preview_session.current_generation(),
         source_identity: loaded_image.path.clone(),
@@ -286,6 +296,7 @@ pub(crate) fn generate_export_soft_proof_preview(
         let _ = state.services.analytics.submit(AnalyticsJob {
             path: loaded_image.path,
             frame_id: AnalyticsFrameId::default(),
+            preview_operation_identity: Box::new(request.preview_operation_identity),
             image: Arc::new(proof_image),
             products: AnalyticsProducts::HISTOGRAM
                 | AnalyticsProducts::GAMUT_MASK
@@ -419,7 +430,7 @@ fn render_processed_export_soft_proof_preview(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
     let lut: Option<Arc<Lut>> = adjustments["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         adjustments,
         &loaded_image.path,

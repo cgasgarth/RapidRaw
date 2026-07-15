@@ -134,7 +134,7 @@ async function validateDiscoveryPreviewApplyAndRevert() {
   );
 
   await act(async () => {
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: { ...useEditorStore.getState().adjustments, exposure: 1.25 },
     });
     await flushPromises();
@@ -189,7 +189,7 @@ async function validateLoadFailure() {
 
 async function renderPanel(options: { invoke: InvokeHandler; selectedReady: boolean }): Promise<RenderedPanel> {
   invokeHandler = options.invoke;
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     selectedImage: options.selectedReady
       ? {

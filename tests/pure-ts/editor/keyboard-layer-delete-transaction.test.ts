@@ -29,7 +29,7 @@ const seedStore = () => {
     sessionId: 'keyboard-delete-test',
   });
   const adjustments = persistLayerStackSidecarInAdjustments({ ...baseAdjustments, masks: [layer] }, sidecar);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeMaskContainerId: layer.id,
     activeMaskId: null,
     adjustmentRevision: 0,

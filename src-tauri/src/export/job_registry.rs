@@ -58,6 +58,7 @@ impl ExportJobHandle {
 struct ActiveExportJob {
     handle: ExportJobHandle,
     task_handle: Option<JoinHandle<()>>,
+    terminal_publication_claimed: bool,
 }
 
 impl ActiveExportJob {
@@ -107,6 +108,7 @@ impl ExportJobRegistry {
         state.active = Some(ActiveExportJob {
             handle: handle.clone(),
             task_handle: None,
+            terminal_publication_claimed: false,
         });
         Ok(handle)
     }
@@ -116,7 +118,11 @@ impl ExportJobRegistry {
         let attached = {
             let mut state = self.state.lock().unwrap();
             match state.active.as_mut() {
-                Some(active) if active.matches(handle) && active.task_handle.is_none() => {
+                Some(active)
+                    if active.matches(handle)
+                        && active.task_handle.is_none()
+                        && !active.terminal_publication_claimed =>
+                {
                     active.task_handle = task.take();
                     true
                 }
@@ -136,6 +142,9 @@ impl ExportJobRegistry {
         let Some(active) = state.active.as_ref() else {
             return Err(NO_EXPORT_ERROR.to_string());
         };
+        if active.terminal_publication_claimed {
+            return Err(CANCELLATION_PENDING_ERROR.to_string());
+        }
         if active
             .handle
             .cancellation_token
@@ -164,6 +173,19 @@ impl ExportJobRegistry {
         } else {
             false
         }
+    }
+
+    pub(crate) fn claim_terminal_publication(&self, handle: &ExportJobHandle) -> bool {
+        let mut state = self.state.lock().unwrap();
+        let Some(active) = state
+            .active
+            .as_mut()
+            .filter(|active| active.matches(handle) && !active.terminal_publication_claimed)
+        else {
+            return false;
+        };
+        active.terminal_publication_claimed = true;
+        true
     }
 
     pub fn snapshot(&self) -> Option<ExportJobSnapshot> {
@@ -213,6 +235,42 @@ mod tests {
         let owner = results.into_iter().find_map(Result::ok).unwrap();
         assert_eq!(registry.snapshot().unwrap().job_id, owner.job_id());
         assert!(registry.complete(&owner));
+    }
+
+    #[test]
+    fn app_service_preserves_generation_across_concurrent_cancel_and_retry() {
+        let services = Arc::new(crate::app::services::AppServices::new());
+        let barrier = Arc::new(Barrier::new(17));
+        let contenders = (0..16)
+            .map(|_| {
+                let services = Arc::clone(&services);
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    services.export().admit()
+                })
+            })
+            .collect::<Vec<_>>();
+        barrier.wait();
+        let mut admitted = contenders
+            .into_iter()
+            .filter_map(|contender| contender.join().unwrap().ok());
+        let owner = admitted.next().expect("one export owner");
+        assert!(admitted.next().is_none());
+
+        let acknowledgement = services.export().request_cancellation().unwrap();
+        assert_eq!(acknowledgement.active_job_id, owner.job_id());
+        assert!(owner.cancellation().is_cancelled());
+        assert!(services.export().complete(&owner));
+
+        let retry = services.export().admit().unwrap();
+        assert!(!services.export().complete(&owner));
+        let snapshot = services.export().snapshot().unwrap();
+        assert_eq!(snapshot.job_id, retry.job_id());
+        assert_eq!(snapshot.generation, 2);
+        assert!(!snapshot.cancellation_requested);
+        assert!(services.export().request_cancellation().is_ok());
+        assert!(services.export().complete(&retry));
     }
 
     #[test]

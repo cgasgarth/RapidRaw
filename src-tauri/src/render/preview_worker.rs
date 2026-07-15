@@ -8,7 +8,10 @@ use tauri::{Emitter, Manager};
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_settings::load_preview_runtime_settings_or_default;
-use crate::app_state::{AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState};
+use crate::app_state::{
+    AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState,
+    FrontendPreviewOperationIdentity,
+};
 use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
@@ -26,7 +29,7 @@ use crate::render::preview_frame_cache_service::CachedPreview;
 use crate::render_plan::{
     CompileRenderPlanContext, RenderPlanRevision, compile_render_plan_cached, content_revision,
 };
-use crate::{get_or_load_lut, render_caches, render_pipeline};
+use crate::{render_caches, render_pipeline};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NativePreviewPresentationReason {
@@ -71,6 +74,7 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) adjustments_json: serde_json::Value,
     pub(crate) expected_image_path: &'a str,
     pub(crate) is_interactive: bool,
+    pub(crate) preview_operation_identity: &'a FrontendPreviewOperationIdentity,
     pub(crate) target_resolution: Option<u32>,
     pub(crate) roi: Option<(f32, f32, f32, f32)>,
     pub(crate) compute_waveform: bool,
@@ -145,6 +149,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         mut adjustments_json,
         expected_image_path,
         is_interactive,
+        preview_operation_identity,
         target_resolution,
         roi,
         compute_waveform,
@@ -191,7 +196,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let lut = adjustments_clone["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(&state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let settings_revision = u64::from(tm_override.unwrap_or(0));
     let revision = viewer_sample_graph_revision.map_or_else(
         || {
@@ -447,6 +452,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
                 preview_generation: preview_id.generation,
                 graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
             },
+            preview_operation_identity: preview_operation_identity.clone(),
             products: requested_products(compute_waveform, active_waveform_channel),
             active_waveform_channel: channel_filter,
             service: Arc::clone(&state.services.analytics),
@@ -636,13 +642,15 @@ fn encode_preview_response(
 ) -> Result<Vec<u8>, String> {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_snapshot = app_handle.map(|app| {
-        app.state::<AppState>()
-            .services
+        let services = &app.state::<AppState>().services;
+        services
             .gpu_context
             .coordinator_snapshot()
             .and_then(|coordinator| coordinator.current_snapshot())
             .unwrap_or_else(|| {
-                Arc::new(crate::display_profile::display_preview_transform_snapshot_for_app(app))
+                services
+                    .display_profile
+                    .preview_transform_snapshot_for_app(app)
             })
     });
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -839,7 +847,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<AppState>();
     let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
         PreviewSchedulingPolicy::default(),
-        Some(Arc::clone(&state.interactive_gpu_pressure)),
+        Some(Arc::clone(&state.services.interactive_gpu_pressure)),
     );
     let worker_token = state
         .services
@@ -862,6 +870,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                     adjustments_json: (*job.adjustments).clone(),
                     expected_image_path: &job.expected_image_path,
                     is_interactive: job.is_interactive,
+                    preview_operation_identity: &job.preview_operation_identity,
                     target_resolution: job.target_resolution,
                     roi: job.roi,
                     compute_waveform: job.compute_waveform,

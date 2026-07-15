@@ -29,7 +29,7 @@ const mediumJpeg = async (): Promise<Uint8Array> => {
 };
 
 const seedEditor = () =>
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:model-loop-before',
     histogram: {

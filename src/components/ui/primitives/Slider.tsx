@@ -19,6 +19,9 @@ interface SliderProps {
   max: number;
   min: number;
   onChange: (event: SliderChangeEvent) => void;
+  onInteractionCancel?: (() => void) | undefined;
+  onInteractionCommit?: (() => void) | undefined;
+  onInteractionStart?: (() => void) | undefined;
   disabled?: boolean;
   onDragStateChange?: ((state: boolean) => void) | undefined;
   step: number;
@@ -43,6 +46,9 @@ const Slider = ({
   max,
   min,
   onChange,
+  onInteractionCancel,
+  onInteractionCommit,
+  onInteractionStart,
   disabled = false,
   onDragStateChange = () => {},
   step,
@@ -79,11 +85,41 @@ const Slider = ({
   } | null>(null);
   const suppressTouchChangeRef = useRef(false);
   const wheelTimeoutRef = useRef<number | undefined>(undefined);
+  const interactionActiveRef = useRef(false);
+  const onInteractionStartRef = useRef(onInteractionStart);
+  const onInteractionCommitRef = useRef(onInteractionCommit);
+  const onInteractionCancelRef = useRef(onInteractionCancel);
+
+  onInteractionStartRef.current = onInteractionStart;
+  onInteractionCommitRef.current = onInteractionCommit;
+  onInteractionCancelRef.current = onInteractionCancel;
+
+  const beginInteraction = useCallback(() => {
+    if (interactionActiveRef.current) return;
+    interactionActiveRef.current = true;
+    onInteractionStartRef.current?.();
+  }, []);
+
+  const commitInteraction = useCallback(() => {
+    if (!interactionActiveRef.current) return;
+    interactionActiveRef.current = false;
+    onInteractionCommitRef.current?.();
+  }, []);
+
+  const cancelInteraction = useCallback(() => {
+    if (!interactionActiveRef.current) return;
+    interactionActiveRef.current = false;
+    onInteractionCancelRef.current?.();
+  }, []);
 
   useEffect(() => {
     return () => {
       if (wheelTimeoutRef.current !== undefined) {
         window.clearTimeout(wheelTimeoutRef.current);
+      }
+      if (interactionActiveRef.current) {
+        interactionActiveRef.current = false;
+        onInteractionCancelRef.current?.();
       }
     };
   }, []);
@@ -120,15 +156,19 @@ const Slider = ({
   snapToStepRef.current = snapToStep;
   rangeRef.current = { min, max };
 
-  const startDrag = useCallback((draft: number) => {
-    setInteractionDraft(draft);
-    if (isDraggingRef.current) {
-      return;
-    }
-    isDraggingRef.current = true;
-    setIsDragging(true);
-    onDragStateChangeRef.current(true);
-  }, []);
+  const startDrag = useCallback(
+    (draft: number) => {
+      setInteractionDraft(draft);
+      if (isDraggingRef.current) {
+        return;
+      }
+      isDraggingRef.current = true;
+      beginInteraction();
+      setIsDragging(true);
+      onDragStateChangeRef.current(true);
+    },
+    [beginInteraction],
+  );
 
   const finishDrag = useCallback(() => {
     pendingTouchRef.current = null;
@@ -140,7 +180,20 @@ const Slider = ({
     isDraggingRef.current = false;
     setIsDragging(false);
     onDragStateChangeRef.current(false);
-  }, []);
+    commitInteraction();
+  }, [commitInteraction]);
+
+  const cancelDrag = useCallback(() => {
+    pendingTouchRef.current = null;
+    suppressTouchChangeRef.current = false;
+    setInteractionDraft(null);
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      onDragStateChangeRef.current(false);
+    }
+    cancelInteraction();
+  }, [cancelInteraction]);
 
   useEffect(() => {
     const sliderElement = containerRef.current;
@@ -171,7 +224,9 @@ const Slider = ({
             value: clampedValue,
           },
         };
+        beginInteraction();
         onChangeRef.current(syntheticEvent);
+        commitInteraction();
       }
     };
 
@@ -180,17 +235,13 @@ const Slider = ({
     return () => {
       sliderElement.removeEventListener('wheel', handleWheel);
     };
-  }, [step]);
+  }, [beginInteraction, commitInteraction, step]);
 
   // Handle Dragging
   useEffect(() => {
-    if (!isDragging) return;
-
-    const inputEl = rangeInputRef.current;
-    if (!inputEl) return;
-    const sliderWidth = inputEl.getBoundingClientRect().width || 1;
-
     const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      const sliderWidth = rangeInputRef.current?.getBoundingClientRect().width || 1;
       let clientX: number;
       let shiftKey: boolean;
 
@@ -229,24 +280,28 @@ const Slider = ({
     };
 
     const handlePointerUp = () => {
+      if (!isDraggingRef.current) return;
       lastUpTime.current = Date.now();
       finishDrag();
     };
+    const handlePointerCancel = () => cancelDrag();
 
     window.addEventListener('mousemove', handlePointerMove, { passive: false });
     window.addEventListener('mouseup', handlePointerUp);
     window.addEventListener('touchmove', handlePointerMove, { passive: false });
     window.addEventListener('touchend', handlePointerUp);
-    window.addEventListener('touchcancel', handlePointerUp);
+    window.addEventListener('touchcancel', handlePointerCancel);
+    window.addEventListener('blur', handlePointerCancel);
 
     return () => {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
-      window.removeEventListener('touchcancel', handlePointerUp);
+      window.removeEventListener('touchcancel', handlePointerCancel);
+      window.removeEventListener('blur', handlePointerCancel);
     };
-  }, [finishDrag, isDragging]);
+  }, [cancelDrag, finishDrag]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -280,7 +335,9 @@ const Slider = ({
         value: defaultValue,
       },
     };
+    beginInteraction();
     onChange(syntheticEvent);
+    commitInteraction();
   };
 
   const handleRangeValueChange = (e: React.FormEvent<HTMLInputElement>) => {
@@ -322,6 +379,7 @@ const Slider = ({
 
     startDrag(snappedValue);
     onChange({ target: { value: snappedValue } });
+    e.stopPropagation();
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
@@ -392,6 +450,7 @@ const Slider = ({
 
     startDrag(snappedValue);
     onChange({ target: { value: snappedValue } });
+    e.stopPropagation();
   };
 
   const handleTouchEnd = () => {
@@ -436,6 +495,7 @@ const Slider = ({
     };
     setIsEditing(false);
     onChange(syntheticEvent);
+    commitInteraction();
   };
 
   const handleInputBlur = () => {
@@ -459,15 +519,17 @@ const Slider = ({
       restoreValueFocusAfterEditRef.current = true;
       const startingValue = editStartValueRef.current;
       setInputValue(String(startingValue));
-      onChange({
-        target: {
-          value: startingValue,
-        },
-      });
+      if (onInteractionCancelRef.current === undefined) {
+        onChange({ target: { value: startingValue } });
+        interactionActiveRef.current = false;
+      } else {
+        cancelInteraction();
+      }
       setIsEditing(false);
       e.currentTarget.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
+      beginInteraction();
       let currentNum = parseFloat(inputValue.replace(',', '.'));
       if (Number.isNaN(currentNum)) {
         currentNum = value;
@@ -485,6 +547,14 @@ const Slider = ({
   };
 
   const handleRangeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelDrag();
+      return;
+    }
+    if (['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp'].includes(e.key)) {
+      beginInteraction();
+    }
     if (e.ctrlKey || e.metaKey) {
       e.currentTarget.blur();
       return;
@@ -492,6 +562,16 @@ const Slider = ({
     if (GLOBAL_KEYS.includes(e.key)) {
       e.currentTarget.blur();
     }
+  };
+
+  const handleRangeKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp'].includes(e.key)) {
+      commitInteraction();
+    }
+  };
+
+  const handleRangeBlur = () => {
+    if (!isDraggingRef.current) commitInteraction();
   };
 
   const numericValue = Number.isNaN(value) ? 0 : value;
@@ -615,13 +695,17 @@ const Slider = ({
         max={String(max)}
         min={String(min)}
         onInput={handleRangeValueChange}
+        onBlur={handleRangeBlur}
         onDoubleClick={handleReset}
         onKeyDown={handleRangeKeyDown}
+        onKeyUp={handleRangeKeyUp}
         onMouseDown={handleMouseDown}
+        onLostPointerCapture={cancelDrag}
+        onPointerCancel={cancelDrag}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onTouchCancel={cancelDrag}
         step={String(step)}
         type="range"
         value={rangeValue}

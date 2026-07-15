@@ -10,4 +10,5 @@ pub(crate) mod denoising;
 #[cfg(test)]
 pub(crate) mod grading_render;
 pub(crate) mod retouch_render;
+pub(crate) mod runtime_services;
 pub(crate) mod wavelet_render;
