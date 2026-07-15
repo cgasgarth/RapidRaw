@@ -8,5 +8,6 @@ pub(crate) mod hdr_display_capability;
 pub(crate) mod services;
 pub(crate) mod settings;
 pub(crate) mod startup;
+pub(crate) mod startup_file_handoff;
 pub(crate) mod state;
 pub(crate) mod window_customizer;
