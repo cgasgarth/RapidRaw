@@ -58,6 +58,9 @@ for (const input of ['base_sha', 'expected_head_sha', 'pull_request_number']) {
 if (!required.concurrency?.group?.includes('inputs.pull_request_number')) {
   throw new Error('dispatched required checks must retain per-PR concurrency isolation');
 }
+if (!required.concurrency?.group?.includes('inputs.expected_head_sha')) {
+  throw new Error('dispatched required checks must isolate each immutable PR head');
+}
 const planEnvironment = required.jobs?.plan?.steps?.find((step) => step.env?.HEAD_SHA)?.env;
 if (
   planEnvironment?.BASE_SHA !== '${{ github.event.pull_request.base.sha || inputs.base_sha }}' ||

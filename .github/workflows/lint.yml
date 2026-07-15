@@ -18,8 +18,8 @@ on:
         type: string
 
 concurrency:
-  group: pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: pr-fast-${{ github.event.pull_request.number || inputs.pull_request_number || github.ref }}-${{ github.event.pull_request.head.sha || inputs.expected_head_sha || github.sha }}
+  cancel-in-progress: false
 
 permissions:
   actions: read
