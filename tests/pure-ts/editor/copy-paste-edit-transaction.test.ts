@@ -148,14 +148,16 @@ describe('copy/paste edit transaction', () => {
   test('compensates an exact native failure without overwriting a newer edit', () => {
     const enabledState = useEditorStore.getState();
     const disabledDocument = setEditDocumentV2NodeEnabled(enabledState.editDocumentV2, 'scene_curve', false);
-    useEditorStore.setState({
-      adjustmentSnapshot: publishAdjustmentSnapshot(
-        enabledState.adjustmentSnapshot,
-        enabledState.adjustments,
-        disabledDocument,
+    enabledState.hydrateEditorRenderAuthority({
+      adjustmentRevision: enabledState.adjustmentRevision,
+      adjustments: enabledState.adjustments,
+      editDocumentHistory: enabledState.editDocumentHistory.map((entry, index) =>
+        index === enabledState.historyIndex ? disabledDocument : entry,
       ),
-      editDocumentHistory: [disabledDocument],
       editDocumentV2: disabledDocument,
+      history: enabledState.history,
+      historyCheckpoints: enabledState.historyCheckpoints,
+      historyIndex: enabledState.historyIndex,
     });
     const before = useEditorStore.getState();
     before.createHistoryCheckpoint('Before paste');

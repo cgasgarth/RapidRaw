@@ -19,7 +19,7 @@ const seedEditor = () => {
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-medium-preview-attachment',
-    history: [INITIAL_ADJUSTMENTS],
+    history: [INITIAL_ADJUSTMENTS, INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -108,9 +108,11 @@ describe('agent medium preview attachment runtime', () => {
     const initialHistory = useEditorStore.getState().history;
     const snapshot = buildAgentImageContextSnapshot();
     const stale = manager.acquire({ deadlineAt: Date.now() + 5_000, snapshot });
-    useEditorStore
-      .getState()
-      .hydrateEditorRenderAuthority({ adjustments: useEditorStore.getState().adjustments, historyIndex: 1 });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
+      history: initialHistory,
+      historyIndex: 1,
+    });
     resolveRender?.(bytes);
     await expect(stale).rejects.toMatchObject({
       outcome: 'stale',

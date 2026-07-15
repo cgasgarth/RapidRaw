@@ -10,6 +10,7 @@ const reset = () => {
     adjustmentRevision: 0,
     adjustments,
     editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
+    editDocumentHistory: [legacyAdjustmentsToEditDocumentV2(adjustments)],
     history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
@@ -23,6 +24,7 @@ describe('editor render-authority boundary', () => {
     const state = useEditorStore.getState();
     const adjustmentUpdate = { adjustments: { ...state.adjustments, exposure: 0.75 } };
     const historyUpdate = { history: [state.adjustments] };
+    const typedHistoryUpdate = { editDocumentHistory: [state.editDocumentV2] };
     const adjustmentUpdater = () => adjustmentUpdate;
     const historyUpdater = () => historyUpdate;
 
@@ -31,6 +33,9 @@ describe('editor render-authority boundary', () => {
     );
     expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdate])).toThrow(
       'editor.setState.render_authority_forbidden:history',
+    );
+    expect(() => Reflect.apply(state.setEditor, undefined, [typedHistoryUpdate])).toThrow(
+      'editor.setEditor.render_authority_forbidden:editDocumentHistory',
     );
     expect(() => Reflect.apply(state.setEditor, undefined, [adjustmentUpdater])).toThrow(
       'editor.setEditor.render_authority_forbidden:adjustments',
@@ -57,6 +62,7 @@ describe('editor render-authority boundary', () => {
       adjustmentRevision: 7,
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [editDocumentV2],
       history: [adjustments],
       historyIndex: 0,
     });
@@ -64,6 +70,7 @@ describe('editor render-authority boundary', () => {
 
     expect(hydrated.adjustmentRevision).toBe(7);
     expect(hydrated.editDocumentV2.nodes.tone_equalizer?.enabled).toBe(false);
+    expect(hydrated.editDocumentHistory[0]?.nodes.tone_equalizer?.enabled).toBe(false);
     expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
     expect(hydrated.adjustmentSnapshot.value.exposure).toBe(0.4);
   });

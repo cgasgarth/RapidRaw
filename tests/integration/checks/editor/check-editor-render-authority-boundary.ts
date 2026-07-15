@@ -9,6 +9,7 @@ const authorityKeys = new Set([
   'adjustments',
   'adjustmentRevision',
   'adjustmentSnapshot',
+  'editDocumentHistory',
   'editDocumentV2',
   'history',
   'historyCheckpoints',

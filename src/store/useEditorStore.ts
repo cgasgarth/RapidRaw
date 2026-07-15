@@ -312,6 +312,7 @@ const editorRenderAuthorityKeys = [
   'adjustments',
   'adjustmentRevision',
   'adjustmentSnapshot',
+  'editDocumentHistory',
   'editDocumentV2',
   'history',
   'historyCheckpoints',
@@ -324,7 +325,15 @@ export type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => Ed
 export type EditorRenderAuthorityHydration = EditorStateUpdate &
   Pick<EditorState, 'adjustments'> &
   Partial<
-    Pick<EditorState, 'adjustmentRevision' | 'editDocumentV2' | 'history' | 'historyCheckpoints' | 'historyIndex'>
+    Pick<
+      EditorState,
+      | 'adjustmentRevision'
+      | 'editDocumentHistory'
+      | 'editDocumentV2'
+      | 'history'
+      | 'historyCheckpoints'
+      | 'historyIndex'
+    >
   >;
 export type EditorRenderAuthorityHydrationUpdater =
   | EditorRenderAuthorityHydration
@@ -470,6 +479,27 @@ const applyEditorStateUpdate = (
       update.referenceMatchPreview = null;
       update.autoEditPreviewSession = null;
       update.editDocumentV2 = update.editDocumentV2 ?? legacyAdjustmentsToEditDocumentV2(update.adjustments);
+      if (allowRenderAuthority) {
+        const history = update.history ?? state.history;
+        const historyIndex = update.historyIndex ?? state.historyIndex;
+        if (!Number.isInteger(historyIndex) || historyIndex < 0 || historyIndex >= history.length) {
+          throw new Error('editor.hydration.invalid_history_index');
+        }
+        const editDocumentHistory =
+          update.editDocumentHistory?.map((entry) => structuredClone(entry)) ??
+          history.map((entry, index) =>
+            index === historyIndex
+              ? structuredClone(update.editDocumentV2 as EditDocumentV2)
+              : legacyAdjustmentsToEditDocumentV2(entry),
+          );
+        if (
+          editDocumentHistory.length !== history.length ||
+          !areEditDocumentsEqual(editDocumentHistory[historyIndex], update.editDocumentV2)
+        ) {
+          throw new Error('editor.hydration.inconsistent_edit_document_history');
+        }
+        update.editDocumentHistory = editDocumentHistory;
+      }
       update.adjustmentSnapshot = publishAdjustmentSnapshot(
         state.adjustmentSnapshot,
         update.adjustments,

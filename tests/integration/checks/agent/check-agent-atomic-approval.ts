@@ -10,8 +10,23 @@ import {
   applyApprovedAgentPlanAtomically,
   rollbackApprovedAgentPlan,
 } from '../../../../src/utils/agent/safety/agentAtomicApproval.ts';
+import {
+  legacyAdjustmentsToEditDocumentV2,
+  setEditDocumentV2NodeEnabled,
+} from '../../../../src/utils/editDocumentV2.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
+const initialDocument = setEditDocumentV2NodeEnabled(
+  legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+  'tone_equalizer',
+  false,
+);
+const futureAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 3 };
+const futureDocument = setEditDocumentV2NodeEnabled(
+  legacyAdjustmentsToEditDocumentV2(futureAdjustments),
+  'tone_equalizer',
+  false,
+);
 
 useLibraryStore.getState().setLibrary({
   activeAlbumId: 'album_agent_atomic_approval',
@@ -40,9 +55,11 @@ useLibraryStore.getState().setLibrary({
 
 useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
+  editDocumentHistory: [initialDocument, futureDocument],
+  editDocumentV2: initialDocument,
   finalPreviewUrl: 'blob:rawengine-atomic-before',
   hasRenderedFirstFrame: true,
-  history: [INITIAL_ADJUSTMENTS],
+  history: [INITIAL_ADJUSTMENTS, futureAdjustments],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '1000', LensModel: 'FE 35mm F1.4 GM' },
@@ -55,6 +72,7 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     width: 6000,
   },
 });
+useEditorStore.getState().createHistoryCheckpoint('Atomic approval baseline');
 
 const steps = [
   {
@@ -167,12 +185,35 @@ if (rolledBackState.finalPreviewUrl !== 'blob:rawengine-atomic-before') {
   throw new Error('Rollback did not restore original preview identity.');
 }
 if (
+  rolledBackState.editDocumentV2.nodes.tone_equalizer?.enabled !== false ||
+  rolledBackState.editDocumentHistory.length !== 2 ||
+  rolledBackState.historyCheckpoints[0]?.label !== 'Atomic approval baseline'
+) {
+  throw new Error('Rollback did not restore typed document history and named checkpoint authority.');
+}
+if (
   rolledBackState.adjustmentRevision !== beforeRollbackRevision + 1 ||
   rolledBackState.lastEditApplicationReceipt?.source !== 'history' ||
   rolledBackState.lastEditApplicationReceipt.transactionId !==
     `agent-approval-rollback:history_0:${String(beforeRollbackRevision)}`
 ) {
   throw new Error('Rollback did not publish one history-navigation transaction receipt.');
+}
+rolledBackState.redo();
+const redoneState = useEditorStore.getState();
+if (
+  redoneState.editDocumentV2.nodes.tone_equalizer?.enabled !== false ||
+  redoneState.historyCheckpoints[0]?.label !== 'Atomic approval baseline'
+) {
+  throw new Error('Redo lost typed document or named checkpoint metadata after atomic rollback.');
+}
+redoneState.undo();
+const undoneState = useEditorStore.getState();
+if (
+  undoneState.editDocumentV2.nodes.tone_equalizer?.enabled !== false ||
+  undoneState.historyCheckpoints[0]?.label !== 'Atomic approval baseline'
+) {
+  throw new Error('Undo lost typed document or named checkpoint metadata after atomic rollback.');
 }
 
 console.log('agent atomic approval ok');
