@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
   ApprovalClass,
@@ -14,7 +15,7 @@ import { levelsSettingsSchema } from '../../../schemas/color/levelsSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
 import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -54,7 +55,7 @@ const pointCurvesPatchSchema = z
   });
 const parametricSettingsSchema = z
   .object({
-    blackLevel: z.number().min(-100).max(100),
+    blackLevel: z.number().min(0).max(100),
     darks: z.number().min(-100).max(100),
     highlights: z.number().min(-100).max(100),
     lights: z.number().min(-100).max(100),
@@ -62,7 +63,7 @@ const parametricSettingsSchema = z
     split1: z.number().min(0).max(100),
     split2: z.number().min(0).max(100),
     split3: z.number().min(0).max(100),
-    whiteLevel: z.number().min(-100).max(100),
+    whiteLevel: z.number().min(-100).max(0),
   })
   .strict()
   .superRefine((settings, context) => {
@@ -104,14 +105,14 @@ export const agentCurveLevelsApplyRequestSchema = z
 
 export const agentCurveLevelsApplyResponseSchema = z
   .object({
-    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
-    changedPixelCount: z.number().int().positive(),
+    changedPixelCount: z.number().int().nonnegative(),
     receipt: z
       .object({
-        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        adjustedFields: z.array(z.string().trim().min(1)),
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
@@ -186,7 +187,7 @@ const estimateChangedPixels = ({
   const changedFieldCount = CURVE_LEVELS_KEYS.filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   ).length;
-  return Math.max(1, Math.round((imageArea / 512) * Math.max(1, changedFieldCount)));
+  return changedFieldCount === 0 ? 0 : Math.max(1, Math.round((imageArea / 512) * changedFieldCount));
 };
 
 const buildCurveLevelsPatchOperations = (
@@ -255,18 +256,20 @@ const buildAgentCurveLevelsEditGraphCommand = ({
     },
   });
 
-const dispatchTypedCurveLevelsEditGraphApply = async ({
-  expectedGraphRevision,
-  imagePath,
-  operations,
-  request,
-}: {
-  expectedGraphRevision: string;
-  imagePath: string;
-  operations: EditGraphParameterPatchOperationV1[];
-  request: AgentCurveLevelsApplyRequest;
-}): Promise<EditGraphMutationResultV1> => {
-  const bridge = createLiveEditorAppServerBridge();
+const dispatchTypedCurveLevelsEditGraphApply = async (
+  {
+    expectedGraphRevision,
+    imagePath,
+    operations,
+    request,
+  }: {
+    expectedGraphRevision: string;
+    imagePath: string;
+    operations: EditGraphParameterPatchOperationV1[];
+    request: AgentCurveLevelsApplyRequest;
+  },
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
+): Promise<EditGraphMutationResultV1> => {
   const dryRunCommand = buildAgentCurveLevelsEditGraphCommand({
     commandId: `${request.operationId}_dry_run`,
     dryRun: true,
@@ -297,6 +300,7 @@ const dispatchTypedCurveLevelsEditGraphApply = async ({
 
 export const applyAgentCurveLevels = async (
   request: AgentCurveLevelsApplyRequest,
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
 ): Promise<AgentCurveLevelsApplyResponse> => {
   const parsedRequest = agentCurveLevelsApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
@@ -307,26 +311,32 @@ export const applyAgentCurveLevels = async (
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent curve/levels apply requires a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Agent curve/levels apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
   const operations = buildCurveLevelsPatchOperations(state.adjustments, parsedRequest.curveLevels);
-  const typedMutation = await dispatchTypedCurveLevelsEditGraphApply({
-    expectedGraphRevision: undoGraphRevision,
-    imagePath: selectedImage.path,
-    operations,
-    request: parsedRequest,
-  });
+  const typedMutation = await dispatchTypedCurveLevelsEditGraphApply(
+    {
+      expectedGraphRevision: undoGraphRevision,
+      imagePath: selectedImage.path,
+      operations,
+      request: parsedRequest,
+    },
+    bridge,
+  );
   const nextAdjustments = applyCurveLevelsPatchToAdjustments(state.adjustments, parsedRequest.curveLevels);
-  const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-  useEditorStore.setState({
-    adjustments: nextAdjustments,
-    history: history.history,
-    historyIndex: history.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  });
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+  );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
-  const adjustedFields = CURVE_LEVELS_KEYS.filter((key) => parsedRequest.curveLevels[key] !== undefined);
+  const adjustedFields = CURVE_LEVELS_KEYS.filter(
+    (key) =>
+      parsedRequest.curveLevels[key] !== undefined &&
+      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+  );
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
   return agentCurveLevelsApplyResponseSchema.parse({
