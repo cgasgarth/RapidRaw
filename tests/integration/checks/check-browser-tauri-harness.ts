@@ -701,9 +701,12 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     const selectedPath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
     if (!selectedPath) throw new Error('Selected editor path was unavailable for Batch Auto Adjust proof.');
     const targetThumbnail = page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${selectedPath}"]`);
-    await targetThumbnail.click({ button: 'right' });
-    const menuDiagnostics = () =>
-      page.evaluate(() => {
+    const menuDiagnostics = async (reason: string, attempt: number) => ({
+      attempt,
+      reason,
+      targetBox: await targetThumbnail.boundingBox(),
+      targetCount: await targetThumbnail.count(),
+      ...(await page.evaluate(() => {
         const active = document.activeElement as HTMLElement | null;
         const visibleItems = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
           .filter((item) => item.getClientRects().length > 0)
@@ -724,21 +727,57 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
             : null,
           visibleItems,
         };
-      });
-    try {
-      await page.waitForFunction(
-        () => {
-          const active = document.activeElement as HTMLButtonElement | null;
-          return (
-            active?.getAttribute('role') === 'menuitem' &&
-            !active.disabled &&
-            active.getClientRects().length > 0 &&
-            active.closest('[role="menu"]')?.parentElement?.closest('[role="menu"]') === null
-          );
-        },
-        undefined,
-        { timeout: 10_000 },
+      })),
+    });
+    const hasVisibleMenuItems = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
+          (item) => item.getClientRects().length > 0,
+        ),
       );
+    let openAttempt = 0;
+    let openFailureReason = 'context_menu_not_attempted';
+    for (openAttempt = 1; openAttempt <= 2; openAttempt += 1) {
+      if (openAttempt === 2 && (await hasVisibleMenuItems())) {
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(
+          () =>
+            ![...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].some(
+              (item) => item.getClientRects().length > 0,
+            ),
+          undefined,
+          { timeout: 2_000 },
+        );
+      }
+      await targetThumbnail.waitFor({ state: 'visible', timeout: 10_000 });
+      await targetThumbnail.scrollIntoViewIfNeeded();
+      await targetThumbnail.click({ button: 'right' });
+      try {
+        await page.waitForFunction(
+          () => {
+            const active = document.activeElement as HTMLButtonElement | null;
+            return (
+              active?.getAttribute('role') === 'menuitem' &&
+              !active.disabled &&
+              active.getClientRects().length > 0 &&
+              active.closest('[role="menu"]')?.parentElement?.closest('[role="menu"]') === null
+            );
+          },
+          undefined,
+          { timeout: 2_500 },
+        );
+        openFailureReason = '';
+        break;
+      } catch {
+        openFailureReason = 'trusted_context_click_did_not_focus_visible_root_item';
+      }
+    }
+    if (openFailureReason) {
+      throw new Error(
+        `Batch Auto Adjust context menu did not open: ${JSON.stringify(await menuDiagnostics(openFailureReason, openAttempt - 1))}`,
+      );
+    }
+    try {
       let productivityFocused = false;
       for (let step = 0; step < 32; step += 1) {
         productivityFocused = await page.evaluate(() => {
@@ -764,7 +803,9 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
         if (productivityFocused) break;
       }
       if (!productivityFocused) {
-        throw new Error(`Productivity keyboard target not reached: ${JSON.stringify(await menuDiagnostics())}`);
+        throw new Error(
+          `Productivity keyboard target not reached: ${JSON.stringify(await menuDiagnostics('productivity_keyboard_target_not_reached', openAttempt))}`,
+        );
       }
       await page.waitForFunction(
         () => {
@@ -791,9 +832,10 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
         { timeout: 10_000 },
       );
     } catch (error) {
-      throw new Error(`Batch Auto Adjust keyboard menu activation failed: ${JSON.stringify(await menuDiagnostics())}`, {
-        cause: error,
-      });
+      throw new Error(
+        `Batch Auto Adjust keyboard menu activation failed: ${JSON.stringify(await menuDiagnostics('keyboard_navigation_or_activation_failed', openAttempt))}`,
+        { cause: error },
+      );
     }
   };
   const waitForSingleAutoAdjustInvocation = async (baselineCount: number) => {
