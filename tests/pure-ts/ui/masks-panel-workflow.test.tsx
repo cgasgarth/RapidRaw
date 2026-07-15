@@ -126,6 +126,7 @@ describe('compact masks panel workflow', () => {
         .maskSubmaskActive,
     ).toBe('true');
 
+    const revisionBeforeVisibility = useEditorStore.getState().adjustmentRevision;
     await act(async () => {
       required<HTMLButtonElement>(firstRow, '[aria-label="Hide Mask"]').click();
       await flush();
@@ -133,6 +134,12 @@ describe('compact masks panel workflow', () => {
 
     expect(useEditorStore.getState().adjustments.masks[0]?.visible).toBe(false);
     expect(firstRow.dataset.maskContainerVisible).toBe('false');
+    expect(useEditorStore.getState().adjustmentRevision).toBe(revisionBeforeVisibility + 1);
+    expect(useEditorStore.getState().editDocumentV2.nodes.layers?.params.masks[0]?.visible).toBe(false);
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      persistence: 'commit',
+      source: 'layer-command',
+    });
 
     const disclosure = required<HTMLButtonElement>(secondRow, 'button[aria-label^="Collapse"]');
     await act(async () => {
@@ -142,9 +149,11 @@ describe('compact masks panel workflow', () => {
     expect(secondRow.getAttribute('aria-expanded')).toBe('false');
 
     await act(async () => {
-      required<HTMLButtonElement>(firstRow, '[aria-label="Show Mask"]').click();
+      useEditorStore.getState().undo();
       await flush();
     });
+    expect(useEditorStore.getState().adjustments.masks[0]?.visible).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes.layers?.params.masks[0]?.visible).toBe(true);
     expect(secondRow.getAttribute('aria-expanded')).toBe('false');
 
     await act(async () => {
