@@ -46,6 +46,11 @@ interface BrowserHarnessMetadataSaveResponse {
   sidecarRevision?: string;
 }
 
+interface BrowserHarnessInvokeResponse {
+  delayMs: number;
+  value: unknown;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -69,6 +74,7 @@ declare global {
       batchAutoAdjustCommitDelayMs: number;
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
+      lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
@@ -117,6 +123,9 @@ const commandNames: Record<
   | 'applyAdjustmentsToPaths'
   | 'applyLibraryCatalogChanges'
   | 'getLensfunMakers'
+  | 'getLensfunLensesForMaker'
+  | 'getLensDistortionParams'
+  | 'autodetectLens'
   | 'getLogFilePath'
   | 'getNativeCapabilities'
   | 'getAlbumImages'
@@ -177,6 +186,9 @@ const commandNames: Record<
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
+  getLensfunLensesForMaker: Invokes.GetLensfunLensesForMaker,
+  getLensDistortionParams: Invokes.GetLensDistortionParams,
+  autodetectLens: Invokes.AutodetectLens,
   getLogFilePath: Invokes.GetLogFilePath,
   getNativeCapabilities: Invokes.GetNativeCapabilities,
   getAlbumImages: Invokes.GetAlbumImages,
@@ -306,6 +318,7 @@ export const installBrowserTauriHarness = (): void => {
     enabled: true,
     failNextSettingsSave: false,
     imageOpenDelayMs: 250,
+    lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
     revokedObjectUrls: [],
@@ -971,6 +984,15 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       return Promise.resolve(getStringArrayArg(args, 'paths').map(createHarnessFolderTree));
     case commandNames.getLensfunMakers:
       return Promise.resolve([]);
+    case commandNames.getLensfunLensesForMaker:
+      return Promise.resolve(['35mm Prime', 'Slow Prime', 'Fast Prime']);
+    case commandNames.getLensDistortionParams: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.lensDistortionResponses.shift();
+      if (response === undefined) return Promise.resolve(null);
+      return new Promise((resolve) => window.setTimeout(() => resolve(response.value), response.delayMs));
+    }
+    case commandNames.autodetectLens:
+      return Promise.resolve(null);
     case commandNames.getLogFilePath:
       return Promise.resolve('/tmp/rawengine-browser-harness/RapidRAW.log');
     case commandNames.listImagesInDir:

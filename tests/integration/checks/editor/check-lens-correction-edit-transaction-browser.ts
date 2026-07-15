@@ -24,6 +24,40 @@ const persistenceSchema = z
       .strict(),
   })
   .passthrough();
+const profilePersistenceSchema = z
+  .object({
+    adjustments: z
+      .object({
+        lensCorrectionMode: z.literal('auto'),
+        lensDistortionParams: z.null(),
+        lensMaker: z.null(),
+        lensModel: z.null(),
+      })
+      .passthrough(),
+    path: z.literal(sourcePath),
+    transaction: z
+      .object({
+        baseAdjustmentRevision: z.number().int().nonnegative(),
+        imageSessionId: z.string().min(1),
+        nextAdjustmentRevision: z.number().int().positive(),
+        transactionId: z.string().min(1),
+      })
+      .strict(),
+  })
+  .passthrough();
+const manualProfilePersistenceSchema = z
+  .object({
+    adjustments: z
+      .object({
+        lensCorrectionMode: z.literal('manual'),
+        lensDistortionParams: z.object({ k1: z.literal(0.22) }).passthrough(),
+        lensMaker: z.literal('Harness Optics'),
+        lensModel: z.literal('Fast Prime'),
+      })
+      .passthrough(),
+    path: z.literal(sourcePath),
+  })
+  .passthrough();
 const renderCallSchema = z.object({
   args: z.object({
     request: z.object({
@@ -31,7 +65,16 @@ const renderCallSchema = z.object({
         extensions: z.object({ legacyAdjustments: z.record(z.string(), z.unknown()) }).passthrough(),
         nodes: z
           .object({
-            lens_correction: z.object({ params: z.object({ lensVignetteAmount: z.number() }).passthrough() }),
+            lens_correction: z.object({
+              params: z
+                .object({
+                  lensCorrectionMode: z.string(),
+                  lensMaker: z.string().nullable(),
+                  lensModel: z.string().nullable(),
+                  lensVignetteAmount: z.number(),
+                })
+                .passthrough(),
+            }),
           })
           .passthrough(),
       }),
@@ -47,6 +90,33 @@ const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', Strin
 let serverOutput = '';
 const captureServerOutput = (chunk: Buffer) => {
   serverOutput = `${serverOutput}${chunk.toString()}`.slice(-4_000);
+};
+
+const waitForRenderedLensProfile = async (
+  page: Page,
+  expected: { maker: string | null; mode: string; model: string | null },
+) => {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const call = renderCallSchema.safeParse(
+      await page.evaluate(() =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_adjustments')
+          .at(-1),
+      ),
+    );
+    const params = call.success ? call.data.args.request.editDocumentV2.nodes.lens_correction.params : null;
+    if (
+      call.success &&
+      call.data.endedAtMs !== null &&
+      params?.lensCorrectionMode === expected.mode &&
+      params.lensMaker === expected.maker &&
+      params.lensModel === expected.model
+    )
+      return;
+    await page.waitForTimeout(50);
+  }
+  throw new Error(`Timed out waiting for rendered lens profile ${JSON.stringify(expected)}.`);
 };
 server.stdout.on('data', captureServerOutput);
 server.stderr.on('data', captureServerOutput);
@@ -221,6 +291,81 @@ try {
   const restoredValue = (await page.getByTestId('lens-control-vignette-amount-value').textContent())?.trim();
   if (restoredValue !== '100%') {
     throw new Error(`Undo rendered 100 but visible lens value is ${restoredValue ?? 'missing'}.`);
+  }
+
+  const profileBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  const profileBaselineApplies = await commandCount(page, 'apply_adjustments');
+  await controls.getByRole('button', { name: 'Manual', exact: true }).click();
+  await controls.getByRole('option', { name: 'Auto', exact: true }).click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', profileBaselineSaves + 1);
+  await waitForCommandCount(page, 'apply_adjustments', profileBaselineApplies + 1);
+  await waitForRenderedLensProfile(page, { maker: null, mode: 'auto', model: null });
+  const profilePersisted = profilePersistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args ?? null,
+    ),
+  );
+  if (profilePersisted.transaction.nextAdjustmentRevision !== profilePersisted.transaction.baseAdjustmentRevision + 1) {
+    throw new Error(`Auto profile selection did not persist one exact revision: ${JSON.stringify(profilePersisted)}`);
+  }
+
+  await undo.click();
+  await waitForCommandCount(page, 'apply_adjustments', profileBaselineApplies + 2);
+  await waitForRenderedLensProfile(page, { maker: 'Harness Optics', mode: 'manual', model: '35mm Prime' });
+
+  const raceBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.lensDistortionResponses.push(
+      {
+        delayMs: 600,
+        value: { k1: 0.11, k2: 0, k3: 0, model: 1, tca_vb: 1, tca_vr: 1, vig_k1: 0, vig_k2: 0, vig_k3: 0 },
+      },
+      {
+        delayMs: 20,
+        value: { k1: 0.22, k2: 0, k3: 0, model: 1, tca_vb: 1, tca_vr: 1, vig_k1: 0, vig_k2: 0, vig_k3: 0 },
+      },
+    );
+  });
+  await controls.getByRole('button', { name: '35mm Prime', exact: true }).click();
+  await controls.getByRole('option', { name: 'Slow Prime', exact: true }).click();
+  await controls.getByRole('button', { name: '35mm Prime', exact: true }).click();
+  await controls.getByRole('option', { name: 'Fast Prime', exact: true }).click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', raceBaselineSaves + 1);
+  await waitForRenderedLensProfile(page, { maker: 'Harness Optics', mode: 'manual', model: 'Fast Prime' });
+  await page.waitForTimeout(750);
+  if ((await commandCount(page, 'save_metadata_and_update_thumbnail')) !== raceBaselineSaves + 1) {
+    throw new Error('Late Slow Prime response persisted after the newer Fast Prime intent.');
+  }
+  manualProfilePersistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args ?? null,
+    ),
+  );
+
+  await undo.click();
+  await waitForRenderedLensProfile(page, { maker: 'Harness Optics', mode: 'manual', model: '35mm Prime' });
+  const invalidationBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.lensDistortionResponses.push({
+      delayMs: 500,
+      value: { k1: 0.33, k2: 0, k3: 0, model: 1, tca_vb: 1, tca_vr: 1, vig_k1: 0, vig_k2: 0, vig_k3: 0 },
+    });
+  });
+  await controls.getByRole('button', { name: '35mm Prime', exact: true }).click();
+  await controls.getByRole('option', { name: 'Slow Prime', exact: true }).click();
+  await controls.getByRole('button', { name: 'Manual', exact: true }).click();
+  await controls.getByRole('option', { name: 'Auto', exact: true }).click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', invalidationBaselineSaves + 1);
+  await waitForRenderedLensProfile(page, { maker: null, mode: 'auto', model: null });
+  await page.waitForTimeout(650);
+  if ((await commandCount(page, 'save_metadata_and_update_thumbnail')) !== invalidationBaselineSaves + 1) {
+    throw new Error('A synchronous mode intent did not invalidate the in-flight lens profile response.');
   }
   console.log('lens correction edit transaction browser ok');
 } catch (error) {
