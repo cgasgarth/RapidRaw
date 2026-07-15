@@ -33,7 +33,7 @@
       }
     ],
     "viewTransforms": ["AgX v1"],
-    "outputProfiles": ["srgb"],
+    "outputProfiles": ["srgb", "display_p3"],
     "bitDepths": [16, 32],
     "proofCrops": [[0, 0, 1, 1]]
   },
@@ -42,6 +42,14 @@
     "rmse": 0.00000001,
     "neutralAxisDrift": 0.0001,
     "identityDeltaE00": 0.0001,
+    "modelReferenceMaxAbs": 0.0002,
+    "modelReferenceRmse": 0.00005,
+    "referenceDeltaE00Mean": 0.001,
+    "referenceDeltaE00Max": 0.005,
+    "neutralChromaMax": 0.001,
+    "gamutHueDriftMax": 90,
+    "gamutNeutralAxisDriftMax": 1.5,
+    "gamutPerceptualDeltaL1Max": 5,
     "monotonicTolerance": 0.000001,
     "grainRepeatTolerance": 0,
     "grainMeanDrift": 0.02,

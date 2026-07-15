@@ -1,0 +1,35 @@
+{
+  "contract": "rapidraw.film_release_approval.v1",
+  "fixtureId": "film-validation.reference-analytic.v1",
+  "sourceSha256": "sha256:61b76551a57e867ebdd8b5e32a20238fed84072ea36a20595627b53ee239deac",
+  "profileRef": {
+    "id": "rapidraw.reference_film.v1",
+    "version": "1",
+    "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef"
+  },
+  "profileClaim": {
+    "kind": "reference_model"
+  },
+  "executionIdentity": {
+    "backendAbiVersion": "film_backend_abi_v1",
+    "modelAbiVersion": "film_model_abi_v1"
+  },
+  "approvedBaselines": {
+    "grainHash": "sha256:70cfd798c9bb81646dbdc184a76af363ed73466dced1e62f636bf77d685f8519",
+    "postFilmHash": "sha256:16260994fb7505296208b35303b385030c29556f32e72aa2a9fd66f2eb4b2a7f"
+  },
+  "approval": {
+    "approvedAt": "2026-07-14T22:44:18Z",
+    "approvalCommit": "5601121e377b9b10098b95ac7a27a5d8d7cee2a1",
+    "issueUrl": "https://github.com/cgasgarth/RapidRaw/issues/5024",
+    "prUrl": "https://github.com/cgasgarth/RapidRaw/pull/5734",
+    "reason": "Initial governed analytic, deterministic grain, and optical release baselines approved with production-path evidence.",
+    "reviewer": "repository-owner:cgasgarth"
+  },
+  "releasePolicy": {
+    "nativeProofIssueUrl": "https://github.com/cgasgarth/RapidRaw/issues/5030",
+    "nativeProofReceiptSha256": null,
+    "productionFilmPixelsChanged": false,
+    "requireNativeProofOnPixelChange": true
+  }
+}

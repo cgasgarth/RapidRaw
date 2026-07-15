@@ -5,12 +5,15 @@ import { resolve } from 'node:path';
 
 import {
   filmAnalyticVectorSetV1Schema,
+  filmReleaseApprovalV1Schema,
   filmValidationFixtureV1Schema,
 } from '../../../../packages/rawengine-schema/src/index.ts';
 
 const root = resolve(import.meta.dir, '../../../..');
 const manifestPath = resolve(root, 'fixtures/film/validation/reference-film-validation-manifest-v1.json');
+const approvalPath = resolve(root, 'fixtures/film/validation/reference-film-release-approval-v1.json');
 const manifest = filmValidationFixtureV1Schema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
+const approval = filmReleaseApprovalV1Schema.parse(JSON.parse(await readFile(approvalPath, 'utf8')));
 const sourcePath = resolve(root, manifest.source.pathOrPrivateRef);
 const sourceBytes = await readFile(sourcePath);
 const vectors = filmAnalyticVectorSetV1Schema.parse(JSON.parse(sourceBytes.toString('utf8')));
@@ -18,6 +21,10 @@ const sourceHash = `sha256:${new Bun.CryptoHasher('sha256').update(sourceBytes).
 if (sourceHash !== manifest.source.sha256) throw new Error('Governed Film source hash drifted.');
 if (JSON.stringify(vectors.profileRef) !== JSON.stringify(manifest.render.profileRefs[0]))
   throw new Error('Governed Film profile identity drifted between manifest and vectors.');
+if (!manifest.render.outputProfiles.includes('srgb') || !manifest.render.outputProfiles.includes('display_p3'))
+  throw new Error('Governed Film validation must cover both sRGB and Display P3 output domains.');
+if (approval.sourceSha256 !== sourceHash || JSON.stringify(approval.profileRef) !== JSON.stringify(vectors.profileRef))
+  throw new Error('Film baseline approval identity drifted from its governed fixture.');
 
 const privateAsPublic = {
   ...manifest,
@@ -35,5 +42,29 @@ const nonMonotoneVectors = {
 };
 if (filmAnalyticVectorSetV1Schema.safeParse(nonMonotoneVectors).success)
   throw new Error('Analytic source accepted a non-monotone neutral ramp.');
+const pixelChangeWithoutNativeProof = {
+  ...approval,
+  releasePolicy: { ...approval.releasePolicy, productionFilmPixelsChanged: true },
+};
+if (filmReleaseApprovalV1Schema.safeParse(pixelChangeWithoutNativeProof).success)
+  throw new Error('Production Film pixel changes were accepted without #5030 native proof.');
+const measuredWithoutEvidence = { ...approval, profileClaim: { kind: 'measured' } };
+if (filmReleaseApprovalV1Schema.safeParse(measuredWithoutEvidence).success)
+  throw new Error('Measured Film profile approval was accepted without holdout evidence.');
+const blockedRelease = Bun.spawnSync(
+  [
+    'bun',
+    'scripts/film/validate-profile.ts',
+    '--profile',
+    'rapidraw.reference_film.v1',
+    '--public-fixtures',
+    '--production-film-pixels-changed',
+  ],
+  { cwd: root, stderr: 'pipe', stdout: 'pipe' },
+);
+if (blockedRelease.exitCode === 0 || !blockedRelease.stderr.toString().includes('native #5030 proof receipt'))
+  throw new Error('Film release command did not fail closed without required #5030 native proof.');
 
-console.log(`film validation manifest ok (${manifest.id}, ${String(vectors.samples.length)} production vectors)`);
+console.log(
+  `film validation manifest ok (${manifest.id}, ${String(vectors.samples.length)} production vectors, sRGB/P3, approved baselines)`,
+);
