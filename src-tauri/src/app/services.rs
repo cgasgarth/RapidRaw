@@ -123,6 +123,7 @@ impl JobCoordinator {
 #[derive(Clone)]
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
+    pub(crate) startup: Arc<crate::app::startup::StartupRuntimeService>,
     pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
     pub(crate) payload_residency:
@@ -158,6 +159,7 @@ impl AppServices {
     pub(crate) fn new(cache_budget: Arc<CacheBudgetCoordinator>) -> Self {
         Self {
             editor: Arc::default(),
+            startup: Arc::default(),
             startup_files: Arc::default(),
             denoise: Arc::default(),
             payload_residency: Arc::default(),

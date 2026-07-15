@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -99,8 +99,9 @@ pub fn request_gpu_initialization(app: tauri::AppHandle, priority: Initializatio
 
     if !app
         .state::<crate::AppState>()
-        .gpu_initialization
-        .request(priority)
+        .services
+        .startup
+        .request_gpu(priority)
     {
         return;
     }
@@ -116,14 +117,7 @@ pub fn request_gpu_initialization(app: tauri::AppHandle, priority: Initializatio
         .await
         .unwrap_or_else(|error| Err(error.to_string()));
         let state = completion_app.state::<crate::AppState>();
-        state.gpu_initialization.finish(&result);
-        mark_initialization_service_result(
-            &state.startup_trace,
-            NativeStartupPhase::GpuReady,
-            "gpu",
-            state.gpu_initialization.snapshot(),
-            result,
-        );
+        state.services.startup.finish_gpu(result);
     });
 }
 
@@ -133,8 +127,9 @@ pub fn request_lens_initialization(app: tauri::AppHandle, priority: Initializati
 
     if !app
         .state::<crate::AppState>()
-        .lens_initialization
-        .request(priority)
+        .services
+        .startup
+        .request_lens(priority)
     {
         return;
     }
@@ -161,14 +156,7 @@ pub fn request_lens_initialization(app: tauri::AppHandle, priority: Initializati
         .await
         .unwrap_or_else(|error| Err(error.to_string()));
         let state = completion_app.state::<crate::AppState>();
-        state.lens_initialization.finish(&result);
-        mark_initialization_service_result(
-            &state.startup_trace,
-            NativeStartupPhase::LibraryServicesReady,
-            "lensfun",
-            state.lens_initialization.snapshot(),
-            result,
-        );
+        state.services.startup.finish_lens(result);
     });
 }
 
@@ -423,6 +411,127 @@ impl StartupTrace {
     }
 }
 
+/// Owns native startup coordination as one capability instead of exposing
+/// independent trace, initialization, and window-readiness fields on AppState.
+pub struct StartupRuntimeService {
+    trace: StartupTrace,
+    gpu: InitializationService,
+    lens: InitializationService,
+    window_setup_complete: AtomicBool,
+    optional_services_pending: AtomicU8,
+    optional_services_degraded: AtomicBool,
+}
+
+impl Default for StartupRuntimeService {
+    fn default() -> Self {
+        Self {
+            trace: StartupTrace::new(),
+            gpu: InitializationService::default(),
+            lens: InitializationService::default(),
+            window_setup_complete: AtomicBool::new(false),
+            optional_services_pending: AtomicU8::new(Self::GPU_PENDING | Self::LENS_PENDING),
+            optional_services_degraded: AtomicBool::new(false),
+        }
+    }
+}
+
+impl StartupRuntimeService {
+    const GPU_PENDING: u8 = 1 << 0;
+    const LENS_PENDING: u8 = 1 << 1;
+
+    pub fn request_gpu(&self, priority: InitializationPriority) -> bool {
+        self.gpu.request(priority)
+    }
+
+    pub fn request_lens(&self, priority: InitializationPriority) -> bool {
+        self.lens.request(priority)
+    }
+
+    pub fn finish_gpu(&self, result: Result<(), String>) {
+        if result.is_err() {
+            self.optional_services_degraded
+                .store(true, Ordering::Release);
+        }
+        self.gpu.finish(&result);
+        mark_initialization_service_result(
+            &self.trace,
+            NativeStartupPhase::GpuReady,
+            "gpu",
+            self.gpu.snapshot(),
+            result,
+        );
+        self.finish_optional_service(Self::GPU_PENDING);
+    }
+
+    pub fn finish_lens(&self, result: Result<(), String>) {
+        if result.is_err() {
+            self.optional_services_degraded
+                .store(true, Ordering::Release);
+        }
+        self.lens.finish(&result);
+        mark_initialization_service_result(
+            &self.trace,
+            NativeStartupPhase::LibraryServicesReady,
+            "lensfun",
+            self.lens.snapshot(),
+            result,
+        );
+        self.finish_optional_service(Self::LENS_PENDING);
+    }
+
+    pub fn claim_first_window_setup(&self) -> bool {
+        !self.window_setup_complete.swap(true, Ordering::AcqRel)
+    }
+
+    pub fn mark(&self, phase: NativeStartupPhase, status: &'static str, detail: Option<String>) {
+        self.trace.mark(phase, status, detail);
+    }
+
+    pub fn snapshot(&self) -> StartupTraceSnapshot {
+        self.trace.snapshot()
+    }
+
+    pub fn arm_idle_warm_after(&self, phase: FrontendStartupPhase) -> bool {
+        self.trace.arm_idle_warm_after(phase)
+    }
+
+    pub fn record_frontend_phase(
+        &self,
+        trace_id: &str,
+        phase: FrontendStartupPhase,
+        status: &str,
+        detail: Option<String>,
+        followup: impl FnOnce(&StartupTraceSnapshot),
+    ) -> Result<StartupTraceSnapshot, String> {
+        record_frontend_phase_with_followup(&self.trace, trace_id, phase, status, detail, followup)
+    }
+
+    fn finish_optional_service(&self, completed: u8) {
+        let previous = self
+            .optional_services_pending
+            .fetch_and(!completed, Ordering::AcqRel);
+        if previous & !completed != 0 {
+            return;
+        }
+        let degraded = self.optional_services_degraded.load(Ordering::Acquire);
+        self.trace.mark(
+            NativeStartupPhase::OptionalServicesReady,
+            if degraded { "degraded" } else { "ok" },
+            Some("gpu+lensfun".to_string()),
+        );
+    }
+
+    #[cfg(test)]
+    fn gpu_snapshot(&self) -> InitializationServiceSnapshot {
+        self.gpu.snapshot()
+    }
+
+    #[cfg(test)]
+    fn lens_snapshot(&self) -> InitializationServiceSnapshot {
+        self.lens.snapshot()
+    }
+}
+
 fn critical_path_order_valid(phases: &[StartupPhaseReceipt]) -> bool {
     let first_index = |phase| phases.iter().position(|receipt| receipt.phase == phase);
     let Some(process) = first_index(NativeStartupPhase::ProcessStarted) else {
@@ -513,8 +622,8 @@ mod tests {
         FIRST_PAINT_BUDGET_MS, FrontendStartupPhase, NativeStartupPhase, StartupTrace,
         mark_deferred_service_result, record_frontend_phase, record_frontend_phase_with_followup,
     };
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Barrier};
 
     fn mark_at(
         trace: &StartupTrace,
@@ -828,5 +937,106 @@ mod tests {
         );
         assert!(!service.request(super::InitializationPriority::IdleWarm));
         assert_eq!(service.snapshot().starts, 1);
+    }
+
+    #[test]
+    fn startup_service_admits_one_concurrent_gpu_start_and_preserves_demand_priority() {
+        let service = Arc::new(super::StartupRuntimeService::default());
+        let barrier = Arc::new(Barrier::new(16));
+        let workers: Vec<_> = (0..16)
+            .map(|index| {
+                let service = Arc::clone(&service);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    let priority = if index % 2 == 0 {
+                        super::InitializationPriority::IdleWarm
+                    } else {
+                        super::InitializationPriority::EditorDemand
+                    };
+                    service.request_gpu(priority)
+                })
+            })
+            .collect();
+
+        let admitted = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .filter(|admitted| *admitted)
+            .count();
+        let snapshot = service.gpu_snapshot();
+        assert_eq!(admitted, 1);
+        assert_eq!(snapshot.starts, 1);
+        assert_eq!(
+            snapshot.priority,
+            Some(super::InitializationPriority::EditorDemand)
+        );
+        assert!(snapshot.promotions <= 1);
+    }
+
+    #[test]
+    fn startup_service_claims_first_window_setup_exactly_once_under_contention() {
+        let service = Arc::new(super::StartupRuntimeService::default());
+        let workers: Vec<_> = (0..16)
+            .map(|_| {
+                let service = Arc::clone(&service);
+                std::thread::spawn(move || service.claim_first_window_setup())
+            })
+            .collect();
+
+        assert_eq!(
+            workers
+                .into_iter()
+                .map(|worker| worker.join().unwrap())
+                .filter(|claimed| *claimed)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn startup_service_finishes_initializers_with_trace_receipts_atomically_owned() {
+        let service = super::StartupRuntimeService::default();
+        assert!(service.request_gpu(super::InitializationPriority::EditorDemand));
+        assert!(service.request_lens(super::InitializationPriority::IdleWarm));
+
+        service.finish_gpu(Ok(()));
+        service.finish_lens(Err("injected lens failure".to_string()));
+
+        assert_eq!(
+            service.gpu_snapshot().state,
+            super::InitializationState::Ready
+        );
+        assert_eq!(
+            service.lens_snapshot().state,
+            super::InitializationState::Degraded
+        );
+        let snapshot = service.snapshot();
+        let gpu = snapshot
+            .phases
+            .iter()
+            .find(|receipt| receipt.phase == NativeStartupPhase::GpuReady)
+            .unwrap();
+        let lens = snapshot
+            .phases
+            .iter()
+            .find(|receipt| receipt.phase == NativeStartupPhase::LibraryServicesReady)
+            .unwrap();
+        let optional = snapshot
+            .phases
+            .iter()
+            .find(|receipt| receipt.phase == NativeStartupPhase::OptionalServicesReady)
+            .unwrap();
+        assert_eq!(gpu.status, "ok");
+        assert!(gpu.detail.as_deref().unwrap().contains("starts=1"));
+        assert_eq!(lens.status, "degraded");
+        assert!(
+            lens.detail
+                .as_deref()
+                .unwrap()
+                .contains("injected lens failure")
+        );
+        assert_eq!(optional.status, "degraded");
+        assert_eq!(optional.detail.as_deref(), Some("gpu+lensfun"));
     }
 }
