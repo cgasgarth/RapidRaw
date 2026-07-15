@@ -316,22 +316,16 @@ pub fn run() {
                 .services
                 .startup
                 .mark(NativeStartupPhase::ProcessStarted, "ok", None);
-            let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
-            let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
-
-            {
-                let state = app.state::<AppState>();
-                state
-                    .services
-                    .gpu_crash_marker
-                    .configure(crash_flag_path.clone());
-            }
-
-            let mut settings: AppSettings = load_settings_or_default(&app_handle);
+            let settings: AppSettings = load_settings_or_default(&app_handle);
             app.state::<AppState>().services.startup.mark(
                 NativeStartupPhase::MinimalSettingsLoaded,
                 "ok",
                 None,
+            );
+            let settings = crate::app::runtime_environment::configure(
+                &app_handle,
+                &app.state::<AppState>(),
+                settings,
             );
 
             {
@@ -340,63 +334,7 @@ pub fn run() {
                 render_caches::RenderCaches::new(&state).set_decoded_image_cache_capacity(cache_size);
             }
 
-            if crash_flag_path.exists() {
-                log::warn!("GPU Driver crash detected on last run! Falling back to OpenGL backend.");
-                settings.processing_backend = Some("gl".to_string());
-                let _ = crate::save_settings(settings.clone(), app_handle.clone());
-                let _ = std::fs::remove_file(&crash_flag_path);
-            }
-
-            unsafe {
-                if let Some(backend) = &settings.processing_backend
-                    && backend != "auto" {
-                        std::env::set_var("WGPU_BACKEND", backend);
-                    }
-
-                if settings.linux_gpu_optimization.unwrap_or(true) {
-                    #[cfg(target_os = "linux")]
-                    {
-                        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-                        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-                        std::env::set_var("NODEVICE_SELECT", "1");
-                    }
-                }
-
-                #[cfg(not(target_os = "android"))]
-                {
-                    let resource_path = app_handle
-                        .path()
-                        .resolve("resources", tauri::path::BaseDirectory::Resource)
-                        .expect("failed to resolve resource directory");
-
-                    let ort_library_name = {
-                        #[cfg(target_os = "windows")]
-                        { "onnxruntime.dll" }
-                        #[cfg(target_os = "linux")]
-                        { "libonnxruntime.so" }
-                        #[cfg(target_os = "macos")]
-                        { "libonnxruntime.dylib" }
-                        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
-                        { "libonnxruntime.so" }
-                    };
-                    let ort_library_path = resource_path.join(ort_library_name);
-                    std::env::set_var("ORT_DYLIB_PATH", &ort_library_path);
-                    println!("Set ORT_DYLIB_PATH to: {}", ort_library_path.display());
-                }
-            }
-
             setup_logging(&app_handle);
-
-            if let Some(backend) = &settings.processing_backend
-                && backend != "auto" {
-                    log::info!("Applied processing backend setting: {}", backend);
-                }
-            if settings.linux_gpu_optimization.unwrap_or(false) {
-                #[cfg(target_os = "linux")]
-                {
-                    log::info!("Applied Linux GPU optimizations.");
-                }
-            }
 
             #[cfg(feature = "advanced-codecs")]
             rapidraw_codecs::register_jxl_decoding_hook();
