@@ -335,17 +335,23 @@ pub fn run() {
             {
                 let resolver_app = app.handle().clone();
                 let publisher_app = app.handle().clone();
+                let state = app.state::<AppState>();
+                let display_profile = Arc::clone(&state.services.display_profile);
                 let coordinator =
                     crate::app::display_target::DisplayTargetCoordinator::new_with_publisher(
                         Duration::from_millis(120),
-                        move |_| crate::app::display_target::resolve_for_app(&resolver_app),
+                        move |_| {
+                            crate::app::display_target::resolve_for_app(
+                                &resolver_app,
+                                &display_profile,
+                            )
+                        },
                         move |change| {
                             if let Err(error) = publisher_app.emit("display-target-changed", change) {
                                 log::warn!("failed to publish display target change: {error}");
                             }
                         },
                     );
-                let state = app.state::<AppState>();
                 let context = state
                     .services
                     .gpu_context
@@ -487,8 +493,8 @@ pub fn run() {
             denoising::cancel_denoising,
             denoising::batch_denoise_images,
             denoising::save_denoised_image,
-            display_profile::get_active_display_profile,
-            display_profile::get_display_preview_lut_status,
+            app::commands::display_profile::get_active_display_profile,
+            app::commands::display_profile::get_display_preview_lut_status,
             color::camera_profile::registry::list_camera_profiles,
             color::camera_profile::registry::import_camera_profile,
             color::camera_profile::registry::remove_camera_profile,

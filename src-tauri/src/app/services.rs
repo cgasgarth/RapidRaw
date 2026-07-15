@@ -121,6 +121,8 @@ impl JobCoordinator {
 #[derive(Clone)]
 pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
+    pub(crate) display_profile:
+        Arc<crate::app::display_profile_service::DisplayProfileRuntimeService>,
     pub(crate) startup: Arc<crate::app::startup::StartupRuntimeService>,
     pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
@@ -176,6 +178,7 @@ impl AppServices {
         crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
         Self {
             editor: Arc::default(),
+            display_profile: Arc::default(),
             startup: Arc::default(),
             startup_files: Arc::default(),
             denoise: Arc::default(),

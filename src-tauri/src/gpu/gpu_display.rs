@@ -12,8 +12,6 @@ use tauri::Manager;
 use half::f16;
 
 #[cfg(target_os = "windows")]
-use crate::display_profile::build_srgb_to_active_display_lut_for_app;
-#[cfg(target_os = "windows")]
 use crate::gpu::pipeline_registry::GpuPipelineRegistry;
 
 #[repr(C)]
@@ -854,7 +852,12 @@ pub(crate) fn create_wgpu_display(
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    let display_lut = build_srgb_to_active_display_lut_for_app(window.app_handle());
+    let display_lut = window
+        .app_handle()
+        .state::<crate::AppState>()
+        .services
+        .display_profile
+        .display_lut_for_app(window.app_handle());
     let display_lut_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Active Display Profile LUT"),
         size: wgpu::Extent3d {

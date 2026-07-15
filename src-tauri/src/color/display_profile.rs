@@ -1,9 +1,4 @@
 use serde::Serialize;
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
-use std::sync::{Mutex, OnceLock};
-
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
-static DISPLAY_SELECTION: OnceLock<Mutex<(Option<String>, u64)>> = OnceLock::new();
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub const DISPLAY_TRANSFORM_IMPLEMENTATION_VERSION: &str = "rapidraw-display-preview-v2";
@@ -48,32 +43,11 @@ pub enum DisplayPreviewLutTransformStatus {
     UnsupportedPlatform,
 }
 
-#[tauri::command]
-pub fn get_active_display_profile(app: tauri::AppHandle) -> Result<ActiveDisplayProfile, String> {
-    active_display_profile_for_app(&app)
-}
-
-#[tauri::command]
-pub fn get_display_preview_lut_status(
-    app: tauri::AppHandle,
-) -> Result<DisplayPreviewLutStatus, String> {
-    display_preview_lut_status_for_app(&app)
-}
-
 #[cfg(target_os = "macos")]
 #[allow(dead_code)]
 pub fn active_display_profile() -> Result<ActiveDisplayProfile, String> {
     let display_id = macos::main_display_id();
     active_display_profile_for_id(display_id)
-}
-
-#[cfg(target_os = "macos")]
-pub fn active_display_profile_for_app(
-    app: &tauri::AppHandle,
-) -> Result<ActiveDisplayProfile, String> {
-    active_display_profile_for_id(
-        macos::display_id_for_app(app).unwrap_or_else(macos::main_display_id),
-    )
 }
 
 #[cfg(target_os = "macos")]
@@ -109,7 +83,7 @@ pub fn active_display_profile() -> Result<ActiveDisplayProfile, String> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn active_display_profile_for_app(
+pub(crate) fn active_display_profile_for_app(
     _app: &tauri::AppHandle,
 ) -> Result<ActiveDisplayProfile, String> {
     active_display_profile()
@@ -155,13 +129,6 @@ pub struct DisplayPreviewTransformSnapshot {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-pub fn display_preview_transform_snapshot_for_app(
-    app: &tauri::AppHandle,
-) -> DisplayPreviewTransformSnapshot {
-    display_preview_transform_snapshot_from_capture(display_preview_transform_capture_for_app(app))
-}
-
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub(crate) fn display_preview_transform_capture_for_app(
     app: &tauri::AppHandle,
 ) -> Result<(Option<u32>, Vec<u8>), String> {
@@ -182,8 +149,13 @@ pub(crate) fn display_preview_transform_capture_for_app(
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 pub(crate) fn display_preview_transform_snapshot_from_capture(
     captured: Result<(Option<u32>, Vec<u8>), String>,
+    selection_generation: u64,
 ) -> DisplayPreviewTransformSnapshot {
     let size = DISPLAY_LUT_SIZE;
+    let captured_display_id = captured
+        .as_ref()
+        .ok()
+        .and_then(|(display_id, _)| *display_id);
     let resolved = captured.and_then(|(display_id, bytes)| {
         let profile = match display_id {
             #[cfg(target_os = "macos")]
@@ -202,18 +174,21 @@ pub(crate) fn display_preview_transform_snapshot_from_capture(
         validate_display_lut(&lut)?;
         Ok((lut, bytes))
     });
-    let (lut, icc_bytes) = resolved.unwrap_or_else(|reason| {
+    let (mut lut, icc_bytes) = resolved.unwrap_or_else(|reason| {
         let bytes = crate::color::icc_profiles::standardized_srgb_profile()
             .encode()
             .expect("built-in sRGB profile must encode");
-        (fallback_display_lut(size, reason), bytes)
+        let mut lut = fallback_display_lut(size, reason);
+        lut.profile.display_id = captured_display_id;
+        (lut, bytes)
     });
     let icc_sha256 = sha256_hex(&icc_bytes);
+    lut.profile.icc_sha256 = Some(icc_sha256.clone());
+    lut.profile.profile_byte_count = Some(icc_bytes.len());
     debug_assert_eq!(
         lut.profile.icc_sha256.as_deref().unwrap_or(&icc_sha256),
         icc_sha256
     );
-    let selection_generation = display_selection_generation(&lut.profile, &icc_sha256);
     DisplayPreviewTransformSnapshot {
         selection_generation,
         profile: lut.profile.clone(),
@@ -226,20 +201,6 @@ pub(crate) fn display_preview_transform_snapshot_from_capture(
         implementation_version: DISPLAY_TRANSFORM_IMPLEMENTATION_VERSION,
         encoding_contract: "pixels_and_jpeg_icc_from_same_snapshot",
     }
-}
-
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
-fn display_selection_generation(profile: &ActiveDisplayProfile, hash: &str) -> u64 {
-    let key = format!("{:?}:{hash}", profile.display_id);
-    let mut selection = DISPLAY_SELECTION
-        .get_or_init(|| Mutex::new((None, 0)))
-        .lock()
-        .unwrap();
-    if selection.0.as_deref() != Some(&key) {
-        selection.0 = Some(key);
-        selection.1 += 1;
-    }
-    selection.1
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -308,33 +269,9 @@ pub fn build_srgb_to_active_display_lut() -> DisplayLut {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
-pub fn build_srgb_to_active_display_lut_for_app(app: &tauri::AppHandle) -> DisplayLut {
-    let size = DISPLAY_LUT_SIZE;
-    #[cfg(target_os = "macos")]
-    if let Some(display_id) = macos::display_id_for_app(app) {
-        return try_build_srgb_to_display_id_lut(size, display_id)
-            .unwrap_or_else(|error| fallback_display_lut(size, error));
-    }
-    build_srgb_to_active_display_lut_with_size(size)
-}
-
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
 #[allow(dead_code)]
 pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
     let lut = build_srgb_to_active_display_lut();
-    Ok(DisplayPreviewLutStatus {
-        sample_count: lut.rgba16f.len() / 4,
-        size: lut.size,
-        status: display_lut_transform_status(&lut.profile),
-        profile: lut.profile,
-    })
-}
-
-#[cfg(not(any(target_os = "android", target_os = "linux")))]
-pub fn display_preview_lut_status_for_app(
-    app: &tauri::AppHandle,
-) -> Result<DisplayPreviewLutStatus, String> {
-    let lut = build_srgb_to_active_display_lut_for_app(app);
     Ok(DisplayPreviewLutStatus {
         sample_count: lut.rgba16f.len() / 4,
         size: lut.size,
@@ -354,7 +291,7 @@ pub fn display_preview_lut_status() -> Result<DisplayPreviewLutStatus, String> {
 }
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
-pub fn display_preview_lut_status_for_app(
+pub(crate) fn display_preview_lut_status_for_app(
     _app: &tauri::AppHandle,
 ) -> Result<DisplayPreviewLutStatus, String> {
     display_preview_lut_status()
@@ -772,20 +709,10 @@ mod cross_platform_tests {
     }
 
     #[test]
-    fn display_selection_generation_changes_only_with_identity_or_profile() {
-        let profile = fallback_display_profile("test".to_string());
-        let first = display_selection_generation(&profile, "sha256:stable-test");
-        let second = display_selection_generation(&profile, "sha256:stable-test");
-        let changed = display_selection_generation(&profile, "sha256:changed-test");
-        assert_eq!(first, second);
-        assert!(changed > second);
-    }
-
-    #[test]
     fn captured_profile_bytes_own_both_pixel_transform_and_artifact_tag() {
         let bytes = moxcms::ColorProfile::new_srgb().encode().unwrap();
         let snapshot =
-            display_preview_transform_snapshot_from_capture(Ok((Some(77), bytes.clone())));
+            display_preview_transform_snapshot_from_capture(Ok((Some(77), bytes.clone())), 1);
         assert_eq!(snapshot.icc_bytes, bytes);
         assert_eq!(snapshot.icc_sha256, sha256_hex(&snapshot.icc_bytes));
         assert_eq!(
@@ -800,7 +727,7 @@ mod cross_platform_tests {
     #[test]
     fn malformed_capture_falls_back_to_identity_pixels_and_srgb_tag() {
         let snapshot =
-            display_preview_transform_snapshot_from_capture(Ok((Some(88), b"bad icc".to_vec())));
+            display_preview_transform_snapshot_from_capture(Ok((Some(88), b"bad icc".to_vec())), 1);
         assert!(matches!(
             snapshot.profile.status,
             ActiveDisplayProfileStatus::FallbackNoActiveProfile

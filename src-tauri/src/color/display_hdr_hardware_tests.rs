@@ -374,6 +374,7 @@ fn native_colorsync_edr_hdr_contract_and_visual_artifact_are_bound_and_numeric()
     let snapshot = crate::display_profile::display_preview_transform_snapshot_from_capture(
         crate::display_profile::active_display_profile_bytes()
             .map(|bytes| (profile.display_id, bytes)),
+        1,
     );
     #[cfg(any(target_os = "android", target_os = "linux"))]
     let snapshot_hash = profile

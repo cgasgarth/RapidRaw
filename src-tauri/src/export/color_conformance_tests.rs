@@ -335,7 +335,7 @@ fn generated_corrupt_display_profiles_fall_back_to_safe_srgb_identity() {
         .bytes;
     for malformed in malformed_profiles(&seed) {
         let snapshot =
-            display_preview_transform_snapshot_from_capture(Ok((Some(77), malformed.clone())));
+            display_preview_transform_snapshot_from_capture(Ok((Some(77), malformed.clone())), 0);
         assert!(matches!(
             snapshot.profile.status,
             ActiveDisplayProfileStatus::FallbackNoActiveProfile
