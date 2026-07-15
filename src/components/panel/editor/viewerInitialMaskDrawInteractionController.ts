@@ -61,7 +61,10 @@ interface ActiveInitialMaskDraw {
 
 const DRAW_THRESHOLD_CSS_PIXELS = 15;
 
-const sameContext = (key: ViewerInitialMaskDrawSessionKey, context: ViewerInitialMaskDrawCurrentContext): boolean =>
+export const isViewerInitialMaskDrawKeyCurrent = (
+  key: ViewerInitialMaskDrawSessionKey,
+  context: ViewerInitialMaskDrawCurrentContext,
+): boolean =>
   context.active &&
   key.geometryEpoch === context.geometryEpoch &&
   key.imageSessionId === context.imageSessionId &&
@@ -212,7 +215,7 @@ export const createViewerInitialMaskDrawInteractionController = (): ViewerInitia
   let operationGeneration = 0;
 
   const synchronize = (context: ViewerInitialMaskDrawCurrentContext): boolean => {
-    if (active === null || sameContext(active.key, context)) return false;
+    if (active === null || isViewerInitialMaskDrawKeyCurrent(active.key, context)) return false;
     active = null;
     return true;
   };

@@ -158,6 +158,7 @@ interface DisplaySizeUpdate extends BaseRenderSize {
 
 interface MaskOverlayRequest {
   identity: string;
+  imageSessionId: string;
   jsAdjustments: Adjustments;
   maskDef: MaskPreviewDefinition;
   renderSize: RenderSize;
@@ -165,6 +166,7 @@ interface MaskOverlayRequest {
 
 interface MaskOverlayRuntimeState {
   identity: string | null;
+  imageSessionId: string | null;
   status: 'current' | 'none' | 'stale-ignored';
 }
 
@@ -217,6 +219,8 @@ export default function Editor({
   const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const editorImageSession = useEditorStore((s) => s.imageSession);
   const editorImageSessionGeneration = useEditorStore((s) => s.imageSessionId);
+  const maskOverlayImageSessionId =
+    editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`;
   const adjustments = useEditorStore((s) => s.adjustments);
   const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
@@ -326,6 +330,7 @@ export default function Editor({
   const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
   const [maskOverlayRuntimeState, setMaskOverlayRuntimeState] = useState<MaskOverlayRuntimeState>({
     identity: null,
+    imageSessionId: null,
     status: 'none',
   });
 
@@ -341,9 +346,26 @@ export default function Editor({
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
+  const maskOverlayImageSessionRef = useRef<string | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
   const viewportInteractionControllerRef = useRef<ViewerViewportInteractionController | null>(null);
   const [isViewportInteractionControllerReady, setIsViewportInteractionControllerReady] = useState(false);
+  useLayoutEffect(() => {
+    if (maskOverlayImageSessionRef.current === maskOverlayImageSessionId) return;
+    maskOverlayImageSessionRef.current = maskOverlayImageSessionId;
+    const invalidationIdentity = JSON.stringify({
+      imageSessionId: maskOverlayImageSessionId,
+      status: 'session-invalidated',
+    });
+    pendingOverlayRequestRef.current = null;
+    latestOverlayRequestIdentityRef.current = invalidationIdentity;
+    setMaskOverlayUrl(null);
+    setMaskOverlayRuntimeState({
+      identity: invalidationIdentity,
+      imageSessionId: maskOverlayImageSessionId,
+      status: 'none',
+    });
+  }, [maskOverlayImageSessionId]);
   useEffect(() => {
     let active = true;
     void viewerViewportInteractionControllerModule.then(({ createViewerViewportInteractionController }) => {
@@ -1588,7 +1610,7 @@ export default function Editor({
   const processOverlayQueue = useCallback(async () => {
     if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
 
-    const { identity, maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
+    const { identity, imageSessionId, maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
     const { maskOverlaySettings, patchResidency } = useEditorStore.getState();
@@ -1602,7 +1624,7 @@ export default function Editor({
 
     if (overlayPayload === null) {
       setMaskOverlayUrl(null);
-      setMaskOverlayRuntimeState({ identity, status: 'none' });
+      setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
       return;
     }
 
@@ -1610,21 +1632,21 @@ export default function Editor({
     try {
       const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, { ...overlayPayload });
       if (!isMaskOverlayResponseCurrent(latestOverlayRequestIdentityRef.current, identity)) {
-        setMaskOverlayRuntimeState({ identity, status: 'stale-ignored' });
+        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'stale-ignored' });
         return;
       }
 
       if (dataUrl) {
         setMaskOverlayUrl(dataUrl);
-        setMaskOverlayRuntimeState({ identity, status: 'current' });
+        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'current' });
       } else {
         setMaskOverlayUrl(null);
-        setMaskOverlayRuntimeState({ identity, status: 'none' });
+        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
       }
     } catch (e) {
       console.error('Failed to generate live mask overlay:', e);
       setMaskOverlayUrl(null);
-      setMaskOverlayRuntimeState({ identity, status: 'none' });
+      setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
     } finally {
       isGeneratingOverlayRef.current = false;
       requestAnimationFrame(() => {
@@ -1655,15 +1677,22 @@ export default function Editor({
         maskOverlaySettings: currentMaskOverlaySettings,
       });
       const identity = buildMaskOverlayRequestIdentity({
+        imageSessionId: maskOverlayImageSessionId,
         renderSize,
         selectedImagePath: selectedImage?.path,
         triggerHash,
       });
       latestOverlayRequestIdentityRef.current = identity;
-      pendingOverlayRequestRef.current = { identity, maskDef, renderSize, jsAdjustments: currentAdjustments };
+      pendingOverlayRequestRef.current = {
+        identity,
+        imageSessionId: maskOverlayImageSessionId,
+        jsAdjustments: currentAdjustments,
+        maskDef,
+        renderSize,
+      };
       void processOverlayQueue();
     },
-    [processOverlayQueue, selectedImage?.path],
+    [maskOverlayImageSessionId, processOverlayQueue, selectedImage?.path],
   );
 
   const handleLiveMaskPreview = useCallback(
@@ -2213,6 +2242,14 @@ export default function Editor({
     x: 0.5,
     y: 0.5,
   };
+  const canPublishMaskOverlay = maskOverlayRuntimeState.imageSessionId === maskOverlayImageSessionId;
+  const publishedMaskOverlayRuntimeState = canPublishMaskOverlay
+    ? maskOverlayRuntimeState
+    : {
+        identity: JSON.stringify({ imageSessionId: maskOverlayImageSessionId, status: 'render-invalidated' }),
+        imageSessionId: maskOverlayImageSessionId,
+        status: 'none' as const,
+      };
 
   const previewOnlyLabel = t('editor.previewOnly.label');
   const exitPreviewLabel = t('editor.previewOnly.exit');
@@ -2383,8 +2420,8 @@ export default function Editor({
                 isRotationActive={isRotationActive}
                 isSliderDragging={isSliderDragging}
                 isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
-                maskOverlayUrl={maskOverlayUrl}
-                maskOverlayRuntimeState={maskOverlayRuntimeState}
+                maskOverlayUrl={canPublishMaskOverlay ? maskOverlayUrl : null}
+                maskOverlayRuntimeState={publishedMaskOverlayRuntimeState}
                 onAiMaskBoxCommit={handleAiMaskBoxCommit}
                 onBrushCommit={handleBrushCommit}
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}

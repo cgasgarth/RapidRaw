@@ -488,7 +488,85 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       throw new Error(`Timed out waiting for ${label} persistence: ${JSON.stringify(latest)}.`);
     }
   };
-
+  const assertCurrentOverlayMatchesPersisted = async (label: string, overlayCallsBefore: number): Promise<void> => {
+    try {
+      await page.waitForFunction(
+        ({ minimumOverlayCalls }) => {
+          const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+          const overlays = calls.filter(({ command }) => command === 'generate_mask_overlay');
+          if (overlays.length <= minimumOverlayCalls) return false;
+          const canvas = document.querySelector('[data-testid="image-canvas"]');
+          const workspace = document.querySelector('[data-testid="editor-workspace"]');
+          const maskId = canvas?.getAttribute('data-initial-mask-draw-context-mask');
+          const sourcePath = workspace?.getAttribute('data-selected-image-path');
+          const imageSessionId = canvas?.getAttribute('data-initial-mask-draw-context-session');
+          const identityText = canvas?.getAttribute('data-mask-overlay-identity');
+          if (
+            maskId === null ||
+            maskId === undefined ||
+            sourcePath === null ||
+            sourcePath === undefined ||
+            imageSessionId === null ||
+            imageSessionId === undefined ||
+            identityText === null ||
+            identityText === undefined ||
+            canvas?.getAttribute('data-mask-overlay-status') !== 'current'
+          )
+            return false;
+          const latestSave = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(-1);
+          const masks = latestSave?.args?.['adjustments']?.['masks'];
+          const persisted = Array.isArray(masks)
+            ? masks.flatMap((mask) => mask['subMasks']).find((subMask) => subMask['id'] === maskId)?.['parameters']
+            : null;
+          const native = overlays
+            .at(-1)
+            ?.args?.['maskDef']?.['subMasks']?.find((subMask: Record<string, unknown>) => subMask['id'] === maskId)?.[
+            'parameters'
+          ];
+          const identity = JSON.parse(identityText) as {
+            imageSessionId?: unknown;
+            selectedImagePath?: unknown;
+            triggerHash?: unknown;
+          };
+          if (
+            typeof identity.triggerHash !== 'string' ||
+            identity.imageSessionId !== imageSessionId ||
+            identity.selectedImagePath !== sourcePath
+          )
+            return false;
+          const trigger = JSON.parse(identity.triggerHash) as { subMasks?: Array<Record<string, unknown>> };
+          const identified = trigger.subMasks?.find((subMask) => subMask['id'] === maskId)?.['parameters'];
+          return (
+            typeof persisted === 'object' &&
+            persisted !== null &&
+            JSON.stringify(persisted) === JSON.stringify(native) &&
+            JSON.stringify(persisted) === JSON.stringify(identified)
+          );
+        },
+        { minimumOverlayCalls: overlayCallsBefore },
+        { timeout: 10_000 },
+      );
+    } catch {
+      const diagnostics = await page.evaluate(() => {
+        const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+        const canvas = document.querySelector('[data-testid="image-canvas"]');
+        const latestOverlay = calls.filter(({ command }) => command === 'generate_mask_overlay').at(-1);
+        return {
+          active: canvas?.getAttribute('data-initial-mask-draw-context-active'),
+          identity: canvas?.getAttribute('data-mask-overlay-identity'),
+          mask: canvas?.getAttribute('data-initial-mask-draw-context-mask'),
+          overlayCalls: calls.filter(({ command }) => command === 'generate_mask_overlay').length,
+          overlayMask: latestOverlay?.args?.['maskDef'] ?? null,
+          source: document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path'),
+          status: canvas?.getAttribute('data-mask-overlay-status'),
+          tool: canvas?.getAttribute('data-initial-mask-draw-context-tool'),
+        };
+      });
+      throw new Error(
+        `Timed out waiting for ${label} native overlay rollback/currentness: ${JSON.stringify(diagnostics)}.`,
+      );
+    }
+  };
   await page.getByTestId('right-panel-switcher-button-masks').click();
   const createMask = async (type: 'linear' | 'radial'): Promise<void> => {
     const contextual = page.getByTestId(`mask-contextual-create-${type}`);
@@ -523,6 +601,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   const end = { x: start.x + 110, y: start.y + 80 };
 
   const saveBeforeCancel = await readCallCount('save_metadata_and_update_thumbnail');
+  const overlayBeforeCancel = await readCallCount('generate_mask_overlay');
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
@@ -563,8 +642,36 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeCancel) {
     throw new Error('A cancelled initial-mask pointer persisted a mask commit.');
   }
+  await assertCurrentOverlayMatchesPersisted('pointercancel radial', overlayBeforeCancel);
+  for (const cancellation of ['lostpointercapture', 'escape'] as const) {
+    const saveBeforeLifecycleCancel = await readCallCount('save_metadata_and_update_thumbnail');
+    const overlayBeforeLifecycleCancel = await readCallCount('generate_mask_overlay');
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y);
+    if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+      throw new Error(`Radial ${cancellation} proof did not begin a keyed draft.`);
+    }
+    if (cancellation === 'lostpointercapture') {
+      await imageCanvas.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse' });
+    } else {
+      await imageCanvas.focus();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-active') ===
+        'false',
+    );
+    await page.mouse.up();
+    if ((await readCallCount('save_metadata_and_update_thumbnail')) !== saveBeforeLifecycleCancel) {
+      throw new Error(`Radial ${cancellation} cancellation persisted a semantic commit.`);
+    }
+    await assertCurrentOverlayMatchesPersisted(`${cancellation} radial`, overlayBeforeLifecycleCancel);
+  }
 
   const saveBeforeGeometry = await readCallCount('save_metadata_and_update_thumbnail');
+  const overlayBeforeGeometry = await readCallCount('generate_mask_overlay');
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y);
@@ -580,6 +687,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
   const narrowGeometry = await imageCanvas.getAttribute('data-initial-mask-draw-context-geometry');
   await page.setViewportSize(viewport);
   await waitForStableGeometry(narrowGeometry);
+  await assertCurrentOverlayMatchesPersisted('geometry-successor radial', overlayBeforeGeometry);
 
   const radialBaseline = {
     overlays: await readCallCount('generate_mask_overlay'),
@@ -855,6 +963,100 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
     throw new Error(
       `Tool replacement persisted the stale radial draft or did not persist the new linear mask once: ${JSON.stringify({ saveBeforeToolReplacement, savesAfterToolReplacement, toolReplacementProof })}.`,
     );
+  }
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+
+  const sourceReplacementBaseline = await readCallCount('save_metadata_and_update_thumbnail');
+  const sourceReplacementOverlayBaseline = await readCallCount('generate_mask_overlay');
+  const sourceA = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
+  if (sourceA === null) throw new Error('Initial mask A→B→A proof could not resolve source A.');
+  await page.mouse.move(replacementStart.x, replacementStart.y);
+  await page.mouse.down();
+  await page.mouse.move(replacementEnd.x, replacementEnd.y);
+  if ((await imageCanvas.getAttribute('data-initial-mask-draw-active')) !== 'true') {
+    throw new Error(`Initial mask A→B→A proof did not begin source A draft: ${JSON.stringify(await readContext())}.`);
+  }
+  const sourceBThumbnail = page
+    .locator(`[data-testid="filmstrip-thumbnail"]:not([data-image-path="${sourceA}"])`)
+    .first();
+  const sourceB = await sourceBThumbnail.getAttribute('data-image-path');
+  if (sourceB === null) throw new Error('Initial mask A→B→A proof requires source B.');
+  await sourceBThumbnail.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source B thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceB,
+  );
+  await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourceA}"]`).evaluate((element) => {
+    if (!(element instanceof HTMLElement)) throw new Error('Source A thumbnail is not interactive.');
+    element.click();
+  });
+  await page.waitForFunction(
+    (path) =>
+      document.querySelector('[data-testid="editor-workspace"]')?.getAttribute('data-selected-image-path') === path,
+    sourceA,
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline) {
+    throw new Error('A source-A draft revived and persisted after an A→B→A image-session replacement.');
+  }
+  const sourceInvalidation = await imageCanvas.evaluate((element) => {
+    const identityText = element.getAttribute('data-mask-overlay-identity');
+    return {
+      contextSession: element.getAttribute('data-initial-mask-draw-context-session'),
+      identity: identityText === null ? null : JSON.parse(identityText),
+      status: element.getAttribute('data-mask-overlay-status'),
+      urlPresent: element.getAttribute('data-mask-overlay-url-present'),
+    };
+  });
+  if (
+    sourceInvalidation.status !== 'none' ||
+    sourceInvalidation.urlPresent !== 'false' ||
+    sourceInvalidation.identity?.['status'] !== 'session-invalidated' ||
+    sourceInvalidation.identity?.['imageSessionId'] !== sourceInvalidation.contextSession
+  ) {
+    throw new Error(
+      `A→B→A did not invalidate the stale native overlay authority: ${JSON.stringify(sourceInvalidation)}.`,
+    );
+  }
+
+  await createMask('radial');
+  await waitForPersistedMask('radial', true, 'unmount radial');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-initial-mask-draw-context-active') ===
+      'true',
+  );
+  await waitForGeometryIdle();
+  await assertCurrentOverlayMatchesPersisted('successor-A radial', sourceReplacementOverlayBaseline);
+  const unmountBaseline = await readCallCount('save_metadata_and_update_thumbnail');
+  const unmountStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const unmountBox = await unmountStage.boundingBox();
+  if (unmountBox === null) throw new Error('Initial mask unmount proof could not resolve the input surface.');
+  await page.mouse.move(unmountBox.x + unmountBox.width * 0.32, unmountBox.y + unmountBox.height * 0.36);
+  await page.mouse.down();
+  await page.mouse.move(unmountBox.x + unmountBox.width * 0.63, unmountBox.y + unmountBox.height * 0.64);
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if ((await readCallCount('save_metadata_and_update_thumbnail')) !== unmountBaseline) {
+    throw new Error('Initial mask controller published a semantic commit after ImageCanvas unmount.');
   }
 }
 

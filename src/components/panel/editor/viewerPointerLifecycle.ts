@@ -1,4 +1,4 @@
-export type ViewerPointerType = 'mouse' | 'pen' | 'touch';
+import type { ViewerPointerType } from './viewerPointerEvents';
 
 interface ActiveViewerPointer {
   readonly pointerId: number;
