@@ -16,6 +16,7 @@ import {
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
 import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
+import { areAdjustmentsEqual } from '../utils/adjustmentsSnapshot';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
@@ -601,14 +602,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (request.persistence === 'preview-only') {
         throw new Error('edit_transaction.preview_requires_proposal');
       }
+      const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
+      if (
+        nativeHistoryBaseline !== undefined &&
+        (request.persistence !== 'native-committed' || request.history !== 'single-entry')
+      ) {
+        throw new Error('edit_transaction.native_history_baseline_requires_native_single_entry');
+      }
       const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
       const nextResult = reduceEditTransaction(
-        state.adjustments,
+        nativeHistoryBaseline ?? state.adjustments,
         state.adjustmentRevision,
         request,
         currentImageSessionId,
-        state.editDocumentV2,
+        nativeHistoryBaseline === undefined
+          ? state.editDocumentV2
+          : legacyAdjustmentsToEditDocumentV2(nativeHistoryBaseline),
       );
+      const reconcilesHydratedNativeCommit =
+        nativeHistoryBaseline !== undefined && !areAdjustmentsEqual(state.adjustments, nativeHistoryBaseline);
+      if (reconcilesHydratedNativeCommit && !areAdjustmentsEqual(state.adjustments, nextResult.after)) {
+        throw new Error('edit_transaction.native_history_baseline_mismatch');
+      }
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
         request.history === 'coalesced-interaction' &&
@@ -644,7 +659,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                   historyIndex: state.historyIndex,
                 }
               : pushEditHistoryEntryWithCheckpoints(
-                  state.history,
+                  reconcilesHydratedNativeCommit
+                    ? state.history.map((entry, index) =>
+                        index === state.historyIndex ? nativeHistoryBaseline : entry,
+                      )
+                    : state.history,
                   state.historyIndex,
                   nextResult.after,
                   state.historyCheckpoints,

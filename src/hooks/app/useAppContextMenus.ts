@@ -79,6 +79,7 @@ import {
   buildSelectedBatchAutoAdjustTransaction,
   resolveBatchAutoAdjustAcceptanceIdentity,
   resolveBatchAutoAdjustHydrationProtection,
+  resolveBatchAutoAdjustReconciledHistoryBaseline,
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
@@ -677,20 +678,31 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       hydrationProtection.transactionId,
                     );
                   }
-                  const acceptanceIdentity = resolveBatchAutoAdjustAcceptanceIdentity({
+                  const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
+                  const reconciledHistoryBaseline = resolveBatchAutoAdjustReconciledHistoryBaseline({
+                    acceptedAdjustments,
                     captured: capturedSelection,
                     capturedAdjustments,
                     current: latestSelection,
                     currentAdjustments: latest.selectedImage ? latest.adjustments : null,
-                    currentSource: latest.imageSession?.source ?? null,
-                    successorBaseline,
                   });
+                  const acceptanceIdentity =
+                    reconciledHistoryBaseline === null
+                      ? resolveBatchAutoAdjustAcceptanceIdentity({
+                          captured: capturedSelection,
+                          capturedAdjustments,
+                          current: latestSelection,
+                          currentAdjustments: latest.selectedImage ? latest.adjustments : null,
+                          currentSource: latest.imageSession?.source ?? null,
+                          successorBaseline,
+                        })
+                      : latestSelection;
                   if (acceptanceIdentity !== null) {
-                    const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
                     const transaction = buildSelectedBatchAutoAdjustTransaction({
                       acceptedAdjustments,
                       captured: capturedSelection,
                       current: acceptanceIdentity,
+                      ...(reconciledHistoryBaseline === null ? {} : { historyBaseline: reconciledHistoryBaseline }),
                       result: committed,
                     });
                     if (transaction !== null) latest.applyEditTransaction(transaction);

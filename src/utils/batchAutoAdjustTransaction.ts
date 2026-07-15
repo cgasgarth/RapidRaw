@@ -108,6 +108,7 @@ interface SelectedBatchAutoAdjustInput {
   acceptedAdjustments: Adjustments;
   captured: BatchAutoAdjustSelectionIdentity;
   current: BatchAutoAdjustSelectionIdentity | null;
+  historyBaseline?: Adjustments;
   result: BatchAutoAdjustPathResultV1;
 }
 
@@ -115,6 +116,7 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
   acceptedAdjustments,
   captured,
   current,
+  historyBaseline,
   result,
 }: SelectedBatchAutoAdjustInput): EditTransactionRequest | null => {
   if (
@@ -132,7 +134,29 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
     imageSessionId: current.imageSessionId,
     operations: [{ adjustments: acceptedAdjustments, type: 'replace-adjustments' }],
     persistence: 'native-committed',
+    ...(historyBaseline === undefined ? {} : { nativeCommittedHistoryBaseline: historyBaseline }),
     source: 'auto-edit',
     transactionId: result.receipt.transactionId,
   };
 };
+
+export const resolveBatchAutoAdjustReconciledHistoryBaseline = ({
+  acceptedAdjustments,
+  captured,
+  capturedAdjustments,
+  current,
+  currentAdjustments,
+}: {
+  acceptedAdjustments: Adjustments;
+  captured: BatchAutoAdjustSelectionIdentity;
+  capturedAdjustments: Adjustments;
+  current: BatchAutoAdjustSelectionIdentity | null;
+  currentAdjustments: Adjustments | null;
+}): Adjustments | null =>
+  current !== null &&
+  currentAdjustments !== null &&
+  current.path === captured.path &&
+  current.imageSessionId !== captured.imageSessionId &&
+  areAdjustmentsEqual(currentAdjustments, acceptedAdjustments)
+    ? capturedAdjustments
+    : null;
