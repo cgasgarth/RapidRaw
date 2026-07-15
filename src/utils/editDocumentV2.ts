@@ -3,6 +3,7 @@ import {
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  editDocumentCameraInputV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentNodeEnvelopeV2Schema,
@@ -55,9 +56,11 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       const params =
         nodeType === 'geometry'
           ? normalizeGeometryParams({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-          : nodeType === 'layers'
-            ? { masks: [], ...mappedParams }
-            : mappedParams;
+          : nodeType === 'camera_input'
+            ? editDocumentCameraInputV2Schema.parse({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
+            : nodeType === 'layers'
+              ? { masks: [], ...mappedParams }
+              : mappedParams;
       return [
         nodeType,
         {
@@ -75,10 +78,12 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
-  const geometryDescriptor = descriptorFor('geometry');
-  const geometryDefaulted = (geometryDescriptor?.legacyFields ?? [])
-    .filter((field) => !Object.hasOwn(adjustments, field))
-    .map((field) => `geometry.${field}`);
+  const defaultedNodeParams = (['camera_input', 'geometry'] as const).flatMap((nodeType) => {
+    const descriptor = descriptorFor(nodeType);
+    return Object.keys(descriptor?.defaultParams ?? {})
+      .filter((field) => !Object.hasOwn(adjustments, field))
+      .map((field) => `${nodeType}.${field}`);
+  });
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const legacyCrop = adjustments['crop'];
   const defaultedCropUnit = hasRecordShape(legacyCrop) && !Object.hasOwn(legacyCrop, 'unit');
@@ -90,7 +95,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     layers: nodes['layers']?.params ?? {},
     migration: {
-      defaulted: [...geometryDefaulted, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
+      defaulted: [...defaultedNodeParams, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
       disabled: [],
       mapped: [
         ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
