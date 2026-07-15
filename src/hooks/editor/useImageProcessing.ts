@@ -24,6 +24,7 @@ import {
   type PreviewQualitySnapshot,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
 import { PreviewInvalidationAdapter } from '../../utils/previewInvalidationAdapter';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
@@ -160,6 +161,14 @@ export function useImageProcessing() {
       }),
     [previewUrlReleaseAuthority],
   );
+  const previewFailureAdapter = useMemo(
+    () =>
+      new PreviewFailureAdapter({
+        getCoordinatorState: () => previewCoordinator.snapshot(),
+        publish: setEditor,
+      }),
+    [previewCoordinator, setEditor],
+  );
 
   const originalPreviewRunner =
     originalPreviewRunnerRef.current ??
@@ -186,26 +195,11 @@ export function useImageProcessing() {
           roi: context.request.roi,
         }),
       onCurrentFailure: (error, context) => {
-        const expectedSupersession = String(error).includes('preview_superseded');
-        if (!expectedSupersession) console.error('Failed to apply adjustments:', error);
-        if (expectedSupersession) return;
-        const { interactiveIdentity, quality, scopeRecovery } = context.request;
-        setEditor({
-          previewQualityStatus: {
-            ...quality,
-            generation: interactiveIdentity.generation,
-            limitedBy: 'error',
-            phase: 'degraded_limited',
-            reason: 'render_error',
-            requestId: context.identity.operationId,
-            sufficientForSemanticZoom: false,
-          },
-          ...(scopeRecovery
-            ? {
-                previewScopeRecoveryError: error instanceof Error ? error.message : String(error),
-                previewScopeRecoveryState: 'error' as const,
-              }
-            : {}),
+        previewFailureAdapter.fail(error, {
+          identity: context.identity,
+          interactiveIdentity: context.request.interactiveIdentity,
+          quality: context.request.quality,
+          scopeRecovery: context.request.scopeRecovery,
         });
       },
       onPresented: (result, context) => {
