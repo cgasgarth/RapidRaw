@@ -49,6 +49,25 @@ const objectUpdate = (expression: ts.Expression): ts.ObjectLiteralExpression | n
   return null;
 };
 
+const objectUpdates = (expression: ts.Expression): ts.ObjectLiteralExpression[] => {
+  const current = unwrap(expression);
+  if (!ts.isArrowFunction(current) || !ts.isBlock(current.body)) {
+    const update = objectUpdate(current);
+    return update === null ? [] : [update];
+  }
+  const updates: ts.ObjectLiteralExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isReturnStatement(node) && node.expression !== undefined) {
+      const update = objectUpdate(node.expression);
+      if (update !== null) updates.push(update);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(current.body);
+  return updates;
+};
+
 const propertyName = (property: ts.ObjectLiteralElementLike): string | null => {
   if (!('name' in property) || property.name === undefined) return null;
   return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) ? property.name.text : null;
@@ -80,8 +99,10 @@ export const findEditorRenderAuthorityViolations = (filePath: string, contents: 
         ? node.expression.text
         : null;
     const update = node.arguments[0] === undefined ? null : objectUpdate(node.arguments[0]);
-    if (method === 'setEditor' && update !== null) {
-      const forbidden = update.properties.map(propertyName).filter((name) => name !== null && authorityKeys.has(name));
+    if (method === 'setEditor') {
+      const forbidden = objectUpdates(node.arguments[0] ?? ts.factory.createObjectLiteralExpression())
+        .flatMap(({ properties }) => properties.map(propertyName))
+        .filter((name) => name !== null && authorityKeys.has(name));
       if (forbidden.length > 0) report(node, `setEditor writes ${forbidden.join(',')}`);
     }
     if (method === 'hydrateEditorRenderAuthority') {
@@ -113,6 +134,11 @@ const selfTest = () => {
   const cases = [
     ['setEditor authority', 'store.setEditor({ adjustments });', ['setEditor writes adjustments']],
     ['identifier setEditor', 'setEditor({ historyIndex: 2 });', ['setEditor writes historyIndex']],
+    [
+      'block setEditor',
+      'setEditor((state) => { if (state.ready) return {}; return { adjustments: state.adjustments }; });',
+      ['setEditor writes adjustments'],
+    ],
     ['structural cast', 'store.setEditor(({ history }) as Update);', ['setEditor writes history']],
     ['direct Zustand authority', 'useEditorStore.setState({ adjustmentRevision: 2 });', ['setState writes']],
     ['dynamic Zustand update', 'useEditorStore.setState(update);', ['dynamic']],

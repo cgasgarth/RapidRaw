@@ -126,6 +126,22 @@ if (consumePendingNegativeConversionSavedPositiveHandoff(savedPath) !== null) {
 if (!consumePendingNegativeConversionDustHealLayers(savedPath)) {
   throw new Error('Negative Lab saved positive dust-heal layers were not consumed for the opened positive.');
 }
+const committedDustState = useEditorStore.getState();
+if (
+  committedDustState.historyIndex !== 1 ||
+  committedDustState.history.length !== 2 ||
+  committedDustState.lastEditApplicationReceipt?.source !== 'layer-command'
+) {
+  throw new Error('Negative Lab dust handoff bypassed the canonical edit transaction/history boundary.');
+}
+committedDustState.undo();
+if (useEditorStore.getState().adjustments.masks.some(({ id }) => id === acceptedDustHealLayer.id)) {
+  throw new Error('Negative Lab dust handoff Undo did not remove the accepted layer.');
+}
+useEditorStore.getState().redo();
+if (!useEditorStore.getState().adjustments.masks.some(({ id }) => id === acceptedDustHealLayer.id)) {
+  throw new Error('Negative Lab dust handoff Redo did not restore the accepted layer.');
+}
 const openedPositive = useEditorStore.getState().selectedImage;
 const openedMetadata =
   typeof openedPositive?.metadata === 'object' &&
