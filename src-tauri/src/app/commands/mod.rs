@@ -9,5 +9,6 @@ pub(crate) mod source;
 pub(crate) mod startup;
 pub(crate) mod temporary_artifacts;
 pub(crate) mod thumbnail;
+pub(crate) mod uncropped_preview;
 pub(crate) mod viewer_sampling;
 pub(crate) mod wgpu_presentation;
