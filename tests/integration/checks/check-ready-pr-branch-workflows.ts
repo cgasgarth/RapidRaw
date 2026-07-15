@@ -41,13 +41,28 @@ if (
 ) {
   throw new Error('active-check skips must retry after required workflow completion');
 }
-const updaterStep = updater.jobs?.update?.steps?.find((step) => step.run);
+const updaterStep = updater.jobs?.update?.steps?.find(
+  (step) => step.run === 'bun scripts/ci/update-ready-pr-branches.ts',
+);
 const updaterRun = updaterStep?.run;
 if (updaterRun !== 'bun scripts/ci/update-ready-pr-branches.ts') {
   throw new Error('ready PR updater must execute the tested branch freshness implementation');
 }
-if (updaterStep?.env?.GITHUB_TOKEN !== '${{ github.token }}') {
-  throw new Error('ready PR updater must use the repository workflow token');
+if (updaterStep?.env?.READY_PR_UPDATE_TOKEN !== '${{ secrets.READY_PR_UPDATE_TOKEN }}') {
+  throw new Error('ready PR updater must use the dedicated non-recursive credential');
+}
+if (updaterStep?.env?.GITHUB_TOKEN) {
+  throw new Error('ready PR updater must not mutate PR heads with GITHUB_TOKEN');
+}
+const checkoutStep = updater.jobs?.update?.steps?.find((step) => step.uses?.startsWith('actions/checkout@'));
+if (checkoutStep?.with?.token !== '${{ secrets.READY_PR_UPDATE_TOKEN }}') {
+  throw new Error('checkout must configure git pushes with the dedicated non-recursive credential');
+}
+const credentialGuard = updater.jobs?.update?.steps?.find(
+  (step) => step.env?.READY_PR_UPDATE_TOKEN && step.run?.includes('READY_PR_UPDATE_TOKEN is required'),
+);
+if (!credentialGuard) {
+  throw new Error('ready PR updater must fail closed with an actionable missing-credential error');
 }
 
 const required = readWorkflow('lint.yml');

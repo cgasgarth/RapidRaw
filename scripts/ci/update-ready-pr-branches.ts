@@ -412,11 +412,14 @@ if (import.meta.main) {
     .string()
     .regex(/^[^/]+\/[^/]+$/u)
     .parse(process.env.GITHUB_REPOSITORY);
-  const token = z.string().min(1).parse(process.env.GITHUB_TOKEN);
+  const token = z
+    .string({ error: 'READY_PR_UPDATE_TOKEN must be a GitHub App installation token or fine-grained user token' })
+    .min(1, 'READY_PR_UPDATE_TOKEN must not be empty')
+    .parse(process.env.READY_PR_UPDATE_TOKEN);
   const api = new GitHubApi(repository, token);
   const gitEnvironment = Object.fromEntries(
     Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[0] !== 'GITHUB_TOKEN' && entry[1] !== undefined,
+      (entry): entry is [string, string] => entry[0] !== 'READY_PR_UPDATE_TOKEN' && entry[1] !== undefined,
     ),
   );
   const results = await updateReadyPullRequests(repository, new GitBranchUpdater(api, process.cwd(), gitEnvironment));
