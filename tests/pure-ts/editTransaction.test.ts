@@ -188,6 +188,14 @@ describe('reduceEditTransaction', () => {
         },
       ],
     );
+    const levels = { ...structuredClone(INITIAL_ADJUSTMENTS.levels), enabled: true, gamma: 1.25 };
+    expect(buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, levels })).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'luma_levels',
+        patch: { levels },
+      },
+    ]);
 
     const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
     const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
@@ -260,7 +268,7 @@ describe('reduceEditTransaction', () => {
     const operations = buildEditorSectionNodeEnablementOperations(document, 'color', false);
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request({ operations }), undefined, document);
 
-    expect(operations).toHaveLength(7);
+    expect(operations).toHaveLength(8);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
     expect(result.after).toBe(INITIAL_ADJUSTMENTS);

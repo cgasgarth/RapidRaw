@@ -2015,7 +2015,11 @@ fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
     }
 }
 
-fn apply_luma_levels(color: Vec3, settings: LevelsSettings, preserve_extended: bool) -> Vec3 {
+pub(crate) fn apply_luma_levels(
+    color: Vec3,
+    settings: LevelsSettings,
+    preserve_extended: bool,
+) -> Vec3 {
     if settings.enabled == 0 {
         return color;
     }

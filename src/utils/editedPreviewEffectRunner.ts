@@ -235,6 +235,7 @@ const executeNativeEditedPreview = async (
           'display_creative',
           'geometry',
           'lens_correction',
+          'luma_levels',
           'layers',
           'perceptual_grading',
           'point_color',

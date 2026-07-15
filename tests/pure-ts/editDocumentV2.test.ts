@@ -84,6 +84,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'color_balance_rgb',
       'black_white_mixer',
       'channel_mixer',
+      'luma_levels',
       'perceptual_grading',
       'camera_input',
       'lens_correction',
@@ -203,6 +204,40 @@ describe('EditDocumentV2 legacy adapter', () => {
       };
     }
     expect(() => editDocumentV2Schema.parse(identity)).toThrow();
+  });
+
+  test('owns strict luma Levels state and excludes it from quarantined legacy fields', () => {
+    const levels = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.levels),
+      enabled: true,
+      gamma: 1.25,
+      inputBlack: 0.04,
+      inputWhite: 0.96,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      levels,
+    });
+
+    expect(document.nodes.luma_levels?.params).toEqual({ levels });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('levels');
+    expect(document.migration?.mapped).toContain('luma_levels.levels');
+    expect(compileEditDocumentNodeV2(document.nodes.luma_levels).params).toEqual({ levels });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.luma_levels) unknown.nodes.luma_levels.params.levels = { ...levels, futurePivot: true };
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.luma_levels) outOfRange.nodes.luma_levels.params.levels.gamma = 5.1;
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
+
+    const invalidRange = structuredClone(document);
+    if (invalidRange.nodes.luma_levels) {
+      invalidRange.nodes.luma_levels.params.levels.inputBlack = 0.9;
+      invalidRange.nodes.luma_levels.params.levels.inputWhite = 0.9;
+    }
+    expect(() => editDocumentV2Schema.parse(invalidRange)).toThrow();
   });
 
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
@@ -790,6 +825,55 @@ describe('EditDocumentV2 legacy adapter', () => {
       colorBalanceRgb: corruptFlatAdjustments.colorBalanceRgb,
     });
     expect(corruptFlat.migration?.mapped).not.toContain('color_balance_rgb.colorBalanceRgb');
+  });
+
+  test('promotes pre-Levels-node state and quarantines corrupt legacy values idempotently', () => {
+    const levels = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.levels),
+      enabled: true,
+      gamma: 1.25,
+      inputBlack: 0.04,
+      inputWhite: 0.96,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      levels,
+    });
+    const oldV2 = structuredClone(document);
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.extensions.legacyAdjustments.levels = levels;
+    delete oldV2.nodes.luma_levels;
+    migration.mapped = migration.mapped.filter((path) => path !== 'luma_levels.levels');
+    migration.quarantined.push('levels');
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.luma_levels.params).toEqual({ levels });
+    expect(reopened.nodes.luma_levels.enabled).toBe(reopened.nodes.channel_mixer.enabled);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('levels');
+    expect(reopened.migration?.mapped).toContain('luma_levels.levels');
+    expect(reopened.migration?.quarantined).not.toContain('levels');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptV2 = structuredClone(document);
+    const corrupt = { ...levels, gamma: 8 };
+    corruptV2.extensions.legacyAdjustments.levels = corrupt;
+    delete corruptV2.nodes.luma_levels;
+    const quarantined = editDocumentV2Schema.parse(corruptV2);
+    expect(quarantined.nodes.luma_levels.params.levels).toEqual(INITIAL_ADJUSTMENTS.levels);
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ levels: corrupt });
+    expect(quarantined.migration?.defaulted).toContain('luma_levels.levels');
+    expect(quarantined.migration?.quarantined).toContain('levels');
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
+
+    const corruptFlatAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    corruptFlatAdjustments.levels.gamma = Number.NaN;
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2(corruptFlatAdjustments);
+    expect(corruptFlat.nodes.luma_levels.params.levels).toEqual(INITIAL_ADJUSTMENTS.levels);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({
+      levels: corruptFlatAdjustments.levels,
+    });
+    expect(corruptFlat.migration?.mapped).not.toContain('luma_levels.levels');
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {
@@ -1431,6 +1515,27 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     expect(renderDocument.nodes.color_balance_rgb).toBe(authoritative.nodes.color_balance_rgb);
     expect(renderDocument.nodes.color_balance_rgb?.params).toEqual({ colorBalanceRgb });
+    expect(renderDocument.nodes.channel_mixer).toEqual(preparedDocument.nodes.channel_mixer);
+  });
+
+  test('render preparation overlays the authoritative luma Levels envelope', () => {
+    const levels = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.levels),
+      enabled: true,
+      gamma: 1.25,
+      inputBlack: 0.04,
+      inputWhite: 0.96,
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      levels,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['luma_levels']);
+
+    expect(renderDocument.nodes.luma_levels).toBe(authoritative.nodes.luma_levels);
+    expect(renderDocument.nodes.luma_levels?.params).toEqual({ levels });
     expect(renderDocument.nodes.channel_mixer).toEqual(preparedDocument.nodes.channel_mixer);
   });
 
