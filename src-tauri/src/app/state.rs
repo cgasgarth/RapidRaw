@@ -7,7 +7,6 @@ use serde::Serialize;
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
 #[cfg(feature = "ai")]
 use crate::render::native_cache::{CachePolicy, MemoryLruCache};
-use crate::source_revision::FingerprintCache;
 
 pub struct PreviewJob {
     pub adjustments: Arc<serde_json::Value>,
@@ -77,7 +76,6 @@ pub struct AppState {
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
-    pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub smart_preview_scheduler:
         Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
 }
@@ -122,7 +120,6 @@ impl AppState {
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             interactive_gpu_pressure: Arc::default(),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
-            source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             smart_preview_scheduler:
                 crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
         }
