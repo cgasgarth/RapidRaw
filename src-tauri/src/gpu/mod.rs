@@ -4,6 +4,7 @@ pub(crate) mod crash_marker_service;
 pub(crate) mod gpu_context;
 pub(crate) mod gpu_display;
 pub(crate) mod gpu_processing;
+pub(crate) mod gpu_processing_service;
 pub(crate) mod gpu_readback;
 pub(crate) mod gpu_runtime;
 pub(crate) mod gpu_textures;

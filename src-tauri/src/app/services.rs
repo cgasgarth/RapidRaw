@@ -128,6 +128,7 @@ pub struct AppServices {
     pub(crate) payload_residency:
         Arc<crate::color::payload_residency_service::PayloadResidencyService>,
     pub(crate) gpu_crash_marker: Arc<crate::gpu::crash_marker_service::GpuCrashMarkerService>,
+    pub(crate) gpu_processing: Arc<crate::gpu::gpu_processing_service::GpuProcessingService>,
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
@@ -160,6 +161,7 @@ impl AppServices {
             denoise: Arc::default(),
             payload_residency: Arc::default(),
             gpu_crash_marker: Arc::default(),
+            gpu_processing: Arc::default(),
             lens_database: Arc::default(),
             focus_stack: Arc::default(),
             focus_stack_results: Arc::default(),
