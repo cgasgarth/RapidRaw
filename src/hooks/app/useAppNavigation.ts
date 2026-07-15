@@ -15,12 +15,13 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { type Adjustments, normalizeLoadedAdjustments } from '../../utils/adjustments';
 import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
   cancelBackgroundIndexingWithSchema,
   startBackgroundIndexingWithSchema,
 } from '../../utils/catalogIndexingInvokes';
+import { applyEditorTeardownIfCurrent, captureEditorTeardownIdentity } from '../../utils/editorTeardownTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
@@ -158,7 +159,12 @@ export function useAppNavigation({
     if (editor.selectedImage?.path && outgoingCacheEntry) {
       globalImageCache.set(editor.selectedImage.path, outgoingCacheEntry);
     }
-    editor.setEditor({ imageSession: null, selectedImage: null });
+    debouncedSave.flush();
+    debouncedSetHistory.cancel();
+    const teardownIdentity = captureEditorTeardownIdentity(editor);
+    if (teardownIdentity !== null) {
+      applyEditorTeardownIfCurrent(editor, teardownIdentity, `navigation-home:${teardownIdentity.imageSessionId}`);
+    }
     useLibraryStore.getState().setLibrary({
       rootPaths: [],
       currentFolderPath: null,
@@ -175,7 +181,7 @@ export function useAppNavigation({
 
   const handleBackToLibrary = useCallback(() => {
     const editor = useEditorStore.getState();
-    const { selectedImage, resetHistory, setEditor } = editor;
+    const { selectedImage } = editor;
     const { setLibrary } = useLibraryStore.getState();
     const { setUI } = useUIStore.getState();
 
@@ -191,33 +197,15 @@ export function useAppNavigation({
 
     const lastActivePath = selectedImage?.path ?? null;
 
-    setEditor({
-      hasRenderedFirstFrame: false,
-      selectedImage: null,
-      imageSession: null,
-      finalPreviewUrl: null,
-      uncroppedAdjustedPreviewUrl: null,
-      histogram: null,
-      waveform: null,
-      previewScopeStatus: null,
-      gamutWarningOverlay: null,
-      activeMaskId: null,
-      activeMaskContainerId: null,
-      activeAiPatchContainerId: null,
-      isMaskControlHovered: false,
-      isWbPickerActive: false,
-      activeAiSubMaskId: null,
-      transformedOriginalUrl: null,
-    });
+    const teardownIdentity = captureEditorTeardownIdentity(editor);
+    if (teardownIdentity !== null) {
+      applyEditorTeardownIfCurrent(editor, teardownIdentity, `navigation-back:${teardownIdentity.imageSessionId}`);
+    }
 
     setLibrary({ libraryActivePath: lastActivePath });
     setUI({ slideDirection: 1 });
 
-    setEditor({ adjustments: INITIAL_ADJUSTMENTS });
-    resetHistory(INITIAL_ADJUSTMENTS);
-
     isBackendReadyRef.current = true;
-    setEditor({ interactivePatch: null });
   }, [isBackendReadyRef, transformWrapperRef]);
 
   const handleImageSelect = useCallback(
@@ -495,7 +483,8 @@ export function useAppNavigation({
         appendCatalogPage,
       } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
-      const { selectedImage, resetHistory, setEditor } = useEditorStore.getState();
+      const editorAtFolderSelection = useEditorStore.getState();
+      const teardownIdentity = captureEditorTeardownIdentity(editorAtFolderSelection);
       const libraryViewMode = appSettings?.libraryViewMode;
 
       if (!preserveEditor) {
@@ -545,19 +534,15 @@ export function useAppNavigation({
           ...(preserveEditor ? {} : { imageList: [], multiSelectedPaths: [], libraryActivePath: null }),
         });
 
-        if (!preserveEditor && selectedImage) {
+        if (!preserveEditor && teardownIdentity !== null) {
           debouncedSave.flush();
           debouncedSetHistory.cancel();
-          setEditor({
-            finalPreviewUrl: null,
-            gamutWarningOverlay: null,
-            histogram: null,
-            selectedImage: null,
-            isMaskControlHovered: false,
-            uncroppedAdjustedPreviewUrl: null,
-          });
-          setEditor({ adjustments: INITIAL_ADJUSTMENTS });
-          resetHistory(INITIAL_ADJUSTMENTS);
+          const currentEditor = useEditorStore.getState();
+          applyEditorTeardownIfCurrent(
+            currentEditor,
+            teardownIdentity,
+            `folder-switch:${teardownIdentity.imageSessionId}:${path ?? 'root'}`,
+          );
         }
 
         let files: ImageFile[];
