@@ -8,6 +8,7 @@ import {
 import type { Adjustments } from './adjustments';
 import {
   legacyAdjustmentsToEditDocumentV2,
+  pasteEditDocumentV2Node,
   setEditDocumentV2NodeEnabled,
   updateEditDocumentV2Node,
 } from './editDocumentV2';
@@ -52,6 +53,7 @@ export type EditNodeOperation =
       patch: Readonly<Record<string, unknown>>;
     }
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
+  | { type: 'replace-edit-document-node'; nodeType: EditDocumentNodeTypeV2; node: unknown }
   | { type: 'patch-adjustments'; patch: Partial<Adjustments> }
   | { type: 'replace-edit-authority'; adjustments: Adjustments; editDocumentV2: EditDocumentV2 }
   | { type: 'replace-adjustments'; adjustments: Adjustments };
@@ -336,6 +338,24 @@ export const reduceEditTransaction = (
       }
       if (previousEnabled !== undefined && previousEnabled !== operation.enabled) {
         documentChangedKeys.push(`nodes.${operation.nodeType}.enabled`);
+      }
+      continue;
+    }
+    if (operation.type === 'replace-edit-document-node') {
+      const replacedDocument = pasteEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, operation.node);
+      if (replacedDocument !== afterEditDocumentV2) {
+        afterEditDocumentV2 = replacedDocument;
+        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+        if (
+          request.source === 'copy-paste' &&
+          afterEditDocumentV2.provenance.referenceMatchApplicationReceipt !== null
+        ) {
+          afterEditDocumentV2 = {
+            ...afterEditDocumentV2,
+            provenance: { ...afterEditDocumentV2.provenance, referenceMatchApplicationReceipt: null },
+          };
+          after = { ...after, referenceMatchApplicationReceipt: null };
+        }
       }
       continue;
     }

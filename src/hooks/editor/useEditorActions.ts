@@ -13,12 +13,9 @@ import { Invokes } from '../../tauri/commands';
 import {
   type Adjustments,
   bindTypedCurveGraphVersion,
-  COPYABLE_ADJUSTMENT_KEYS,
   INITIAL_ADJUSTMENTS,
-  LensAdjustment,
   normalizeLoadedAdjustments,
   PasteMode,
-  pickAdjustmentValues,
 } from '../../utils/adjustments';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from '../../utils/appEventLogger';
 import {
@@ -40,6 +37,13 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../utils/copyPasteEditTransaction';
+import {
+  copyEditDocumentV2Nodes,
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  legacyAdjustmentsToEditDocumentV2,
+  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
+  selectEditDocumentV2CopyPayload,
+} from '../../utils/editDocumentV2';
 import {
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
@@ -331,9 +335,10 @@ export function useEditorActions() {
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
-    const { selectedImage, adjustments } = useEditorStore.getState();
+    const { selectedImage, adjustments, editDocumentV2 } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
     let sourceAdjustments: Adjustments | null = null;
+    let sourceDocument = selectedImage ? editDocumentV2 : null;
 
     if (selectedImage) {
       sourceAdjustments = adjustments;
@@ -347,6 +352,7 @@ export function useEditorActions() {
           } else {
             sourceAdjustments = INITIAL_ADJUSTMENTS;
           }
+          sourceDocument = legacyAdjustmentsToEditDocumentV2(sourceAdjustments);
         } catch (err) {
           toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
@@ -354,46 +360,41 @@ export function useEditorActions() {
       }
     }
 
-    if (!sourceAdjustments) return;
+    if (!sourceAdjustments || sourceDocument === null) return;
 
-    const adjustmentsToCopy = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, sourceAdjustments, {
-      requireExistingKey: true,
+    const copiedEditDocumentV2 = copyEditDocumentV2Nodes(sourceDocument);
+    useEditorStore.getState().setEditor({
+      copiedEditDocumentV2,
     });
-    useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
     useProcessStore.getState().setProcess({ isCopied: true });
   }, []);
 
   const handlePasteAdjustments = useCallback(
     (paths?: string[]) => {
-      const { copiedAdjustments, selectedImage } = useEditorStore.getState();
+      const { copiedEditDocumentV2, selectedImage } = useEditorStore.getState();
       const { multiSelectedPaths } = useLibraryStore.getState();
       const { appSettings } = useSettingsStore.getState();
       const { setProcess } = useProcessStore.getState();
 
-      if (!copiedAdjustments || !appSettings) return;
+      if (!copiedEditDocumentV2 || !appSettings) return;
 
       const { mode, includedAdjustments } = appSettings.copyPasteSettings ?? {
         mode: PasteMode.Merge,
-        includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+        includedAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
       };
-      const selectedAdjustmentsToApply = pickAdjustmentValues(includedAdjustments, copiedAdjustments, {
-        requireExistingKey: true,
-        skipDefaultValues: mode === PasteMode.Merge,
-      });
+      const selectedPayload = selectEditDocumentV2CopyPayload(
+        copiedEditDocumentV2,
+        includedAdjustments,
+        mode === PasteMode.Merge,
+      );
       const adjustmentsToApply = bindTypedCurveGraphVersion(
         acceptReferenceMatchAdjustmentTransfer({
-          adjustments: selectedAdjustmentsToApply,
+          adjustments: lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selectedPayload),
           transferMode: 'copy-paste',
         }).adjustments,
       );
 
-      if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
-        if (!adjustmentsToApply[LensAdjustment.LensMaker]) {
-          adjustmentsToApply[LensAdjustment.LensDistortionParams] = null;
-        }
-      }
-
-      if (Object.keys(adjustmentsToApply).length === 0) {
+      if (Object.keys(selectedPayload.nodes).length === 0) {
         setProcess({ isPasted: true });
         return;
       }
@@ -412,22 +413,24 @@ export function useEditorActions() {
         nextAdjustmentRevision: baseAdjustmentRevision + 1,
       };
       let compensationTarget: CopyPasteCompensationTarget | null = null;
+      let selectedPasteWasNoOp = false;
+
+      if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+        compensationTarget = captureCopyPasteCompensationTarget(editorState, selectedImage.path);
+        const request = buildCopyPasteEditTransaction(editorState, selectedImage.path, selectedPayload, transactionId);
+        const result = applyEditTransaction(request);
+        selectedPasteWasNoOp = result.noOp;
+        transaction = buildEditTransactionPersistenceContext(request, result);
+      }
+
+      if (selectedPasteWasNoOp && pathsToUpdate.length === 1 && pathsToUpdate[0] === selectedImage?.path) {
+        setProcess({ isPasted: true });
+        return;
+      }
 
       pathsToUpdate.forEach((p) => {
         globalImageCache.delete(p);
       });
-
-      if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-        compensationTarget = captureCopyPasteCompensationTarget(editorState, selectedImage.path);
-        const request = buildCopyPasteEditTransaction(
-          editorState,
-          selectedImage.path,
-          adjustmentsToApply,
-          transactionId,
-        );
-        const result = applyEditTransaction(request);
-        transaction = buildEditTransactionPersistenceContext(request, result);
-      }
 
       invokeWithSchema(
         Invokes.ApplyAdjustmentsToPaths,

@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import {
+  EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentNodeTypeV2,
+} from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { TextVariants } from '../../../types/typography';
+import { type CopyPasteSettings, PasteMode } from '../../../utils/adjustments';
 import {
-  ADJUSTMENT_GROUPS,
-  COPYABLE_ADJUSTMENT_KEYS,
-  type CopyPasteSettings,
-  PasteMode,
-} from '../../../utils/adjustments';
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  getEditDocumentV2CopyableNodeTypes,
+} from '../../../utils/editDocumentV2';
 import Button from '../../ui/primitives/Button';
 import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedControl';
 import Switch from '../../ui/primitives/Switch';
@@ -22,7 +25,33 @@ interface CopyPasteSettingsModalProps {
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const labelFallback = (labelKey: string) => capitalize(labelKey.split('.').pop() ?? labelKey);
+const NODE_LABEL_KEY_PARTS: Partial<Record<EditDocumentNodeTypeV2, readonly string[]>> = {
+  black_white_mixer: ['modals', 'copyPaste', 'groups', 'blackWhiteMixer'],
+  camera_input: ['modals', 'copyPaste', 'groups', 'profileTone'],
+  channel_mixer: ['modals', 'copyPaste', 'groups', 'channelMixer'],
+  color_calibration: ['modals', 'copyPaste', 'groups', 'colorCalibration'],
+  detail_denoise_dehaze: ['modals', 'copyPaste', 'groups', 'clarityDehaze'],
+  display_creative: ['editor', 'adjustments', 'sections', 'effects'],
+  geometry: ['modals', 'copyPaste', 'groups', 'transformRotation'],
+  lens_correction: ['modals', 'copyPaste', 'groups', 'lensCorrection'],
+  perceptual_grading: ['modals', 'copyPaste', 'groups', 'colorGrading'],
+  point_color: ['modals', 'copyPaste', 'groups', 'colorMixer'],
+  scene_curve: ['modals', 'copyPaste', 'groups', 'curves'],
+  scene_global_color_tone: ['modals', 'copyPaste', 'groups', 'tone'],
+  tone_equalizer: ['modals', 'copyPaste', 'groups', 'exposureToneMapper'],
+};
+type CopyPasteNodeDescriptor = (typeof EDIT_DOCUMENT_NODE_DESCRIPTORS)[number];
+const COPY_PASTE_NODE_GROUPS = Object.entries(
+  EDIT_DOCUMENT_NODE_DESCRIPTORS.filter(({ nodeType }) =>
+    EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES.includes(nodeType),
+  ).reduce<Record<string, CopyPasteNodeDescriptor[]>>((groups, descriptor) => {
+    const section =
+      descriptor.editorSection ??
+      (descriptor.nodeType === 'geometry' || descriptor.nodeType === 'lens_correction' ? 'geometry' : 'other');
+    (groups[section] ??= []).push(descriptor);
+    return groups;
+  }, {}),
+);
 
 interface PasteModeSwitchProps {
   selectedMode: PasteMode;
@@ -93,7 +122,11 @@ export default function CopyPasteSettingsModal(props: CopyPasteSettingsModalProp
 
 export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show }: CopyPasteSettingsDraftProps) {
   const { t } = useTranslation();
-  const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(() => initialSettings);
+  const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(() => ({
+    ...initialSettings,
+    includedAdjustments: [...getEditDocumentV2CopyableNodeTypes(initialSettings.includedAdjustments)],
+    knownAdjustments: [...EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES],
+  }));
 
   const handleSave = useCallback(() => {
     onSave(localSettings);
@@ -117,7 +150,10 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
   }, [show, handleKeyDown]);
 
   const handleSelectAll = () => {
-    setLocalSettings((prev) => ({ ...prev, includedAdjustments: [...COPYABLE_ADJUSTMENT_KEYS] }));
+    setLocalSettings((prev) => ({
+      ...prev,
+      includedAdjustments: [...EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES],
+    }));
   };
 
   const handleSelectNone = () => {
@@ -198,21 +234,26 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
             </div>
             <div className="bg-bg-primary p-4 rounded-md max-h-64 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
-                {Object.entries(ADJUSTMENT_GROUPS).map(([section, groups]) => (
+                {COPY_PASTE_NODE_GROUPS.map(([section, descriptors]) => (
                   <div key={section}>
                     <UiText variant={TextVariants.heading} className="mb-2">
                       {t(`editor.adjustments.sections.${section}`, { defaultValue: capitalize(section) })}
                     </UiText>
-                    {groups.map((group) => {
-                      const isFullyChecked = group.keys.every((key) => localSettings.includedAdjustments.includes(key));
+                    {descriptors?.map((descriptor) => {
+                      const isChecked = localSettings.includedAdjustments.includes(descriptor.nodeType);
+                      const labelKey = NODE_LABEL_KEY_PARTS[descriptor.nodeType]?.join('.');
 
                       return (
-                        <div key={group.label} className="mb-1.5 last:mb-0">
+                        <div key={descriptor.nodeType} className="mb-1.5 last:mb-0">
                           <Switch
-                            label={t(group.label, { defaultValue: labelFallback(group.label) })}
-                            checked={isFullyChecked}
+                            label={
+                              labelKey === undefined
+                                ? capitalize(descriptor.nodeType.replaceAll('_', ' '))
+                                : t(labelKey, { defaultValue: capitalize(descriptor.nodeType.replaceAll('_', ' ')) })
+                            }
+                            checked={isChecked}
                             onChange={(checked) => {
-                              handleGroupToggle(group.keys, checked);
+                              handleGroupToggle([descriptor.nodeType], checked);
                             }}
                           />
                         </div>

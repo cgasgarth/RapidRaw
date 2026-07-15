@@ -260,7 +260,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.preventDefault();
       event.stopPropagation();
 
-      const { selectedImage, history, historyIndex, undo, redo, copiedAdjustments } = useEditorStore.getState();
+      const { selectedImage, history, historyIndex, undo, redo, copiedEditDocumentV2 } = useEditorStore.getState();
       const { imageList } = useLibraryStore.getState();
       const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { isFullScreen, setRightPanel, setUI } = useUIStore.getState();
@@ -319,7 +319,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           onClick: () => {
             handlePasteAdjustments();
           },
-          disabled: copiedAdjustments === null,
+          disabled: copiedEditDocumentV2 === null,
         },
         {
           label: t('contextMenus.editor.productivity'),
@@ -444,7 +444,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       event.stopPropagation();
 
       const editorAtContextOpen = useEditorStore.getState();
-      const { selectedImage, copiedAdjustments, setEditor } = editorAtContextOpen;
+      const { selectedImage, copiedEditDocumentV2, setEditor } = editorAtContextOpen;
       const { multiSelectedPaths, imageList, albumTree, activeAlbumId, setLibrary } = useLibraryStore.getState();
       const { appSettings, supportedTypes } = useSettingsStore.getState();
       const { setUI, setRightPanel } = useUIStore.getState();
@@ -829,7 +829,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           onClick: () => handleCopyAdjustments(),
         },
         {
-          disabled: copiedAdjustments === null,
+          disabled: copiedEditDocumentV2 === null,
           icon: ClipboardPaste,
           label: pasteLabel,
           onClick: () => {
