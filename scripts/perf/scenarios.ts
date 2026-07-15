@@ -239,8 +239,18 @@ const browserQaScenario = (
         new Response(child.stderr).text(),
         child.exited,
       ]);
-      if (exitCode !== 0) throw new Error(`${qaScenarioId} failed:\n${`${stdout}\n${stderr}`.trim().slice(-8_000)}`);
       const receiptPath = stdout.match(/^receipt (.+?)(?: starts=|$)/mu)?.[1];
+      if (exitCode !== 0) {
+        const receiptError =
+          receiptPath === undefined
+            ? undefined
+            : await readFile(resolve(receiptPath), 'utf8')
+                .then((text) => qaReceiptSchema.parse(JSON.parse(text)).scenarios[0]?.error)
+                .catch(() => undefined);
+        throw new Error(
+          `${qaScenarioId} failed:\n${[receiptError, stdout, stderr].filter(Boolean).join('\n').trim().slice(-8_000)}`,
+        );
+      }
       if (receiptPath === undefined) throw new Error(`${qaScenarioId} did not emit a QA receipt path.`);
       const receipt = qaReceiptSchema.parse(JSON.parse(await readFile(resolve(receiptPath), 'utf8')));
       const result = receipt.scenarios[0];
