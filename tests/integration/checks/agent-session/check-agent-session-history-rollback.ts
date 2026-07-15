@@ -87,7 +87,16 @@ if (editedState.lastBasicToneCommand === null) {
   throw new Error('Agent edit did not retain runtime basic-tone provenance before rollback.');
 }
 
-useEditorStore.getState().pushHistory({ ...editedState.adjustments, contrast: 7 });
+if (editedState.imageSession === null) throw new Error('Expected active image session before rollback stale check.');
+editedState.applyEditTransaction({
+  baseAdjustmentRevision: editedState.adjustmentRevision,
+  history: 'single-entry',
+  imageSessionId: editedState.imageSession.id,
+  operations: [{ patch: { contrast: 7 }, type: 'patch-adjustments' }],
+  persistence: 'commit',
+  source: 'agent-command',
+  transactionId: 'agent-history-intervening-edit',
+});
 expectRejects(() =>
   rollbackAgentSessionHistory({
     checkpoint,
@@ -103,6 +112,7 @@ if (useEditorStore.getState().historyIndex !== 2) {
   throw new Error('Rejected stale rollback mutated the current edit graph.');
 }
 useEditorStore.getState().goToHistoryIndex(1);
+const beforeRollbackRevision = useEditorStore.getState().adjustmentRevision;
 
 const rollback = rollbackAgentSessionHistory({
   checkpoint,
@@ -126,6 +136,14 @@ if (
 }
 if (restoredState.historyIndex !== 0 || restoredState.history.length !== 1) {
   throw new Error('Agent history rollback did not restore session-start history.');
+}
+if (
+  restoredState.adjustmentRevision !== beforeRollbackRevision + 1 ||
+  restoredState.lastEditApplicationReceipt?.source !== 'history' ||
+  restoredState.lastEditApplicationReceipt.transactionId !==
+    'agent-history:agent-history-3163:session_start:agent-history-rollback-3163'
+) {
+  throw new Error('Agent history rollback did not publish one history-navigation transaction receipt.');
 }
 if (restoredState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure || restoredState.adjustments.shadows !== 0) {
   throw new Error('Agent history rollback did not restore session-start adjustments.');
