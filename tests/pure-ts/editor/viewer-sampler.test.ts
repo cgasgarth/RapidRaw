@@ -30,6 +30,7 @@ describe('viewer sampler contract', () => {
       compareOrientation: 'vertical' as const,
       geometryEpoch: 7,
       graphRevision: 'history_3',
+      imageSessionId: 'image-session:fixture:1',
       imageIdentity: '/fixture/color-patches.tif',
       proofRecipeId: null,
       softProofEnabled: false,
@@ -37,6 +38,7 @@ describe('viewer sampler contract', () => {
     const identity = buildViewerSamplerIdentity(baseline);
     const variants = [
       { ...baseline, imageIdentity: '/fixture/other.tif' },
+      { ...baseline, imageSessionId: 'image-session:fixture:2' },
       { ...baseline, graphRevision: 'history_4' },
       { ...baseline, geometryEpoch: 8 },
       { ...baseline, compareMode: 'split-wipe' as const },

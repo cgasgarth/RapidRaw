@@ -43,6 +43,7 @@ export interface ViewerSamplerInteractionContext {
 export interface ViewerSamplerInteractionResult {
   readonly request: ViewerSampleRequest;
   readonly target: ViewerSampleTarget;
+  readonly viewPoint: { readonly x: number; readonly y: number };
 }
 
 /** Converts one surface pointer into the canonical sampler request and target. */
@@ -100,5 +101,13 @@ export const resolveViewerSamplerInteraction = (
       requestedSpace: 'displayEncoded',
     }),
     target,
+    viewPoint: {
+      x:
+        (sideBySideRenderSize?.offsetX ?? context.displayedImageRect.x) +
+        mapped.normalizedImagePoint.x * (sideBySideRenderSize?.width ?? context.displayedImageRect.width),
+      y:
+        (sideBySideRenderSize?.offsetY ?? context.displayedImageRect.y) +
+        mapped.normalizedImagePoint.y * (sideBySideRenderSize?.height ?? context.displayedImageRect.height),
+    },
   };
 };

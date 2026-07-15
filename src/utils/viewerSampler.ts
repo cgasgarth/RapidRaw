@@ -51,6 +51,7 @@ export interface ViewerSamplerIdentityInput {
   compareOrientation: 'horizontal' | 'vertical';
   geometryEpoch: number;
   graphRevision: string;
+  imageSessionId: string;
   imageIdentity: string;
   proofRecipeId: string | null;
   softProofEnabled: boolean;
@@ -59,6 +60,7 @@ export interface ViewerSamplerIdentityInput {
 export const buildViewerSamplerIdentity = (input: ViewerSamplerIdentityInput): string =>
   JSON.stringify([
     input.imageIdentity,
+    input.imageSessionId,
     input.graphRevision,
     input.geometryEpoch,
     input.compareMode,
@@ -156,20 +158,20 @@ export const mapViewerPointToImage = ({
   };
 };
 
-export class LatestViewerSampleScheduler {
-  private latest: ViewerSampleRequest | null = null;
+export class LatestViewerSampleScheduler<T = ViewerSampleRequest> {
+  private latest: T | null = null;
   private inFlight = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private lastStartedAt = Number.NEGATIVE_INFINITY;
   private disposed = false;
 
   constructor(
-    private readonly execute: (request: ViewerSampleRequest) => Promise<void>,
+    private readonly execute: (request: T) => Promise<void>,
     private readonly minimumIntervalMs = 80,
     private readonly now: () => number = () => performance.now(),
   ) {}
 
-  schedule(request: ViewerSampleRequest): void {
+  schedule(request: T): void {
     if (this.disposed) return;
     this.latest = request;
     this.pump();
