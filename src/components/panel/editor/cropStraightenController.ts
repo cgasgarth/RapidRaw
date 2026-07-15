@@ -123,7 +123,7 @@ export const initialCropStraightenControllerState = (): CropStraightenController
   session: null,
 });
 
-const isCropStraightenSessionCurrent = (
+export const isCropStraightenSessionCurrent = (
   expected: CropStraightenSessionIdentity,
   actual: CropStraightenSessionIdentity,
 ): boolean =>
