@@ -32,7 +32,15 @@ export const validateManifest = (manifest: readonly ValidationNode[]): void => {
   for (const node of manifest) {
     if (ids.has(node.id)) throw new Error(`duplicate validation node: ${node.id}`);
     ids.add(node.id);
-    if (node.command.length === 0 || node.inputs.length === 0 || node.modes.length === 0 || node.timeoutMs <= 0) {
+    if (
+      node.command.length === 0 ||
+      node.inputs.length === 0 ||
+      node.modes.length === 0 ||
+      node.timeoutMs <= 0 ||
+      (node.queueTimeoutMs !== undefined && node.queueTimeoutMs <= 0) ||
+      node.queueResources?.some((resource) => resource.length === 0) ||
+      new Set(node.queueResources ?? []).size !== (node.queueResources?.length ?? 0)
+    ) {
       throw new Error(`invalid validation node: ${node.id}`);
     }
   }
@@ -346,6 +354,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   await assertFreeSpace(cacheDirectory);
   const snapshot = await freezeValidationSnapshot(options.root);
   const children = new Set<ReturnType<typeof Bun.spawn>>();
+  const queueAbortController = new AbortController();
   let failed = false;
   let interrupted = false;
   const terminateChildren = (): void => {
@@ -368,6 +377,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   const onInterrupt = (): void => {
     interrupted = true;
     process.exitCode = 130;
+    queueAbortController.abort();
     terminateChildren();
   };
   process.once('SIGINT', onInterrupt);
@@ -394,6 +404,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           resource: validationOutputResource(options.root, output),
           root: resourceCoordinatorRoot,
           ownerId: runOwnerId,
+          signal: queueAbortController.signal,
         }),
       );
     }
@@ -435,16 +446,9 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
     const coordinatedClass = ['cpu-heavy', 'suite-exclusive', 'native-heavy', 'browser', 'network'].includes(
       node.resourceClass,
     );
-    const classLease = coordinatedClass
-      ? await acquireResourceLease({
-          capacity: capacities[node.resourceClass],
-          label: `validation-class-${node.resourceClass}:${node.id}`,
-          resource: `validation-class-${node.resourceClass}`,
-          root: resourceCoordinatorRoot,
-          ownerId: runOwnerId,
-        })
-      : undefined;
+    let classLease: ResourceLease | undefined;
     let cacheLease: ResourceLease | undefined;
+    const commandResourceLeases: ResourceLease[] = [];
     try {
       cacheLease =
         node.cachePolicy === 'none'
@@ -454,6 +458,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
               resource: `validation-cache-${node.id}-${key.slice(0, 20)}`,
               root: resourceCoordinatorRoot,
               ownerId: runOwnerId,
+              signal: queueAbortController.signal,
+              timeoutMs: node.queueTimeoutMs,
             });
       let cached = !options.noCache && node.cachePolicy !== 'none' ? await readCacheRecord(recordPath, key) : undefined;
       if (cached && JSON.stringify(cached.artifacts) !== JSON.stringify(await artifactDigests(node)))
@@ -465,6 +471,29 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       if (interrupted) throw new Error('validation_interrupted');
       if (options.explainCache) console.log(`${cached ? 'VERIFY' : 'MISS'} ${node.id} key=${key}`);
+      classLease = coordinatedClass
+        ? await acquireResourceLease({
+            capacity: capacities[node.resourceClass],
+            label: `validation-class-${node.resourceClass}:${node.id}`,
+            resource: `validation-class-${node.resourceClass}`,
+            root: resourceCoordinatorRoot,
+            ownerId: runOwnerId,
+            signal: queueAbortController.signal,
+            timeoutMs: node.queueTimeoutMs,
+          })
+        : undefined;
+      for (const resource of [...(node.queueResources ?? [])].sort()) {
+        commandResourceLeases.push(
+          await acquireResourceLease({
+            label: `validation-resource-${resource}:${node.id}`,
+            resource,
+            root: resourceCoordinatorRoot,
+            ownerId: runOwnerId,
+            signal: queueAbortController.signal,
+            timeoutMs: node.queueTimeoutMs,
+          }),
+        );
+      }
       // The run owns every declared output root at this point. Always prepare a
       // producer from an empty root so cache mismatches, interrupted children,
       // and prior failed runs cannot leak partial artifacts into its inputs.
@@ -494,6 +523,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       children.add(child);
       await cacheLease?.updateOwnerPid(child.pid);
       await classLease?.updateOwnerPid(child.pid);
+      for (const lease of commandResourceLeases) await lease.updateOwnerPid(child.pid);
       const killGroup = (signal: 'SIGTERM' | 'SIGKILL'): void => {
         try {
           process.kill(-child.pid, signal);
@@ -552,8 +582,9 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       completed.set(node.id, { ok, key });
     } finally {
-      await cacheLease?.release();
+      for (const lease of commandResourceLeases.reverse()) await lease.release();
       await classLease?.release();
+      await cacheLease?.release();
     }
   };
 
