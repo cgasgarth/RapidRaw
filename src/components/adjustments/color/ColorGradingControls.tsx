@@ -79,11 +79,13 @@ export const ColorGradingControls = ({
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const commitIdentity = useMemo<PerceptualGradingCommitIdentity | null>(
     () =>
-      !isForMask && imageSessionId !== null && selectedImagePath !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
