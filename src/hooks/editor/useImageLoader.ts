@@ -50,7 +50,7 @@ export function useImageLoader() {
         state.applyEditTransaction(
           buildImageOpenHydrationEditTransaction(
             state,
-            { imageSessionId: sessionId, path: selectedImagePath },
+            { adjustmentRevision: state.adjustmentRevision, imageSessionId: sessionId, path: selectedImagePath },
             hydratedAdjustments,
             `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
           ),

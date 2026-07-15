@@ -3,8 +3,12 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { areAdjustmentsEqual } from '../../../src/utils/adjustmentsSnapshot';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
-import { buildImageOpenHydrationEditTransaction } from '../../../src/utils/imageOpenHydrationEditTransaction';
+import {
+  buildImageOpenHydrationEditTransaction,
+  publishCurrentImageOpenHydration,
+} from '../../../src/utils/imageOpenHydrationEditTransaction';
 
 const path = '/fixtures/hydration.ARW';
 const session = createEditorImageSession({ generation: 12, path, source: 'cold-load' });
@@ -69,7 +73,7 @@ describe('image-open hydration edit transaction', () => {
     const hydrated = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 14, exposure: 0.25 };
     const request = buildImageOpenHydrationEditTransaction(
       state,
-      { imageSessionId: session.id, path },
+      { adjustmentRevision: state.adjustmentRevision, imageSessionId: session.id, path },
       hydrated,
       'hydrate-current',
     );
@@ -96,7 +100,7 @@ describe('image-open hydration edit transaction', () => {
     expect(() =>
       buildImageOpenHydrationEditTransaction(
         beforeStale,
-        { imageSessionId: 'editor-image-session:stale', path },
+        { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: 'editor-image-session:stale', path },
         INITIAL_ADJUSTMENTS,
         'hydrate-stale-session',
       ),
@@ -104,9 +108,17 @@ describe('image-open hydration edit transaction', () => {
     expect(() =>
       buildImageOpenHydrationEditTransaction(
         beforeStale,
-        { imageSessionId: session.id, path: '/fixtures/other.ARW' },
+        { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: session.id, path: '/fixtures/other.ARW' },
         INITIAL_ADJUSTMENTS,
         'hydrate-stale-path',
+      ),
+    ).toThrow('image_open_hydration.stale_identity');
+    expect(() =>
+      buildImageOpenHydrationEditTransaction(
+        beforeStale,
+        { adjustmentRevision: beforeStale.adjustmentRevision - 1, imageSessionId: session.id, path },
+        INITIAL_ADJUSTMENTS,
+        'hydrate-stale-revision',
       ),
     ).toThrow('image_open_hydration.stale_identity');
     const afterStale = useEditorStore.getState();
@@ -122,7 +134,7 @@ describe('image-open hydration edit transaction', () => {
 
     const request = buildImageOpenHydrationEditTransaction(
       afterStale,
-      { imageSessionId: session.id, path },
+      { adjustmentRevision: afterStale.adjustmentRevision, imageSessionId: session.id, path },
       afterStale.adjustments,
       'hydrate-no-op',
     );
@@ -137,5 +149,108 @@ describe('image-open hydration edit transaction', () => {
     expect(useEditorStore.getState().provisionalPreviewFrame).toBeNull();
     expect(useEditorStore.getState().transformedOriginalUrl).toBeNull();
     expect(useEditorStore.getState().uncroppedAdjustedPreviewUrl).toBeNull();
+  });
+
+  test('preserves a matching cached preview until authoritative background metadata replaces it', () => {
+    const initial = useEditorStore.getState();
+    const cachedAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
+    initial.applyEditTransaction(
+      buildImageOpenHydrationEditTransaction(
+        initial,
+        { adjustmentRevision: initial.adjustmentRevision, imageSessionId: session.id, path },
+        cachedAdjustments,
+        'hydrate-cache',
+      ),
+    );
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:matching-cache-preview',
+      uncroppedAdjustedPreviewUrl: 'blob:matching-cache-uncropped',
+    });
+    expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
+
+    const cached = useEditorStore.getState();
+    expect(areAdjustmentsEqual(cached.adjustments, structuredClone(cachedAdjustments))).toBeTrue();
+    expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
+    const authoritativeAdjustments = { ...cachedAdjustments, contrast: 12 };
+    expect(areAdjustmentsEqual(cached.adjustments, authoritativeAdjustments)).toBeFalse();
+    const backgroundTransaction = buildImageOpenHydrationEditTransaction(
+      cached,
+      { adjustmentRevision: cached.adjustmentRevision, imageSessionId: session.id, path },
+      authoritativeAdjustments,
+      'hydrate-background-metadata',
+    );
+    cached.applyEditTransaction(backgroundTransaction);
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustments: { contrast: 12, exposure: 0.4 },
+      finalPreviewUrl: null,
+      historyIndex: 0,
+      uncroppedAdjustedPreviewUrl: null,
+    });
+    expect(useEditorStore.getState().history).toEqual([authoritativeAdjustments]);
+  });
+
+  test('blocks every current-image publication when image A completes after image B opens', () => {
+    const imageA = useEditorStore.getState();
+    const imageAIdentity = {
+      adjustmentRevision: imageA.adjustmentRevision,
+      imageSessionId: session.id,
+      path,
+    };
+    const imageBPath = '/fixtures/newer-image-B.CR3';
+    const imageBSession = createEditorImageSession({ generation: 13, path: imageBPath, source: 'cold-load' });
+    const imageBHistory = [{ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 }];
+    const imageBSelected = {
+      ...selectedImage,
+      exif: { Make: 'Camera B' },
+      height: 4000,
+      metadata: { camera: 'B' },
+      path: imageBPath,
+      width: 6000,
+    };
+    useEditorStore.setState({
+      adjustmentRevision: 6,
+      finalPreviewUrl: 'blob:image-b-preview',
+      history: imageBHistory,
+      historyIndex: 0,
+      imageSession: imageBSession,
+      originalSize: { height: 4000, width: 6000 },
+      selectedImage: imageBSelected,
+      uncroppedAdjustedPreviewUrl: 'blob:image-b-uncropped',
+    });
+    const refs = {
+      callbackCount: 0,
+      currentResolution: 2048,
+      isBackendReady: false,
+      previousPath: imageBPath,
+    };
+
+    publishCurrentImageOpenHydration(useEditorStore.getState(), imageAIdentity, () => {
+      refs.callbackCount += 1;
+      useEditorStore.setState({
+        finalPreviewUrl: null,
+        history: [structuredClone(INITIAL_ADJUSTMENTS)],
+        originalSize: { height: 3000, width: 4000 },
+        selectedImage: { ...selectedImage, metadata: { camera: 'A' } },
+        uncroppedAdjustedPreviewUrl: null,
+      });
+      refs.currentResolution = 0;
+      refs.isBackendReady = true;
+      refs.previousPath = path;
+    });
+
+    const after = useEditorStore.getState();
+    expect(after.imageSession).toBe(imageBSession);
+    expect(after.selectedImage).toBe(imageBSelected);
+    expect(after.selectedImage?.metadata).toEqual({ camera: 'B' });
+    expect(after.originalSize).toEqual({ height: 4000, width: 6000 });
+    expect(after.history).toBe(imageBHistory);
+    expect(after.finalPreviewUrl).toBe('blob:image-b-preview');
+    expect(after.uncroppedAdjustedPreviewUrl).toBe('blob:image-b-uncropped');
+    expect(refs).toEqual({
+      callbackCount: 0,
+      currentResolution: 2048,
+      isBackendReady: false,
+      previousPath: imageBPath,
+    });
   });
 });
