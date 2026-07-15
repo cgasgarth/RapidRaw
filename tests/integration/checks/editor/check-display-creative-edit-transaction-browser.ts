@@ -13,7 +13,18 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) }).passthrough(),
+    adjustments: z
+      .object({
+        filmLookId: z.null(),
+        filmLookStrength: z.literal(100),
+        grainAmount: z.literal(28),
+        grainRoughness: z.literal(50),
+        grainSize: z.literal(34),
+        halationAmount: z.literal(24),
+        vignetteAmount: z.literal(-32),
+        vignetteMidpoint: z.literal(63),
+      })
+      .passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -23,6 +34,28 @@ const persistenceSchema = z
         transactionId: z.string().min(1),
       })
       .strict(),
+  })
+  .passthrough();
+const vignettePersistenceSchema = z
+  .object({
+    adjustments: z.object({ vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) }).passthrough(),
+    path: z.literal(sourcePath),
+    transaction: persistenceSchema.shape.transaction,
+  })
+  .passthrough();
+const halationPersistenceSchema = z
+  .object({
+    adjustments: z
+      .object({
+        filmLookId: z.null(),
+        filmLookStrength: z.literal(100),
+        halationAmount: z.literal(24),
+        vignetteAmount: z.literal(-32),
+        vignetteMidpoint: z.literal(63),
+      })
+      .passthrough(),
+    path: z.literal(sourcePath),
+    transaction: persistenceSchema.shape.transaction,
   })
   .passthrough();
 const renderCallSchema = z.object({
@@ -36,7 +69,16 @@ const renderCallSchema = z.object({
                 .object({
                   display_creative: z
                     .object({
-                      params: z.object({ vignetteAmount: z.number(), vignetteMidpoint: z.number() }).passthrough(),
+                      params: z
+                        .object({
+                          grainAmount: z.number(),
+                          grainRoughness: z.number(),
+                          grainSize: z.number(),
+                          halationAmount: z.number(),
+                          vignetteAmount: z.number(),
+                          vignetteMidpoint: z.number(),
+                        })
+                        .passthrough(),
                     })
                     .passthrough(),
                 })
@@ -136,6 +178,34 @@ const waitForRenderedVignette = async (page: Page, expectedAmount: number, expec
   );
 };
 
+const waitForRenderedFilmEffects = async (
+  page: Page,
+  expected: { grainAmount: number; grainRoughness: number; grainSize: number; halationAmount: number },
+) => {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const call = renderCallSchema.safeParse(
+      await page.evaluate(() =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_adjustments')
+          .at(-1),
+      ),
+    );
+    const params = call.success ? call.data.args.request.editDocumentV2.nodes.display_creative.params : null;
+    if (
+      call.success &&
+      call.data.endedAtMs !== null &&
+      params?.grainAmount === expected.grainAmount &&
+      params.grainRoughness === expected.grainRoughness &&
+      params.grainSize === expected.grainSize &&
+      params.halationAmount === expected.halationAmount
+    )
+      return;
+    await page.waitForTimeout(50);
+  }
+  throw new Error(`Timed out waiting for rendered film effects ${JSON.stringify(expected)}.`);
+};
+
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
   await waitForServer();
@@ -151,6 +221,12 @@ try {
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
+  await page.evaluate((path) => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.setAdjustmentsForPath(path, {
+      filmLookId: 'film_look.generic.warm.v1',
+      filmLookStrength: 72,
+    });
+  }, sourcePath);
   await page.getByRole('button', { name: /Open Folder/u }).click();
   const thumbnail = page.getByRole('button', { name: /browser-harness\.ARW/u }).first();
   await thumbnail.waitFor({ timeout: 10_000 });
@@ -187,6 +263,10 @@ try {
     window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
       { color: [24, 200, 80], delayMs: 20 },
       { color: [60, 120, 220], delayMs: 20 },
+      { color: [220, 130, 60], delayMs: 20 },
+      { color: [180, 80, 200], delayMs: 20 },
+      { color: [80, 180, 160], delayMs: 20 },
+      { color: [160, 180, 80], delayMs: 20 },
     );
   });
   await page.getByTestId('effects-control-vignette-amount-value').click();
@@ -211,7 +291,7 @@ try {
     throw new Error('Vignette Midpoint was not visibly committed.');
   }
 
-  const persisted = persistenceSchema.parse(
+  const persisted = vignettePersistenceSchema.parse(
     await page.evaluate(
       () =>
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
@@ -230,29 +310,76 @@ try {
   }
   await waitForRenderedVignette(page, -32, 63);
 
-  const undo = page.locator('button[data-command-id="undo"]:visible').first();
-  if (!(await undo.isEnabled())) throw new Error('Vignette commits did not create undo boundaries.');
-  await undo.click();
-  await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="effects-control-vignette-midpoint-value"]')?.textContent?.trim() === '50',
-    undefined,
-    { timeout: 10_000 },
-  );
+  await page.getByTestId('effects-control-halation-amount-value').click();
+  const halationInput = page.getByTestId('effects-control-halation-amount-input');
+  await halationInput.fill('24');
+  await halationInput.press('Enter');
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 3);
   await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 3);
-  await waitForRenderedVignette(page, -32, 50);
-  if ((await page.getByTestId('effects-control-vignette-amount-value').textContent())?.trim() !== '-32') {
-    throw new Error('Undo of Midpoint crossed the prior Vignette Amount history boundary.');
+  await waitForRenderedFilmEffects(page, {
+    grainAmount: 0,
+    grainRoughness: 50,
+    grainSize: 25,
+    halationAmount: 24,
+  });
+
+  await page.getByTestId('film-grain-preset-film_grain.ui_preset.iso_400_classic.v1').click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 4);
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 4);
+  await waitForRenderedFilmEffects(page, {
+    grainAmount: 28,
+    grainRoughness: 50,
+    grainSize: 34,
+    halationAmount: 24,
+  });
+
+  const saveCalls = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ) ?? [],
+  );
+  const halationSave = halationPersistenceSchema.parse(saveCalls.at(-2)?.args);
+  const grainSave = persistenceSchema.parse(saveCalls.at(-1)?.args);
+  if (
+    halationSave.adjustments.filmLookId !== null ||
+    halationSave.adjustments.filmLookStrength !== 100 ||
+    halationSave.adjustments.halationAmount !== 24 ||
+    halationSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision ||
+    grainSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision + 1
+  ) {
+    throw new Error(
+      `Film effects did not persist sequential revisions with atomic Film Look invalidation: ${JSON.stringify({ grainSave, halationSave })}`,
+    );
   }
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  if (!(await undo.isEnabled())) throw new Error('Film effects commits did not create undo boundaries.');
+  await undo.click();
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 5);
+  await waitForRenderedFilmEffects(page, {
+    grainAmount: 0,
+    grainRoughness: 50,
+    grainSize: 25,
+    halationAmount: 24,
+  });
 
   await undo.click();
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="effects-control-vignette-amount-value"]')?.textContent?.trim() === '0',
+    () => document.querySelector('[data-testid="effects-control-halation-amount-value"]')?.textContent?.trim() === '0',
     undefined,
     { timeout: 10_000 },
   );
-  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 4);
-  await waitForRenderedVignette(page, 0, 50);
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 6);
+  await waitForRenderedFilmEffects(page, {
+    grainAmount: 0,
+    grainRoughness: 50,
+    grainSize: 25,
+    halationAmount: 0,
+  });
+  if ((await page.getByTestId('effects-active-summary').textContent())?.includes('72%') !== true) {
+    throw new Error('Undo of manual Halation did not visibly restore the prior Film Look identity.');
+  }
 
   console.log('display creative edit transaction browser ok');
 } catch (error) {
