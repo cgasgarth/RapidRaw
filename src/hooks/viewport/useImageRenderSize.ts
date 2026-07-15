@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export interface ImageDimensions {
   height: number;
@@ -21,6 +21,15 @@ export interface RenderSize {
 }
 
 const DEFAULT_SIZE: RenderSize = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
+
+const preserveEqualRenderSize = (current: RenderSize, next: RenderSize): RenderSize =>
+  current.width === next.width &&
+  current.height === next.height &&
+  current.scale === next.scale &&
+  current.offsetX === next.offsetX &&
+  current.offsetY === next.offsetY
+    ? current
+    : next;
 
 export const resolveImageRenderSize = (
   containerSize: ImageDimensions,
@@ -56,19 +65,26 @@ export const useImageRenderSize = (
   imageDimensions: ImageDimensions | null,
 ) => {
   const [renderSize, setRenderSize] = useState<RenderSize>(DEFAULT_SIZE);
+  const renderSizeRef = useRef(renderSize);
   const imgWidth = imageDimensions?.width;
   const imgHeight = imageDimensions?.height;
 
   useLayoutEffect(() => {
     const container = containerRef.current;
+    const commitRenderSize = (next: RenderSize) => {
+      const resolved = preserveEqualRenderSize(renderSizeRef.current, next);
+      if (resolved === renderSizeRef.current) return;
+      renderSizeRef.current = resolved;
+      setRenderSize(resolved);
+    };
 
     if (!container || !imgWidth || !imgHeight) {
-      setRenderSize(DEFAULT_SIZE);
+      commitRenderSize(DEFAULT_SIZE);
       return;
     }
 
     const updateSize = () => {
-      setRenderSize(
+      commitRenderSize(
         resolveImageRenderSize(
           { height: container.clientHeight, width: container.clientWidth },
           { height: imgHeight, width: imgWidth },

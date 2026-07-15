@@ -1,5 +1,4 @@
 import { listen } from '@tauri-apps/api/event';
-import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Panel } from '../../components/ui/AppProperties';
 import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
@@ -42,22 +41,11 @@ import {
   type PreviewQualitySnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
+  resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-
-interface TransformState {
-  positionX: number;
-  positionY: number;
-  scale: number;
-}
-
-interface TransformWrapperRefValue {
-  instance?: {
-    transformState?: TransformState | null;
-  };
-}
 
 interface InteractivePreviewScopeSnapshot {
   roi: [number, number, number, number] | null;
@@ -75,7 +63,7 @@ type MaterializedEditedPreviewValue =
 
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
-export function useImageProcessing(transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>) {
+export function useImageProcessing() {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const committedAdjustments = useEditorStore((state) => state.adjustments);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
@@ -84,8 +72,8 @@ export function useImageProcessing(transformWrapperRef: React.RefObject<Transfor
   const activeWaveformChannel = useEditorStore((state) => state.activeWaveformChannel);
   const displaySize = useEditorStore((state) => state.displaySize);
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
+  const previewViewportTransform = useEditorStore((state) => state.previewViewportTransform);
   const originalSize = useEditorStore((state) => state.originalSize);
-  const zoomMode = useEditorStore((state) => state.zoomMode);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
   const editorImageSession = useEditorStore((state) => state.imageSession);
   const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
@@ -387,51 +375,10 @@ export function useImageProcessing(transformWrapperRef: React.RefObject<Transfor
     [],
   );
 
-  const calculateROI = useCallback(() => {
-    if (!transformWrapperRef.current) return null;
-    const state = transformWrapperRef.current.instance?.transformState;
-    if (!state) return null;
-
-    const { scale, positionX, positionY } = state;
-    const {
-      width: baseW,
-      height: baseH,
-      offsetX,
-      offsetY,
-      containerWidth,
-      containerHeight,
-    } = useEditorStore.getState().baseRenderSize;
-
-    if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
-    if (scale <= 1.01) return null;
-
-    const visibleLeft = -positionX / scale;
-    const visibleTop = -positionY / scale;
-    const visibleRight = visibleLeft + containerWidth / scale;
-    const visibleBottom = visibleTop + containerHeight / scale;
-
-    const imgLeft = offsetX;
-    const imgTop = offsetY;
-    const imgRight = offsetX + baseW;
-    const imgBottom = offsetY + baseH;
-
-    const intersectLeft = Math.max(visibleLeft, imgLeft);
-    const intersectTop = Math.max(visibleTop, imgTop);
-    const intersectRight = Math.min(visibleRight, imgRight);
-    const intersectBottom = Math.min(visibleBottom, imgBottom);
-
-    if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) {
-      return null;
-    }
-
-    const roiX = (intersectLeft - imgLeft) / baseW;
-    const roiY = (intersectTop - imgTop) / baseH;
-    const roiW = (intersectRight - intersectLeft) / baseW;
-    const roiH = (intersectBottom - intersectTop) / baseH;
-
-    if (roiW > 0.999 && roiH > 0.999) return null;
-    return [roiX, roiY, roiW, roiH] as PreviewRoi;
-  }, [baseRenderSize, transformWrapperRef]);
+  const calculateROI = useCallback((): PreviewRoi | null => {
+    const roi = resolvePreviewViewportRoi(baseRenderSize, previewViewportTransform);
+    return roi === null ? null : [...roi];
+  }, [baseRenderSize, previewViewportTransform]);
 
   interactiveScopeRef.current = (targetRes, roi) => {
     const editor = useEditorStore.getState();
@@ -714,7 +661,7 @@ export function useImageProcessing(transformWrapperRef: React.RefObject<Transfor
     });
     const resolvedZoom = resolveEditorZoom({
       devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
-      mode: zoomMode,
+      mode: useEditorStore.getState().zoomMode,
       renderSize: {
         height: baseRenderSize.height,
         scale: baseRenderSize.width / Math.max(sourceSize.width, 1),
@@ -748,7 +695,6 @@ export function useImageProcessing(transformWrapperRef: React.RefObject<Transfor
     adjustments.orientationSteps,
     baseRenderSize,
     originalSize,
-    zoomMode,
   ]);
 
   const requestOriginalPreview = useCallback(
