@@ -642,6 +642,15 @@ fn is_valid_perceptual_color(value: &JsonValue) -> bool {
         && number_in_range(object.get("lightness"), -1.0, 4.0)
 }
 
+fn is_valid_perceptual_grading(value: &JsonValue) -> bool {
+    let Ok(settings) = serde_json::from_value::<
+        crate::color::perceptual_grading::PerceptualGradingSettingsV1,
+    >(value.clone()) else {
+        return false;
+    };
+    crate::color::perceptual_grading::PerceptualGradingPlanV1::compile(settings).is_ok()
+}
+
 fn is_valid_point_color_sample(value: &JsonValue) -> bool {
     let Some(object) = value.as_object() else {
         return false;
@@ -836,6 +845,7 @@ fn validate_adjustments(
         "pointCurves",
         "pointColor",
         "parametricCurve",
+        "perceptualGradingV1",
         "curveMode",
         "rawProcessingModeOverride",
         "rawEngineEditGraphVersion",
@@ -1003,6 +1013,12 @@ fn validate_adjustments(
         (
             "pointColor",
             object.get("pointColor").is_none_or(is_valid_point_color),
+        ),
+        (
+            "perceptualGradingV1",
+            object
+                .get("perceptualGradingV1")
+                .is_none_or(is_valid_perceptual_grading),
         ),
         (
             "viewTransform",
@@ -2793,6 +2809,23 @@ mod tests {
         })
     }
 
+    fn perceptual_grading_fixture() -> JsonValue {
+        serde_json::json!({
+            "balance": 0,
+            "blending": 0.5,
+            "falloff": 1,
+            "global": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "highlightFulcrumEv": 2,
+            "highlights": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "midtones": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "neutralProtection": 0.7,
+            "perceptualModel": "oklab_d65_from_acescg_v1",
+            "shadowFulcrumEv": -2,
+            "shadows": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "skinProtection": 0.2
+        })
+    }
+
     #[test]
     fn point_color_persistence_contract_accepts_current_plan_and_rejects_drift() {
         let valid = point_color_fixture();
@@ -3055,6 +3088,7 @@ mod tests {
                     "mode": "guided",
                     "resolvedPlan": null
                 },
+                "perceptualGradingV1": perceptual_grading_fixture(),
                 "rawEngineEditGraphVersion": 1,
                 "toneMapper": "rapidView",
                 "viewTransform": {
@@ -3083,6 +3117,27 @@ mod tests {
         );
         assert_eq!(reloaded.adjustments["toneMapper"], "rapidView");
         assert_eq!(reloaded.adjustments["viewTransform"]["contrast"], 1.15);
+        assert_eq!(
+            reloaded.adjustments["perceptualGradingV1"],
+            perceptual_grading_fixture()
+        );
+    }
+
+    #[test]
+    fn save_sidecar_rejects_invalid_perceptual_grading_contract() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let mut grading = perceptual_grading_fixture();
+        grading["falloff"] = serde_json::json!(0);
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({ "perceptualGradingV1": grading }),
+            ..Default::default()
+        };
+
+        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect_err("invalid perceptual grading state must fail closed");
+        assert!(error.contains("adjustments.perceptualGradingV1"));
+        assert!(!sidecar_path.exists());
     }
 
     #[test]
