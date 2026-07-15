@@ -4,6 +4,7 @@ import {
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   editDocumentCameraInputV2Schema,
+  editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentNodeEnvelopeV2Schema,
@@ -61,9 +62,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
             ? editDocumentCameraInputV2Schema.parse({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
             : nodeType === 'scene_curve'
               ? editDocumentSceneCurveV2Schema.parse({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-              : nodeType === 'layers'
-                ? { masks: [], ...mappedParams }
-                : mappedParams;
+              : nodeType === 'detail_denoise_dehaze'
+                ? editDocumentDetailDenoiseDehazeV2Schema.parse({
+                    ...(descriptor?.defaultParams ?? {}),
+                    ...mappedParams,
+                  })
+                : nodeType === 'layers'
+                  ? { masks: [], ...mappedParams }
+                  : mappedParams;
       return [
         nodeType,
         {
@@ -81,12 +87,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
-  const defaultedNodeParams = (['camera_input', 'geometry', 'scene_curve'] as const).flatMap((nodeType) => {
-    const descriptor = descriptorFor(nodeType);
-    return Object.keys(descriptor?.defaultParams ?? {})
-      .filter((field) => !Object.hasOwn(adjustments, field))
-      .map((field) => `${nodeType}.${field}`);
-  });
+  const defaultedNodeParams = (['camera_input', 'detail_denoise_dehaze', 'geometry', 'scene_curve'] as const).flatMap(
+    (nodeType) => {
+      const descriptor = descriptorFor(nodeType);
+      return Object.keys(descriptor?.defaultParams ?? {})
+        .filter((field) => !Object.hasOwn(adjustments, field))
+        .map((field) => `${nodeType}.${field}`);
+    },
+  );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const legacyCrop = adjustments['crop'];
   const defaultedCropUnit = hasRecordShape(legacyCrop) && !Object.hasOwn(legacyCrop, 'unit');

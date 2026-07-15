@@ -213,6 +213,7 @@ const executeNativeEditedPreview = async (
         computeWaveform: request.computeWaveform,
         editDocumentV2: prepareEditDocumentV2ForRender(payload, request.snapshot.editDocumentV2, [
           'camera_input',
+          'detail_denoise_dehaze',
           'geometry',
           'scene_curve',
           'scene_global_color_tone',

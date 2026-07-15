@@ -16,6 +16,20 @@ export const sceneGlobalColorToneParamsV2Schema = z
   })
   .strict();
 
+export const editDocumentDetailDenoiseDehazeV2Schema = z
+  .object({
+    clarity: z.number().finite().min(-100).max(100),
+    colorNoiseReduction: z.number().finite().min(0).max(100),
+    dehaze: z.number().finite().min(-100).max(100),
+    denoiseContrastProtection: z.number().finite().min(0).max(100),
+    denoiseDetail: z.number().finite().min(0).max(100),
+    denoiseNaturalGrain: z.number().finite().min(0).max(100),
+    denoiseShadowBias: z.number().finite().min(-100).max(100),
+    lumaNoiseReduction: z.number().finite().min(0).max(100),
+    sharpness: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
   .strict();
@@ -305,7 +319,17 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
+    defaultParams: {
+      clarity: 0,
+      colorNoiseReduction: 0,
+      dehaze: 0,
+      denoiseContrastProtection: 50,
+      denoiseDetail: 50,
+      denoiseNaturalGrain: 0,
+      denoiseShadowBias: 0,
+      lumaNoiseReduction: 0,
+      sharpness: 0,
+    },
     legacyFields: [
       'clarity',
       'colorNoiseReduction',
@@ -654,6 +678,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'detail_denoise_dehaze') {
+        const detail = editDocumentDetailDenoiseDehazeV2Schema.safeParse(node.params);
+        if (!detail.success) {
+          for (const issue of detail.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -733,6 +765,7 @@ export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelope
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
+export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
@@ -757,6 +790,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   }
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
+  if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
