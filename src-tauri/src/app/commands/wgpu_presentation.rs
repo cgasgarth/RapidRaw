@@ -46,10 +46,9 @@ pub(crate) async fn flush_wgpu_presentation(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let presentation = state
+        .services
         .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
+        .context_snapshot()
         .map(|context| Arc::clone(&context.presentation));
     match presentation {
         Some(presentation) => presentation.flush(sequence).await,
@@ -62,10 +61,9 @@ pub(crate) fn get_wgpu_presentation_report(
     state: State<'_, AppState>,
 ) -> Option<PresentationSchedulerReport> {
     state
+        .services
         .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
+        .context_snapshot()
         .map(|context| context.presentation.report())
 }
 
@@ -74,10 +72,9 @@ pub(crate) fn get_gpu_pipeline_report(
     state: State<'_, AppState>,
 ) -> Option<crate::gpu::pipeline_registry::GpuPipelineReport> {
     state
+        .services
         .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
+        .context_snapshot()
         .map(|context| context.pipeline_registry.report())
 }
 
