@@ -11,12 +11,14 @@ import {
   createDefaultEditorWorkspacePreferences,
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
   getEffectiveEditorWorkspaceLayout,
-  LEGACY_DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY,
-  LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
-  migrateLegacyEditorWorkspacePreferences,
   readEditorWorkspacePreferences,
   saveEditorWorkspacePreferences,
 } from '../../../src/utils/editorWorkspacePreferences';
+import {
+  createDefaultLibraryWorkspacePreferences,
+  LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY,
+  readLibraryWorkspacePreferences,
+} from '../../../src/utils/libraryWorkspacePreferences';
 
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 
@@ -88,63 +90,66 @@ describe('editor workspace preferences', () => {
     expect(
       editorWorkspacePreferencesSchema.safeParse({ ...preferences, selectedImagePath: '/private/raw.nef' }).success,
     ).toBe(false);
+    const { drawerState: _drawerState, ...incompleteCompact } = preferences.compact;
+    expect(editorWorkspacePreferencesSchema.safeParse({ ...preferences, compact: incompleteCompact }).success).toBe(
+      false,
+    );
   });
 
-  test('migrates valid legacy editor layout settings once and ignores invalid dimensions', () => {
+  test('ignores obsolete keys and incomplete current editor state', () => {
     const storage = new MemoryStorage();
     installStorage(storage);
-    storage.setItem(LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, Panel.Masks);
+    storage.setItem('rapidraw.lastEditingRightPanel.v1', Panel.Masks);
+    storage.setItem('rapidraw.developPanelPinnedControlIds.v1', JSON.stringify(['exposure']));
+    expect(readEditorWorkspacePreferences()).toEqual(createDefaultEditorWorkspacePreferences());
+
+    const current = createDefaultEditorWorkspacePreferences();
+    const { drawerState: _drawerState, ...incompleteCompact } = current.compact;
     storage.setItem(
-      LEGACY_DEVELOP_PANEL_PINNED_CONTROL_IDS_STORAGE_KEY,
-      JSON.stringify(['exposure', 'exposure', 'tone']),
+      EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({ ...current, compact: incompleteCompact }),
     );
-
-    const migrated = migrateLegacyEditorWorkspacePreferences({
-      bottomPanelHeight: 180,
-      compactEditorPanelHeightOverride: 360,
-      leftPanelWidth: 288,
-      rightPanelWidth: 420,
-      uiVisibility: { filmstrip: false, folderTree: false },
-    });
-
-    expect(migrated).toMatchObject({
-      compact: { toolsHeight: 360 },
-      filmstrip: { height: 180, visible: false },
-      leftSidebar: { visible: false, width: 288 },
-      rightInspector: { activePanel: Panel.Masks, pinnedControlIds: ['exposure', 'tone'], width: 420 },
-    });
-    expect(migrateLegacyEditorWorkspacePreferences({ rightPanelWidth: 900 }).rightInspector.width).toBe(360);
+    expect(readEditorWorkspacePreferences()).toEqual(createDefaultEditorWorkspacePreferences());
   });
 
-  test('uses a valid current preference over legacy values and safely falls back from corrupt or future data', () => {
+  test('uses valid current preferences and resets corrupt or future data', () => {
     const storage = new MemoryStorage();
     installStorage(storage);
     const current = createDefaultEditorWorkspacePreferences();
     current.rightInspector.activePanel = Panel.Agent;
     storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify(current));
-    storage.setItem(LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY, Panel.Masks);
-
-    expect(readEditorWorkspacePreferences({ uiVisibility: { filmstrip: false } })).toEqual(current);
+    storage.setItem('rapidraw.lastEditingRightPanel.v1', Panel.Masks);
+    expect(readEditorWorkspacePreferences()).toEqual(current);
 
     storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, '{not-json');
-    expect(readEditorWorkspacePreferences().rightInspector.activePanel).toBe(Panel.Masks);
+    expect(readEditorWorkspacePreferences().rightInspector.activePanel).toBe(Panel.Color);
 
     storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify({ ...current, version: 2 }));
-    expect(readEditorWorkspacePreferences().rightInspector.activePanel).toBe(Panel.Masks);
+    expect(readEditorWorkspacePreferences().rightInspector.activePanel).toBe(Panel.Color);
   });
 
-  test('migrates the legacy compact visibility flag into an explicit drawer state', () => {
+  test('persists a complete default after current editor storage recovery', () => {
     const storage = new MemoryStorage();
     installStorage(storage);
-    const legacyCurrent = createDefaultEditorWorkspacePreferences();
-    const { drawerState: _drawerState, ...legacyCompact } = legacyCurrent.compact;
-    legacyCompact.toolsExpanded = false;
-    storage.setItem(
-      EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ ...legacyCurrent, compact: legacyCompact }),
-    );
+    storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, '{not-json');
 
-    expect(readEditorWorkspacePreferences().compact.drawerState).toBe('collapsed');
+    useUIStore.getState().hydrateEditorWorkspacePreferences();
+
+    const persisted = JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}');
+    expect(editorWorkspacePreferencesSchema.parse(persisted)).toEqual(createDefaultEditorWorkspacePreferences());
+  });
+
+  test('accepts only complete current library workspace storage', () => {
+    const storage = new MemoryStorage();
+    installStorage(storage);
+    const current = createDefaultLibraryWorkspacePreferences();
+    current.folderTree = { visible: false, width: 320 };
+    storage.setItem(LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify(current));
+    expect(readLibraryWorkspacePreferences()).toEqual(current);
+
+    storage.setItem(LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify({ version: 1, folderTree: {} }));
+    useUIStore.getState().hydrateLibraryWorkspacePreferences();
+    expect(readLibraryWorkspacePreferences()).toEqual(createDefaultLibraryWorkspacePreferences());
   });
 
   test('persists compact drawer states without overwriting the preferred drawer height', () => {

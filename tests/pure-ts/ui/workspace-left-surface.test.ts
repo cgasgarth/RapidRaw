@@ -67,7 +67,7 @@ test('persists Library and Develop geometry, visibility, and sections independen
     libraryLeftPanelWidth: 256,
     libraryWorkspacePreferences: createDefaultLibraryWorkspacePreferences(),
   });
-  useUIStore.getState().hydrateLibraryWorkspacePreferences(true);
+  useUIStore.getState().hydrateLibraryWorkspacePreferences();
   expect(useUIStore.getState().libraryWorkspacePreferences.folderTree).toEqual({ visible: false, width: 344 });
 
   useUIStore.getState().setLibraryFolderTreeWidth(900);

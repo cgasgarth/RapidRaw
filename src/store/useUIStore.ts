@@ -59,11 +59,8 @@ import {
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
   type EditorWorkspaceViewport,
   getEffectiveEditorWorkspaceLayout,
-  LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY,
-  type LegacyEditorWorkspacePreferences,
   readEditorWorkspacePreferences,
   saveEditorWorkspacePreferences,
-  shouldPersistLegacyWorkspaceMigration,
 } from '../utils/editorWorkspacePreferences';
 import type { FocusStackSourcePreflightMetadata } from '../utils/focusStackSourcePreflight';
 import type { HdrBracketPreflightSourceMetadata } from '../utils/hdrBracketPreflight';
@@ -105,7 +102,6 @@ export interface PointColorPickerUiReceipt {
   sourceFingerprint: string;
 }
 
-export const LAST_EDITING_RIGHT_PANEL_STORAGE_KEY = LEGACY_LAST_EDITING_RIGHT_PANEL_STORAGE_KEY;
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
@@ -494,8 +490,8 @@ export interface UIState {
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
-  hydrateEditorWorkspacePreferences: (legacy?: LegacyEditorWorkspacePreferences) => void;
-  hydrateLibraryWorkspacePreferences: (folderTreeVisible?: unknown) => void;
+  hydrateEditorWorkspacePreferences: () => void;
+  hydrateLibraryWorkspacePreferences: () => void;
   setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
   setDefaultEditorZoomMode: (mode: EditorWorkspaceZoomMode) => void;
   setEditorLightsOutLevel: (level: EditorWorkspaceLightsOutLevel) => void;
@@ -705,9 +701,9 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
-    hydrateEditorWorkspacePreferences: (legacy = {}) => {
-      const preferences = readEditorWorkspacePreferences(legacy);
-      if (shouldPersistLegacyWorkspaceMigration(legacy)) saveEditorWorkspacePreferences(preferences);
+    hydrateEditorWorkspacePreferences: () => {
+      const preferences = readEditorWorkspacePreferences();
+      saveEditorWorkspacePreferences(preferences);
       const activeRightPanel = preferences.rightInspector.visible ? preferences.rightInspector.activePanel : null;
       set({
         ...applyWorkspacePreferences(preferences),
@@ -719,8 +715,8 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
-    hydrateLibraryWorkspacePreferences: (folderTreeVisible) => {
-      const preferences = readLibraryWorkspacePreferences({ folderTreeVisible });
+    hydrateLibraryWorkspacePreferences: () => {
+      const preferences = readLibraryWorkspacePreferences();
       saveLibraryWorkspacePreferences(preferences);
       set({ libraryLeftPanelWidth: preferences.folderTree.width, libraryWorkspacePreferences: preferences });
     },
