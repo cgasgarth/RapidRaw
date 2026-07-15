@@ -4,6 +4,7 @@ import { createEditorImageSession, useEditorStore } from '../../../src/store/use
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 import {
   buildPerspectiveCorrectionEditTransaction,
   capturePerspectiveCorrectionCommitIdentity,
@@ -86,6 +87,8 @@ describe('perspective correction edit transaction', () => {
 
   test('commits a resolved analysis plan as one persistent geometry revision with Undo', () => {
     const state = useEditorStore.getState();
+    const beforeGeometry = state.editDocumentV2.nodes.geometry;
+    const beforeTone = state.editDocumentV2.nodes.scene_global_color_tone;
     expect(capturePerspectiveCorrectionCommitIdentity(state)).toEqual(identity());
     const request = buildPerspectiveCorrectionEditTransaction(
       state,
@@ -93,9 +96,31 @@ describe('perspective correction edit transaction', () => {
       { resolvedPlan },
       'perspective-analysis',
     );
+    expect(request.operations).toEqual([
+      {
+        nodeType: 'geometry',
+        patch: { perspectiveCorrection: { ...state.adjustments.perspectiveCorrection, resolvedPlan } },
+        type: 'patch-edit-document-node',
+      },
+    ]);
     const result = state.applyEditTransaction(request);
 
     expect(result.after.perspectiveCorrection.resolvedPlan).toEqual(resolvedPlan);
+    expect(result.afterEditDocumentV2.nodes.geometry).not.toBe(beforeGeometry);
+    expect(result.afterEditDocumentV2.nodes.geometry.params.perspectiveCorrection).toEqual(
+      result.after.perspectiveCorrection,
+    );
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('perspectiveCorrection');
+    const reopened = hydrateImageOpenEditDocumentV2(
+      {
+        adjustments: structuredClone(result.after),
+        editDocumentV2: structuredClone(result.afterEditDocumentV2),
+      },
+      structuredClone(result.after),
+    );
+    expect(reopened.nodes.geometry.params.perspectiveCorrection).toEqual(result.after.perspectiveCorrection);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('perspectiveCorrection');
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',
@@ -106,6 +131,13 @@ describe('perspective correction edit transaction', () => {
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 1, historyIndex: 1 });
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.perspectiveCorrection.resolvedPlan).toBeNull();
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes.geometry.params.perspectiveCorrection.resolvedPlan,
+    ).toBeNull();
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.geometry.params.perspectiveCorrection.resolvedPlan).toEqual(
+      resolvedPlan,
+    );
   });
 
   test('validates manual patches, preserves exact no-ops, and rejects every stale identity dimension', () => {
@@ -113,10 +145,16 @@ describe('perspective correction edit transaction', () => {
     const build = (commitIdentity: PerspectiveCorrectionCommitIdentity, patch = { amount: 72 }) =>
       buildPerspectiveCorrectionEditTransaction(state, commitIdentity, patch, 'manual-perspective');
 
+    let storeEmissions = 0;
+    const unsubscribe = useEditorStore.subscribe(() => {
+      storeEmissions += 1;
+    });
     const noOp = state.applyEditTransaction(
       build(identity(), { amount: state.adjustments.perspectiveCorrection.amount }),
     );
+    unsubscribe();
     expect(noOp.noOp).toBe(true);
+    expect(storeEmissions).toBe(0);
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 0, historyIndex: 0 });
     expect(() => build(identity({ sourceIdentity: '/fixture/stale.ARW' }))).toThrow(
       'perspective_correction_transaction.stale_source',

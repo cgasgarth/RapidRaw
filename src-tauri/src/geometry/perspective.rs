@@ -38,7 +38,7 @@ pub enum PerspectiveLineClass {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PerspectiveGuideV1 {
     pub id: String,
     pub class: PerspectiveLineClass,
@@ -52,7 +52,7 @@ fn default_guide_weight() -> f32 {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PerspectiveCorrectionSettingsV1 {
     #[serde(default)]
     pub mode: PerspectiveCorrectionMode,
@@ -67,7 +67,7 @@ pub struct PerspectiveCorrectionSettingsV1 {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PerspectiveAnalysisIdentityV1 {
     pub source_revision: u64,
     pub orientation_fingerprint: u64,
@@ -206,7 +206,7 @@ fn weighted_median_angle(angles: &[(f32, f32)]) -> Option<f32> {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NormalizedCropV1 {
     pub x: f64,
     pub y: f64,
@@ -215,7 +215,7 @@ pub struct NormalizedCropV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PerspectiveCorrectionPlanV1 {
     pub analysis_identity: Option<PerspectiveAnalysisIdentityV1>,
     pub source_to_corrected: [[f64; 3]; 3],

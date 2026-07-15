@@ -101,6 +101,47 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.extensions.legacyAdjustments).not.toHaveProperty('sectionVisibility');
   });
 
+  test('owns strict Perspective Correction state in the geometry node and explicit domain', () => {
+    const perspectiveCorrection = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.perspectiveCorrection),
+      amount: 72,
+      guides: [
+        {
+          class: 'vertical' as const,
+          endpointsSourceNormalized: [
+            [0.2, 0.1],
+            [0.1, 0.9],
+          ] as [[number, number], [number, number]],
+          id: 'left',
+          weight: 1,
+        },
+      ],
+      mode: 'guided' as const,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      perspectiveCorrection,
+    });
+
+    expect(document.nodes.geometry.params.perspectiveCorrection).toEqual(perspectiveCorrection);
+    expect(document.geometry.perspectiveCorrection).toEqual(perspectiveCorrection);
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('perspectiveCorrection');
+    expect(document.migration?.mapped).toContain('geometry.perspectiveCorrection');
+    expect(compileEditDocumentNodeV2(document.nodes.geometry).params.perspectiveCorrection).toEqual(
+      perspectiveCorrection,
+    );
+
+    const reset = resetEditDocumentV2Node(document, 'geometry');
+    expect(reset.nodes.geometry.params.perspectiveCorrection).toEqual(INITIAL_ADJUSTMENTS.perspectiveCorrection);
+    expect(reset.geometry.perspectiveCorrection).toEqual(INITIAL_ADJUSTMENTS.perspectiveCorrection);
+    expect(reset.extensions.legacyAdjustments).not.toHaveProperty('perspectiveCorrection');
+
+    const unknown = structuredClone(document);
+    unknown.nodes.geometry.params.perspectiveCorrection = { ...perspectiveCorrection, futureProjection: true };
+    unknown.geometry.perspectiveCorrection = unknown.nodes.geometry.params.perspectiveCorrection;
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+  });
+
   test('owns strict black-and-white mixer state and excludes it from quarantined legacy fields', () => {
     const blackWhiteMixer = {
       ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
@@ -825,6 +866,59 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(corruptFlat.migration?.defaulted).toContain('lens_correction.chromaticAberrationBlueYellow');
     expect(corruptFlat.migration?.mapped).not.toContain('lens_correction.chromaticAberrationBlueYellow');
+  });
+
+  test('promotes pre-Perspective geometry state and quarantines corrupt legacy values idempotently', () => {
+    const perspectiveCorrection = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.perspectiveCorrection),
+      amount: 65,
+      mode: 'auto_full' as const,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      perspectiveCorrection,
+    });
+    const oldV2 = structuredClone(document);
+    const oldNodeParams = oldV2.nodes.geometry.params as Record<string, unknown>;
+    const oldGeometry = oldV2.geometry as Record<string, unknown>;
+    oldV2.extensions.legacyAdjustments.perspectiveCorrection = perspectiveCorrection;
+    delete oldNodeParams.perspectiveCorrection;
+    delete oldGeometry.perspectiveCorrection;
+    if (oldV2.migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.migration.mapped = oldV2.migration.mapped.filter((path) => path !== 'geometry.perspectiveCorrection');
+    oldV2.migration.quarantined.push('perspectiveCorrection');
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.geometry.params.perspectiveCorrection).toEqual(perspectiveCorrection);
+    expect(reopened.geometry.perspectiveCorrection).toEqual(perspectiveCorrection);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('perspectiveCorrection');
+    expect(reopened.migration?.mapped).toContain('geometry.perspectiveCorrection');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptV2 = structuredClone(document);
+    const corrupt = { ...perspectiveCorrection, amount: 500 };
+    corruptV2.extensions.legacyAdjustments.perspectiveCorrection = corrupt;
+    delete (corruptV2.nodes.geometry.params as Record<string, unknown>).perspectiveCorrection;
+    delete (corruptV2.geometry as Record<string, unknown>).perspectiveCorrection;
+    if (corruptV2.migration === undefined) throw new Error('fixture migration receipt is required');
+    corruptV2.migration.mapped = corruptV2.migration.mapped.filter((path) => path !== 'geometry.perspectiveCorrection');
+    corruptV2.migration.quarantined.push('perspectiveCorrection');
+    const quarantined = editDocumentV2Schema.parse(corruptV2);
+    expect(quarantined.nodes.geometry.params.perspectiveCorrection).toEqual(INITIAL_ADJUSTMENTS.perspectiveCorrection);
+    expect(quarantined.geometry.perspectiveCorrection).toEqual(INITIAL_ADJUSTMENTS.perspectiveCorrection);
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ perspectiveCorrection: corrupt });
+    expect(quarantined.migration?.defaulted).toContain('geometry.perspectiveCorrection');
+    expect(quarantined.migration?.quarantined).toContain('perspectiveCorrection');
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
+
+    const corruptFlatAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    corruptFlatAdjustments.perspectiveCorrection.amount = Number.NaN;
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2(corruptFlatAdjustments);
+    expect(corruptFlat.nodes.geometry.params.perspectiveCorrection).toEqual(INITIAL_ADJUSTMENTS.perspectiveCorrection);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({
+      perspectiveCorrection: corruptFlatAdjustments.perspectiveCorrection,
+    });
+    expect(corruptFlat.migration?.mapped).not.toContain('geometry.perspectiveCorrection');
   });
 
   test('promotes pre-Color-Balance node state and quarantines corrupt legacy values idempotently', () => {
