@@ -43,6 +43,7 @@ pub struct RawOpenEditExportProofRequest {
     pub edit_command: RawOpenEditExportCommand,
     pub fixture_id: String,
     pub private_root_path: String,
+    pub source_root_path: Option<String>,
     pub source_metadata: RawOpenEditExportSourceMetadata,
     pub source_relative_path: String,
 }
@@ -179,6 +180,15 @@ pub struct RawOpenEditExportSkinToneUniformityParameters {
     pub target_hue_degrees: f64,
     pub target_luminance: f64,
     pub target_saturation: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportFilmEmulationParameters {
+    pub accepted_dry_run_plan_hash: String,
+    pub accepted_dry_run_plan_id: String,
+    pub operation: crate::render::film_emulation::FilmEmulationOperationV1,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -355,7 +365,15 @@ fn run_raw_open_edit_export_proof_with_context(
         return Err("privateRootPath must be absolute.".to_string());
     }
 
-    let source_path = resolve_private_relative(&private_root, &request.source_relative_path)?;
+    let source_root = request
+        .source_root_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| private_root.clone());
+    if !source_root.is_absolute() {
+        return Err("sourceRootPath must be absolute when provided.".to_string());
+    }
+    let source_path = resolve_private_relative(&source_root, &request.source_relative_path)?;
     let artifact_dir = resolve_private_relative(&private_root, &request.artifact_dir_relative)?;
     fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
     let adjustments = edit_command_adjustments(&request.edit_command)?;
@@ -601,7 +619,10 @@ fn run_raw_open_edit_export_proof_with_context(
     let source_hash_after = sha256_file(&source_path)?;
     let source_hash_unchanged = source_hash_before == source_hash_after;
 
-    let source_raw = hashed_path(request.source_relative_path.clone(), source_hash_before);
+    let source_raw = hashed_path(
+        private_source_evidence_path(&request.source_relative_path)?,
+        source_hash_before,
+    );
     let preview_before_path = hash_relative_path(&private_root, &preview_before_relative)?;
     let preview_after_path = hash_relative_path(&private_root, &preview_after_relative)?;
     let sidecar_after_path = hash_relative_path(&private_root, &sidecar_after_relative)?;
@@ -936,10 +957,28 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
         "toneColor.adjustSkinToneUniformity" => {
             skin_tone_uniformity_adjustments(&command.parameters)
         }
+        "edit.apply_film_emulation_operation" => film_emulation_adjustments(&command.parameters),
         _ => Err(
-            "editCommand.commandType must be toneColor.setBasicTone, toneColor.setWhiteBalance, toneColor.adjustHsl, or toneColor.adjustSkinToneUniformity.".to_string(),
+            "editCommand.commandType is not supported by the RAW open/edit/export proof command."
+                .to_string(),
         ),
     }
+}
+
+fn film_emulation_adjustments(parameters: &Value) -> Result<Value, String> {
+    let parameters: RawOpenEditExportFilmEmulationParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
+        || parameters.accepted_dry_run_plan_id.trim().is_empty()
+    {
+        return Err(
+            "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
+        );
+    }
+    let node = crate::render::film_emulation::apply_operation_to_node(None, &parameters.operation)
+        .map_err(str::to_string)?
+        .ok_or_else(|| "film proof command must produce an enabled Film node.".to_string())?;
+    Ok(json!({ "filmEmulation": node }))
 }
 
 fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
@@ -1295,6 +1334,20 @@ fn resolve_private_relative(private_root: &Path, relative_path: &str) -> Result<
         return Err(format!("{relative_path} must not contain path traversal."));
     }
     Ok(private_root.join(path))
+}
+
+fn private_source_evidence_path(relative_path: &str) -> Result<String, String> {
+    let path = Path::new(relative_path);
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "sourceRelativePath must end in a UTF-8 filename.".to_string())?;
+    if relative_path.starts_with("private-fixtures/")
+        || relative_path.starts_with("private-artifacts/")
+    {
+        return Ok(relative_path.to_string());
+    }
+    Ok(format!("private-fixtures/film-runtime/{file_name}"))
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
@@ -1720,6 +1773,39 @@ mod tests {
         }
     }
 
+    fn sample_film_emulation_command() -> RawOpenEditExportCommand {
+        RawOpenEditExportCommand {
+            actor: json!({
+                "id": "agent.film-runtime-proof-wrapper",
+                "kind": "agent",
+                "sessionId": "film-runtime-proof-wrapper"
+            }),
+            approval: RawOpenEditExportBasicToneApproval {
+                approval_class: "edit_apply".to_string(),
+                reason: "Apply accepted canonical Film operation through native RAW rendering."
+                    .to_string(),
+                state: "approved".to_string(),
+            },
+            color_pipeline: sample_color_pipeline(),
+            command_id: "command.raw-open-edit-export.film-reference.v1".to_string(),
+            command_type: "edit.apply_film_emulation_operation".to_string(),
+            correlation_id: "corr.raw-open-edit-export.film-reference.v1".to_string(),
+            dry_run: false,
+            expected_graph_revision: "graph-rev.raw-open-edit-export.film-reference.v1".to_string(),
+            idempotency_key: Some("idem.raw-open-edit-export.film-reference.v1".to_string()),
+            parameters: json!({
+                "acceptedDryRunPlanHash": "sha256:film-runtime-proof-accepted-plan-v1",
+                "acceptedDryRunPlanId": "dryrun_film_runtime_proof_v1",
+                "operation": { "kind": "set_mix", "mix": 0.7 }
+            }),
+            schema_version: 1,
+            target: json!({
+                "imagePath": "private-fixtures/film-runtime/alaska-reference.arw",
+                "kind": "image"
+            }),
+        }
+    }
+
     fn sample_color_pipeline() -> RawOpenEditExportColorPipeline {
         RawOpenEditExportColorPipeline {
             chromatic_adaptation: RawOpenEditExportChromaticAdaptation {
@@ -1765,6 +1851,7 @@ mod tests {
             edit_command: sample_basic_tone_command(),
             fixture_id: "validation.raw-open-edit-export.edge-ringing.v1".to_string(),
             private_root_path: "/tmp/rawengine-private-root".to_string(),
+            source_root_path: None,
             source_metadata: sample_source_metadata(),
             source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
         }
@@ -2002,6 +2089,82 @@ mod tests {
     }
 
     #[test]
+    fn film_command_compiles_canonical_node_and_changes_scene_pixels() {
+        let command = sample_film_emulation_command();
+        let adjustments = edit_command_adjustments(&command).expect("Film operation maps");
+        let params = crate::render::film_emulation::parse_node(&adjustments)
+            .expect("Film node parses")
+            .expect("Film node is enabled");
+        assert_eq!(params.mix, 0.7);
+
+        let film_pixel =
+            crate::render::film_emulation::apply_pixel(glam::Vec3::new(0.18, 0.36, 0.08), params);
+        assert_ne!(film_pixel, glam::Vec3::new(0.18, 0.36, 0.08));
+
+        let source_revision = 17;
+        let film_plan = compile_render_plan(
+            &adjustments,
+            CompileRenderPlanContext {
+                revision: content_revision(&adjustments, 1, source_revision, 1),
+                is_raw: true,
+                tonemapper_override: Some(1),
+            },
+            None,
+        )
+        .expect("Film command compiles through production render planning");
+        let neutral = json!({});
+        let neutral_plan = compile_render_plan(
+            &neutral,
+            CompileRenderPlanContext {
+                revision: content_revision(&neutral, 1, source_revision, 1),
+                is_raw: true,
+                tonemapper_override: Some(1),
+            },
+            None,
+        )
+        .expect("neutral render plan compiles");
+        assert_ne!(
+            film_plan.fingerprints.color,
+            neutral_plan.fingerprints.color
+        );
+        assert!(film_plan.effective_json.get("filmEmulation").is_some());
+    }
+
+    #[test]
+    fn film_command_fails_closed_on_profile_identity_and_remove_operation() {
+        let mut invalid_profile = sample_film_emulation_command();
+        invalid_profile.parameters["operation"] = json!({
+            "kind": "set_profile",
+            "profileRef": {
+                "id": crate::render::film_emulation::REFERENCE_PROFILE_ID,
+                "version": crate::render::film_emulation::REFERENCE_PROFILE_VERSION,
+                "contentSha256": "sha256:invalid"
+            }
+        });
+        assert!(edit_command_adjustments(&invalid_profile).is_err());
+
+        let mut remove = sample_film_emulation_command();
+        remove.parameters["operation"] = json!({ "kind": "remove_node" });
+        assert_eq!(
+            edit_command_adjustments(&remove),
+            Err("film proof command must produce an enabled Film node.".to_string())
+        );
+    }
+
+    #[test]
+    fn separate_source_root_uses_privacy_safe_evidence_path() {
+        assert_eq!(
+            private_source_evidence_path("DSC_7853.ARW").expect("source path maps"),
+            "private-fixtures/film-runtime/DSC_7853.ARW"
+        );
+        assert_eq!(
+            private_source_evidence_path("private-fixtures/film/sample.arw")
+                .expect("private source path remains stable"),
+            "private-fixtures/film/sample.arw"
+        );
+    }
+
+    #[test]
     fn proof_report_serializes_run_report_schema_fields() {
         let asset = hashed_path(
             "private-artifacts/validation/open-edit-export/sample.png".to_string(),
@@ -2181,6 +2344,9 @@ mod tests {
             &context,
             &state,
             true,
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(
+                "synthetic-extended-range.ARW",
+            ),
             "color_graph_trace_synthetic_preview",
             Some(2),
             &[],
@@ -2193,6 +2359,9 @@ mod tests {
             &context,
             &state,
             true,
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(
+                "synthetic-extended-range.ARW",
+            ),
             "color_graph_trace_synthetic_export",
             Some(2),
             &[],
@@ -2264,6 +2433,7 @@ mod tests {
             processing_profile: crate::raw_processing::RawProcessingProfile::Balanced,
             camera_profile: crate::raw_processing::RawCameraProfileReport {
                 algorithm_id: "synthetic_exact_v1",
+                camera_model: Some("synthetic-camera".to_string()),
                 candidate_count: 1,
                 cct_clamped: Some(false),
                 cool_illuminant: None,
@@ -2273,10 +2443,14 @@ mod tests {
                 illuminant_estimate_confidence: "exact",
                 illuminant_estimate_method: "synthetic_fixture",
                 matrix_hash: Some("sha256:synthetic-profile-v1".to_string()),
+                profile_illuminant_duv: None,
+                profile_illuminant_xy: None,
                 status: "synthetic_exact",
                 warm_illuminant: None,
+                white_balance_plan_fingerprint: None,
                 warning_codes: Vec::new(),
             },
+            selected_camera_profile: None,
             input_transform: None,
             stage_samples: [
                 ("sensor_decode", "sensor_mosaic_normalized_linear"),
@@ -2298,6 +2472,8 @@ mod tests {
                 },
             )
             .collect(),
+            highlight_reconstruction:
+                crate::raw::highlight_reconstruction::HighlightReconstructionReportV2::default(),
             runtime: None,
             xtrans_hq: None,
         };
