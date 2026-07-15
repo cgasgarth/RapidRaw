@@ -7,7 +7,6 @@ use std::sync::{Arc, Condvar, Mutex};
 pub enum SmartPreviewDemandClass {
     VisibleIdle,
     ExplicitBuild,
-    SelectedImageOfflineSafety,
 }
 
 #[derive(Clone)]
