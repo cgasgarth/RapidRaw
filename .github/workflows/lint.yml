@@ -30,7 +30,7 @@ jobs:
   plan:
     name: 'validation: affected fast-lane plan'
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 2
     outputs:
       js: ${{ steps.plan.outputs.js }}
       frontend: ${{ steps.plan.outputs.frontend }}

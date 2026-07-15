@@ -72,6 +72,11 @@ if (!required.jobs?.['pr-ci-required']?.if?.includes("inputs.pull_request_number
   throw new Error('PR CI / required must run for updater-dispatched PR validation');
 }
 
+const planLane = required.jobs?.plan;
+if (planLane?.['timeout-minutes'] !== 2) {
+  throw new Error('affected-lane planning must allow bounded cold-runner setup inside the four-minute PR budget');
+}
+
 const nativeLane = required.jobs?.['fast-rust'];
 if (nativeLane?.['timeout-minutes'] !== 4) {
   throw new Error('affected native feedback must retain the four-minute PR budget');
