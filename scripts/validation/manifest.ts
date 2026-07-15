@@ -11,6 +11,8 @@ export interface ValidationNode {
   cachePolicy: 'none' | 'local' | 'local-ci';
   modes: readonly ValidationMode[];
   timeoutMs: number;
+  queueTimeoutMs?: number;
+  queueResources?: readonly string[];
   outputs?: readonly string[];
 }
 
@@ -48,7 +50,10 @@ export const validationManifest: readonly ValidationNode[] = [
   ),
   node('rustfmt', ['bun', 'run', 'check:rust:fmt'], ['rust']),
   node('render-abi', ['bun', 'run', 'check:render-abi'], ['rust', 'scripts']),
-  node('rust-clippy', ['bun', 'run', 'check:rust:clippy'], ['rust', 'dependencies'], 'native-heavy'),
+  {
+    ...node('rust-clippy', ['bun', 'run', 'check:rust:clippy'], ['rust', 'dependencies'], 'native-heavy'),
+    queueResources: ['native-heavy'],
+  },
   node('schema', ['bun', 'run', 'check:schema'], ['schema', 'frontend'], 'cpu-heavy'),
   node(
     'bundle-build',
@@ -117,12 +122,25 @@ export const validationManifest: readonly ValidationNode[] = [
     ['rust', 'dependencies'],
     'native-heavy',
   ),
-  node('browser-harness', ['bun', 'run', 'check:browser-harness'], ['frontend', 'schema', 'rust'], 'browser', broad),
-  node(
-    'tauri-contracts',
-    ['bun', 'tests/integration/checks/tauri/check-tauri-command-registration.ts'],
-    ['frontend', 'rust', 'schema'],
-  ),
+  {
+    ...node(
+      'browser-harness',
+      ['bun', 'run', 'check:browser-harness'],
+      ['frontend', 'schema', 'rust'],
+      'browser',
+      broad,
+    ),
+    queueResources: ['native-heavy'],
+  },
+  {
+    ...node(
+      'tauri-contracts',
+      ['bun', 'tests/integration/checks/tauri/check-tauri-command-registration.ts'],
+      ['frontend', 'rust', 'schema'],
+      'native-heavy',
+    ),
+    queueResources: ['native-heavy'],
+  },
   node(
     'tauri-schemas',
     ['bun', 'tests/integration/checks/tauri/check-tauri-schema-validation.ts'],
@@ -130,11 +148,15 @@ export const validationManifest: readonly ValidationNode[] = [
   ),
   node('script-types', ['bun', 'tests/integration/checks/check-script-type-coverage.ts'], ['scripts', 'frontend']),
   node('rust-cfg', ['bun', 'tests/integration/checks/check-rust-platform-cfg-dead-code.ts'], ['rust']),
-  node(
-    'native-boundaries',
-    ['bun', 'tests/integration/checks/check-native-contract-boundary.ts'],
-    ['rust', 'dependencies'],
-  ),
+  {
+    ...node(
+      'native-boundaries',
+      ['bun', 'tests/integration/checks/check-native-contract-boundary.ts'],
+      ['rust', 'dependencies'],
+      'native-heavy',
+    ),
+    queueResources: ['native-heavy'],
+  },
   node('native-leaves', ['bun', 'tests/integration/checks/check-native-feature-leaves.ts'], ['rust', 'dependencies']),
   node(
     'perf-smoke',
