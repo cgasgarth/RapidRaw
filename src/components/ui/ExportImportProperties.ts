@@ -1,3 +1,4 @@
+import type { ExportRecipe } from '../../schemas/export/exportRecipeSchemas';
 import type { ImportResumeValidation } from '../../schemas/fileOperationSchemas';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
 import {
@@ -61,20 +62,22 @@ export interface HdrExportWorkflowSettings {
   target: 'sdr_companion_tiff16' | 'hdr_pq10' | 'hdr_hlg10';
 }
 
-export enum ExportColorProfile {
-  Srgb = 'srgb',
-  DisplayP3 = 'displayP3',
-  AdobeRgb1998 = 'adobeRgb1998',
-  ProPhotoRgb = 'proPhotoRgb',
-  SourceEmbedded = 'sourceEmbedded',
-}
+export const ExportColorProfile = {
+  AdobeRgb1998: 'adobeRgb1998',
+  DisplayP3: 'displayP3',
+  ProPhotoRgb: 'proPhotoRgb',
+  SourceEmbedded: 'sourceEmbedded',
+  Srgb: 'srgb',
+} as const;
+export type ExportColorProfile = (typeof ExportColorProfile)[keyof typeof ExportColorProfile];
 
-export enum ExportRenderingIntent {
-  AbsoluteColorimetric = 'absoluteColorimetric',
-  Perceptual = 'perceptual',
-  RelativeColorimetric = 'relativeColorimetric',
-  Saturation = 'saturation',
-}
+export const ExportRenderingIntent = {
+  AbsoluteColorimetric: 'absoluteColorimetric',
+  Perceptual: 'perceptual',
+  RelativeColorimetric: 'relativeColorimetric',
+  Saturation: 'saturation',
+} as const;
+export type ExportRenderingIntent = (typeof ExportRenderingIntent)[keyof typeof ExportRenderingIntent];
 
 export interface OutputSharpeningSettings {
   amount: number;
@@ -83,17 +86,18 @@ export interface OutputSharpeningSettings {
   threshold: number;
 }
 
-export enum WatermarkAnchor {
-  TopLeft = 'topLeft',
-  TopCenter = 'topCenter',
-  TopRight = 'topRight',
-  CenterLeft = 'centerLeft',
-  Center = 'center',
-  CenterRight = 'centerRight',
-  BottomLeft = 'bottomLeft',
-  BottomCenter = 'bottomCenter',
-  BottomRight = 'bottomRight',
-}
+export const WatermarkAnchor = {
+  BottomCenter: 'bottomCenter',
+  BottomLeft: 'bottomLeft',
+  BottomRight: 'bottomRight',
+  Center: 'center',
+  CenterLeft: 'centerLeft',
+  CenterRight: 'centerRight',
+  TopCenter: 'topCenter',
+  TopLeft: 'topLeft',
+  TopRight: 'topRight',
+} as const;
+export type WatermarkAnchor = (typeof WatermarkAnchor)[keyof typeof WatermarkAnchor];
 
 export interface WatermarkSettings {
   path: string;
@@ -199,30 +203,4 @@ export enum Status {
   Success = 'success',
 }
 
-export interface ExportPreset {
-  blackPointCompensation?: boolean;
-  colorProfile?: ExportColorProfile;
-  id: string;
-  name: string;
-  fileFormat: string;
-  jpegQuality: number;
-  enableResize: boolean;
-  resizeMode: string;
-  resizeValue: number;
-  dontEnlarge: boolean;
-  keepMetadata: boolean;
-  preserveTimestamps: boolean;
-  stripGps: boolean;
-  exportMasks?: boolean;
-  preserveFolders?: boolean;
-  filenameTemplate: string;
-  enableWatermark: boolean;
-  watermarkPath: string | null;
-  watermarkAnchor: string;
-  watermarkScale: number;
-  watermarkSpacing: number;
-  watermarkOpacity: number;
-  lastExportPath?: string;
-  outputSharpening?: OutputSharpeningSettings | null;
-  renderingIntent?: ExportRenderingIntent;
-}
+export type ExportPreset = ExportRecipe;

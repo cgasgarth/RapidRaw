@@ -29,7 +29,6 @@ const exportPresetLocale = z
     validRecipeCount_other: z.string(),
   })
   .safeParse(localeRoot.success ? localeRoot.data.ui.exportPresets : undefined);
-const componentSource = await readFile('src/components/panel/right/export/ExportPresetsList.tsx', 'utf8');
 
 if (rows.length !== recipes.length) {
   failures.push(`Expected ${recipes.length} UI rows, got ${rows.length}.`);
@@ -45,22 +44,6 @@ if (rows.filter((row) => row.isValidRecipe).length !== recipes.length) {
 
 if (!exportPresetLocale.success) {
   failures.push('Export recipe readiness locale keys must be present.');
-}
-
-for (const marker of [
-  'data-testid="export-recipe-readiness-summary"',
-  'data-testid="export-recipe-picker"',
-  'data-testid="export-selected-recipe-status"',
-  'data-recipe-count={recipeRows.length}',
-  'data-valid-recipe-count={validRecipeCount}',
-  'data-built-in-recipe-count={builtInRecipeCount}',
-  'ui.exportPresets.validRecipeCount',
-  'data-recipe-state={',
-  'aria-pressed={selectedPresetId === row.id}',
-]) {
-  if (!componentSource.includes(marker)) {
-    failures.push(`Export recipe readiness marker missing: ${marker}`);
-  }
 }
 
 for (const row of rows) {

@@ -32,23 +32,28 @@ export async function runExportUiCheck({ label, run, settings = {} }: ExportUiCh
     await waitForDevServer(baseUrl);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
-    await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
-      key: 'rawengine-browser-tauri-harness-settings-v1',
-      value: JSON.stringify({
-        editorPreviewResolution: 1024,
-        lastFolderState: {
-          currentFolderPath: exportHarnessRootPath,
-          expandedFolders: [exportHarnessRootPath],
-        },
-        lastRootPath: exportHarnessRootPath,
-        libraryViewMode: 'flat',
-        rootFolders: [exportHarnessRootPath],
-        theme: 'dark',
-        thumbnailSize: 'medium',
-        useWgpuRenderer: false,
-        ...settings,
-      }),
-    });
+    await page.addInitScript(
+      ({ key, value }) => {
+        if (window.localStorage.getItem(key) === null) window.localStorage.setItem(key, value);
+      },
+      {
+        key: 'rawengine-browser-tauri-harness-settings-v1',
+        value: JSON.stringify({
+          editorPreviewResolution: 1024,
+          lastFolderState: {
+            currentFolderPath: exportHarnessRootPath,
+            expandedFolders: [exportHarnessRootPath],
+          },
+          lastRootPath: exportHarnessRootPath,
+          libraryViewMode: 'flat',
+          rootFolders: [exportHarnessRootPath],
+          theme: 'dark',
+          thumbnailSize: 'medium',
+          useWgpuRenderer: false,
+          ...settings,
+        }),
+      },
+    );
 
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Continue Session/u }).click();

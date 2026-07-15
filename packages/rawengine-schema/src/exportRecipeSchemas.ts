@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const exportRecipeFileFormatV1Schema = z.enum(['jpeg', 'png', 'tiff', 'webp']);
+export const exportRecipeFileFormatV1Schema = z.enum(['avif', 'cube', 'jpeg', 'jxl', 'png', 'tiff', 'webp']);
 export const exportRecipeColorProfileV1Schema = z.enum([
   'srgb',
   'displayP3',
@@ -26,14 +26,40 @@ export const exportRecipeWatermarkAnchorV1Schema = z.enum([
   'bottomCenter',
   'bottomRight',
 ]);
+export const exportRecipeOutputSharpeningV1Schema = z
+  .object({
+    amount: z.number().min(0).max(100),
+    radiusPx: z.number().min(0.3).max(3),
+    target: z.enum(['custom', 'print', 'screen']),
+    threshold: z.number().min(0).max(1),
+  })
+  .strict()
+  .superRefine((settings, context) => {
+    if (settings.target === 'print' && settings.amount > 0 && settings.radiusPx < 0.8) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Print output sharpening requires radiusPx >= 0.8.',
+        path: ['radiusPx'],
+      });
+    }
+
+    if (settings.amount === 0 && settings.threshold > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Disabled output sharpening must use threshold 0.',
+        path: ['threshold'],
+      });
+    }
+  });
 
 export const exportRecipeV1Schema = z
   .object({
-    colorProfile: exportRecipeColorProfileV1Schema.default('srgb'),
+    blackPointCompensation: z.boolean(),
+    colorProfile: exportRecipeColorProfileV1Schema,
     dontEnlarge: z.boolean(),
     enableResize: z.boolean(),
     enableWatermark: z.boolean(),
-    exportMasks: z.boolean().default(false),
+    exportMasks: z.boolean(),
     fileFormat: exportRecipeFileFormatV1Schema,
     filenameTemplate: z.string().trim().min(1),
     id: z.string().trim().min(1),
@@ -41,9 +67,10 @@ export const exportRecipeV1Schema = z
     keepMetadata: z.boolean(),
     lastExportPath: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1),
-    preserveFolders: z.boolean().default(false),
-    preserveTimestamps: z.boolean().default(false),
-    renderingIntent: exportRecipeRenderingIntentV1Schema.default('relativeColorimetric'),
+    outputSharpening: exportRecipeOutputSharpeningV1Schema.nullable(),
+    preserveFolders: z.boolean(),
+    preserveTimestamps: z.boolean(),
+    renderingIntent: exportRecipeRenderingIntentV1Schema,
     resizeMode: exportRecipeResizeModeV1Schema,
     resizeValue: z.number().int().min(1).max(100_000),
     stripGps: z.boolean(),
@@ -68,6 +95,14 @@ export const exportRecipeV1Schema = z
         code: 'custom',
         message: 'Source-embedded profile export requires relative colorimetric rendering intent.',
         path: ['renderingIntent'],
+      });
+    }
+
+    if (recipe.colorProfile === 'sourceEmbedded' && recipe.blackPointCompensation) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Source-embedded profile export does not support black-point compensation.',
+        path: ['blackPointCompensation'],
       });
     }
 

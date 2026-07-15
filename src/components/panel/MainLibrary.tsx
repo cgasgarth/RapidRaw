@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import type { ThumbnailViewportUpdate } from '../../hooks/library/useThumbnails';
 import { consumeStartupShellIntent } from '../../product/startupShellHandoff';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/export/exportRecipeIds';
+import { buildExportRecipeUiRows } from '../../schemas/export/exportRecipeUiSchemas';
 import { buildLibrarySessionUiCard } from '../../schemas/library/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
@@ -255,8 +256,9 @@ export default function MainLibrary(props: MainLibraryProps) {
     () =>
       buildLibrarySessionUiCard({
         assetCount: props.imageList.length,
-        exportRecipeCount:
-          props.appSettings?.exportPresets?.filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID).length ?? 0,
+        exportRecipeCount: buildExportRecipeUiRows(props.appSettings?.exportPresets ?? []).filter(
+          (recipe) => recipe.id !== EXPORT_LAST_USED_PRESET_ID,
+        ).length,
         folderPath: props.currentFolderPath,
         id: 'current-library-session',
         name: props.currentFolderPath?.split('/').pop() || t('library.splash.continueSession'),

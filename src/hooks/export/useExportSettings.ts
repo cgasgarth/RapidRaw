@@ -93,7 +93,7 @@ export function useExportSettings() {
   );
   const [jpegQuality, setJpegQuality] = useState(90);
   const [enableResize, setEnableResize] = useState(false);
-  const [resizeMode, setResizeMode] = useState('longEdge');
+  const [resizeMode, setResizeMode] = useState<ExportPreset['resizeMode']>('longEdge');
   const [resizeValue, setResizeValue] = useState(2048);
   const [dontEnlarge, setDontEnlarge] = useState(true);
   const [keepMetadata, setKeepMetadata] = useState(true);
@@ -114,10 +114,10 @@ export function useExportSettings() {
     (preset: ExportPreset) => {
       const nextFileFormat = isFileFormat(preset.fileFormat) ? preset.fileFormat : FileFormats.Jpeg;
       updateColorSelection({
-        blackPointCompensation: preset.blackPointCompensation ?? false,
-        colorProfile: preset.colorProfile ?? ExportColorProfile.Srgb,
+        blackPointCompensation: preset.blackPointCompensation,
+        colorProfile: preset.colorProfile,
         fileFormat: nextFileFormat,
-        renderingIntent: preset.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
+        renderingIntent: preset.renderingIntent,
       });
       setJpegQuality(preset.jpegQuality);
       setEnableResize(preset.enableResize);
@@ -127,8 +127,8 @@ export function useExportSettings() {
       setKeepMetadata(preset.keepMetadata);
       setPreserveTimestamps(preset.preserveTimestamps);
       setStripGps(preset.stripGps);
-      setExportMasks(preset.exportMasks ?? false);
-      setPreserveFolders(preset.preserveFolders ?? false);
+      setExportMasks(preset.exportMasks);
+      setPreserveFolders(preset.preserveFolders);
       setFilenameTemplate(preset.filenameTemplate);
       setEnableWatermark(preset.enableWatermark);
       setWatermarkPath(preset.watermarkPath);
@@ -138,7 +138,7 @@ export function useExportSettings() {
       setWatermarkScale(preset.watermarkScale);
       setWatermarkSpacing(preset.watermarkSpacing);
       setWatermarkOpacity(preset.watermarkOpacity);
-      setOutputSharpening(preset.outputSharpening ?? null);
+      setOutputSharpening(preset.outputSharpening);
     },
     [updateColorSelection],
   );
