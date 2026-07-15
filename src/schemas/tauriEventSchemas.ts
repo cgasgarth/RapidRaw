@@ -3,7 +3,7 @@ import type { CullingSuggestions, Progress } from '../components/ui/AppPropertie
 import { previewOperationIdentitySchema } from '../utils/previewCoordinator';
 import { panoramaRenderedReviewSchema } from './computational-merge/panoramaUiSchemas';
 import { denoiseOperationHandleSchema } from './denoiseWorkflowSchemas';
-import { importJobAuthoritySchema } from './fileOperationSchemas';
+import { importJobAuthoritySchema, importJobReceiptSchema } from './fileOperationSchemas';
 import { rawDevelopmentReportSchema } from './imageLoaderSchemas';
 import {
   thumbnailErrorPayloadSchema,
@@ -219,7 +219,9 @@ export const importProgressPayloadSchema = pathProgressPayloadSchema.extend({
   committedPath: z.string().nullable().optional(),
 });
 
-export const importTerminalPayloadSchema = importJobAuthoritySchema.extend({ receipt: z.unknown() }).strict();
+export const importTerminalPayloadSchema = importJobAuthoritySchema
+  .extend({ receipt: importJobReceiptSchema })
+  .strict();
 
 export const importErrorPayloadSchema = importJobAuthoritySchema.extend({ message: z.string() }).strict();
 

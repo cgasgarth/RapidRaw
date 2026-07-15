@@ -2,6 +2,7 @@ import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDo
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
+import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
 
 type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
 type BrowserTauriEventCallback = (event: unknown) => void;
@@ -786,10 +787,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.importFiles: {
       const sourcePaths = getStringArrayArg(args, 'sourcePaths');
       const destinationFolder = getStringArg(args, 'destinationFolder') ?? browserHarnessRoot;
-      const jobId = 'browser-harness-import-job';
-      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', { jobId, total: sourcePaths.length }), 0);
+      const lifecycle = createBrowserHarnessImportLifecycle({
+        destinationFolder,
+        generation: 1,
+        jobId: 'browser-harness-import-job',
+        sourcePaths,
+      });
+      window.setTimeout(() => dispatchBrowserHarnessEvent('import-start', lifecycle.start), 0);
       sourcePaths.forEach((sourcePath, index) => {
-        const importedPath = `${destinationFolder}/${sourcePath.split('/').at(-1) ?? `import-${index + 1}.ARW`}`;
+        const importedPath = lifecycle.destinations[index];
+        if (importedPath === undefined) return;
         if (!harnessImages.some(({ path }) => path === importedPath)) {
           harnessImages.push({
             exif: null,
@@ -802,22 +809,16 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           });
         }
         window.setTimeout(
-          () =>
-            dispatchBrowserHarnessEvent('import-progress', {
-              bytesCopied: (index + 1) * 24_000_000,
-              committedPath: importedPath,
-              current: index + 1,
-              path: importedPath,
-              stage: 'copy',
-              total: sourcePaths.length,
-              totalBytes: sourcePaths.length * 24_000_000,
-            }),
+          () => dispatchBrowserHarnessEvent('import-progress', lifecycle.progress[index]),
           20 * (index + 1),
         );
       });
       folderRevision += sourcePaths.length;
-      window.setTimeout(() => dispatchBrowserHarnessEvent('import-complete', { jobId }), 20 * (sourcePaths.length + 1));
-      return Promise.resolve(jobId);
+      window.setTimeout(
+        () => dispatchBrowserHarnessEvent('import-complete', lifecycle.terminal),
+        20 * (sourcePaths.length + 1),
+      );
+      return Promise.resolve(lifecycle.authority);
     }
     case commandNames.planHdr: {
       const paths = getStringArrayArg(args, 'paths');
