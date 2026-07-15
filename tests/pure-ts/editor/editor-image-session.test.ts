@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import type { SelectedImage } from '../../../src/components/ui/AppProperties';
 import {
   createEditorImageSession,
   isEditorImageSessionCurrent,
@@ -6,8 +7,31 @@ import {
 } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildImageCacheEntry } from '../../../src/utils/ImageLRUCache';
+import { resolvePreviewViewportRoi } from '../../../src/utils/previewCoordinator';
 
 const originalEditorState = useEditorStore.getState();
+
+const selectedImage = (path: string): SelectedImage => ({
+  exif: null,
+  height: 4000,
+  isRaw: true,
+  isReady: true,
+  metadata: null,
+  originalUrl: null,
+  path,
+  rawDevelopmentReport: null,
+  thumbnailUrl: `thumb:${path}`,
+  width: 6000,
+});
+
+const viewportLayout = {
+  containerHeight: 600,
+  containerWidth: 800,
+  height: 600,
+  offsetX: 0,
+  offsetY: 0,
+  width: 800,
+};
 
 afterEach(() => {
   useEditorStore.setState(originalEditorState, true);
@@ -75,5 +99,42 @@ describe('editor image session ownership', () => {
     expect(
       buildImageCacheEntry({ ...snapshot, selectedImage: { ...snapshot.selectedImage, isReady: false } }),
     ).toBeNull();
+  });
+
+  test('settled viewport publication advances revision only for material transform changes and Fit clears ROI', () => {
+    const publish = useEditorStore.getState().publishPreviewViewportTransform;
+    const baselineRevision = useEditorStore.getState().viewportRevision;
+
+    publish({ positionX: -400, positionY: -300, scale: 2 });
+    let editor = useEditorStore.getState();
+    expect(editor.viewportRevision).toBe(baselineRevision + 1);
+    expect(resolvePreviewViewportRoi(viewportLayout, editor.previewViewportTransform)).toEqual([0.25, 0.25, 0.5, 0.5]);
+
+    publish({ positionX: -400, positionY: -300, scale: 2 });
+    expect(useEditorStore.getState().viewportRevision).toBe(baselineRevision + 1);
+
+    publish({ positionX: 0, positionY: 0, scale: 1 });
+    editor = useEditorStore.getState();
+    expect(editor.viewportRevision).toBe(baselineRevision + 2);
+    expect(resolvePreviewViewportRoi(viewportLayout, editor.previewViewportTransform)).toBeNull();
+
+    publish({ positionX: 0, positionY: 0, scale: 1 });
+    expect(useEditorStore.getState().viewportRevision).toBe(baselineRevision + 2);
+  });
+
+  test('image source replacement resets a zoomed viewport snapshot to full-frame authority', () => {
+    const editor = useEditorStore.getState();
+    editor.setEditor({ selectedImage: selectedImage('/raw/A.ARW') });
+    editor.publishPreviewViewportTransform({ positionX: -400, positionY: -300, scale: 2 });
+    const zoomedRevision = useEditorStore.getState().viewportRevision;
+    expect(
+      resolvePreviewViewportRoi(viewportLayout, useEditorStore.getState().previewViewportTransform),
+    ).not.toBeNull();
+
+    useEditorStore.getState().setEditor({ selectedImage: selectedImage('/raw/B.ARW') });
+    const replaced = useEditorStore.getState();
+    expect(replaced.previewViewportTransform).toEqual({ positionX: 0, positionY: 0, scale: 1 });
+    expect(replaced.viewportRevision).toBeGreaterThan(zoomedRevision);
+    expect(resolvePreviewViewportRoi(viewportLayout, replaced.previewViewportTransform)).toBeNull();
   });
 });

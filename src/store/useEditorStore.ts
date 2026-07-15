@@ -48,6 +48,7 @@ import {
   reduceEditTransaction,
 } from '../utils/editTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
+import type { PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
 import type { WhiteBalancePickerRuntimeReceipt } from '../utils/whiteBalancePicker';
@@ -167,6 +168,7 @@ interface EditorState {
   imageSessionId: number;
   imageSession: EditorImageSession | null;
   viewportRevision: number;
+  previewViewportTransform: PreviewViewportTransformSnapshot;
   proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
 
@@ -251,6 +253,7 @@ interface EditorState {
   presetApplication: PresetApplication | null;
 
   // Actions
+  publishPreviewViewportTransform: (transform: PreviewViewportTransformSnapshot) => void;
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
   publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
@@ -368,6 +371,7 @@ const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialAdjustm
 const viewportRevisionKeys: Array<keyof EditorState> = [
   'baseRenderSize',
   'displaySize',
+  'previewViewportTransform',
   'previewSize',
   'viewportEpoch',
   'zoomMode',
@@ -383,6 +387,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageSessionId: 1,
   imageSession: null,
   viewportRevision: 1,
+  previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
   proofRevision: 1,
   lastBasicToneCommand: null,
   history: [initialAdjustments],
@@ -458,6 +463,26 @@ export const useEditorStore = create<EditorState>((set) => ({
   wgpuFailureSerial: 0,
   patchResidency: new PatchResidencyTracker(1),
 
+  publishPreviewViewportTransform: (transform) => {
+    set((state) => {
+      const previous = state.previewViewportTransform;
+      const transformChanged =
+        previous.scale !== transform.scale ||
+        previous.positionX !== transform.positionX ||
+        previous.positionY !== transform.positionY;
+      const zoomChanged = state.zoom !== transform.scale;
+      if (!transformChanged && !zoomChanged) return state;
+      return {
+        ...(transformChanged
+          ? {
+              previewViewportTransform: { ...transform },
+              viewportRevision: state.viewportRevision + 1,
+            }
+          : {}),
+        ...(zoomChanged ? { zoom: transform.scale } : {}),
+      };
+    });
+  },
   setEditor: (updater) => {
     set((state) => {
       const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
@@ -521,6 +546,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       }
       if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
         update.navigatorPreviewArtifact = null;
+      }
+      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+        update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
       }
       if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
         update.viewportRevision = state.viewportRevision + 1;
