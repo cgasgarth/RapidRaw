@@ -23,6 +23,7 @@ export interface CameraInputCommitIdentity {
 export interface CameraInputEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
 
@@ -31,13 +32,16 @@ export interface AutoWhiteBalanceRequestConfiguration {
   inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
 }
 
+const currentImageSessionId = (state: CameraInputEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
 export const captureCameraInputCommitIdentity = (
   state: CameraInputEditTransactionState,
 ): CameraInputCommitIdentity | null =>
-  state.selectedImage?.path !== undefined && state.imageSession !== null
+  state.selectedImage?.path !== undefined
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: state.selectedImage.path,
       }
     : null;
@@ -47,7 +51,7 @@ export const isCurrentCameraInputCommitIdentity = (
   identity: CameraInputCommitIdentity,
 ): boolean =>
   state.selectedImage?.path === identity.sourceIdentity &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.adjustmentRevision === identity.adjustmentRevision;
 
 export const isCurrentCameraInputAsyncRequest = (
@@ -81,9 +85,9 @@ export const buildCameraInputEditTransaction = (
       `camera_input_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `camera_input_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `camera_input_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

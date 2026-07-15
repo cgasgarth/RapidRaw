@@ -13,11 +13,13 @@ type CameraInputPatchUpdate = CameraInputPatch | ((current: Readonly<CameraInput
 export const useCameraInputEditCommit = (enabled = true) => {
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const identity = useMemo<CameraInputCommitIdentity | null>(
     () =>
-      enabled && selectedImagePath !== null && imageSessionId !== null
+      enabled && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, enabled, imageSessionId, selectedImagePath],
