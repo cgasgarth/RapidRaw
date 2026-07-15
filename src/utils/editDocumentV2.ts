@@ -11,6 +11,7 @@ import {
   editDocumentNodeEnvelopeV2Schema,
   editDocumentSceneCurveV2Schema,
   editDocumentSourceArtifactsV2Schema,
+  editDocumentToneEqualizerV2Schema,
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
@@ -73,9 +74,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                       ...(descriptor?.defaultParams ?? {}),
                       ...mappedParams,
                     })
-                  : nodeType === 'layers'
-                    ? { masks: [], ...mappedParams }
-                    : mappedParams;
+                  : nodeType === 'tone_equalizer'
+                    ? editDocumentToneEqualizerV2Schema.parse({
+                        ...(descriptor?.defaultParams ?? {}),
+                        ...mappedParams,
+                      })
+                    : nodeType === 'layers'
+                      ? { masks: [], ...mappedParams }
+                      : mappedParams;
       return [
         nodeType,
         {
@@ -94,7 +100,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
   const defaultedNodeParams = (
-    ['camera_input', 'detail_denoise_dehaze', 'display_creative', 'geometry', 'scene_curve'] as const
+    ['camera_input', 'detail_denoise_dehaze', 'display_creative', 'geometry', 'scene_curve', 'tone_equalizer'] as const
   ).flatMap((nodeType) => {
     const descriptor = descriptorFor(nodeType);
     return Object.keys(descriptor?.defaultParams ?? {})

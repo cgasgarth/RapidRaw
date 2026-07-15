@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, curve, and geometry changes to node operations', () => {
+  test('routes focused tone, camera, curve, tone-equalizer, and geometry changes to node operations', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -90,6 +90,23 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'scene_curve',
         patch: { curveMode: 'parametric', parametricCurve, toneCurve: 'soft_contrast' },
+      },
+    ]);
+
+    const toneEqualizer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.toneEqualizer),
+      enabled: true,
+    };
+    expect(
+      buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+        ...INITIAL_ADJUSTMENTS,
+        toneEqualizer,
+      }),
+    ).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'tone_equalizer',
+        patch: { toneEqualizer },
       },
     ]);
 
