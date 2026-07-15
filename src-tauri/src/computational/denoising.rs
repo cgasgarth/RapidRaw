@@ -76,7 +76,7 @@ pub fn apply_denoising(
         return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
     }
 
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let operation = denoise.begin(&path, &plan)?;
     Ok(operation.handle())
 }
@@ -90,7 +90,7 @@ pub fn execute_denoising(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let preparation = (|| {
         let (source_path, _) = parse_virtual_path(&path);
         let path_str = source_path.to_string_lossy().to_string();
@@ -203,7 +203,7 @@ pub fn cancel_denoising(
     operation: DenoiseOperationHandle,
     state: tauri::State<'_, AppState>,
 ) -> super::denoise_service::DenoiseCancelReceipt {
-    state.services.denoise.cancel(operation)
+    state.computational().denoise().cancel(operation)
 }
 
 #[tauri::command]
@@ -238,7 +238,7 @@ pub async fn batch_denoise_images(
         }
     }
 
-    let denoise = Arc::clone(&state.services.denoise);
+    let denoise = Arc::clone(state.computational().denoise());
     let cache_root = enhanced_cache_root(&app_handle)?;
     tokio::task::spawn_blocking(move || {
         let _ai_lease = ai_lease;
@@ -349,8 +349,8 @@ pub async fn save_denoised_image(
         crate::file_management::parse_virtual_path(&original_path_str);
     let requested_source = super::denoise_artifact::PhysicalSourceRevision::from_path(&first_path)?;
     let artifact = state
-        .services
-        .denoise
+        .computational()
+        .denoise()
         .current_artifact(&original_path_str, &requested_source)
         .ok_or_else(|| {
             "No enhanced denoise artifact is active for the current image and source revision."
