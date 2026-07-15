@@ -406,7 +406,6 @@ pub struct ImageEmbeddings {
 
 #[derive(Clone)]
 pub struct CachedDepthMap {
-    pub path_hash: String,
     pub depth_image: GrayImage,
     pub original_size: (u32, u32),
 }

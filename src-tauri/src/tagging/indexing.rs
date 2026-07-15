@@ -108,12 +108,7 @@ pub(crate) async fn start_background_indexing(
         let max_concurrent_tasks = settings.tagging_thread_count.unwrap_or(3).max(1) as usize;
         let custom_ai_tags = settings.custom_ai_tags.clone();
         let ai_tag_count = settings.ai_tag_count.unwrap_or(10) as usize;
-        let clip_lease = match crate::ai::ai_processing::acquire_clip_model(
-            &app_handle,
-            &state.ai_model_registry,
-        )
-        .await
-        {
+        let clip_lease = match state.services.ai.acquire_clip_model(&app_handle).await {
             Ok(lease) => lease,
             Err(error) => {
                 if let Some(terminal) = service.fail(start.authority) {

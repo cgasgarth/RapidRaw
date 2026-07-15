@@ -11,4 +11,6 @@ pub(crate) mod model_registry;
 pub(crate) mod person_part_parser;
 #[cfg(feature = "ai")]
 pub(crate) mod person_segmentation;
+#[cfg(feature = "ai")]
+pub(crate) mod runtime_service;
 pub(crate) mod types;

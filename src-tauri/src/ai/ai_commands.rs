@@ -15,13 +15,10 @@ use super::ai_connector;
 use crate::adjustment_fields::GEOMETRY_KEYS;
 use crate::ai::ai_processing::{
     self, AiDepthMaskParameters, AiForegroundMaskParameters, AiSkyMaskParameters,
-    AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, acquire_capability,
-    generate_image_embeddings, run_depth_anything_model, run_sam_decoder, run_sky_seg_model,
-    run_u2netp_model,
+    AiSubjectMaskParameters, CachedDepthMap, ImageEmbeddings, generate_image_embeddings,
+    run_depth_anything_model, run_sam_decoder, run_sky_seg_model, run_u2netp_model,
 };
-use crate::ai::model_registry::{
-    AiCapability, AiDerivedCacheReport, AiModelId, AiModelRegistryReport,
-};
+use crate::ai::model_registry::{AiCapability, AiModelId, AiModelRegistryReport};
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::formats::png_data_url;
@@ -41,31 +38,17 @@ fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
 
 #[tauri::command]
 pub fn get_ai_model_registry_report(state: tauri::State<'_, AppState>) -> AiModelRegistryReport {
-    let mut report = state.ai_model_registry.report();
-    let embedding_stats = state.ai_embeddings.stats();
-    let depth_stats = state.ai_depth_maps.stats();
-    report.derived_caches = [embedding_stats, depth_stats]
-        .map(|stats| AiDerivedCacheReport {
-            name: stats.name,
-            budget_bytes: stats.soft_limit_bytes,
-            resident_bytes: stats.bytes,
-            entries: stats.entries,
-            hits: stats.hits,
-            misses: stats.misses,
-            evictions: stats.evictions,
-        })
-        .to_vec();
-    report
+    state.services.ai.report()
 }
 
 #[tauri::command]
 pub fn cancel_ai_model_load(id: AiModelId, state: tauri::State<'_, AppState>) -> bool {
-    state.ai_model_registry.cancel_load(id)
+    state.services.ai.cancel_model_load(id)
 }
 
 #[tauri::command]
 pub fn evict_ai_model_session(id: AiModelId, state: tauri::State<'_, AppState>) -> bool {
-    state.ai_model_registry.evict_idle(id)
+    state.services.ai.evict_model_session(id)
 }
 
 #[derive(serde::Serialize)]
@@ -200,7 +183,7 @@ fn get_cached_or_generate_sam_embeddings(
     path_hash: &str,
 ) -> Result<(ImageEmbeddings, Option<f64>), String> {
     let cache_key = path_hash.to_string();
-    if let Some(cached_embeddings) = state.ai_embeddings.get(&cache_key) {
+    if let Some(cached_embeddings) = state.services.ai.embedding(&cache_key) {
         return Ok((cached_embeddings.as_ref().clone(), None));
     }
 
@@ -212,8 +195,9 @@ fn get_cached_or_generate_sam_embeddings(
     let embedding_latency_ms = embedding_start.elapsed().as_secs_f64() * 1000.0;
     let retained_bytes = (new_embeddings.embeddings.len() * size_of::<f32>()) as u64;
     state
-        .ai_embeddings
-        .insert(cache_key, Arc::new(new_embeddings.clone()), retained_bytes);
+        .services
+        .ai
+        .cache_embedding(cache_key, Arc::new(new_embeddings.clone()), retained_bytes);
     Ok((new_embeddings, Some(embedding_latency_ms)))
 }
 
@@ -227,13 +211,12 @@ pub async fn generate_ai_foreground_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiForegroundMaskParameters, String> {
-    let capability = acquire_capability(
-        &app_handle,
-        &state.ai_model_registry,
-        AiCapability::ForegroundMask,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::ForegroundMask)
+        .await
+        .map_err(|e| e.to_string())?;
     let session = capability.lease(AiModelId::ForegroundU2Net)?.ort()?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
@@ -262,10 +245,12 @@ pub async fn generate_ai_sky_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSkyMaskParameters, String> {
-    let capability =
-        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SkyMask)
-            .await
-            .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::SkyMask)
+        .await
+        .map_err(|e| e.to_string())?;
     let session = capability.lease(AiModelId::SkyU2Net)?.ort()?;
 
     let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
@@ -327,13 +312,12 @@ pub async fn generate_ai_person_part_mask(
             crate::ai::person_segmentation::generate_whole_person_mask(warped_image.as_ref())?
         }
         "clothing" | "hair" => {
-            let capability = acquire_capability(
-                &app_handle,
-                &state.ai_model_registry,
-                AiCapability::PersonPartMask,
-            )
-            .await
-            .map_err(|error| error.to_string())?;
+            let capability = state
+                .services
+                .ai
+                .acquire_capability(&app_handle, AiCapability::PersonPartMask)
+                .await
+                .map_err(|error| error.to_string())?;
             let parser = capability.lease(AiModelId::PersonPartParser)?.ort()?;
             let target = if part == "hair" {
                 crate::ai::person_part_parser::PersonPartMaskTarget::Hair
@@ -393,13 +377,12 @@ pub async fn generate_ai_depth_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiDepthMaskParameters, String> {
-    let capability = acquire_capability(
-        &app_handle,
-        &state.ai_model_registry,
-        AiCapability::DepthMask,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::DepthMask)
+        .await
+        .map_err(|e| e.to_string())?;
     let depth_session = capability.lease(AiModelId::DepthAnything)?.ort()?;
 
     let path_hash = derived_cache_key(
@@ -408,7 +391,7 @@ pub async fn generate_ai_depth_mask(
         &js_adjustments,
     )?;
 
-    let cached_depth = match state.ai_depth_maps.get(&path_hash) {
+    let cached_depth = match state.services.ai.depth_map(&path_hash) {
         Some(cached) => cached,
         None => {
             let warped_image = get_cached_full_warped_image(&state, &js_adjustments)?;
@@ -416,13 +399,13 @@ pub async fn generate_ai_depth_mask(
                 .map_err(|e| e.to_string())?;
             let retained_bytes = depth_img.as_raw().capacity() as u64;
             let new_cache = Arc::new(CachedDepthMap {
-                path_hash: path_hash.clone(),
                 depth_image: depth_img,
                 original_size: (warped_image.width(), warped_image.height()),
             });
             state
-                .ai_depth_maps
-                .insert(path_hash, Arc::clone(&new_cache), retained_bytes);
+                .services
+                .ai
+                .cache_depth_map(path_hash, Arc::clone(&new_cache), retained_bytes);
             new_cache
         }
     };
@@ -464,10 +447,12 @@ pub async fn generate_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<AiSubjectMaskParameters, String> {
-    let capability =
-        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SamMask)
-            .await
-            .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::SamMask)
+        .await
+        .map_err(|e| e.to_string())?;
     let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
     let decoder = capability.lease(AiModelId::SamDecoder)?.ort()?;
 
@@ -525,10 +510,12 @@ pub async fn generate_ai_object_mask_proposal(
     app_handle: tauri::AppHandle,
 ) -> Result<AiObjectMaskProposal, String> {
     let total_start = Instant::now();
-    let capability =
-        acquire_capability(&app_handle, &state.ai_model_registry, AiCapability::SamMask)
-            .await
-            .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::SamMask)
+        .await
+        .map_err(|e| e.to_string())?;
     let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
     let decoder = capability.lease(AiModelId::SamDecoder)?.ort()?;
     let path_hash = sam_path_hash(&path, &js_adjustments)?;
@@ -586,18 +573,17 @@ pub async fn precompute_ai_subject_mask(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let capability = acquire_capability(
-        &app_handle,
-        &state.ai_model_registry,
-        AiCapability::SamEmbedding,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let capability = state
+        .services
+        .ai
+        .acquire_capability(&app_handle, AiCapability::SamEmbedding)
+        .await
+        .map_err(|e| e.to_string())?;
     let encoder = capability.lease(AiModelId::SamEncoder)?.ort()?;
 
     let path_hash = sam_path_hash(&path, &js_adjustments)?;
 
-    if state.ai_embeddings.get(&path_hash).is_some() {
+    if state.services.ai.embedding(&path_hash).is_some() {
         return Ok(());
     }
 
@@ -608,8 +594,9 @@ pub async fn precompute_ai_subject_mask(
     new_embeddings.path_hash = path_hash.clone();
     let retained_bytes = (new_embeddings.embeddings.len() * size_of::<f32>()) as u64;
     state
-        .ai_embeddings
-        .insert(path_hash, Arc::new(new_embeddings), retained_bytes);
+        .services
+        .ai
+        .cache_embedding(path_hash, Arc::new(new_embeddings), retained_bytes);
 
     Ok(())
 }
@@ -696,13 +683,12 @@ pub async fn invoke_generative_replace_with_mask_def(
     let mask_bitmap = unwarped_dynamic.to_luma8();
 
     let patch_rgba = if use_fast_inpaint {
-        let capability = ai_processing::acquire_capability(
-            &app_handle,
-            &state.ai_model_registry,
-            AiCapability::Inpainting,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+        let capability = state
+            .services
+            .ai
+            .acquire_capability(&app_handle, AiCapability::Inpainting)
+            .await
+            .map_err(|e| e.to_string())?;
         let lama_model = capability.lease(AiModelId::Lama)?.ort()?;
 
         ai_processing::run_lama_inpainting(&source_image, &mask_bitmap, &lama_model)
