@@ -11,6 +11,42 @@ export interface AutoEditProposalBase {
   path: string;
 }
 
+export interface AutoEditProposalState {
+  adjustmentRevision: number;
+  adjustments: Adjustments;
+  historyIndex: number;
+  imageSession: { id: string } | null;
+  imageSessionId: number;
+  selectedImage: { isReady: boolean; path: string } | null;
+}
+
+export const currentAutoEditImageSessionId = (state: AutoEditProposalState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const captureAutoEditProposalBase = (state: AutoEditProposalState): AutoEditProposalBase | null =>
+  state.selectedImage?.isReady === true
+    ? {
+        adjustmentRevision: state.adjustmentRevision,
+        adjustments: state.adjustments,
+        graphRevision: `history_${String(state.historyIndex)}`,
+        imageSessionId: currentAutoEditImageSessionId(state),
+        path: state.selectedImage.path,
+      }
+    : null;
+
+export const isCurrentAutoEditProposalBase = (state: AutoEditProposalState, base: AutoEditProposalBase): boolean =>
+  state.adjustmentRevision === base.adjustmentRevision &&
+  `history_${String(state.historyIndex)}` === base.graphRevision &&
+  currentAutoEditImageSessionId(state) === base.imageSessionId &&
+  state.selectedImage?.path === base.path;
+
+export const isCurrentAutoEditProposalRequest = (
+  state: AutoEditProposalState,
+  base: AutoEditProposalBase,
+  requestGeneration: number,
+  currentRequestGeneration: number,
+): boolean => requestGeneration === currentRequestGeneration && isCurrentAutoEditProposalBase(state, base);
+
 export interface AutoEditPreviewSession {
   baseAdjustmentRevision: number;
   baseGraphRevision: string;

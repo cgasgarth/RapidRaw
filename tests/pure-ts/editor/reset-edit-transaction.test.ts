@@ -151,4 +151,48 @@ describe('Reset edit transaction', () => {
     expect(result.noOp).toBeTrue();
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 0, historyIndex: 0 });
   });
+
+  test('commits a native fallback Reset and rejects A to B to A reopen', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-reset-before',
+      imageSession: null,
+      imageSessionId: 124,
+    });
+    const state = useEditorStore.getState();
+    const identity = captureResetEditCommitIdentity(state, sourcePath);
+    if (identity === null) throw new Error('Expected fallback Reset identity');
+    expect(identity.imageSessionId).toBe('editor-image-session:124');
+    expect(isCurrentResetEditCommitIdentity(state, identity)).toBeTrue();
+    expect(
+      isCurrentResetEditCommitIdentity(
+        { ...state, imageSessionId: 125, selectedImage: { isReady: true, path: '/fixture/B.ARW' } },
+        identity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentResetEditCommitIdentity({ ...state, imageSessionId: 126 }, identity)).toBeFalse();
+    expect(isCurrentResetEditCommitIdentity({ ...state, adjustmentRevision: 5 }, identity)).toBeFalse();
+
+    const request = buildResetEditTransaction(state, identity, receipt, selectedImage, 'fallback-reset-native');
+    const result = state.applyEditTransaction(request);
+    expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed' });
+    expect(result).toMatchObject({ nextAdjustmentRevision: 5, noOp: false, source: 'reset' });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 0,
+      lastEditApplicationReceipt: {
+        imageSessionId: identity.imageSessionId,
+        transactionId: 'fallback-reset-native',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(1);
+    expect(() =>
+      buildResetEditTransaction(
+        { ...state, imageSessionId: 126 },
+        identity,
+        receipt,
+        selectedImage,
+        'stale-reopened-a',
+      ),
+    ).toThrow('reset_edit_transaction.stale_session');
+  });
 });

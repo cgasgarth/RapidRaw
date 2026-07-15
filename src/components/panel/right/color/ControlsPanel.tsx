@@ -61,13 +61,15 @@ import {
 import {
   type AutoEditProposalBase,
   buildAutoEditTransactionRequest,
+  captureAutoEditProposalBase,
   clearAutoEditPreviewSession,
   createAutoEditPreviewSession,
+  currentAutoEditImageSessionId,
+  isCurrentAutoEditProposalRequest,
   setAutoEditPreviewBypass,
 } from '../../../../utils/autoEditTransaction';
 import {
   highConfidenceAutoEditGroups,
-  isCurrentAutoEditCompletion,
   mergeAutoEditAdjustments,
   recommendedAutoEditGroups,
   toggleAutoEditGroup,
@@ -258,7 +260,7 @@ export default function Controls() {
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
       selectedImage: state.selectedImage,
-      selectedImageSessionId: state.imageSession?.id ?? null,
+      selectedImageSessionId: currentAutoEditImageSessionId(state),
       setEditor: state.setEditor,
     })),
   );
@@ -292,15 +294,7 @@ export default function Controls() {
         });
         const preview: AutoEditPreviewV1 = autoEditPreviewV1Schema.parse(rawPreview);
         const state = useEditorStore.getState();
-        if (
-          serial !== autoEditRequestSerial.current ||
-          !isCurrentAutoEditCompletion(
-            base.imageSessionId,
-            base.graphRevision,
-            state.imageSession?.id ?? null,
-            `history_${String(state.historyIndex)}`,
-          )
-        ) {
+        if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
         const previewAdjustments = mergeAutoEditAdjustments(base.adjustments, preview.adjustments);
@@ -324,16 +318,8 @@ export default function Controls() {
   const beginAutoEdit = useCallback(async () => {
     const state = useEditorStore.getState();
     const image = state.selectedImage;
-    const imageSessionId = state.imageSession?.id;
-    if (!image?.isReady || !imageSessionId) return;
-    const graphRevision = `history_${String(state.historyIndex)}`;
-    const base = {
-      adjustmentRevision: state.adjustmentRevision,
-      adjustments: state.adjustments,
-      graphRevision,
-      imageSessionId,
-      path: image.path,
-    };
+    const base = captureAutoEditProposalBase(state);
+    if (image === null || base === null) return;
     autoEditBaseRef.current = base;
     autoEditPreviewKeyRef.current = null;
     setIsAutoEditOpen(true);
@@ -345,23 +331,15 @@ export default function Controls() {
       const rawProposal = await invoke<unknown>(Invokes.AnalyzeAutoEdit, {
         request: {
           expectedImagePath: image.path,
-          imageSessionId,
-          graphRevision,
+          imageSessionId: base.imageSessionId,
+          graphRevision: base.graphRevision,
           currentAdjustments: base.adjustments,
           cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
         },
       });
       const proposal = autoEditProposalV1Schema.parse(rawProposal);
       const current = useEditorStore.getState();
-      if (
-        serial !== autoEditRequestSerial.current ||
-        !isCurrentAutoEditCompletion(
-          imageSessionId,
-          graphRevision,
-          current.imageSession?.id ?? null,
-          `history_${String(current.historyIndex)}`,
-        )
-      ) {
+      if (!isCurrentAutoEditProposalRequest(current, base, serial, autoEditRequestSerial.current)) {
         return;
       }
       const groups = recommendedAutoEditGroups(proposal);
@@ -413,15 +391,7 @@ export default function Controls() {
         });
         const applied: AppliedAutoEditV1 = appliedAutoEditV1Schema.parse(rawApplied);
         const state = useEditorStore.getState();
-        if (
-          serial !== autoEditRequestSerial.current ||
-          !isCurrentAutoEditCompletion(
-            base.imageSessionId,
-            base.graphRevision,
-            state.imageSession?.id ?? null,
-            `history_${String(state.historyIndex)}`,
-          )
-        ) {
+        if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
         const nextAdjustments = mergeAutoEditAdjustments(base.adjustments, applied.adjustments);

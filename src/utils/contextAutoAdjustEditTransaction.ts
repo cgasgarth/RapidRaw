@@ -39,18 +39,22 @@ export interface ContextAutoAdjustEditTransactionState {
   adjustments: Adjustments;
   historyIndex: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { isReady: boolean; path: string; rawDevelopmentReport?: unknown } | null;
 }
+
+const currentImageSessionId = (state: ContextAutoAdjustEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const captureContextAutoAdjustBase = (
   state: ContextAutoAdjustEditTransactionState,
 ): ContextAutoAdjustBase | null =>
-  state.selectedImage?.isReady === true && state.imageSession !== null
+  state.selectedImage?.isReady === true
     ? {
         adjustmentRevision: state.adjustmentRevision,
         adjustments: structuredClone(state.adjustments),
         graphRevision: `history_${String(state.historyIndex)}`,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         inputSemantics:
           state.selectedImage.rawDevelopmentReport == null ? 'rendered_scene_linear_approximation' : 'raw_scene_linear',
         path: state.selectedImage.path,
@@ -65,7 +69,7 @@ export const isCurrentContextAutoAdjustRequest = (
 ): boolean =>
   requestGeneration === currentRequestGeneration &&
   state.adjustmentRevision === base.adjustmentRevision &&
-  state.imageSession?.id === base.imageSessionId &&
+  currentImageSessionId(state) === base.imageSessionId &&
   state.selectedImage?.path === base.path;
 
 export const buildContextAutoAdjustEditTransaction = (
@@ -77,9 +81,9 @@ export const buildContextAutoAdjustEditTransaction = (
   if (state.selectedImage?.path !== base.path) {
     throw new Error(`context_auto_adjust_transaction.stale_source:${base.path}:${state.selectedImage?.path ?? 'none'}`);
   }
-  if (state.imageSession?.id !== base.imageSessionId) {
+  if (currentImageSessionId(state) !== base.imageSessionId) {
     throw new Error(
-      `context_auto_adjust_transaction.stale_session:${base.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `context_auto_adjust_transaction.stale_session:${base.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== base.adjustmentRevision) {
