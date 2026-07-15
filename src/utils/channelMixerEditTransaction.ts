@@ -10,8 +10,20 @@ export interface ChannelMixerCommitIdentity {
 export interface ChannelMixerEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: ChannelMixerEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const isCurrentChannelMixerIdentity = (
+  state: ChannelMixerEditTransactionState,
+  identity: ChannelMixerCommitIdentity,
+): boolean =>
+  state.adjustmentRevision === identity.adjustmentRevision &&
+  currentImageSessionId(state) === identity.imageSessionId &&
+  state.selectedImage?.path === identity.sourceIdentity;
 
 export const buildChannelMixerEditTransaction = (
   state: ChannelMixerEditTransactionState,
@@ -24,9 +36,9 @@ export const buildChannelMixerEditTransaction = (
       `channel_mixer_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `channel_mixer_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `channel_mixer_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
