@@ -19,6 +19,7 @@ export interface RunOptions {
   explainCache: boolean;
   root: string;
   resourceCoordinatorRoot?: string;
+  resourceOwnerId?: string;
 }
 
 export const validateManifest = (manifest: readonly ValidationNode[]): void => {
@@ -316,6 +317,7 @@ const capacities: Record<ResourceClass, number> = {
 };
 
 export const runValidation = async (manifest: readonly ValidationNode[], options: RunOptions): Promise<number> => {
+  const runOwnerId = options.resourceOwnerId ?? crypto.randomUUID();
   const plan = planValidation(manifest, options.mode, options.changedPaths);
   for (const entry of plan) console.log(`${entry.selected ? 'RUN' : 'SKIP'} ${entry.node.id} (${entry.reason})`);
   const pending = new Map(plan.filter((entry) => entry.selected).map((entry) => [entry.node.id, entry.node]));
@@ -375,6 +377,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           label: `validation-output-run:${output}`,
           resource: validationOutputResource(options.root, output),
           root: options.resourceCoordinatorRoot,
+          ownerId: runOwnerId,
         }),
       );
     }
@@ -422,6 +425,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           label: `validation-class-${node.resourceClass}:${node.id}`,
           resource: `validation-class-${node.resourceClass}`,
           root: options.resourceCoordinatorRoot,
+          ownerId: runOwnerId,
         })
       : undefined;
     let cacheLease: ResourceLease | undefined;
@@ -433,6 +437,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
               label: `validation-cache-${node.id}`,
               resource: `validation-cache-${node.id}-${key.slice(0, 20)}`,
               root: options.resourceCoordinatorRoot,
+              ownerId: runOwnerId,
             });
       let cached = !options.noCache && node.cachePolicy !== 'none' ? await readCacheRecord(recordPath, key) : undefined;
       if (cached && JSON.stringify(cached.artifacts) !== JSON.stringify(await artifactDigests(node)))
@@ -461,7 +466,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         cwd: options.root,
         stdout: 'pipe',
         stderr: 'pipe',
-        env: process.env,
+        env: { ...process.env, RAWENGINE_RESOURCE_OWNER_ID: runOwnerId },
         detached: true,
       });
       let timedOut = false;
