@@ -4,16 +4,11 @@ import { Panel } from '../../components/ui/AppProperties';
 import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
 import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
-import { type ExportSoftProofTransformState, useEditorStore } from '../../store/useEditorStore';
+import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import {
-  getPreviewReadyPhase,
-  type PreviewOperationClass,
-  type PreviewQualityStatus,
-  type PreviewRoi,
-} from '../../utils/adaptivePreviewQuality';
+import type { PreviewOperationClass, PreviewRoi } from '../../utils/adaptivePreviewQuality';
 import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
@@ -36,20 +31,12 @@ import {
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
 import { PreviewInvalidationAdapter } from '../../utils/previewInvalidationAdapter';
+import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
 import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-
-type ParsedInteractivePatch = ReturnType<typeof parseInteractivePreviewPatchPayload>;
-type ReadyInteractivePatch = Extract<ParsedInteractivePatch, { ok: true }>;
-type MaterializedEditedPreviewValue =
-  | { kind: 'empty' }
-  | { kind: 'wgpu' }
-  | { kind: 'limited'; reason: string }
-  | { kind: 'patch'; patch: ReadyInteractivePatch; url: string }
-  | { kind: 'full'; transform: ExportSoftProofTransformState | null; url: string };
 
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
@@ -123,7 +110,7 @@ export function useImageProcessing() {
     previewUrlReleaseAuthorityRef.current ??
     new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) });
   previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
-  const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<MaterializedEditedPreviewValue> | null>(null);
+  const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
 
   const dispatchPreviewCoordinator = useCallback(
@@ -155,6 +142,22 @@ export function useImageProcessing() {
       }),
     [dispatchPreviewCoordinator, previewCoordinator],
   );
+  const previewPresentationAdapter = useMemo(
+    () =>
+      new PreviewPresentationAdapter({
+        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getPresentationState: () => {
+          const editor = useEditorStore.getState();
+          return {
+            imageSessionId: editor.imageSession?.id ?? null,
+            previewScopeStatus: editor.previewScopeStatus,
+          };
+        },
+        publish: setEditor,
+        recordTiming: (sample) => previewQualityControllerRef.current.record(sample),
+      }),
+    [previewCoordinator, setEditor],
+  );
 
   const originalPreviewRunner =
     originalPreviewRunnerRef.current ??
@@ -171,7 +174,7 @@ export function useImageProcessing() {
     async (
       result: ExecutedEditedPreview,
       context: EditedPreviewExecutionContext,
-    ): Promise<MaterializedEditedPreview<MaterializedEditedPreviewValue>> => {
+    ): Promise<MaterializedEditedPreview<PreviewPresentationValue>> => {
       const { buffer, transform } = result;
       if (buffer.byteLength === 0) return { value: { kind: 'empty' } };
       const prefix = new TextDecoder().decode(buffer.slice(0, 11));
@@ -198,120 +201,9 @@ export function useImageProcessing() {
     [previewUrlReleaseAuthority],
   );
 
-  const onEditedPreviewPresented = useCallback(
-    (
-      result: MaterializedEditedPreview<MaterializedEditedPreviewValue>,
-      context: EditedPreviewExecutionContext,
-    ): void => {
-      const { interactiveIdentity, quality, scopeRecovery, targetResolution } = context.request;
-      const requestId = context.identity.operationId;
-      const commitStartedAt = previewNow();
-      const recordTiming = (): void => {
-        previewQualityControllerRef.current.record({
-          commitMs: Math.max(0, previewNow() - commitStartedAt),
-          decodeMs: result.decodeMs ?? 0,
-          displayedAgeMs: Math.max(0, previewNow() - context.request.createdAt),
-          inputToDispatchMs: context.inputToDispatchMs,
-          renderMs: context.renderMs,
-          tier: quality.tier,
-        });
-      };
-      const readyStatus: PreviewQualityStatus = {
-        ...quality,
-        generation: interactiveIdentity.generation,
-        phase: getPreviewReadyPhase(quality),
-        requestId,
-      };
-      const value = result.value;
-      if (value.kind === 'empty' || value.kind === 'limited') {
-        setEditor({
-          previewQualityStatus: {
-            ...quality,
-            generation: interactiveIdentity.generation,
-            limitedBy: 'backend',
-            phase: 'degraded_limited',
-            reason: value.kind === 'empty' ? 'empty_render_buffer' : value.reason,
-            requestId,
-            sufficientForSemanticZoom: false,
-          },
-        });
-        recordTiming();
-        return;
-      }
-      if (value.kind === 'wgpu') {
-        setEditor({
-          interactivePatch: null,
-          previewQualityStatus: readyStatus,
-          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-        });
-        recordTiming();
-        return;
-      }
-      if (value.kind === 'patch') {
-        setEditor({
-          interactivePatch: {
-            basePreviewUrl: interactiveIdentity.basePreviewUrl,
-            fullHeight: value.patch.fullHeight,
-            fullWidth: value.patch.fullWidth,
-            geometryIdentity: interactiveIdentity.geometryIdentity,
-            normH: value.patch.normH,
-            normW: value.patch.normW,
-            normX: value.patch.normX,
-            normY: value.patch.normY,
-            pixelHeight: value.patch.pixelHeight,
-            pixelWidth: value.patch.pixelWidth,
-            sourceImagePath: interactiveIdentity.sourceImagePath,
-            url: value.url,
-          },
-          previewQualityStatus: readyStatus,
-          ...(context.request.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-        });
-        recordTiming();
-        return;
-      }
-
-      const completedScopeStatus = useEditorStore.getState().previewScopeStatus;
-      const transform = value.transform;
-      setEditor({
-        exportSoftProofTransform: transform,
-        interactivePatch: null,
-        navigatorPreviewArtifact: {
-          graphIdentity: interactiveIdentity.graphIdentity,
-          id: `${interactiveIdentity.graphIdentity}:${String(interactiveIdentity.generation)}:${String(requestId)}`,
-          imageSessionId: useEditorStore.getState().imageSession?.id ?? String(interactiveIdentity.imageSessionId),
-          url: value.url,
-        },
-        previewScopeStatus:
-          transform &&
-          completedScopeStatus?.path === interactiveIdentity.sourceImagePath &&
-          completedScopeStatus.histogramReady &&
-          completedScopeStatus.waveformReady
-            ? {
-                ...completedScopeStatus,
-                displayTransformLabel: transform.colorManagedTransform ?? 'Display preview transform',
-                exportProfileLabel: transform.effectiveColorProfile,
-                exportRenderingIntentLabel: transform.effectiveRenderingIntent,
-                renderBasis: 'export_preview',
-                softProofTransformApplied: transform.transformApplied === true,
-                sourceLabel: 'Export preview',
-                warningCodes: [
-                  transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
-                  'render_target_matches_export_recipe',
-                ],
-              }
-            : completedScopeStatus,
-        previewQualityStatus: readyStatus,
-        renderedPreviewResolution: targetResolution,
-      });
-      if (scopeRecovery) setEditor({ previewScopeRecoveryError: null });
-      recordTiming();
-    },
-    [setEditor],
-  );
-
   const editedPreviewRunner =
     editedPreviewRunnerRef.current ??
-    new EditedPreviewEffectRunner<MaterializedEditedPreviewValue>({
+    new EditedPreviewEffectRunner<PreviewPresentationValue>({
       dispatch: dispatchPreviewCoordinator,
       getPatchResidency: () => useEditorStore.getState().patchResidency.snapshot(),
       markPatchesResident: (sessionId, patchIds) => {
@@ -341,7 +233,18 @@ export function useImageProcessing() {
             : {}),
         });
       },
-      onPresented: onEditedPreviewPresented,
+      onPresented: (result, context) => {
+        previewPresentationAdapter.present(result, {
+          createdAt: context.request.createdAt,
+          identity: context.identity,
+          inputToDispatchMs: context.inputToDispatchMs,
+          interactiveIdentity: context.request.interactiveIdentity,
+          quality: context.request.quality,
+          renderMs: context.renderMs,
+          scopeRecovery: context.request.scopeRecovery,
+          targetResolution: context.request.targetResolution,
+        });
+      },
       releaseMaterialized: (result) => {
         if (result.value.kind === 'patch' || result.value.kind === 'full') {
           previewUrlReleaseAuthority.release(result.value.url);
