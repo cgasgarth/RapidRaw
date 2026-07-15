@@ -1602,7 +1602,7 @@ fn schedule_smart_preview(
     demand_class: SmartPreviewDemandClass,
 ) {
     let state = app_handle.state::<AppState>();
-    let generation = state.smart_preview_scheduler.enqueue(
+    let generation = state.services.smart_previews.enqueue(
         path.to_string(),
         request.source_revision,
         request.adjustments,
@@ -1614,7 +1614,7 @@ fn schedule_smart_preview(
     );
     let _ = app_handle.emit(
         "smart-preview-progress",
-        state.smart_preview_scheduler.progress(),
+        state.services.smart_previews.progress(),
     );
 }
 
@@ -1687,7 +1687,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let smart_app = app_handle;
     let smart_scheduler = smart_app
         .state::<crate::AppState>()
-        .smart_preview_scheduler
+        .services
+        .smart_previews
         .clone();
     std::thread::spawn(move || {
         loop {
