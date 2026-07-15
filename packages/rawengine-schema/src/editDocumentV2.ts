@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
+import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 
@@ -49,6 +50,8 @@ export const editDocumentDisplayCreativeV2Schema = z
     vignetteRoundness: z.number().finite().min(-100).max(100),
   })
   .strict();
+
+export const editDocumentToneEqualizerV2Schema = z.object({ toneEqualizer: toneEqualizerSettingsV1Schema }).strict();
 
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
@@ -326,6 +329,29 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'scene_curve',
     process: 'scene_referred_v2',
     renderStage: 'scene_curve',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
+      toneEqualizer: {
+        autoPlacement: false,
+        bandEv: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        detailPreservation: 0.65,
+        edgeRefinement: 2,
+        enabled: false,
+        maskExposureCompensation: 0,
+        pivotEv: 0,
+        previewMode: 0,
+        rangeEv: 16,
+        selectedBand: 4,
+        smoothingRadius: 32,
+      },
+    },
+    legacyFields: ['toneEqualizer'],
+    nodeType: 'tone_equalizer',
+    process: 'scene_referred_v2',
+    renderStage: 'tone_equalizer',
     implementationVersion: 1,
   },
   {
@@ -746,6 +772,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'tone_equalizer') {
+        const toneEqualizer = editDocumentToneEqualizerV2Schema.safeParse(node.params);
+        if (!toneEqualizer.success) {
+          for (const issue of toneEqualizer.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -827,6 +861,7 @@ export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigratio
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
+export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
@@ -853,6 +888,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
+  if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
