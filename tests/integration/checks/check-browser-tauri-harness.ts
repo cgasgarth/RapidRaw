@@ -506,6 +506,14 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
     throw new Error('Konva and global touchend handlers duplicated the linear-mask commit.');
   }
 
+  const editReceipt = await page.getByTestId('editor-image-preview-panel').evaluate((element) => ({
+    source: element.getAttribute('data-last-edit-source'),
+    transactionId: element.getAttribute('data-last-edit-transaction-id'),
+  }));
+  if (editReceipt.source !== 'layer-command' || !editReceipt.transactionId?.startsWith('initial-mask-draw:')) {
+    throw new Error(`Initial mask draw bypassed the semantic edit command: ${JSON.stringify(editReceipt)}.`);
+  }
+
   const outputProof = await page.evaluate(() => {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
     const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
@@ -526,7 +534,9 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
     typeof renderRequest !== 'object' ||
     renderRequest === null
   ) {
-    throw new Error(`Initial mask output proof was incomplete: ${JSON.stringify(outputProof)}.`);
+    throw new Error(
+      `Initial mask output proof was incomplete: persistence=${String(persistedAdjustments !== null)} overlay=${String(overlayMask !== null)} render=${String(renderRequest !== null)}.`,
+    );
   }
   const editDocument = editDocumentV2Schema.parse(renderRequest['editDocumentV2']);
   const persistedLinear = persistedAdjustments.masks

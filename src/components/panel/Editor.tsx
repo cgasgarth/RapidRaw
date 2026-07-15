@@ -188,6 +188,7 @@ export default function Editor({
   const editorImageSession = useEditorStore((s) => s.imageSession);
   const adjustments = useEditorStore((s) => s.adjustments);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
+  const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
   const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
   const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
     imageSessionId: editorImageSession?.id ?? null,
@@ -751,7 +752,7 @@ export default function Editor({
           },
           command.key,
           command.parameters,
-          crypto.randomUUID(),
+          `initial-mask-draw:${crypto.randomUUID()}`,
         ),
       );
     },
@@ -2184,6 +2185,8 @@ export default function Editor({
           data-editor-transform-position-y={String(transformState.positionY)}
           data-editor-transform-scale={String(transformState.scale)}
           data-editor-zoom-mode={zoomMode.kind}
+          data-last-edit-source={lastEditApplicationReceipt?.source ?? ''}
+          data-last-edit-transaction-id={lastEditApplicationReceipt?.transactionId ?? ''}
           data-viewer-active-tool={activeViewerTool}
           data-viewer-gesture-state={isViewerGestureDragging ? 'dragging' : 'idle'}
           data-viewer-temporary-hand={String(isTemporaryHand)}

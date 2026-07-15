@@ -38,6 +38,7 @@ import EditorNavigator, { type EditorTransformController } from '../../component
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import ViewerFooter from '../../components/panel/editor/ViewerFooter';
+import type { ViewerInitialMaskDrawCommand } from '../../components/panel/editor/viewerInitialMaskDrawInteractionController';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { AgentPanel } from '../../components/panel/right/ai/AgentPanel';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
@@ -127,6 +128,8 @@ import { buildSuperResolutionOutputReviewWorkflow } from '../../utils/superResol
 import type { SuperResolutionSourcePreflightMetadata } from '../../utils/superResolutionSourcePreflight';
 import { PANEL_SCOPES_HEIGHT } from '../../utils/waveformSizing';
 import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmokeMode } from './visualSmokeScenarios';
+
+const ignoreInitialMaskDrawCommit = (_command: ViewerInitialMaskDrawCommand): void => {};
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -2487,6 +2490,7 @@ function BrushMaskCanvasVisualSmoke() {
                 isStraightenActive={false}
                 maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
                 onGenerateAiMask={() => {}}
+                onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onLiveMaskPreview={(preview) => {
                   if (isMaskContainer(preview)) setLivePreview(preview);
                 }}
@@ -2698,6 +2702,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 liveRotation={liveRotation}
                 maskOverlayUrl={null}
                 onGenerateAiMask={() => {}}
+                onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onQuickErase={() => {}}
                 onSelectAiSubMask={() => {}}
                 onSelectMask={() => {}}
@@ -2896,6 +2901,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     isStraightenActive: false,
     liveRotation: null,
     onGenerateAiMask: () => {},
+    onInitialMaskDrawCommit: ignoreInitialMaskDrawCommit,
     onQuickErase: () => {},
     onSelectAiSubMask: () => {},
     onSelectMask: () => {},

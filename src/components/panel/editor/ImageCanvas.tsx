@@ -227,7 +227,7 @@ interface ImageCanvasProps {
   maskOverlayUrl: string | null;
   maskOverlayRuntimeState?: { identity: string | null; status: 'current' | 'none' | 'stale-ignored' };
   onGenerateAiMask: (id: string | null, start: Coord, end: Coord) => void;
-  onInitialMaskDrawCommit?: (command: ViewerInitialMaskDrawCommand) => void;
+  onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
   onSelectAiSubMask: (id: string | null) => void;
@@ -914,8 +914,7 @@ const ImageCanvas = memo(
       (commands: readonly ViewerInitialMaskDrawCommand[]) => {
         for (const command of commands) {
           const parameters = { ...command.parameters };
-          if (onInitialMaskDrawCommit) onInitialMaskDrawCommit(command);
-          else updateSubMask(command.maskId, { parameters });
+          onInitialMaskDrawCommit(command);
           if (onLiveMaskPreview && activeContainer && activeSubMask) {
             onLiveMaskPreview({
               ...activeContainer,
@@ -928,14 +927,7 @@ const ImageCanvas = memo(
         if (commands.length > 0) drawingStageRef.current = null;
         publishInitialMaskDrawOverlay();
       },
-      [
-        activeContainer,
-        activeSubMask,
-        onInitialMaskDrawCommit,
-        onLiveMaskPreview,
-        publishInitialMaskDrawOverlay,
-        updateSubMask,
-      ],
+      [activeContainer, activeSubMask, onInitialMaskDrawCommit, onLiveMaskPreview, publishInitialMaskDrawOverlay],
     );
     useEffect(() => {
       if (viewerInitialMaskDrawController.synchronize(viewerInitialMaskDrawContext)) {
