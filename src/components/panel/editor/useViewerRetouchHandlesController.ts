@@ -2,10 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } 
 import type { MaskContainer, RetouchRemoveSource } from '../../../utils/adjustments';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
+import { createRetouchLayerRevision } from '../../../utils/retouchHandleEditTransaction';
 import type { SubMask } from '../right/layers/Masks';
-import type { ViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
-import { createViewerRetouchCommandAdapter } from './viewerRetouchCommandAdapter';
-import { viewerRetouchViewToNormalized } from './viewerRetouchGeometry';
+import type { ViewerSurfaceInputEvent, ViewerSurfacePointerEvent } from './viewerInputRouter';
+import {
+  viewerRetouchNormalizedToView,
+  viewerRetouchSurfacePointToView,
+  viewerRetouchViewToNormalized,
+} from './viewerRetouchGeometry';
 import {
   createViewerRetouchHandlesController,
   type ViewerRetouchCommand,
@@ -19,6 +23,7 @@ export type ViewerRetouchOverlayDescriptor =
   | {
       readonly activeHandle: ViewerRetouchHandle;
       readonly featherRadiusPx: number;
+      readonly geometryEpoch: number;
       readonly kind: 'clone';
       readonly layerId: string;
       readonly mode: 'clone' | 'heal';
@@ -27,9 +32,12 @@ export type ViewerRetouchOverlayDescriptor =
       readonly scale: number;
       readonly sourcePoint: ViewerRetouchPoint;
       readonly targetPoint: ViewerRetouchPoint;
+      readonly pointerPolicy: 'capture';
+      readonly zOrder: 'tool-geometry';
     }
   | {
       readonly featherRadiusPx: number;
+      readonly geometryEpoch: number;
       readonly isOriginalPreserved: boolean;
       readonly kind: 'remove';
       readonly layerId: string;
@@ -39,16 +47,18 @@ export type ViewerRetouchOverlayDescriptor =
       readonly seed: number;
       readonly status: NonNullable<RetouchRemoveSource['status']>;
       readonly targetPoint: ViewerRetouchPoint;
+      readonly pointerPolicy: 'capture';
+      readonly zOrder: 'tool-geometry';
     };
 
 interface UseViewerRetouchHandlesControllerInput {
   readonly activeCloneLayer: MaskContainer | null;
   readonly activeRemoveLayer: MaskContainer | null;
   readonly activeRemoveTargetSubMask: SubMask | null;
-  readonly adjustments: ViewerAdjustmentCommandServices;
   readonly altPressed: boolean;
   readonly geometry: EditorOverlayGeometry;
   readonly imageSessionId: string;
+  readonly onCommit: (command: ViewerRetouchCommand) => void;
   readonly presentation: EditorPresentationDescriptor;
   readonly visible: boolean;
 }
@@ -56,11 +66,10 @@ interface UseViewerRetouchHandlesControllerInput {
 export interface ViewerRetouchHandlesControllerBinding {
   readonly activeMode: 'remove' | 'retouch' | null;
   readonly descriptor: ViewerRetouchOverlayDescriptor | null;
-  begin(handle: ViewerRetouchHandle, pointer: ViewerRetouchPointer, viewPoint: ViewerRetouchPoint): boolean;
+  readonly interactionActive: boolean;
+  readonly lastCommitStatus: string;
   cancel(): void;
-  end(pointer: ViewerRetouchPointer, viewPoint: ViewerRetouchPoint): void;
-  move(pointer: ViewerRetouchPointer, viewPoint: ViewerRetouchPoint): boolean;
-  place(sourceModifier: boolean, pointer: ViewerRetouchPointer, viewPoint: ViewerRetouchPoint): void;
+  handleInputEvent(event: ViewerSurfaceInputEvent): void;
 }
 
 const numberParameter = (parameters: SubMask['parameters'], key: string, fallback: number): number => {
@@ -71,32 +80,23 @@ export const useViewerRetouchHandlesController = ({
   activeCloneLayer,
   activeRemoveLayer,
   activeRemoveTargetSubMask,
-  adjustments,
   altPressed,
   geometry,
   imageSessionId,
+  onCommit,
   presentation,
   visible,
 }: UseViewerRetouchHandlesControllerInput): ViewerRetouchHandlesControllerBinding => {
   const controller = useMemo(() => createViewerRetouchHandlesController(), []);
-  const adapter = useMemo(() => createViewerRetouchCommandAdapter(adjustments), [adjustments]);
   const [, refresh] = useReducer((revision: number) => revision + 1, 0);
+  const lastCommitStatusRef = useRef('none');
   const cloneSource = activeCloneLayer?.retouchCloneSource ?? null;
   const removeSource = activeRemoveLayer?.retouchRemoveSource ?? null;
   const mode = cloneSource?.retouchMode ?? (removeSource === null ? 'clone' : 'remove');
   const layerId = activeCloneLayer?.id ?? activeRemoveLayer?.id ?? 'retouch:none';
-  const layerRevision = JSON.stringify(
-    cloneSource ?? {
-      removeSource,
-      targetCenter:
-        activeRemoveTargetSubMask === null
-          ? null
-          : {
-              x: numberParameter(activeRemoveTargetSubMask.parameters, 'centerX', geometry.orientedSize.width * 0.5),
-              y: numberParameter(activeRemoveTargetSubMask.parameters, 'centerY', geometry.orientedSize.height * 0.5),
-            },
-    },
-  );
+  const activeLayer = activeCloneLayer ?? activeRemoveLayer;
+  const layerRevision =
+    activeLayer === null ? 'retouch:none' : createRetouchLayerRevision(activeLayer, geometry.orientedSize);
   const current = useMemo<ViewerRetouchCurrentContext>(
     () => ({
       active: visible && (cloneSource !== null || (removeSource !== null && activeRemoveTargetSubMask !== null)),
@@ -105,6 +105,7 @@ export const useViewerRetouchHandlesController = ({
       layerId,
       layerRevision,
       mode,
+      sourceIdentity: presentation.sourceIdentity,
       sourceRevision: presentation.graphRevision,
       toolId: 'retouch-handles',
     }),
@@ -116,6 +117,7 @@ export const useViewerRetouchHandlesController = ({
       layerId,
       layerRevision,
       mode,
+      presentation.sourceIdentity,
       presentation.graphRevision,
       removeSource,
       visible,
@@ -135,43 +137,24 @@ export const useViewerRetouchHandlesController = ({
   const execute = useCallback(
     (command: ViewerRetouchCommand | null) => {
       if (command === null) return;
-      const receipt = adapter.commit(command, {
-        current: currentRef.current,
-        imageSize: { height: geometry.orientedSize.height, width: geometry.orientedSize.width },
-        removeSource,
-      });
-      if (receipt === null) {
-        controller.fail(command.key, currentRef.current);
-      } else {
+      try {
+        onCommit(command);
         controller.receive(command.key, currentRef.current);
+        lastCommitStatusRef.current = `committed:${String(command.key.operationGeneration)}`;
+      } catch (error) {
+        controller.fail(command.key, currentRef.current);
+        lastCommitStatusRef.current = `rejected:${error instanceof Error ? error.message : 'unknown'}`;
       }
       refresh();
     },
-    [adapter, controller, geometry.orientedSize.height, geometry.orientedSize.width, removeSource],
+    [controller, onCommit],
   );
   const cancel = useCallback(() => {
     controller.cancel();
     refresh();
   }, [controller]);
 
-  useEffect(() => {
-    const onBlur = () => cancel();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') cancel();
-    };
-    const onPointerCancel = () => cancel();
-    window.addEventListener('blur', onBlur);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('lostpointercapture', onPointerCancel);
-    window.addEventListener('pointercancel', onPointerCancel);
-    return () => {
-      window.removeEventListener('blur', onBlur);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('lostpointercapture', onPointerCancel);
-      window.removeEventListener('pointercancel', onPointerCancel);
-      controller.cancel();
-    };
-  }, [cancel, controller]);
+  useEffect(() => () => controller.cancel(), [controller]);
 
   const override = controller.overlayOverride();
   let descriptor: ViewerRetouchOverlayDescriptor | null = null;
@@ -179,6 +162,7 @@ export const useViewerRetouchHandlesController = ({
     descriptor = {
       activeHandle: altPressed ? 'sourcePoint' : 'targetPoint',
       featherRadiusPx: cloneSource.featherRadiusPx ?? 0,
+      geometryEpoch: current.geometryEpoch,
       kind: 'clone',
       layerId: activeCloneLayer.id,
       mode: cloneSource.retouchMode ?? 'clone',
@@ -187,6 +171,8 @@ export const useViewerRetouchHandlesController = ({
       scale: cloneSource.scale,
       sourcePoint: override?.handle === 'sourcePoint' ? override.point : cloneSource.sourcePoint,
       targetPoint: override?.handle === 'targetPoint' ? override.point : cloneSource.targetPoint,
+      pointerPolicy: 'capture',
+      zOrder: 'tool-geometry',
     };
   } else if (
     removeSource !== null &&
@@ -206,6 +192,7 @@ export const useViewerRetouchHandlesController = ({
     };
     descriptor = {
       featherRadiusPx: removeSource.featherRadiusPx ?? 24,
+      geometryEpoch: current.geometryEpoch,
       isOriginalPreserved:
         removeSource.status === 'fallback_unchanged' && removeSource.resolvedSourcePoint === undefined,
       kind: 'remove',
@@ -216,28 +203,68 @@ export const useViewerRetouchHandlesController = ({
       seed: removeSource.seed,
       status: removeSource.status ?? 'needs_regeneration',
       targetPoint: override?.point ?? targetPoint,
+      pointerPolicy: 'capture',
+      zOrder: 'tool-geometry',
     };
   }
 
+  const pointerFromEvent = (event: ViewerSurfacePointerEvent): ViewerRetouchPointer => ({
+    id: event.pointerId,
+    pressure: event.pressure,
+    type: event.pointerType,
+  });
+  const viewPointFromEvent = (event: ViewerSurfacePointerEvent): ViewerRetouchPoint | null => {
+    if (event.surfaceRect === undefined) return null;
+    return viewerRetouchSurfacePointToView(geometry, event, event.surfaceRect);
+  };
+  const isInsideImage = (point: ViewerRetouchPoint): boolean => {
+    const rect = geometry.displayedImageRectInViewCssPixels;
+    return point.x >= 0 && point.y >= 0 && point.x <= rect.width && point.y <= rect.height;
+  };
+  const hitHandle = (point: ViewerRetouchPoint): ViewerRetouchHandle | null => {
+    if (descriptor?.kind === 'clone') {
+      const source = viewerRetouchNormalizedToView(geometry, descriptor.sourcePoint);
+      const target = viewerRetouchNormalizedToView(geometry, descriptor.targetPoint);
+      if (Math.hypot(point.x - source.x, point.y - source.y) <= 16) return 'sourcePoint';
+      if (Math.hypot(point.x - target.x, point.y - target.y) <= 16) return 'targetPoint';
+    } else if (descriptor?.kind === 'remove') {
+      const target = viewerRetouchNormalizedToView(geometry, descriptor.targetPoint);
+      if (Math.hypot(point.x - target.x, point.y - target.y) <= 16) return 'targetPoint';
+    }
+    return null;
+  };
+  const handleInputEvent = (event: ViewerSurfaceInputEvent): void => {
+    if (!('pointerId' in event)) {
+      cancel();
+      return;
+    }
+    if (event.type === 'pointercancel' || event.type === 'lostpointercapture') {
+      cancel();
+      return;
+    }
+    const point = viewPointFromEvent(event);
+    if (point === null) return;
+    const pointer = pointerFromEvent(event);
+    if (event.type === 'pointerdown') {
+      if (!isInsideImage(point)) return;
+      const handle = hitHandle(point);
+      if (handle === null) execute(controller.place(currentRef.current, event.altKey, pointer, normalizedPoint(point)));
+      else if (controller.begin(currentRef.current, handle, pointer, normalizedPoint(point))) refresh();
+      return;
+    }
+    if (event.type === 'pointermove') {
+      if (controller.move(pointer, normalizedPoint(point))) refresh();
+      return;
+    }
+    execute(controller.end(currentRef.current, pointer, normalizedPoint(point)));
+  };
+
   return {
     activeMode: descriptor?.kind === 'remove' ? 'remove' : descriptor?.kind === 'clone' ? 'retouch' : null,
-    begin: (handle, pointer, viewPoint) => {
-      const accepted = controller.begin(currentRef.current, handle, pointer, normalizedPoint(viewPoint));
-      if (accepted) refresh();
-      return accepted;
-    },
     cancel,
     descriptor,
-    end: (pointer, viewPoint) => {
-      execute(controller.end(currentRef.current, pointer, normalizedPoint(viewPoint)));
-    },
-    move: (pointer, viewPoint) => {
-      const accepted = controller.move(pointer, normalizedPoint(viewPoint));
-      if (accepted) refresh();
-      return accepted;
-    },
-    place: (sourceModifier, pointer, viewPoint) => {
-      execute(controller.place(currentRef.current, sourceModifier, pointer, normalizedPoint(viewPoint)));
-    },
+    handleInputEvent,
+    interactionActive: override !== null,
+    lastCommitStatus: lastCommitStatusRef.current,
   };
 };

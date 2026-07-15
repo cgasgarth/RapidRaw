@@ -12,6 +12,7 @@ const current = (overrides: Partial<ViewerRetouchCurrentContext> = {}): ViewerRe
   layerId: 'layer:retouch',
   layerRevision: 'layer-revision:7',
   mode: 'clone',
+  sourceIdentity: '/raw/a.ARW',
   sourceRevision: 'graph:9',
   toolId: 'retouch-handles',
   ...overrides,
@@ -69,6 +70,7 @@ describe('viewer retouch handles controller', () => {
       current({ imageSessionId: 'image-session:13:b' }),
       current({ imageSessionId: 'image-session:14:a' }),
       current({ sourceRevision: 'graph:10' }),
+      current({ sourceIdentity: '/raw/b.ARW' }),
       current({ geometryEpoch: 5 }),
       current({ layerId: 'layer:other' }),
       current({ layerRevision: 'layer-revision:8' }),
@@ -87,6 +89,21 @@ describe('viewer retouch handles controller', () => {
       if (failedCommand === null) throw new Error('expected command');
       expect(failed.fail(failedCommand.key, successor)).toBe(false);
     }
+  });
+
+  test('does not revive a delayed A placement after synchronized A to B to A replacement', () => {
+    const controller = createViewerRetouchHandlesController();
+    const delayedA = controller.place(current(), false, pointer(1, 'touch', 0.5), { x: 0.2, y: 0.3 });
+    if (delayedA === null) throw new Error('expected delayed A command');
+    controller.synchronize(current({ imageSessionId: 'image-session:13:b', sourceIdentity: '/raw/b.ARW' }));
+    const successorA = current({
+      imageSessionId: 'image-session:14:a',
+      layerRevision: 'layer-revision:8',
+      sourceRevision: 'graph:10',
+    });
+    controller.synchronize(successorA);
+    expect(controller.receive(delayedA.key, successorA)).toBe(false);
+    expect(controller.overlayOverride()).toBeNull();
   });
 
   test('cancels active and pending interactions for capture loss, blur, Escape, and unmount', () => {

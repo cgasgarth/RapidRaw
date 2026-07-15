@@ -2,9 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
+  lazy,
   type MouseEvent,
   type RefObject,
-  lazy,
   Suspense,
   useCallback,
   useEffect,
@@ -74,14 +74,15 @@ import {
 } from '../../utils/mask/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
 import { imagePointFromCanvasClick, readObjectPromptCanvasState } from '../../utils/mask/objectMaskPromptCanvas';
-import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
+import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
 import { debounce } from '../../utils/timing';
 import {
@@ -97,30 +98,31 @@ import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import ViewerFooter from './editor/ViewerFooter';
+import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type {
   ViewerAiMaskBoxCommand,
   ViewerAiMaskBoxCurrentContext,
   ViewerAiMaskBoxSessionKey,
 } from './editor/viewerAiMaskBoxInteractionController';
-import ViewerFooter from './editor/ViewerFooter';
-import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
-import {
-  createViewerObjectPromptInteractionController,
-  type ViewerObjectPromptCommand,
-} from './editor/viewerObjectPromptInteractionController';
 import {
   resolveViewerInput,
   shouldActivateTemporaryHand,
   type ViewerActiveTool,
   type ViewerPointerType,
 } from './editor/viewerInputResolver';
+import {
+  createViewerObjectPromptInteractionController,
+  type ViewerObjectPromptCommand,
+} from './editor/viewerObjectPromptInteractionController';
 import type { ViewerParametricMaskTargetCommand } from './editor/viewerParametricMaskTargetInteractionController';
 import {
   getNextViewerLightsOutLevel,
   getViewerLightsOutLabel,
   resolveViewerFramePresentation,
 } from './editor/viewerPresentationContracts';
+import type { ViewerRetouchCommand } from './editor/viewerRetouchHandlesController';
 import type {
   ViewerViewportCurrentContext,
   ViewerViewportInputEvent,
@@ -746,6 +748,24 @@ export default function Editor({
       );
     },
     [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
+  const handleRetouchCommand = useCallback(
+    (command: ViewerRetouchCommand) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildRetouchHandleEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command,
+          overlayGeometry.orientedSize,
+          `retouch-handle:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, overlayGeometry.orientedSize, viewerSampleGraphRevision],
   );
   const presentationDescriptor = useMemo(
     () =>
@@ -2341,6 +2361,7 @@ export default function Editor({
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
                 onLiveMaskPreview={handleLiveMaskPreview}
                 onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
+                onRetouchCommand={handleRetouchCommand}
                 onSelectAiSubMask={(id) => {
                   setEditor({ activeAiSubMaskId: id });
                 }}

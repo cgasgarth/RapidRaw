@@ -37,7 +37,7 @@ describe('viewer input resolver', () => {
       reason: 'active-tool',
       shouldCapturePointer: true,
     });
-    expect(resolve({ activeTool: 'retouch' }).owner).toBe('active-tool');
+    expect(resolve({ activeTool: 'retouch' })).toMatchObject({ owner: 'active-tool', shouldCapturePointer: true });
   });
 
   test('keeps temporary hand and middle mouse available over active tools', () => {

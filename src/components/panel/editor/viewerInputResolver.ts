@@ -103,7 +103,10 @@ export const resolveViewerInput = ({
       owner: 'active-tool',
       reason: 'active-tool',
       shouldCapturePointer:
-        activeTool === 'focus-retouch' || activeTool === 'point-color' || activeTool === 'tone-equalizer',
+        activeTool === 'focus-retouch' ||
+        activeTool === 'point-color' ||
+        activeTool === 'retouch' ||
+        activeTool === 'tone-equalizer',
     };
   }
 
