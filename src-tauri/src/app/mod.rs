@@ -12,3 +12,4 @@ pub(crate) mod startup;
 pub(crate) mod startup_file_handoff;
 pub(crate) mod state;
 pub(crate) mod window_customizer;
+pub(crate) mod window_lifecycle;

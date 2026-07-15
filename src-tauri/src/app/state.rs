@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use image::{DynamicImage, GrayImage};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
@@ -9,16 +9,6 @@ use crate::cache_utils::DecodedImageCache;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
-
-#[derive(Serialize, Deserialize)]
-pub struct WindowState {
-    pub width: u32,
-    pub height: u32,
-    pub x: i32,
-    pub y: i32,
-    pub maximized: bool,
-    pub fullscreen: bool,
-}
 
 pub struct PreviewJob {
     pub adjustments: Arc<serde_json::Value>,
