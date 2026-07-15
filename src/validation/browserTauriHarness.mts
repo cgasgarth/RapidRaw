@@ -83,6 +83,7 @@ declare global {
       autoAdjustResponses: Array<BrowserHarnessAutoAdjustResponse>;
       applyPreviewResponses: Array<BrowserHarnessApplyPreviewResponse>;
       originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
+      resetAdjustmentsResponses: Array<BrowserHarnessInvokeResponse>;
       revokedObjectUrls: Array<string>;
       batchAutoAdjustCommitDelayMs: number;
       batchAutoAdjustPrepareDelayMs: number;
@@ -171,6 +172,7 @@ const commandNames: Record<
   | 'renderNegativeLabDryRunPreviewArtifact'
   | 'preflightNegativeLabSource'
   | 'readExifForPaths'
+  | 'resetAdjustmentsForPaths'
   | 'resolveOriginalSourceIdentity'
   | 'saveSettings'
   | 'saveMetadataAndUpdateThumbnail'
@@ -237,6 +239,7 @@ const commandNames: Record<
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
   preflightNegativeLabSource: Invokes.PreflightNegativeLabSource,
   readExifForPaths: Invokes.ReadExifForPaths,
+  resetAdjustmentsForPaths: Invokes.ResetAdjustmentsForPaths,
   resolveOriginalSourceIdentity: Invokes.ResolveOriginalSourceIdentity,
   saveSettings: Invokes.SaveSettings,
   saveMetadataAndUpdateThumbnail: Invokes.SaveMetadataAndUpdateThumbnail,
@@ -374,6 +377,7 @@ export const installBrowserTauriHarness = (): void => {
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
+    resetAdjustmentsResponses: [],
     perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
     tonePlacementResponses: [],
@@ -416,6 +420,21 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.resetAdjustmentsForPaths: {
+      const paths = getStringArrayArg(args, 'paths');
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.resetAdjustmentsResponses.shift() ?? {
+        delayMs: 0,
+        value: paths.map((path) => ({
+          adjustments: {},
+          path,
+          renderGeneration: 1,
+          revision: `sha256:${'b'.repeat(64)}`,
+        })),
+      };
+      return new Promise((resolve) =>
+        window.setTimeout(() => resolve(structuredClone(response.value)), response.delayMs),
+      );
+    }
     case commandNames.calculateAutoAdjustments: {
       const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.autoAdjustResponses.shift() ?? {
         delayMs: 0,
