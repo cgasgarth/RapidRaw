@@ -4,12 +4,14 @@ export type WgpuPreviewHealth =
   | 'waiting-first-frame'
   | 'missing-cpu-preview'
   | 'pending-frame-health'
+  | 'cpu-composition'
   | 'fresh';
 
 export interface WgpuPreviewHealthInput {
   currentFrameHealth?: 'fresh' | null | undefined;
   hasRenderedFirstFrame: boolean;
   previewSource: string | null | undefined;
+  requiresCpuComposition?: boolean | undefined;
   selectedImageIsReady: boolean;
   useWgpuRenderer: boolean | undefined;
 }
@@ -24,6 +26,7 @@ export const resolveWgpuPreviewVisibility = ({
   currentFrameHealth,
   hasRenderedFirstFrame,
   previewSource,
+  requiresCpuComposition = false,
   selectedImageIsReady,
   useWgpuRenderer,
 }: WgpuPreviewHealthInput): WgpuPreviewVisibility => {
@@ -41,6 +44,10 @@ export const resolveWgpuPreviewVisibility = ({
 
   if (!previewSource) {
     return { health: 'missing-cpu-preview', previewBackend: 'cpu-fallback', shouldHideCpuPreview: false };
+  }
+
+  if (requiresCpuComposition) {
+    return { health: 'cpu-composition', previewBackend: 'cpu-fallback', shouldHideCpuPreview: false };
   }
 
   if (currentFrameHealth === 'fresh') {

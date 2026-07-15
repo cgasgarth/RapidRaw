@@ -13,6 +13,7 @@ import {
 
 const nonnegativeNumberSchema = z.number().nonnegative();
 const nonnegativeIntegerSchema = z.number().int().nonnegative().safe();
+const positiveIntegerSchema = z.number().int().positive().safe();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;
 type CullingProgressPayload = Progress & { stage: string };
 
@@ -247,11 +248,17 @@ const denoiseProgressPayloadSchema = z
   })
   .strict();
 
-const renderPathPayloadSchema = z
+export const wgpuFrameReadyPayloadSchema = z
   .object({
-    path: z.string().optional(),
+    generation: nonnegativeIntegerSchema,
+    height: positiveIntegerSchema,
+    imageSession: nonnegativeIntegerSchema,
+    path: z.string().trim().min(1),
+    previewOperationIdentity: previewOperationIdentitySchema,
+    submitLatencyMicros: nonnegativeIntegerSchema,
+    width: positiveIntegerSchema,
   })
-  .loose();
+  .strict();
 
 const base64PayloadSchema = z
   .object({
@@ -509,7 +516,7 @@ export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadS
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
 const parseDenoiseErrorPayload = (value: unknown) => denoiseErrorPayloadSchema.parse(value);
 export const parseDenoiseProgressPayload = (value: unknown) => denoiseProgressPayloadSchema.parse(value);
-export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
+export const parseWgpuFrameReadyPayload = (value: unknown) => wgpuFrameReadyPayloadSchema.parse(value);
 const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
 export const parseHdrCompletePayload = (value: unknown) => hdrCompletePayloadSchema.parse(value);
 const parseGamutWarningOverlayPayload = (value: unknown) => gamutWarningOverlayPayloadSchema.parse(value);

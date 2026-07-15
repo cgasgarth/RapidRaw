@@ -231,6 +231,7 @@ export default function Editor({
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
+  const presentedPreviewArtifact = useEditorStore((s) => s.presentedPreviewArtifact);
   const provisionalPreviewFrame = useEditorStore((s) => s.provisionalPreviewFrame);
   const uncroppedAdjustedPreviewUrl = useEditorStore((s) => s.uncroppedAdjustedPreviewUrl);
   const transformedOriginalUrl = useEditorStore((s) => s.transformedOriginalUrl);
@@ -2277,6 +2278,7 @@ export default function Editor({
                 exportSoftProofRecipeId={exportSoftProofRecipeId}
                 exportSoftProofTransform={exportSoftProofTransform}
                 finalPreviewUrl={finalPreviewUrl}
+                hasCurrentCpuPreview={presentedPreviewArtifact?.url === finalPreviewUrl}
                 provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
                 gamutWarningOverlay={gamutWarningOverlay}
                 imageRenderSize={imageRenderSize}

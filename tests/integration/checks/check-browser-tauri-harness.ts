@@ -2909,6 +2909,17 @@ try {
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
+  if (browserScenario === 'preview-visible-frame') {
+    await verifyVisiblePreviewReopen(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected visible-frame browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('preview visible-frame reopen and zoom proof passed');
+    process.exit(0);
+  }
   if (browserScenario === 'viewport-controller') {
     await verifyViewportInteractionController(page);
     if (consoleErrors.length > 0) {
@@ -2996,6 +3007,7 @@ try {
   }
   await page.getByTestId('viewer-footer-zoom-select').selectOption('fit');
   await waitForStablePreview(page);
+  await assertVisibleNonEmptyPreviewPixels(page, 'fit-after-image-select', sourceIdentity);
   await page.getByRole('complementary', { name: 'Editor tools' }).waitFor({ timeout: 10_000 });
   await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
@@ -3972,6 +3984,7 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await zoomSelector.selectOption('2');
   await assertRenderedImageGeometry(page, { height: 1536, label: 'selector-zoom-200', width: 2048 });
   await assertPositionedZoomOutput(page, { canonicalBaseHref, sourceIdentity });
+  await assertVisibleNonEmptyPreviewPixels(page, 'selector-zoom-200', sourceIdentity);
   samples.push(await collectBoundsSample(page, 'selector-zoom-200'));
   await assertLatestBoundsSample(samples);
 
@@ -4016,8 +4029,105 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await zoomSelector.selectOption('fit');
   await assertRenderedImageGeometry(page, { height: 397, label: 'wheel-reset-to-fit', width: 529.33 });
   await assertSingleFullFrameOutput(page, sourceIdentity);
+  await assertVisibleNonEmptyPreviewPixels(page, 'wheel-reset-to-fit', sourceIdentity);
 
   await writeBoundsReport('passed');
+}
+
+async function verifyVisiblePreviewReopen(page: Page): Promise<void> {
+  const sourceIdentity = '/tmp/rawengine-browser-harness/browser-harness.ARW';
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await page
+    .getByRole('button', { name: /browser-harness\.ARW/u })
+    .first()
+    .dblclick();
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
+  await waitForStablePreview(page);
+  await assertSingleFullFrameOutput(page, sourceIdentity);
+  await assertVisibleNonEmptyPreviewPixels(page, 'reopened-fit', sourceIdentity);
+
+  const zoomSelector = page.getByTestId('viewer-footer-zoom-select');
+  await zoomSelector.selectOption('2');
+  await waitForStablePreview(page);
+  await assertVisibleNonEmptyPreviewPixels(page, 'reopened-zoom-200', sourceIdentity);
+  await zoomSelector.selectOption('fit');
+  await waitForStablePreview(page);
+  await assertSingleFullFrameOutput(page, sourceIdentity);
+  await assertVisibleNonEmptyPreviewPixels(page, 'reopened-reset-fit', sourceIdentity);
+}
+
+async function assertVisibleNonEmptyPreviewPixels(page: Page, label: string, sourceIdentity: string): Promise<void> {
+  const proof = await page.evaluate(
+    async ({ expectedSourceIdentity }) => {
+      const candidates = Array.from(
+        document.querySelectorAll<SVGImageElement>('[data-testid="svg-preview-base-layer"]'),
+      );
+      const layer = candidates.find(
+        (candidate) =>
+          candidate.dataset.previewSourceIdentity === expectedSourceIdentity &&
+          Number.parseFloat(getComputedStyle(candidate).opacity) > 0.99,
+      );
+      if (layer === undefined) return { error: 'missing-committed-layer' } as const;
+      const href = layer.getAttribute('href');
+      if (href === null) return { error: 'missing-href' } as const;
+      const style = getComputedStyle(layer);
+      const bounds = layer.getBoundingClientRect();
+      const image = new Image();
+      image.src = href;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (context === null) return { error: 'missing-2d-context' } as const;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let opaquePixels = 0;
+      let lumaTotal = 0;
+      let minimumLuma = 255;
+      let maximumLuma = 0;
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        const alpha = pixels[offset + 3] ?? 0;
+        if (alpha === 0) continue;
+        opaquePixels += 1;
+        const luma =
+          (pixels[offset] ?? 0) * 0.2126 + (pixels[offset + 1] ?? 0) * 0.7152 + (pixels[offset + 2] ?? 0) * 0.0722;
+        lumaTotal += luma;
+        minimumLuma = Math.min(minimumLuma, luma);
+        maximumLuma = Math.max(maximumLuma, luma);
+      }
+      return {
+        bounds: { height: bounds.height, width: bounds.width },
+        display: style.display,
+        error: null,
+        maximumLuma,
+        meanLuma: opaquePixels === 0 ? 0 : lumaTotal / opaquePixels,
+        minimumLuma,
+        opaquePixels,
+        visibility: style.visibility,
+      } as const;
+    },
+    { expectedSourceIdentity: sourceIdentity },
+  );
+  if (
+    proof.error !== null ||
+    !('opaquePixels' in proof) ||
+    proof.opaquePixels < 250 ||
+    proof.meanLuma < 8 ||
+    proof.bounds.width <= 0 ||
+    proof.bounds.height <= 0 ||
+    proof.display === 'none' ||
+    proof.visibility !== 'visible'
+  ) {
+    throw new Error(`${label} did not present non-empty visible preview pixels: ${JSON.stringify(proof)}.`);
+  }
 }
 
 async function verifyViewportInteractionController(page: Page): Promise<void> {

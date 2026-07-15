@@ -62,4 +62,21 @@ describe('resolveWgpuPreviewVisibility', () => {
       shouldHideCpuPreview: false,
     });
   });
+
+  it('keeps a current CPU artifact visible until an exact WGPU frame replaces it', () => {
+    expect(
+      resolveWgpuPreviewVisibility({
+        currentFrameHealth: 'fresh',
+        hasRenderedFirstFrame: true,
+        previewSource: 'blob:preview',
+        requiresCpuComposition: true,
+        selectedImageIsReady: true,
+        useWgpuRenderer: true,
+      }),
+    ).toEqual({
+      health: 'cpu-composition',
+      previewBackend: 'cpu-fallback',
+      shouldHideCpuPreview: false,
+    });
+  });
 });
