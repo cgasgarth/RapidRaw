@@ -540,6 +540,8 @@ const applyEditorStateUpdate = (
       update.navigatorPreviewArtifact = null;
       update.presentedPreviewArtifact = null;
       update.provisionalPreviewFrame = null;
+      update.hasRenderedFirstFrame = false;
+      update.previewQualityStatus = null;
       state.patchResidency.reset(update.imageSessionId);
     } else if (
       'selectedImage' in update &&
@@ -558,6 +560,8 @@ const applyEditorStateUpdate = (
             });
       update.navigatorPreviewArtifact = null;
       update.presentedPreviewArtifact = null;
+      update.hasRenderedFirstFrame = false;
+      update.previewQualityStatus = null;
       state.patchResidency.reset(update.imageSessionId);
     }
     if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {

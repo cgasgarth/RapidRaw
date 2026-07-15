@@ -84,6 +84,25 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) preview_id: crate::preview_scheduler::PreviewRequestId,
 }
 
+fn wgpu_frame_ready_payload(
+    path: &str,
+    preview_id: crate::preview_scheduler::PreviewRequestId,
+    preview_operation_identity: &FrontendPreviewOperationIdentity,
+    width: u32,
+    height: u32,
+    submit_latency_micros: u64,
+) -> serde_json::Value {
+    serde_json::json!({
+        "path": path,
+        "imageSession": preview_id.image_session,
+        "generation": preview_id.generation,
+        "previewOperationIdentity": preview_operation_identity,
+        "width": width,
+        "height": height,
+        "submitLatencyMicros": submit_latency_micros,
+    })
+}
+
 fn cancellation_checkpoint(
     cancellation: Option<&PreviewCancellation>,
     stage: PreviewStage,
@@ -542,14 +561,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         );
         let _ = app_handle.emit(
             crate::events::WGPU_FRAME_READY,
-            serde_json::json!({
-                "path": loaded_image.path,
-                "imageSession": preview_id.image_session,
-                "generation": preview_id.generation,
-                "width": preview_width,
-                "height": preview_height,
-                "submitLatencyMicros": fn_start.elapsed().as_micros().min(u64::MAX as u128) as u64,
-            }),
+            wgpu_frame_ready_payload(
+                &loaded_image.path,
+                preview_id,
+                preview_operation_identity,
+                preview_width,
+                preview_height,
+                fn_start.elapsed().as_micros().min(u64::MAX as u128) as u64,
+            ),
         );
         return Ok(b"WGPU_RENDER".to_vec());
     }
@@ -959,6 +978,38 @@ mod tests {
         let response = b"WGPU_RENDER";
         assert_eq!(response.len(), 11);
         assert_ne!(&response[..2], &[0xff, 0xd8]);
+    }
+
+    #[test]
+    fn native_frame_receipt_preserves_the_frontend_operation_identity() {
+        let mut identity = FrontendPreviewOperationIdentity::compatibility_identity();
+        identity.operation_id = 41;
+        identity.generation = 9;
+        identity.session.image_session_id = 17;
+        identity.session.source_image_path = "/fixtures/current.raw".to_string();
+        identity.session.graph_revision = "graph-current".to_string();
+        let payload = wgpu_frame_ready_payload(
+            "/fixtures/current.raw",
+            crate::preview_scheduler::PreviewRequestId {
+                image_session: 5,
+                generation: 8,
+            },
+            &identity,
+            1600,
+            1200,
+            250,
+        );
+
+        assert_eq!(payload["path"], "/fixtures/current.raw");
+        assert_eq!(payload["previewOperationIdentity"]["operationId"], 41);
+        assert_eq!(
+            payload["previewOperationIdentity"]["session"]["imageSessionId"],
+            17
+        );
+        assert_eq!(
+            payload["previewOperationIdentity"]["session"]["graphRevision"],
+            "graph-current"
+        );
     }
 
     #[test]
