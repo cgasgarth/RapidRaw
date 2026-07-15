@@ -23,48 +23,57 @@ const matrixSchema = z.tuple([
   z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]),
   z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]),
 ]);
-const analysisIdentitySchema = z.object({
-  analysisDimensions: z.tuple([z.number().int().positive(), z.number().int().positive()]),
-  implementationVersion: z.literal(1),
-  lensGeometryFingerprint: z.number().int().nonnegative(),
-  orientationFingerprint: z.number().int().nonnegative(),
-  sourceRevision: z.number().int().nonnegative(),
-});
+const analysisIdentitySchema = z
+  .object({
+    analysisDimensions: z.tuple([z.number().int().positive(), z.number().int().positive()]),
+    implementationVersion: z.literal(1),
+    lensGeometryFingerprint: z.number().int().nonnegative(),
+    orientationFingerprint: z.number().int().nonnegative(),
+    sourceRevision: z.number().int().nonnegative(),
+  })
+  .strict();
 
-export const perspectiveGuideSchema = z.object({
-  class: perspectiveLineClassSchema,
-  endpointsSourceNormalized: z.tuple([pointSchema, pointSchema]),
-  id: z.string().min(1),
-  weight: z.number().finite().positive().default(1),
-});
+export const perspectiveGuideSchema = z
+  .object({
+    class: perspectiveLineClassSchema,
+    endpointsSourceNormalized: z.tuple([pointSchema, pointSchema]),
+    id: z.string().min(1),
+    weight: z.number().finite().positive().default(1),
+  })
+  .strict();
 
-export const perspectivePlanSchema = z.object({
-  analysisIdentity: analysisIdentitySchema.nullable(),
-  confidence: z.number().finite().min(0).max(1),
-  correctedToSource: matrixSchema,
-  fingerprint: z.number().int().nonnegative(),
-  implementationVersion: z.literal(1),
-  retainedArea: z.number().finite().min(0).max(1),
-  sourceToCorrected: matrixSchema,
-  suggestedCrop: z
-    .object({
-      height: z.number().finite().positive(),
-      width: z.number().finite().positive(),
-      x: z.number().finite(),
-      y: z.number().finite(),
-    })
-    .nullable(),
-  validPolygon: z.array(pointSchema).min(4),
-  warningCodes: z.array(z.string()),
-});
+export const perspectivePlanSchema = z
+  .object({
+    analysisIdentity: analysisIdentitySchema.nullable(),
+    confidence: z.number().finite().min(0).max(1),
+    correctedToSource: matrixSchema,
+    fingerprint: z.number().int().nonnegative(),
+    implementationVersion: z.literal(1),
+    retainedArea: z.number().finite().min(0).max(1),
+    sourceToCorrected: matrixSchema,
+    suggestedCrop: z
+      .object({
+        height: z.number().finite().positive(),
+        width: z.number().finite().positive(),
+        x: z.number().finite(),
+        y: z.number().finite(),
+      })
+      .strict()
+      .nullable(),
+    validPolygon: z.array(pointSchema).min(4),
+    warningCodes: z.array(z.string()),
+  })
+  .strict();
 
-export const perspectiveCorrectionSettingsSchema = z.object({
-  amount: z.number().finite().min(0).max(100),
-  cropPolicy: perspectiveCropPolicySchema,
-  guides: z.array(perspectiveGuideSchema).max(8),
-  mode: perspectiveCorrectionModeSchema,
-  resolvedPlan: perspectivePlanSchema.nullable(),
-});
+export const perspectiveCorrectionSettingsSchema = z
+  .object({
+    amount: z.number().finite().min(0).max(100),
+    cropPolicy: perspectiveCropPolicySchema,
+    guides: z.array(perspectiveGuideSchema).max(8),
+    mode: perspectiveCorrectionModeSchema,
+    resolvedPlan: perspectivePlanSchema.nullable(),
+  })
+  .strict();
 
 const detectedLineSchema = z.object({
   confidence: z.number().finite().min(0).max(1),

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradingSettingsV1};
+use crate::geometry::perspective::{
+    PERSPECTIVE_IMPLEMENTATION_VERSION_V1, PerspectiveCorrectionSettingsV1,
+};
 use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
 use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -172,6 +175,8 @@ struct GeometryV2 {
     flip_horizontal: bool,
     flip_vertical: bool,
     orientation_steps: u8,
+    #[serde(default)]
+    perspective_correction: PerspectiveCorrectionSettingsV1,
     rotation: f64,
     #[serde(default)]
     transform_aspect: f64,
@@ -240,8 +245,120 @@ impl GeometryV2 {
         if let Some(crop) = &self.crop {
             crop.validate()?;
         }
+        validate_perspective_correction(&self.perspective_correction)?;
         Ok(())
     }
+}
+
+fn validate_perspective_correction(
+    settings: &PerspectiveCorrectionSettingsV1,
+) -> Result<(), String> {
+    if !settings.amount.is_finite() || !(0.0..=100.0).contains(&settings.amount) {
+        return Err(
+            "EditDocumentV2 geometry perspectiveCorrection amount must be within 0..=100"
+                .to_string(),
+        );
+    }
+    if settings.guides.len() > 8 {
+        return Err(
+            "EditDocumentV2 geometry perspectiveCorrection supports at most 8 guides".to_string(),
+        );
+    }
+    let mut guide_ids = std::collections::BTreeSet::new();
+    for guide in &settings.guides {
+        if guide.id.trim().is_empty()
+            || !guide_ids.insert(&guide.id)
+            || !guide.weight.is_finite()
+            || guide.weight <= 0.0
+            || !guide
+                .endpoints_source_normalized
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        {
+            return Err(
+                "EditDocumentV2 geometry perspectiveCorrection contains an invalid guide"
+                    .to_string(),
+            );
+        }
+    }
+    if let Some(plan) = &settings.resolved_plan {
+        if plan.implementation_version != PERSPECTIVE_IMPLEMENTATION_VERSION_V1
+            || !plan.confidence.is_finite()
+            || !(0.0..=1.0).contains(&plan.confidence)
+            || !plan.retained_area.is_finite()
+            || !(0.0..=1.0).contains(&plan.retained_area)
+            || plan.valid_polygon.len() < 4
+            || !plan
+                .source_to_corrected
+                .iter()
+                .chain(plan.corrected_to_source.iter())
+                .flatten()
+                .all(|value| value.is_finite())
+            || !plan
+                .valid_polygon
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        {
+            return Err(
+                "EditDocumentV2 geometry perspectiveCorrection resolvedPlan is invalid".to_string(),
+            );
+        }
+        if plan.suggested_crop.as_ref().is_some_and(|crop| {
+            !crop.x.is_finite()
+                || !crop.y.is_finite()
+                || !crop.width.is_finite()
+                || !crop.height.is_finite()
+                || crop.width <= 0.0
+                || crop.height <= 0.0
+        }) {
+            return Err(
+                "EditDocumentV2 geometry perspectiveCorrection suggestedCrop is invalid"
+                    .to_string(),
+            );
+        }
+        if plan.analysis_identity.as_ref().is_some_and(|identity| {
+            identity.analysis_dimensions.contains(&0)
+                || identity.implementation_version != PERSPECTIVE_IMPLEMENTATION_VERSION_V1
+        }) {
+            return Err(
+                "EditDocumentV2 geometry perspectiveCorrection analysisIdentity is invalid"
+                    .to_string(),
+            );
+        }
+    }
+    crate::geometry::perspective::compile_perspective_plan(settings)
+        .map(|_| ())
+        .map_err(|error| {
+            format!("EditDocumentV2 geometry perspectiveCorrection cannot compile: {error}")
+        })
+}
+
+fn validate_perspective_param_contract(params: &Map<String, Value>) -> Result<(), String> {
+    let Some(value) = params.get("perspectiveCorrection") else {
+        // V2 documents persisted before Perspective node ownership compile through
+        // their quarantined legacy field until the frontend migration reopens them.
+        return Ok(());
+    };
+    let object = value.as_object().ok_or_else(|| {
+        "EditDocumentV2 geometry perspectiveCorrection must be an object".to_string()
+    })?;
+    let fields = ["amount", "cropPolicy", "guides", "mode", "resolvedPlan"];
+    if let Some(field) = fields.iter().find(|field| !object.contains_key(**field)) {
+        return Err(format!(
+            "EditDocumentV2 geometry perspectiveCorrection is missing field '{field}'"
+        ));
+    }
+    if let Some(field) = object
+        .keys()
+        .find(|field| !fields.contains(&field.as_str()))
+    {
+        return Err(format!(
+            "EditDocumentV2 geometry perspectiveCorrection contains unknown field '{field}'"
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -2373,6 +2490,7 @@ fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifacts
 }
 
 fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
+    validate_perspective_param_contract(params)?;
     let geometry: GeometryV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 geometry is invalid: {error}"))?;
     geometry.validate()?;
@@ -4232,6 +4350,65 @@ mod tests {
             .expect("straighten geometry compiles into native render authority");
         assert_eq!(compiled["crop"], valid_crop);
         assert_eq!(compiled["rotation"], json!(-5.5));
+
+        let perspective = json!({
+            "amount": 100,
+            "cropPolicy": "auto_crop",
+            "guides": [
+                { "class": "vertical", "endpointsSourceNormalized": [[0.22, 0.1], [0.12, 0.9]], "id": "left", "weight": 1 },
+                { "class": "vertical", "endpointsSourceNormalized": [[0.78, 0.1], [0.88, 0.9]], "id": "right", "weight": 1 },
+                { "class": "horizontal", "endpointsSourceNormalized": [[0.22, 0.1], [0.78, 0.1]], "id": "top", "weight": 1 },
+                { "class": "horizontal", "endpointsSourceNormalized": [[0.12, 0.9], [0.88, 0.9]], "id": "bottom", "weight": 1 }
+            ],
+            "mode": "guided",
+            "resolvedPlan": null
+        });
+        let mut perspective_document = document_with_legacy(json!({}));
+        perspective_document["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
+            perspective.clone();
+        perspective_document["geometry"]["perspectiveCorrection"] = perspective.clone();
+        let compiled = serde_json::from_value::<EditDocumentV2>(perspective_document)
+            .expect("valid perspective geometry document")
+            .into_render_adjustments()
+            .expect("perspective geometry compiles into native render authority");
+        assert_eq!(compiled["perspectiveCorrection"], perspective);
+        assert!(compiled["lensDistortionParams"].is_null());
+        assert!(!crate::geometry::is_geometry_identity(
+            &crate::geometry::get_geometry_params_from_json(&compiled)
+        ));
+
+        let mut missing_perspective = document_with_legacy(json!({}));
+        let incomplete = json!({
+            "amount": 50,
+            "guides": [],
+            "mode": "guided",
+            "resolvedPlan": null
+        });
+        missing_perspective["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
+            incomplete.clone();
+        missing_perspective["geometry"]["perspectiveCorrection"] = incomplete;
+        let error = serde_json::from_value::<EditDocumentV2>(missing_perspective)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("incomplete perspective node state must fail");
+        assert!(error.contains("missing field 'cropPolicy'"));
+
+        let mut out_of_range_perspective = document_with_legacy(json!({}));
+        let invalid = json!({
+            "amount": 101,
+            "cropPolicy": "auto_crop",
+            "guides": [],
+            "mode": "auto_full",
+            "resolvedPlan": null
+        });
+        out_of_range_perspective["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
+            invalid.clone();
+        out_of_range_perspective["geometry"]["perspectiveCorrection"] = invalid;
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range_perspective)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range perspective amount must fail");
+        assert!(error.contains("amount must be within 0..=100"));
 
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["geometry"]["params"]["futureWarp"] = json!(1);

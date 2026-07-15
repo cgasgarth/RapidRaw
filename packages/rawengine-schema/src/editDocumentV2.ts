@@ -6,6 +6,7 @@ import { levelsSettingsSchema } from './color/levelsSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import { selectiveColorMixerSettingsSchema } from './color/selectiveColorMixerSchemas.js';
+import { perspectiveCorrectionSettingsSchema } from './geometry/perspective/perspectiveSchemas.js';
 import {
   detailDeblurUiControlsV1Schema,
   lensProfileDistortionParamsV1Schema,
@@ -420,6 +421,21 @@ export const editDocumentGeometryCropV2Schema = z
     }
   });
 
+export const EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS = {
+  perspectiveCorrection: {
+    amount: 100,
+    cropPolicy: 'auto_crop',
+    guides: [],
+    mode: 'off',
+    resolvedPlan: null,
+  },
+} as const;
+
+export const EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS = ['perspectiveCorrection'] as const;
+export const editDocumentPerspectiveCorrectionV2Schema = z
+  .object({ perspectiveCorrection: perspectiveCorrectionSettingsSchema })
+  .strict();
+
 export const editDocumentGeometryV2Schema = z
   .object({
     aspectRatio: z.number().finite().positive().nullable(),
@@ -427,6 +443,10 @@ export const editDocumentGeometryV2Schema = z
     flipHorizontal: z.boolean(),
     flipVertical: z.boolean(),
     orientationSteps: z.number().int().min(0).max(3),
+    perspectiveCorrection: perspectiveCorrectionSettingsSchema.default(() => ({
+      ...EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS.perspectiveCorrection,
+      guides: [],
+    })),
     rotation: z.number().finite().min(-45).max(45),
     transformAspect: z.number().finite().min(-100).max(100).default(0),
     transformDistortion: z.number().finite().min(-100).max(100).default(0),
@@ -877,6 +897,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       flipHorizontal: false,
       flipVertical: false,
       orientationSteps: 0,
+      ...EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS,
       rotation: 0,
       transformAspect: 0,
       transformDistortion: 0,
@@ -894,6 +915,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'flipHorizontal',
       'flipVertical',
       'orientationSteps',
+      ...EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS,
       'rotation',
       'transformAspect',
       'transformDistortion',
@@ -1602,7 +1624,7 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     nodeType: 'luma_levels',
     schemas: editDocumentLumaLevelsV2Schema.shape,
   });
-  return normalizeLegacyNodeOwnership(document, {
+  document = normalizeLegacyNodeOwnership(document, {
     createNode: {
       enabledFromNodeType: 'channel_mixer',
       implementationVersion: 1,
@@ -1613,6 +1635,28 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     nodeType: 'selective_color_mixer',
     schemas: editDocumentSelectiveColorMixerV2Schema.shape,
   });
+  document = normalizeLegacyNodeOwnership(document, {
+    defaults: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS,
+    fields: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS,
+    nodeType: 'geometry',
+    schemas: editDocumentPerspectiveCorrectionV2Schema.shape,
+  });
+  const migratedNodes = document['nodes'];
+  const migratedGeometry = document['geometry'];
+  const migratedGeometryNode = isEditDocumentRecord(migratedNodes) ? migratedNodes['geometry'] : undefined;
+  const migratedGeometryParams = isEditDocumentRecord(migratedGeometryNode)
+    ? migratedGeometryNode['params']
+    : undefined;
+  if (isEditDocumentRecord(migratedGeometry) && isEditDocumentRecord(migratedGeometryParams)) {
+    document = {
+      ...document,
+      geometry: {
+        ...migratedGeometry,
+        perspectiveCorrection: migratedGeometryParams['perspectiveCorrection'],
+      },
+    };
+  }
+  return document;
 }, editDocumentV2ObjectSchema);
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;

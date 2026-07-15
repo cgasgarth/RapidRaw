@@ -81,7 +81,7 @@ export const buildPerspectiveCorrectionEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: [{ patch: { perspectiveCorrection }, type: 'patch-adjustments' }],
+    operations: [{ nodeType: 'geometry', patch: { perspectiveCorrection }, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'geometry-tool',
     transactionId,

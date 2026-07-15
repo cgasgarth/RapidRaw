@@ -908,7 +908,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             historyIndex: 0,
           };
         }
-        return historyTargetIndex === undefined ? {} : { historyIndex: historyTargetIndex };
+        return historyTargetIndex === undefined ? state : { historyIndex: historyTargetIndex };
       }
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
