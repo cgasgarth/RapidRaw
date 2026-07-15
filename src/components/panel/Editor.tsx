@@ -115,12 +115,16 @@ import {
   getViewerLightsOutLabel,
   resolveViewerFramePresentation,
 } from './editor/viewerPresentationContracts';
-import {
-  createViewerViewportInteractionController,
-  type ViewerViewportCurrentContext,
-  type ViewerViewportTransition,
+import type {
+  ViewerViewportCurrentContext,
+  ViewerViewportInputEvent,
+  ViewerViewportInteractionController,
+  ViewerViewportTransition,
 } from './editor/viewerViewportInteractionController';
+import { applyViewerViewportMotionCancellation } from './editor/viewerViewportMotionCancellation';
 import { Mask, type SubMask } from './right/layers/Masks';
+
+const viewerViewportInteractionControllerModule = import('./editor/viewerViewportInteractionController.js');
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -315,7 +319,22 @@ export default function Editor({
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
-  const [viewportInteractionController] = useState(createViewerViewportInteractionController);
+  const viewportInteractionControllerRef = useRef<ViewerViewportInteractionController | null>(null);
+  const [isViewportInteractionControllerReady, setIsViewportInteractionControllerReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void viewerViewportInteractionControllerModule.then(({ createViewerViewportInteractionController }) => {
+      if (active) {
+        viewportInteractionControllerRef.current = createViewerViewportInteractionController();
+        setIsViewportInteractionControllerReady(true);
+      }
+    });
+    return () => {
+      active = false;
+      viewportInteractionControllerRef.current?.dispose();
+      viewportInteractionControllerRef.current = null;
+    };
+  }, []);
   const [isTemporaryHand, setIsTemporaryHand] = useState(false);
   const [isViewerGestureDragging, setIsViewerGestureDragging] = useState(false);
   const [viewportLayoutEpoch, setViewportLayoutEpoch] = useState(0);
@@ -989,9 +1008,16 @@ export default function Editor({
     viewerSampleGraphRevision,
   ]);
 
+  const dispatchViewportInteraction = useCallback(
+    (event: ViewerViewportInputEvent) =>
+      viewportInteractionControllerRef.current?.dispatch(getViewportInteractionContext(), event) ?? null,
+    [getViewportInteractionContext],
+  );
+
   const applyViewportTransition = useCallback(
-    (transition: ViewerViewportTransition) => {
-      if (transition.cancelMotion) cancelViewerMotion();
+    (transition: ViewerViewportTransition | null) => {
+      if (transition === null) return;
+      applyViewerViewportMotionCancellation(transition, cancelViewerMotion);
       if (transition.focalPoint) {
         captureFocalPoint({ x: transition.focalPoint.x, y: transition.focalPoint.y }, transition.focalPoint.source);
       }
@@ -1026,7 +1052,7 @@ export default function Editor({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         applyViewportTransition(
-          viewportInteractionController.dispatch(getViewportInteractionContext(), {
+          dispatchViewportInteraction({
             reason: 'escape',
             type: 'cancel',
           }),
@@ -1037,7 +1063,7 @@ export default function Editor({
       if (!shouldActivateTemporaryHand({ focusContext, key: event.key })) return;
       event.preventDefault();
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           active: true,
           type: 'temporary-hand',
         }),
@@ -1046,7 +1072,7 @@ export default function Editor({
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key !== ' ') return;
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           active: false,
           type: 'temporary-hand',
         }),
@@ -1054,7 +1080,7 @@ export default function Editor({
     };
     const handleWindowBlur = () =>
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           reason: 'blur',
           type: 'cancel',
         }),
@@ -1068,13 +1094,13 @@ export default function Editor({
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
       window.removeEventListener('blur', handleWindowBlur);
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           reason: 'unmount',
           type: 'cancel',
         }),
       );
     };
-  }, [applyViewportTransition, getViewportInteractionContext]);
+  }, [applyViewportTransition, dispatchViewportInteraction]);
 
   useEffect(() => {
     const container = imageContainerRef.current;
@@ -1083,7 +1109,7 @@ export default function Editor({
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           altKey: e.altKey,
           clientX: e.clientX,
           clientY: e.clientY,
@@ -1100,7 +1126,7 @@ export default function Editor({
     return () => {
       container.removeEventListener('wheel', handleNativeWheel);
     };
-  }, [applyViewportTransition, getViewportInteractionContext]);
+  }, [applyViewportTransition, dispatchViewportInteraction]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1112,7 +1138,7 @@ export default function Editor({
       if (declaredPointerOwner === 'active-tool' && e.pointerType !== 'touch' && e.button !== 1 && !isTemporaryHand)
         return;
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
-      const transition = viewportInteractionController.dispatch(getViewportInteractionContext(), {
+      const transition = dispatchViewportInteraction({
         button: e.button,
         clientX: e.clientX,
         clientY: e.clientY,
@@ -1122,15 +1148,15 @@ export default function Editor({
         type: 'pointerdown',
       });
       applyViewportTransition(transition);
-      if (transition.capturePointerId === e.pointerId) e.currentTarget.setPointerCapture(e.pointerId);
+      if (transition?.capturePointerId === e.pointerId) e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [applyViewportTransition, getViewportInteractionContext, isTemporaryHand],
+    [applyViewportTransition, dispatchViewportInteraction, isTemporaryHand],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           button: e.button,
           clientX: e.clientX,
           clientY: e.clientY,
@@ -1141,12 +1167,12 @@ export default function Editor({
         }),
       );
     },
-    [applyViewportTransition, getViewportInteractionContext],
+    [applyViewportTransition, dispatchViewportInteraction],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      const transition = viewportInteractionController.dispatch(getViewportInteractionContext(), {
+      const transition = dispatchViewportInteraction({
         button: e.button,
         clientX: e.clientX,
         clientY: e.clientY,
@@ -1160,31 +1186,31 @@ export default function Editor({
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
     },
-    [applyViewportTransition, getViewportInteractionContext],
+    [applyViewportTransition, dispatchViewportInteraction],
   );
 
   const handlePointerCancel = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           pointerId: e.pointerId,
           type: 'pointercancel',
         }),
       );
     },
-    [applyViewportTransition, getViewportInteractionContext],
+    [applyViewportTransition, dispatchViewportInteraction],
   );
 
   const handleLostPointerCapture = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionController.dispatch(getViewportInteractionContext(), {
+        dispatchViewportInteraction({
           pointerId: e.pointerId,
           type: 'lostpointercapture',
         }),
       );
     },
-    [applyViewportTransition, getViewportInteractionContext],
+    [applyViewportTransition, dispatchViewportInteraction],
   );
 
   const handleClick = useCallback(
@@ -1293,14 +1319,16 @@ export default function Editor({
     if (contextChanged) {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
-      const cancellation = viewportInteractionController.synchronize({
+      const cancellation = viewportInteractionControllerRef.current?.synchronize({
         ...getViewportInteractionContext(),
         geometryEpoch: viewportLayoutEpochRef.current + 1,
       });
-      setIsPanningState(cancellation.state.isPanning);
-      setIsMiddleMousePanningState(cancellation.state.isMiddleMousePanning);
-      setIsViewerGestureDragging(cancellation.state.isDragging);
-      setIsTemporaryHand(cancellation.state.temporaryHand);
+      if (cancellation) {
+        setIsPanningState(cancellation.state.isPanning);
+        setIsMiddleMousePanningState(cancellation.state.isMiddleMousePanning);
+        setIsViewerGestureDragging(cancellation.state.isDragging);
+        setIsTemporaryHand(cancellation.state.temporaryHand);
+      }
       focalPointRef.current = null;
     }
 
@@ -2110,6 +2138,7 @@ export default function Editor({
           data-viewer-active-tool={activeViewerTool}
           data-viewer-gesture-state={isViewerGestureDragging ? 'dragging' : 'idle'}
           data-viewer-temporary-hand={String(isTemporaryHand)}
+          data-viewer-viewport-controller={isViewportInteractionControllerReady ? 'ready' : 'loading'}
           data-viewer-frame-edge={String(framePresentation.edgeVisible)}
           data-viewer-frame-shadow={String(framePresentation.shadowVisible)}
           data-testid="editor-image-preview-panel"

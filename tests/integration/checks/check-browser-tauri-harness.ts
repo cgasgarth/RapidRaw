@@ -1897,6 +1897,11 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   const sourceIdentity = '/tmp/rawengine-browser-harness/browser-harness.ARW';
   await previewPanel.waitFor({ timeout: 10_000 });
   await zoomSelector.waitFor({ timeout: 10_000 });
+  await page.waitForFunction(
+    () => document.querySelector('[data-viewer-viewport-controller="ready"]') !== null,
+    undefined,
+    { timeout: 10_000 },
+  );
   await waitForStablePreview(page);
 
   samples.push(await collectBoundsSample(page, 'fit-after-image-select'));
@@ -1989,6 +1994,35 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
   if (!bounds) throw new Error('Viewport controller proof could not resolve the preview bounds.');
   const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
   const positionBefore = Number(await previewPanel.getAttribute('data-editor-transform-position-x'));
+
+  await previewPanel.dispatchEvent('pointerdown', {
+    button: 0,
+    clientX: center.x,
+    clientY: center.y,
+    pointerId: 91,
+    pointerType: 'mouse',
+  });
+  const activeToolDown = await previewPanel.evaluate((element) => ({
+    gesture: element.getAttribute('data-viewer-gesture-state'),
+    positionX: Number(element.getAttribute('data-editor-transform-position-x')),
+    temporaryHand: element.getAttribute('data-viewer-temporary-hand'),
+    tool: element.getAttribute('data-viewer-active-tool'),
+  }));
+  if (
+    activeToolDown.tool !== 'crop' ||
+    activeToolDown.gesture !== 'idle' ||
+    activeToolDown.temporaryHand !== 'false' ||
+    activeToolDown.positionX !== positionBefore
+  ) {
+    throw new Error(`Active-tool pointerdown stole the viewport gesture: ${JSON.stringify(activeToolDown)}.`);
+  }
+  await previewPanel.dispatchEvent('pointerup', {
+    button: 0,
+    clientX: center.x,
+    clientY: center.y,
+    pointerId: 91,
+    pointerType: 'mouse',
+  });
 
   await page.keyboard.down('Space');
   await page.waitForFunction(() => document.querySelector('[data-viewer-temporary-hand="true"]') !== null, undefined, {

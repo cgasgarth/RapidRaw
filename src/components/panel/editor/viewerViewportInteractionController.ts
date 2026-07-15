@@ -139,6 +139,7 @@ const boundedTransform = (
 
 export interface ViewerViewportInteractionController {
   dispatch(context: ViewerViewportCurrentContext, event: ViewerViewportInputEvent): ViewerViewportTransition;
+  dispose(): void;
   getState(): ViewerViewportControllerState;
   synchronize(context: ViewerViewportCurrentContext): ViewerViewportTransition;
 }
@@ -229,6 +230,7 @@ export const createViewerViewportInteractionController = (): ViewerViewportInter
   });
 
   return {
+    dispose: () => clearGesture(true),
     dispatch: (context, event) => {
       const synchronized = synchronize(context);
       if (
@@ -326,7 +328,7 @@ export const createViewerViewportInteractionController = (): ViewerViewportInter
           }
         }
         const pointer = pointers.get(event.pointerId);
-        if (pointer?.owner !== 'viewer-pan') return transition();
+        if (pointer?.owner !== 'viewer-pan') return transition({ cancelMotion: true });
         const key = sessionKey ?? beginSession(context);
         hadViewerGesture = true;
         if (resolution.reason === 'middle-button') middleMousePanning = true;

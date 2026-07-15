@@ -5,6 +5,7 @@ import {
   type ViewerViewportCurrentContext,
   type ViewerViewportInputEvent,
 } from '../../../src/components/panel/editor/viewerViewportInteractionController';
+import { applyViewerViewportMotionCancellation } from '../../../src/components/panel/editor/viewerViewportMotionCancellation';
 
 const bounds = { maxX: 100, maxY: 80, minX: -100, minY: -80 };
 
@@ -130,6 +131,30 @@ describe('viewer viewport interaction controller', () => {
     const lost = controller.dispatch(context(), { pointerId: 1, type: 'lostpointercapture' });
     expect(lost.cancelMotion).toBe(true);
     expect(lost.state.activePointerCount).toBe(0);
+  });
+
+  test('active-tool pointerdown cancels viewport motion without stealing tool ownership', () => {
+    const controller = createViewerViewportInteractionController();
+    const toolContext = context({ activeTool: 'brush', transform: { positionX: 20, positionY: 10, scale: 2 } });
+    const down = controller.dispatch(toolContext, pointer('pointerdown'));
+    expect(down.cancelMotion).toBe(true);
+    expect(down.capturePointerId).toBeNull();
+    expect(down.transform).toBeNull();
+    expect(down.sessionKey).toBeNull();
+    let cancellationCount = 0;
+    applyViewerViewportMotionCancellation(down, () => {
+      cancellationCount += 1;
+    });
+    expect(cancellationCount).toBe(1);
+
+    const move = controller.dispatch(toolContext, pointer('pointermove', { clientX: 560, clientY: 390 }));
+    applyViewerViewportMotionCancellation(move, () => {
+      cancellationCount += 1;
+    });
+    expect(move.transform).toBeNull();
+    expect(move.state.isDragging).toBe(false);
+    expect(cancellationCount).toBe(1);
+    controller.dispatch(toolContext, pointer('pointerup'));
   });
 
   test('image A to B to A and geometry replacement invalidate old sessions', () => {
