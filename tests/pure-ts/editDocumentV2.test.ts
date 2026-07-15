@@ -1164,6 +1164,20 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(next.provenance).toEqual(document.provenance);
   });
 
+  test('focused source-artifact updates and render preparation mirror node authority into the explicit domain', () => {
+    const prepared = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const authoritative = updateEditDocumentV2Node(prepared, 'source_artifacts', (params) => ({
+      ...params,
+      aiPatches: [sourcePatch],
+    }));
+    expect(authoritative.sourceArtifacts).toEqual(authoritative.nodes.source_artifacts?.params);
+
+    const rendered = prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, authoritative, ['source_artifacts']);
+    expect(rendered.nodes.source_artifacts).toBe(authoritative.nodes.source_artifacts);
+    expect(rendered.sourceArtifacts).toEqual(authoritative.sourceArtifacts);
+    expect(rendered.sourceArtifacts.aiPatches).toEqual([sourcePatch]);
+  });
+
   test('copy and paste derive eligibility from descriptors and isolate node state', () => {
     const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.5 });
     const clipboard = copyEditDocumentV2Node(document, 'scene_global_color_tone');

@@ -9,8 +9,10 @@ import { AIPanel } from '../../../src/components/panel/right/ai/AIPanel.tsx';
 import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
-import { useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { type AiPatch, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -36,18 +38,29 @@ const edit = (id: string, targets: Array<string>): AiPatch => ({
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
+const sourcePath = '/test/image.jpg';
+const imageSession = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
+
 afterEach(() => {
   if (renderedRoot) {
     act(() => renderedRoot?.root.unmount());
     renderedRoot.container.remove();
     renderedRoot = null;
   }
+  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.setState({
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
-    adjustments: structuredClone(INITIAL_ADJUSTMENTS),
-    history: [structuredClone(INITIAL_ADJUSTMENTS)],
+    adjustmentRevision: 0,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+    adjustments,
+    editDocumentV2,
+    history: [adjustments],
+    historyCheckpoints: [],
     historyIndex: 0,
+    imageSession: null,
+    lastEditApplicationReceipt: null,
     selectedImage: null,
   });
 });
@@ -58,19 +71,27 @@ describe('AI panel command-owned selection', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       aiPatches: [edit('first', ['one', 'middle', 'last']), edit('second', [])],
     };
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.setState({
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: null,
+      adjustmentRevision: 0,
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
+      editDocumentV2,
       history: [adjustments],
+      historyCheckpoints: [],
       historyIndex: 0,
+      imageSession,
+      imageSessionId: imageSession.generation,
+      lastEditApplicationReceipt: null,
       selectedImage: {
         exif: null,
         height: 800,
         isRaw: false,
         isReady: true,
         originalUrl: null,
-        path: '/test/image.jpg',
+        path: sourcePath,
         thumbnailUrl: '',
         width: 1200,
       },
