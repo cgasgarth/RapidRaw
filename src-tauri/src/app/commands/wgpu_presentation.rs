@@ -8,9 +8,26 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::AppState;
-use crate::WgpuTransformPayload;
 use crate::gpu::gpu_display::{DisplayTransformState, PresentationSchedulerReport};
 use crate::image_processing::get_or_init_gpu_context;
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WgpuTransformPayload {
+    pub window_width: f32,
+    pub window_height: f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub clip_x: f32,
+    pub clip_y: f32,
+    pub clip_width: f32,
+    pub clip_height: f32,
+    pub bg_primary: [f32; 4],
+    pub bg_secondary: [f32; 4],
+    pub pixelated: bool,
+}
 
 fn to_display_transform(payload: WgpuTransformPayload) -> DisplayTransformState {
     DisplayTransformState {

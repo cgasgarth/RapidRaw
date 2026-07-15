@@ -5006,7 +5006,7 @@ mod blur_pass_tests {
             None,
         )
         .expect("decode private RAW");
-        let preview = crate::downscale_f32_image(&decoded, 256, 256);
+        let preview = crate::image_processing::downscale_f32_image(&decoded, 256, 256);
         let revision = PixelBufferRevision::constructed(
             PreGpuImageIdentity::source_revision(&source_path),
             stable_revision_hash(&("private-raw-preview", preview.dimensions())),

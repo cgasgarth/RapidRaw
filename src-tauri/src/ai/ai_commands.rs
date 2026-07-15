@@ -22,10 +22,12 @@ use crate::ai::model_registry::{AiCapability, AiModelId, AiModelRegistryReport};
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::formats::png_data_url;
+use crate::get_cached_full_warped_image;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;
-use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
-use crate::{get_cached_full_warped_image, resolve_warped_image_for_masks};
+use crate::mask_generation::{
+    AiPatchDefinition, MaskDefinition, generate_mask_bitmap, resolve_warped_image_for_masks,
+};
 
 fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
     let mut buf = Cursor::new(Vec::new());

@@ -3,8 +3,9 @@ use std::sync::Arc;
 use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
+use crate::image_processing::apply_srgb_to_linear;
 use crate::render::render_plan::compile_consumer_render_plan;
-use crate::{AppState, apply_srgb_to_linear, hydrate_adjustments};
+use crate::{AppState, hydrate_adjustments};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

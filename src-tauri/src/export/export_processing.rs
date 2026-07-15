@@ -802,10 +802,11 @@ impl<W: Write> Write for DigestingWriter<W> {
         self.inner.flush()
     }
 }
+use crate::mask_generation::{get_cached_or_generate_mask, resolve_warped_image_for_masks};
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
-    apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    hydrate_adjustments, load_settings_or_default, resolve_warped_image_for_masks,
+    apply_all_transformations, generate_transformed_preview, hydrate_adjustments,
+    load_settings_or_default,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1397,7 +1398,7 @@ fn export_masks_for_image(
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("jpg");
-        let pre_gpu_revision = crate::calculate_transform_hash(js_adjustments);
+        let pre_gpu_revision = crate::cache_utils::calculate_transform_hash(js_adjustments);
         let settings = crate::load_settings_or_default(app_handle);
         let effective_settings = raw_processing_settings_for_adjustments(&settings, js_adjustments);
         let source_revision = crate::render::artifact_identity::stable_hash(&(

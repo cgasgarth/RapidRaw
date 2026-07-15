@@ -11,6 +11,7 @@ use crate::cache_utils::calculate_transform_hash;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
+use crate::image_codecs::encode_jpeg_response;
 use crate::image_loader::load_and_composite;
 use crate::image_processing::{
     RenderRequest, apply_geometry_warp, get_or_init_gpu_context, process_and_get_dynamic_image,
@@ -18,7 +19,7 @@ use crate::image_processing::{
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::render::render_plan::compile_consumer_render_plan;
-use crate::{AppState, apply_all_transformations, encode_jpeg_response};
+use crate::{AppState, apply_all_transformations};
 
 #[tauri::command]
 pub(crate) fn generate_preview_for_path(
