@@ -70,9 +70,9 @@ use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
-use tauri::{Emitter, Manager, ipc::Response};
+use tauri::{Emitter, Manager};
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_commands as build_ai_commands;
@@ -215,81 +215,6 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
         256,
     );
     Ok(arc_lut)
-}
-
-pub(crate) fn validate_expected_preview_image(
-    actual_path: &str,
-    expected_path: &str,
-) -> Result<(), String> {
-    if actual_path == expected_path {
-        return Ok(());
-    }
-    Err("Preview request rejected: expected image is no longer loaded".to_string())
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ApplyAdjustmentsRequest {
-    edit_document_v2: adjustments::edit_document_v2::EditDocumentV2,
-    expected_image_path: String,
-    is_interactive: bool,
-    target_resolution: Option<u32>,
-    roi: Option<(f32, f32, f32, f32)>,
-    compute_waveform: bool,
-    active_waveform_channel: Option<String>,
-    viewer_sample_graph_revision: Option<String>,
-}
-
-#[tauri::command]
-async fn apply_adjustments(
-    request: ApplyAdjustmentsRequest,
-    state: tauri::State<'_, AppState>,
-) -> Result<Response, String> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-
-    let loaded_image_path = state
-        .original_image
-        .lock()
-        .unwrap()
-        .as_ref()
-        .ok_or("No original image loaded")?
-        .path
-        .clone();
-    validate_expected_preview_image(&loaded_image_path, &request.expected_image_path)?;
-    let render_adjustments = request.edit_document_v2.into_render_adjustments()?;
-
-    let job = PreviewJob {
-        adjustments: Arc::new(render_adjustments),
-        expected_image_path: request.expected_image_path,
-        is_interactive: request.is_interactive,
-        target_resolution: request.target_resolution,
-        roi: request.roi,
-        compute_waveform: request.compute_waveform,
-        active_waveform_channel: request.active_waveform_channel,
-        viewer_sample_graph_revision: request.viewer_sample_graph_revision,
-        responder: tx,
-    };
-    state
-        .services
-        .preview_runtime
-        .submit(job)
-        .map_err(|_| "preview_worker_stopped".to_string())?;
-
-    match rx.await {
-        Ok(preview_scheduler::PreviewCompletion::Rendered { bytes, .. }) => {
-            Ok(Response::new(bytes))
-        }
-        Ok(preview_scheduler::PreviewCompletion::Superseded { .. }) => {
-            Err("preview_superseded".to_string())
-        }
-        Ok(preview_scheduler::PreviewCompletion::Cancelled { .. }) => {
-            Err("preview_cancelled".to_string())
-        }
-        Ok(preview_scheduler::PreviewCompletion::Failed { code, message }) => {
-            Err(format!("{code}: {message}"))
-        }
-        Err(_) => Err("preview_worker_stopped".to_string()),
-    }
 }
 
 fn compile_consumer_render_plan(
@@ -1052,7 +977,7 @@ pub fn run() {
         .manage(library::changefeed::LibraryFilesystemChangefeed::default())
         .manage(library::catalog::LibraryCatalog::default())
         .invoke_handler(tauri::generate_handler![
-            apply_adjustments,
+            app::commands::preview::apply_adjustments,
             app::commands::soft_proof_preview::generate_export_soft_proof_preview,
             app::commands::soft_proof_preview::resolve_export_soft_proof_transform_metadata,
             app::commands::path_preview::generate_preview_for_path,
@@ -1338,23 +1263,5 @@ mod tests {
         let changed = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
         assert!(!Arc::ptr_eq(&first, &changed));
         assert_ne!(first.content_hash, changed.content_hash);
-    }
-
-    #[test]
-    fn preview_dispatch_rejects_an_expected_image_mismatch_before_enqueue() {
-        let error = validate_expected_preview_image("/photos/alaska-b.ARW", "/photos/alaska-a.ARW")
-            .expect_err("a request for image A must not run against image B");
-
-        assert_eq!(
-            error,
-            "Preview request rejected: expected image is no longer loaded"
-        );
-    }
-
-    #[test]
-    fn preview_dispatch_accepts_the_expected_loaded_image() {
-        assert!(
-            validate_expected_preview_image("/photos/alaska-a.ARW", "/photos/alaska-a.ARW").is_ok()
-        );
     }
 }

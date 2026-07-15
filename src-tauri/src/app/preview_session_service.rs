@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::{error::Error, fmt};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UncroppedPreviewRequest {
@@ -12,6 +13,34 @@ pub(crate) struct UncroppedPreviewRequest {
 struct ActiveImageSession {
     image_generation: u64,
     source_identity: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ActiveImageSourceError {
+    Missing,
+    Stale,
+}
+
+impl fmt::Display for ActiveImageSourceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Missing => "No original image loaded",
+            Self::Stale => "Preview request rejected: expected image is no longer loaded",
+        })
+    }
+}
+
+impl Error for ActiveImageSourceError {}
+
+pub(crate) fn validate_expected_preview_image(
+    actual_path: &str,
+    expected_path: &str,
+) -> Result<(), ActiveImageSourceError> {
+    if actual_path == expected_path {
+        Ok(())
+    } else {
+        Err(ActiveImageSourceError::Stale)
+    }
 }
 
 #[derive(Default)]
@@ -60,6 +89,23 @@ impl Default for PreviewSessionService {
 }
 
 impl PreviewSessionService {
+    pub(crate) fn validate_active_source(
+        &self,
+        expected_source_identity: &str,
+    ) -> Result<(), ActiveImageSourceError> {
+        let authority = self
+            .authority
+            .lock()
+            .expect("preview-session authority poisoned");
+        match authority.active_image.as_ref() {
+            None => Err(ActiveImageSourceError::Missing),
+            Some(active) if active.source_identity != expected_source_identity => {
+                Err(ActiveImageSourceError::Stale)
+            }
+            Some(_) => Ok(()),
+        }
+    }
+
     pub(crate) fn begin_image_load(&self) -> ImageLoadOperation {
         let mut authority = self
             .authority
@@ -280,6 +326,30 @@ mod tests {
                 panic!("stale output published after image switch")
             }),
             None
+        );
+    }
+
+    #[test]
+    fn active_source_validation_is_owned_by_the_atomic_image_session() {
+        let service = PreviewSessionService::default();
+        assert_eq!(
+            service.validate_active_source("/a.raw"),
+            Err(ActiveImageSourceError::Missing)
+        );
+        install(&service, "/a.raw");
+        assert_eq!(service.validate_active_source("/a.raw"), Ok(()));
+        assert_eq!(
+            service.validate_active_source("/b.raw"),
+            Err(ActiveImageSourceError::Stale)
+        );
+        service.begin_image_load();
+        assert_eq!(
+            service.validate_active_source("/a.raw"),
+            Err(ActiveImageSourceError::Missing)
+        );
+        assert_eq!(
+            validate_expected_preview_image("/b.raw", "/a.raw"),
+            Err(ActiveImageSourceError::Stale)
         );
     }
 }
