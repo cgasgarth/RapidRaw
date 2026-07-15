@@ -21,21 +21,16 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn native_cache_report(&self) -> NativeCacheReport {
-        let (total_soft_limit_bytes, total_hard_limit_bytes) = self.state.cache_budget.limits();
-        let mut caches = vec![
-            self.state.geometry_cache.stats(),
-            self.state.thumbnail_geometry_cache.stats(),
-            self.state.mask_cache.stats(),
-            self.state.services.viewer_sampling.stats(),
-            self.state.lut_cache.stats(),
-            self.state.lut_content_cache.stats(),
-            self.state.decoded_image_cache.stats(),
-        ];
+        let (total_known_cpu_cache_bytes, limits) =
+            self.state.services.native_caches.budget_usage();
+        let (total_soft_limit_bytes, total_hard_limit_bytes) = limits;
+        let mut caches = self.state.services.native_caches.stats();
+        caches.push(self.state.services.viewer_sampling.stats());
         if let Some(patch_stats) = crate::patch_assets::patch_asset_cache_stats() {
             caches.extend(patch_stats);
         }
         NativeCacheReport {
-            total_known_cpu_cache_bytes: self.state.cache_budget.current_bytes(),
+            total_known_cpu_cache_bytes,
             total_soft_limit_bytes,
             total_hard_limit_bytes,
             caches,
@@ -68,24 +63,30 @@ impl<'a> RenderCaches<'a> {
     pub fn insert_geometry_cache_entry(&self, key: u64, image: DynamicImage, max_entries: usize) {
         let _ = max_entries;
         self.state
-            .geometry_cache
-            .insert_weighted(key, std::sync::Arc::new(image));
+            .services
+            .native_caches
+            .insert_geometry(key, std::sync::Arc::new(image));
     }
 
     pub fn set_decoded_image_cache_capacity(&self, capacity: usize) {
-        self.state.decoded_image_cache.set_capacity(capacity);
+        self.state
+            .services
+            .native_caches
+            .set_decoded_capacity(capacity);
     }
 
     pub fn clear_image_caches(&self) {
-        self.state.decoded_image_cache.clear();
+        self.state.services.native_caches.clear_decoded();
         self.clear_backend_generation_artifacts();
     }
 
     pub fn clear_session_caches(&self) {
         crate::patch_assets::clear_patch_asset_cache();
         self.state.services.payload_residency.clear();
-        self.state.mask_cache.clear();
-        self.state.geometry_cache.clear();
+        self.state
+            .services
+            .native_caches
+            .clear_session_derivatives();
         self.state.services.viewer_sampling.clear_frames();
         if let Ok(report) = serde_json::to_string(&self.native_cache_report()) {
             log::debug!("native_cache_report={report}");
@@ -104,7 +105,7 @@ impl<'a> RenderCaches<'a> {
     /// separate domain and may be retained when the caller keeps the active source loaded.
     pub fn clear_canonical_reset_artifacts(&self) {
         self.clear_active_image_render_state();
-        self.state.thumbnail_geometry_cache.clear();
+        self.state.services.native_caches.clear_thumbnail_geometry();
     }
 }
 
@@ -116,11 +117,11 @@ mod tests {
     fn display_invalidation_preserves_scene_and_decode_domains() {
         let state = AppState::new();
         state
-            .geometry_cache
-            .insert_weighted(7, std::sync::Arc::new(DynamicImage::new_rgb8(2, 2)));
-        let before = state.geometry_cache.stats().entries;
+            .services
+            .native_caches
+            .insert_geometry(7, std::sync::Arc::new(DynamicImage::new_rgb8(2, 2)));
+        let before = state.services.native_caches.geometry(7).is_some();
         RenderCaches::new(&state).clear_display_encoded_artifacts();
-        assert_eq!(state.geometry_cache.stats().entries, before);
-        assert_eq!(state.decoded_image_cache.stats().entries, 0);
+        assert_eq!(state.services.native_caches.geometry(7).is_some(), before);
     }
 }

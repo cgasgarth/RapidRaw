@@ -2321,7 +2321,7 @@ fn get_cached_or_generate_mask_with_preview(
     let key = hasher.finish();
 
     {
-        if let Some(img) = state.mask_cache.get(&key) {
+        if let Some(img) = state.services.native_caches.mask(key) {
             return Some(img.as_ref().clone());
         }
     }
@@ -2352,8 +2352,9 @@ fn get_cached_or_generate_mask_with_preview(
 
     if let Some(img) = &generated {
         state
-            .mask_cache
-            .insert(key, Arc::new(img.clone()), img.as_raw().len() as u64);
+            .services
+            .native_caches
+            .insert_mask(key, Arc::new(img.clone()));
     }
 
     generated
