@@ -1,10 +1,11 @@
 import cx from 'clsx';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { type Adjustments, BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { toneEqualizerPlacementResponseSchema } from '../../utils/toneEqualizerPicker';
 import type { AppSettings } from '../ui/AppProperties';
@@ -121,7 +122,19 @@ export default function BasicAdjustments({
   const toneEqualizerPickerActive = useUIStore((state) => state.toneEqualizerPickerActive);
   const toneEqualizerPickerReceipt = useUIStore((state) => state.toneEqualizerPickerReceipt);
   const setUI = useUIStore((state) => state.setUI);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const basicToneCommitIdentity = useMemo<BasicToneCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
+  basicToneCommitIdentityRef.current = basicToneCommitIdentity;
   const toneHistogramPath = useMemo(() => {
     if (toneHistogram.length === 0) return '';
     const peak = Math.max(1, ...toneHistogram);
@@ -134,6 +147,18 @@ export default function BasicAdjustments({
   }, [toneHistogram]);
 
   const handleAdjustmentChange = (key: BasicAdjustment, value: number) => {
+    if (!isForMask) {
+      const identity = basicToneCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildBasicToneEditTransaction(useEditorStore.getState(), identity, key, value, crypto.randomUUID()),
+      );
+      basicToneCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
@@ -233,7 +258,13 @@ export default function BasicAdjustments({
   };
 
   return (
-    <div className="min-w-0 space-y-px" data-testid="basic-light-controls">
+    <div
+      className="min-w-0 space-y-px"
+      data-commit-adjustment-revision={basicToneCommitIdentity?.adjustmentRevision}
+      data-commit-image-session={basicToneCommitIdentity?.imageSessionId}
+      data-commit-source-identity={basicToneCommitIdentity?.sourceIdentity}
+      data-testid="basic-light-controls"
+    >
       {!hideToneMapper && (
         <ToneMapperSwitch
           selectedMapper={adjustments.toneMapper}
