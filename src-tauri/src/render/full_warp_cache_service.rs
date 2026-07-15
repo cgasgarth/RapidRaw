@@ -112,9 +112,7 @@ pub(crate) fn get_cached_full_warped_image(
         .ok_or("No original image loaded")?;
     let identity = RenderArtifactIdentity::source_geometry(
         &loaded_image.artifact_source,
-        state
-            .load_image_generation
-            .load(std::sync::atomic::Ordering::SeqCst) as u64,
+        state.services.preview_session.current_generation(),
         crate::cache_utils::calculate_transform_hash(adjustments),
         loaded_image.artifact_source.source_fingerprint(),
         geometry_hash,

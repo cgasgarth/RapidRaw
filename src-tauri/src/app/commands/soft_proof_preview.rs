@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage};
 use rapidraw_codecs::JpegPreset;
@@ -82,7 +81,7 @@ pub(crate) fn generate_export_soft_proof_preview(
         validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
     }
     let session = SoftProofPreviewSession {
-        generation: state.load_image_generation.load(Ordering::SeqCst) as u64,
+        generation: state.services.preview_session.current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -142,7 +141,7 @@ pub(crate) fn generate_export_soft_proof_preview(
         .services
         .preview_session
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.load_image_generation.load(Ordering::SeqCst) as u64;
+            let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .original_image
                 .lock()
@@ -324,7 +323,7 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         .clone()
         .ok_or("No original image loaded")?;
     let session = SoftProofPreviewSession {
-        generation: state.load_image_generation.load(Ordering::SeqCst) as u64,
+        generation: state.services.preview_session.current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -348,7 +347,7 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         .services
         .preview_session
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.load_image_generation.load(Ordering::SeqCst) as u64;
+            let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .original_image
                 .lock()
@@ -464,13 +463,12 @@ fn render_processed_export_soft_proof_preview(
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::sync::atomic::AtomicUsize;
     use std::sync::mpsc;
     use std::thread;
     use std::time::Duration;
 
     use super::{SoftProofPreviewSession, validate_current_source};
-    use crate::app::commands::uncropped_preview::PreviewSessionService;
+    use crate::app::preview_session_service::PreviewSessionService;
 
     fn session() -> SoftProofPreviewSession {
         SoftProofPreviewSession {
@@ -493,13 +491,16 @@ mod tests {
     #[test]
     fn image_switch_waits_for_atomic_publication_then_rejects_stale_work() {
         let service = Arc::new(PreviewSessionService::default());
-        let generation = Arc::new(AtomicUsize::new(7));
-        service.install_image_session(7, "/a.raw");
+        let installed = service.begin_image_load();
+        service
+            .complete_image_load(&installed, "/a.raw", || ())
+            .unwrap();
+        let installed_generation = installed.generation();
         let (entered_tx, entered_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let publisher_service = Arc::clone(&service);
         let publisher = thread::spawn(move || {
-            publisher_service.with_active_image_session(7, "/a.raw", || {
+            publisher_service.with_active_image_session(installed_generation, "/a.raw", || {
                 entered_tx.send(()).unwrap();
                 release_rx.recv().unwrap();
                 "published"
@@ -510,11 +511,10 @@ mod tests {
         let (transition_started_tx, transition_started_rx) = mpsc::channel();
         let (transition_tx, transition_rx) = mpsc::channel();
         let transition_service = Arc::clone(&service);
-        let transition_generation = Arc::clone(&generation);
         let transition = thread::spawn(move || {
             transition_started_tx.send(()).unwrap();
             transition_tx
-                .send(transition_service.begin_image_load(&transition_generation))
+                .send(transition_service.begin_image_load())
                 .unwrap();
         });
         transition_started_rx.recv().unwrap();
@@ -526,10 +526,13 @@ mod tests {
 
         release_tx.send(()).unwrap();
         assert_eq!(publisher.join().unwrap(), Some("published"));
-        assert_eq!(transition_rx.recv().unwrap(), 8);
+        assert_eq!(
+            transition_rx.recv().unwrap().generation(),
+            installed_generation + 1
+        );
         transition.join().unwrap();
         assert_eq!(
-            service.with_active_image_session(7, "/a.raw", || {
+            service.with_active_image_session(installed_generation, "/a.raw", || {
                 panic!("stale soft-proof viewer/event/analytics output published")
             }),
             None

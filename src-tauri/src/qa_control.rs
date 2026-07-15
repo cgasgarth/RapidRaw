@@ -319,7 +319,7 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
         "identity": state.identity,
         "sessionRevision": state.session_revision.load(Ordering::Acquire),
         "renderRevision": state.render_revision.load(Ordering::Acquire),
-        "loadImageGeneration": app_state.load_image_generation.load(Ordering::Acquire),
+        "loadImageGeneration": app_state.services.preview_session.current_generation(),
         "sourcePath": state.source_path.lock().ok().and_then(|path| path.clone()),
         "activeNativeSource": active_native_source,
         "preview": preview,

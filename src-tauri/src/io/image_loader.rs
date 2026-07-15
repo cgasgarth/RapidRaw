@@ -1084,18 +1084,21 @@ pub(crate) async fn load_image_prepared(
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
     prepared_raw_source: Option<Arc<RawSource>>,
 ) -> Result<LoadImageResult, String> {
-    let (generation_tracker, my_generation) = if let Some(cancellation) = cancellation {
-        cancellation
-    } else if install_active {
-        let generation = state
-            .services
-            .preview_session
-            .begin_image_load(&state.load_image_generation);
-        (Arc::clone(&state.load_image_generation), generation)
+    let image_load_operation = if cancellation.is_none() {
+        Some(if install_active {
+            state.services.preview_session.begin_image_load()
+        } else {
+            state.services.preview_session.current_operation()
+        })
     } else {
-        let generation = state.load_image_generation.load(Ordering::SeqCst);
-        (Arc::clone(&state.load_image_generation), generation)
+        None
     };
+    let (generation_tracker, my_generation) = cancellation.unwrap_or_else(|| {
+        image_load_operation
+            .as_ref()
+            .expect("internal image loads own a typed operation")
+            .cancellation_pair()
+    });
     let cancel_token = Some((generation_tracker.clone(), my_generation));
 
     if install_active {
@@ -1388,24 +1391,32 @@ pub(crate) async fn load_image_prepared(
     let (orig_width, orig_height) = pristine_arc.dimensions();
 
     if install_active {
-        state
-            .services
-            .viewer_sampling
-            .install_session(my_generation as u64, &path);
-        state
-            .services
-            .full_warp_cache
-            .install_session(my_generation as u64, &artifact_source);
-        *state.original_image.lock().unwrap() = Some(LoadedImage {
-            path: path.clone(),
-            image: pristine_arc,
-            is_raw: loaded_is_raw,
-            artifact_source,
-        });
-        state
+        let operation = image_load_operation
+            .as_ref()
+            .expect("active image loads own a typed operation");
+        if state
             .services
             .preview_session
-            .install_image_session(my_generation as u64, &path);
+            .complete_image_load(operation, &path, || {
+                state
+                    .services
+                    .viewer_sampling
+                    .install_session(operation.generation(), &path);
+                state
+                    .services
+                    .full_warp_cache
+                    .install_session(operation.generation(), &artifact_source);
+                *state.original_image.lock().unwrap() = Some(LoadedImage {
+                    path: path.clone(),
+                    image: pristine_arc,
+                    is_raw: loaded_is_raw,
+                    artifact_source,
+                });
+            })
+            .is_none()
+        {
+            return Err("Load cancelled".to_string());
+        }
     }
 
     Ok(LoadImageResult {

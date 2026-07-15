@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use image::GenericImageView;
 
@@ -63,7 +62,7 @@ pub(crate) fn generate_original_transformed_preview(
         .ok_or("No original image loaded")?;
     validate_source_identity(&expected_image_path, &loaded_image.path)?;
     let session = OriginalPreviewSession {
-        generation: state.load_image_generation.load(Ordering::SeqCst) as u64,
+        generation: state.services.preview_session.current_generation(),
         source_identity: loaded_image.path.clone(),
         source_fingerprint: loaded_image.artifact_source.source_fingerprint(),
     };
@@ -95,7 +94,7 @@ pub(crate) fn generate_original_transformed_preview(
         .services
         .preview_session
         .with_active_image_session(session.generation, &session.source_identity, || {
-            let current_generation = state.load_image_generation.load(Ordering::SeqCst) as u64;
+            let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
                 .original_image
                 .lock()
@@ -150,9 +149,8 @@ pub(crate) fn generate_original_transformed_preview(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicUsize;
 
-    use crate::app::commands::uncropped_preview::PreviewSessionService;
+    use crate::app::preview_session_service::PreviewSessionService;
 
     fn session() -> OriginalPreviewSession {
         OriginalPreviewSession {
@@ -184,16 +182,19 @@ mod tests {
     #[test]
     fn image_load_transition_closes_the_final_publication_gate() {
         let service = PreviewSessionService::default();
-        let generation = AtomicUsize::new(7);
-        service.install_image_session(7, "/a.raw");
+        let operation = service.begin_image_load();
+        service
+            .complete_image_load(&operation, "/a.raw", || ())
+            .unwrap();
         assert_eq!(
-            service.with_active_image_session(7, "/a.raw", || "published"),
+            service.with_active_image_session(operation.generation(), "/a.raw", || "published"),
             Some("published")
         );
 
-        assert_eq!(service.begin_image_load(&generation), 8);
+        let next = service.begin_image_load();
+        assert_eq!(next.generation(), operation.generation() + 1);
         assert_eq!(
-            service.with_active_image_session(7, "/a.raw", || {
+            service.with_active_image_session(operation.generation(), "/a.raw", || {
                 panic!("stale original preview published during image load")
             }),
             None
