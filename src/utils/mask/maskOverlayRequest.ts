@@ -40,6 +40,7 @@ export interface BuildMaskOverlayTriggerHashParams {
 }
 
 export interface BuildMaskOverlayRequestIdentityParams {
+  imageSessionId: string;
   renderSize: Pick<RenderSize, 'height' | 'scale' | 'width'>;
   selectedImagePath: string | null | undefined;
   triggerHash: string | null;
@@ -189,11 +190,13 @@ export const buildMaskOverlayTriggerHash = ({
 };
 
 export const buildMaskOverlayRequestIdentity = ({
+  imageSessionId,
   renderSize,
   selectedImagePath,
   triggerHash,
 }: BuildMaskOverlayRequestIdentityParams): string =>
   JSON.stringify({
+    imageSessionId,
     renderSize: {
       h: Math.round(renderSize.height),
       scale: Number(renderSize.scale.toFixed(4)),
