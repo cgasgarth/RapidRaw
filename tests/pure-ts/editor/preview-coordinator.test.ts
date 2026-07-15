@@ -521,6 +521,8 @@ test('display generation accepts only newer identities and releases reordered co
 test('quality decisions are translated once and ROI fingerprints are resolution-stable', () => {
   expect(quantizePreviewRoi([0.1234, 0.5678, 0.25, 0.125], 100)).toEqual([0.12, 0.57, 0.25, 0.13]);
   expect(fingerprintPreviewRoi(null)).toBe('[0,0,1,1]');
+  expect(fingerprintPreviewRoi([0.1, 0.1, 0.8, 0.8])).toBe(fingerprintPreviewRoi([0.1, 0.1, 0.8, 0.8]));
+  expect(fingerprintPreviewRoi([0.1, 0.1, 0.8, 0.8])).not.toBe(fingerprintPreviewRoi([0.15, 0.1, 0.8, 0.8]));
   const quality = {
     effectiveTargetResolution: 1600,
     interacting: false,
