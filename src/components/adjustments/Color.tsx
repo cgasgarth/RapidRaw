@@ -299,6 +299,7 @@ export default function ColorPanel({
             <PointColorControls
               adjustments={adjustments}
               appSettings={appSettings}
+              isForMask={isForMask}
               onDragStateChange={onDragStateChange}
               setAdjustments={setAdjustments}
             />

@@ -57,7 +57,6 @@ pub use render::resample::{
 pub(crate) use render::*;
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
 use std::panic;
@@ -66,7 +65,6 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
@@ -934,296 +932,6 @@ pub fn get_full_image_for_processing(
         loaded_image.image.clone().as_ref().clone(),
         loaded_image.is_raw,
     ))
-}
-
-#[tauri::command]
-fn generate_preset_preview(
-    js_adjustments: serde_json::Value,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
-
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded for preset preview")?;
-    let is_raw = loaded_image.is_raw;
-
-    const PRESET_PREVIEW_DIM: u32 = 400;
-
-    let (preview_image, scale_for_gpu, unscaled_crop_offset) =
-        generate_transformed_preview(&state, &loaded_image, &js_adjustments, PRESET_PREVIEW_DIM)?;
-
-    let (img_w, img_h) = preview_image.dimensions();
-
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-
-    let scaled_crop_offset = (
-        unscaled_crop_offset.0 * scale_for_gpu,
-        unscaled_crop_offset.1 * scale_for_gpu,
-    );
-
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            get_cached_or_generate_mask(
-                &state,
-                def,
-                img_w,
-                img_h,
-                scale_for_gpu,
-                scaled_crop_offset,
-                &js_adjustments,
-            )
-        })
-        .collect();
-
-    let tm_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
-    let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-    let render_plan = compile_consumer_render_plan(
-        render_adjustments.as_ref(),
-        &loaded_image.path,
-        is_raw,
-        tm_override,
-        lut,
-    )?;
-    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
-        &preview_image,
-        calculate_transform_hash(render_adjustments.as_ref()),
-        render_adjustments.as_ref(),
-        is_raw,
-    );
-    let mut gpu_adjustments = render_plan.adjustments;
-    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
-        detail_stage.owns_legacy_global_detail,
-    );
-    let processed_image = process_and_get_dynamic_image(
-        &context,
-        &state,
-        detail_stage.image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::for_stage(
-            detail_stage.image.as_ref(),
-            loaded_image.artifact_source.source_fingerprint(),
-            detail_stage.render_hash,
-            detail_stage.render_hash,
-        ),
-        RenderRequest {
-            adjustments: gpu_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut: render_plan.lut.clone(),
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-                &render_plan.edit_graph,
-            )),
-        },
-        "generate_preset_preview",
-    )?;
-
-    encode_jpeg_response(&processed_image, 80)
-}
-
-#[tauri::command]
-async fn generate_all_community_previews(
-    image_paths: Vec<String>,
-    presets: Vec<CommunityPreset>,
-    state: tauri::State<'_, AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<HashMap<String, Vec<u8>>, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let mut results: HashMap<String, Vec<u8>> = HashMap::new();
-
-    const TILE_DIM: u32 = 360;
-    const PROCESSING_DIM: u32 = TILE_DIM * 2;
-
-    let settings = load_settings_or_default(&app_handle);
-
-    let mut base_thumbnails: Vec<(DynamicImage, bool, f32, u64)> = Vec::new();
-    for image_path in image_paths.iter() {
-        let (source_path, _) = parse_virtual_path(image_path);
-        let source_path_str = source_path.to_string_lossy().to_string();
-        let image_bytes = fs::read(&source_path).map_err(|e| e.to_string())?;
-        let original_image = crate::image_loader::load_base_image_from_bytes(
-            &image_bytes,
-            &source_path_str,
-            true,
-            &settings,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-
-        let is_raw = is_raw_file(&source_path_str);
-        let (orig_w, orig_h) = original_image.dimensions();
-        let (base_image, base_scale) = if orig_w > PROCESSING_DIM || orig_h > PROCESSING_DIM {
-            let downscaled = downscale_f32_image(&original_image, PROCESSING_DIM, PROCESSING_DIM);
-            let scale = downscaled.width() as f32 / orig_w as f32;
-            (downscaled, scale)
-        } else {
-            (original_image, 1.0)
-        };
-
-        base_thumbnails.push((
-            base_image,
-            is_raw,
-            base_scale,
-            crate::render::artifact_identity::stable_hash(&(
-                crate::gpu_processing::PreGpuImageIdentity::source_revision(image_path),
-                crate::image_loader::raw_processing_profile_key(&settings),
-            )),
-        ));
-    }
-
-    for preset in presets.iter() {
-        let mut processed_tiles: Vec<RgbImage> = Vec::new();
-        let js_adjustments = &preset.adjustments;
-
-        for (base_image, is_raw, base_scale, source_revision) in &base_thumbnails {
-            let mut scaled_adjustments = js_adjustments.clone();
-            if let Some(crop_val) = scaled_adjustments.get_mut(adjustment_fields::CROP)
-                && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
-            {
-                *crop_val = serde_json::to_value(Crop {
-                    x: c.x * (*base_scale as f64),
-                    y: c.y * (*base_scale as f64),
-                    width: c.width * (*base_scale as f64),
-                    height: c.height * (*base_scale as f64),
-                })
-                .unwrap_or(serde_json::Value::Null);
-            }
-
-            let (transformed_image, _scaled_crop_offset) =
-                crate::apply_all_transformations(Cow::Borrowed(base_image), &scaled_adjustments);
-            let (img_w, img_h) = transformed_image.dimensions();
-
-            let mask_definitions: Vec<MaskDefinition> = scaled_adjustments
-                .get("masks")
-                .and_then(|m| serde_json::from_value(m.clone()).ok())
-                .unwrap_or_else(Vec::new);
-
-            let unscaled_crop_offset = js_adjustments
-                .get(adjustment_fields::CROP)
-                .and_then(|c| serde_json::from_value::<Crop>(c.clone()).ok())
-                .map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
-            let actual_scaled_crop_offset = (
-                unscaled_crop_offset.0 * base_scale,
-                unscaled_crop_offset.1 * base_scale,
-            );
-
-            let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-                .iter()
-                .filter_map(|def| {
-                    generate_mask_bitmap(
-                        def,
-                        img_w,
-                        img_h,
-                        *base_scale,
-                        actual_scaled_crop_offset,
-                        None,
-                    )
-                })
-                .collect();
-
-            let tm_override = resolve_tonemapper_override_from_handle(&app_handle, *is_raw);
-            let render_adjustments =
-                normalize_film_look_adjustments_for_render(&scaled_adjustments);
-            let lut_path = render_adjustments["lutPath"].as_str();
-            let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-            let render_plan = compile_consumer_render_plan(
-                render_adjustments.as_ref(),
-                &preset.name,
-                *is_raw,
-                tm_override,
-                lut,
-            )?;
-            let pre_gpu_revision = calculate_transform_hash(&scaled_adjustments);
-
-            let processed_image_dynamic = crate::image_processing::process_and_get_dynamic_image(
-                &context,
-                &state,
-                transformed_image.as_ref(),
-                crate::gpu_processing::PreGpuImageIdentity::for_stage(
-                    transformed_image.as_ref(),
-                    *source_revision,
-                    pre_gpu_revision,
-                    pre_gpu_revision,
-                ),
-                RenderRequest {
-                    adjustments: render_plan.adjustments,
-                    mask_bitmaps: &mask_bitmaps,
-                    lut: render_plan.lut.clone(),
-                    roi: None,
-                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                        Arc::clone(&render_plan.edit_graph),
-                    ),
-                },
-                "generate_all_community_previews",
-            )?;
-
-            let processed_image = processed_image_dynamic.to_rgb8();
-
-            let (proc_w, proc_h) = processed_image.dimensions();
-            let size = proc_w.min(proc_h);
-            let cropped_processed_image = image::imageops::crop_imm(
-                &processed_image,
-                (proc_w - size) / 2,
-                (proc_h - size) / 2,
-                size,
-                size,
-            )
-            .to_image();
-
-            let final_tile = image::imageops::resize(
-                &cropped_processed_image,
-                TILE_DIM,
-                TILE_DIM,
-                image::imageops::FilterType::Lanczos3,
-            );
-            processed_tiles.push(final_tile);
-        }
-
-        let final_image_buffer = match processed_tiles.len() {
-            1 => processed_tiles.remove(0),
-            2 => {
-                let mut canvas = RgbImage::new(TILE_DIM * 2, TILE_DIM);
-                image::imageops::overlay(&mut canvas, &processed_tiles[0], 0, 0);
-                image::imageops::overlay(&mut canvas, &processed_tiles[1], TILE_DIM as i64, 0);
-                canvas
-            }
-            4 => {
-                let mut canvas = RgbImage::new(TILE_DIM * 2, TILE_DIM * 2);
-                image::imageops::overlay(&mut canvas, &processed_tiles[0], 0, 0);
-                image::imageops::overlay(&mut canvas, &processed_tiles[1], TILE_DIM as i64, 0);
-                image::imageops::overlay(&mut canvas, &processed_tiles[2], 0, TILE_DIM as i64);
-                image::imageops::overlay(
-                    &mut canvas,
-                    &processed_tiles[3],
-                    TILE_DIM as i64,
-                    TILE_DIM as i64,
-                );
-                canvas
-            }
-            _ => continue,
-        };
-
-        let mut buf = Cursor::new(Vec::new());
-        if final_image_buffer
-            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 75))
-            .is_ok()
-        {
-            results.insert(preset.name.clone(), buf.into_inner());
-        }
-    }
-
-    Ok(results)
 }
 
 type LoadedHdrMergeItem = (String, String, DynamicImage, Duration, f32);
@@ -2143,7 +1851,7 @@ pub fn run() {
             app::commands::negative_lab_dust::analyze_negative_lab_dust_spots,
             app::commands::original_preview::generate_original_transformed_preview,
             app::commands::viewer_sampling::sample_viewer_pixel,
-            generate_preset_preview,
+            app::commands::preset_previews::generate_preset_preview,
             app::commands::uncropped_preview::generate_uncropped_preview,
             preview_geometry_transform,
             app::commands::logging::get_log_file_path,
@@ -2162,7 +1870,7 @@ pub fn run() {
             save_hdr,
             app::commands::lut::load_and_parse_lut,
             app::commands::community_presets::fetch_community_presets,
-            generate_all_community_previews,
+            app::commands::preset_previews::generate_all_community_previews,
             app::commands::temporary_artifacts::save_temp_file,
             app::commands::source::get_image_dimensions,
             app::commands::perspective::analyze_perspective_correction,

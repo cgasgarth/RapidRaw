@@ -17,6 +17,7 @@ enum EditNodeTypeV2 {
     ToneEqualizer,
     DisplayCreative,
     DetailDenoiseDehaze,
+    PointColor,
     CameraInput,
     Geometry,
     Layers,
@@ -32,6 +33,7 @@ impl EditNodeTypeV2 {
             Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
+            Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::Layers => ("layers", "scene_referred_v2", 1),
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
@@ -252,6 +254,111 @@ impl ToneEqualizerSettingsV1 {
     }
 }
 
+fn point_color_in_range(value: f64, minimum: f64, maximum: f64) -> bool {
+    value.is_finite() && (minimum..=maximum).contains(&value)
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorCoordinateV1 {
+    chroma: f64,
+    hue_degrees: f64,
+    lightness: f64,
+}
+
+impl PointColorCoordinateV1 {
+    fn validate(&self) -> Result<(), String> {
+        if point_color_in_range(self.chroma, 0.0, 2.0)
+            && point_color_in_range(self.hue_degrees, 0.0, 360.0)
+            && point_color_in_range(self.lightness, -1.0, 4.0)
+        {
+            return Ok(());
+        }
+        Err("EditDocumentV2 point_color coordinate is out of range".to_string())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorSampleV1 {
+    confidence: f64,
+    graph_revision: String,
+    id: String,
+    sample_radius_px: f64,
+    source_color: PointColorCoordinateV1,
+    source_scene_revision: String,
+}
+
+impl PointColorSampleV1 {
+    fn validate(&self) -> Result<(), String> {
+        if !point_color_in_range(self.confidence, 0.0, 1.0)
+            || !point_color_in_range(self.sample_radius_px, 1.0, 128.0)
+            || self.graph_revision.is_empty()
+            || self.id.is_empty()
+            || self.source_scene_revision.is_empty()
+        {
+            return Err("EditDocumentV2 point_color sample is invalid".to_string());
+        }
+        self.source_color.validate()
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorAdjustmentV1 {
+    chroma_radius: f64,
+    chroma_shift: f64,
+    enabled: bool,
+    feather: f64,
+    hue_radius_degrees: f64,
+    hue_shift_degrees: f64,
+    id: String,
+    lightness_radius: f64,
+    lightness_shift: f64,
+    name: String,
+    opacity: f64,
+    samples: Vec<PointColorSampleV1>,
+    saturation_shift: f64,
+    variance: f64,
+}
+
+impl PointColorAdjustmentV1 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("chromaRadius", self.chroma_radius, 0.001, 1.0),
+            ("chromaShift", self.chroma_shift, -1.0, 1.0),
+            ("feather", self.feather, 0.0, 1.0),
+            ("hueRadiusDegrees", self.hue_radius_degrees, 0.1, 180.0),
+            ("hueShiftDegrees", self.hue_shift_degrees, -180.0, 180.0),
+            ("lightnessRadius", self.lightness_radius, 0.001, 2.0),
+            ("lightnessShift", self.lightness_shift, -1.0, 1.0),
+            ("opacity", self.opacity, 0.0, 1.0),
+            ("saturationShift", self.saturation_shift, -1.0, 4.0),
+            ("variance", self.variance, 0.25, 4.0),
+        ] {
+            if !point_color_in_range(value, minimum, maximum) {
+                return Err(format!(
+                    "EditDocumentV2 point_color field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        if self.id.is_empty()
+            || self.name.is_empty()
+            || self.name.chars().count() > 80
+            || !(1..=8).contains(&self.samples.len())
+        {
+            return Err(
+                "EditDocumentV2 point_color adjustment identity or samples are invalid".to_string(),
+            );
+        }
+        for sample in &self.samples {
+            sample.validate()?;
+        }
+        let _ = self.enabled;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ToneEqualizerV2 {
@@ -261,6 +368,88 @@ struct ToneEqualizerV2 {
 impl ToneEqualizerV2 {
     fn validate(&self) -> Result<(), String> {
         self.tone_equalizer.validate()
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorSkinUniformityV1 {
+    chroma_uniformity: f64,
+    enabled: bool,
+    hue_uniformity: f64,
+    lightness_uniformity: f64,
+    preserve_extremes: f64,
+    range: Option<PointColorAdjustmentV1>,
+    target: Option<PointColorCoordinateV1>,
+}
+
+impl PointColorSkinUniformityV1 {
+    fn validate(&self) -> Result<(), String> {
+        for value in [
+            self.chroma_uniformity,
+            self.hue_uniformity,
+            self.lightness_uniformity,
+            self.preserve_extremes,
+        ] {
+            if !point_color_in_range(value, 0.0, 1.0) {
+                return Err(
+                    "EditDocumentV2 point_color skin uniformity is out of range".to_string()
+                );
+            }
+        }
+        if let Some(range) = &self.range {
+            range.validate()?;
+        }
+        if let Some(target) = &self.target {
+            target.validate()?;
+        }
+        let _ = self.enabled;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum PointColorVisualizeModeV1 {
+    Image,
+    Range,
+    Solo,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorPlanV1 {
+    enabled: bool,
+    points: Vec<PointColorAdjustmentV1>,
+    process: String,
+    selected_point_id: Option<String>,
+    skin_uniformity: PointColorSkinUniformityV1,
+    visualize_mode: PointColorVisualizeModeV1,
+}
+
+impl PointColorPlanV1 {
+    fn validate(&self) -> Result<(), String> {
+        if self.process != "rawengine.point-color.oklab-ap1.v1" || self.points.len() > 16 {
+            return Err("EditDocumentV2 point_color process or point count is invalid".to_string());
+        }
+        for point in &self.points {
+            point.validate()?;
+        }
+        self.skin_uniformity.validate()?;
+        let _ = (self.enabled, &self.selected_point_id, &self.visualize_mode);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PointColorV2 {
+    point_color: PointColorPlanV1,
+}
+
+impl PointColorV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.point_color.validate()
     }
 }
 
@@ -1053,6 +1242,10 @@ fn compile_node_params(
             parse_detail_denoise_dehaze(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::PointColor => {
+            parse_point_color(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::DisplayCreative => {
             parse_display_creative(&node.params)?;
             Ok(node.params.clone())
@@ -1100,6 +1293,13 @@ fn parse_detail_denoise_dehaze(
         .map_err(|error| format!("EditDocumentV2 detail_denoise_dehaze is invalid: {error}"))?;
     detail.validate()?;
     Ok(detail)
+}
+
+fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String> {
+    let point_color: PointColorV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 point_color is invalid: {error}"))?;
+    point_color.validate()?;
+    Ok(point_color)
 }
 
 fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreativeV2, String> {
@@ -1367,6 +1567,49 @@ mod tests {
         })
     }
 
+    fn point_color_params() -> Value {
+        json!({
+            "pointColor": {
+                "enabled": true,
+                "points": [{
+                    "chromaRadius": 0.08,
+                    "chromaShift": 0,
+                    "enabled": true,
+                    "feather": 0.4,
+                    "hueRadiusDegrees": 25,
+                    "hueShiftDegrees": 0,
+                    "id": "point-1",
+                    "lightnessRadius": 0.2,
+                    "lightnessShift": 0,
+                    "name": "Point 1",
+                    "opacity": 1,
+                    "samples": [{
+                        "confidence": 1,
+                        "graphRevision": "graph-1",
+                        "id": "sample-1",
+                        "sampleRadiusPx": 5,
+                        "sourceColor": { "chroma": 0.12, "hueDegrees": 30, "lightness": 0.6 },
+                        "sourceSceneRevision": "scene-1"
+                    }],
+                    "saturationShift": 0,
+                    "variance": 1
+                }],
+                "process": "rawengine.point-color.oklab-ap1.v1",
+                "selectedPointId": "point-1",
+                "skinUniformity": {
+                    "chromaUniformity": 0,
+                    "enabled": false,
+                    "hueUniformity": 0,
+                    "lightnessUniformity": 0,
+                    "preserveExtremes": 0.5,
+                    "range": null,
+                    "target": null
+                },
+                "visualizeMode": "range"
+            }
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1431,6 +1674,13 @@ mod tests {
                     "params": detail_params(),
                     "process": "scene_referred_v2",
                     "type": "detail_denoise_dehaze"
+                },
+                "point_color": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": point_color_params(),
+                    "process": "scene_referred_v2",
+                    "type": "point_color"
                 },
                 "camera_input": {
                     "enabled": true,
@@ -1577,6 +1827,7 @@ mod tests {
             "lumaNoiseReduction": 5,
             "masks": [],
             "orientationSteps": 1,
+            "pointColor": point_color_params()["pointColor"].clone(),
             "rawEngineEditGraphVersion": 2,
             "rotation": 0.5,
             "saturation": 7,
@@ -1920,6 +2171,66 @@ mod tests {
             .into_render_adjustments()
             .expect_err("wrong tone-equalizer band count must fail");
         assert!(error.contains("array of length 9"));
+    }
+
+    #[test]
+    fn point_color_compiler_rejects_unowned_missing_oversized_and_out_of_range_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["point_color"]["params"]["pointColor"]["futureRange"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned point-color field must fail");
+        assert!(error.contains("unknown field `futureRange`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["point_color"]["params"]["pointColor"]
+            .as_object_mut()
+            .expect("point-color plan object")
+            .remove("process");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing point-color field must fail");
+        assert!(error.contains("missing field `process`"));
+
+        let point = point_color_params()["pointColor"]["points"][0].clone();
+        let mut too_many_points = document_with_legacy(json!({}));
+        too_many_points["nodes"]["point_color"]["params"]["pointColor"]["points"] =
+            Value::Array((0..17).map(|_| point.clone()).collect());
+        let error = serde_json::from_value::<EditDocumentV2>(too_many_points)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("oversized point-color plan must fail");
+        assert!(error.contains("point count is invalid"));
+
+        let sample = point_color_params()["pointColor"]["points"][0]["samples"][0].clone();
+        let mut too_many_samples = document_with_legacy(json!({}));
+        too_many_samples["nodes"]["point_color"]["params"]["pointColor"]["points"][0]["samples"] =
+            Value::Array((0..9).map(|_| sample.clone()).collect());
+        let error = serde_json::from_value::<EditDocumentV2>(too_many_samples)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("oversized point-color samples must fail");
+        assert!(error.contains("adjustment identity or samples are invalid"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["point_color"]["params"]["pointColor"]["points"][0]["hueRadiusDegrees"] =
+            json!(181);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range point-color control must fail");
+        assert!(error.contains("hueRadiusDegrees"));
+
+        let mut invalid_process = document_with_legacy(json!({}));
+        invalid_process["nodes"]["point_color"]["params"]["pointColor"]["process"] =
+            json!("legacy.point-color");
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_process)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unknown point-color process must fail");
+        assert!(error.contains("process or point count is invalid"));
     }
 
     #[test]

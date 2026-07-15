@@ -74,6 +74,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'tone_equalizer',
       'display_creative',
       'detail_denoise_dehaze',
+      'point_color',
       'camera_input',
       'geometry',
       'layers',
@@ -458,6 +459,44 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('point color defaults legacy state and rejects malformed render authority', () => {
+    const { pointColor: _pointColor, ...legacyPointColor } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyPointColor);
+    expect(defaulted.nodes.point_color?.params).toEqual({ pointColor: INITIAL_ADJUSTMENTS.pointColor });
+    expect(defaulted.migration?.defaulted).toContain('point_color.pointColor');
+    expect(compileEditDocumentNodeV2(defaulted.nodes.point_color).params.pointColor).toEqual(
+      defaulted.nodes.point_color?.params.pointColor,
+    );
+
+    const node = defaulted.nodes.point_color;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          point_color: {
+            ...node,
+            params: { pointColor: { ...defaulted.nodes.point_color?.params.pointColor, futurePoint: true } },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          point_color: {
+            ...node,
+            params: {
+              pointColor: { ...defaulted.nodes.point_color?.params.pointColor, visualizeMode: 'heatmap' },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -779,6 +818,24 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.tone_equalizer?.params.toneEqualizer).toMatchObject({
       bandEv: [0, 0, 0, 0, 0.75, 0, 0, 0, 0],
       enabled: true,
+    });
+    expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
+    expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays the authoritative point-color envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      pointColor: { ...structuredClone(INITIAL_ADJUSTMENTS.pointColor), enabled: true, visualizeMode: 'range' },
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['point_color']);
+
+    expect(renderDocument.nodes.point_color).toBe(authoritative.nodes.point_color);
+    expect(renderDocument.nodes.point_color?.params.pointColor).toMatchObject({
+      enabled: true,
+      visualizeMode: 'range',
     });
     expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
