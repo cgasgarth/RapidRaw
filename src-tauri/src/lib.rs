@@ -588,27 +588,22 @@ async fn apply_adjustments(
     validate_expected_preview_image(&loaded_image_path, &request.expected_image_path)?;
     let render_adjustments = request.edit_document_v2.into_render_adjustments()?;
 
-    {
-        let scheduler_guard = state.preview_scheduler.lock().unwrap();
-        if let Some(scheduler) = &*scheduler_guard {
-            let job = PreviewJob {
-                adjustments: Arc::new(render_adjustments),
-                expected_image_path: request.expected_image_path,
-                is_interactive: request.is_interactive,
-                target_resolution: request.target_resolution,
-                roi: request.roi,
-                compute_waveform: request.compute_waveform,
-                active_waveform_channel: request.active_waveform_channel,
-                viewer_sample_graph_revision: request.viewer_sample_graph_revision,
-                responder: tx,
-            };
-            scheduler
-                .submit(job)
-                .map_err(|_| "preview_worker_stopped".to_string())?;
-        } else {
-            return Err("Preview worker not running".to_string());
-        }
-    }
+    let job = PreviewJob {
+        adjustments: Arc::new(render_adjustments),
+        expected_image_path: request.expected_image_path,
+        is_interactive: request.is_interactive,
+        target_resolution: request.target_resolution,
+        roi: request.roi,
+        compute_waveform: request.compute_waveform,
+        active_waveform_channel: request.active_waveform_channel,
+        viewer_sample_graph_revision: request.viewer_sample_graph_revision,
+        responder: tx,
+    };
+    state
+        .services
+        .preview_runtime
+        .submit(job)
+        .map_err(|_| "preview_worker_stopped".to_string())?;
 
     match rx.await {
         Ok(preview_scheduler::PreviewCompletion::Rendered { bytes, .. }) => {

@@ -235,20 +235,18 @@ fn process_resource_usage() -> Value {
 
 fn scheduler_metrics(app_state: &AppState) -> Value {
     app_state
-        .preview_scheduler
-        .lock()
-        .ok()
-        .and_then(|scheduler| {
-            scheduler.as_ref().map(|scheduler| {
-                json!({
-                    "interactiveSubmissions": scheduler.metrics.interactive_submissions.load(Ordering::Acquire),
-                    "settledSubmissions": scheduler.metrics.settled_submissions.load(Ordering::Acquire),
-                    "pendingReplacements": scheduler.metrics.pending_replacements.load(Ordering::Acquire),
-                    "activeCancellations": scheduler.metrics.active_cancellations.load(Ordering::Acquire),
-                    "renderedInteractive": scheduler.metrics.rendered_interactive.load(Ordering::Acquire),
-                    "renderedSettled": scheduler.metrics.rendered_settled.load(Ordering::Acquire),
-                    "maxResidentRequests": scheduler.metrics.max_resident_requests.load(Ordering::Acquire),
-                })
+        .services
+        .preview_runtime
+        .metrics_snapshot()
+        .map(|metrics| {
+            json!({
+                "interactiveSubmissions": metrics.interactive_submissions,
+                "settledSubmissions": metrics.settled_submissions,
+                "pendingReplacements": metrics.pending_replacements,
+                "activeCancellations": metrics.active_cancellations,
+                "renderedInteractive": metrics.rendered_interactive,
+                "renderedSettled": metrics.rendered_settled,
+                "maxResidentRequests": metrics.max_resident_requests,
             })
         })
         .unwrap_or(Value::Null)

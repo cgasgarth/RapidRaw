@@ -831,7 +831,10 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
         PreviewSchedulingPolicy::default(),
         Some(Arc::clone(&state.export_interactive_gpu_waiters)),
     );
-    *state.preview_scheduler.lock().unwrap() = Some(Arc::clone(&scheduler));
+    let worker_token = state
+        .services
+        .preview_runtime
+        .install(Arc::clone(&scheduler));
 
     thread::spawn(move || {
         while let Some(request) = scheduler.next() {
@@ -896,6 +899,11 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                 queued_for.as_secs_f64() * 1000.0
             );
         }
+        app_handle
+            .state::<AppState>()
+            .services
+            .preview_runtime
+            .uninstall(worker_token);
     });
 }
 

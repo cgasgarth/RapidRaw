@@ -115,6 +115,7 @@ impl PreviewScheduler {
         generation
     }
 
+    #[cfg(test)]
     pub fn new(policy: PreviewSchedulingPolicy) -> Arc<Self> {
         Self::new_with_export_gpu_pressure(policy, None)
     }

@@ -2537,13 +2537,7 @@ pub async fn reset_adjustments_for_paths(
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
         state.decoded_image_cache.clear();
-        let render_generation = state
-            .preview_scheduler
-            .lock()
-            .unwrap()
-            .as_ref()
-            .map(|scheduler| scheduler.invalidate_current())
-            .unwrap_or(0);
+        let render_generation = state.services.preview_runtime.invalidate_current();
         for result in &mut results {
             result.render_generation = render_generation;
         }
@@ -3160,9 +3154,7 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         let state = app_handle.state::<AppState>();
         crate::render_caches::RenderCaches::new(&state).clear_canonical_reset_artifacts();
         state.decoded_image_cache.clear();
-        if let Some(scheduler) = state.preview_scheduler.lock().unwrap().as_ref() {
-            scheduler.invalidate_current();
-        }
+        state.services.preview_runtime.invalidate_current();
     }
     let mut metadata = persisted.metadata;
     let mut should_save_sidecar = false;
