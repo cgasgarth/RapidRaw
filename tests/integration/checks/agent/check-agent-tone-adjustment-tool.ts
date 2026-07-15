@@ -61,6 +61,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-stale-uncropped',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 const failures: string[] = [];
 
@@ -173,6 +174,21 @@ if (
 }
 if (state.historyIndex !== 1 || state.history.length !== 2) {
   failures.push('agent tone apply must create one undoable history entry.');
+}
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== state.lastBasicToneCommand?.commandId ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  failures.push('agent tone apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.42 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity !== 18
+) {
+  failures.push('agent tone apply did not update canonical tone and detail nodes.');
 }
 if (state.lastBasicToneCommand?.commandType !== 'toneColor.setBasicTone' || state.lastBasicToneCommand.dryRun) {
   failures.push('agent tone apply did not retain the typed applied basic-tone command.');
