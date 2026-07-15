@@ -32,13 +32,7 @@ export interface ViewerParametricMaskTargetSettings {
 }
 
 export interface ViewerParametricMaskTargetCommand {
-  readonly input: {
-    readonly pointerId: number;
-    readonly pointerType: ViewerParametricMaskTargetPointerType;
-  };
   readonly key: ViewerParametricMaskTargetKey;
-  readonly kind: 'commit-parametric-mask-target';
-  readonly maskId: string;
   readonly parameters: SubMaskParameters;
 }
 
@@ -50,35 +44,31 @@ export interface ViewerParametricMaskTargetInteractionController {
   ): ViewerParametricMaskTargetCommand | null;
 }
 
-const finitePoint = (point: ViewerParametricMaskTargetSample['imagePoint']): boolean =>
-  Number.isFinite(point.x) && Number.isFinite(point.y);
-
-const validSettings = (settings: ViewerParametricMaskTargetSettings): boolean =>
-  Number.isFinite(settings.orientationSteps) && Number.isFinite(settings.rotation);
-
 export const createViewerParametricMaskTargetInteractionController =
   (): ViewerParametricMaskTargetInteractionController => {
     let operationGeneration = 0;
 
     return {
       activate: (context, sample, settings) => {
-        if (!context.active || !finitePoint(sample.imagePoint) || !validSettings(settings)) return null;
-        operationGeneration += 1;
+        const { x: targetX, y: targetY } = sample.imagePoint;
+        if (
+          !context.active ||
+          ![targetX, targetY, settings.orientationSteps, settings.rotation].every(Number.isFinite)
+        ) {
+          return null;
+        }
         const parameters: SubMaskParameters = {
           ...settings.baselineParameters,
           flipHorizontal: settings.flipHorizontal,
           flipVertical: settings.flipVertical,
           orientationSteps: settings.orientationSteps,
           rotation: settings.rotation,
-          targetX: sample.imagePoint.x,
-          targetY: sample.imagePoint.y,
+          targetX,
+          targetY,
         };
         delete parameters['isInitialDraw'];
         return {
-          input: { pointerId: sample.pointerId, pointerType: sample.pointerType },
-          key: { ...context, operationGeneration },
-          kind: 'commit-parametric-mask-target',
-          maskId: context.maskId,
+          key: { ...context, operationGeneration: ++operationGeneration },
           parameters,
         };
       },

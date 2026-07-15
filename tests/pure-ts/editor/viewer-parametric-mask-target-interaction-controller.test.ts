@@ -31,10 +31,7 @@ describe('viewer parametric mask target interaction controller', () => {
     expect(
       controller.activate(context(), { imagePoint: { x: 812, y: 614 }, pointerId: 4, pointerType: 'mouse' }, settings),
     ).toEqual({
-      input: { pointerId: 4, pointerType: 'mouse' },
       key: { ...context(), operationGeneration: 1 },
-      kind: 'commit-parametric-mask-target',
-      maskId: 'mask:color',
       parameters: {
         flipHorizontal: true,
         flipVertical: false,
@@ -62,7 +59,6 @@ describe('viewer parametric mask target interaction controller', () => {
     );
     expect(first).toMatchObject({
       key: { operationGeneration: 1, tool: 'luminance' },
-      input: { pointerType: 'touch' },
     });
     expect(second).toMatchObject({
       key: { operationGeneration: 2, tool: 'luminance' },

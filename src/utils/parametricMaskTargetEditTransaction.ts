@@ -17,13 +17,16 @@ export interface ParametricMaskTargetEditTransactionState {
 const expectedImageSessionId = (state: ParametricMaskTargetEditTransactionState): string =>
   state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
+const rejectParametricMaskTarget = (reason: string): never => {
+  throw new Error(`parametric_mask_target.${reason}`);
+};
+
 const assertCurrent = (state: ParametricMaskTargetEditTransactionState, key: ViewerParametricMaskTargetKey): void => {
-  if (!key.active) throw new Error('parametric_mask_target.inactive');
-  if (key.imageSessionId !== expectedImageSessionId(state))
-    throw new Error('parametric_mask_target.stale_image_session');
-  if (key.sourceIdentity !== state.selectedImage?.path) throw new Error('parametric_mask_target.stale_source');
-  if (key.sourceRevision !== state.sourceRevision) throw new Error('parametric_mask_target.stale_source_revision');
-  if (key.geometryEpoch !== state.geometryEpoch) throw new Error('parametric_mask_target.stale_geometry');
+  if (!key.active) rejectParametricMaskTarget('inactive');
+  if (key.imageSessionId !== expectedImageSessionId(state)) rejectParametricMaskTarget('stale_image_session');
+  if (key.sourceIdentity !== state.selectedImage?.path) rejectParametricMaskTarget('stale_source');
+  if (key.sourceRevision !== state.sourceRevision) rejectParametricMaskTarget('stale_source_revision');
+  if (key.geometryEpoch !== state.geometryEpoch) rejectParametricMaskTarget('stale_geometry');
 };
 
 export const buildParametricMaskTargetEditTransaction = (
@@ -37,7 +40,7 @@ export const buildParametricMaskTargetEditTransaction = (
   const updateSubMasks = (subMasks: Adjustments['masks'][number]['subMasks']) =>
     subMasks.map((subMask) => {
       if (subMask.id !== key.maskId) return subMask;
-      if (subMask.type !== key.tool) throw new Error('parametric_mask_target.stale_tool');
+      if (subMask.type !== key.tool) rejectParametricMaskTarget('stale_tool');
       matched = true;
       return { ...subMask, parameters: { ...parameters } };
     });
@@ -46,6 +49,6 @@ export const buildParametricMaskTargetEditTransaction = (
     aiPatches: state.adjustments.aiPatches.map((patch) => ({ ...patch, subMasks: updateSubMasks(patch.subMasks) })),
     masks: state.adjustments.masks.map((mask) => ({ ...mask, subMasks: updateSubMasks(mask.subMasks) })),
   };
-  if (!matched) throw new Error('parametric_mask_target.missing_mask');
+  if (!matched) rejectParametricMaskTarget('missing_mask');
   return buildLayerEditTransactionRequest(state, adjustments, transactionId);
 };
