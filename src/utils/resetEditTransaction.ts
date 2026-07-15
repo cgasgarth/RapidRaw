@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from './adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
 
 const resetAdjustmentDocumentSchema = z.custom<Partial<Adjustments>>(
@@ -94,12 +95,13 @@ export const buildResetEditTransaction = (
   }
 
   const normalized = normalizeLoadedAdjustments(result.adjustments);
-  const resultVisibility = result.adjustments.sectionVisibility;
-  if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && resultVisibility?.['effects'] === undefined) {
+  const resultVisibility = result.adjustments['sectionVisibility'];
+  const legacyEffectsEnabled =
+    resultVisibility !== null && typeof resultVisibility === 'object' && !Array.isArray(resultVisibility)
+      ? (resultVisibility as Readonly<Record<string, unknown>>)['effects']
+      : undefined;
+  if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && legacyEffectsEnabled === undefined) {
     normalized.effectsEnabled = state.adjustments.effectsEnabled;
-  }
-  if (!Object.hasOwn(result.adjustments, 'sectionVisibility')) {
-    normalized.sectionVisibility = structuredClone(state.adjustments.sectionVisibility);
   }
   const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : null;
   const resetAdjustments: Adjustments = {
@@ -112,7 +114,13 @@ export const buildResetEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'reset',
     imageSessionId: identity.imageSessionId,
-    operations: [{ adjustments: resetAdjustments, type: 'replace-adjustments' }],
+    operations: [
+      {
+        adjustments: resetAdjustments,
+        editDocumentV2: legacyAdjustmentsToEditDocumentV2(resetAdjustments),
+        type: 'replace-edit-authority',
+      },
+    ],
     persistence: 'native-committed',
     source: 'reset',
     transactionId,

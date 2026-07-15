@@ -170,6 +170,7 @@ jobs:
           bunx playwright install chromium
           bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
           bun tests/integration/checks/check-browser-tauri-harness.ts
+          bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts
 
   fast-js-security:
     name: 'pr fast: JavaScript audit'

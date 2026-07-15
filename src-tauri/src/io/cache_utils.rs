@@ -103,12 +103,6 @@ pub fn calculate_transform_hash(adjustments: &serde_json::Value) -> u64 {
         }
     }
     adjustments
-        .get("sectionVisibility")
-        .and_then(|visibility| visibility.get("color"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(true)
-        .hash(&mut hasher);
-    adjustments
         .get("effectsEnabled")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(true)
@@ -204,12 +198,19 @@ mod tests {
             "a native color edit must rebuild the preview and zoom source image"
         );
 
-        let mut hidden = base.clone();
-        hidden["sectionVisibility"]["color"] = json!(false);
+        let mut collapsed = base.clone();
+        collapsed["sectionVisibility"]["color"] = json!(false);
+        assert_eq!(
+            calculate_transform_hash(&base),
+            calculate_transform_hash(&collapsed),
+            "workspace disclosure must not participate in render fingerprints"
+        );
+
+        let disabled = json!({});
         assert_ne!(
             calculate_transform_hash(&base),
-            calculate_transform_hash(&hidden),
-            "hiding the color section must invalidate baked mixer pixels"
+            calculate_transform_hash(&disabled),
+            "compiled disabled color nodes omit their render fields"
         );
     }
 

@@ -106,6 +106,12 @@ pub struct ImageMetadata {
     pub version: u32,
     pub rating: u8,
     pub adjustments: Value,
+    #[serde(
+        default,
+        rename = "editDocumentV2",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub edit_document_v2: Option<Value>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -130,6 +136,7 @@ impl Default for ImageMetadata {
             version: 1,
             rating: 0,
             adjustments: Value::Null,
+            edit_document_v2: None,
             tags: None,
             exif: None,
             raw_engine_artifacts: None,
@@ -1288,6 +1295,7 @@ mod tests {
             version: 1,
             rating: 5,
             adjustments: json!({ "exposure": 0.15 }),
+            edit_document_v2: None,
             tags: Some(vec!["color:green".to_string(), "user:panorama".to_string()]),
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {

@@ -573,6 +573,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               }
             : null;
         const capturedAdjustments = capturedSelection === null ? null : structuredClone(editor.adjustments);
+        const capturedEditDocumentV2 = capturedSelection === null ? null : structuredClone(editor.editDocumentV2);
         let successorBaseline: BatchAutoAdjustSuccessorBaseline | null = null;
         const stopTrackingSuccessor =
           capturedSelection === null
@@ -703,6 +704,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       captured: capturedSelection,
                       current: acceptanceIdentity,
                       ...(reconciledHistoryBaseline === null ? {} : { historyBaseline: reconciledHistoryBaseline }),
+                      ...(reconciledHistoryBaseline === null || capturedEditDocumentV2 === null
+                        ? {}
+                        : { historyEditDocumentBaseline: capturedEditDocumentV2 }),
                       result: committed,
                     });
                     if (transaction !== null) latest.applyEditTransaction(transaction);

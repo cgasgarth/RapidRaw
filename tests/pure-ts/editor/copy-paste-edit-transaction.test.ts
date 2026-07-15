@@ -9,8 +9,11 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../../src/utils/copyPasteEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
-import { buildEditTransactionPersistenceContext } from '../../../src/utils/editTransaction';
+import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
+import {
+  buildEditTransactionPersistenceContext,
+  type EditTransactionRequest,
+} from '../../../src/utils/editTransaction';
 
 const targetPath = '/fixture/paste-target.ARW';
 const session = createEditorImageSession({ generation: 19, path: targetPath, source: 'cache' });
@@ -36,6 +39,7 @@ describe('copy/paste edit transaction', () => {
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [editDocumentV2],
       history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
@@ -142,6 +146,17 @@ describe('copy/paste edit transaction', () => {
   });
 
   test('compensates an exact native failure without overwriting a newer edit', () => {
+    const enabledState = useEditorStore.getState();
+    const disabledDocument = setEditDocumentV2NodeEnabled(enabledState.editDocumentV2, 'scene_curve', false);
+    useEditorStore.setState({
+      adjustmentSnapshot: publishAdjustmentSnapshot(
+        enabledState.adjustmentSnapshot,
+        enabledState.adjustments,
+        disabledDocument,
+      ),
+      editDocumentHistory: [disabledDocument],
+      editDocumentV2: disabledDocument,
+    });
     const before = useEditorStore.getState();
     before.createHistoryCheckpoint('Before paste');
     const expectedHistory = structuredClone(useEditorStore.getState().history);
@@ -163,6 +178,22 @@ describe('copy/paste edit transaction', () => {
     });
     if (compensation === null) throw new Error('Expected exact native failure compensation.');
     if (compensation.compensationHistory === undefined) throw new Error('Expected compensation history authority.');
+    const compensationOperation = compensation.operations[0];
+    if (compensationOperation?.type !== 'replace-edit-authority') {
+      throw new Error('Expected replacement authority for compensation.');
+    }
+    const reorderedCompensation = {
+      ...compensation,
+      operations: [
+        {
+          ...compensationOperation,
+          editDocumentV2: {
+            ...compensationOperation.editDocumentV2,
+            nodes: Object.fromEntries(Object.entries(compensationOperation.editDocumentV2.nodes).reverse()),
+          },
+        },
+      ],
+    } satisfies EditTransactionRequest;
     const beforeMalformed = useEditorStore.getState();
     expect(() =>
       beforeMalformed.applyEditTransaction({
@@ -192,7 +223,7 @@ describe('copy/paste edit transaction', () => {
     }
     capturedEntry.exposure = 4;
     capturedCheckpoint.historyIndex = 99;
-    useEditorStore.getState().applyEditTransaction(compensation);
+    useEditorStore.getState().applyEditTransaction(reorderedCompensation);
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 2,
       adjustments: { brightness: 0.2, exposure: 0.1 },
@@ -208,6 +239,8 @@ describe('copy/paste edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toEqual(expectedHistory);
     expect(useEditorStore.getState().historyCheckpoints).toEqual(expectedCheckpoints);
+    expect(useEditorStore.getState().editDocumentV2.nodes.scene_curve.enabled).toBeFalse();
+    expect(useEditorStore.getState().editDocumentHistory[0]?.nodes.scene_curve.enabled).toBeFalse();
     const compensatedRevision = useEditorStore.getState().adjustmentRevision;
     useEditorStore.getState().undo();
     useEditorStore.getState().redo();

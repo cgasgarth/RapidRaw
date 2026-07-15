@@ -14,6 +14,7 @@ import {
 import { Mask, type SubMask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskAdjustments,
@@ -392,6 +393,8 @@ const buildRollbackTarget = (
 const makeLayer = (request: z.infer<typeof agentLayerCreateRequestSchema>): MaskContainer => ({
   adjustments: toMaskAdjustments(request.adjustments),
   blendMode: request.blendMode,
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: request.layerId ?? `agent_layer_${toIdSegment(request.operationId)}`,
   invert: false,
   name: request.name,
@@ -957,6 +960,8 @@ export const applyAgentObjectSelection = (
   const layer: MaskContainer = {
     adjustments: toMaskAdjustments(parsedRequest.adjustments),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name: parsedRequest.layerName,

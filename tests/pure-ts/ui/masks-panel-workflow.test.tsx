@@ -8,7 +8,12 @@ import { Mask } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -23,6 +28,8 @@ mock.module('@clerk/react', () => ({
 
 const firstMask: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: 'mask-first',
   invert: false,
   name: 'Sky recovery',
@@ -33,6 +40,8 @@ const firstMask: MaskContainer = {
 
 const secondMask: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: 'mask-second',
   invert: false,
   name: 'Foreground lift',

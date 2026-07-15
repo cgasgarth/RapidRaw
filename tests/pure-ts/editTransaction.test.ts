@@ -2,11 +2,12 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2';
+import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../src/utils/editDocumentV2';
 import {
   buildAdjustmentMutationOperations,
+  buildEditorSectionNodeEnablementOperations,
   buildEditTransactionPersistenceContext,
   type EditTransactionRequest,
   reduceEditTransaction,
@@ -222,7 +223,11 @@ describe('reduceEditTransaction', () => {
       document,
     );
 
-    expect(result).toMatchObject({ changedKeys: ['effectsEnabled'], nextAdjustmentRevision: 5, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['effectsEnabled', 'nodes.display_creative.enabled'],
+      nextAdjustmentRevision: 5,
+      noOp: false,
+    });
     expect(result.after.effectsEnabled).toBeFalse();
     expect(result.after.grainAmount).toBe(42);
     expect(result.afterEditDocumentV2.nodes.display_creative).toMatchObject({
@@ -232,6 +237,81 @@ describe('reduceEditTransaction', () => {
     expect(result.afterEditDocumentV2.nodes.display_creative.params).toEqual(
       result.beforeEditDocumentV2.nodes.display_creative.params,
     );
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
+  });
+
+  test('toggles every registry-owned Color node in one document-only transaction', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const operations = buildEditorSectionNodeEnablementOperations(document, 'color', false);
+    const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request({ operations }), undefined, document);
+
+    expect(operations).toHaveLength(6);
+    expect(result.nextAdjustmentRevision).toBe(5);
+    expect(result.noOp).toBeFalse();
+    expect(result.after).toBe(INITIAL_ADJUSTMENTS);
+    expect(result.changedKeys).toEqual(
+      operations.map((operation) =>
+        operation.type === 'set-edit-document-node-enabled' ? `nodes.${operation.nodeType}.enabled` : 'unexpected',
+      ),
+    );
+    for (const operation of operations) {
+      if (operation.type === 'set-edit-document-node-enabled') {
+        expect(result.afterEditDocumentV2.nodes[operation.nodeType]?.enabled).toBeFalse();
+      }
+    }
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.enabled).toBeTrue();
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
+  });
+
+  test('legacy patches preserve document-only node enablement while updating latent params', () => {
+    let document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    for (const nodeType of ['scene_global_color_tone', 'scene_curve', 'detail_denoise_dehaze'] as const) {
+      document = setEditDocumentV2NodeEnabled(document, nodeType, false);
+    }
+    const result = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({ operations: [{ patch: { exposure: 1.25, vignetteAmount: -20 }, type: 'patch-adjustments' }] }),
+      undefined,
+      document,
+    );
+
+    expect(result.after).toMatchObject({ exposure: 1.25, vignetteAmount: -20 });
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toMatchObject({
+      enabled: false,
+      params: { exposure: 1.25 },
+    });
+    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze.enabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeTrue();
+  });
+
+  test('typed-only authority replacement is a real revision with render invalidation', () => {
+    const beforeDocument = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const afterDocument = setEditDocumentV2NodeEnabled(beforeDocument, 'scene_curve', false);
+    const result = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({
+        operations: [
+          {
+            adjustments: INITIAL_ADJUSTMENTS,
+            editDocumentV2: afterDocument,
+            type: 'replace-edit-authority',
+          },
+        ],
+      }),
+      undefined,
+      beforeDocument,
+    );
+
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.scene_curve.enabled'],
+      nextAdjustmentRevision: 5,
+      noOp: false,
+    });
+    expect(result.after).toEqual(INITIAL_ADJUSTMENTS);
+    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
   });
 
@@ -395,17 +475,51 @@ describe('reduceEditTransaction', () => {
   });
 
   test('exact no-ops do not advance revision or create a changed-key set', () => {
+    const currentDocument = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+      'scene_curve',
+      false,
+    );
     const result = reduceEditTransaction(
       INITIAL_ADJUSTMENTS,
       4,
       request({
         operations: [{ type: 'patch-adjustments', patch: { exposure: INITIAL_ADJUSTMENTS.exposure } }],
       }),
+      undefined,
+      currentDocument,
     );
 
     expect(result.noOp).toBe(true);
     expect(result.changedKeys).toEqual([]);
     expect(result.nextAdjustmentRevision).toBe(4);
+    expect(result.afterEditDocumentV2).toEqual(currentDocument);
+
+    const replacement = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({ operations: [{ type: 'replace-adjustments', adjustments: INITIAL_ADJUSTMENTS }] }),
+      undefined,
+      currentDocument,
+    );
+    expect(replacement.noOp).toBeTrue();
+    expect(replacement.afterEditDocumentV2).toEqual(currentDocument);
+
+    const roundTrip = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({
+        operations: [
+          { type: 'patch-adjustments', patch: { exposure: 0.5 } },
+          { type: 'replace-adjustments', adjustments: INITIAL_ADJUSTMENTS },
+        ],
+      }),
+      undefined,
+      currentDocument,
+    );
+    expect(roundTrip.noOp).toBeTrue();
+    expect(roundTrip.after).toEqual(INITIAL_ADJUSTMENTS);
+    expect(roundTrip.afterEditDocumentV2).toEqual(currentDocument);
   });
 
   test('rejects stale proposals before applying any operation', () => {
@@ -469,6 +583,8 @@ describe('reduceEditTransaction', () => {
       masks: [
         {
           adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer-1',
           invert: false,
           name: 'Layer 1',
@@ -500,6 +616,8 @@ describe('reduceEditTransaction', () => {
       masks: [
         {
           adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer-persisted',
           invert: false,
           name: 'Layer persisted',

@@ -19,6 +19,7 @@ import {
   editDocumentToneEqualizerV2Schema,
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
+  getEditDocumentNodeTypesForEditorSection,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 
@@ -61,9 +62,29 @@ const readEffectsEnabled = (adjustments: Readonly<Record<string, unknown>>): boo
     : true;
 };
 
+const readLegacySectionEnabled = (
+  adjustments: Readonly<Record<string, unknown>>,
+  section: 'basic' | 'color' | 'curves' | 'details',
+): boolean => {
+  // biome-ignore lint/complexity/useLiteralKeys: the adapter owns the legacy index-signature boundary.
+  const visibility = adjustments['sectionVisibility'];
+  return hasRecordShape(visibility) && typeof visibility[section] === 'boolean' ? visibility[section] : true;
+};
+
+const normalizeLegacyLayers = (params: Readonly<Record<string, unknown>>) =>
+  editDocumentLayersV2Schema.parse({
+    ...params,
+    masks: Array.isArray(params['masks']) ? params['masks'] : [],
+  });
+
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
   const effectsEnabled = readEffectsEnabled(adjustments);
+  const disabledNodeTypes = new Set<EditDocumentNodeTypeV2>(
+    (['basic', 'color', 'curves', 'details'] as const).flatMap((section) =>
+      readLegacySectionEnabled(adjustments, section) ? [] : getEditDocumentNodeTypesForEditorSection(section),
+    ),
+  );
   const mapped = entries
     .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
     .filter((entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } => entry.nodeType !== null);
@@ -121,12 +142,12 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                                   ...mappedParams,
                                 })
                               : nodeType === 'layers'
-                                ? { masks: [], ...mappedParams }
+                                ? normalizeLegacyLayers({ masks: [], ...mappedParams })
                                 : mappedParams;
       return [
         nodeType,
         {
-          enabled: nodeType === 'display_creative' ? effectsEnabled : true,
+          enabled: nodeType === 'display_creative' ? effectsEnabled : !disabledNodeTypes.has(nodeType),
           implementationVersion: descriptor?.implementationVersion ?? 1,
           params,
           process: descriptor?.process ?? 'scene_referred_v2',
@@ -137,7 +158,11 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   );
   const legacyAdjustments = Object.fromEntries(
     entries.filter(
-      ([key]) => key !== 'effectsEnabled' && nodeTypeForField(key) === null && !PROVENANCE_FIELDS.has(key),
+      ([key]) =>
+        key !== 'effectsEnabled' &&
+        key !== 'sectionVisibility' &&
+        nodeTypeForField(key) === null &&
+        !PROVENANCE_FIELDS.has(key),
     ),
   );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
@@ -166,7 +191,12 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   const legacyCrop = adjustments['crop'];
   const defaultedCropUnit = hasRecordShape(legacyCrop) && !Object.hasOwn(legacyCrop, 'unit');
   return editDocumentV2Schema.parse({
-    extensions: { legacyAdjustments },
+    extensions: {
+      legacyAdjustments,
+      ...(hasRecordShape(adjustments['sectionVisibility'])
+        ? { legacyDisclosureMetadata: { sectionVisibility: adjustments['sectionVisibility'] } }
+        : {}),
+    },
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     geometry: nodes['geometry']?.params ?? {},
     graphProcess: 'scene_referred_v2',
@@ -174,7 +204,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     layers: nodes['layers']?.params ?? {},
     migration: {
       defaulted: [...defaultedNodeParams, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
-      disabled: effectsEnabled ? [] : ['display_creative'],
+      disabled: [...disabledNodeTypes, ...(effectsEnabled ? [] : ['display_creative' as const])].sort(),
       mapped: [
         ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
         ...(Object.hasOwn(adjustments, 'effectsEnabled') ||
@@ -183,7 +213,10 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
           : []),
         ...(entries.some(([key]) => PROVENANCE_FIELDS.has(key)) ? ['provenance.referenceMatchApplicationReceipt'] : []),
       ].sort(),
-      quarantined: Object.keys(legacyAdjustments).sort(),
+      quarantined: [
+        ...Object.keys(legacyAdjustments),
+        ...(hasRecordShape(adjustments['sectionVisibility']) ? ['sectionVisibility'] : []),
+      ].sort(),
       sourceSchemaVersion: 1,
     },
     nodes,
@@ -229,7 +262,8 @@ export const updateEditDocumentV2Node = (
     editDocumentV2Schema.parse(next);
     return next;
   }
-  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: updatedParams });
+  const normalizedParams = nodeType === 'layers' ? editDocumentLayersV2Schema.parse(updatedParams) : updatedParams;
+  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: normalizedParams });
   const next: EditDocumentV2 = {
     ...document,
     layers: nodeType === 'layers' ? editDocumentLayersV2Schema.parse(nextNode.params) : document.layers,

@@ -2325,6 +2325,7 @@ fn submit_thumbnail_invalidation(
 pub fn save_metadata_and_update_thumbnail(
     path: String,
     adjustments: Value,
+    edit_document_v2: Option<Value>,
     transaction: Option<EditTransactionPersistenceContext>,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
@@ -2338,6 +2339,9 @@ pub fn save_metadata_and_update_thumbnail(
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
         let mut final_adjustments = adjustments;
+        if let Some(document) = edit_document_v2.as_ref() {
+            crate::adjustments::edit_document_v2::validate_edit_document_v2(document)?;
+        }
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
             &metadata.exif,
@@ -2354,6 +2358,7 @@ pub fn save_metadata_and_update_thumbnail(
         }
 
         metadata.adjustments = final_adjustments;
+        metadata.edit_document_v2 = edit_document_v2;
         save_metadata_sidecar(&sidecar_path, &metadata)?;
         metadata
     };
@@ -2656,26 +2661,12 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
                 .and_then(|visibility| visibility.get("effects"))
                 .and_then(Value::as_bool)
         });
-    let section_visibility = metadata
-        .adjustments
-        .get("sectionVisibility")
-        .and_then(Value::as_object)
-        .map(|visibility| {
-            visibility
-                .iter()
-                .filter(|(section, value)| section.as_str() != "effects" && value.is_boolean())
-                .map(|(section, value)| (section.clone(), value.clone()))
-                .collect::<serde_json::Map<String, Value>>()
-        })
-        .filter(|visibility| !visibility.is_empty());
     let mut reset_adjustments = serde_json::Map::new();
     if let Some(enabled) = effects_enabled {
         reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
     }
-    if let Some(visibility) = section_visibility {
-        reset_adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
-    }
     metadata.adjustments = Value::Object(reset_adjustments);
+    metadata.edit_document_v2 = None;
     if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
         artifacts.hdr_merge_artifacts.clear();
         artifacts.negative_lab_artifacts.clear();
@@ -2738,16 +2729,9 @@ fn merge_auto_adjustment_document(
     let auto_map = auto_adjustments
         .as_object()
         .ok_or_else(|| "auto_adjust_invalid_analysis_document".to_string())?;
+    existing_map.remove("sectionVisibility");
     for (key, value) in auto_map {
-        if key == "sectionVisibility"
-            && let Some(existing_visibility) = existing_map.get_mut(key)
-            && let (Some(existing_visibility), Some(auto_visibility)) =
-                (existing_visibility.as_object_mut(), value.as_object())
-        {
-            for (visibility_key, visibility_value) in auto_visibility {
-                existing_visibility.insert(visibility_key.clone(), visibility_value.clone());
-            }
-        } else {
+        if key != "sectionVisibility" {
             existing_map.insert(key.clone(), value.clone());
         }
     }
@@ -4502,7 +4486,7 @@ mod tests {
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
 
     #[test]
-    fn batch_auto_adjust_merge_is_idempotent_and_preserves_visibility_members() {
+    fn batch_auto_adjust_merge_is_idempotent_and_discards_disclosure_metadata() {
         let auto = serde_json::json!({
             "exposure": 0.5,
             "sectionVisibility": {"basic": true}
@@ -4519,8 +4503,7 @@ mod tests {
         assert_eq!(existing, accepted);
         assert_eq!(existing["contrast"], 8);
         assert_eq!(existing["exposure"], 0.5);
-        assert_eq!(existing["sectionVisibility"]["basic"], true);
-        assert_eq!(existing["sectionVisibility"]["details"], false);
+        assert!(existing.get("sectionVisibility").is_none());
     }
 
     #[test]

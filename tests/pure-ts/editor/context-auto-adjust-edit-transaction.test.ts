@@ -10,7 +10,7 @@ import {
   contextAutoAdjustPatchSchema,
   isCurrentContextAutoAdjustRequest,
 } from '../../../src/utils/contextAutoAdjustEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/context-auto-adjust.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
@@ -46,14 +46,18 @@ const patch = {
 describe('context Auto Adjust edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    adjustments.sectionVisibility.curves = false;
     adjustments.effectsEnabled = false;
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2(adjustments),
+      'scene_curve',
+      false,
+    );
     useEditorStore.setState({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [editDocumentV2],
       history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
@@ -73,7 +77,8 @@ describe('context Auto Adjust edit transaction', () => {
 
     expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35, whiteBalanceMigration: 'native_v1' });
     expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
-    expect(result.after.sectionVisibility).toEqual({ basic: true, color: true, curves: false, details: true });
+    expect(result.after).not.toHaveProperty('sectionVisibility');
+    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
     expect(result.after.effectsEnabled).toBeFalse();
     expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
     expect(result.applicationReceipt).toMatchObject({

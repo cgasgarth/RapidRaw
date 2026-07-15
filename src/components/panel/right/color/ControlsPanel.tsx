@@ -25,6 +25,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
+import { getEditDocumentNodeTypesForEditorSection } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
+
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import {
@@ -211,7 +213,7 @@ export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
-  const { setAdjustments, handleLutSelect } = useEditorActions();
+  const { setAdjustments, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
   const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
   const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
@@ -249,6 +251,7 @@ export default function Controls() {
   const {
     adjustmentRevision,
     adjustments,
+    editDocumentV2,
     copiedSectionAdjustments,
     histogram,
     selectedImage,
@@ -258,6 +261,7 @@ export default function Controls() {
     useShallow((state) => ({
       adjustmentRevision: state.adjustmentRevision,
       adjustments: state.adjustments,
+      editDocumentV2: state.editDocumentV2,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
       selectedImage: state.selectedImage,
@@ -1226,19 +1230,10 @@ export default function Controls() {
   );
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
-    setAdjustments((prev: Adjustments) => {
-      if (sectionName === 'effects') {
-        return { ...prev, effectsEnabled: !prev.effectsEnabled };
-      }
-      const currentVisibility = prev.sectionVisibility;
-      return {
-        ...prev,
-        sectionVisibility: {
-          ...currentVisibility,
-          [sectionName]: !currentVisibility[sectionName],
-        },
-      };
-    });
+    if (sectionName === 'transformLens') return;
+    const nodeTypes = getEditDocumentNodeTypesForEditorSection(sectionName);
+    const enabled = nodeTypes.every((nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false);
+    setEditorSectionEnabled(sectionName, !enabled);
   };
 
   const handleResetAdjustments = () => {
@@ -1685,13 +1680,12 @@ export default function Controls() {
           }
 
           const title = getAdjustmentSectionLabel(t, sectionName);
-          const sectionVisibility = adjustments.sectionVisibility;
           const sectionActions = buildSectionActions(sectionName);
           const canToggleVisibility = sectionName !== 'transformLens';
           const isContentVisible = canToggleVisibility
-            ? sectionName === 'effects'
-              ? adjustments.effectsEnabled
-              : sectionVisibility[sectionName]
+            ? getEditDocumentNodeTypesForEditorSection(sectionName).every(
+                (nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false,
+              )
             : true;
 
           return (

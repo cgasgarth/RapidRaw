@@ -122,7 +122,6 @@ const ADJUSTMENT_LABELS: Record<string, string> = {
   masks: 'Masks',
   orientationSteps: 'Rotation',
   rawProcessingModeOverride: 'RAW Processing Mode',
-  sectionVisibility: 'Section Visibility',
   selectiveColorRangeControls: 'Selective Color Range',
   showClipping: 'Show Clipping',
   skinToneUniformity: 'Skin Tone Uniformity',

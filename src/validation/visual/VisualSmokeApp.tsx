@@ -111,6 +111,7 @@ import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import {
   ActiveChannel,
   type Adjustments,
+  createDefaultMaskEditNodes,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -2390,6 +2391,8 @@ const createBrushMaskCanvasSubMask = (): SubMask => ({
 const createBrushMaskCanvasContainer = (subMask: SubMask): MaskContainer => ({
   adjustments: INITIAL_ADJUSTMENTS,
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: brushMaskCanvasContainerId,
   invert: false,
   name: 'Brush canvas proof',
@@ -2787,6 +2790,8 @@ const professionalCanvasRetouchMask: SubMask = {
 const professionalCanvasRetouchContainer: MaskContainer = {
   adjustments: INITIAL_ADJUSTMENTS,
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: professionalCanvasRetouchLayerId,
   invert: false,
   name: 'Retouch canvas proof',
@@ -7802,6 +7807,8 @@ function NegativeLabEditorLayerHandoffVisualSmoke() {
   const layer: MaskContainer = {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: 'normal',
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: 'negative-lab-print-grade',
     invert: false,
     name: 'Print grade',

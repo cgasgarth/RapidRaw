@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { z } from 'zod';
 
+import type { EditDocumentEditorSection } from '../../../packages/rawengine-schema/src/editDocumentV2';
+
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -56,6 +58,7 @@ import {
 } from '../../utils/editorZoom';
 import {
   buildAdjustmentMutationOperations,
+  buildEditorSectionNodeEnablementOperations,
   buildEditTransactionPersistenceContext,
   type EditTransactionPersistenceContext,
   type EditTransactionRequest,
@@ -190,6 +193,24 @@ export function useEditorActions() {
       if (lastBasicToneCommand !== state.lastBasicToneCommand) setEditor({ lastBasicToneCommand });
     },
     [applyEditTransaction, setEditor],
+  );
+
+  const setEditorSectionEnabled = useCallback(
+    (section: EditDocumentEditorSection, enabled: boolean) => {
+      const state = useEditorStore.getState();
+      const operations = buildEditorSectionNodeEnablementOperations(state.editDocumentV2, section, enabled);
+      if (operations.length === 0) return;
+      applyEditTransaction({
+        baseAdjustmentRevision: state.adjustmentRevision,
+        history: 'single-entry',
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        operations,
+        persistence: 'commit',
+        source: 'manual-control',
+        transactionId: createOperationId(),
+      });
+    },
+    [applyEditTransaction],
   );
 
   const handleRotate = useCallback(
@@ -466,6 +487,7 @@ export function useEditorActions() {
 
   return {
     setAdjustments,
+    setEditorSectionEnabled,
     handleRotate,
     handleAutoAdjustments,
     handleLutSelect,

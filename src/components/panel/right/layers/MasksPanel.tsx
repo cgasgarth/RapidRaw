@@ -67,6 +67,7 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
@@ -138,6 +139,7 @@ import {
   OPTION_SEPARATOR,
   type Option,
   Orientation,
+  Panel,
   Theme,
 } from '../../../ui/AppProperties';
 import CollapsibleSection from '../../../ui/CollapsibleSection';
@@ -1347,6 +1349,8 @@ function LinearGradientMaskControls({
   );
 }
 
+const EMPTY_MASK_EXPANDED_SECTIONS: string[] = [];
+
 export function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments, handleLutSelect } = useEditorActions();
@@ -1362,6 +1366,11 @@ export function MasksPanel() {
   const layerMaskSourceGraphRevision = useUIStore((s) => s.layerMaskSourceGraphRevision);
   const markLayerMaskProvenanceStale = useUIStore((s) => s.markLayerMaskProvenanceStale);
   const recordLayerMaskPreviewReceipt = useUIStore((s) => s.recordLayerMaskPreviewReceipt);
+  const maskExpandedSections = useUIStore(
+    (s) =>
+      s.editorWorkspacePreferences.rightInspector.expandedSectionsByPanel[Panel.Masks] ?? EMPTY_MASK_EXPANDED_SECTIONS,
+  );
+  const setEditorSectionExpanded = useUIStore((s) => s.setEditorSectionExpanded);
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
@@ -1508,13 +1517,22 @@ export function MasksPanel() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [copiedSubMask, setCopiedSubMask] = useState<SubMask | null>(null);
-  const [collapsibleState, setCollapsibleState] = useState<CollapsibleState>({
-    basic: true,
-    curves: false,
-    color: false,
-    details: false,
-    effects: false,
-  });
+  const collapsibleState = useMemo<CollapsibleState>(
+    () =>
+      Object.fromEntries(
+        Object.keys(ADJUSTMENT_SECTIONS).map((section) => [section, maskExpandedSections.includes(section)]),
+      ),
+    [maskExpandedSections],
+  );
+  const setCollapsibleState = useCallback<SetState<CollapsibleState>>(
+    (updater) => {
+      const next = typeof updater === 'function' ? updater(collapsibleState) : updater;
+      for (const [section, expanded] of Object.entries(next)) {
+        if (collapsibleState[section] !== expanded) setEditorSectionExpanded(Panel.Masks, section, expanded);
+      }
+    },
+    [collapsibleState, setEditorSectionExpanded],
+  );
   const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState<CopiedSectionAdjustments | null>(null);
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -2960,7 +2978,6 @@ function ContainerRow({
               onClick: () => {
                 const newAdj = { ...container.adjustments, ...presetAdjustments };
                 newAdj.effectsEnabled = container.adjustments.effectsEnabled;
-                newAdj.sectionVisibility = { ...container.adjustments.sectionVisibility, ...newAdj.sectionVisibility };
                 updateContainer(container.id, { adjustments: newAdj });
               },
             };
@@ -3575,6 +3592,7 @@ function SettingsPanel({
     adjustments: INITIAL_MASK_ADJUSTMENTS,
   };
   const displayContainer = container || placeholderContainer;
+  const displayEditNodes = displayContainer.editNodes ?? createDefaultMaskEditNodes();
   const displayAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...displayContainer.adjustments };
 
   const handleApplyPresetToMask = (presetAdjustments: Partial<Adjustments>) => {
@@ -3584,10 +3602,6 @@ function SettingsPanel({
       ...currentAdjustments,
       ...presetAdjustments,
       effectsEnabled: currentAdjustments.effectsEnabled,
-      sectionVisibility: {
-        ...currentAdjustments.sectionVisibility,
-        ...(presetAdjustments.sectionVisibility || {}),
-      },
     };
     updateContainer(container.id, { adjustments: newMaskAdjustments });
   };
@@ -3798,9 +3812,14 @@ function SettingsPanel({
       updateContainer(container.id, { adjustments: { ...cur, effectsEnabled: !cur.effectsEnabled } });
       return;
     }
-    const vis = cur.sectionVisibility;
+    if (!(['basic', 'color', 'curves', 'details'] as const).some((nodeType) => nodeType === sectionName)) return;
+    const nodeType = sectionName as 'basic' | 'color' | 'curves' | 'details';
+    const editNodes = container.editNodes ?? createDefaultMaskEditNodes();
     updateContainer(container.id, {
-      adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
+      editNodes: {
+        ...editNodes,
+        [nodeType]: { enabled: !editNodes[nodeType].enabled },
+      },
     });
   };
 
@@ -3901,8 +3920,6 @@ function SettingsPanel({
         return null;
     }
   };
-
-  const sectionVisibility = displayContainer.adjustments.sectionVisibility;
 
   return (
     <div
@@ -4241,13 +4258,14 @@ function SettingsPanel({
           const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
           return (
             <CollapsibleSection
+              canToggleVisibility
               key={sectionName}
               title={title}
               isOpen={collapsibleState[sectionName] ?? false}
               isContentVisible={
                 sectionName === 'effects'
                   ? displayContainer.adjustments.effectsEnabled
-                  : (sectionVisibility[sectionName] ?? true)
+                  : (displayEditNodes[sectionName as 'basic' | 'color' | 'curves' | 'details']?.enabled ?? true)
               }
               isDirty={hasAdjustmentValueChanges(
                 ADJUSTMENT_SECTIONS[sectionName] ?? [],
@@ -4263,6 +4281,7 @@ function SettingsPanel({
               onContextMenu={(e: ReactMouseEvent) => {
                 handleSectionContextMenu(e, sectionName);
               }}
+              testId={`mask-adjustments-section-${sectionName}`}
             >
               {renderAdjustmentSection(sectionName)}
             </CollapsibleSection>
