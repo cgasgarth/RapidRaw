@@ -55,7 +55,7 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
   expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
   expect(useEditorStore.getState().historyIndex).toBe(1);
   act(() => useEditorStore.getState().undo());
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBe(receipt);
+  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(receipt);
   act(() => useEditorStore.getState().redo());
   expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
 });

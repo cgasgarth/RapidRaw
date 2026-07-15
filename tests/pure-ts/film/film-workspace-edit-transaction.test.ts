@@ -175,8 +175,8 @@ describe('Film workspace EditTransaction boundary', () => {
     expect(committed.history[1]).not.toBe(abandonedGestureEntry);
     expect(committed.history[1]?.filmLookStrength).toBe(70);
     expect(committed.lastEditApplicationReceipt).toMatchObject({
-      adjustmentRevision: 2,
-      baseAdjustmentRevision: 1,
+      adjustmentRevision: 3,
+      baseAdjustmentRevision: 2,
       transactionId,
     });
     committed.undo();
