@@ -363,8 +363,8 @@ export function useImageProcessing() {
     (effects) => previewAnalyticsRunner.consume(effects),
     (effects) => editedPreviewRunner.consume(effects),
     (effects) => previewInvalidationRunner.consume(effects),
-    (effects) => originalPreviewAdapter.consume(effects),
     (effects) => previewInteractionSchedulingRunner.consume(effects),
+    (effects) => originalPreviewAdapter.consume(effects),
   ]);
 
   useEffect(() => {

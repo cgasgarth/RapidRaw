@@ -71,7 +71,8 @@ function required<T>(value: T | undefined): T {
 }
 
 const schedulingInputHarness = () => {
-  const scopeAdapter = new PreviewRequestScopeAdapter({ getDisplayGeneration: () => 1 });
+  let currentDisplayGeneration = 1;
+  const scopeAdapter = new PreviewRequestScopeAdapter({ getDisplayGeneration: () => currentDisplayGeneration });
   let previousSnapshot: AdjustmentSnapshot | null = null;
   const snapshot = (exposure: number, advance: boolean): AdjustmentSnapshot => {
     if (!advance && previousSnapshot !== null) return previousSnapshot;
@@ -85,10 +86,12 @@ const schedulingInputHarness = () => {
     advanceAdjustment = true,
     compareActive = false,
     devicePixelRatio = 1,
+    displayGeneration = 1,
     dragging = false,
     exposure = 0,
     imageSessionId = 1,
     path = '/fixtures/a.raw',
+    proofRevision = 1,
     ready = true,
     roi = null,
     targetResolution = 1200,
@@ -96,10 +99,12 @@ const schedulingInputHarness = () => {
     advanceAdjustment?: boolean;
     compareActive?: boolean;
     devicePixelRatio?: number;
+    displayGeneration?: number;
     dragging?: boolean;
     exposure?: number;
     imageSessionId?: number;
     path?: string;
+    proofRevision?: number;
     ready?: boolean;
     roi?: [number, number, number, number] | null;
     targetResolution?: number;
@@ -117,6 +122,7 @@ const schedulingInputHarness = () => {
       };
     }
     const adjustmentSnapshot = snapshot(exposure, advanceAdjustment);
+    currentDisplayGeneration = displayGeneration;
     const source: PreviewRequestScopeInput = {
       adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
       adjustmentSnapshot,
@@ -135,7 +141,7 @@ const schedulingInputHarness = () => {
       imageSession: { id: `session:${String(imageSessionId)}:${path}` },
       imageSessionId,
       previewViewportTransform: { positionX: 0, positionY: 0, scale: roi === null ? 1 : 2 },
-      proofRevision: 1,
+      proofRevision,
       referenceMatchPreview: null,
       selectedImage: { isReady: true, path, thumbnailUrl: `blob:thumb:${path}` },
       settings: { editorPreviewResolution: 1200, enableZoomHifi: true, useWgpuRenderer: false },
@@ -396,8 +402,43 @@ test('compare, target, ROI, zoom, and DPR snapshots causally schedule their succ
   expect(dprChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(true);
   state = dprChanged.state;
 
+  const proofChanged = transition(state, {
+    inputs: prepare({
+      advanceAdjustment: false,
+      compareActive: true,
+      devicePixelRatio: 2,
+      proofRevision: 2,
+      roi: [0.1, 0.1, 0.5, 0.5],
+      targetResolution: 1800,
+    }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(proofChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(true);
+  state = proofChanged.state;
+
+  const displayChanged = transition(state, {
+    inputs: prepare({
+      advanceAdjustment: false,
+      compareActive: true,
+      devicePixelRatio: 2,
+      displayGeneration: 2,
+      proofRevision: 2,
+      roi: [0.1, 0.1, 0.5, 0.5],
+      targetResolution: 1800,
+    }),
+    type: 'scheduling-inputs-changed',
+  });
+  expect(displayChanged.effects.some((effect) => effect.type === 'schedule-original')).toBe(true);
+  state = displayChanged.state;
+
   const disabled = transition(state, {
-    inputs: prepare({ advanceAdjustment: false, compareActive: false, devicePixelRatio: 2 }),
+    inputs: prepare({
+      advanceAdjustment: false,
+      compareActive: false,
+      devicePixelRatio: 2,
+      displayGeneration: 2,
+      proofRevision: 2,
+    }),
     type: 'scheduling-inputs-changed',
   });
   expect(disabled.effects).toContainEqual({ reason: 'compare-disabled', type: 'clear-original' });
