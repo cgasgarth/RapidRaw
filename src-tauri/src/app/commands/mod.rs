@@ -9,6 +9,7 @@ pub(crate) mod path_preview;
 pub(crate) mod perspective;
 pub(crate) mod preset_previews;
 pub(crate) mod preview;
+pub(crate) mod registration;
 pub(crate) mod soft_proof_preview;
 pub(crate) mod source;
 pub(crate) mod startup;
