@@ -10,6 +10,11 @@ import {
   isCurrentColorBalanceRgbIdentity,
 } from '../../../src/utils/colorBalanceRgbEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/color-balance-rgb.ARW';
 const session = createEditorImageSession({ generation: 73, path: sourcePath, source: 'cache' });
@@ -57,14 +62,18 @@ describe('Color Balance RGB edit transaction', () => {
 
   test('commits one RGB change with receipt, output invalidation, and complete Undo/Redo', () => {
     const before = useEditorStore.getState();
+    const beforeNode = before.editDocumentV2.nodes.color_balance_rgb;
+    const beforeTone = before.editDocumentV2.nodes.scene_global_color_tone;
     const next = initialColorBalance();
     next.midtones = { ...next.midtones, red: 24 };
     next.enabled = true;
 
-    const result = before.applyEditTransaction(
-      buildColorBalanceRgbEditTransaction(before, identity(), next, 'color-balance-midtones-red'),
-    );
+    const request = buildColorBalanceRgbEditTransaction(before, identity(), next, 'color-balance-midtones-red');
+    const result = before.applyEditTransaction(request);
 
+    expect(request.operations).toEqual([
+      { nodeType: 'color_balance_rgb', patch: { colorBalanceRgb: next }, type: 'patch-edit-document-node' },
+    ]);
     expect(result).toMatchObject({
       changedKeys: ['colorBalanceRgb'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
@@ -84,11 +93,77 @@ describe('Color Balance RGB edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustments.colorBalanceRgb).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes.color_balance_rgb).not.toBe(beforeNode);
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('colorBalanceRgb');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.colorBalanceRgb).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb);
+    expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(
+      INITIAL_ADJUSTMENTS.colorBalanceRgb,
+    );
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().adjustments.colorBalanceRgb).toEqual(next);
+    expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+  });
+
+  test('carries Color Balance RGB node authority through save execution and reopen', async () => {
+    const before = useEditorStore.getState();
+    const beforeDocument = before.editDocumentV2;
+    const next = initialColorBalance();
+    next.enabled = true;
+    next.shadows = { ...next.shadows, blue: -16 };
+    before.applyEditTransaction(
+      buildColorBalanceRgbEditTransaction(before, identity(), next, 'save-color-balance-rgb'),
+    );
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'a'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.submit({
+      adjustmentRevision: 0,
+      adjustments: { ...committed.adjustments, colorBalanceRgb: initialColorBalance() },
+      editDocumentV2: beforeDocument,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: null,
+      sessionGeneration: session.generation,
+    });
+    runner.submit({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: session.id,
+      interactionActive: false,
+      multiSelection: null,
+      path: sourcePath,
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: session.generation,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(executions).toHaveLength(1);
+    expect(executions[0]?.editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    expect(reopened).toEqual(committed.editDocumentV2);
   });
 
   test('keeps no-ops inert and makes range/full resets single undoable boundaries', () => {
@@ -218,6 +293,12 @@ describe('Color Balance RGB edit transaction', () => {
     outOfRange.highlights.blue = 101;
     expect(() => buildColorBalanceRgbEditTransaction(state, identity(), outOfRange, 'out-of-range')).toThrow(
       'color_balance_rgb_transaction.invalid_channel:highlights:blue',
+    );
+
+    const identityEnabled = initialColorBalance();
+    identityEnabled.enabled = true;
+    expect(() => buildColorBalanceRgbEditTransaction(state, identity(), identityEnabled, 'identity-enabled')).toThrow(
+      'color_balance_rgb_transaction.enabled_identity',
     );
   });
 });

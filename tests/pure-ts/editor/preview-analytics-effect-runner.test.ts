@@ -53,7 +53,7 @@ const harness = () => {
   const coordinator = new PreviewCoordinator();
   const updates: PreviewAnalyticsUpdate[] = [];
   let emit: ((payload: unknown) => void) | null = null;
-  let presentationState: PreviewAnalyticsPresentationState = {
+  const presentationState: PreviewAnalyticsPresentationState = {
     exportSoftProofTransform: null,
     isExportSoftProofEnabled: false,
     selectedImagePath: '/fixtures/a.raw',
@@ -66,7 +66,6 @@ const harness = () => {
   };
   runner = new PreviewAnalyticsEffectRunner({
     dispatch,
-    getPresentationState: () => presentationState,
     now: () => new Date('2026-07-15T12:00:00.000Z'),
     publish: (update) => updates.push(update),
     subscribe: async (onPayload) => {
@@ -82,9 +81,8 @@ const harness = () => {
       emit(payload);
     },
     runner,
-    setPresentationState: (state: PreviewAnalyticsPresentationState) => {
-      presentationState = state;
-    },
+    bindPresentation: (identity: PreviewOperationIdentity, state = presentationState) =>
+      runner.bindPresentation(identity, state),
     updates,
   };
 };
@@ -97,7 +95,7 @@ const requiredIdentity = (transition: ReturnType<PreviewCoordinator['dispatch']>
 
 describe('preview analytics effect runner', () => {
   test('early analytics publishes only after exact artifact presentation and stale results cannot mutate output', async () => {
-    const { dispatch, emit, runner, updates } = harness();
+    const { bindPresentation, dispatch, emit, runner, updates } = harness();
     await runner.start();
     const queued = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
     const identity = requiredIdentity(queued);
@@ -105,6 +103,8 @@ describe('preview analytics effect runner', () => {
     emit(analyticsPayload(identity));
     expect(updates).toEqual([]);
     dispatch({ artifact: { identity, url: 'blob:current' }, identity, type: 'operation-completed' });
+    expect(updates).toEqual([]);
+    expect(bindPresentation(identity)).toBe(true);
     expect(updates.at(-1)).toMatchObject({
       histogram: { luma: { data: [1] } },
       previewScopeStatus: { path: '/fixtures/a.raw', updatedAt: '2026-07-15T12:00:00.000Z' },
@@ -117,7 +117,7 @@ describe('preview analytics effect runner', () => {
   });
 
   test('replacement clears prior analytics and unmount drops pending payloads', async () => {
-    const { coordinator, dispatch, emit, runner, updates } = harness();
+    const { bindPresentation, coordinator, dispatch, emit, runner, updates } = harness();
     await runner.start();
     const first = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
     const firstIdentity = requiredIdentity(first);
@@ -128,6 +128,7 @@ describe('preview analytics effect runner', () => {
       identity: firstIdentity,
       type: 'operation-completed',
     });
+    bindPresentation(firstIdentity);
 
     const second = dispatch({
       identity: session({ adjustmentRevision: 2, graphRevision: 'graph-b' }),
@@ -141,6 +142,7 @@ describe('preview analytics effect runner', () => {
       identity: secondIdentity,
       type: 'operation-completed',
     });
+    bindPresentation(secondIdentity);
     expect(updates.at(-1)).toEqual({
       histogram: null,
       previewScopeStatus: null,
@@ -158,12 +160,12 @@ describe('preview analytics effect runner', () => {
   });
 
   test('late analytics uses proof metadata captured with the exact presented artifact', async () => {
-    const { dispatch, emit, runner, setPresentationState, updates } = harness();
+    const { bindPresentation, dispatch, emit, runner, updates } = harness();
     await runner.start();
     const queued = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
     const identity = requiredIdentity(queued);
     dispatch({ identity, type: 'operation-started' });
-    setPresentationState({
+    const proofA: PreviewAnalyticsPresentationState = {
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
         colorManagedTransform: 'Display P3 → sRGB',
@@ -177,23 +179,9 @@ describe('preview analytics effect runner', () => {
       },
       isExportSoftProofEnabled: true,
       selectedImagePath: '/fixtures/a.raw',
-    });
+    };
     dispatch({ artifact: { identity, url: 'blob:proof-a' }, identity, type: 'operation-completed' });
-    setPresentationState({
-      exportSoftProofTransform: {
-        blackPointCompensation: 'disabled',
-        colorManagedTransform: 'Display P3 → Adobe RGB',
-        effectiveColorProfile: 'Adobe RGB (1998)',
-        effectiveRenderingIntent: 'perceptual',
-        policyStatus: 'applied',
-        policyVersion: '2',
-        sourcePrecisionPath: 'f16',
-        transformApplied: false,
-        transformPolicyFingerprint: 'proof-b',
-      },
-      isExportSoftProofEnabled: true,
-      selectedImagePath: '/fixtures/a.raw',
-    });
+    expect(bindPresentation(identity, proofA)).toBe(true);
 
     emit(analyticsPayload(identity));
 
@@ -206,16 +194,58 @@ describe('preview analytics effect runner', () => {
     });
   });
 
+  test('successor publication rejects a late predecessor binding and flushes only successor analytics', async () => {
+    const { bindPresentation, dispatch, emit, runner, updates } = harness();
+    await runner.start();
+    const first = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+    const firstIdentity = requiredIdentity(first);
+    dispatch({ identity: firstIdentity, type: 'operation-started' });
+    emit(analyticsPayload(firstIdentity, 1));
+    dispatch({
+      artifact: { identity: firstIdentity, url: 'blob:first' },
+      identity: firstIdentity,
+      type: 'operation-completed',
+    });
+
+    const successor = dispatch({
+      identity: session({ adjustmentRevision: 2, graphRevision: 'graph-successor', proofRevision: 2 }),
+      kind: 'settled',
+      type: 'render-inputs-changed',
+    });
+    const successorIdentity = requiredIdentity(successor);
+    dispatch({ identity: successorIdentity, type: 'operation-started' });
+    emit(analyticsPayload(successorIdentity, 2));
+    dispatch({
+      artifact: { identity: successorIdentity, url: 'blob:successor' },
+      identity: successorIdentity,
+      type: 'operation-completed',
+    });
+
+    expect(bindPresentation(firstIdentity)).toBe(false);
+    expect(updates).toEqual([
+      {
+        histogram: null,
+        previewScopeStatus: null,
+        referenceMatchSpatialAnalysis: null,
+        waveform: null,
+      },
+    ]);
+    expect(
+      bindPresentation(successorIdentity, {
+        exportSoftProofTransform: null,
+        isExportSoftProofEnabled: true,
+        selectedImagePath: '/fixtures/a.raw',
+      }),
+    ).toBe(true);
+    expect(updates.at(-1)).toMatchObject({ histogram: { luma: { data: [2] } } });
+    expect(runner.pendingCount()).toBe(0);
+  });
+
   test('start resolves only after the analytics subscription is installed', async () => {
     let install: ((unlisten: () => void) => void) | null = null;
     const coordinator = new PreviewCoordinator();
     const runner = new PreviewAnalyticsEffectRunner({
       dispatch: (event) => coordinator.dispatch(event),
-      getPresentationState: () => ({
-        exportSoftProofTransform: null,
-        isExportSoftProofEnabled: false,
-        selectedImagePath: null,
-      }),
       publish: () => undefined,
       subscribe: () =>
         new Promise((resolve) => {

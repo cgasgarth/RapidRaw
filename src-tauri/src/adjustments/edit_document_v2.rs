@@ -19,6 +19,7 @@ enum EditNodeTypeV2 {
     DisplayCreative,
     DetailDenoiseDehaze,
     PointColor,
+    ColorBalanceRgb,
     BlackWhiteMixer,
     ChannelMixer,
     PerceptualGrading,
@@ -40,6 +41,7 @@ impl EditNodeTypeV2 {
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
+            Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
             Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
             Self::ChannelMixer => ("channel_mixer", "scene_referred_v2", 1),
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
@@ -58,6 +60,7 @@ impl EditNodeTypeV2 {
             Self::DetailDenoiseDehaze => Some("details"),
             Self::DisplayCreative => Some("effects"),
             Self::PointColor
+            | Self::ColorBalanceRgb
             | Self::BlackWhiteMixer
             | Self::ChannelMixer
             | Self::PerceptualGrading
@@ -596,6 +599,77 @@ impl PointColorPlanV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct ColorBalanceRgbRangeV2 {
+    blue: f64,
+    green: f64,
+    red: f64,
+}
+
+impl ColorBalanceRgbRangeV2 {
+    fn validate(&self, range: &str) -> Result<(), String> {
+        for (channel, value) in [
+            ("blue", self.blue),
+            ("green", self.green),
+            ("red", self.red),
+        ] {
+            if !value.is_finite() || !(-100.0..=100.0).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 color_balance_rgb field '{range}.{channel}' must be finite and within [-100, 100]"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn is_identity(self) -> bool {
+        self.blue == 0.0 && self.green == 0.0 && self.red == 0.0
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ColorBalanceRgbSettingsV2 {
+    enabled: bool,
+    highlights: ColorBalanceRgbRangeV2,
+    midtones: ColorBalanceRgbRangeV2,
+    preserve_luminance: bool,
+    shadows: ColorBalanceRgbRangeV2,
+}
+
+impl ColorBalanceRgbSettingsV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.shadows.validate("shadows")?;
+        self.midtones.validate("midtones")?;
+        self.highlights.validate("highlights")?;
+        if self.enabled
+            && self.shadows.is_identity()
+            && self.midtones.is_identity()
+            && self.highlights.is_identity()
+        {
+            return Err(
+                "EditDocumentV2 enabled color_balance_rgb requires a non-zero channel response"
+                    .to_string(),
+            );
+        }
+        let _ = self.preserve_luminance;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ColorBalanceRgbV2 {
+    color_balance_rgb: ColorBalanceRgbSettingsV2,
+}
+
+impl ColorBalanceRgbV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.color_balance_rgb.validate()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -1785,6 +1859,10 @@ fn compile_node_params(
             parse_point_color(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::ColorBalanceRgb => {
+            parse_color_balance_rgb(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::BlackWhiteMixer => {
             parse_black_white_mixer(&node.params)?;
             Ok(node.params.clone())
@@ -1915,6 +1993,14 @@ fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String
         .map_err(|error| format!("EditDocumentV2 point_color is invalid: {error}"))?;
     point_color.validate()?;
     Ok(point_color)
+}
+
+fn parse_color_balance_rgb(params: &Map<String, Value>) -> Result<ColorBalanceRgbV2, String> {
+    let color_balance_rgb: ColorBalanceRgbV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 color_balance_rgb is invalid: {error}"))?;
+    color_balance_rgb.validate()?;
+    Ok(color_balance_rgb)
 }
 
 fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixerV2, String> {
@@ -2131,7 +2217,9 @@ mod tests {
 
     use super::super::parse::get_all_adjustments_from_json;
     use super::EditDocumentV2;
-    use crate::color::mixer_render::{apply_black_white_mixer, apply_channel_mixer};
+    use crate::color::mixer_render::{
+        apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
+    };
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -2196,6 +2284,28 @@ mod tests {
             "lumaNoiseReduction": 5,
             "sharpness": 24,
             "structure": 21
+        })
+    }
+
+    fn color_balance_rgb_params() -> Value {
+        json!({
+            "colorBalanceRgb": {
+                "enabled": true,
+                "highlights": { "blue": 8, "green": -10, "red": 20 },
+                "midtones": { "blue": 8, "green": -10, "red": 20 },
+                "preserveLuminance": false,
+                "shadows": { "blue": 8, "green": -10, "red": 20 }
+            }
+        })
+    }
+
+    fn color_balance_rgb_node() -> Value {
+        json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": color_balance_rgb_params(),
+            "process": "scene_referred_v2",
+            "type": "color_balance_rgb"
         })
     }
 
@@ -2368,7 +2478,7 @@ mod tests {
     }
 
     fn document_with_legacy(legacy: Value) -> Value {
-        json!({
+        let mut document = json!({
             "extensions": { "legacyAdjustments": legacy },
             "geometry": {
                 "aspectRatio": null,
@@ -2549,7 +2659,9 @@ mod tests {
             "provenance": {},
             "schemaVersion": 2,
             "sourceArtifacts": { "aiPatches": [] }
-        })
+        });
+        document["nodes"]["color_balance_rgb"] = color_balance_rgb_node();
+        document
     }
 
     fn source_patch() -> Value {
@@ -2652,6 +2764,7 @@ mod tests {
             "vibrance": 11,
             "whites": 9
         });
+        expected["colorBalanceRgb"] = color_balance_rgb_params()["colorBalanceRgb"].clone();
         expected["cameraProfileAmount"] = json!(100);
         expected["centré"] = json!(-9);
         expected["localContrastHaloGuard"] = json!(62);
@@ -3323,6 +3436,88 @@ mod tests {
             .into_render_adjustments()
             .expect_err("enabled identity channel mixer must fail");
         assert!(error.contains("must not be identity"));
+    }
+
+    #[test]
+    fn color_balance_rgb_compiler_is_strict_and_drives_native_pixel_output() {
+        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
+            .expect("valid color-balance document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("color-balance document compiles");
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        let output = apply_color_balance_rgb(
+            [0.5, 0.25, 0.75],
+            adjustments.global.color_balance_rgb,
+            false,
+        );
+        assert!(
+            (output[0] - 0.55).abs() <= 1.0e-6,
+            "unexpected red output: {output:?}"
+        );
+        assert!(
+            (output[1] - 0.225).abs() <= 1.0e-6,
+            "unexpected green output: {output:?}"
+        );
+        assert!(
+            (output[2] - 0.77).abs() <= 1.0e-6,
+            "unexpected blue output: {output:?}"
+        );
+
+        let mut pre_color_balance_node = document_with_legacy(json!({
+            "colorBalanceRgb": color_balance_rgb_params()["colorBalanceRgb"].clone()
+        }));
+        pre_color_balance_node["nodes"]
+            .as_object_mut()
+            .expect("node map")
+            .remove("color_balance_rgb");
+        serde_json::from_value::<EditDocumentV2>(pre_color_balance_node)
+            .expect("pre-color-balance-node v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-color-balance-node v2 document remains compilable");
+
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["futureRange"] =
+            json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned color-balance field must fail");
+        assert!(error.contains("unknown field `futureRange`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["midtones"]
+            .as_object_mut()
+            .expect("midtones object")
+            .remove("green");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing color-balance channel must fail");
+        assert!(error.contains("missing field `green`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["highlights"]["blue"] =
+            json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range color-balance channel must fail");
+        assert!(error.contains("highlights.blue"));
+
+        let mut identity = document_with_legacy(json!({}));
+        identity["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"] = json!({
+            "enabled": true,
+            "highlights": { "blue": 0, "green": 0, "red": 0 },
+            "midtones": { "blue": 0, "green": 0, "red": 0 },
+            "preserveLuminance": true,
+            "shadows": { "blue": 0, "green": 0, "red": 0 }
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(identity)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("enabled identity color balance must fail");
+        assert!(error.contains("requires a non-zero channel response"));
     }
 
     #[test]
