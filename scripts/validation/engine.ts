@@ -2,7 +2,11 @@ import { mkdir, readdir, readFile, rm, stat, statfs, writeFile } from 'node:fs/p
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
 import { isolatedGitEnvironment } from '../lib/ci/git-environment';
-import { acquireResourceLease, type ResourceLease } from '../lib/ci/resource-coordinator';
+import {
+  acquireResourceLease,
+  type ResourceLease,
+  resolveResourceCoordinatorRoot,
+} from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
 import { classesForPath } from './ownership';
 
@@ -322,7 +326,14 @@ const capacities: Record<ResourceClass, number> = {
 };
 
 export const runValidation = async (manifest: readonly ValidationNode[], options: RunOptions): Promise<number> => {
-  const runOwnerId = options.resourceOwnerId ?? crypto.randomUUID();
+  const resourceCoordinatorRoot = resolveResourceCoordinatorRoot(options.resourceCoordinatorRoot);
+  const inheritedOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID;
+  const inheritedOwnerRoot = Bun.env.RAWENGINE_RESOURCE_OWNER_ROOT;
+  const runOwnerId =
+    options.resourceOwnerId ??
+    (inheritedOwnerId !== undefined && inheritedOwnerRoot === resourceCoordinatorRoot
+      ? inheritedOwnerId
+      : crypto.randomUUID());
   const plan = planValidation(manifest, options.mode, options.changedPaths);
   for (const entry of plan) console.log(`${entry.selected ? 'RUN' : 'SKIP'} ${entry.node.id} (${entry.reason})`);
   const pending = new Map(plan.filter((entry) => entry.selected).map((entry) => [entry.node.id, entry.node]));
@@ -381,7 +392,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         await acquireResourceLease({
           label: `validation-output-run:${output}`,
           resource: validationOutputResource(options.root, output),
-          root: options.resourceCoordinatorRoot,
+          root: resourceCoordinatorRoot,
           ownerId: runOwnerId,
         }),
       );
@@ -429,7 +440,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           capacity: capacities[node.resourceClass],
           label: `validation-class-${node.resourceClass}:${node.id}`,
           resource: `validation-class-${node.resourceClass}`,
-          root: options.resourceCoordinatorRoot,
+          root: resourceCoordinatorRoot,
           ownerId: runOwnerId,
         })
       : undefined;
@@ -441,7 +452,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           : await acquireResourceLease({
               label: `validation-cache-${node.id}`,
               resource: `validation-cache-${node.id}-${key.slice(0, 20)}`,
-              root: options.resourceCoordinatorRoot,
+              root: resourceCoordinatorRoot,
               ownerId: runOwnerId,
             });
       let cached = !options.noCache && node.cachePolicy !== 'none' ? await readCacheRecord(recordPath, key) : undefined;
@@ -472,7 +483,11 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         cwd: options.root,
         stdout: 'pipe',
         stderr: 'pipe',
-        env: { ...process.env, RAWENGINE_RESOURCE_OWNER_ID: runOwnerId },
+        env: {
+          ...process.env,
+          RAWENGINE_RESOURCE_OWNER_ID: runOwnerId,
+          RAWENGINE_RESOURCE_OWNER_ROOT: resourceCoordinatorRoot,
+        },
         detached: true,
       });
       let timedOut = false;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { acquireResourceLease } from '../lib/ci/resource-coordinator';
+import { acquireResourceLease, resolveResourceCoordinatorRoot } from '../lib/ci/resource-coordinator';
 
 const args = process.argv.slice(2);
 const separator = args.indexOf('--');
@@ -84,7 +84,11 @@ const lease = await acquireResourceLease({ label, resource });
 try {
   const child = Bun.spawn(['bun', import.meta.path, '--supervise-child-of', String(process.pid), '--', ...command], {
     detached: true,
-    env: { ...Bun.env, RAWENGINE_RESOURCE_OWNER_ID: lease.ownerId },
+    env: {
+      ...Bun.env,
+      RAWENGINE_RESOURCE_OWNER_ID: lease.ownerId,
+      RAWENGINE_RESOURCE_OWNER_ROOT: resolveResourceCoordinatorRoot(),
+    },
     stderr: 'inherit',
     stdout: 'inherit',
   });
