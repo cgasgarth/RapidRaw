@@ -1,7 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Panel } from '../../components/ui/AppProperties';
-import { ExportColorProfile, ExportRenderingIntent } from '../../components/ui/ExportImportProperties';
 import { displayTargetChangePayloadSchema } from '../../schemas/tauriEventSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -21,13 +20,13 @@ import {
   fingerprintPreviewRoi,
   PreviewCoordinator,
   type PreviewCoordinatorEvent,
-  type PreviewQualitySnapshot,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
 import { PreviewInvalidationAdapter } from '../../utils/previewInvalidationAdapter';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
+import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
 import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
@@ -278,6 +277,30 @@ export function useImageProcessing() {
     },
     [activeRightPanel, calculateROI],
   );
+  const previewRequestIntentAdapter = useMemo(
+    () =>
+      new PreviewRequestIntentAdapter({
+        captureScope: capturePreviewRequestScope,
+        decideQuality: resolveQualityDecision,
+        dispatch: dispatchPreviewCoordinator,
+        installSession: (scope) => {
+          previewInvalidationAdapter.installSession(
+            scope.session,
+            useEditorStore.getState().previewScopeRecoveryRequestId,
+          );
+        },
+        publish: setEditor,
+        schedule: (request, delayMs) => editedPreviewRunner.request(request, delayMs),
+      }),
+    [
+      capturePreviewRequestScope,
+      dispatchPreviewCoordinator,
+      editedPreviewRunner,
+      previewInvalidationAdapter,
+      resolveQualityDecision,
+      setEditor,
+    ],
+  );
 
   useEffect(
     () => () => {
@@ -313,73 +336,23 @@ export function useImageProcessing() {
   const applyAdjustments = useCallback(
     (dragging: boolean = false, targetRes?: number, scopeRecovery = false, delayMs = 0) => {
       if (!selectedImage?.isReady) return;
-
-      const requestedTargetRes = Math.max(1, Math.round(targetRes ?? appSettings?.editorPreviewResolution ?? 1920));
-      const quality = resolveQualityDecision(requestedTargetRes, dragging);
-      const qualitySnapshot: PreviewQualitySnapshot = {
-        effectiveTargetResolution: quality.effectiveTargetResolution,
-        interacting: dragging,
-        reason: quality.reason,
-        requestedTargetResolution: quality.requestedTargetResolution,
-        roiFingerprint: fingerprintPreviewRoi(quality.effectiveRoi),
-        sufficientForSemanticZoom: quality.sufficientForSemanticZoom,
-        tier: quality.tier,
-      };
-      dispatchPreviewCoordinator({ quality: qualitySnapshot, type: 'quality-decision-changed' });
-      const normalizedTargetRes = quality.effectiveTargetResolution;
-      const scopeSnapshot = capturePreviewRequestScope(normalizedTargetRes, quality.effectiveRoi);
-      if (scopeSnapshot === null) return;
-      const session = scopeSnapshot.session;
-      previewInvalidationAdapter.installSession(session, previewScopeRecoveryRequestId);
-      const identity = editedPreviewRunner.request(
-        {
-          activeWaveformChannel,
-          computeWaveform: isWaveformVisible || scopeRecovery,
-          createdAt: previewNow(),
-          kind: dragging ? 'interactive' : 'settled',
-          proof:
-            !dragging && selectedProofRecipe
-              ? {
-                  blackPointCompensation: selectedProofRecipe.blackPointCompensation ?? false,
-                  colorProfile: selectedProofRecipe.colorProfile ?? ExportColorProfile.Srgb,
-                  exportSoftProofRecipeId: selectedProofRecipe.id,
-                  renderingIntent: selectedProofRecipe.renderingIntent ?? ExportRenderingIntent.RelativeColorimetric,
-                }
-              : null,
-          quality,
-          roi: scopeSnapshot.roi,
-          scopeRecovery,
-          session,
-          snapshot: scopeSnapshot.renderSnapshot,
-          targetResolution: normalizedTargetRes,
-          viewerScope: scopeSnapshot.scope,
-          viewportAuthority: scopeSnapshot.viewport,
-        },
+      previewRequestIntentAdapter.request({
+        activeWaveformChannel,
         delayMs,
-      );
-      setEditor({
-        ...(!dragging ? { requestedPreviewResolution: quality.requestedTargetResolution } : {}),
-        previewQualityStatus: {
-          ...quality,
-          generation: identity.generation,
-          phase: dragging ? 'rendering_interaction' : 'refining_current_view',
-          requestId: identity.operationId,
-        },
+        dragging,
+        isWaveformVisible,
+        proofRecipe: selectedProofRecipe ?? null,
+        requestedTargetResolution: targetRes ?? appSettings?.editorPreviewResolution ?? 1920,
+        scopeRecovery,
       });
     },
     [
       activeWaveformChannel,
       appSettings?.editorPreviewResolution,
-      capturePreviewRequestScope,
-      dispatchPreviewCoordinator,
-      editedPreviewRunner,
       isWaveformVisible,
-      previewInvalidationAdapter,
-      previewScopeRecoveryRequestId,
-      resolveQualityDecision,
+      previewRequestIntentAdapter,
       selectedProofRecipe,
       selectedImage?.isReady,
-      setEditor,
     ],
   );
   useEffect(() => {
