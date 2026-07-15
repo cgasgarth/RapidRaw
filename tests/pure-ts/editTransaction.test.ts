@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, curve, tone-equalizer, and geometry changes to node operations', () => {
+  test('routes focused tone, camera, curve, tone-equalizer, point-color, and geometry changes to node operations', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -107,6 +107,15 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'tone_equalizer',
         patch: { toneEqualizer },
+      },
+    ]);
+
+    const pointColor = { ...structuredClone(INITIAL_ADJUSTMENTS.pointColor), enabled: true };
+    expect(buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, pointColor })).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'point_color',
+        patch: { pointColor },
       },
     ]);
 

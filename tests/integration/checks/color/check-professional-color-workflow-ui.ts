@@ -10,7 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { readLayerStackSidecarsFromSidecar } from '../../../../packages/rawengine-schema/src';
 import { type AppSettings, Theme } from '../../../../src/components/ui/AppProperties';
-import { useEditorStore } from '../../../../src/store/useEditorStore';
+import { createEditorImageSession, useEditorStore } from '../../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
 import {
   COLOR_OUTPUT_FOCUS_EVENT,
@@ -106,6 +106,7 @@ try {
       restoredRendered.unmount();
     }
     await validateOutputFocusEvent(localRendered.container, false);
+    await validateMaskPointColorAuthority(localRendered.container);
   } finally {
     localRendered.unmount();
   }
@@ -140,6 +141,11 @@ async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
       isExportSoftProofEnabled: false,
       isGamutWarningOverlayVisible: false,
       previewScopeStatus: null,
+      imageSession: createEditorImageSession({
+        generation: 1,
+        path: '/fixtures/color-foundation.raw',
+        source: 'cache',
+      }),
       selectedImage: {
         exif: null,
         height: 3000,
@@ -304,6 +310,24 @@ function validateMaskLocalFiltering(container: Element) {
   assert.equal(
     normalizeText(getByTestId(foundation, 'color-quick-white-balance').textContent).includes('Local Color Balance'),
     true,
+  );
+}
+
+async function validateMaskPointColorAuthority(container: Element) {
+  await selectMixerWorkspace(container);
+  const adjustmentRevision = useEditorStore.getState().adjustmentRevision;
+  const enable = getByTestId<HTMLButtonElement>(container, 'point-color-enable');
+  assert.equal(normalizeText(enable.textContent), 'Enable');
+  await click(enable);
+  assert.equal(
+    normalizeText(enable.textContent),
+    'Enabled',
+    'Mask Point Color must update its local adjustment state.',
+  );
+  assert.equal(
+    useEditorStore.getState().adjustmentRevision,
+    adjustmentRevision,
+    'Mask Point Color must not redirect its local edit into the global node document.',
   );
 }
 
