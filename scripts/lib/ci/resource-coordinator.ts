@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
+import { isolatedGitEnvironment } from './git-environment';
 
 interface LeaseOwner {
   hostname: string;
@@ -59,6 +60,7 @@ export const resolveResourceCoordinatorRoot = (explicitRoot?: string): string =>
   const override = explicitRoot ?? Bun.env.RAWENGINE_RESOURCE_COORDINATOR_ROOT;
   if (override) return resolve(override);
   const result = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
+    env: isolatedGitEnvironment(),
     stderr: 'pipe',
     stdout: 'pipe',
   });

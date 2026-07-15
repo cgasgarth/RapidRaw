@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireResourceLease } from '../../../scripts/lib/ci/resource-coordinator';
@@ -146,6 +146,51 @@ const seedStaleLock = async (root: string, label: string): Promise<void> => {
 };
 
 describe('cross-worktree resource coordinator', () => {
+  test('isolates root discovery from inherited Git configuration', async () => {
+    const root = await temporaryRoot();
+    const repository = join(root, 'repository');
+    const bin = join(root, 'bin');
+    const capture = join(root, 'git-environment');
+    await Promise.all([mkdir(repository), mkdir(bin)]);
+    const fakeGit = join(bin, 'git');
+    await writeFile(
+      fakeGit,
+      `#!/bin/sh
+printf 'global=%s\nnosystem=%s\ncount=%s\n' "\${GIT_CONFIG_GLOBAL-unset}" "\${GIT_CONFIG_NOSYSTEM-unset}" "\${GIT_CONFIG_COUNT-unset}" > ${JSON.stringify(capture)}
+printf '.git\n'
+`,
+    );
+    await chmod(fakeGit, 0o755);
+    const { RAWENGINE_RESOURCE_COORDINATOR_ROOT: _coordinatorRoot, ...inheritedEnvironment } = Bun.env;
+    const environment = {
+      ...inheritedEnvironment,
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'core.fsmonitor',
+      GIT_CONFIG_VALUE_0: 'true',
+      GIT_CONFIG_GLOBAL: join(root, 'hostile-global-config'),
+      PATH: `${bin}:${Bun.env.PATH ?? ''}`,
+    };
+    const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
+    const child = trackChild(
+      Bun.spawn(
+        [
+          'bun',
+          '-e',
+          `import { resolveResourceCoordinatorRoot } from ${JSON.stringify(modulePath)}; console.log(resolveResourceCoordinatorRoot());`,
+        ],
+        { cwd: repository, env: environment, stderr: 'pipe', stdout: 'pipe' },
+      ),
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(exitCode, stderr).toBe(0);
+    expect(stdout.trim()).toBe(join(await realpath(repository), '.git', 'rapidraw-resource-locks'));
+    expect(await readFile(capture, 'utf8')).toBe('global=/dev/null\nnosystem=1\ncount=unset\n');
+  });
+
   test('bounds memory-heavy lanes across worktrees without serializing safe parallel work', async () => {
     const root = await temporaryRoot();
     const worktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];

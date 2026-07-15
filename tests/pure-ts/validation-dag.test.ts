@@ -363,7 +363,7 @@ describe('affected validation DAG', () => {
 
   test('shared producer artifact is generated once, reused, and regenerated from a corrupt output root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-artifact-'));
-    initFixtureRepository(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
     await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
     const producer: ValidationNode = {
       id: 'producer',
@@ -406,7 +406,7 @@ describe('affected validation DAG', () => {
   test('timeout kills grandchildren and releases the shared resource-class lease', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-cancel-'));
     const grandchildPidPath = join(tmpdir(), `rapidraw-validation-grandchild-${crypto.randomUUID()}.pid`);
-    initFixtureRepository(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
     await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
     const timeoutNode: ValidationNode = {
       id: 'timeout-native',
@@ -712,7 +712,7 @@ await lease.release();`;
 
   test('commit failure preserves an independent active node disposition and returns deterministic nonzero', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-fail-fast-'));
-    initFixtureRepository(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
     await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
     const base: ValidationNode = {
       id: 'fail',
@@ -744,7 +744,7 @@ await lease.release();`;
 
   test('failed child diagnostics retain bounded stdout, stderr, exit, signal, RSS, and reason', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-diagnostics-'));
-    initFixtureRepository(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
     await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
     const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
     const script = `import { runValidation } from ${JSON.stringify(enginePath)};
@@ -761,7 +761,7 @@ process.exit(await runValidation([node],{mode:'commit',changedPaths:['input.ts']
 
   test('SIGINT exits 130, kills the process group, and leaves no resource lease', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-sigint-'));
-    initFixtureRepository(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
     await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
     const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
     const script = `import { runValidation } from ${JSON.stringify(enginePath)};
