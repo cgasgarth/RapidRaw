@@ -144,7 +144,6 @@ pub struct AppState {
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
-    pub initial_file_path: Mutex<Option<String>>,
     pub preview_scheduler: Mutex<Option<Arc<crate::preview_scheduler::PreviewScheduler>>>,
     pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
@@ -218,7 +217,6 @@ impl AppState {
                 policy("lut_cpu", 64, 96, Some(32)),
                 Arc::clone(&cache_budget),
             ),
-            initial_file_path: Mutex::new(None),
             preview_scheduler: Mutex::new(None),
             export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
             mask_cache: MemoryLruCache::new(
