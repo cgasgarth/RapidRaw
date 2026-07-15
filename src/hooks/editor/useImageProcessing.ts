@@ -12,15 +12,9 @@ import type { PreviewOperationClass, PreviewRoi } from '../../utils/adaptivePrev
 import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
-import {
-  EditedPreviewEffectRunner,
-  type EditedPreviewExecutionContext,
-  type ExecutedEditedPreview,
-  type MaterializedEditedPreview,
-} from '../../utils/editedPreviewEffectRunner';
+import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import { decodeInteractivePreviewUrl, parseInteractivePreviewPatchPayload } from '../../utils/interactivePreviewPatch';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
 import {
   createPreviewQualityPolicy,
@@ -31,6 +25,7 @@ import {
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
 import { PreviewInvalidationAdapter } from '../../utils/previewInvalidationAdapter';
+import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
 import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
@@ -158,6 +153,13 @@ export function useImageProcessing() {
       }),
     [previewCoordinator, setEditor],
   );
+  const previewMaterializationAdapter = useMemo(
+    () =>
+      new PreviewMaterializationAdapter({
+        releaseUrl: (url) => previewUrlReleaseAuthority.release(url),
+      }),
+    [previewUrlReleaseAuthority],
+  );
 
   const originalPreviewRunner =
     originalPreviewRunnerRef.current ??
@@ -170,37 +172,6 @@ export function useImageProcessing() {
     });
   originalPreviewRunnerRef.current = originalPreviewRunner;
 
-  const materializeEditedPreview = useCallback(
-    async (
-      result: ExecutedEditedPreview,
-      context: EditedPreviewExecutionContext,
-    ): Promise<MaterializedEditedPreview<PreviewPresentationValue>> => {
-      const { buffer, transform } = result;
-      if (buffer.byteLength === 0) return { value: { kind: 'empty' } };
-      const prefix = new TextDecoder().decode(buffer.slice(0, 11));
-      if (prefix === 'WGPU_RENDER') return { value: { kind: 'wgpu' } };
-
-      const positioned = context.request.kind === 'interactive' || context.request.roi !== null;
-      const patch = positioned ? parseInteractivePreviewPatchPayload(buffer) : null;
-      if (patch !== null && !patch.ok) return { value: { kind: 'limited', reason: patch.reason } };
-
-      const blob = new Blob([patch?.ok ? patch.imageBuffer : buffer], { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
-      const decodeStartedAt = previewNow();
-      try {
-        await decodeInteractivePreviewUrl(url);
-      } catch (error) {
-        previewUrlReleaseAuthority.release(url);
-        throw error;
-      }
-      const decodeMs = Math.max(0, previewNow() - decodeStartedAt);
-      return patch?.ok
-        ? { decodeMs, value: { kind: 'patch', patch, url } }
-        : { artifactUrl: url, decodeMs, value: { kind: 'full', transform, url } };
-    },
-    [previewUrlReleaseAuthority],
-  );
-
   const editedPreviewRunner =
     editedPreviewRunnerRef.current ??
     new EditedPreviewEffectRunner<PreviewPresentationValue>({
@@ -209,7 +180,11 @@ export function useImageProcessing() {
       markPatchesResident: (sessionId, patchIds) => {
         useEditorStore.getState().patchResidency.markResident(sessionId, patchIds);
       },
-      materialize: materializeEditedPreview,
+      materialize: (result, context) =>
+        previewMaterializationAdapter.materialize(result, {
+          kind: context.request.kind,
+          roi: context.request.roi,
+        }),
       onCurrentFailure: (error, context) => {
         const expectedSupersession = String(error).includes('preview_superseded');
         if (!expectedSupersession) console.error('Failed to apply adjustments:', error);
