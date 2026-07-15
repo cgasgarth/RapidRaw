@@ -46,6 +46,7 @@ import {
 } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { buildLutLoadEditTransaction, captureLutCommitIdentity } from '../../utils/lutEditTransaction';
 import {
   acceptReferenceMatchAdjustmentTransfer,
   reconcileReferenceMatchReceiptsAfterEdit,
@@ -203,24 +204,27 @@ export function useEditorActions() {
   const handleLutSelect = useCallback(
     async (path: string) => {
       const isAndroid = useSettingsStore.getState().osPlatform === 'android';
+      const identity = captureLutCommitIdentity(useEditorStore.getState());
+      if (identity === null) return;
       try {
         const result: { size: number } = await invoke(Invokes.LoadAndParseLut, { path });
         const name = isAndroid
           ? await invoke<string>(Invokes.ResolveAndroidContentUriName, { uriStr: path })
           : path.split(/[\\/]/).pop() || 'LUT';
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          lutPath: path,
-          lutName: name,
-          lutSize: result.size,
-          lutIntensity: 100,
-          sectionVisibility: { ...prev.sectionVisibility, effects: true },
-        }));
+        const state = useEditorStore.getState();
+        applyEditTransaction(
+          buildLutLoadEditTransaction(
+            state,
+            identity,
+            { data: null, intensity: 100, name, path, size: result.size },
+            crypto.randomUUID(),
+          ),
+        );
       } catch (err) {
         toast.error(`Failed to load LUT: ${formatUnknownError(err)}`);
       }
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleResetAdjustments = useCallback(

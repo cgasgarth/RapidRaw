@@ -24,6 +24,7 @@ import {
   getFilmStageControlDescriptors,
 } from '../../utils/film-look/filmStageControls';
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
+import { buildLutClearEditTransaction } from '../../utils/lutEditTransaction';
 import FilmStageControls from '../film/FilmStageControls';
 import type { AppSettings, Preset } from '../ui/AppProperties';
 import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
@@ -144,14 +145,12 @@ export default function EffectsPanel({
   };
 
   const handleLutClear = () => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      lutPath: null,
-      lutName: null,
-      lutData: null,
-      lutSize: 0,
-      lutIntensity: 100,
-    }));
+    const identity = displayCreativeCommitIdentityRef.current;
+    if (identity === null) return;
+    const result = applyEditTransaction(
+      buildLutClearEditTransaction(useEditorStore.getState(), identity, crypto.randomUUID()),
+    );
+    displayCreativeCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
   };
 
   const handleFilmLookApply = async (look: FilmLookBrowserItem, strength: number) => {
