@@ -192,6 +192,7 @@ interface ImageCanvasProps {
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
   finalPreviewUrl: string | null;
+  hasCurrentCpuPreview?: boolean;
   provisionalPreviewUrl?: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   imageRenderSize: RenderSize;
@@ -230,6 +231,7 @@ export const ImageCanvas = memo(
     exportSoftProofRecipeId,
     exportSoftProofTransform,
     finalPreviewUrl,
+    hasCurrentCpuPreview = false,
     provisionalPreviewUrl = null,
     gamutWarningOverlay,
     imageRenderSize,
@@ -367,6 +369,14 @@ export const ImageCanvas = memo(
       provisionalPreviewUrl,
       thumbnailUrl: selectedImage.thumbnailUrl,
     });
+    const patchGeometryIdentity = adjustmentGeometryRevision;
+    const patchContext = {
+      basePreviewUrl: previewSource,
+      geometryIdentity: patchGeometryIdentity,
+      sourceImagePath: selectedImage.path,
+    };
+    const coherentInteractivePatch =
+      interactivePatch && isInteractivePreviewPatchCoherent(interactivePatch, patchContext) ? interactivePatch : null;
     const presentationDescriptor = useMemo(
       () =>
         providedPresentationDescriptor ??
@@ -477,6 +487,7 @@ export const ImageCanvas = memo(
       currentFrameHealth: rendererHandoff.committedBackend === 'wgpu' ? 'fresh' : null,
       hasRenderedFirstFrame,
       previewSource,
+      requiresCpuComposition: hasCurrentCpuPreview || coherentInteractivePatch !== null || isExportSoftProofEnabled,
       selectedImageIsReady: selectedImage.isReady,
       useWgpuRenderer: appSettings?.useWgpuRenderer,
     });
@@ -838,7 +849,6 @@ export const ImageCanvas = memo(
       isExportSoftProofEnabled,
       selectedImagePath: selectedImage.path,
     });
-    const patchGeometryIdentity = adjustmentGeometryRevision;
     const patchScopeKey = [
       selectedImage.path,
       patchGeometryIdentity,
@@ -847,14 +857,6 @@ export const ImageCanvas = memo(
       imageRenderSize.offsetX,
       imageRenderSize.offsetY,
     ].join(':');
-    const patchContext = {
-      basePreviewUrl: previewSource,
-      geometryIdentity: patchGeometryIdentity,
-      sourceImagePath: selectedImage.path,
-    };
-    const coherentInteractivePatch =
-      interactivePatch && isInteractivePreviewPatchCoherent(interactivePatch, patchContext) ? interactivePatch : null;
-
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
       if (!selectedImage.width || !selectedImage.height || !imageRenderSize.width || !imageRenderSize.height) {
         return null;

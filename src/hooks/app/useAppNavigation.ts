@@ -223,8 +223,6 @@ export function useAppNavigation({
         path,
         source: cachedReadyEntry ? 'cache' : 'cold-load',
       });
-      const isCachedInBackend = cachedReadyEntry?.backendReady === true;
-
       const process = useProcessStore.getState();
       const prefetchRequest = imagePrefetchScheduler.schedule({
         currentPath: path,
@@ -242,14 +240,9 @@ export function useAppNavigation({
         });
       }
 
-      const hasDifferentResolution =
-        cached &&
-        (useEditorStore.getState().originalSize.width !== cached.originalSize.width ||
-          useEditorStore.getState().originalSize.height !== cached.originalSize.height);
-
-      if (!isCachedInBackend || hasDifferentResolution) {
-        setEditor({ hasRenderedFirstFrame: false });
-      }
+      // A cached CPU artifact is safe to reuse, but a native frame belongs to the
+      // previous editor session until an exact operation receipt proves otherwise.
+      setEditor({ hasRenderedFirstFrame: false });
 
       requestThumbnails([path]);
       setLibrary({ multiSelectedPaths: [path], libraryActivePath: null, selectionAnchorPath: path });

@@ -17,6 +17,7 @@ import {
   type PreviewCoordinatorState,
   type PreviewOperationIdentity,
 } from './previewCoordinator';
+import type { WgpuPreviewCommit } from './wgpuFramePresentationAuthority';
 
 export type PreviewPresentationValue =
   | { kind: 'empty' }
@@ -52,6 +53,7 @@ export interface PreviewPresentationUpdate {
 }
 
 export interface PreviewPresentationAdapterOptions {
+  acceptWgpuPresentation: (commit: WgpuPreviewCommit) => void;
   getCoordinatorState: () => Readonly<PreviewCoordinatorState>;
   getPresentationState: () => PreviewPresentationState;
   now?: () => number;
@@ -105,11 +107,13 @@ export class PreviewPresentationAdapter {
         },
       };
     } else if (value.kind === 'wgpu') {
-      update = {
-        interactivePatch: null,
+      this.options.acceptWgpuPresentation({
+        identity: context.identity,
         previewQualityStatus: readyStatus,
         ...(context.identity.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-      };
+      });
+      this.recordTiming(result, context, commitStartedAt);
+      return true;
     } else if (value.kind === 'patch') {
       update = {
         interactivePatch: {
@@ -168,14 +172,22 @@ export class PreviewPresentationAdapter {
     }
 
     this.options.publish(update);
+    this.recordTiming(result, context, commitStartedAt);
+    return true;
+  }
+
+  private recordTiming(
+    result: MaterializedEditedPreview<PreviewPresentationValue>,
+    context: PreviewPresentationContext,
+    commitStartedAt: number,
+  ): void {
     this.options.recordTiming({
       commitMs: Math.max(0, this.now() - commitStartedAt),
       decodeMs: result.decodeMs ?? 0,
       displayedAgeMs: Math.max(0, this.now() - context.createdAt),
       inputToDispatchMs: context.inputToDispatchMs,
       renderMs: context.renderMs,
-      tier: quality.tier,
+      tier: context.quality.tier,
     });
-    return true;
   }
 }

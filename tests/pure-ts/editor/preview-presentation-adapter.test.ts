@@ -135,6 +135,14 @@ const harness = () => {
   const timings: PreviewTimingSample[] = [];
   const times = [100, 104, 108];
   const adapter = new PreviewPresentationAdapter({
+    acceptWgpuPresentation: (commit) =>
+      updates.push({
+        interactivePatch: null,
+        previewQualityStatus: commit.previewQualityStatus,
+        ...(commit.renderedPreviewResolution === undefined
+          ? {}
+          : { renderedPreviewResolution: commit.renderedPreviewResolution }),
+      }),
     getCoordinatorState: () => coordinator.snapshot(),
     getPresentationState: () => ({ imageSessionId: 'editor-session-a', previewScopeStatus: scopeStatus }),
     now: () => times.shift() ?? 108,
