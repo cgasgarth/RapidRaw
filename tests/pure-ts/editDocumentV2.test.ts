@@ -76,6 +76,7 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.schemaVersion).toBe(2);
     expect(editDocumentV2NodeInventory(document)).toEqual([
       'scene_global_color_tone',
+      'color_presence',
       'scene_curve',
       'tone_equalizer',
       'display_creative',
@@ -99,6 +100,52 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
     expect(document.migration?.quarantined).not.toContain('sectionVisibility');
     expect(document.extensions.legacyAdjustments).not.toHaveProperty('sectionVisibility');
+  });
+
+  test('owns strict Color Presence state and migrates old scene-node fields idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      hue: -38,
+      vibrance: 47,
+    });
+    expect(document.nodes.color_presence.params).toMatchObject({ hue: -38, saturation: 0, vibrance: 47 });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('hue');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('vibrance');
+    expect(document.migration?.mapped).toContain('color_presence.hue');
+    expect(document.migration?.mapped).toContain('color_presence.vibrance');
+
+    const oldV2 = structuredClone(document);
+    const params = oldV2.nodes.scene_global_color_tone.params as Record<string, unknown>;
+    params.hue = -38;
+    params.saturation = 0;
+    params.vibrance = 47;
+    delete (oldV2.nodes as Partial<typeof oldV2.nodes>).color_presence;
+    if (oldV2.migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.migration.mapped = oldV2.migration.mapped.filter(
+      (path) => path !== 'color_presence.hue' && path !== 'color_presence.vibrance',
+    );
+    oldV2.migration.quarantined.push('hue', 'vibrance');
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.color_presence.params).toMatchObject({ hue: -38, saturation: 0, vibrance: 47 });
+    expect(reopened.nodes.scene_global_color_tone.params).not.toHaveProperty('saturation');
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('hue');
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('vibrance');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corrupt = structuredClone(oldV2);
+    delete (corrupt.nodes as Partial<typeof corrupt.nodes>).color_presence;
+    const corruptParams = corrupt.nodes.scene_global_color_tone.params as Record<string, unknown>;
+    corruptParams.hue = 181;
+    const quarantined = editDocumentV2Schema.parse(corrupt);
+    expect(quarantined.nodes.color_presence.params.hue).toBe(0);
+    expect(quarantined.extensions.quarantinedLegacyAdjustments?.hue).toBe(181);
+    expect(quarantined.migration?.defaulted).toContain('color_presence.hue');
+
+    const invalid = structuredClone(INITIAL_ADJUSTMENTS);
+    invalid.vibrance = Number.NaN;
+    const invalidLegacy = legacyAdjustmentsToEditDocumentV2(invalid);
+    expect(invalidLegacy.nodes.color_presence.params.vibrance).toBe(0);
+    expect(invalidLegacy.extensions.quarantinedLegacyAdjustments?.vibrance).toBeNaN();
   });
 
   test('owns strict Perspective Correction state in the geometry node and explicit domain', () => {
@@ -1897,7 +1944,6 @@ describe('EditDocumentV2 legacy adapter', () => {
       contrast: 0,
       exposure: 0,
       highlights: 0,
-      saturation: 0,
       shadows: 0,
       whites: 0,
     });
