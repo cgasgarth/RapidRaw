@@ -12,13 +12,13 @@ import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSlide
 import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
 import { getEditorZoomDpr } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
 import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
 import { PreviewCoordinatorRuntime } from '../../utils/previewCoordinatorRuntime';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
 import { PreviewInteractionSchedulingEffectRunner } from '../../utils/previewInteractionSchedulingEffectRunner';
 import { PreviewInvalidationEffectRunner } from '../../utils/previewInvalidationEffectRunner';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
+import { PreviewOriginalCompareAdapter } from '../../utils/previewOriginalCompareAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
 import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
@@ -106,7 +106,7 @@ export function useImageProcessing() {
     });
   previewRequestScopeAdapterRef.current = previewRequestScopeAdapter;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
-  const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
+  const originalPreviewAdapterRef = useRef<PreviewOriginalCompareAdapter | null>(null);
   const dispatchPreviewCoordinator = previewRuntime.dispatch;
   const previewAnalyticsRunner = useMemo(
     () =>
@@ -164,16 +164,16 @@ export function useImageProcessing() {
     [previewRuntime, setEditor],
   );
 
-  const originalPreviewRunner =
-    originalPreviewRunnerRef.current ??
-    new OriginalPreviewEffectRunner({
+  const originalPreviewAdapter =
+    originalPreviewAdapterRef.current ??
+    new PreviewOriginalCompareAdapter({
       dispatch: dispatchPreviewCoordinator,
       onCurrentFailure: (error) => {
         console.error('Failed to generate original preview:', error);
         useEditorStore.getState().dispatchCompare({ type: 'exit' });
       },
     });
-  originalPreviewRunnerRef.current = originalPreviewRunner;
+  originalPreviewAdapterRef.current = originalPreviewAdapter;
 
   const editedPreviewRunner =
     editedPreviewRunnerRef.current ??
@@ -327,9 +327,9 @@ export function useImageProcessing() {
       previewInvalidationRunner.stop('editor-unmounted');
       previewAnalyticsRunner.stop();
       editedPreviewRunner.cancel();
-      originalPreviewRunner.dispose();
+      originalPreviewAdapter.dispose();
     };
-  }, [editedPreviewRunner, originalPreviewRunner, previewAnalyticsRunner, previewInvalidationRunner]);
+  }, [editedPreviewRunner, originalPreviewAdapter, previewAnalyticsRunner, previewInvalidationRunner]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -363,16 +363,8 @@ export function useImageProcessing() {
     (effects) => previewAnalyticsRunner.consume(effects),
     (effects) => editedPreviewRunner.consume(effects),
     (effects) => previewInvalidationRunner.consume(effects),
-    (effects) => originalPreviewRunner.consume(effects),
+    (effects) => originalPreviewAdapter.consume(effects),
     (effects) => previewInteractionSchedulingRunner.consume(effects),
-    (effects) => {
-      for (const effect of effects) {
-        if (effect.type === 'schedule-original') {
-          dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
-          originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
-        }
-      }
-    },
   ]);
 
   useEffect(() => {
@@ -395,21 +387,11 @@ export function useImageProcessing() {
             scopeRecovery,
           })
         : null;
-      const originalScope =
-        ready && isCompareActive ? capturePreviewRequestScope(requestedTargetResolution, null) : null;
-      const original =
-        originalScope === null
-          ? null
-          : {
-              request: {
-                expectedImagePath: originalScope.session.sourceImagePath,
-                jsAdjustments: structuredClone(originalScope.renderSnapshot.value as Adjustments),
-                targetResolution: originalScope.session.targetWidth,
-                viewerSampleGraphRevision: originalScope.session.graphRevision,
-              },
-              session: originalScope.session,
-              viewport: originalScope.viewport.coordinator,
-            };
+      const original = ready
+        ? originalPreviewAdapter.capture(isCompareActive, requestedTargetResolution, (targetResolution) =>
+            capturePreviewRequestScope(targetResolution, null),
+          )
+        : null;
       return {
         compareActive: isCompareActive,
         devicePixelRatio,
@@ -437,6 +419,7 @@ export function useImageProcessing() {
       isCompareActive,
       isSliderDragging,
       isWaveformVisible,
+      originalPreviewAdapter,
       previewRequestIntentAdapter,
       selectedImage?.isReady,
       selectedImage?.path,
