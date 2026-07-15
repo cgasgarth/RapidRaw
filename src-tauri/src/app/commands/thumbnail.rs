@@ -14,7 +14,7 @@ pub(crate) fn cancel_thumbnail_generation(
         generation,
         operation_id,
     };
-    let Some(emission) = state.services.thumbnails.cancel(authority) else {
+    let Some(emission) = state.library().thumbnails().cancel(authority) else {
         return Ok(false);
     };
     crate::file_management::emit_thumbnail_lifecycle(&app_handle, &emission);

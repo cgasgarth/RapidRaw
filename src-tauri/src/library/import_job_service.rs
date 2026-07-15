@@ -310,13 +310,13 @@ mod tests {
             .unwrap();
         let state = app.state::<crate::AppState>();
         let first = state
-            .services
-            .import_jobs
+            .library()
+            .import_jobs()
             .begin_new("import-ipc-a".into())
             .unwrap();
         let successor = state
-            .services
-            .import_jobs
+            .library()
+            .import_jobs()
             .begin_new("import-ipc-b".into())
             .unwrap();
 
@@ -339,7 +339,7 @@ mod tests {
 
         assert!(!successor.cancellation.load(Ordering::Acquire));
         assert_eq!(
-            state.services.import_jobs.status().unwrap().authority,
+            state.library().import_jobs().status().unwrap().authority,
             successor.authority
         );
     }

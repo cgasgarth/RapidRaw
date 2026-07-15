@@ -292,7 +292,11 @@ mod tests {
         authority: CatalogIndexingAuthority,
         state: tauri::State<'_, crate::AppState>,
     ) -> bool {
-        state.services.catalog_indexing.cancel(authority).is_some()
+        state
+            .library()
+            .catalog_indexing()
+            .cancel(authority)
+            .is_some()
     }
 
     #[cfg(feature = "tauri-test")]
@@ -308,7 +312,8 @@ mod tests {
         let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
             .build()
             .unwrap();
-        let service = Arc::clone(&app.state::<crate::AppState>().services.catalog_indexing);
+        let state = app.state::<crate::AppState>();
+        let service = Arc::clone(state.library().catalog_indexing());
         let predecessor = service.begin("old".into()).unwrap();
         let successor = service.begin("current".into()).unwrap();
 

@@ -1602,7 +1602,7 @@ fn schedule_smart_preview(
     demand_class: SmartPreviewDemandClass,
 ) {
     let state = app_handle.state::<AppState>();
-    let generation = state.services.smart_previews.enqueue(
+    let generation = state.library().smart_previews().enqueue(
         path.to_string(),
         request.source_revision,
         request.adjustments,
@@ -1614,7 +1614,7 @@ fn schedule_smart_preview(
     );
     let _ = app_handle.emit(
         "smart-preview-progress",
-        state.services.smart_previews.progress(),
+        state.library().smart_previews().progress(),
     );
 }
 
@@ -1639,7 +1639,7 @@ pub(crate) fn emit_thumbnail_lifecycle(
 
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
-    let thumbnails = Arc::clone(&state.services.thumbnails);
+    let thumbnails = Arc::clone(state.library().thumbnails());
     let settings = load_settings_or_default(&app_handle);
     let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
@@ -1687,8 +1687,8 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let smart_app = app_handle;
     let smart_scheduler = smart_app
         .state::<crate::AppState>()
-        .services
-        .smart_previews
+        .library()
+        .smart_previews()
         .clone();
     std::thread::spawn(move || {
         loop {
@@ -1762,8 +1762,8 @@ pub fn update_thumbnail_queue(
 ) -> Result<ThumbnailOperationAuthority, String> {
     let state = app_handle.state::<crate::AppState>();
     let (authority, emission) = state
-        .services
-        .thumbnails
+        .library()
+        .thumbnails()
         .update(request)
         .map_err(str::to_string)?;
     emit_thumbnail_lifecycle(&app_handle, &emission);
@@ -2293,8 +2293,8 @@ fn submit_thumbnail_invalidation(
     receipt: &MetadataSaveReceipt,
 ) {
     let (outcome, progress) = match state
-        .services
-        .thumbnails
+        .library()
+        .thumbnails()
         .invalidate_if_demanded(&receipt.path, receipt.thumbnail_revision.clone())
     {
         Ok(result) => result,
@@ -2501,7 +2501,7 @@ pub async fn reset_adjustments_for_paths(
         return Err("Reset requires at least one image path".to_string());
     }
     let state = app_handle.state::<AppState>();
-    let thumbnails = Arc::clone(&state.services.thumbnails);
+    let thumbnails = Arc::clone(state.library().thumbnails());
     let (batch, start) = thumbnails
         .begin_explicit(paths.len())
         .map_err(str::to_string)?;
@@ -3450,7 +3450,8 @@ pub(super) async fn import_files_for_runtime<R: Runtime>(
         return Err("Import destination is not a directory".to_string());
     }
     let job_id = super::import_pipeline::new_job_id();
-    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let state = app_handle.state::<AppState>();
+    let import_jobs = Arc::clone(state.library().import_jobs());
     let start = import_jobs.begin_new(job_id).map_err(str::to_string)?;
     let cancellation = Arc::clone(&start.cancellation);
     emit_import_start(&app_handle, &start.authority, total_files);
@@ -3501,8 +3502,8 @@ pub fn cancel_import(
     state: tauri::State<'_, AppState>,
 ) -> Result<bool, String> {
     state
-        .services
-        .import_jobs
+        .library()
+        .import_jobs()
         .cancel(&super::import_job_service::ImportJobAuthority { generation, job_id })
         .map_err(str::to_string)
 }
@@ -3511,7 +3512,7 @@ pub fn cancel_import(
 pub fn get_active_import_job_status(
     state: tauri::State<'_, AppState>,
 ) -> Option<super::import_job_service::ImportJobStatus> {
-    state.services.import_jobs.status()
+    state.library().import_jobs().status()
 }
 
 #[tauri::command]
@@ -3529,8 +3530,8 @@ pub fn validate_import_job_resume(
 ) -> Result<super::import_pipeline::ImportResumeValidation, String> {
     app_handle
         .state::<AppState>()
-        .services
-        .import_jobs
+        .library()
+        .import_jobs()
         .ensure_resume_available()
         .map_err(str::to_string)?;
     super::import_pipeline::validate_job_resume(&app_handle, &job_id)
@@ -3548,7 +3549,8 @@ pub(super) async fn resume_import_job_for_runtime<R: Runtime>(
     job_id: String,
     app_handle: AppHandle<R>,
 ) -> Result<super::import_job_service::ImportJobAuthority, String> {
-    let import_jobs = Arc::clone(&app_handle.state::<AppState>().services.import_jobs);
+    let state = app_handle.state::<AppState>();
+    let import_jobs = Arc::clone(state.library().import_jobs());
     let reservation = import_jobs
         .reserve_resume(job_id.clone())
         .map_err(str::to_string)?;

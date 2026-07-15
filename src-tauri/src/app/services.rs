@@ -145,11 +145,7 @@ pub struct AppServices {
     pub(crate) preview_runtime: Arc<crate::render::preview_runtime_service::PreviewRuntimeService>,
     pub(crate) preview_frames:
         Arc<crate::render::preview_frame_cache_service::PreviewFrameCacheService>,
-    pub(crate) import_jobs: Arc<crate::library::import_job_service::ImportJobService>,
-    pub(crate) catalog_indexing:
-        Arc<crate::library::catalog_indexing_service::CatalogIndexingService>,
-    pub(crate) thumbnails:
-        Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
+    library: crate::library::runtime_services::LibraryRuntimeServices,
     pub(crate) preview_session: Arc<crate::app::preview_session_service::PreviewSessionService>,
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
@@ -159,10 +155,8 @@ pub struct AppServices {
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
-    pub(crate) smart_previews: Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
     pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
-    pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
 }
 
@@ -196,9 +190,7 @@ impl AppServices {
             panorama: Arc::default(),
             preview_runtime: Arc::default(),
             preview_frames: Arc::default(),
-            import_jobs: Arc::default(),
-            catalog_indexing: Arc::default(),
-            thumbnails: Arc::default(),
+            library: Default::default(),
             preview_session: Arc::default(),
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
@@ -207,14 +199,16 @@ impl AppServices {
             ai,
             interactive_gpu_pressure: Arc::default(),
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
-            smart_previews: crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),
             image_open: Arc::default(),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),
-            tether: Arc::default(),
             jobs: Arc::default(),
         }
+    }
+
+    pub(crate) fn library(&self) -> &crate::library::runtime_services::LibraryRuntimeServices {
+        &self.library
     }
 }
 
@@ -401,13 +395,13 @@ mod tests {
     #[test]
     fn smart_preview_service_coalesces_concurrent_revision_replacement() {
         let services = Arc::new(AppServices::new());
-        let old_generation = services.smart_previews.enqueue(
+        let old_generation = services.library().smart_previews().enqueue(
             "/roll/image.raw".to_string(),
             "revision-1".to_string(),
             Vec::new(),
             SmartPreviewDemandClass::VisibleIdle,
         );
-        let old_job = services.smart_previews.claim();
+        let old_job = services.library().smart_previews().claim();
         assert_eq!(old_job.generation, old_generation);
 
         let barrier = Arc::new(Barrier::new(9));
@@ -417,7 +411,7 @@ mod tests {
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
                     barrier.wait();
-                    services.smart_previews.enqueue(
+                    services.library().smart_previews().enqueue(
                         "/roll/image.raw".to_string(),
                         "revision-2".to_string(),
                         vec![1, 2, 3],
@@ -437,14 +431,22 @@ mod tests {
                 .all(|generation| *generation == generations[0])
         );
         assert_ne!(generations[0], old_generation);
-        assert!(!services.smart_previews.is_publishable(&old_job));
-        let cancelled = services.smart_previews.finish(&old_job, false);
+        assert!(!services.library().smart_previews().is_publishable(&old_job));
+        let cancelled = services.library().smart_previews().finish(&old_job, false);
         assert_eq!(cancelled.cancelled, 1);
 
-        let replacement = services.smart_previews.claim();
+        let replacement = services.library().smart_previews().claim();
         assert_eq!(replacement.generation, generations[0]);
-        assert!(services.smart_previews.is_publishable(&replacement));
-        let progress = services.smart_previews.finish(&replacement, true);
+        assert!(
+            services
+                .library()
+                .smart_previews()
+                .is_publishable(&replacement)
+        );
+        let progress = services
+            .library()
+            .smart_previews()
+            .finish(&replacement, true);
         assert_eq!(progress.pending, 0);
         assert_eq!(progress.in_flight, 0);
         assert_eq!(progress.completed, 1);
