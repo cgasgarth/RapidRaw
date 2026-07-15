@@ -47,6 +47,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-layer-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentLayerCreateRequestSchema.safeParse({
@@ -201,6 +202,14 @@ if (createdLayer.adjustments.exposure !== 0.45 || createdLayer.adjustments.shado
 }
 if (afterLayerState.historyIndex !== 1 || afterLayerState.history.length !== 2) {
   throw new Error('agent.layer.create must create one undoable history entry.');
+}
+if (
+  afterLayerState.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  afterLayerState.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  afterLayerState.lastEditApplicationReceipt.transactionId !== 'agent_subject_lift_apply' ||
+  afterLayerState.editDocumentV2.nodes.layers?.params.masks[0]?.id !== 'agent_subject_lift'
+) {
+  throw new Error('agent.layer.create did not publish one canonical EditTransaction receipt.');
 }
 if (afterLayerState.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.layer.create must invalidate stale preview output.');

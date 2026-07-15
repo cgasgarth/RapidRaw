@@ -800,6 +800,243 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
   }
 }
 
+async function verifyObjectPromptController(page: Page): Promise<void> {
+  const callCount = (command: string) =>
+    page.evaluate(
+      (expected) =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expected).length ?? 0,
+      command,
+    );
+  const persistedPrompt = () =>
+    page.evaluate(() => {
+      const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(
+          ({ command, endedAtMs }) => command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+        )
+        .at(-1);
+      const masks = latest?.args?.['adjustments']?.['masks'];
+      return Array.isArray(masks)
+        ? (masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters'] ?? null)
+        : null;
+    });
+  const waitForPrompt = async (expected: { box: boolean; pending: boolean; points: number }): Promise<void> => {
+    try {
+      await page.waitForFunction(
+        ({ box, pending, points }) => {
+          const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+            .filter(
+              ({ command, endedAtMs }) =>
+                command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+            )
+            .at(-1);
+          const masks = latest?.args?.['adjustments']?.['masks'];
+          if (!Array.isArray(masks)) return false;
+          const parameters = masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters'];
+          return (
+            typeof parameters === 'object' &&
+            parameters !== null &&
+            Array.isArray(parameters['pointPrompts']) &&
+            parameters['pointPrompts'].length === points &&
+            (parameters['boxPrompt'] != null) === box &&
+            (parameters['pendingBoxAnchor'] != null) === pending
+          );
+        },
+        expected,
+        { timeout: 10_000 },
+      );
+    } catch {
+      const actual = await persistedPrompt();
+      const ui = await page.evaluate(() => ({
+        boxReady: document
+          .querySelector('[data-testid="object-prompt-controls"]')
+          ?.getAttribute('data-object-prompt-box-ready'),
+        mode: document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode'),
+        points: document
+          .querySelector('[data-testid="object-prompt-controls"]')
+          ?.getAttribute('data-object-prompt-point-count'),
+        receipt: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-transaction-id'),
+        saves: (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .map((call) => ({ ended: call.endedAtMs, keys: Object.keys(call.args ?? {}) })),
+      }));
+      throw new Error(
+        `Object Prompt state timed out: expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)} ui=${JSON.stringify(ui)}.`,
+      );
+    }
+  };
+  const waitForPromptMode = (mode: 'background_point' | 'box') =>
+    page.waitForFunction(
+      (expectedMode) => {
+        const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(
+            ({ command, endedAtMs }) =>
+              command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
+          )
+          .at(-1);
+        const masks = latest?.args?.['adjustments']?.['masks'];
+        return (
+          Array.isArray(masks) &&
+          masks
+            .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
+            .find((candidate) => candidate?.['type'] === 'ai-object')?.['parameters']?.['promptMode'] === expectedMode
+        );
+      },
+      mode,
+      { timeout: 10_000 },
+    );
+  const restoreViewerScroll = () =>
+    page.getByTestId('editor-image-preview-panel').evaluate((element) => {
+      let ancestor: HTMLElement | null = element;
+      while (ancestor !== null) {
+        ancestor.scrollTop = 0;
+        ancestor = ancestor.parentElement;
+      }
+      window.scrollTo(0, 0);
+    });
+
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  const contextual = page.getByTestId('mask-contextual-create-ai-object');
+  if ((await contextual.count()) > 0 && (await contextual.isVisible())) {
+    await contextual.click();
+  } else {
+    await page.getByTestId('mask-creation-ai-object').click();
+  }
+  const controls = page.getByTestId('object-prompt-controls');
+  await controls.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForTimeout(600);
+
+  const pointAt = (x: number, y: number) =>
+    page.getByTestId('editor-image-preview-panel').evaluate(
+      (element, point) => {
+        const bounds = element.getBoundingClientRect();
+        const left = Number(element.getAttribute('data-editor-image-rect-left'));
+        const top = Number(element.getAttribute('data-editor-image-rect-top'));
+        const width = Number(element.getAttribute('data-editor-image-rect-width'));
+        const height = Number(element.getAttribute('data-editor-image-rect-height'));
+        if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+          throw new Error('Object Prompt surface omitted canonical image geometry.');
+        }
+        const targetY = bounds.top + top + height * point.y;
+        if (targetY < 120 || targetY > window.innerHeight - 120) {
+          window.scrollBy(0, targetY - window.innerHeight / 2);
+        }
+        const visibleBounds = element.getBoundingClientRect();
+        return { x: visibleBounds.left + left + width * point.x, y: visibleBounds.top + top + height * point.y };
+      },
+      { x, y },
+    );
+  const clickPrompt = (point: { x: number; y: number }) =>
+    page.getByTestId('editor-image-preview-panel').dispatchEvent('click', {
+      bubbles: true,
+      button: 0,
+      clientX: point.x,
+      clientY: point.y,
+      detail: 1,
+    });
+
+  const foregroundBaseline = {
+    overlays: await callCount('generate_mask_overlay'),
+    renders: await callCount('apply_adjustments'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  const foreground = await pointAt(0.3, 0.4);
+  await clickPrompt(foreground);
+  await waitForPrompt({ box: false, pending: false, points: 1 });
+  await page.waitForFunction(
+    ({ overlays, renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      return (
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders &&
+        calls.filter(({ command }) => command === 'generate_mask_overlay').length > overlays
+      );
+    },
+    foregroundBaseline,
+    { timeout: 10_000 },
+  );
+  const foregroundOverlay = page.locator('[data-object-prompt-label="foreground"]');
+  await foregroundOverlay.waitFor({ state: 'visible', timeout: 10_000 });
+
+  await page.getByTestId('object-prompt-mode-background_point').click();
+  await restoreViewerScroll();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode') ===
+      'background_point',
+  );
+  await waitForPromptMode('background_point');
+  await page.waitForTimeout(650);
+  const background = await pointAt(0.68, 0.62);
+  await clickPrompt(background);
+  await waitForPrompt({ box: false, pending: false, points: 2 });
+  await page.locator('[data-object-prompt-label="background"]').waitFor({ state: 'visible', timeout: 10_000 });
+
+  await page.getByTestId('object-prompt-mode-box').click();
+  await restoreViewerScroll();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="object-prompt-controls"]')?.getAttribute('data-object-prompt-mode') ===
+      'box',
+  );
+  await waitForPromptMode('box');
+  await page.waitForTimeout(650);
+  const anchor = await pointAt(0.2, 0.25);
+  const end = await pointAt(0.76, 0.72);
+  await clickPrompt(anchor);
+  await waitForPrompt({ box: false, pending: true, points: 2 });
+  await page.getByTestId('object-prompt-pending-box-anchor').waitFor({ state: 'visible', timeout: 10_000 });
+  await clickPrompt(end);
+  await waitForPrompt({ box: true, pending: false, points: 2 });
+  await page.getByTestId('object-prompt-box').waitFor({ state: 'visible', timeout: 10_000 });
+
+  const proof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      overlay: latest('generate_mask_overlay'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      receipt: {
+        source: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-source'),
+        transactionId: document
+          .querySelector('[data-testid="editor-image-preview-panel"]')
+          ?.getAttribute('data-last-edit-transaction-id'),
+      },
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persisted = await persistedPrompt();
+  const overlayPrompt = proof.overlay?.['maskDef']?.['subMasks']?.find(
+    (candidate: Record<string, unknown>) => candidate['type'] === 'ai-object',
+  )?.['parameters'];
+  const renderDocument = editDocumentV2Schema.parse(proof.render?.['request']?.['editDocumentV2']);
+  const rendered = renderDocument.layers.masks
+    .flatMap((container) => container.subMasks)
+    .find((candidate) => candidate.type === 'ai-object')?.parameters;
+  if (
+    proof.receipt.source !== 'layer-command' ||
+    !proof.receipt.transactionId?.startsWith('object-prompt:') ||
+    persisted === null ||
+    JSON.stringify(persisted) !== JSON.stringify(overlayPrompt) ||
+    JSON.stringify(persisted) !== JSON.stringify(rendered)
+  ) {
+    throw new Error(
+      `Object Prompt persistence, overlay, render, and command receipt diverged: ${JSON.stringify(proof.receipt)}.`,
+    );
+  }
+
+  await page.locator('button[data-command-id="undo"]:visible').first().click();
+  await waitForPrompt({ box: false, pending: true, points: 2 });
+  await page.getByTestId('object-prompt-pending-box-anchor').waitFor({ state: 'visible', timeout: 10_000 });
+}
+
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 45_000) {
@@ -863,7 +1100,9 @@ try {
   browser = await chromium.launch({ headless: true });
   page = await browser.newPage({
     hasTouch:
-      browserScenario === 'initial-mask-draw-controller' || browserScenario === 'parametric-mask-target-controller',
+      browserScenario === 'initial-mask-draw-controller' ||
+      browserScenario === 'object-prompt-controller' ||
+      browserScenario === 'parametric-mask-target-controller',
     viewport,
   });
   const consoleErrors: string[] = [];
@@ -938,6 +1177,20 @@ try {
     browser = undefined;
     await stopServer(server);
     console.log('parametric mask target browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'object-prompt-controller') {
+    await verifyObjectPromptController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected Object Prompt browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected Object Prompt browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('Object Prompt browser controller proof passed');
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
