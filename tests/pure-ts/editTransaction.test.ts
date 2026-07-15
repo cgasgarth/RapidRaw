@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused scene-tone, camera-input, and geometry changes to node operations', () => {
+  test('routes focused tone, camera, curve, and geometry changes to node operations', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -74,6 +74,22 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'camera_input',
         patch: { cameraProfile: 'camera_neutral', cameraProfileAmount: 65 },
+      },
+    ]);
+
+    const parametricCurve = structuredClone(INITIAL_ADJUSTMENTS.parametricCurve);
+    parametricCurve.luma.highlights = 18;
+    const sceneCurve = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      curveMode: 'parametric',
+      parametricCurve,
+      toneCurve: 'soft_contrast',
+    });
+    expect(sceneCurve).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'scene_curve',
+        patch: { curveMode: 'parametric', parametricCurve, toneCurve: 'soft_contrast' },
       },
     ]);
 

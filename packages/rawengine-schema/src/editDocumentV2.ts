@@ -16,6 +16,199 @@ export const sceneGlobalColorToneParamsV2Schema = z
   })
   .strict();
 
+const editDocumentLegacyCurvePointV2Schema = z
+  .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
+  .strict();
+
+const editDocumentLegacyCurveChannelV2Schema = z
+  .array(editDocumentLegacyCurvePointV2Schema)
+  .min(2)
+  .max(16)
+  .superRefine((points, context) => {
+    for (let index = 1; index < points.length; index += 1) {
+      if ((points[index]?.x ?? 0) <= (points[index - 1]?.x ?? 0)) {
+        context.addIssue({ code: 'custom', message: 'Curve x coordinates must increase.', path: [index, 'x'] });
+      }
+    }
+  });
+
+export const editDocumentLegacyCurvesV2Schema = z
+  .object({
+    blue: editDocumentLegacyCurveChannelV2Schema,
+    green: editDocumentLegacyCurveChannelV2Schema,
+    luma: editDocumentLegacyCurveChannelV2Schema,
+    red: editDocumentLegacyCurveChannelV2Schema,
+  })
+  .strict();
+
+const editDocumentParametricCurveChannelV2Schema = z
+  .object({
+    blackLevel: z.number().finite().min(0).max(100),
+    darks: z.number().finite().min(-100).max(100),
+    highlights: z.number().finite().min(-100).max(100),
+    lights: z.number().finite().min(-100).max(100),
+    shadows: z.number().finite().min(-100).max(100),
+    split1: z.number().finite().min(0).max(100),
+    split2: z.number().finite().min(0).max(100),
+    split3: z.number().finite().min(0).max(100),
+    whiteLevel: z.number().finite().min(-100).max(0),
+  })
+  .strict()
+  .refine(({ split1, split2, split3 }) => split1 < split2 && split2 < split3, {
+    message: 'Parametric curve splits must increase.',
+  });
+
+export const editDocumentParametricCurveV2Schema = z
+  .object({
+    blue: editDocumentParametricCurveChannelV2Schema,
+    green: editDocumentParametricCurveChannelV2Schema,
+    luma: editDocumentParametricCurveChannelV2Schema,
+    red: editDocumentParametricCurveChannelV2Schema,
+  })
+  .strict();
+
+export const editDocumentSceneCurveSettingsV1Schema = z
+  .object({
+    channelMode: z.enum(['luminance_preserving', 'linked_rgb']),
+    middleGrey: z.number().finite().min(1e-6).max(1),
+    points: z
+      .array(
+        z
+          .object({
+            xEv: z.number().finite().min(-16).max(16),
+            yEv: z.number().finite().min(-16).max(16),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(32),
+  })
+  .strict()
+  .superRefine(({ points }, context) => {
+    for (let index = 1; index < points.length; index += 1) {
+      const current = points[index];
+      const previous = points[index - 1];
+      if (current === undefined || previous === undefined) continue;
+      if (current.xEv - previous.xEv < 1 / 4096) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Scene-curve xEv values must increase.',
+          path: ['points', index, 'xEv'],
+        });
+      }
+      if (current.yEv < previous.yEv) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Scene-curve yEv values must not decrease.',
+          path: ['points', index, 'yEv'],
+        });
+      }
+    }
+  });
+
+export const editDocumentOutputCurveSettingsV1Schema = z
+  .object({
+    domain: z.enum(['view_encoded', 'output_encoded']),
+    peakNits: z.number().finite().positive().max(10_000),
+    points: z
+      .array(z.object({ input: z.number().finite().nonnegative(), output: z.number().finite().nonnegative() }).strict())
+      .min(2)
+      .max(32),
+    sdrReferenceWhiteNits: z.number().finite().positive().max(10_000),
+    targetIdentity: z
+      .string()
+      .min(1)
+      .refine((value) => new TextEncoder().encode(value).length <= 128, {
+        message: 'Target identity must contain at most 128 bytes.',
+      }),
+  })
+  .strict()
+  .superRefine(({ peakNits, points, sdrReferenceWhiteNits }, context) => {
+    if (peakNits < sdrReferenceWhiteNits) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Peak luminance must cover SDR reference white.',
+        path: ['peakNits'],
+      });
+      return;
+    }
+    const headroom = peakNits / sdrReferenceWhiteNits;
+    for (let index = 0; index < points.length; index += 1) {
+      const current = points[index];
+      const previous = points[index - 1];
+      if (current === undefined) continue;
+      if (current.input > headroom || current.output > headroom) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Output-curve point exceeds target headroom.',
+          path: ['points', index],
+        });
+      }
+      if (previous !== undefined && current.input - previous.input < 1 / 65_536) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Output-curve inputs must increase.',
+          path: ['points', index, 'input'],
+        });
+      }
+      if (previous !== undefined && current.output < previous.output) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Output-curve outputs must not decrease.',
+          path: ['points', index, 'output'],
+        });
+      }
+    }
+  });
+
+export const editDocumentSceneCurveV2Schema = z
+  .object({
+    curveMode: z.enum(['point', 'parametric']),
+    curves: editDocumentLegacyCurvesV2Schema,
+    outputCurveV1: editDocumentOutputCurveSettingsV1Schema.optional(),
+    parametricCurve: editDocumentParametricCurveV2Schema,
+    pointCurves: editDocumentLegacyCurvesV2Schema,
+    sceneCurveV1: editDocumentSceneCurveSettingsV1Schema.optional(),
+    toneCurve: z.enum(['auto_filmic', 'linear', 'soft_contrast', 'high_contrast', 'shadow_lift']),
+  })
+  .strict();
+
+const DEFAULT_EDIT_DOCUMENT_CURVES_V2 = {
+  blue: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  green: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  luma: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+  red: [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ],
+} as const;
+
+const DEFAULT_EDIT_DOCUMENT_PARAMETRIC_CURVES_V2 = Object.fromEntries(
+  ['blue', 'green', 'luma', 'red'].map((channel) => [
+    channel,
+    {
+      blackLevel: 0,
+      darks: 0,
+      highlights: 0,
+      lights: 0,
+      shadows: 0,
+      split1: 25,
+      split2: 50,
+      split3: 75,
+      whiteLevel: 0,
+    },
+  ]),
+);
+
 const editDocumentGeometryCropCoordinatesV2Schema = z.object({
   height: z.number().finite().positive(),
   width: z.number().finite().positive(),
@@ -80,8 +273,22 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
-    defaultParams: {},
-    legacyFields: ['outputToneCurve', 'sceneCurve', 'toneCurve'],
+    defaultParams: {
+      curveMode: 'point',
+      curves: DEFAULT_EDIT_DOCUMENT_CURVES_V2,
+      parametricCurve: DEFAULT_EDIT_DOCUMENT_PARAMETRIC_CURVES_V2,
+      pointCurves: DEFAULT_EDIT_DOCUMENT_CURVES_V2,
+      toneCurve: 'auto_filmic',
+    },
+    legacyFields: [
+      'curveMode',
+      'curves',
+      'outputCurveV1',
+      'parametricCurve',
+      'pointCurves',
+      'sceneCurveV1',
+      'toneCurve',
+    ],
     nodeType: 'scene_curve',
     process: 'scene_referred_v2',
     renderStage: 'scene_curve',
@@ -439,6 +646,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'scene_curve') {
+        const sceneCurve = editDocumentSceneCurveV2Schema.safeParse(node.params);
+        if (!sceneCurve.success) {
+          for (const issue of sceneCurve.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -518,6 +733,7 @@ export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelope
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
+export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 
@@ -540,6 +756,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
+  if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);

@@ -168,14 +168,16 @@ export const buildAdjustmentMutationOperations = (
   after: Adjustments,
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
-  const focusedNodeType = (['scene_global_color_tone', 'camera_input', 'geometry'] as const).find((nodeType) => {
-    const descriptor = getEditDocumentNodeDescriptor(nodeType);
-    return (
-      descriptor !== undefined &&
-      keys.length > 0 &&
-      keys.every((key) => descriptor.legacyFields.some((field) => field === key))
-    );
-  });
+  const focusedNodeType = (['scene_global_color_tone', 'camera_input', 'scene_curve', 'geometry'] as const).find(
+    (nodeType) => {
+      const descriptor = getEditDocumentNodeDescriptor(nodeType);
+      return (
+        descriptor !== undefined &&
+        keys.length > 0 &&
+        keys.every((key) => descriptor.legacyFields.some((field) => field === key))
+      );
+    },
+  );
   if (focusedNodeType === undefined) return [{ type: 'replace-adjustments', adjustments: after }];
   return [
     {

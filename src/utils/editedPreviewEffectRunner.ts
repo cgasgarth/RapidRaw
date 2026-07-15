@@ -214,6 +214,7 @@ const executeNativeEditedPreview = async (
         editDocumentV2: prepareEditDocumentV2ForRender(payload, request.snapshot.editDocumentV2, [
           'camera_input',
           'geometry',
+          'scene_curve',
           'scene_global_color_tone',
         ]),
         expectedImagePath: request.session.sourceImagePath,

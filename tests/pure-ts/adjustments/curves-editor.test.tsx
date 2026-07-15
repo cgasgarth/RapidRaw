@@ -216,6 +216,24 @@ test('typed curve editor enforces the native 32-point limit before mutation', as
   expect(changes).toHaveLength(0);
 });
 
+test('legacy curve editor enforces the native 16-point limit before mutation', async () => {
+  const changes: Adjustments[] = [];
+  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  initial.curves.luma = Array.from({ length: 16 }, (_, index) => {
+    const value = (255 * index) / 15;
+    return { x: value, y: value };
+  });
+  const { container } = await renderCurveEditor(changes, initial);
+  const region = container.querySelector<HTMLElement>('[role="region"][aria-label*="Point Curve"]');
+  if (!region) throw new Error('Expected the point-curve graph region.');
+
+  await act(async () => {
+    region.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 120, clientY: 120 }));
+    await flushPromises();
+  });
+  expect(changes).toHaveLength(0);
+});
+
 test('numeric point editing commits valid changes and Escape does not add history', async () => {
   const changes: Adjustments[] = [];
   const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
