@@ -439,7 +439,11 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
         for (const ownerPath of ownerPaths) {
           owner ??= await readOwner(ownerPath);
         }
-        if (owner?.ownerId !== undefined && options.ownerAliases?.includes(owner.ownerId)) {
+        if (
+          owner?.ownerId !== undefined &&
+          owner.worktree === process.cwd() &&
+          options.ownerAliases?.includes(owner.ownerId)
+        ) {
           throw new Error(
             `${options.label} refused self-queue on ${options.resource}: effective owner ${ownerId} aliases ${owner.ownerId}`,
           );
@@ -494,7 +498,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   const resourceLease = await acquireSingleResourceLease({
     ...options,
     onQueued: notifyQueued,
-    ownerAliases: [...new Set([...(options.ownerAliases ?? []), options.ownerId, processOwnerId])].filter(
+    ownerAliases: [...new Set([...(options.ownerAliases ?? []), options.ownerId])].filter(
       (ownerId): ownerId is string => ownerId !== undefined && ownerId !== effectiveOwnerId,
     ),
     ownerId: effectiveOwnerId,
