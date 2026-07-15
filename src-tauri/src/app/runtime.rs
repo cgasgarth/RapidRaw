@@ -355,6 +355,9 @@ fn configure_builder() -> tauri::Builder<tauri::Wry> {
 }
 
 fn handle_run_event(app_handle: &tauri::AppHandle, event: tauri::RunEvent) {
+    #[cfg(not(target_os = "macos"))]
+    let _ = app_handle;
+
     match event {
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Opened { urls } => {

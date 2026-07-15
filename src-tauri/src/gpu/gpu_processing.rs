@@ -4591,22 +4591,41 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
+        let compile_dehaze_plan = |amount: f32| {
+            let raw = serde_json::json!({
+                "dehaze": f64::from(amount) * 750.0,
+                "rawEngineEditGraphVersion": 2,
+            });
+            crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(
+                        &raw,
+                        0,
+                        0,
+                        u64::from(amount.to_bits()),
+                    ),
+                    is_raw: false,
+                    tonemapper_override: None,
+                },
+                None,
+            )
+            .expect("typed Dehaze edit graph compiles")
+        };
         let identity = PreGpuImageIdentity::for_source(&source, "dehaze_source_analysis");
         let render = |amount| {
-            let mut adjustments = AllAdjustments::default();
-            adjustments.global.dehaze = amount;
-            adjustments.global.edit_graph_version = 2.0;
+            let plan = compile_dehaze_plan(amount);
             process_and_get_unclamped_dynamic_image(
                 &context,
                 &state,
                 &source,
                 identity,
                 RenderRequest {
-                    adjustments,
+                    adjustments: plan.adjustments,
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
                 },
                 "dehaze_source_analysis",
             )
@@ -4639,20 +4658,18 @@ mod blur_pass_tests {
         }));
         let clear_identity = PreGpuImageIdentity::for_source(&clear, "dehaze_clear_air");
         let render_clear = |amount| {
-            let mut adjustments = AllAdjustments::default();
-            adjustments.global.dehaze = amount;
-            adjustments.global.edit_graph_version = 2.0;
+            let plan = compile_dehaze_plan(amount);
             process_and_get_unclamped_dynamic_image(
                 &context,
                 &state,
                 &clear,
                 clear_identity,
                 RenderRequest {
-                    adjustments,
+                    adjustments: plan.adjustments,
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
                 },
                 "dehaze_clear_air",
             )
