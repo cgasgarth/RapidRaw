@@ -7,7 +7,8 @@ type Workflow = {
     string,
     {
       if?: string;
-      steps?: Array<{ env?: Record<string, string>; run?: string }>;
+      steps?: Array<{ env?: Record<string, string>; run?: string; uses?: string; with?: Record<string, unknown> }>;
+      'timeout-minutes'?: number;
     }
   >;
   on?: {
@@ -66,6 +67,25 @@ if (
 }
 if (!required.jobs?.['pr-ci-required']?.if?.includes("inputs.pull_request_number != ''")) {
   throw new Error('PR CI / required must run for updater-dispatched PR validation');
+}
+
+const nativeLane = required.jobs?.['fast-rust'];
+if (nativeLane?.['timeout-minutes'] !== 4) {
+  throw new Error('affected native feedback must retain the four-minute PR budget');
+}
+const rustSetup = nativeLane.steps?.find((step) => step.uses?.startsWith('actions-rust-lang/setup-rust-toolchain@'));
+if (rustSetup?.with?.['cache-save-if'] !== 'false' || Object.hasOwn(rustSetup?.with ?? {}, 'cache')) {
+  throw new Error('affected native feedback must restore Rust cache without an unnecessary post-job save');
+}
+const nativeValidation = nativeLane.steps?.find((step) => step.run)?.run;
+for (const command of [
+  'cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check',
+  'cargo metadata --manifest-path src-tauri/Cargo.toml --locked --no-deps --format-version 1 > /dev/null',
+  'bun test tests/pure-ts/native-feedback.test.ts',
+  'bun tests/integration/checks/check-native-feature-leaves.ts',
+]) {
+  if (!nativeValidation?.includes(command))
+    throw new Error(`affected native feedback dropped required check: ${command}`);
 }
 
 console.log('ready PR branch workflow contract ok');
