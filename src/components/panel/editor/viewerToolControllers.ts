@@ -13,12 +13,14 @@ export interface ViewerToolPointerSample {
 
 export type ViewerToolId =
   | 'brush'
+  | 'compare-divider'
   | 'crop'
   | 'focus-retouch'
   | 'mask'
   | 'pan'
   | 'point-color'
   | 'retouch'
+  | 'straighten'
   | 'tone-equalizer'
   | 'viewer-sampler'
   | 'white-balance';
@@ -27,6 +29,7 @@ export interface ViewerToolSessionKey {
   readonly geometryEpoch: number;
   readonly imageSessionId: string;
   readonly operationGeneration: number;
+  readonly sourceIdentity: string;
   readonly sourceRevision: string;
   readonly toolId: ViewerToolId;
 }
@@ -98,12 +101,14 @@ const createController = (id: ViewerToolId): ViewerToolController => ({
 
 export const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
   brush: createController('brush'),
+  'compare-divider': createController('compare-divider'),
   crop: createController('crop'),
   'focus-retouch': createController('focus-retouch'),
   mask: createController('mask'),
   pan: createController('pan'),
   'point-color': createController('point-color'),
   retouch: createController('retouch'),
+  straighten: createController('straighten'),
   'tone-equalizer': createController('tone-equalizer'),
   'viewer-sampler': createController('viewer-sampler'),
   'white-balance': createController('white-balance'),
@@ -112,10 +117,12 @@ export const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolCont
 export const resolveViewerToolId = (tool: string): ViewerToolId => {
   if (
     tool === 'brush' ||
+    tool === 'compare-divider' ||
     tool === 'crop' ||
     tool === 'mask' ||
     tool === 'point-color' ||
     tool === 'retouch' ||
+    tool === 'straighten' ||
     tool === 'tone-equalizer' ||
     tool === 'white-balance'
   )
@@ -171,6 +178,7 @@ export const createViewerToolSessionRegistry = (): ViewerToolSessionRegistry => 
 
 export const isViewerToolSessionCurrent = (expected: ViewerToolSessionKey, actual: ViewerToolSessionKey): boolean =>
   expected.imageSessionId === actual.imageSessionId &&
+  expected.sourceIdentity === actual.sourceIdentity &&
   expected.sourceRevision === actual.sourceRevision &&
   expected.geometryEpoch === actual.geometryEpoch &&
   expected.toolId === actual.toolId &&

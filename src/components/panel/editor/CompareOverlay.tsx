@@ -1,117 +1,41 @@
-import type { KeyboardEvent, PointerEvent } from 'react';
-import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
-import {
-  type CompareDividerCommand,
-  type CompareDividerCurrentContext,
-  type CompareDividerPointerSample,
-  createCompareDividerInteractionController,
-  createCompareDividerOverlayDescriptor,
-} from './compareDividerInteractionController';
+import type { CompareDividerOverlayDescriptor } from './compareDividerInteractionController';
 import { imageCanvasLayerZIndex } from './imageCanvasContracts';
 
 interface CompareOverlayProps {
   canShowOriginalCompare: boolean;
-  compareDividerPosition: number;
   compareLabelsVisible: boolean;
   comparisonLabel?: string | null;
   compareOrientation: EditorCompareOrientation;
   compareOverlayDisabled: boolean;
   editedImageRect: RenderSize;
-  geometryEpoch: number;
-  imageSessionId: string;
+  descriptor: CompareDividerOverlayDescriptor;
   isCompareModeActive: boolean;
-  onDividerPositionChange: (position: number) => void;
-  onDividerReset: () => void;
   originalImageRect: RenderSize;
   originalStatus: 'error' | 'loading' | 'ready';
   showSideBySideCompare: boolean;
   showSplitCompare: boolean;
-  sourceIdentity: string;
-  sourceRevision: string;
 }
 
 const cssPx = (value: number): string => `${String(value)}px`;
 
 export function CompareOverlay({
   canShowOriginalCompare,
-  compareDividerPosition,
   compareLabelsVisible,
   comparisonLabel = null,
   compareOrientation,
   compareOverlayDisabled,
   editedImageRect,
-  geometryEpoch,
-  imageSessionId,
+  descriptor,
   isCompareModeActive,
-  onDividerPositionChange,
-  onDividerReset,
   originalImageRect,
   originalStatus,
   showSideBySideCompare,
   showSplitCompare,
-  sourceIdentity,
-  sourceRevision,
 }: CompareOverlayProps) {
   const { t } = useTranslation();
-  const controller = useMemo(() => createCompareDividerInteractionController(), []);
-  const interactionContext: CompareDividerCurrentContext = {
-    active: showSplitCompare,
-    geometryEpoch,
-    imageSessionId,
-    imageRect: editedImageRect,
-    orientation: compareOrientation,
-    position: compareDividerPosition,
-    sourceIdentity,
-    sourceRevision,
-  };
-  const descriptor = createCompareDividerOverlayDescriptor(interactionContext);
-
-  useEffect(() => {
-    controller.invalidate();
-  }, [controller, descriptor.sessionFingerprint]);
-
-  useEffect(() => () => controller.invalidate(), [controller]);
-
-  const execute = (commands: readonly CompareDividerCommand[]): void => {
-    for (const command of commands) {
-      if (command.kind === 'reset') onDividerReset();
-      else onDividerPositionChange(command.position);
-    }
-  };
-
-  const pointerSample = (event: PointerEvent<HTMLDivElement>): CompareDividerPointerSample | null => {
-    const host = event.currentTarget.parentElement;
-    if (!host || host.offsetWidth <= 0 || host.offsetHeight <= 0) return null;
-    const hostBounds = host.getBoundingClientRect();
-    const scaleX = hostBounds.width / host.offsetWidth;
-    const scaleY = hostBounds.height / host.offsetHeight;
-    return {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      imageBounds: {
-        height: editedImageRect.height * scaleY,
-        left: hostBounds.left + editedImageRect.offsetX * scaleX,
-        top: hostBounds.top + editedImageRect.offsetY * scaleY,
-        width: editedImageRect.width * scaleX,
-      },
-      pointerId: event.pointerId,
-      pointerType: event.pointerType === 'touch' || event.pointerType === 'pen' ? event.pointerType : 'mouse',
-    };
-  };
-
-  const handleDividerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const commands = controller.dispatch(interactionContext, {
-      key: event.key,
-      shiftKey: event.shiftKey,
-      type: 'keydown',
-    });
-    if (commands.length === 0) return;
-    event.preventDefault();
-    execute(commands);
-  };
 
   const label = (text: string, rect: RenderSize, align: 'left' | 'right') => (
     <span
@@ -141,38 +65,7 @@ export function CompareOverlay({
           data-compare-divider-geometry-epoch={String(descriptor.geometryEpoch)}
           data-compare-divider-session={descriptor.sessionFingerprint}
           data-testid="editor-compare-split-divider"
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            execute(controller.dispatch(interactionContext, { type: 'reset' }));
-          }}
-          onKeyDown={handleDividerKeyDown}
-          onPointerDown={(event) => {
-            event.stopPropagation();
-            const sample = pointerSample(event);
-            if (sample === null) return;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            execute(controller.dispatch(interactionContext, { ...sample, type: 'pointerdown' }));
-          }}
-          onPointerMove={(event) => {
-            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-            const sample = pointerSample(event);
-            if (sample !== null) execute(controller.dispatch(interactionContext, { ...sample, type: 'pointermove' }));
-          }}
-          onPointerUp={(event) => {
-            const sample = pointerSample(event);
-            if (sample !== null) execute(controller.dispatch(interactionContext, { ...sample, type: 'pointerup' }));
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            }
-          }}
-          onPointerCancel={(event) => {
-            const sample = pointerSample(event);
-            if (sample !== null) controller.dispatch(interactionContext, { ...sample, type: 'pointercancel' });
-          }}
-          onLostPointerCapture={(event) => {
-            const sample = pointerSample(event);
-            if (sample !== null) controller.dispatch(interactionContext, { ...sample, type: 'lostpointercapture' });
-          }}
+          data-viewer-input-tool="compare-divider"
           role="slider"
           style={{
             background: 'rgba(255, 255, 255, 0.9)',

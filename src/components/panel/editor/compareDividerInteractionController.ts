@@ -4,6 +4,7 @@ import {
   type EditorCompareOrientation,
   resolveCompareDividerGeometry,
 } from '../../../utils/editorCompare';
+import type { ViewerSurfacePointerEvent } from './viewerInputRouter';
 
 export interface CompareDividerCurrentContext {
   readonly active: boolean;
@@ -44,7 +45,7 @@ export type CompareDividerInputEvent =
       readonly type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel' | 'lostpointercapture';
     } & CompareDividerPointerSample)
   | { readonly key: string; readonly shiftKey: boolean; readonly type: 'keydown' }
-  | { readonly type: 'reset' | 'session-invalidated' };
+  | { readonly type: 'blur' | 'escape' | 'reset' | 'session-invalidated' };
 
 export type CompareDividerCommand =
   | { readonly key: CompareDividerSessionKey; readonly kind: 'set-position'; readonly position: number }
@@ -99,6 +100,36 @@ export const resolveCompareDividerPointerPosition = (
   const axisStart = orientation === 'vertical' ? sample.imageBounds.left : sample.imageBounds.top;
   const axisPoint = orientation === 'vertical' ? sample.clientX : sample.clientY;
   return clampCompareDivider((axisPoint - axisStart) / axisSize);
+};
+
+/** Shared surface-to-image mapping used by divider command input and its rendered descriptor. */
+export const compareDividerPointerSampleFromSurface = (
+  event: ViewerSurfacePointerEvent,
+  imageRect: RenderSize,
+): CompareDividerPointerSample | null => {
+  const surface = event.surfaceRect;
+  if (
+    surface === undefined ||
+    surface.layoutWidth <= 0 ||
+    surface.layoutHeight <= 0 ||
+    surface.width <= 0 ||
+    surface.height <= 0
+  )
+    return null;
+  const scaleX = surface.width / surface.layoutWidth;
+  const scaleY = surface.height / surface.layoutHeight;
+  return {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    imageBounds: {
+      height: imageRect.height * scaleY,
+      left: surface.x + imageRect.offsetX * scaleX,
+      top: surface.y + imageRect.offsetY * scaleY,
+      width: imageRect.width * scaleX,
+    },
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+  };
 };
 
 export const createCompareDividerOverlayDescriptor = (
@@ -158,6 +189,10 @@ export const createCompareDividerInteractionController = (): CompareDividerInter
     dispatch: (context, event) => {
       const invalidated = synchronize(context);
       if (event.type === 'session-invalidated') {
+        active = null;
+        return [];
+      }
+      if (event.type === 'blur' || event.type === 'escape') {
         active = null;
         return [];
       }
