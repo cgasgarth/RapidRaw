@@ -74,7 +74,6 @@ export function useImageProcessing() {
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const previewViewportTransform = useEditorStore((state) => state.previewViewportTransform);
   const originalSize = useEditorStore((state) => state.originalSize);
-  const zoomMode = useEditorStore((state) => state.zoomMode);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
   const editorImageSession = useEditorStore((state) => state.imageSession);
   const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(adjustmentSnapshot, autoEditPreviewSession, {
@@ -662,7 +661,7 @@ export function useImageProcessing() {
     });
     const resolvedZoom = resolveEditorZoom({
       devicePixelRatio: getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
-      mode: zoomMode,
+      mode: useEditorStore.getState().zoomMode,
       renderSize: {
         height: baseRenderSize.height,
         scale: baseRenderSize.width / Math.max(sourceSize.width, 1),
@@ -696,7 +695,6 @@ export function useImageProcessing() {
     adjustments.orientationSteps,
     baseRenderSize,
     originalSize,
-    zoomMode,
   ]);
 
   const requestOriginalPreview = useCallback(
