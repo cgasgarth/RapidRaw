@@ -6,6 +6,7 @@ pub(crate) mod negative_lab_dust;
 pub(crate) mod original_preview;
 pub(crate) mod path_preview;
 pub(crate) mod perspective;
+pub(crate) mod preset_previews;
 pub(crate) mod source;
 pub(crate) mod startup;
 pub(crate) mod temporary_artifacts;
