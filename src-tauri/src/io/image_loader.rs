@@ -1089,7 +1089,7 @@ pub(crate) async fn load_image_prepared(
     } else if install_active {
         let generation = state
             .services
-            .uncropped_preview
+            .preview_session
             .begin_image_load(&state.load_image_generation);
         (Arc::clone(&state.load_image_generation), generation)
     } else {
@@ -1404,7 +1404,7 @@ pub(crate) async fn load_image_prepared(
         });
         state
             .services
-            .uncropped_preview
+            .preview_session
             .install_image_session(my_generation as u64, &path);
     }
 
