@@ -2459,6 +2459,7 @@ function BrushMaskCanvasVisualSmoke() {
           <div className="grid place-items-center bg-[#0b0d10] p-8">
             <div className="relative h-[360px] w-[640px] overflow-hidden rounded border border-white/10 bg-black">
               <ImageCanvas
+                adjustmentRevision={0}
                 activeAiPatchContainerId={null}
                 activeAiSubMaskId={null}
                 activeMaskContainerId={brushMaskCanvasContainerId}
@@ -2466,6 +2467,7 @@ function BrushMaskCanvasVisualSmoke() {
                 adjustments={adjustments}
                 appSettings={null}
                 brushSettings={brushSettings}
+                brushImageSessionId="editor-image-session:51"
                 crop={null}
                 cursorStyle="crosshair"
                 exportSoftProofRecipeId={null}
@@ -2474,7 +2476,7 @@ function BrushMaskCanvasVisualSmoke() {
                 gamutWarningOverlay={null}
                 handleCropComplete={() => {}}
                 hasRenderedFirstFrame
-                imageSessionId="visual-smoke:brush-mask-canvas"
+                imageSessionId={null}
                 imageRenderSize={{
                   height: brushMaskCanvasImageHeight,
                   offsetX: 0,
@@ -2494,6 +2496,16 @@ function BrushMaskCanvasVisualSmoke() {
                 isStraightenActive={false}
                 maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
                 onAiMaskBoxCommit={() => {}}
+                onBrushCommit={(command) => {
+                  if (
+                    command.key.containerId !== brushMaskCanvasContainerId ||
+                    command.key.maskId !== brushMaskCanvasSubMaskId
+                  ) {
+                    return;
+                  }
+                  setSubMask((current) => ({ ...current, parameters: command.parameters }));
+                  setLivePreview(null);
+                }}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
                 onRetouchCommand={ignoreRetouchCommand}
@@ -2504,17 +2516,7 @@ function BrushMaskCanvasVisualSmoke() {
                 onSelectMask={() => {}}
                 onStraighten={() => {}}
                 selectedImage={brushMaskCanvasImage}
-                setAdjustments={(updater) => {
-                  setSubMask((current) => {
-                    const previous: Adjustments = {
-                      ...INITIAL_ADJUSTMENTS,
-                      aiPatches: [],
-                      masks: [createBrushMaskCanvasContainer(current)],
-                    };
-                    const next = updater(previous);
-                    return next.masks[0]?.subMasks[0] ?? current;
-                  });
-                }}
+                setAdjustments={() => {}}
                 setCrop={() => {}}
                 setIsMaskHovered={() => {}}
                 setIsMaskTouchInteracting={() => {}}
@@ -2675,6 +2677,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
               style={{ maxHeight: 520, maxWidth: 920 }}
             >
               <ImageCanvas
+                adjustmentRevision={0}
                 activeAiPatchContainerId={null}
                 activeAiSubMaskId={null}
                 activeMaskContainerId={null}
@@ -2682,6 +2685,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 adjustments={adjustments}
                 appSettings={null}
                 brushSettings={null}
+                brushImageSessionId="visual-smoke:crop-transform"
                 crop={crop}
                 cursorStyle="default"
                 exportSoftProofRecipeId={null}
@@ -2707,6 +2711,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 liveRotation={liveRotation}
                 maskOverlayUrl={null}
                 onAiMaskBoxCommit={() => {}}
+                onBrushCommit={() => {}}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
                 onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
                 onRetouchCommand={ignoreRetouchCommand}
@@ -2888,7 +2893,9 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
   const brushOverlayUrl = buildBrushMaskCanvasOverlayUrl(professionalCanvasBrushSubMask);
 
   const baseCanvasProps = {
+    adjustmentRevision: 0,
     appSettings: professionalCanvasAppSettings,
+    brushImageSessionId: 'visual-smoke:professional-canvas',
     cursorStyle: 'default',
     exportSoftProofRecipeId: null,
     exportSoftProofTransform: null,
@@ -2907,6 +2914,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
     isStraightenActive: false,
     liveRotation: null,
     onAiMaskBoxCommit: () => {},
+    onBrushCommit: () => {},
     onInitialMaskDrawCommit: ignoreInitialMaskDrawCommit,
     onParametricMaskTargetCommit: ignoreParametricMaskTargetCommit,
     onRetouchCommand: ignoreRetouchCommand,

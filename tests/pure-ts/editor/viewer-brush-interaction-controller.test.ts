@@ -8,9 +8,13 @@ import {
 
 const context = (overrides: Partial<ViewerBrushCurrentContext> = {}): ViewerBrushCurrentContext => ({
   active: true,
+  adjustmentRevision: 12,
+  containerId: 'layer:brush',
+  containerKind: 'masks',
   geometryEpoch: 4,
   imageSessionId: 'image-session:12:a',
   maskId: 'mask:brush',
+  sourceIdentity: '/raws/alaska/a.arw',
   sourceRevision: 'graph:9',
   toolId: 'brush',
   ...overrides,
@@ -93,11 +97,15 @@ describe('viewer brush interaction controller', () => {
 
   test('rejects competing pointers and resets on exact A to B to A currentness changes', () => {
     const successors = [
+      context({ adjustmentRevision: 13 }),
+      context({ containerId: 'layer:successor' }),
+      context({ containerKind: 'aiPatches' }),
       context({ geometryEpoch: 5 }),
       context({ sourceRevision: 'graph:10' }),
       context({ imageSessionId: 'image-session:13:b' }),
       context({ imageSessionId: 'image-session:14:a' }),
       context({ maskId: 'mask:successor' }),
+      context({ sourceIdentity: '/raws/alaska/b.arw' }),
       context({ active: false }),
     ];
     for (const successor of successors) {

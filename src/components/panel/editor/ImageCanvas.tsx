@@ -84,7 +84,6 @@ import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSurface } from './ViewerSurface';
-import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import {
   createViewerAiMaskBoxInteractionController,
   type ViewerAiMaskBoxCommand,
@@ -95,6 +94,7 @@ import {
 import {
   createViewerBrushCommandAdapter,
   type ViewerBrushCommandCaptureSummary,
+  type ViewerBrushCommitResult,
   type ViewerBrushParameters,
 } from './viewerBrushCommandAdapter';
 import {
@@ -212,6 +212,7 @@ const canvasOverlayShadowProps = {
   shadowOpacity: canvasOverlayTokens.shadow.opacity,
 } as const;
 interface ImageCanvasProps {
+  adjustmentRevision: number;
   appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
   activeAiSubMaskId: string | null;
@@ -219,6 +220,7 @@ interface ImageCanvasProps {
   activeMaskId: string | null;
   adjustments: Adjustments;
   adjustmentGeometryRevision?: number;
+  brushImageSessionId: string;
   brushSettings: BrushSettings | null;
   crop: Crop | null;
   exportSoftProofRecipeId: string | null;
@@ -244,6 +246,7 @@ interface ImageCanvasProps {
   maskOverlayUrl: string | null;
   maskOverlayRuntimeState?: { identity: string | null; status: 'current' | 'none' | 'stale-ignored' };
   onAiMaskBoxCommit: (command: ViewerAiMaskBoxCommand) => void;
+  onBrushCommit: (command: ViewerBrushCommitResult) => void;
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
@@ -296,8 +299,10 @@ export const ImageCanvas = memo(
     activeAiSubMaskId,
     activeMaskContainerId,
     activeMaskId,
+    adjustmentRevision,
     adjustments,
     adjustmentGeometryRevision = 1,
+    brushImageSessionId,
     brushSettings,
     crop,
     exportSoftProofRecipeId,
@@ -324,6 +329,7 @@ export const ImageCanvas = memo(
     maskOverlayUrl,
     maskOverlayRuntimeState,
     onAiMaskBoxCommit,
+    onBrushCommit,
     onInitialMaskDrawCommit,
     onLiveMaskPreview,
     onParametricMaskTargetCommit,
@@ -369,10 +375,6 @@ export const ImageCanvas = memo(
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
     const setUI = useUIStore((state) => state.setUI);
-    const viewerAdjustmentCommandServices = useMemo(
-      () => createViewerAdjustmentCommandServices(setAdjustments),
-      [setAdjustments],
-    );
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
@@ -381,6 +383,7 @@ export const ImageCanvas = memo(
     const maskInteractionIdentityRef = useRef<SubMaskInteractionIdentity | null>(null);
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<KonvaStage | null>(null);
+    const activeBrushPenPointerIdRef = useRef<number | null>(null);
     const pointerGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
     const viewerAiMaskBoxController = useMemo(() => createViewerAiMaskBoxInteractionController(), []);
     const aiMaskBoxTransitionRef = useRef('idle');
@@ -395,10 +398,7 @@ export const ImageCanvas = memo(
       () => createViewerParametricMaskTargetInteractionController(),
       [],
     );
-    const viewerBrushCommands = useMemo(
-      () => createViewerBrushCommandAdapter((id, patch) => viewerAdjustmentCommandServices.updateSubMask(id, patch)),
-      [viewerAdjustmentCommandServices],
-    );
+    const viewerBrushCommands = useMemo(() => createViewerBrushCommandAdapter(), []);
     const viewerInteractionCoordinator = useMemo(() => createViewerInteractionCoordinator(), []);
     const viewerInteractionTransitionRef = useRef<ViewerInteractionTransition | null>(null);
     const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
@@ -756,9 +756,13 @@ export const ImageCanvas = memo(
     const activeBrushMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerBrushContext: ViewerBrushCurrentContext = {
       active: isBrushActive && activeBrushMaskId !== null,
+      adjustmentRevision,
+      containerId: activeContainer?.id ?? 'brush-container:none',
+      containerKind: isAiEditing ? 'aiPatches' : 'masks',
       geometryEpoch: overlayGeometry.geometryEpoch,
-      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+      imageSessionId: brushImageSessionId,
       maskId: activeBrushMaskId ?? 'brush:none',
+      sourceIdentity: selectedImage.path,
       sourceRevision: presentationDescriptor.graphRevision,
       toolId: 'brush',
     };
@@ -802,7 +806,10 @@ export const ImageCanvas = memo(
             parameters: activeSubMaskParameters,
             subMask: activeSubMask,
           });
-          if (result !== null) setLastBrushCommandCapture(result.summary);
+          if (result !== null) {
+            setLastBrushCommandCapture(result.summary);
+            onBrushCommit(result);
+          }
         }
         if (commands.some((command) => command.kind === 'cancel' || command.kind === 'commit')) {
           drawingStageRef.current = null;
@@ -813,6 +820,7 @@ export const ImageCanvas = memo(
         activeSubMask,
         activeSubMaskParameters,
         effectiveImageDimensions,
+        onBrushCommit,
         publishBrushOverlay,
         selectedImage.path,
         viewerBrushCommands,
@@ -1593,6 +1601,41 @@ export const ImageCanvas = memo(
       ],
     );
 
+    const handlePenStart = useCallback(
+      (event: KonvaEventObject<PointerEvent>) => {
+        if (!isBrushActive || event.evt.pointerType !== 'pen' || activeBrushPenPointerIdRef.current !== null) return;
+        activeBrushPenPointerIdRef.current = event.evt.pointerId;
+        handleStart(event);
+      },
+      [handleStart, isBrushActive],
+    );
+
+    const handlePenMove = useCallback(
+      (event: KonvaEventObject<PointerEvent>) => {
+        if (event.evt.pointerType !== 'pen' || activeBrushPenPointerIdRef.current !== event.evt.pointerId) return;
+        handleMove(event);
+      },
+      [handleMove],
+    );
+
+    const handlePenEnd = useCallback(
+      (event: KonvaEventObject<PointerEvent>) => {
+        if (event.evt.pointerType !== 'pen' || activeBrushPenPointerIdRef.current !== event.evt.pointerId) return;
+        handleUp(event);
+        activeBrushPenPointerIdRef.current = null;
+      },
+      [handleUp],
+    );
+
+    const handlePenCancel = useCallback(
+      (event: KonvaEventObject<PointerEvent>) => {
+        if (event.evt.pointerType !== 'pen' || activeBrushPenPointerIdRef.current !== event.evt.pointerId) return;
+        activeBrushPenPointerIdRef.current = null;
+        executeBrushCommands(viewerBrushController.cancel('pointercancel'));
+      },
+      [executeBrushCommands, viewerBrushController],
+    );
+
     const handleMouseEnter = useCallback(() => {
       if (isToolActive) {
         setCursorPreview((p: CursorPreview) => ({ ...p, visible: true }));
@@ -2059,7 +2102,9 @@ export const ImageCanvas = memo(
         }}
         onPointerDown={(event) => {
           const transition = viewerInteractionTransitionRef.current;
-          if (transition?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
+          if (transition?.shouldCapturePointer && event.nativeEvent.isTrusted) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
           if (pickerControllers.activeTool !== null || whiteBalanceController.active) {
             event.preventDefault();
             return;
@@ -2202,14 +2247,19 @@ export const ImageCanvas = memo(
           />
           {showInteractiveToolOverlayStage && (
             <div
+              data-brush-command-adjustment-revision={lastBrushCommandCapture?.adjustmentRevision ?? ''}
               data-brush-command-expected-graph-revision={lastBrushCommandCapture?.expectedGraphRevision ?? ''}
               data-brush-command-hash={lastBrushCommandCapture?.commandHash ?? ''}
               data-brush-command-image-path={lastBrushCommandCapture?.imagePath ?? ''}
+              data-brush-command-image-session-id={lastBrushCommandCapture?.imageSessionId ?? ''}
+              data-brush-command-container-id={lastBrushCommandCapture?.containerId ?? ''}
+              data-brush-command-container-kind={lastBrushCommandCapture?.containerKind ?? ''}
               data-brush-command-mask-id={lastBrushCommandCapture?.maskId ?? ''}
               data-brush-command-operation-id={lastBrushCommandCapture?.operationId ?? ''}
               data-brush-command-pressure-point-count={lastBrushCommandCapture?.pressurePointCount ?? 0}
               data-brush-command-receipt-version={lastBrushCommandCapture?.receiptVersion ?? 0}
               data-brush-command-schema-version={lastBrushCommandCapture?.schemaVersion ?? 0}
+              data-brush-command-source-identity={lastBrushCommandCapture?.sourceIdentity ?? ''}
               data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
               data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
               data-brush-command-last-mode={lastBrushCommandCapture?.lastStrokeMode ?? ''}
@@ -2241,14 +2291,24 @@ export const ImageCanvas = memo(
               <Stage
                 width={stageWidth * maxSafeScale}
                 height={stageHeight * maxSafeScale}
-                onMouseDown={handleStart}
+                onMouseDown={(event) => {
+                  if (activeBrushPenPointerIdRef.current === null) handleStart(event);
+                }}
                 onTouchStart={handleStart}
+                onPointerDown={handlePenStart}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
-                onMouseMove={handleMove}
+                onMouseMove={(event) => {
+                  if (activeBrushPenPointerIdRef.current === null) handleMove(event);
+                }}
                 onTouchMove={handleMove}
-                onMouseUp={handleUp}
+                onPointerMove={handlePenMove}
+                onMouseUp={(event) => {
+                  if (activeBrushPenPointerIdRef.current === null) handleUp(event);
+                }}
                 onTouchEnd={handleUp}
+                onPointerUp={handlePenEnd}
+                onPointerCancel={handlePenCancel}
               >
                 <Layer listening={showInteractiveToolOverlayStage}>
                   <Group scaleX={maxSafeScale} scaleY={maxSafeScale}>
