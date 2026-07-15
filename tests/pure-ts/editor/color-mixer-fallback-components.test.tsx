@@ -76,11 +76,21 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     source: 'manual-control',
   });
 
+  act(() => getButton(container, 'color-balance-toggle').click());
+  expect(useEditorStore.getState().adjustments.colorBalanceRgb).toMatchObject({
+    enabled: true,
+    midtones: { red: 10 },
+  });
+  expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(
+    useEditorStore.getState().adjustments.colorBalanceRgb,
+  );
+  expect(useEditorStore.getState().editDocumentV2.nodes.channel_mixer.params).not.toHaveProperty('colorBalanceRgb');
+
   act(() => getButton(container, 'channel-mixer-toggle').click());
   expect(useEditorStore.getState().adjustments.channelMixer.enabled).toBeTrue();
-  expect(useEditorStore.getState().history).toHaveLength(3);
+  expect(useEditorStore.getState().history).toHaveLength(4);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
-    adjustmentRevision: 2,
+    adjustmentRevision: 3,
     imageSessionId: 'editor-image-session:91',
   });
   expect(genericSetter).not.toHaveBeenCalled();

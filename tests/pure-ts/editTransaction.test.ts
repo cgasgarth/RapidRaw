@@ -174,6 +174,21 @@ describe('reduceEditTransaction', () => {
       },
     ]);
 
+    const colorBalanceRgb = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones, red: 18 },
+    };
+    expect(buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, colorBalanceRgb })).toEqual(
+      [
+        {
+          type: 'patch-edit-document-node',
+          nodeType: 'color_balance_rgb',
+          patch: { colorBalanceRgb },
+        },
+      ],
+    );
+
     const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
     const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
     expect(
@@ -245,7 +260,7 @@ describe('reduceEditTransaction', () => {
     const operations = buildEditorSectionNodeEnablementOperations(document, 'color', false);
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request({ operations }), undefined, document);
 
-    expect(operations).toHaveLength(6);
+    expect(operations).toHaveLength(7);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
     expect(result.after).toBe(INITIAL_ADJUSTMENTS);

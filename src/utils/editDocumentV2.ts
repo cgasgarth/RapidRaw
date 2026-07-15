@@ -10,6 +10,7 @@ import {
   editDocumentBlackWhiteMixerV2Schema,
   editDocumentCameraInputV2Schema,
   editDocumentChannelMixerV2Schema,
+  editDocumentColorBalanceRgbV2Schema,
   editDocumentColorCalibrationV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
@@ -44,6 +45,7 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
       key as (typeof EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS)[number]
     ];
   }
+  if (key === 'colorBalanceRgb') return editDocumentColorBalanceRgbV2Schema.shape.colorBalanceRgb;
   return undefined;
 };
 
@@ -165,19 +167,24 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                                 ...(descriptor?.defaultParams ?? {}),
                                 ...mappedParams,
                               })
-                            : nodeType === 'perceptual_grading'
-                              ? editDocumentPerceptualGradingV2Schema.parse({
+                            : nodeType === 'color_balance_rgb'
+                              ? editDocumentColorBalanceRgbV2Schema.parse({
                                   ...(descriptor?.defaultParams ?? {}),
                                   ...mappedParams,
                                 })
-                              : nodeType === 'color_calibration'
-                                ? editDocumentColorCalibrationV2Schema.parse({
+                              : nodeType === 'perceptual_grading'
+                                ? editDocumentPerceptualGradingV2Schema.parse({
                                     ...(descriptor?.defaultParams ?? {}),
                                     ...mappedParams,
                                   })
-                                : nodeType === 'layers'
-                                  ? normalizeLegacyLayers({ masks: [], ...mappedParams })
-                                  : mappedParams;
+                                : nodeType === 'color_calibration'
+                                  ? editDocumentColorCalibrationV2Schema.parse({
+                                      ...(descriptor?.defaultParams ?? {}),
+                                      ...mappedParams,
+                                    })
+                                  : nodeType === 'layers'
+                                    ? normalizeLegacyLayers({ masks: [], ...mappedParams })
+                                    : mappedParams;
       return [
         nodeType,
         {
@@ -206,6 +213,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'camera_input',
       'black_white_mixer',
       'channel_mixer',
+      'color_balance_rgb',
       'color_calibration',
       'detail_denoise_dehaze',
       'display_creative',
