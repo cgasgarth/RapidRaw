@@ -4,6 +4,7 @@ import { filmEmulationNodeV1Schema } from '../../../packages/rawengine-schema/sr
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   EditedPreviewEffectRunner,
   type EditedPreviewRequest,
@@ -560,19 +561,29 @@ describe('edited preview effect runner', () => {
     const persistenceInput = {
       adjustmentRevision: 2,
       adjustments: { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 },
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 }),
       imageSessionId: 'session-a',
       interactionActive: false,
       multiSelection: null,
       path: '/fixtures/a.raw',
-      receipt: null,
+      receipt: {
+        adjustmentRevision: 2,
+        baseAdjustmentRevision: 1,
+        changedKeys: ['exposure'],
+        imageSessionId: 'session-a',
+        persistence: 'commit' as const,
+        source: 'manual-control' as const,
+        transactionId: 'persistence-failure-2',
+      },
       sessionGeneration: 1,
     };
-    persistence.submit({
+    persistence.installSession({
       ...persistenceInput,
       adjustmentRevision: 0,
       adjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
     });
-    persistence.submit(persistenceInput);
+    persistence.submitCommitted(persistenceInput);
     preview.runner.request(buildRequest());
     await tick();
 

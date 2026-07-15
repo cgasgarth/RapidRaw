@@ -53,7 +53,18 @@ export function useEditorPersistence(): void {
 
   useEffect(() => {
     if (!selectedImage?.isReady || imageSession === null) return;
-    runner.submit({
+    runner.installSession({
+      adjustmentRevision,
+      adjustments,
+      editDocumentV2,
+      imageSessionId: imageSession.id,
+      path: selectedImage.path,
+      sessionGeneration: imageSessionId,
+    });
+    if (receipt?.imageSessionId !== imageSession.id || receipt.adjustmentRevision !== adjustmentRevision) {
+      return;
+    }
+    runner.submitCommitted({
       adjustmentRevision,
       adjustments,
       editDocumentV2,
