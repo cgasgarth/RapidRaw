@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GrayImage};
 
 use crate::cache_utils::DecodedImageCache;
-use crate::lut_processing::{CachedLutPath, Lut};
+use crate::lut_processing::{self, CachedLutPath, Lut};
 use crate::raw_processing::RawDevelopmentReport;
 use crate::render::native_cache::{
     CacheBudgetCoordinator, CachePolicy, CacheStats, MemoryLruCache,
@@ -21,6 +21,7 @@ pub(crate) struct NativeCacheService {
     budget: Arc<CacheBudgetCoordinator>,
     lut_paths: MemoryLruCache<String, CachedLutPath>,
     lut_content: MemoryLruCache<[u8; 32], Lut>,
+    lut_publication: Mutex<()>,
     masks: MemoryLruCache<u64, GrayImage>,
     geometry: MemoryLruCache<u64, DynamicImage>,
     thumbnail_geometry: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
@@ -46,6 +47,7 @@ impl Default for NativeCacheService {
                 policy("lut_cpu", 64, 96, Some(32)),
                 Arc::clone(&budget),
             ),
+            lut_publication: Mutex::new(()),
             masks: MemoryLruCache::new(policy("masks", 96, 128, Some(64)), Arc::clone(&budget)),
             geometry: MemoryLruCache::new(
                 policy("geometry", 256, 384, Some(16)),
@@ -81,20 +83,67 @@ impl NativeCacheService {
         ]
     }
 
-    pub(crate) fn lut_path(&self, path: &str) -> Option<Arc<CachedLutPath>> {
-        self.lut_paths.get(&path.to_string())
+    pub(crate) fn get_or_load_lut(&self, path: &str) -> Result<Arc<Lut>, String> {
+        self.get_or_load_lut_with_before_publication(path, || {})
     }
 
-    pub(crate) fn insert_lut_path(&self, path: String, value: Arc<CachedLutPath>) {
-        self.lut_paths.insert(path, value, 256);
-    }
+    fn get_or_load_lut_with_before_publication(
+        &self,
+        path: &str,
+        before_publication: impl Fn(),
+    ) -> Result<Arc<Lut>, String> {
+        const MAX_SOURCE_CHANGE_RETRIES: usize = 3;
 
-    pub(crate) fn lut_content(&self, hash: &[u8; 32]) -> Option<Arc<Lut>> {
-        self.lut_content.get(hash)
-    }
+        for _ in 0..MAX_SOURCE_CHANGE_RETRIES {
+            let fingerprint =
+                lut_processing::source_fingerprint(path).map_err(|error| error.to_string())?;
+            if let Some(entry) = self.lut_paths.get(&path.to_string())
+                && entry.fingerprint == fingerprint
+            {
+                return Ok(Arc::clone(&entry.lut));
+            }
 
-    pub(crate) fn insert_lut_content(&self, hash: [u8; 32], lut: Arc<Lut>, weight: u64) {
-        self.lut_content.insert(hash, lut, weight);
+            let parsed = lut_processing::parse_lut_file(path).map_err(|error| error.to_string())?;
+            let confirmed_fingerprint =
+                lut_processing::source_fingerprint(path).map_err(|error| error.to_string())?;
+            if confirmed_fingerprint != fingerprint {
+                continue;
+            }
+
+            before_publication();
+            let _publication = self.lut_publication.lock().unwrap();
+            // Metadata I/O is intentionally inside this narrow publication section: an older
+            // parser must not overwrite a newer path authority after waiting for this lock.
+            let publication_fingerprint =
+                lut_processing::source_fingerprint(path).map_err(|error| error.to_string())?;
+            if publication_fingerprint != fingerprint {
+                continue;
+            }
+            if let Some(entry) = self.lut_paths.get(&path.to_string())
+                && entry.fingerprint == fingerprint
+            {
+                return Ok(Arc::clone(&entry.lut));
+            }
+
+            let content_hash = parsed.content_hash;
+            let lut = self.lut_content.get(&content_hash).unwrap_or_else(|| {
+                let lut = Arc::new(parsed);
+                self.lut_content
+                    .insert(content_hash, Arc::clone(&lut), lut.retained_bytes());
+                lut
+            });
+            self.lut_paths.insert(
+                path.to_string(),
+                Arc::new(CachedLutPath {
+                    fingerprint,
+                    lut: Arc::clone(&lut),
+                }),
+                256,
+            );
+            return Ok(lut);
+        }
+
+        Err(format!("lut_source_changed_during_load:{path}"))
     }
 
     pub(crate) fn mask(&self, key: u64) -> Option<Arc<GrayImage>> {
@@ -172,6 +221,14 @@ mod tests {
     use super::*;
     use std::sync::Barrier;
 
+    fn write_test_lut(path: &std::path::Path, middle: f32) {
+        let mut cube = String::from("LUT_3D_SIZE 2\n");
+        for _ in 0..8 {
+            cube.push_str(&format!("0 {middle} 1\n"));
+        }
+        std::fs::write(path, cube).unwrap();
+    }
+
     #[test]
     fn cache_family_accounts_shared_budget_and_clears_session_domains_only() {
         let service = NativeCacheService::default();
@@ -215,5 +272,127 @@ mod tests {
             assert!(service.mask(key).is_none());
         }
         assert_eq!(service.budget_usage().0, 0);
+    }
+
+    #[test]
+    fn lut_cache_reuses_content_and_invalidates_replaced_path() {
+        let temp = tempfile::tempdir().unwrap();
+        let first_path = temp.path().join("first.cube");
+        let alias_path = temp.path().join("alias.cube");
+        write_test_lut(&first_path, 0.5);
+        write_test_lut(&alias_path, 0.5);
+        let service = NativeCacheService::default();
+
+        let first = service
+            .get_or_load_lut(first_path.to_str().unwrap())
+            .unwrap();
+        let warm = service
+            .get_or_load_lut(first_path.to_str().unwrap())
+            .unwrap();
+        let alias = service
+            .get_or_load_lut(alias_path.to_str().unwrap())
+            .unwrap();
+        assert!(Arc::ptr_eq(&first, &warm));
+        assert!(Arc::ptr_eq(&first, &alias));
+
+        let replacement = temp.path().join("replacement.cube");
+        write_test_lut(&replacement, 0.25);
+        std::fs::rename(&replacement, &first_path).unwrap();
+        let changed = service
+            .get_or_load_lut(first_path.to_str().unwrap())
+            .unwrap();
+        assert!(!Arc::ptr_eq(&first, &changed));
+        assert_ne!(first.content_hash, changed.content_hash);
+    }
+
+    #[test]
+    fn concurrent_aliases_of_replaced_content_publish_one_lut_revision() {
+        let temp = tempfile::tempdir().unwrap();
+        let first_path = temp.path().join("first.cube");
+        write_test_lut(&first_path, 0.5);
+        let service = Arc::new(NativeCacheService::default());
+        let original = service
+            .get_or_load_lut(first_path.to_str().unwrap())
+            .unwrap();
+
+        let replacement = temp.path().join("replacement.cube");
+        write_test_lut(&replacement, 0.25);
+        std::fs::rename(&replacement, &first_path).unwrap();
+        let mut paths = vec![first_path];
+        for index in 0..7 {
+            let alias = temp.path().join(format!("alias-{index}.cube"));
+            write_test_lut(&alias, 0.25);
+            paths.push(alias);
+        }
+
+        let barrier = Arc::new(Barrier::new(paths.len()));
+        let workers: Vec<_> = paths
+            .into_iter()
+            .map(|path| {
+                let service = Arc::clone(&service);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    service.get_or_load_lut(path.to_str().unwrap()).unwrap()
+                })
+            })
+            .collect();
+        let published: Vec<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+
+        assert_ne!(published[0].content_hash, original.content_hash);
+        assert!(published.iter().all(|lut| Arc::ptr_eq(lut, &published[0])));
+        assert_eq!(
+            service
+                .stats()
+                .into_iter()
+                .find(|stats| stats.name == "lut_cpu")
+                .unwrap()
+                .entries,
+            2
+        );
+    }
+
+    #[test]
+    fn stale_waiter_cannot_overwrite_newer_path_publication() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("racing.cube");
+        write_test_lut(&path, 0.5);
+        let service = Arc::new(NativeCacheService::default());
+        let old_ready = Arc::new(Barrier::new(2));
+        let release_old = Arc::new(Barrier::new(2));
+        let first_attempt = Arc::new(AtomicBool::new(true));
+
+        let old_service = Arc::clone(&service);
+        let old_path = path.clone();
+        let old_ready_worker = Arc::clone(&old_ready);
+        let release_old_worker = Arc::clone(&release_old);
+        let first_attempt_worker = Arc::clone(&first_attempt);
+        let old_waiter = std::thread::spawn(move || {
+            old_service
+                .get_or_load_lut_with_before_publication(old_path.to_str().unwrap(), || {
+                    if first_attempt_worker.swap(false, Ordering::AcqRel) {
+                        old_ready_worker.wait();
+                        release_old_worker.wait();
+                    }
+                })
+                .unwrap()
+        });
+
+        old_ready.wait();
+        let replacement = temp.path().join("replacement.cube");
+        write_test_lut(&replacement, 0.25);
+        std::fs::rename(&replacement, &path).unwrap();
+        let newer = service.get_or_load_lut(path.to_str().unwrap()).unwrap();
+        release_old.wait();
+
+        let recovered = old_waiter.join().unwrap();
+        let authoritative = service.get_or_load_lut(path.to_str().unwrap()).unwrap();
+        assert!(Arc::ptr_eq(&recovered, &newer));
+        assert!(Arc::ptr_eq(&authoritative, &newer));
     }
 }

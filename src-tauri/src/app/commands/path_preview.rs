@@ -18,7 +18,7 @@ use crate::image_processing::{
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::render::render_plan::compile_consumer_render_plan;
-use crate::{AppState, apply_all_transformations, encode_jpeg_response, get_or_load_lut};
+use crate::{AppState, apply_all_transformations, encode_jpeg_response};
 
 #[tauri::command]
 pub(crate) fn generate_preview_for_path(
@@ -90,7 +90,7 @@ pub(crate) fn generate_preview_for_path(
     let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
     let lut = render_adjustments["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(&state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         render_adjustments.as_ref(),
         &source_path_str,
