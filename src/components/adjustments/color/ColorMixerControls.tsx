@@ -35,6 +35,7 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   isForMask: boolean;
   commitBlackWhiteMixer: (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => void;
   commitChannelMixer: (update: (current: ChannelMixerSettings) => ChannelMixerSettings) => void;
+  commitColorBalanceRgb: (update: (current: ColorBalanceRgbSettings) => ColorBalanceRgbSettings) => void;
   commitSelectiveColorMixer: (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => void;
   onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
@@ -233,6 +234,7 @@ export const ColorMixerControls = ({
   canCreateLocalAdjustmentFromActiveRange = false,
   commitBlackWhiteMixer,
   commitChannelMixer,
+  commitColorBalanceRgb,
   commitSelectiveColorMixer,
   isForMask,
   onCreateLocalAdjustmentFromActiveRange,
@@ -240,7 +242,6 @@ export const ColorMixerControls = ({
   setActiveChannelMixerOutput,
   setActiveColor,
   setActiveColorBalanceRange,
-  setAdjustments,
 }: ColorMixerControlsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
@@ -604,11 +605,11 @@ export const ColorMixerControls = ({
           channelMixerCommitIdentity={channelMixerCommitIdentity}
           commitBlackWhiteMixer={commitBlackWhiteMixer}
           commitChannelMixer={commitChannelMixer}
+          commitColorBalanceRgb={commitColorBalanceRgb}
           onDragStateChange={onDragStateChange}
           setActiveChannelMixerOutput={setActiveChannelMixerOutput}
           setActiveColor={setActiveColor}
           setActiveColorBalanceRange={setActiveColorBalanceRange}
-          setAdjustments={setAdjustments}
         />
       )}
     </div>
@@ -625,11 +626,12 @@ type AdvancedMixerControlsProps = Pick<
   | 'channelMixerCommitIdentity'
   | 'commitBlackWhiteMixer'
   | 'commitChannelMixer'
+  | 'commitColorBalanceRgb'
   | 'setActiveChannelMixerOutput'
   | 'setActiveColor'
   | 'setActiveColorBalanceRange'
 > &
-  Omit<ColorPanelGroupProps, 'appSettings'>;
+  Omit<ColorPanelGroupProps, 'appSettings' | 'setAdjustments'>;
 
 const AdvancedMixerControls = ({
   activeChannelMixerOutput,
@@ -641,11 +643,11 @@ const AdvancedMixerControls = ({
   channelMixerCommitIdentity,
   commitBlackWhiteMixer,
   commitChannelMixer,
+  commitColorBalanceRgb,
   onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
   setActiveColorBalanceRange,
-  setAdjustments,
 }: AdvancedMixerControlsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
@@ -675,16 +677,10 @@ const AdvancedMixerControls = ({
     }));
   };
   const resetColorBalance = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      colorBalanceRgb: structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
-    }));
+    commitColorBalanceRgb(() => structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb));
   };
   const resetActiveBalance = () => {
-    setAdjustments((previous) => ({
-      ...previous,
-      colorBalanceRgb: resetColorBalanceRange(previous.colorBalanceRgb, activeColorBalanceRange),
-    }));
+    commitColorBalanceRgb((current) => resetColorBalanceRange(current, activeColorBalanceRange));
   };
   const resetChannelMixer = () => {
     commitChannelMixer(() => structuredClone(INITIAL_ADJUSTMENTS.channelMixer));
@@ -931,12 +927,7 @@ const AdvancedMixerControls = ({
                   <HeaderToggle
                     checked={colorBalance.enabled}
                     label={t('adjustments.color.colorBalanceRgb.title')}
-                    onChange={() =>
-                      setAdjustments((previous) => ({
-                        ...previous,
-                        colorBalanceRgb: { ...previous.colorBalanceRgb, enabled: !previous.colorBalanceRgb.enabled },
-                      }))
-                    }
+                    onChange={() => commitColorBalanceRgb((current) => ({ ...current, enabled: !current.enabled }))}
                     testId="color-balance-toggle"
                   />
                   <ChevronDown aria-hidden="true" className="text-text-secondary group-open:rotate-180" size={14} />
@@ -1001,14 +992,11 @@ const AdvancedMixerControls = ({
                   min={-100}
                   onDragStateChange={onDragStateChange}
                   onValueChange={(value) =>
-                    setAdjustments((previous) => ({
-                      ...previous,
-                      colorBalanceRgb: {
-                        ...previous.colorBalanceRgb,
-                        [activeColorBalanceRange]: {
-                          ...previous.colorBalanceRgb[activeColorBalanceRange],
-                          [channel]: value,
-                        },
+                    commitColorBalanceRgb((current) => ({
+                      ...current,
+                      [activeColorBalanceRange]: {
+                        ...current[activeColorBalanceRange],
+                        [channel]: value,
                       },
                     }))
                   }
@@ -1022,12 +1010,9 @@ const AdvancedMixerControls = ({
                     checked={colorBalance.preserveLuminance}
                     className="accent-editor-primary-active"
                     onChange={() =>
-                      setAdjustments((previous) => ({
-                        ...previous,
-                        colorBalanceRgb: {
-                          ...previous.colorBalanceRgb,
-                          preserveLuminance: !previous.colorBalanceRgb.preserveLuminance,
-                        },
+                      commitColorBalanceRgb((current) => ({
+                        ...current,
+                        preserveLuminance: !current.preserveLuminance,
                       }))
                     }
                     type="checkbox"

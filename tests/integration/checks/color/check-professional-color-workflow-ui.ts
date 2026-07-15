@@ -80,6 +80,7 @@ try {
   await selectMixerWorkspace(rendered.container);
   await validateCompactMixerSurface(rendered.container);
   await validateHslSurfaceInteraction(rendered.container);
+  await validateColorBalanceRgbTransaction(rendered.container);
   await validateColorRangeLocalAdjustmentTransaction(rendered.container);
   await validateOutputFocusEvent(rendered.container, true);
 
@@ -331,6 +332,11 @@ function validateMaskLocalFiltering(container: Element) {
   assert.equal(foundation.querySelector('[data-testid="color-white-balance-picker"]'), null);
   assert.equal(getRangeByLabel(foundation, 'Local Hue'), null);
   assert.equal(
+    container.querySelector('[data-testid="color-balance-disclosure"]'),
+    null,
+    'Global Color Balance RGB must remain outside mask-local adjustment authority.',
+  );
+  assert.equal(
     normalizeText(getByTestId(foundation, 'color-quick-white-balance').textContent).includes('Local Color Balance'),
     true,
   );
@@ -517,6 +523,60 @@ async function validateHslSurfaceInteraction(container: Element) {
     useEditorStore.getState().redo();
     await flushPromises();
   });
+}
+
+async function validateColorBalanceRgbTransaction(container: Element) {
+  const disclosure = getByTestId<HTMLDetailsElement>(container, 'color-balance-disclosure');
+  const summary = disclosure.querySelector<HTMLElement>('summary');
+  assert.ok(summary, 'Color Balance RGB summary was not rendered.');
+  await click(summary);
+
+  await act(async () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:color-balance-rendered-before',
+      transformedOriginalUrl: 'blob:color-balance-transformed-before',
+    });
+    await flushPromises();
+  });
+  const beforeToggle = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'color-balance-toggle'));
+  const toggled = useEditorStore.getState();
+  assert.equal(toggled.adjustmentRevision, beforeToggle.adjustmentRevision + 1);
+  assert.equal(toggled.history.length, beforeToggle.history.length + 1);
+  assert.equal(toggled.adjustments.colorBalanceRgb.enabled, true);
+  assert.equal(toggled.lastEditApplicationReceipt?.source, 'manual-control');
+  assert.equal(toggled.finalPreviewUrl, null, 'Color Balance RGB toggle must invalidate rendered output.');
+  assert.equal(toggled.transformedOriginalUrl, null, 'Color Balance RGB toggle must invalidate transformed output.');
+
+  const controls = getByTestId(container, 'color-balance-controls');
+  const red = getRangeByLabel(controls, 'Red');
+  assert.ok(red, 'Color Balance RGB red slider was not rendered.');
+  const beforeChannel = useEditorStore.getState();
+  await changeRange(red, 17);
+  assert.equal(useEditorStore.getState().adjustmentRevision, beforeChannel.adjustmentRevision + 1);
+  assert.equal(useEditorStore.getState().adjustments.colorBalanceRgb.midtones.red, 17);
+
+  const preserveLuminance = getByTestId(container, 'color-balance-controls').querySelector<HTMLInputElement>(
+    'input[type="checkbox"]',
+  );
+  assert.ok(preserveLuminance, 'Color Balance RGB preserve-luminance control was not rendered.');
+  await click(preserveLuminance);
+  assert.equal(useEditorStore.getState().adjustments.colorBalanceRgb.preserveLuminance, false);
+
+  const beforeRangeReset = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'color-balance-reset-range'));
+  const rangeReset = useEditorStore.getState();
+  assert.equal(rangeReset.adjustmentRevision, beforeRangeReset.adjustmentRevision + 1);
+  assert.deepEqual(rangeReset.adjustments.colorBalanceRgb.midtones, INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones);
+  assert.equal(rangeReset.adjustments.colorBalanceRgb.enabled, true);
+  assert.equal(rangeReset.adjustments.colorBalanceRgb.preserveLuminance, false);
+
+  const beforeFullReset = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'color-balance-reset'));
+  const fullReset = useEditorStore.getState();
+  assert.equal(fullReset.adjustmentRevision, beforeFullReset.adjustmentRevision + 1);
+  assert.equal(fullReset.history.length, beforeFullReset.history.length + 1);
+  assert.deepEqual(fullReset.adjustments.colorBalanceRgb, INITIAL_ADJUSTMENTS.colorBalanceRgb);
 }
 
 async function validateColorRangeLocalAdjustmentTransaction(container: Element) {
