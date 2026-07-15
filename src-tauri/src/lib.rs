@@ -42,6 +42,7 @@ mod validation;
 mod window_customizer;
 
 pub(crate) use color::*;
+pub use community_presets::CommunityPreset;
 pub(crate) use computational::*;
 pub use computational::{deblur_cpu_reference, denoise_cpu_reference};
 pub(crate) use gpu::*;
@@ -136,17 +137,6 @@ pub fn register_exit_handler() {
 
 #[cfg(not(target_os = "macos"))]
 pub fn register_exit_handler() {}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CommunityPreset {
-    pub name: String,
-    pub creator: String,
-    pub adjustments: Value,
-    #[serde(rename = "includeMasks")]
-    pub include_masks: Option<bool>,
-    #[serde(rename = "includeCropTransform")]
-    pub include_crop_transform: Option<bool>,
-}
 
 #[derive(Serialize)]
 struct LutParseResult {
@@ -1283,29 +1273,6 @@ fn generate_preset_preview(
 }
 
 #[tauri::command]
-async fn fetch_community_presets() -> Result<Vec<CommunityPreset>, String> {
-    let client = reqwest::Client::new();
-
-    let response = client
-        .get(community_presets::COMMUNITY_PRESET_MANIFEST_URL)
-        .header("User-Agent", community_presets::COMMUNITY_PRESET_USER_AGENT)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch manifest from GitHub: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("GitHub returned an error: {}", response.status()));
-    }
-
-    let presets: Vec<CommunityPreset> = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
-
-    Ok(presets)
-}
-
-#[tauri::command]
 async fn generate_all_community_previews(
     image_paths: Vec<String>,
     presets: Vec<CommunityPreset>,
@@ -2434,7 +2401,7 @@ pub fn run() {
             merge::focus_stack::retouch::navigate_focus_stack_retouch,
             save_hdr,
             app::commands::lut::load_and_parse_lut,
-            fetch_community_presets,
+            app::commands::community_presets::fetch_community_presets,
             generate_all_community_previews,
             app::commands::temporary_artifacts::save_temp_file,
             app::commands::source::get_image_dimensions,
