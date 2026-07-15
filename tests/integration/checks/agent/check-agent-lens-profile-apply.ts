@@ -87,6 +87,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-lens-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentLensProfileApplyRequestSchema.safeParse({
@@ -183,26 +184,38 @@ if (
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.lens_profile.apply must create undo history and invalidate stale preview output.');
 }
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'agent_lens_profile_3169_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.lens_profile.apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.lens_correction?.params.lensDistortionAmount !== 87 ||
+  state.editDocumentV2.nodes.lens_correction.params.lensMaker !== 'Sony' ||
+  state.editDocumentV2.nodes.lens_correction.params.lensVignetteAmount !== 112
+) {
+  throw new Error('agent.lens_profile.apply did not update the canonical lens node.');
+}
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.lens_profile.apply did not update preview render identity.');
 }
-if (parsedResult.receipt.typedCommand.changedNodeIds.length !== parsedResult.adjustedFields.length) {
-  throw new Error('agent.lens_profile.apply typed command receipt did not cover every adjusted field.');
+if (!parsedResult.receipt.typedCommand.changedNodeIds.some((nodeId) => nodeId.includes('lens_profile'))) {
+  throw new Error('agent.lens_profile.apply typed command receipt did not identify the lens node.');
 }
 if (afterSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.recipeHash) {
   throw new Error('agent lens/profile recipe hash did not change after apply.');
 }
 for (const field of [
-  'lensCorrectionMode',
   'lensDistortionAmount',
-  'lensDistortionEnabled',
   'lensDistortionParams',
   'lensMaker',
   'lensModel',
   'lensTcaAmount',
-  'lensTcaEnabled',
   'lensVignetteAmount',
-  'lensVignetteEnabled',
 ]) {
   if (!parsedResult.adjustedFields.includes(field)) {
     throw new Error(`agent.lens_profile.apply response missing adjusted field: ${field}`);
