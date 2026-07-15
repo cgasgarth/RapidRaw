@@ -18,7 +18,7 @@ export const editorWorkspacePreferencesSchema = z
       .object({
         toolsExpanded: z.boolean(),
         toolsHeight: z.number().int().min(180).max(850).nullable(),
-        drawerState: compactEditorDrawerStateSchema.default('expanded'),
+        drawerState: compactEditorDrawerStateSchema,
       })
       .strict(),
     filmstrip: z

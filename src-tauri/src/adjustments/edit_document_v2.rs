@@ -173,6 +173,26 @@ struct GeometryV2 {
     flip_vertical: bool,
     orientation_steps: u8,
     rotation: f64,
+    #[serde(default)]
+    transform_aspect: f64,
+    #[serde(default)]
+    transform_distortion: f64,
+    #[serde(default)]
+    transform_horizontal: f64,
+    #[serde(default)]
+    transform_rotate: f64,
+    #[serde(default = "default_transform_scale")]
+    transform_scale: f64,
+    #[serde(default)]
+    transform_vertical: f64,
+    #[serde(default)]
+    transform_x_offset: f64,
+    #[serde(default)]
+    transform_y_offset: f64,
+}
+
+fn default_transform_scale() -> f64 {
+    100.0
 }
 
 impl GeometryV2 {
@@ -192,6 +212,30 @@ impl GeometryV2 {
         }
         if !self.rotation.is_finite() || !(-45.0..=45.0).contains(&self.rotation) {
             return Err("EditDocumentV2 geometry rotation must be within -45..=45".to_string());
+        }
+        for (label, value, range) in [
+            ("transformAspect", self.transform_aspect, -100.0..=100.0),
+            (
+                "transformDistortion",
+                self.transform_distortion,
+                -100.0..=100.0,
+            ),
+            (
+                "transformHorizontal",
+                self.transform_horizontal,
+                -100.0..=100.0,
+            ),
+            ("transformRotate", self.transform_rotate, -45.0..=45.0),
+            ("transformScale", self.transform_scale, 0.1..=150.0),
+            ("transformVertical", self.transform_vertical, -100.0..=100.0),
+            ("transformXOffset", self.transform_x_offset, -100.0..=100.0),
+            ("transformYOffset", self.transform_y_offset, -100.0..=100.0),
+        ] {
+            if !value.is_finite() || !range.contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 geometry {label} is outside its supported range"
+                ));
+            }
         }
         if let Some(crop) = &self.crop {
             crop.validate()?;
@@ -4153,6 +4197,29 @@ mod tests {
 
     #[test]
     fn geometry_compiler_rejects_unowned_out_of_range_and_out_of_bounds_params() {
+        let mut transformed = document_with_legacy(json!({}));
+        let transform_params = json!({
+            "transformAspect": 12,
+            "transformDistortion": -8,
+            "transformHorizontal": 4,
+            "transformRotate": 2,
+            "transformScale": 104,
+            "transformVertical": -3,
+            "transformXOffset": 5,
+            "transformYOffset": -6,
+        });
+        for (field, value) in transform_params
+            .as_object()
+            .expect("transform params must be an object")
+        {
+            transformed["nodes"]["geometry"]["params"][field] = value.clone();
+            transformed["geometry"][field] = value.clone();
+        }
+        serde_json::from_value::<EditDocumentV2>(transformed)
+            .expect("current transform geometry remains parseable")
+            .into_render_adjustments()
+            .expect("current transform geometry remains compilable");
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["geometry"]["params"]["futureWarp"] = json!(1);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)
@@ -4169,6 +4236,15 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range rotation must fail");
         assert!(error.contains("rotation must be within -45..=45"));
+
+        let mut transform_scale = document_with_legacy(json!({}));
+        transform_scale["nodes"]["geometry"]["params"]["transformScale"] = json!(151);
+        transform_scale["geometry"]["transformScale"] = json!(151);
+        let error = serde_json::from_value::<EditDocumentV2>(transform_scale)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range transform scale must fail");
+        assert!(error.contains("transformScale"));
 
         let invalid_crop =
             json!({ "height": 0.8, "unit": "normalized", "width": 0.8, "x": 0.3, "y": 0.3 });

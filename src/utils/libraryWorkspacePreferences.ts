@@ -5,10 +5,6 @@ import {
 
 export const LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY = 'rapidraw.libraryWorkspacePreferences.v1';
 
-export interface LegacyLibraryWorkspacePreferences {
-  folderTreeVisible?: unknown;
-}
-
 export const createDefaultLibraryWorkspacePreferences = (): LibraryWorkspacePreferences => ({
   folderTree: { visible: true, width: 256 },
   version: 1,
@@ -22,9 +18,7 @@ const getStorage = (): Storage | null => {
   }
 };
 
-export const readLibraryWorkspacePreferences = (
-  legacy: LegacyLibraryWorkspacePreferences = {},
-): LibraryWorkspacePreferences => {
+export const readLibraryWorkspacePreferences = (): LibraryWorkspacePreferences => {
   const storage = getStorage();
   if (storage) {
     try {
@@ -38,9 +32,7 @@ export const readLibraryWorkspacePreferences = (
     }
   }
 
-  const preferences = createDefaultLibraryWorkspacePreferences();
-  if (typeof legacy.folderTreeVisible === 'boolean') preferences.folderTree.visible = legacy.folderTreeVisible;
-  return preferences;
+  return createDefaultLibraryWorkspacePreferences();
 };
 
 export const saveLibraryWorkspacePreferences = (preferences: LibraryWorkspacePreferences): void => {
