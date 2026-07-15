@@ -691,6 +691,7 @@ export function useImageProcessing() {
     baseRenderSize,
     originalSize,
   ]);
+  const calculatedTargetResolution = calculateTargetRes();
 
   const requestOriginalPreview = useCallback(
     (targetRes: number, delayMs: number): void => {
@@ -720,19 +721,18 @@ export function useImageProcessing() {
 
   useEffect(() => {
     if (!selectedImage?.isReady) return;
-    const targetRes = calculateTargetRes();
     if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) applyAdjustments(adjustments, true, targetRes);
+      if (appSettings?.enableLivePreviews !== false) applyAdjustments(adjustments, true, calculatedTargetResolution);
       return;
     }
-    applyAdjustments(adjustments, false, targetRes, false, 50);
+    applyAdjustments(adjustments, false, calculatedTargetResolution, false, 50);
   }, [
     adjustments,
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
     applyAdjustments,
-    calculateTargetRes,
+    calculatedTargetResolution,
     appSettings?.enableLivePreviews,
   ]);
 
