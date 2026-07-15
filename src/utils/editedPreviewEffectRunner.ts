@@ -212,6 +212,7 @@ const executeNativeEditedPreview = async (
         activeWaveformChannel: request.activeWaveformChannel,
         computeWaveform: request.computeWaveform,
         editDocumentV2: prepareEditDocumentV2ForRender(payload, request.snapshot.editDocumentV2, [
+          'geometry',
           'scene_global_color_tone',
         ]),
         expectedImagePath: request.session.sourceImagePath,

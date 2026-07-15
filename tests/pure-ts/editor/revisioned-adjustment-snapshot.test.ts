@@ -12,10 +12,12 @@ test('published adjustment snapshots are immutable and preserve prior revisions'
   const firstValue = adjustments();
   const first = publishAdjustmentSnapshot(null, firstValue);
   const second = publishAdjustmentSnapshot(first, { ...firstValue, exposure: firstValue.exposure + 1 });
+  const geometry = publishAdjustmentSnapshot(second, { ...second.value, aspectRatio: 4 / 3 });
 
   expect(first.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
   expect(second.adjustmentRevision).toBe(first.adjustmentRevision + 1);
   expect(second.geometryRevision).toBe(first.geometryRevision);
+  expect(geometry.geometryRevision).toBe(second.geometryRevision + 1);
   expect(Object.isFrozen(first.value)).toBe(true);
   expect(() => ((first.value as { exposure: number }).exposure = 99)).toThrow();
 });

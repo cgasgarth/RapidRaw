@@ -115,11 +115,30 @@ const assertNodePatch = (nodeType: EditDocumentNodeTypeV2, patch: Readonly<Recor
   }
 };
 
+const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
+  if (Object.is(before, after)) return true;
+  if (Array.isArray(before) || Array.isArray(after)) {
+    return (
+      Array.isArray(before) &&
+      Array.isArray(after) &&
+      before.length === after.length &&
+      before.every((value, index) => sameAdjustmentValue(value, after[index]))
+    );
+  }
+  if (before === null || after === null || typeof before !== 'object' || typeof after !== 'object') return false;
+  const beforeEntries = Object.entries(before);
+  const afterRecord = after as Record<string, unknown>;
+  return (
+    beforeEntries.length === Object.keys(afterRecord).length &&
+    beforeEntries.every(
+      ([key, value]) => Object.hasOwn(afterRecord, key) && sameAdjustmentValue(value, afterRecord[key]),
+    )
+  );
+};
+
 const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
-  [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((key) =>
-    Object.is(before[key as keyof Adjustments], after[key as keyof Adjustments])
-      ? false
-      : JSON.stringify(before[key as keyof Adjustments]) !== JSON.stringify(after[key as keyof Adjustments]),
+  [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+    (key) => !sameAdjustmentValue(before[key as keyof Adjustments], after[key as keyof Adjustments]),
   );
 
 /**
@@ -149,16 +168,19 @@ export const buildAdjustmentMutationOperations = (
   after: Adjustments,
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
-  const descriptor = getEditDocumentNodeDescriptor('scene_global_color_tone');
-  const isFocusedSceneNodeEdit =
-    descriptor !== undefined &&
-    keys.length > 0 &&
-    keys.every((key) => descriptor.legacyFields.some((field) => field === key));
-  if (!isFocusedSceneNodeEdit) return [{ type: 'replace-adjustments', adjustments: after }];
+  const focusedNodeType = (['scene_global_color_tone', 'geometry'] as const).find((nodeType) => {
+    const descriptor = getEditDocumentNodeDescriptor(nodeType);
+    return (
+      descriptor !== undefined &&
+      keys.length > 0 &&
+      keys.every((key) => descriptor.legacyFields.some((field) => field === key))
+    );
+  });
+  if (focusedNodeType === undefined) return [{ type: 'replace-adjustments', adjustments: after }];
   return [
     {
       type: 'patch-edit-document-node',
-      nodeType: 'scene_global_color_tone',
+      nodeType: focusedNodeType,
       patch: Object.fromEntries(keys.map((key) => [key, after[key]])),
     },
   ];
@@ -208,7 +230,15 @@ export const reduceEditTransaction = (
   const invalidatedStages: EditInvalidationStage[] = keys.length === 0 ? [] : ['preview', 'navigator', 'thumbnail'];
   if (
     keys.some((key) =>
-      ['crop', 'rotation', 'orientationSteps', 'flipHorizontal', 'flipVertical', 'perspectiveCorrection'].includes(key),
+      [
+        'aspectRatio',
+        'crop',
+        'rotation',
+        'orientationSteps',
+        'flipHorizontal',
+        'flipVertical',
+        'perspectiveCorrection',
+      ].includes(key),
     )
   ) {
     invalidatedStages.push('geometry');
