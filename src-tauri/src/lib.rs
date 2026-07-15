@@ -2607,7 +2607,10 @@ pub fn run() {
 
             {
                 let state = app.state::<AppState>();
-                *state.gpu_crash_flag_path.lock().unwrap() = Some(crash_flag_path.clone());
+                state
+                    .services
+                    .gpu_crash_marker
+                    .configure(crash_flag_path.clone());
             }
 
             let mut settings: AppSettings = load_settings_or_default(&app_handle);

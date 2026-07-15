@@ -52,13 +52,7 @@ pub fn get_or_init_gpu_context(
         instance_desc.backends = wgpu::Backends::PRIMARY;
     }
 
-    let flag_path = state.gpu_crash_flag_path.lock().unwrap().clone();
-    if let Some(p) = &flag_path {
-        if let Some(parent) = p.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let _ = std::fs::write(p, "initializing_gpu");
-    }
+    let _crash_marker = state.services.gpu_crash_marker.begin_initialization();
 
     let instance = wgpu::Instance::new(instance_desc);
 
@@ -76,9 +70,6 @@ pub fn get_or_init_gpu_context(
                             "Failed to create surface, falling back to compute-only: {}",
                             e
                         );
-                        if let Some(p) = &flag_path {
-                            let _ = std::fs::remove_file(p);
-                        }
                         None
                     }
                 }
@@ -98,12 +89,7 @@ pub fn get_or_init_gpu_context(
         compatible_surface: surface_opt.as_ref(),
         ..Default::default()
     }))
-    .map_err(|e| {
-        if let Some(p) = &flag_path {
-            let _ = std::fs::remove_file(p);
-        }
-        format!("Failed to find a wgpu adapter: {}", e)
-    })?;
+    .map_err(|e| format!("Failed to find a wgpu adapter: {}", e))?;
 
     let mut required_features = wgpu::Features::empty();
     if adapter
@@ -127,16 +113,7 @@ pub fn get_or_init_gpu_context(
         memory_hints: wgpu::MemoryHints::Performance,
         trace: wgpu::Trace::Off,
     }))
-    .map_err(|e| {
-        if let Some(p) = &flag_path {
-            let _ = std::fs::remove_file(p);
-        }
-        e.to_string()
-    })?;
-
-    if let Some(p) = &flag_path {
-        let _ = std::fs::remove_file(p);
-    }
+    .map_err(|e| e.to_string())?;
 
     let generation = NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
     let cache_root = _app_handle
