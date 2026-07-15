@@ -42,16 +42,16 @@ struct UncroppedPreviewAuthority {
     active_image: Option<ActiveImageSession>,
 }
 
-/// Owns publication authority for detached uncropped-preview work.
+/// Owns the active image-session gate and publication authority for preview work.
 ///
 /// Rendering may finish out of order, so a worker must still be the newest
 /// request for the same active image session before it can update the viewer.
 #[derive(Default)]
-pub(crate) struct UncroppedPreviewService {
+pub(crate) struct PreviewSessionService {
     authority: Mutex<UncroppedPreviewAuthority>,
 }
 
-impl UncroppedPreviewService {
+impl PreviewSessionService {
     pub(crate) fn begin_image_load(&self, generation: &AtomicUsize) -> usize {
         let mut authority = self
             .authority
@@ -71,6 +71,23 @@ impl UncroppedPreviewService {
             image_generation,
             source_identity: source_identity.to_string(),
         });
+    }
+
+    pub(crate) fn with_active_image_session<T>(
+        &self,
+        image_generation: u64,
+        source_identity: &str,
+        work: impl FnOnce() -> T,
+    ) -> Option<T> {
+        let authority = self
+            .authority
+            .lock()
+            .expect("uncropped-preview authority poisoned");
+        let expected = ActiveImageSession {
+            image_generation,
+            source_identity: source_identity.to_string(),
+        };
+        (authority.active_image.as_ref() == Some(&expected)).then(work)
     }
 
     fn begin_request(
@@ -145,7 +162,7 @@ pub(crate) fn generate_uncropped_preview(
         .ok_or("No original image loaded")?;
     let request = state
         .services
-        .uncropped_preview
+        .preview_session
         .begin_request(
             state.load_image_generation.load(Ordering::SeqCst) as u64,
             loaded_image.path.clone(),
@@ -277,7 +294,7 @@ pub(crate) fn generate_uncropped_preview(
         ) {
             match encode_jpeg_data_url(&processed_image, 80) {
                 Ok(data_url) => {
-                    if !state.services.uncropped_preview.publish_if_current(
+                    if !state.services.preview_session.publish_if_current(
                         &request,
                         || {
                             let current_generation =
@@ -314,7 +331,7 @@ mod tests {
 
     #[test]
     fn later_request_supersedes_earlier_request() {
-        let service = UncroppedPreviewService::default();
+        let service = PreviewSessionService::default();
         service.install_image_session(11, "/image-a.raw");
         let first = service
             .begin_request(11, "/image-a.raw".to_string())
@@ -339,7 +356,7 @@ mod tests {
 
     #[test]
     fn publication_requires_the_same_image_session_and_source() {
-        let service = UncroppedPreviewService::default();
+        let service = PreviewSessionService::default();
         service.install_image_session(7, "/image-a.raw");
         let request = service
             .begin_request(7, "/image-a.raw".to_string())
@@ -364,7 +381,7 @@ mod tests {
 
     #[test]
     fn image_load_transition_invalidates_work_and_blocks_new_requests() {
-        let service = UncroppedPreviewService::default();
+        let service = PreviewSessionService::default();
         let generation = AtomicUsize::new(3);
         service.install_image_session(3, "/image-a.raw");
         let stale_request = service
