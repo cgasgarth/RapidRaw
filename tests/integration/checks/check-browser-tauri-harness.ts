@@ -2910,6 +2910,7 @@ try {
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);
   if (browserScenario === 'preview-visible-frame') {
+    await verifyEditorIntrinsicHeightContainment(page);
     await verifyVisiblePreviewReopen(page);
     if (consoleErrors.length > 0) {
       throw new Error(`Unexpected visible-frame browser errors: ${consoleErrors.join('\n')}`);
@@ -4036,6 +4037,62 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   await assertVisibleNonEmptyPreviewPixels(page, 'wheel-reset-to-fit', sourceIdentity);
 
   await writeBoundsReport('passed');
+}
+
+async function verifyEditorIntrinsicHeightContainment(page: Page): Promise<void> {
+  const proof = await page.evaluate(async () => {
+    const workspace = document.querySelector<HTMLElement>('[data-testid="editor-workspace"]');
+    const viewer = document.querySelector<HTMLElement>('[data-testid="image-canvas"]');
+    const layer = document.querySelector<SVGImageElement>('[data-testid="svg-preview-base-layer"]');
+    const tools = document.querySelector<HTMLElement>('[data-testid="editor-right-panel-shell"]');
+    const wrapper = workspace?.parentElement ?? null;
+    const shell = wrapper?.parentElement ?? null;
+    const intrinsicToolsContent = tools?.firstElementChild;
+    if (
+      !workspace ||
+      !viewer ||
+      !layer ||
+      !tools ||
+      !(intrinsicToolsContent instanceof HTMLElement) ||
+      !wrapper ||
+      !shell
+    ) {
+      return { error: 'missing-editor-layout-node' } as const;
+    }
+    const previousMinHeight = intrinsicToolsContent.style.minHeight;
+    intrinsicToolsContent.style.minHeight = '4800px';
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const rect = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return { bottom: bounds.bottom, height: bounds.height, top: bounds.top, width: bounds.width };
+    };
+    const constrained = {
+      layer: rect(layer),
+      shell: rect(shell),
+      viewer: rect(viewer),
+      workspace: rect(workspace),
+      wrapper: rect(wrapper),
+    };
+    intrinsicToolsContent.style.minHeight = previousMinHeight;
+    return { constrained, error: null } as const;
+  });
+  if (proof.error !== null || !('constrained' in proof)) {
+    throw new Error(`Editor intrinsic-height proof could not run: ${JSON.stringify(proof)}.`);
+  }
+  const { layer, shell, viewer, workspace, wrapper } = proof.constrained;
+  const layerCenter = layer.top + layer.height / 2;
+  if (
+    wrapper.height > shell.height + 1 ||
+    workspace.height > shell.height + 1 ||
+    viewer.bottom > shell.bottom + 1 ||
+    layerCenter < viewer.top ||
+    layerCenter > viewer.bottom ||
+    layer.width <= 0 ||
+    layer.height <= 0
+  ) {
+    throw new Error(`Tall inspector displaced the visible CPU preview: ${JSON.stringify(proof.constrained)}.`);
+  }
 }
 
 async function verifyVisiblePreviewReopen(page: Page): Promise<void> {
