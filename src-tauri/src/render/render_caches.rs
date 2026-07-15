@@ -57,7 +57,7 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn clear_gpu_image_cache(&self) {
-        self.state.services.gpu_processing.clear_input();
+        self.state.gpu().processing().clear_input();
     }
 
     pub fn insert_geometry_cache_entry(&self, key: u64, image: DynamicImage, max_entries: usize) {

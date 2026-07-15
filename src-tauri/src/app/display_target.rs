@@ -248,11 +248,10 @@ impl DisplayTargetCoordinator {
 #[cfg(target_os = "macos")]
 pub fn request_for_state(state: &crate::AppState) {
     let device_generation = state
-        .services
-        .gpu_context
+        .gpu()
         .context_snapshot()
         .map_or(0, |context| context.generation);
-    if let Some(coordinator) = state.services.gpu_context.coordinator_snapshot() {
+    if let Some(coordinator) = state.gpu().coordinator_snapshot() {
         coordinator.request_refresh(device_generation);
     }
 }
@@ -470,8 +469,7 @@ fn validate_hdr_capability_contract(
 #[tauri::command]
 pub fn get_display_target_report(state: tauri::State<'_, crate::AppState>) -> DisplayTargetReport {
     state
-        .services
-        .gpu_context
+        .gpu()
         .coordinator_snapshot()
         .map_or_else(DisplayTargetReport::default, |coordinator| {
             coordinator.report()
@@ -594,7 +592,7 @@ pub fn start_validation_benchmark(app: tauri::AppHandle) {
             use tauri::Manager;
 
             let state = app.state::<crate::AppState>();
-            let Some(coordinator) = state.services.gpu_context.coordinator_snapshot() else {
+            let Some(coordinator) = state.gpu().coordinator_snapshot() else {
                 return;
             };
             for _ in 0..1_000 {
