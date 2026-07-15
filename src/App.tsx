@@ -51,7 +51,6 @@ import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
-import type { Adjustments } from './utils/adjustments';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
 import { globalImageCache } from './utils/ImageLRUCache';
@@ -61,11 +60,6 @@ import TitleBar from './window/TitleBar';
 
 const LOCAL_DEV_CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA';
 const CLERK_PUBLISHABLE_KEY = getViteEnv().VITE_CLERK_PUBLISHABLE_KEY ?? LOCAL_DEV_CLERK_PUBLISHABLE_KEY;
-
-interface PreviousAdjustments {
-  adjustments: Adjustments;
-  path: string;
-}
 
 interface TransformController extends EditorTransformController {
   resetTransform(time?: number): void;
@@ -150,12 +144,7 @@ function App() {
   const defaultThumbnailSize = osPlatform === 'android' ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = osPlatform === 'android' ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
 
-  const prevAdjustmentsRef = useRef<PreviousAdjustments | null>(null);
-
   const viewportSize = useEditorWorkspaceViewportSubscription();
-
-  const isBackendReadyRef = useRef(true);
-  const currentResRef = useRef<number>(1280);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [isResizing, setIsResizing] = useState(false);
@@ -278,9 +267,6 @@ function App() {
   const navigationRefs = {
     transformWrapperRef,
     preloadedDataRef,
-    isBackendReadyRef,
-    currentResRef,
-    prevAdjustmentsRef,
   };
 
   const {
@@ -580,7 +566,7 @@ function App() {
 
   return (
     <>
-      <AppServices persistence={{ prevAdjustmentsRef }} />
+      <AppServices />
       <div
         className={cx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',

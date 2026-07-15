@@ -557,17 +557,22 @@ describe('edited preview effect runner', () => {
       onPresented: (value) => presented.push(value),
     });
 
-    persistence.submit({
+    const persistenceInput = {
       adjustmentRevision: 2,
       adjustments: { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 },
-      baselineHint: { adjustments: structuredClone(INITIAL_ADJUSTMENTS), path: '/fixtures/a.raw' },
       imageSessionId: 'session-a',
       interactionActive: false,
       multiSelection: null,
       path: '/fixtures/a.raw',
       receipt: null,
       sessionGeneration: 1,
+    };
+    persistence.submit({
+      ...persistenceInput,
+      adjustmentRevision: 0,
+      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
     });
+    persistence.submit(persistenceInput);
     preview.runner.request(buildRequest());
     await tick();
 
