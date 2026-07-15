@@ -717,6 +717,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       localContrastMidtoneMask: _localContrastMidtoneMask,
       localContrastRadiusPx: _localContrastRadiusPx,
       lumaNoiseReduction: _lumaNoiseReduction,
+      sharpnessThreshold: _sharpnessThreshold,
       structure: _structure,
       ...legacyDetail
     } = structuredClone(INITIAL_ADJUSTMENTS);
@@ -738,6 +739,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       localContrastRadiusPx: 24,
       lumaNoiseReduction: 0,
       sharpness: 24,
+      sharpnessThreshold: 15,
       structure: 0,
     });
     expect(defaulted.migration?.defaulted).toEqual(
@@ -749,6 +751,7 @@ describe('EditDocumentV2 legacy adapter', () => {
         'detail_denoise_dehaze.denoiseContrastProtection',
         'detail_denoise_dehaze.denoiseDetail',
         'detail_denoise_dehaze.localContrastRadiusPx',
+        'detail_denoise_dehaze.sharpnessThreshold',
         'detail_denoise_dehaze.structure',
       ]),
     );
@@ -802,6 +805,8 @@ describe('EditDocumentV2 legacy adapter', () => {
       { localContrastMidtoneMask: -1 },
       { localContrastRadiusPx: 3.9 },
       { localContrastRadiusPx: 96.1 },
+      { sharpnessThreshold: -1 },
+      { sharpnessThreshold: 81 },
       { structure: 101 },
     ]) {
       expect(() =>
@@ -814,6 +819,44 @@ describe('EditDocumentV2 legacy adapter', () => {
         }),
       ).toThrow();
     }
+  });
+
+  test('promotes pre-threshold V2 state and quarantines corrupt values idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      sharpnessThreshold: 33,
+    });
+    const oldV2 = structuredClone(document);
+    const detailParams = oldV2.nodes.detail_denoise_dehaze.params;
+    const legacyAdjustments = oldV2.extensions.legacyAdjustments as Record<string, unknown>;
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    legacyAdjustments.sharpnessThreshold = detailParams.sharpnessThreshold;
+    delete detailParams.sharpnessThreshold;
+    migration.mapped = migration.mapped.filter((path) => path !== 'detail_denoise_dehaze.sharpnessThreshold');
+    migration.quarantined.push('sharpnessThreshold');
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(33);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('sharpnessThreshold');
+    expect(reopened.migration?.mapped).toContain('detail_denoise_dehaze.sharpnessThreshold');
+    expect(reopened.migration?.quarantined).not.toContain('sharpnessThreshold');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptOldV2 = structuredClone(oldV2);
+    (corruptOldV2.extensions.legacyAdjustments as Record<string, unknown>).sharpnessThreshold = 81;
+    const quarantined = editDocumentV2Schema.parse(corruptOldV2);
+    expect(quarantined.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(15);
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ sharpnessThreshold: 81 });
+    expect(quarantined.migration?.defaulted).toContain('detail_denoise_dehaze.sharpnessThreshold');
+    expect(quarantined.migration?.quarantined).toContain('sharpnessThreshold');
+
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      sharpnessThreshold: Number.NaN,
+    });
+    expect(corruptFlat.nodes.detail_denoise_dehaze.params.sharpnessThreshold).toBe(15);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ sharpnessThreshold: Number.NaN });
   });
 
   test('promotes pre-local-contrast V2 state and quarantines corrupt legacy values idempotently', () => {
