@@ -35,6 +35,7 @@ import {
   type PreviewQualitySnapshot,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import { PreviewInvalidationAdapter } from '../../utils/previewInvalidationAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
 import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
@@ -92,6 +93,7 @@ export function useImageProcessing() {
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
+  const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
   const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
   const setEditor = useEditorStore((state) => state.setEditor);
   const isCompareActive = compare.mode !== 'off' || compare.isOriginalHeld;
@@ -144,6 +146,14 @@ export function useImageProcessing() {
       return transition;
     },
     [previewCoordinator, previewUrlReleaseAuthority, setEditor],
+  );
+  const previewInvalidationAdapter = useMemo(
+    () =>
+      new PreviewInvalidationAdapter({
+        dispatch: dispatchPreviewCoordinator,
+        getState: () => previewCoordinator.snapshot(),
+      }),
+    [dispatchPreviewCoordinator, previewCoordinator],
   );
 
   const originalPreviewRunner =
@@ -399,28 +409,26 @@ export function useImageProcessing() {
 
   useEffect(
     () => () => {
-      dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
+      previewInvalidationAdapter.cancelSession('editor-unmounted');
       editedPreviewRunner.cancel();
       originalPreviewRunner.dispose();
     },
-    [dispatchPreviewCoordinator, editedPreviewRunner, originalPreviewRunner],
+    [editedPreviewRunner, originalPreviewRunner, previewInvalidationAdapter],
   );
 
   useEffect(() => {
     if (!selectedImage?.isReady) {
-      dispatchPreviewCoordinator({ reason: 'image-not-ready', type: 'cancel-session' });
+      previewInvalidationAdapter.cancelSession('image-not-ready');
       return;
     }
     const scopeSnapshot = capturePreviewRequestScope(appSettings?.editorPreviewResolution ?? 1920, null);
     if (scopeSnapshot === null) return;
-    dispatchPreviewCoordinator({
-      session: scopeSnapshot.session,
-      type: 'image-session-installed',
-    });
+    previewInvalidationAdapter.installSession(scopeSnapshot.session, previewScopeRecoveryRequestId);
   }, [
     appSettings?.editorPreviewResolution,
     capturePreviewRequestScope,
-    dispatchPreviewCoordinator,
+    previewInvalidationAdapter,
+    previewScopeRecoveryRequestId,
     selectedImage?.path,
     selectedImage?.isReady,
     imageSessionId,
@@ -450,7 +458,7 @@ export function useImageProcessing() {
       const scopeSnapshot = capturePreviewRequestScope(normalizedTargetRes, quality.effectiveRoi);
       if (scopeSnapshot === null) return;
       const session = scopeSnapshot.session;
-      dispatchPreviewCoordinator({ session, type: 'image-session-installed' });
+      previewInvalidationAdapter.installSession(session, previewScopeRecoveryRequestId);
       const identity = editedPreviewRunner.request(
         {
           activeWaveformChannel,
@@ -494,19 +502,21 @@ export function useImageProcessing() {
       dispatchPreviewCoordinator,
       editedPreviewRunner,
       isWaveformVisible,
+      previewInvalidationAdapter,
+      previewScopeRecoveryRequestId,
       resolveQualityDecision,
       selectedProofRecipe,
       selectedImage?.isReady,
       setEditor,
     ],
   );
-  const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
-  const handledScopeRecoveryRequestIdRef = useRef(previewScopeRecoveryRequestId);
   useEffect(() => {
-    if (previewScopeRecoveryRequestId === handledScopeRecoveryRequestIdRef.current) return;
-    handledScopeRecoveryRequestIdRef.current = previewScopeRecoveryRequestId;
-    applyAdjustments(false, undefined, true);
-  }, [adjustments, applyAdjustments, previewScopeRecoveryRequestId]);
+    const token = previewInvalidationAdapter.requestScopeRecovery(previewScopeRecoveryRequestId);
+    if (token === null) return;
+    previewInvalidationAdapter.consume(token, (scopeRecovery) => {
+      applyAdjustments(false, undefined, scopeRecovery);
+    });
+  }, [applyAdjustments, previewInvalidationAdapter, previewScopeRecoveryRequestId]);
 
   useEffect(() => {
     let active = true;
@@ -515,12 +525,11 @@ export function useImageProcessing() {
       if (!active) return;
       const parsed = displayTargetChangePayloadSchema.safeParse(event.payload);
       if (!parsed.success) return;
-      const transition = dispatchPreviewCoordinator({
-        generation: parsed.data.displayResourceGeneration,
-        type: 'display-generation-changed',
+      const token = previewInvalidationAdapter.displayTargetChanged(parsed.data.displayResourceGeneration);
+      if (token === null) return;
+      previewInvalidationAdapter.consume(token, (scopeRecovery) => {
+        applyAdjustments(false, undefined, scopeRecovery);
       });
-      if (transition.state.lastTransition?.reason !== 'display-generation-changed') return;
-      applyAdjustments(false);
     }).then((stop) => {
       if (active) unlisten = stop;
       else stop();
@@ -529,7 +538,7 @@ export function useImageProcessing() {
       active = false;
       unlisten?.();
     };
-  }, [applyAdjustments, dispatchPreviewCoordinator]);
+  }, [applyAdjustments, previewInvalidationAdapter]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
