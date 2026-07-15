@@ -14,6 +14,7 @@ const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 enum EditNodeTypeV2 {
     SceneGlobalColorTone,
     SceneCurve,
+    ToneEqualizer,
     DisplayCreative,
     DetailDenoiseDehaze,
     CameraInput,
@@ -28,6 +29,7 @@ impl EditNodeTypeV2 {
             Self::Geometry => ("geometry", "legacy_pipeline_v1", 1),
             Self::SceneGlobalColorTone => ("scene_global_color_tone", "scene_referred_v2", 1),
             Self::SceneCurve => ("scene_curve", "scene_referred_v2", 1),
+            Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
@@ -186,6 +188,80 @@ struct DetailDenoiseDehazeV2 {
     denoise_shadow_bias: f64,
     luma_noise_reduction: f64,
     sharpness: f64,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ToneEqualizerSettingsV1 {
+    auto_placement: bool,
+    band_ev: [f64; 9],
+    detail_preservation: f64,
+    edge_refinement: f64,
+    enabled: bool,
+    mask_exposure_compensation: f64,
+    pivot_ev: f64,
+    preview_mode: u8,
+    range_ev: f64,
+    selected_band: u8,
+    smoothing_radius: f64,
+}
+
+impl ToneEqualizerSettingsV1 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("detailPreservation", self.detail_preservation, 0.0, 1.0),
+            ("edgeRefinement", self.edge_refinement, 0.0, 8.0),
+            (
+                "maskExposureCompensation",
+                self.mask_exposure_compensation,
+                -4.0,
+                4.0,
+            ),
+            ("pivotEv", self.pivot_ev, -8.0, 8.0),
+            ("rangeEv", self.range_ev, 4.0, 24.0),
+            ("smoothingRadius", self.smoothing_radius, 4.0, 64.0),
+        ] {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 tone_equalizer field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        if self
+            .band_ev
+            .iter()
+            .any(|value| !value.is_finite() || !(-4.0..=4.0).contains(value))
+        {
+            return Err(
+                "EditDocumentV2 tone_equalizer bandEv values must be finite and within [-4, 4]"
+                    .to_string(),
+            );
+        }
+        if self.preview_mode > 4 {
+            return Err(
+                "EditDocumentV2 tone_equalizer previewMode must be within 0..=4".to_string(),
+            );
+        }
+        if self.selected_band > 8 {
+            return Err(
+                "EditDocumentV2 tone_equalizer selectedBand must be within 0..=8".to_string(),
+            );
+        }
+        let _ = (self.auto_placement, self.enabled);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ToneEqualizerV2 {
+    tone_equalizer: ToneEqualizerSettingsV1,
+}
+
+impl ToneEqualizerV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.tone_equalizer.validate()
+    }
 }
 
 impl DetailDenoiseDehazeV2 {
@@ -969,6 +1045,10 @@ fn compile_node_params(
             parse_scene_curve(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::ToneEqualizer => {
+            parse_tone_equalizer(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::DetailDenoiseDehaze => {
             parse_detail_denoise_dehaze(&node.params)?;
             Ok(node.params.clone())
@@ -1004,6 +1084,13 @@ fn parse_scene_curve(params: &Map<String, Value>) -> Result<SceneCurveV2, String
         .map_err(|error| format!("EditDocumentV2 scene_curve is invalid: {error}"))?;
     scene_curve.validate()?;
     Ok(scene_curve)
+}
+
+fn parse_tone_equalizer(params: &Map<String, Value>) -> Result<ToneEqualizerV2, String> {
+    let tone_equalizer: ToneEqualizerV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 tone_equalizer is invalid: {error}"))?;
+    tone_equalizer.validate()?;
+    Ok(tone_equalizer)
 }
 
 fn parse_detail_denoise_dehaze(
@@ -1262,6 +1349,24 @@ mod tests {
         })
     }
 
+    fn tone_equalizer_params() -> Value {
+        json!({
+            "toneEqualizer": {
+                "autoPlacement": false,
+                "bandEv": [-0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4],
+                "detailPreservation": 0.65,
+                "edgeRefinement": 2,
+                "enabled": true,
+                "maskExposureCompensation": 0,
+                "pivotEv": 0,
+                "previewMode": 0,
+                "rangeEv": 16,
+                "selectedBand": 4,
+                "smoothingRadius": 32
+            }
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1305,6 +1410,13 @@ mod tests {
                     "params": scene_curve_params(),
                     "process": "scene_referred_v2",
                     "type": "scene_curve"
+                },
+                "tone_equalizer": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": tone_equalizer_params(),
+                    "process": "scene_referred_v2",
+                    "type": "tone_equalizer"
                 },
                 "display_creative": {
                     "enabled": true,
@@ -1505,6 +1617,12 @@ mod tests {
         for (key, value) in display_creative_params()
             .as_object()
             .expect("display-creative params object")
+        {
+            expected[key] = value.clone();
+        }
+        for (key, value) in tone_equalizer_params()
+            .as_object()
+            .expect("tone-equalizer params object")
         {
             expected[key] = value.clone();
         }
@@ -1762,6 +1880,46 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range display field must fail");
         assert!(error.contains("vignetteAmount"));
+    }
+
+    #[test]
+    fn tone_equalizer_compiler_rejects_unowned_missing_and_malformed_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["futureBand"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned tone-equalizer field must fail");
+        assert!(error.contains("unknown field `futureBand`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]
+            .as_object_mut()
+            .expect("tone-equalizer settings object")
+            .remove("smoothingRadius");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing tone-equalizer field must fail");
+        assert!(error.contains("missing field `smoothingRadius`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["bandEv"][4] =
+            json!(4.1);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range tone-equalizer band must fail");
+        assert!(error.contains("bandEv"));
+
+        let mut wrong_band_count = document_with_legacy(json!({}));
+        wrong_band_count["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["bandEv"] =
+            json!([0, 0, 0, 0, 0, 0, 0, 0]);
+        let error = serde_json::from_value::<EditDocumentV2>(wrong_band_count)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("wrong tone-equalizer band count must fail");
+        assert!(error.contains("array of length 9"));
     }
 
     #[test]

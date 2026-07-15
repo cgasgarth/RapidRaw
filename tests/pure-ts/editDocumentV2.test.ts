@@ -71,6 +71,7 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(editDocumentV2NodeInventory(document)).toEqual([
       'scene_global_color_tone',
       'scene_curve',
+      'tone_equalizer',
       'display_creative',
       'detail_denoise_dehaze',
       'camera_input',
@@ -403,6 +404,60 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('tone equalizer defaults legacy state and rejects malformed render authority', () => {
+    const { toneEqualizer: _toneEqualizer, ...legacyToneEqualizer } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyToneEqualizer);
+    expect(defaulted.nodes.tone_equalizer?.params).toEqual({
+      toneEqualizer: {
+        autoPlacement: false,
+        bandEv: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        detailPreservation: 0.65,
+        edgeRefinement: 2,
+        enabled: false,
+        maskExposureCompensation: 0,
+        pivotEv: 0,
+        previewMode: 0,
+        rangeEv: 16,
+        selectedBand: 4,
+        smoothingRadius: 32,
+      },
+    });
+    expect(defaulted.migration?.defaulted).toContain('tone_equalizer.toneEqualizer');
+    expect(compileEditDocumentNodeV2(defaulted.nodes.tone_equalizer).params.toneEqualizer).toEqual(
+      defaulted.nodes.tone_equalizer?.params.toneEqualizer,
+    );
+
+    const node = defaulted.nodes.tone_equalizer;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          tone_equalizer: {
+            ...node,
+            params: {
+              toneEqualizer: { ...defaulted.nodes.tone_equalizer?.params.toneEqualizer, futureBand: true },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          tone_equalizer: {
+            ...node,
+            params: {
+              toneEqualizer: { ...defaulted.nodes.tone_equalizer?.params.toneEqualizer, selectedBand: 9 },
+            },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -704,6 +759,28 @@ describe('EditDocumentV2 legacy adapter', () => {
       vignetteAmount: -32,
     });
     expect(renderDocument.nodes.detail_denoise_dehaze).toEqual(preparedDocument.nodes.detail_denoise_dehaze);
+    expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays the authoritative tone-equalizer envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      toneEqualizer: {
+        ...structuredClone(INITIAL_ADJUSTMENTS.toneEqualizer),
+        bandEv: [0, 0, 0, 0, 0.75, 0, 0, 0, 0],
+        enabled: true,
+      },
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['tone_equalizer']);
+
+    expect(renderDocument.nodes.tone_equalizer).toBe(authoritative.nodes.tone_equalizer);
+    expect(renderDocument.nodes.tone_equalizer?.params.toneEqualizer).toMatchObject({
+      bandEv: [0, 0, 0, 0, 0.75, 0, 0, 0, 0],
+      enabled: true,
+    });
+    expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
   });
 
