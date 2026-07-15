@@ -140,6 +140,7 @@ pub struct DisplayTargetCoordinator {
 }
 
 impl DisplayTargetCoordinator {
+    #[cfg(any(test, feature = "validation-harness"))]
     pub fn new(
         debounce: Duration,
         resolver: impl Fn(u64) -> Result<ResolvedDisplayTarget, String> + Send + Sync + 'static,
@@ -212,6 +213,7 @@ impl DisplayTargetCoordinator {
             .and_then(|resources| resources.target.snapshot.as_ref().map(Arc::clone))
     }
 
+    #[cfg(any(test, feature = "validation-harness"))]
     pub fn wait_for_idle(&self, timeout: Duration) -> bool {
         let deadline = Instant::now() + timeout;
         let mut state = self.shared.state.lock().unwrap();
@@ -237,12 +239,11 @@ impl DisplayTargetCoordinator {
 #[cfg(target_os = "macos")]
 pub fn request_for_state(state: &crate::AppState) {
     let device_generation = state
+        .services
         .gpu_context
-        .lock()
-        .unwrap()
-        .as_ref()
+        .context_snapshot()
         .map_or(0, |context| context.generation);
-    if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
+    if let Some(coordinator) = state.services.gpu_context.coordinator_snapshot() {
         coordinator.request_refresh(device_generation);
     }
 }
@@ -449,10 +450,9 @@ fn validate_hdr_capability_contract(
 #[tauri::command]
 pub fn get_display_target_report(state: tauri::State<'_, crate::AppState>) -> DisplayTargetReport {
     state
-        .display_target_coordinator
-        .lock()
-        .unwrap()
-        .as_ref()
+        .services
+        .gpu_context
+        .coordinator_snapshot()
         .map_or_else(DisplayTargetReport::default, |coordinator| {
             coordinator.report()
         })
@@ -569,7 +569,7 @@ pub fn start_validation_benchmark(app: tauri::AppHandle) {
             use tauri::Manager;
 
             let state = app.state::<crate::AppState>();
-            let Some(coordinator) = state.display_target_coordinator.lock().unwrap().clone() else {
+            let Some(coordinator) = state.services.gpu_context.coordinator_snapshot() else {
                 return;
             };
             for _ in 0..1_000 {

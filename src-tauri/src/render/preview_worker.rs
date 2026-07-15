@@ -637,10 +637,9 @@ fn encode_preview_response(
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_snapshot = app_handle.map(|app| {
         app.state::<AppState>()
-            .display_target_coordinator
-            .lock()
-            .unwrap()
-            .as_ref()
+            .services
+            .gpu_context
+            .coordinator_snapshot()
             .and_then(|coordinator| coordinator.current_snapshot())
             .unwrap_or_else(|| {
                 Arc::new(crate::display_profile::display_preview_transform_snapshot_for_app(app))

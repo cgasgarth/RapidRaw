@@ -39,10 +39,15 @@ pub fn get_or_init_gpu_context(
     #[cfg(target_os = "windows")]
     let app_handle = _app_handle;
 
-    let mut context_lock = state.gpu_context.lock().unwrap();
-    if let Some(context) = &*context_lock {
-        return Ok(context.clone());
+    let context_service = &state.services.gpu_context;
+    if let Some(context) = context_service.context_snapshot() {
+        return Ok(context);
     }
+    let initialization = context_service.acquire_initialization();
+    if let Some(context) = context_service.context_snapshot() {
+        return Ok(context);
+    }
+    let publication = context_service.begin_context_publication();
 
     #[allow(unused_mut)]
     let mut instance_desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
@@ -162,9 +167,13 @@ pub fn get_or_init_gpu_context(
         pipeline_registry,
         presentation: Arc::new(presentation),
     };
-    *context_lock = Some(new_context.clone());
-    drop(context_lock);
-    if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
+    let coordinator = context_service
+        .publish_context(publication, new_context.clone())
+        .ok_or_else(|| {
+            "GPU context initialization was invalidated before publication".to_string()
+        })?;
+    drop(initialization);
+    if let Some(coordinator) = coordinator {
         coordinator.request_refresh(new_context.generation);
     }
     Ok(new_context)
@@ -174,10 +183,15 @@ pub fn get_or_init_gpu_context(
 pub fn get_or_init_compute_gpu_context_for_tests(
     state: &tauri::State<AppState>,
 ) -> Result<GpuContext, String> {
-    let mut context_lock = state.gpu_context.lock().unwrap();
-    if let Some(context) = &*context_lock {
-        return Ok(context.clone());
+    let context_service = &state.services.gpu_context;
+    if let Some(context) = context_service.context_snapshot() {
+        return Ok(context);
     }
+    let initialization = context_service.acquire_initialization();
+    if let Some(context) = context_service.context_snapshot() {
+        return Ok(context);
+    }
+    let publication = context_service.begin_context_publication();
 
     // Reuse one process-wide compute device across test AppStates. Software
     // Vulkan adapters can retire a dropped device after the next one starts,
@@ -241,9 +255,11 @@ pub fn get_or_init_compute_gpu_context_for_tests(
             })
         })
         .clone()?;
-    *context_lock = Some(new_context.clone());
-    drop(context_lock);
-    if let Some(coordinator) = state.display_target_coordinator.lock().unwrap().as_ref() {
+    let coordinator = context_service
+        .publish_context(publication, new_context.clone())
+        .ok_or_else(|| "test GPU context initialization was invalidated".to_string())?;
+    drop(initialization);
+    if let Some(coordinator) = coordinator {
         coordinator.request_refresh(new_context.generation);
     }
     Ok(new_context)

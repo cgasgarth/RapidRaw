@@ -350,25 +350,6 @@ impl WgpuPresentationScheduler {
         self.shared.has_display.load(Ordering::Acquire) && !mailbox.stopped
     }
 
-    pub fn publish_texture(
-        &self,
-        view: wgpu::TextureView,
-        image_size: [u32; 2],
-        texture_size: [u32; 2],
-    ) -> Result<(), String> {
-        self.publish_texture_for_frame(view, image_size, texture_size, None)
-    }
-
-    pub fn publish_texture_for_frame(
-        &self,
-        view: wgpu::TextureView,
-        image_size: [u32; 2],
-        texture_size: [u32; 2],
-        identity: Option<NativeFrameIdentity>,
-    ) -> Result<(), String> {
-        self.publish_texture_for_frame_with_receipt(view, image_size, texture_size, identity, None)
-    }
-
     pub fn present_texture_for_frame(
         &self,
         view: wgpu::TextureView,
