@@ -16,6 +16,7 @@ const portOverride =
 const port = await allocateFreeTcpPort(host, portOverride);
 const baseUrl = `http://${host}:${port}`;
 const runAgentAuditE2e = process.env.RAWENGINE_AGENT_AUDIT_E2E === '1';
+const browserScenario = process.env.RAWENGINE_BROWSER_SCENARIO ?? 'full';
 const viewport = { height: 720, width: 1280 };
 const boundsReportPath = resolve(
   'private-artifacts/validation/preview-bounds/browser-tauri-harness-bounds-report.json',
@@ -47,6 +48,89 @@ interface BoundsReport {
 }
 
 const boundsSamples: BoundsSample[] = [];
+
+async function verifyCompareDividerController(page: Page): Promise<void> {
+  const divider = page.getByTestId('editor-compare-split-divider');
+  const box = await divider.boundingBox();
+  if (box === null) throw new Error('Compare divider did not expose browser geometry.');
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x - 80, center.y);
+  await page.mouse.up();
+  const mouseValue = Number(await divider.getAttribute('aria-valuenow'));
+  if (!Number.isFinite(mouseValue) || mouseValue >= 50) {
+    throw new Error(`Mouse compare-divider command did not move left: ${String(mouseValue)}.`);
+  }
+
+  await divider.press('Shift+ArrowRight');
+  const keyboardValue = Number(await divider.getAttribute('aria-valuenow'));
+  if (keyboardValue !== mouseValue + 10) {
+    throw new Error(`Keyboard compare-divider command was not semantic: ${String(keyboardValue)}.`);
+  }
+
+  const cdp = await page.context().newCDPSession(page);
+  const touchStart = async (x: number, y: number): Promise<void> => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ force: 1, id: 11, radiusX: 1, radiusY: 1, x, y }],
+      type: 'touchStart',
+    });
+  };
+  const touchMove = async (x: number, y: number): Promise<void> => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      touchPoints: [{ force: 1, id: 11, radiusX: 1, radiusY: 1, x, y }],
+      type: 'touchMove',
+    });
+  };
+  const touchEnd = async (): Promise<void> => {
+    await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  };
+
+  const touchBox = await divider.boundingBox();
+  if (touchBox === null) throw new Error('Compare divider disappeared before touch proof.');
+  const touchCenter = { x: touchBox.x + touchBox.width / 2, y: touchBox.y + touchBox.height / 2 };
+  await touchStart(touchCenter.x, touchCenter.y);
+  await touchMove(touchCenter.x + 60, touchCenter.y);
+  const touchValue = Number(await divider.getAttribute('aria-valuenow'));
+  if (!Number.isFinite(touchValue) || touchValue <= keyboardValue) {
+    throw new Error(`Touch compare-divider command did not move right: ${String(touchValue)}.`);
+  }
+  const capturedPointerId = await divider.evaluate((element) => {
+    for (let pointerId = 1; pointerId <= 32; pointerId += 1) {
+      if (element.hasPointerCapture(pointerId)) return pointerId;
+    }
+    return null;
+  });
+  if (capturedPointerId === null) throw new Error('Touch compare-divider gesture did not capture its pointer.');
+  await divider.evaluate((element, pointerId) => element.releasePointerCapture(pointerId), capturedPointerId);
+  await touchMove(touchCenter.x + 120, touchCenter.y);
+  if (Number(await divider.getAttribute('aria-valuenow')) !== touchValue) {
+    throw new Error('Compare divider continued mutating after lost pointer capture.');
+  }
+  await touchEnd();
+
+  const sessionBox = await divider.boundingBox();
+  const sessionBefore = await divider.getAttribute('data-compare-divider-session');
+  if (sessionBox === null || sessionBefore === null) throw new Error('Compare divider session proof could not start.');
+  const sessionCenter = { x: sessionBox.x + sessionBox.width / 2, y: sessionBox.y + sessionBox.height / 2 };
+  await touchStart(sessionCenter.x, sessionCenter.y);
+  await page.setViewportSize({ height: viewport.height, width: viewport.width - 20 });
+  await page.waitForFunction(
+    (previous) =>
+      document
+        .querySelector('[data-testid="editor-compare-split-divider"]')
+        ?.getAttribute('data-compare-divider-session') !== previous,
+    sessionBefore,
+  );
+  const invalidatedValue = Number(await divider.getAttribute('aria-valuenow'));
+  await touchMove(sessionCenter.x - 100, sessionCenter.y);
+  if (Number(await divider.getAttribute('aria-valuenow')) !== invalidatedValue) {
+    throw new Error('A geometry-successor pointer mutated the invalidated compare-divider session.');
+  }
+  await touchEnd();
+  await page.setViewportSize(viewport);
+}
 
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
@@ -201,6 +285,18 @@ try {
     throw new Error('Split-wipe compare mode did not activate on the image canvas.');
   }
   await page.getByTestId('editor-compare-split-divider').waitFor({ timeout: 10_000 });
+  await verifyCompareDividerController(page);
+  if (browserScenario === 'compare-divider-controller') {
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected compare-divider browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await writeBoundsReport('passed');
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('compare divider browser controller proof passed');
+    process.exit(0);
+  }
   await page.waitForTimeout(750);
   if ((await imageCanvas.getAttribute('data-editor-compare-original-ready')) !== 'true') {
     throw new Error('A late superseded original completion replaced the visible current compare artifact.');
