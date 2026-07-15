@@ -20,11 +20,8 @@ import { areAdjustmentsEqual } from '../utils/adjustmentsSnapshot';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
-import {
-  applyBasicToneCommandEnvelopeToAdjustments,
-  BasicToneApprovalClass,
-  type BasicToneCommandEnvelope,
-} from '../utils/basicToneCommandBridge';
+import { BasicToneApprovalClass, type BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
+import { type BasicToneCommitIdentity, buildBasicToneCommandEditTransaction } from '../utils/basicToneEditTransaction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
 import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
 import {
@@ -267,7 +264,10 @@ interface EditorState {
   ) => void;
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
-  applyBasicToneCommand: (command: BasicToneCommandEnvelope) => void;
+  applyBasicToneCommand: (
+    command: BasicToneCommandEnvelope,
+    identity: BasicToneCommitIdentity,
+  ) => EditTransactionResult;
   pushHistory: (newAdjustments: Adjustments, expected: { adjustmentRevision: number; imageSessionId: string }) => void;
   renameHistoryCheckpoint: (checkpointId: string, label: string) => void;
   undo: () => void;
@@ -753,26 +753,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  applyBasicToneCommand: (command) => {
-    set((state) => {
-      assertApprovedBasicToneCommand(command, state);
-      const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, command);
-      const nextHistory = pushEditHistoryEntryWithCheckpoints(
-        state.history,
-        state.historyIndex,
-        adjustments,
-        state.historyCheckpoints,
-      );
-
-      return {
-        ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, adjustments),
-        history: nextHistory.history,
-        historyCheckpoints: nextHistory.checkpoints,
-        historyIndex: nextHistory.historyIndex,
-        lastBasicToneCommand: command,
-      };
-    });
+  applyBasicToneCommand: (command, identity) => {
+    const state = get();
+    assertApprovedBasicToneCommand(command, state);
+    const result = state.applyEditTransaction(buildBasicToneCommandEditTransaction(state, identity, command));
+    set((current) =>
+      current.adjustmentRevision === result.nextAdjustmentRevision ? { lastBasicToneCommand: command } : {},
+    );
+    return result;
   },
 
   pushHistory: (newAdj, expected) => {

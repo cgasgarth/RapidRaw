@@ -68,6 +68,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: null,
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 const result = await applyBasicToneToLiveEditor({
   operationId: 'live_apply_3155',
@@ -97,8 +98,29 @@ if (state.historyIndex !== 1 || state.history.length !== 2) {
 if (state.lastBasicToneCommand?.commandId !== result.command.commandId || state.lastBasicToneCommand.dryRun) {
   throw new Error('Agent basic-tone apply did not retain the applied command envelope.');
 }
-if (state.finalPreviewUrl !== 'blob:rawengine-preview-before') {
-  throw new Error('Agent basic-tone apply must preserve the visible preview until the native renderer replaces it.');
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== result.command.commandId ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error(
+    `Agent basic-tone apply did not publish one revisioned EditTransaction receipt: ${JSON.stringify({
+      adjustmentRevision: state.adjustmentRevision,
+      receipt: state.lastEditApplicationReceipt,
+      resultCommandId: result.command.commandId,
+    })}`,
+  );
+}
+if (
+  state.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.45 ||
+  state.editDocumentV2.nodes.scene_global_color_tone.params.contrast !== 22
+) {
+  throw new Error('Agent basic-tone apply did not update the canonical scene tone node.');
+}
+if (state.finalPreviewUrl !== null) {
+  throw new Error('Agent basic-tone apply did not invalidate stale preview output for scheduled rendering.');
 }
 if (state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('Agent basic-tone apply must invalidate stale uncropped preview output.');

@@ -18,6 +18,7 @@ export type EditMutationSource =
   | 'layer-command'
   | 'reference-match'
   | 'ai-edit'
+  | 'agent-command'
   | 'reset'
   | 'history'
   | 'hydration'
