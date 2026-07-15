@@ -16,6 +16,7 @@ import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRu
 import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
 import { PreviewCoordinatorRuntime } from '../../utils/previewCoordinatorRuntime';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
+import { PreviewInteractionSchedulingEffectRunner } from '../../utils/previewInteractionSchedulingEffectRunner';
 import { PreviewInvalidationEffectRunner } from '../../utils/previewInvalidationEffectRunner';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
@@ -287,7 +288,8 @@ export function useImageProcessing() {
           );
         },
         publish: setEditor,
-        schedule: (request, delayMs) => editedPreviewRunner.request(request, delayMs),
+        schedule: (request, delayMs, causalGeneration) =>
+          editedPreviewRunner.request(request, delayMs, causalGeneration),
       }),
     [
       capturePreviewRequestScope,
@@ -297,6 +299,14 @@ export function useImageProcessing() {
       resolveQualityDecision,
       setEditor,
     ],
+  );
+  const previewInteractionSchedulingRunner = useMemo(
+    () =>
+      new PreviewInteractionSchedulingEffectRunner({
+        schedule: (prepared, delayMs, causalGeneration) =>
+          previewRequestIntentAdapter.schedulePrepared(prepared, delayMs, causalGeneration),
+      }),
+    [previewRequestIntentAdapter],
   );
 
   useEffect(() => {
@@ -354,11 +364,10 @@ export function useImageProcessing() {
     (effects) => editedPreviewRunner.consume(effects),
     (effects) => previewInvalidationRunner.consume(effects),
     (effects) => originalPreviewRunner.consume(effects),
+    (effects) => previewInteractionSchedulingRunner.consume(effects),
     (effects) => {
       for (const effect of effects) {
-        if (effect.type === 'schedule-edited') {
-          previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
-        } else if (effect.type === 'schedule-original') {
+        if (effect.type === 'schedule-original') {
           dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
           originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
         }
