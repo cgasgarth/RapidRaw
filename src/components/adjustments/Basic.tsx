@@ -7,7 +7,10 @@ import { Invokes } from '../../tauri/commands';
 import { type Adjustments, BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { buildToneEqualizerEditTransaction } from '../../utils/toneEqualizerEditTransaction';
+import {
+  buildToneEqualizerEditTransaction,
+  isCurrentToneEqualizerAsyncRequest,
+} from '../../utils/toneEqualizerEditTransaction';
 import { toneEqualizerPlacementResponseSchema } from '../../utils/toneEqualizerPicker';
 import type { AppSettings } from '../ui/AppProperties';
 import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
@@ -136,6 +139,7 @@ export default function BasicAdjustments({
   );
   const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
   basicToneCommitIdentityRef.current = basicToneCommitIdentity;
+  const tonePlacementRequestGenerationRef = useRef(0);
   const toneHistogramPath = useMemo(() => {
     if (toneHistogram.length === 0) return '';
     const peak = Math.max(1, ...toneHistogram);
@@ -184,7 +188,21 @@ export default function BasicAdjustments({
     }));
   };
 
+  const commitToneEqualizerAtIdentity = (
+    identity: BasicToneCommitIdentity,
+    patch: Partial<Adjustments['toneEqualizer']>,
+  ) => {
+    const result = applyEditTransaction(
+      buildToneEqualizerEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
+    );
+    basicToneCommitIdentityRef.current = {
+      ...identity,
+      adjustmentRevision: result.nextAdjustmentRevision,
+    };
+  };
+
   const updateToneEqualizer = (patch: Partial<Adjustments['toneEqualizer']>) => {
+    tonePlacementRequestGenerationRef.current += 1;
     if (!isForMask) {
       const identity = basicToneCommitIdentityRef.current;
       if (identity === null) {
@@ -195,13 +213,7 @@ export default function BasicAdjustments({
         }));
         return;
       }
-      const result = applyEditTransaction(
-        buildToneEqualizerEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
-      );
-      basicToneCommitIdentityRef.current = {
-        ...identity,
-        adjustmentRevision: result.nextAdjustmentRevision,
-      };
+      commitToneEqualizerAtIdentity(identity, patch);
       return;
     }
     onRequireEditGraphV2?.();
@@ -218,8 +230,10 @@ export default function BasicAdjustments({
   };
 
   const autoPlaceToneEqualizer = async () => {
-    if (!selectedImagePath) return;
-    const expectedSourceIdentity = selectedImagePath;
+    const identity = basicToneCommitIdentityRef.current;
+    if (!selectedImagePath || (!isForMask && identity === null)) return;
+    const requestGeneration = ++tonePlacementRequestGenerationRef.current;
+    const expectedSourceIdentity = identity?.sourceIdentity ?? selectedImagePath;
     setTonePlacementStatus(t('adjustments.basic.toneEqualizer.analyzing'));
     try {
       const placement = await invokeWithSchema(
@@ -227,18 +241,56 @@ export default function BasicAdjustments({
         { expectedSourceIdentity },
         toneEqualizerPlacementResponseSchema,
       );
-      if (placement.sourceIdentity !== useEditorStore.getState().selectedImage?.path) return;
-      updateToneEqualizer({
+      const currentState = useEditorStore.getState();
+      const requestIsCurrent =
+        placement.sourceIdentity === expectedSourceIdentity &&
+        (identity === null
+          ? requestGeneration === tonePlacementRequestGenerationRef.current &&
+            currentState.selectedImage?.path === expectedSourceIdentity
+          : isCurrentToneEqualizerAsyncRequest(
+              currentState,
+              identity,
+              requestGeneration,
+              tonePlacementRequestGenerationRef.current,
+            ));
+      if (!requestIsCurrent) return;
+      const patch = {
         autoPlacement: true,
         enabled: true,
         pivotEv: placement.pivotEv,
         rangeEv: placement.rangeEv,
-      });
+      };
+      if (identity === null) {
+        onRequireEditGraphV2?.();
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          toneEqualizer: { ...prev.toneEqualizer, ...patch },
+        }));
+      } else {
+        commitToneEqualizerAtIdentity(identity, patch);
+      }
       setTonePlacementStatus(
         `${placement.sceneBlackEv.toFixed(1)}…${placement.sceneWhiteEv.toFixed(1)} EV · ${Math.round(placement.confidence * 100)}%`,
       );
       setToneHistogram(placement.histogram);
     } catch {
+      const currentState = useEditorStore.getState();
+      if (
+        identity !== null &&
+        !isCurrentToneEqualizerAsyncRequest(
+          currentState,
+          identity,
+          requestGeneration,
+          tonePlacementRequestGenerationRef.current,
+        )
+      )
+        return;
+      if (
+        identity === null &&
+        (requestGeneration !== tonePlacementRequestGenerationRef.current ||
+          currentState.selectedImage?.path !== expectedSourceIdentity)
+      )
+        return;
       setTonePlacementStatus(t('adjustments.basic.toneEqualizer.analysisUnavailable'));
     }
   };
