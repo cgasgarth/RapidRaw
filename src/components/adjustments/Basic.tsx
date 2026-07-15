@@ -7,6 +7,7 @@ import { Invokes } from '../../tauri/commands';
 import { type Adjustments, BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+import { buildToneEqualizerEditTransaction } from '../../utils/toneEqualizerEditTransaction';
 import { toneEqualizerPlacementResponseSchema } from '../../utils/toneEqualizerPicker';
 import type { AppSettings } from '../ui/AppProperties';
 import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
@@ -184,25 +185,36 @@ export default function BasicAdjustments({
   };
 
   const updateToneEqualizer = (patch: Partial<Adjustments['toneEqualizer']>) => {
-    if (isForMask) onRequireEditGraphV2?.();
+    if (!isForMask) {
+      const identity = basicToneCommitIdentityRef.current;
+      if (identity === null) {
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          rawEngineEditGraphVersion: 2,
+          toneEqualizer: { ...prev.toneEqualizer, ...patch },
+        }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildToneEqualizerEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
+      );
+      basicToneCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
+    onRequireEditGraphV2?.();
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      ...(isForMask ? {} : { rawEngineEditGraphVersion: 2 }),
       toneEqualizer: { ...prev.toneEqualizer, ...patch },
     }));
   };
 
   const updateToneBand = (index: number, value: number) => {
-    if (isForMask) onRequireEditGraphV2?.();
-    setAdjustments((prev: Adjustments) => {
-      const bandEv = [...prev.toneEqualizer.bandEv] as Adjustments['toneEqualizer']['bandEv'];
-      bandEv[index] = value;
-      return {
-        ...prev,
-        ...(isForMask ? {} : { rawEngineEditGraphVersion: 2 }),
-        toneEqualizer: { ...prev.toneEqualizer, bandEv, enabled: true, selectedBand: index },
-      };
-    });
+    const bandEv = [...adjustments.toneEqualizer.bandEv] as Adjustments['toneEqualizer']['bandEv'];
+    bandEv[index] = value;
+    updateToneEqualizer({ bandEv, enabled: true, selectedBand: index });
   };
 
   const autoPlaceToneEqualizer = async () => {

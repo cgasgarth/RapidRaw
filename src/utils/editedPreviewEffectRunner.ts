@@ -218,6 +218,7 @@ const executeNativeEditedPreview = async (
           'geometry',
           'scene_curve',
           'scene_global_color_tone',
+          'tone_equalizer',
         ]),
         expectedImagePath: request.session.sourceImagePath,
         isInteractive: request.kind === 'interactive',
