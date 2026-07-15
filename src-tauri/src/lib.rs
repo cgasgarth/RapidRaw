@@ -394,7 +394,8 @@ pub fn run() {
                 log::warn!("camera_profile_registry_root_unavailable: {error}");
             }
             app.state::<AppState>()
-                .startup_trace
+                .services
+                .startup
                 .mark(NativeStartupPhase::ProcessStarted, "ok", None);
             let config_dir = app_handle.path().app_config_dir().expect("Failed to get config dir");
             let crash_flag_path = config_dir.join(".gpu_init_crash_flag");
@@ -408,7 +409,7 @@ pub fn run() {
             }
 
             let mut settings: AppSettings = load_settings_or_default(&app_handle);
-            app.state::<AppState>().startup_trace.mark(
+            app.state::<AppState>().services.startup.mark(
                 NativeStartupPhase::MinimalSettingsLoaded,
                 "ok",
                 None,
@@ -505,7 +506,7 @@ pub fn run() {
             }
 
             let window = window_builder.build().expect("Failed to build window");
-            app.state::<AppState>().startup_trace.mark(
+            app.state::<AppState>().services.startup.mark(
                 NativeStartupPhase::WindowCreated,
                 "ok",
                 None,
@@ -561,7 +562,7 @@ pub fn run() {
                 if let Err(error) = window.set_focus() {
                     log::error!("Failed to focus startup shell: {}", error);
                 }
-                app.state::<AppState>().startup_trace.mark(
+                app.state::<AppState>().services.startup.mark(
                     NativeStartupPhase::WindowVisible,
                     "ok",
                     Some("webview-bootstrap-chrome".to_string()),
@@ -571,7 +572,7 @@ pub fn run() {
                 let state = app.state::<AppState>();
                 state.services.analytics.start_worker(app.handle().clone());
                 file_management::start_thumbnail_workers(app.handle().clone());
-                app.state::<AppState>().startup_trace.mark(
+                app.state::<AppState>().services.startup.mark(
                     NativeStartupPhase::CoreCommandsReady,
                     "ok",
                     Some("background-services-scheduled".to_string()),

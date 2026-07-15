@@ -1,12 +1,10 @@
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
-use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
@@ -80,10 +78,6 @@ pub struct AnalyticsConfig {
 pub struct AppState {
     /// Narrow service handles are the preferred capability boundary for new commands.
     pub services: Arc<crate::app::services::AppServices>,
-    pub startup_trace: StartupTrace,
-    pub gpu_initialization: InitializationService,
-    pub lens_initialization: InitializationService,
-    pub window_setup_complete: AtomicBool,
     #[cfg(feature = "ai")]
     pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
     #[cfg(feature = "ai")]
@@ -130,10 +124,6 @@ impl AppState {
             services: Arc::new(crate::app::services::AppServices::new(Arc::clone(
                 &cache_budget,
             ))),
-            startup_trace: StartupTrace::new(),
-            gpu_initialization: InitializationService::default(),
-            lens_initialization: InitializationService::default(),
-            window_setup_complete: AtomicBool::new(false),
             #[cfg(feature = "ai")]
             ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
             #[cfg(feature = "ai")]
