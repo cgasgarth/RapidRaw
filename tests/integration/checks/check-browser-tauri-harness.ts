@@ -8,6 +8,7 @@ import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/edi
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 import { Invokes } from '../../../src/tauri/commands';
+import { DISPLAY_TARGET_CHANGED_EVENT } from '../../../src/utils/tauriEventNames';
 
 const host = '127.0.0.1';
 const portOverride =
@@ -240,6 +241,45 @@ async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void
   await page.waitForTimeout(150);
   if ((await status.getAttribute('data-preview-scope-updated-at')) !== acceptedAt) {
     throw new Error('A non-presented preview operation replaced exact-current scope output.');
+  }
+
+  const displayInvalidationBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate((eventName) => {
+    const payload = {
+      deviceGeneration: 10_000,
+      displayResourceGeneration: 10_000,
+      target: {
+        colorSpace: 'display_encoded_srgb',
+        displayId: 1,
+        profileSha256: 'sha256:browser-harness-display',
+        scaleFactorBits: 4_607_182_418_800_017_400,
+      },
+    };
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(eventName, payload);
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(eventName, payload);
+  }, DISPLAY_TARGET_CHANGED_EVENT);
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0) >=
+      baseline + 1,
+    displayInvalidationBaseline,
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(250);
+  const displayInvalidationCount = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  if (displayInvalidationCount !== displayInvalidationBaseline + 1) {
+    throw new Error(
+      `Duplicate display invalidation scheduled ${String(displayInvalidationCount - displayInvalidationBaseline)} previews.`,
+    );
   }
 }
 
