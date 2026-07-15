@@ -7,6 +7,7 @@ pub(crate) mod original_preview;
 pub(crate) mod path_preview;
 pub(crate) mod perspective;
 pub(crate) mod preset_previews;
+pub(crate) mod soft_proof_preview;
 pub(crate) mod source;
 pub(crate) mod startup;
 pub(crate) mod temporary_artifacts;

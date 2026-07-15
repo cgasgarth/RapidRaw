@@ -61,15 +61,15 @@ use std::fs;
 use std::io::Cursor;
 use std::panic;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
+use image::{DynamicImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
 use imageproc::edges::canny;
 use imageproc::hough::{LineDetectionOptions, detect_lines};
-use rapidraw_codecs::JpegPreset;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -86,14 +86,11 @@ use crate::merge::hdr::ALIGNMENT_POLICY_ID;
 use crate::merge::hdr::planning_service::{HdrSavePayload, PendingHdrSourceRef};
 
 use crate::app::startup::NativeStartupPhase;
-use crate::cache_utils::{
-    calculate_geometry_hash, calculate_transform_hash, calculate_visual_hash,
-};
+#[cfg(test)]
+use crate::cache_utils::calculate_geometry_hash;
+use crate::cache_utils::{calculate_transform_hash, calculate_visual_hash};
 use crate::editor::preview_geometry::{
     PreviewGeometryQuality, PreviewGeometryTarget, preview_geometry_transform,
-};
-use crate::editor::viewer_sampling_service::{
-    CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::parse_virtual_path;
@@ -322,349 +319,6 @@ async fn apply_adjustments(
         }
         Err(_) => Err("preview_worker_stopped".to_string()),
     }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ExportSoftProofPreviewRequest {
-    active_waveform_channel: Option<String>,
-    black_point_compensation: bool,
-    compute_waveform: bool,
-    color_profile: export::export_processing::ExportColorProfile,
-    expected_image_path: Option<String>,
-    export_soft_proof_recipe_id: Option<String>,
-    js_adjustments: serde_json::Value,
-    rendering_intent: export::export_processing::ExportRenderingIntent,
-    target_resolution: Option<u32>,
-    viewer_sample_graph_revision: Option<String>,
-}
-
-#[tauri::command]
-fn generate_export_soft_proof_preview(
-    request: ExportSoftProofPreviewRequest,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
-    let mut adjustments_clone = request.js_adjustments;
-    hydrate_adjustments(&state, &mut adjustments_clone);
-
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded")?;
-    if let Some(expected_image_path) = request.expected_image_path.as_deref() {
-        validate_expected_preview_image(&loaded_image.path, expected_image_path)?;
-    }
-
-    let preview_dim = request.target_resolution.unwrap_or(1920).clamp(512, 8192);
-    let preview_image = render_processed_export_soft_proof_preview(
-        &state,
-        &app_handle,
-        &loaded_image,
-        &adjustments_clone,
-        preview_dim,
-    )?;
-    let source_color_state = if loaded_image.is_raw {
-        color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
-    } else {
-        color::working_to_output_transform::WorkingColorState::EncodedSrgbV1
-    };
-    let shared_gamut_warning = if source_color_state
-        == color::working_to_output_transform::WorkingColorState::AcesCgLinearV1
-    {
-        Some(
-            color::working_to_output_transform::analyze_acescg_image_gamut_warning_with_mask(
-                &preview_image,
-                &request.color_profile,
-                &request.rendering_intent,
-            )?,
-        )
-    } else {
-        None
-    };
-    let (proof_pixels, width, height, _) =
-        export::export_processing::export_soft_proof_rgb_pixels_with_working_color_state(
-            &preview_image,
-            source_color_state,
-            &request.color_profile,
-            &request.rendering_intent,
-            request.black_point_compensation,
-        )?;
-    let proof_metadata = export::export_processing::export_soft_proof_transform_metadata(
-        &preview_image,
-        &request.color_profile,
-        &request.rendering_intent,
-        request.black_point_compensation,
-    )?;
-
-    if let Some(graph_revision) = request.viewer_sample_graph_revision.as_deref()
-        && let Some(proof_image) = RgbImage::from_raw(width, height, proof_pixels.clone())
-    {
-        let graph_hash = crate::render::artifact_identity::stable_hash(&graph_revision);
-        let mut artifact_identity =
-            crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
-                &loaded_image.artifact_source,
-                state.load_image_generation.load(Ordering::SeqCst) as u64,
-                graph_hash,
-                loaded_image.artifact_source.source_fingerprint(),
-                calculate_geometry_hash(&adjustments_clone),
-                width,
-                height,
-            );
-        artifact_identity.color_domain =
-            crate::render::artifact_identity::ArtifactColorDomain::DisplayEncoded;
-        artifact_identity.completed_stage = "soft-proof-output";
-        artifact_identity.display_snapshot =
-            Some(crate::render::artifact_identity::stable_hash(&format!(
-                "{:?}:{:?}:{}",
-                request.color_profile, request.rendering_intent, request.black_point_compensation
-            )));
-        let frame = CachedViewerSampleFrame {
-            artifact_identity,
-            graph_revision: graph_revision.to_string(),
-            pixels: SampleablePixels::native(Arc::new(DynamicImage::ImageRgb8(proof_image))),
-            image_identity: loaded_image.path.clone(),
-            space_label: format!("Soft proof · {}", proof_metadata.effective_color_profile),
-        };
-        state
-            .services
-            .viewer_sampling
-            .publish(ViewerSampleCacheSlot::SoftProof, frame);
-    }
-
-    let proof_image =
-        RgbImage::from_raw(width, height, proof_pixels.clone()).map(DynamicImage::ImageRgb8);
-
-    if let Some(recipe_id) = request.export_soft_proof_recipe_id
-        && let Some(proof_image) = proof_image.as_ref()
-        && let Ok(gamut_warning_data) =
-            image_analytics::calculate_gamut_warning_overlay_from_image(proof_image)
-    {
-        let shared_warning_mask_data_url = shared_gamut_warning
-            .as_ref()
-            .map(|analysis| {
-                image_analytics::encode_gamut_warning_mask_data_url(
-                    &analysis.mask_rgba,
-                    analysis.width,
-                    analysis.height,
-                )
-            })
-            .transpose()?;
-        let shared_gamut_warning = shared_gamut_warning
-            .as_ref()
-            .map(|analysis| &analysis.receipt);
-        let source_image_path = &loaded_image.path;
-        let _ = app_handle.emit(
-            crate::events::GAMUT_WARNING_UPDATE,
-            serde_json::json!({
-                "path": source_image_path,
-                "data": {
-                    "black_point_compensation": proof_metadata.black_point_compensation,
-                    "color_managed_transform": proof_metadata.color_managed_transform,
-                    "coverage_ratio": shared_gamut_warning.as_ref().map_or(
-                        gamut_warning_data.coverage_ratio,
-                        |receipt| (receipt.out_of_gamut_pixel_percentage / 100.0) as f32,
-                    ),
-                    "effective_color_profile": proof_metadata.effective_color_profile,
-                    "effective_rendering_intent": proof_metadata.effective_rendering_intent,
-                    "export_soft_proof_recipe_id": recipe_id,
-                    "height": shared_gamut_warning.map_or(gamut_warning_data.height, |_| height),
-                    "mask_data_url": shared_warning_mask_data_url.unwrap_or(gamut_warning_data.mask_data_url),
-                    "max_channel_value": gamut_warning_data.max_channel_value,
-                    "min_channel_value": gamut_warning_data.min_channel_value,
-                    "pixel_count": shared_gamut_warning.map_or(
-                        gamut_warning_data.pixel_count,
-                        |receipt| receipt.pixel_count,
-                    ),
-                    "gamut_mapping_implementation": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.implementation_id.clone(),
-                    ),
-                    "gamut_mapping_version": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.implementation_version,
-                    ),
-                    "gamut_target": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.target.clone(),
-                    ),
-                    "gamut_boundary_fingerprint": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.boundary_fingerprint.clone(),
-                    ),
-                    "gamut_warning_plan_fingerprint": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.plan_fingerprint.clone(),
-                    ),
-                    "maximum_boundary_excess": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.maximum_boundary_excess,
-                    ),
-                    "gamut_compressed_pixel_count": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.compressed_pixel_count,
-                    ),
-                    "gamut_hard_clipped_pixel_count": shared_gamut_warning.as_ref().map(
-                        |receipt| receipt.hard_clipped_pixel_count,
-                    ),
-                    "policy_status": proof_metadata.policy_status,
-                    "policy_version": proof_metadata.policy_version,
-                    "preview_basis": "export_preview",
-                    "source_image_path": source_image_path,
-                    "source_precision_path": proof_metadata.source_precision_path,
-                    "transform_applied": proof_metadata.transform_applied,
-                    "transform_policy_fingerprint": proof_metadata.transform_policy_fingerprint,
-                    "warning_pixel_count": shared_gamut_warning.as_ref().map_or(
-                        gamut_warning_data.warning_pixel_count,
-                        |receipt| receipt.out_of_gamut_pixel_count,
-                    ),
-                    "width": shared_gamut_warning.map_or(gamut_warning_data.width, |_| width),
-                }
-            }),
-        );
-    }
-
-    if let Some(proof_image) = proof_image {
-        let _ = state.services.analytics.submit(AnalyticsJob {
-            path: loaded_image.path,
-            frame_id: AnalyticsFrameId::default(),
-            image: Arc::new(proof_image),
-            products: AnalyticsProducts::HISTOGRAM
-                | AnalyticsProducts::GAMUT_MASK
-                | if request.compute_waveform {
-                    AnalyticsProducts::all()
-                } else {
-                    AnalyticsProducts::empty()
-                },
-            active_waveform_channel: request.active_waveform_channel,
-            policy: AnalyticsSamplingPolicy::default(),
-        });
-    }
-
-    rapidraw_codecs::encode_jpeg_rgb(&proof_pixels, width, height, 86, JpegPreset::Fastest, None)
-        .map(Response::new)
-        .map_err(|e| format!("Failed to encode export soft proof preview: {}", e))
-}
-
-#[tauri::command]
-fn resolve_export_soft_proof_transform_metadata(
-    js_adjustments: serde_json::Value,
-    color_profile: export::export_processing::ExportColorProfile,
-    rendering_intent: export::export_processing::ExportRenderingIntent,
-    black_point_compensation: bool,
-    target_resolution: Option<u32>,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<export::export_processing::ExportReceiptMetadata, String> {
-    let mut adjustments_clone = js_adjustments;
-    hydrate_adjustments(&state, &mut adjustments_clone);
-
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded")?;
-
-    let preview_dim = target_resolution.unwrap_or(1920).clamp(512, 8192);
-    let preview_image = render_processed_export_soft_proof_preview(
-        &state,
-        &app_handle,
-        &loaded_image,
-        &adjustments_clone,
-        preview_dim,
-    )?;
-
-    export::export_processing::export_soft_proof_transform_metadata(
-        &preview_image,
-        &color_profile,
-        &rendering_intent,
-        black_point_compensation,
-    )
-}
-
-fn render_processed_export_soft_proof_preview(
-    state: &tauri::State<AppState>,
-    app_handle: &tauri::AppHandle,
-    loaded_image: &LoadedImage,
-    adjustments: &serde_json::Value,
-    preview_dim: u32,
-) -> Result<DynamicImage, String> {
-    let context = get_or_init_gpu_context(state, app_handle)?;
-    let transform_hash = calculate_transform_hash(adjustments);
-    let (preview_image, scale, unscaled_crop_offset) =
-        generate_transformed_preview(state, loaded_image, adjustments, preview_dim)?;
-    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
-        &preview_image,
-        transform_hash,
-        adjustments,
-        loaded_image.is_raw,
-    );
-    let processing_image = detail_stage.image.as_ref();
-    let (preview_width, preview_height) = processing_image.dimensions();
-    let mask_definitions: Vec<MaskDefinition> = adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-    let scaled_crop_offset = (
-        unscaled_crop_offset.0 * scale,
-        unscaled_crop_offset.1 * scale,
-    );
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            get_cached_or_generate_mask(
-                state,
-                def,
-                preview_width,
-                preview_height,
-                scale,
-                scaled_crop_offset,
-                adjustments,
-            )
-        })
-        .collect();
-    let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
-        processing_image,
-        adjustments,
-        &mask_bitmaps,
-    );
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
-    let lut: Option<Arc<Lut>> = adjustments["lutPath"]
-        .as_str()
-        .and_then(|path| get_or_load_lut(state, path).ok());
-    let render_plan = compile_consumer_render_plan(
-        adjustments,
-        &loaded_image.path,
-        loaded_image.is_raw,
-        tm_override,
-        lut,
-    )?;
-    let mut gpu_adjustments = render_plan.adjustments;
-    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
-        detail_stage.owns_legacy_global_detail,
-    );
-    process_and_get_dynamic_image(
-        &context,
-        state,
-        retouched_image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::for_stage(
-            retouched_image.as_ref(),
-            loaded_image.artifact_source.source_fingerprint(),
-            detail_stage.render_hash,
-            crate::gpu_processing::PixelBufferRevision::combine_generations(&[
-                detail_stage.render_hash,
-                calculate_geometry_hash(adjustments),
-            ]),
-        ),
-        RenderRequest {
-            adjustments: gpu_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut: render_plan.lut.clone(),
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-                &render_plan.edit_graph,
-            )),
-        },
-        "export_soft_proof_preview",
-    )
 }
 
 fn compile_consumer_render_plan(
@@ -1845,8 +1499,8 @@ pub fn run() {
         .manage(library::catalog::LibraryCatalog::default())
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
-            generate_export_soft_proof_preview,
-            resolve_export_soft_proof_transform_metadata,
+            app::commands::soft_proof_preview::generate_export_soft_proof_preview,
+            app::commands::soft_proof_preview::resolve_export_soft_proof_transform_metadata,
             app::commands::path_preview::generate_preview_for_path,
             app::commands::negative_lab_dust::analyze_negative_lab_dust_spots,
             app::commands::original_preview::generate_original_transformed_preview,
