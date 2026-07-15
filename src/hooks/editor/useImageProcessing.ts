@@ -595,6 +595,8 @@ export function useImageProcessing() {
       setEditor,
     ],
   );
+  const applyAdjustmentsRef = useRef(applyAdjustments);
+  applyAdjustmentsRef.current = applyAdjustments;
 
   const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
   const handledScopeRecoveryRequestIdRef = useRef(previewScopeRecoveryRequestId);
@@ -722,16 +724,16 @@ export function useImageProcessing() {
   useEffect(() => {
     if (!selectedImage?.isReady) return;
     if (isSliderDragging) {
-      if (appSettings?.enableLivePreviews !== false) applyAdjustments(adjustments, true, calculatedTargetResolution);
+      if (appSettings?.enableLivePreviews !== false)
+        applyAdjustmentsRef.current(adjustments, true, calculatedTargetResolution);
       return;
     }
-    applyAdjustments(adjustments, false, calculatedTargetResolution, false, 50);
+    applyAdjustmentsRef.current(adjustments, false, calculatedTargetResolution, false, 50);
   }, [
     adjustments,
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
-    applyAdjustments,
     calculatedTargetResolution,
     appSettings?.enableLivePreviews,
   ]);
