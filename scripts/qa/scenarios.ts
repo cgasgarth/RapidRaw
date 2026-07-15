@@ -289,8 +289,27 @@ export const qaScenarios: readonly QaScenario[] = [
     async run({ page }) {
       await openEditorFixture(page);
       const preview = page.getByTestId('editor-image-preview-panel');
+      const applyCallCount = () =>
+        page.evaluate(
+          () =>
+            (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
+              ({ command }) => command === 'apply_adjustments',
+            ).length,
+        );
+      const readLatestRoi = () =>
+        page.evaluate(() => {
+          const request = (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+            .filter(({ command }) => command === 'apply_adjustments')
+            .at(-1)?.args?.['request'];
+          if (typeof request !== 'object' || request === null) return null;
+          const roi = Reflect.get(request, 'roi');
+          return Array.isArray(roi) && roi.length === 4 && roi.every((value) => typeof value === 'number')
+            ? (roi as number[])
+            : null;
+        });
+      const beforeZoomCalls = await applyCallCount();
       const initialScale = Number(await preview.getAttribute('data-editor-transform-scale'));
-      await page.keyboard.press('ArrowUp');
+      await page.getByRole('button', { exact: true, name: '1:1' }).first().click();
       await page.waitForFunction(
         (scale) =>
           Number(
@@ -300,6 +319,24 @@ export const qaScenarios: readonly QaScenario[] = [
           ) > scale,
         initialScale,
       );
+      await page.waitForFunction(
+        (priorCallCount) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+            .filter(({ command }) => command === 'apply_adjustments')
+            .slice(priorCallCount)
+            .some(({ args }) => {
+              const request = args?.['request'];
+              return typeof request === 'object' && request !== null && Array.isArray(Reflect.get(request, 'roi'));
+            }),
+        beforeZoomCalls,
+      );
+      const zoomRoi = await readLatestRoi();
+      if (zoomRoi === null) throw new Error('Zoom did not produce a typed viewport ROI preview request.');
+      const zoomPosition = await preview.evaluate((element) => ({
+        x: Number(element.getAttribute('data-editor-transform-position-x')),
+        y: Number(element.getAttribute('data-editor-transform-position-y')),
+      }));
+      const beforePanCalls = await applyCallCount();
       const box = await preview.boundingBox();
       if (box === null) throw new Error('Editor preview has no presentation bounds.');
       await page.keyboard.down('Space');
@@ -312,9 +349,41 @@ export const qaScenarios: readonly QaScenario[] = [
         x: Number(element.getAttribute('data-editor-transform-position-x')),
         y: Number(element.getAttribute('data-editor-transform-position-y')),
       }));
-      if (position.x === 0 && position.y === 0) throw new Error('Pan gesture did not move the zoomed preview.');
+      if (position.x === zoomPosition.x && position.y === zoomPosition.y)
+        throw new Error('Pan gesture did not move the zoomed preview.');
       if ((await preview.getAttribute('data-viewer-gesture-state')) !== 'idle')
         throw new Error('Pan/zoom presentation did not settle after the gesture.');
+      await page.waitForFunction(
+        ({ priorCallCount, previousRoi }) =>
+          (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+            .filter(({ command }) => command === 'apply_adjustments')
+            .slice(priorCallCount)
+            .some(({ args }) => {
+              const request = args?.['request'];
+              if (typeof request !== 'object' || request === null) return false;
+              const roi = Reflect.get(request, 'roi');
+              return (
+                Array.isArray(roi) &&
+                roi.length === 4 &&
+                roi.some(
+                  (value, index) =>
+                    typeof value === 'number' && Math.abs(value - (previousRoi[index] ?? value)) > 0.0001,
+                )
+              );
+            }),
+        { priorCallCount: beforePanCalls, previousRoi: zoomRoi },
+      );
+      const pannedRoi = await readLatestRoi();
+      if (
+        pannedRoi === null ||
+        pannedRoi.some((value) => !Number.isFinite(value) || value < 0 || value > 1) ||
+        pannedRoi[2] === undefined ||
+        pannedRoi[2] <= 0 ||
+        pannedRoi[3] === undefined ||
+        pannedRoi[3] <= 0
+      ) {
+        throw new Error(`Pan produced an invalid settled viewport ROI: ${JSON.stringify(pannedRoi)}.`);
+      }
     },
   },
   {

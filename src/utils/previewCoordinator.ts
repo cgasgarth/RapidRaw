@@ -94,6 +94,21 @@ export interface PreviewViewportSnapshot {
   targetWidth: number;
 }
 
+export interface PreviewViewportTransformSnapshot {
+  positionX: number;
+  positionY: number;
+  scale: number;
+}
+
+export interface PreviewViewportLayoutSnapshot {
+  containerHeight: number;
+  containerWidth: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+}
+
 export type PreviewRoi = readonly [number, number, number, number] | null;
 
 export function quantizePreviewRoi(roi: PreviewRoi, targetResolution: number): PreviewRoi {
@@ -104,6 +119,44 @@ export function quantizePreviewRoi(roi: PreviewRoi, targetResolution: number): P
 
 export function fingerprintPreviewRoi(roi: PreviewRoi): string {
   return JSON.stringify(roi ?? [0, 0, 1, 1]);
+}
+
+export function resolvePreviewViewportRoi(
+  layout: PreviewViewportLayoutSnapshot,
+  transform: PreviewViewportTransformSnapshot,
+): PreviewRoi {
+  const { containerHeight, containerWidth, height, offsetX, offsetY, width } = layout;
+  const { positionX, positionY, scale } = transform;
+  if (
+    ![containerHeight, containerWidth, height, offsetX, offsetY, positionX, positionY, scale, width].every(
+      Number.isFinite,
+    ) ||
+    width <= 0 ||
+    height <= 0 ||
+    containerWidth <= 0 ||
+    containerHeight <= 0 ||
+    scale <= 1.01
+  ) {
+    return null;
+  }
+
+  const visibleLeft = -positionX / scale;
+  const visibleTop = -positionY / scale;
+  const visibleRight = visibleLeft + containerWidth / scale;
+  const visibleBottom = visibleTop + containerHeight / scale;
+  const intersectLeft = Math.max(visibleLeft, offsetX);
+  const intersectTop = Math.max(visibleTop, offsetY);
+  const intersectRight = Math.min(visibleRight, offsetX + width);
+  const intersectBottom = Math.min(visibleBottom, offsetY + height);
+  if (intersectLeft >= intersectRight || intersectTop >= intersectBottom) return null;
+
+  const roi: Exclude<PreviewRoi, null> = [
+    (intersectLeft - offsetX) / width,
+    (intersectTop - offsetY) / height,
+    (intersectRight - intersectLeft) / width,
+    (intersectBottom - intersectTop) / height,
+  ];
+  return roi[2] > 0.999 && roi[3] > 0.999 ? null : roi;
 }
 
 export interface PreviewQualitySnapshot {

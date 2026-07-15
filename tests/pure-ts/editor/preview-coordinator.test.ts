@@ -10,6 +10,7 @@ import {
   type PreviewSessionIdentity,
   quantizePreviewRoi,
   reducePreviewCoordinator,
+  resolvePreviewViewportRoi,
 } from '../../../src/utils/previewCoordinator';
 
 const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessionIdentity => {
@@ -514,6 +515,26 @@ test('quality decisions are translated once and ROI fingerprints are resolution-
   });
   expect(transition.state.quality).toEqual(quality);
   expect(transition.state.lastTransition?.reason).toBe('quality-decision-changed');
+});
+
+test('settled viewport transforms derive exact bounded ROI snapshots without a UI controller', () => {
+  const layout = {
+    containerHeight: 600,
+    containerWidth: 800,
+    height: 600,
+    offsetX: 0,
+    offsetY: 0,
+    width: 800,
+  };
+  expect(resolvePreviewViewportRoi(layout, { positionX: 0, positionY: 0, scale: 1 })).toBeNull();
+  expect(resolvePreviewViewportRoi(layout, { positionX: -400, positionY: -300, scale: 2 })).toEqual([
+    0.25, 0.25, 0.5, 0.5,
+  ]);
+  expect(resolvePreviewViewportRoi(layout, { positionX: -200, positionY: -120, scale: 2 })).toEqual([
+    0.125, 0.1, 0.5, 0.5,
+  ]);
+  expect(resolvePreviewViewportRoi(layout, { positionX: 2000, positionY: 2000, scale: 2 })).toBeNull();
+  expect(resolvePreviewViewportRoi(layout, { positionX: Number.NaN, positionY: 0, scale: 2 })).toBeNull();
 });
 
 test('quality policy construction stays coordinator-owned and preserves adaptive state', () => {
