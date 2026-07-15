@@ -347,7 +347,7 @@ export const reduceEditTransaction = (
         afterEditDocumentV2 = replacedDocument;
         after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
         if (
-          request.source === 'copy-paste' &&
+          (request.source === 'copy-paste' || request.source === 'preset') &&
           afterEditDocumentV2.provenance.referenceMatchApplicationReceipt !== null
         ) {
           afterEditDocumentV2 = {
