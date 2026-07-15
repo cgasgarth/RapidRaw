@@ -48,12 +48,19 @@ export const dispatchViewerSurfaceInput = (
     }
   }
 
-  const activeHandler = handlers.tools[context.activeTool];
-  const isWhiteBalanceHover = event.type === 'pointermove' && context.activeTool === 'white-balance';
+  const candidateTool =
+    transition.toolCommand?.session.key.toolId ??
+    event.targetTool ??
+    transition.activeSession?.key.toolId ??
+    context.activeTool;
+  const routedTool: ViewerActiveTool | null =
+    candidateTool === 'pan' || candidateTool === 'viewer-sampler' ? null : candidateTool;
+  const activeHandler = routedTool === null ? undefined : handlers.tools[routedTool];
+  const isWhiteBalanceHover = event.type === 'pointermove' && routedTool === 'white-balance';
   if (activeHandler !== undefined && !invoked.has(activeHandler) && (transition.forwardToTool || isWhiteBalanceHover)) {
     activeHandler(event);
     invoked.add(activeHandler);
-    return { routedTool: context.activeTool, transition };
+    return { routedTool, transition };
   }
 
   return { routedTool: null, transition };

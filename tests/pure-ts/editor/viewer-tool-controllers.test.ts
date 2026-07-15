@@ -10,6 +10,7 @@ const key = (geometryEpoch = 4) => ({
   geometryEpoch,
   imageSessionId: '/private/image-a.arw',
   operationGeneration: 2,
+  sourceIdentity: '/private/image-a.arw',
   sourceRevision: 'graph:9',
   toolId: 'brush' as const,
 });
@@ -42,6 +43,7 @@ describe('viewer tool controllers', () => {
     const current = key();
     const successors = [
       { imageSessionId: '/private/image-b.arw' },
+      { sourceIdentity: '/private/image-b.arw' },
       { sourceRevision: 'graph:10' },
       { operationGeneration: 3 },
       { toolId: 'mask' as const },

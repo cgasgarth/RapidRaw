@@ -52,6 +52,8 @@ import { getEdgeFadeStyle, MaskOverlay, OptimizedBrushLine } from './MaskOverlay
 import { type CanvasOverlayStatus, canvasOverlayTokens } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
+import { useCompareDividerController } from './useCompareDividerController';
+import { useCropStraightenController } from './useCropStraightenController';
 import { useViewerAiMaskBoxController } from './useViewerAiMaskBoxController';
 import { useViewerBrushController } from './useViewerBrushController';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
@@ -1055,6 +1057,36 @@ export const ImageCanvas = memo(
 
       return { width: renderWidth, height: renderHeight };
     }, [selectedImage.width, selectedImage.height, imageRenderSize, adjustments.orientationSteps]);
+    const cropRenderSize = useMemo(
+      () =>
+        uncroppedImageRenderSize?.width !== undefined && uncroppedImageRenderSize.height !== undefined
+          ? { height: uncroppedImageRenderSize.height, width: uncroppedImageRenderSize.width }
+          : null,
+      [uncroppedImageRenderSize],
+    );
+    const compareDividerController = useCompareDividerController({
+      context: {
+        active: showSplitCompare,
+        geometryEpoch: overlayGeometry.geometryEpoch,
+        imageRect: imageRenderSize,
+        imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+        orientation: compareOrientation,
+        position: compareDividerPosition,
+        sourceIdentity: presentationDescriptor.sourceIdentity,
+        sourceRevision: presentationDescriptor.graphRevision,
+      },
+      onPositionChange: onCompareDividerPositionChange,
+      onReset: onCompareDividerReset,
+    });
+    const cropStraightenController = useCropStraightenController({
+      onCropChange: setCrop,
+      onCropComplete: handleCropComplete,
+      onCropStart: handleCropStart,
+      onStraighten,
+      renderSize: cropRenderSize,
+      rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
+      session: cropStraightenSession,
+    });
 
     const cropImageTransforms = useMemo(() => {
       const rotation = (liveRotation !== null ? liveRotation : adjustments.rotation) ?? 0;
@@ -1080,7 +1112,9 @@ export const ImageCanvas = memo(
     ]);
 
     const activeCanvasOverlayTool = isCropping
-      ? 'crop'
+      ? isStraightenActive
+        ? 'straighten'
+        : 'crop'
       : pickerControllers.activeTool
         ? pickerControllers.activeTool
         : isWbPickerActive
@@ -1100,22 +1134,26 @@ export const ImageCanvas = memo(
                       : showGamutWarningOverlay
                         ? 'soft-proof'
                         : 'pan-zoom';
-    const viewerInteractionContext: ViewerInteractionContext = {
-      activeTool:
-        pickerControllers.activeTool ??
+    const viewerActiveTool: ViewerActiveTool = isCropping
+      ? isStraightenActive
+        ? 'straighten'
+        : 'crop'
+      : (pickerControllers.activeTool ??
         (whiteBalanceController.active ? 'white-balance' : null) ??
         (focusRetouchController.active ? 'focus-retouch' : null) ??
         (retouchHandlesController.activeMode === null ? null : 'retouch') ??
         viewerInputState?.activeTool ??
-        'none',
+        'none');
+    const viewerInteractionContext: ViewerInteractionContext = {
+      activeTool: viewerActiveTool,
       focusContext: isSliderDragging ? 'editable' : 'viewer',
       geometryEpoch: overlayGeometry.geometryEpoch,
       imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
       isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
       pointerCount: 1,
+      sourceIdentity: presentationDescriptor.sourceIdentity,
       sourceRevision: presentationDescriptor.graphRevision,
-      toolId:
-        retouchHandlesController.activeMode === null ? viewerInteractionToolId(activeCanvasOverlayTool) : 'retouch',
+      toolId: retouchHandlesController.activeMode === null ? viewerInteractionToolId(viewerActiveTool) : 'retouch',
       zoomed: isMaxZoom ?? false,
     };
     const viewerInteraction = useViewerInteractionController({
@@ -1128,9 +1166,12 @@ export const ImageCanvas = memo(
         ],
         observers: [viewerSamplerController.handleInputEvent],
         tools: {
+          'compare-divider': compareDividerController.handleInputEvent,
+          crop: cropStraightenController.handleInputEvent,
           'focus-retouch': focusRetouchController.handleInputEvent,
           'point-color': pickerControllers.handleInputEvent,
           retouch: retouchHandlesController.handleInputEvent,
+          straighten: cropStraightenController.handleInputEvent,
           'tone-equalizer': pickerControllers.handleInputEvent,
           'white-balance': whiteBalanceController.handleInputEvent,
         },
@@ -1333,23 +1374,17 @@ export const ImageCanvas = memo(
           >
             <CompareOverlay
               canShowOriginalCompare={canShowOriginalCompare}
-              compareDividerPosition={compareDividerPosition}
               compareLabelsVisible={compareLabelsVisible}
               comparisonLabel={comparisonLabel}
               compareOrientation={compareOrientation}
               compareOverlayDisabled={compareOverlayDisabled}
               editedImageRect={imageRenderSize}
-              geometryEpoch={overlayGeometry.geometryEpoch}
-              imageSessionId={imageSessionId ?? `viewer-source:${selectedImage.path}`}
+              descriptor={compareDividerController.descriptor}
               isCompareModeActive={isCompareModeActive}
-              onDividerPositionChange={onCompareDividerPositionChange}
-              onDividerReset={onCompareDividerReset}
               originalImageRect={originalImageRenderSize}
               originalStatus={originalLoadFailed ? 'error' : canShowOriginalCompare ? 'ready' : 'loading'}
               showSideBySideCompare={showSideBySideCompare}
               showSplitCompare={showSplitCompare}
-              sourceIdentity={presentationDescriptor.sourceIdentity}
-              sourceRevision={presentationDescriptor.graphRevision}
             />
             <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
             <ViewerSamplerOverlay descriptor={viewerSamplerController.overlay} />
@@ -1683,23 +1718,18 @@ export const ImageCanvas = memo(
           cropImageRef={cropImageRef}
           cropImageTransform={cropImageTransforms}
           cropPreviewUrl={cropPreviewUrl}
-          cropRenderSize={uncroppedImageRenderSize}
-          geometry={overlayGeometry}
-          handleCropComplete={handleCropComplete}
-          handleCropStart={handleCropStart}
+          descriptor={cropStraightenController.descriptor}
+          handleCropComplete={cropStraightenController.handleCropComplete}
           isCropping={isCropping}
           isCropViewVisible={isCropViewVisible}
           onCropPreviewError={() => setLoadedCropPreviewUrl(null)}
           onCropPreviewLoad={() => setLoadedCropPreviewUrl(cropPreviewUrl)}
-          onStraighten={onStraighten}
           isMaxZoom={isMaxZoom}
           isRotationActive={isRotationActive}
           isStraightenActive={isStraightenActive}
           overlayMode={overlayMode}
           overlayRotation={overlayRotation}
-          rotationDegrees={liveRotation ?? adjustments.rotation ?? 0}
-          session={cropStraightenSession}
-          setCrop={setCrop}
+          setCrop={cropStraightenController.handleCropChange}
         />
       </ViewerSurface>
     );

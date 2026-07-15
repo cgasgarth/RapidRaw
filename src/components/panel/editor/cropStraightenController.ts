@@ -1,4 +1,5 @@
 import type { Crop, PercentCrop } from 'react-image-crop';
+import type { ViewerSurfacePointerEvent } from './viewerInputRouter';
 import type { ViewerOverlayDescriptor } from './viewerToolControllers';
 
 export interface CropStraightenSessionIdentity {
@@ -19,6 +20,15 @@ export interface StraightenOverlayDescriptor extends ViewerOverlayDescriptor {
   readonly end: StraightenPoint;
   readonly kind: 'straighten-line';
   readonly start: StraightenPoint;
+}
+
+export interface CropGeometryOverlayDescriptor extends ViewerOverlayDescriptor {
+  readonly kind: 'crop-geometry';
+  readonly renderSize: { readonly height: number; readonly width: number };
+  readonly sessionKey: CropStraightenSessionIdentity;
+  readonly sessionFingerprint: string;
+  readonly straightenLine: StraightenOverlayDescriptor | null;
+  readonly tool: CropStraightenSessionIdentity['tool'];
 }
 
 interface StraightenGesture {
@@ -164,6 +174,57 @@ export const cropStraightenOverlay = (state: CropStraightenControllerState): Str
     start: state.gesture.start,
     zOrder: 'active-tool',
   };
+};
+
+export const cropStraightenSessionFingerprint = (session: CropStraightenSessionIdentity): string =>
+  JSON.stringify([
+    session.imageSessionId,
+    session.sourceIdentity,
+    session.sourceRevision,
+    session.geometryEpoch,
+    session.operationGeneration,
+    session.tool,
+  ]);
+
+export const createCropGeometryOverlayDescriptor = (
+  session: CropStraightenSessionIdentity,
+  renderSize: { readonly height: number; readonly width: number },
+  straightenLine: StraightenOverlayDescriptor | null,
+): CropGeometryOverlayDescriptor => ({
+  ariaLabel: `${session.tool} geometry`,
+  geometryEpoch: session.geometryEpoch,
+  id: `crop-geometry:${session.operationGeneration}`,
+  kind: 'crop-geometry',
+  pointerPolicy: 'capture',
+  renderSize,
+  sessionKey: session,
+  sessionFingerprint: cropStraightenSessionFingerprint(session),
+  straightenLine,
+  tool: session.tool,
+  zOrder: 'tool-geometry',
+});
+
+/** Maps canonical surface coordinates into the exact local geometry used to render the crop overlay. */
+export const cropStraightenPointFromSurface = (
+  event: ViewerSurfacePointerEvent,
+  renderSize: { readonly height: number; readonly width: number },
+): StraightenPoint | null => {
+  const surface = event.surfaceRect;
+  if (
+    surface === undefined ||
+    surface.layoutWidth <= 0 ||
+    surface.layoutHeight <= 0 ||
+    surface.width <= 0 ||
+    surface.height <= 0 ||
+    renderSize.width <= 0 ||
+    renderSize.height <= 0
+  )
+    return null;
+  const scaleX = surface.width / surface.layoutWidth;
+  const scaleY = surface.height / surface.layoutHeight;
+  const left = surface.x + ((surface.layoutWidth - renderSize.width) / 2) * scaleX;
+  const top = surface.y + ((surface.layoutHeight - renderSize.height) / 2) * scaleY;
+  return { x: (event.clientX - left) / scaleX, y: (event.clientY - top) / scaleY };
 };
 
 const transition = (

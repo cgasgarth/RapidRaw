@@ -13,6 +13,7 @@ const context = (overrides: Partial<ViewerInteractionContext> = {}): ViewerInter
   imageSessionId: 'image-session:12:a',
   isTemporaryHand: false,
   pointerCount: 1,
+  sourceIdentity: '/fixture/a.raw',
   sourceRevision: 'graph:9',
   toolId: 'brush',
   zoomed: false,
@@ -108,6 +109,7 @@ describe('viewer interaction coordinator', () => {
   test('invalidates active work on every currentness identity dimension, including A to B to A', () => {
     const successors: ViewerInteractionContext[] = [
       context({ geometryEpoch: 5 }),
+      context({ sourceIdentity: '/fixture/b.raw' }),
       context({ sourceRevision: 'graph:10' }),
       context({ imageSessionId: 'image-session:13:b' }),
       context({ imageSessionId: 'image-session:14:a' }),
@@ -146,5 +148,32 @@ describe('viewer interaction coordinator', () => {
     expect(blocked.activeSession).toBeNull();
     expect(blocked.forwardToTool).toBe(false);
     expect(blocked.shouldCapturePointer).toBe(false);
+  });
+
+  test('uses explicit compare/crop targets without changing the ambient viewer tool', () => {
+    const coordinator = createViewerInteractionCoordinator();
+    const ambient = context({ activeTool: 'none', toolId: 'pan' });
+    const started = coordinator.dispatch(pointer('pointerdown', { targetTool: 'compare-divider' }), ambient);
+    expect(started.activeSession?.key).toMatchObject({
+      sourceIdentity: '/fixture/a.raw',
+      toolId: 'compare-divider',
+    });
+    expect(started.owner).toBe('active-tool');
+    expect(coordinator.dispatch(pointer('pointermove'), ambient).activeSession?.key.toolId).toBe('compare-divider');
+    expect(coordinator.dispatch(pointer('pointerup'), ambient).toolCommand).toMatchObject({
+      kind: 'end',
+      session: { key: { toolId: 'compare-divider' } },
+    });
+  });
+
+  test('gives middle-button pan precedence over an interactive overlay target', () => {
+    const coordinator = createViewerInteractionCoordinator();
+    const started = coordinator.dispatch(
+      pointer('pointerdown', { button: 1, targetTool: 'compare-divider' }),
+      context({ activeTool: 'none', toolId: 'pan' }),
+    );
+    expect(started.owner).toBe('viewer-pan');
+    expect(started.activeSession?.key.toolId).toBe('pan');
+    expect(started.toolCommand).toMatchObject({ kind: 'begin', owner: 'viewer-pan' });
   });
 });

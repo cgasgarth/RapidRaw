@@ -1,22 +1,8 @@
-import {
-  type PointerEvent as ReactPointerEvent,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import CropOverlay, { type Crop, type PercentCrop } from 'react-image-crop';
-import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { OverlayMode } from '../right/color/CropPanel';
-import {
-  type CropStraightenControllerTransition,
-  type CropStraightenSessionIdentity,
-  createCropStraightenController,
-} from './cropStraightenController';
+import type { CropGeometryOverlayDescriptor } from './cropStraightenController';
 import CompositionOverlays from './overlays/CompositionOverlays';
 
 interface CropOverlaySurfaceProps {
@@ -25,22 +11,17 @@ interface CropOverlaySurfaceProps {
   cropImageRef: RefObject<HTMLImageElement | null>;
   cropImageTransform: string;
   cropPreviewUrl: string | null;
-  cropRenderSize: { height?: number; width?: number } | null;
-  geometry: EditorOverlayGeometry;
-  handleCropComplete: (crop: Crop, percentCrop: PercentCrop, identity: CropStraightenSessionIdentity) => void;
-  handleCropStart: () => void;
+  descriptor: CropGeometryOverlayDescriptor | null;
+  handleCropComplete: (crop: Crop, percentCrop: PercentCrop) => void;
   isCropping: boolean;
   isCropViewVisible: boolean;
   onCropPreviewError: () => void;
   onCropPreviewLoad: () => void;
-  onStraighten: (correctionDegrees: number, identity: CropStraightenSessionIdentity) => void;
   isMaxZoom: boolean | undefined;
   isRotationActive: boolean | undefined;
   isStraightenActive: boolean;
   overlayMode: OverlayMode | undefined;
   overlayRotation: number | undefined;
-  rotationDegrees: number;
-  session: CropStraightenSessionIdentity | null;
   setCrop: (crop: Crop, percentCrop: PercentCrop) => void;
 }
 
@@ -53,125 +34,25 @@ export function CropOverlaySurface({
   cropImageRef,
   cropImageTransform,
   cropPreviewUrl,
-  cropRenderSize,
-  geometry,
+  descriptor,
   handleCropComplete,
-  handleCropStart,
   isCropping,
   isCropViewVisible,
   onCropPreviewError,
   onCropPreviewLoad,
-  onStraighten,
   isMaxZoom,
   isRotationActive,
   isStraightenActive,
   overlayMode,
   overlayRotation,
-  rotationDegrees,
-  session,
   setCrop,
 }: CropOverlaySurfaceProps) {
   const { t } = useTranslation();
-  const controller = useMemo(() => createCropStraightenController(), []);
-  const [controllerOverlay, setControllerOverlay] = useState<CropStraightenControllerTransition['overlay']>(null);
-  const straightenInputRef = useRef<HTMLDivElement>(null);
-  const intentionalPointerReleasesRef = useRef(new Set<number>());
-  const handlersRef = useRef({ handleCropComplete, handleCropStart, onStraighten, setCrop });
-  handlersRef.current = { handleCropComplete, handleCropStart, onStraighten, setCrop };
-  const applyTransition = useCallback((transition: CropStraightenControllerTransition, publish = true) => {
-    if (publish) setControllerOverlay(transition.overlay);
-    for (const command of transition.commands) {
-      if (command.type === 'capture-pointer') {
-        straightenInputRef.current?.setPointerCapture(command.pointerId);
-      } else if (command.type === 'release-pointer') {
-        const target = straightenInputRef.current;
-        if (target?.hasPointerCapture(command.pointerId)) {
-          intentionalPointerReleasesRef.current.add(command.pointerId);
-          target.releasePointerCapture(command.pointerId);
-        }
-      } else if (command.type === 'crop-started') {
-        handlersRef.current.handleCropStart();
-      } else if (command.type === 'crop-changed') {
-        handlersRef.current.setCrop(command.crop, command.percentCrop);
-      } else if (command.type === 'crop-completed') {
-        handlersRef.current.handleCropComplete(command.crop, command.percentCrop, command.identity);
-      } else {
-        handlersRef.current.onStraighten(command.correctionDegrees, command.identity);
-      }
-    }
-  }, []);
-
-  useLayoutEffect(() => {
-    applyTransition(controller.dispatch({ session, type: 'session-installed' }));
-  }, [applyTransition, controller, session]);
-  useEffect(() => {
-    const cancel = (reason: 'blur' | 'escape') => {
-      const identity = controller.getState().session;
-      applyTransition(controller.dispatch({ ...(identity === null ? {} : { identity }), reason, type: 'cancelled' }));
-    };
-    const onBlur = () => cancel('blur');
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') cancel('escape');
-    };
-    window.addEventListener('blur', onBlur);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('blur', onBlur);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [applyTransition, controller]);
-  useEffect(
-    () => () => {
-      applyTransition(controller.dispatch({ reason: 'unmount', type: 'cancelled' }), false);
-    },
-    [applyTransition, controller],
-  );
-
   const cropCanvasRatioLabel =
     aspectRatio === null ? t('editor.crop.presets.free.name') : `${aspectRatio.toFixed(2)}:1`;
   const cropCanvasOverlayLabel = isStraightenActive ? t('editor.crop.rotationHeading') : overlayMode || 'none';
-  const cropWidth = cropRenderSize?.width;
-  const cropHeight = cropRenderSize?.height;
-  const dispatchCropStarted = () => {
-    if (session !== null) applyTransition(controller.dispatch({ identity: session, type: 'crop-started' }));
-  };
-  const dispatchCropChanged = (nextCrop: Crop, percentCrop: PercentCrop) => {
-    if (session !== null)
-      applyTransition(controller.dispatch({ crop: nextCrop, identity: session, percentCrop, type: 'crop-changed' }));
-  };
-  const dispatchCropCompleted = (nextCrop: Crop, percentCrop: PercentCrop) => {
-    if (session !== null)
-      applyTransition(controller.dispatch({ crop: nextCrop, identity: session, percentCrop, type: 'crop-completed' }));
-  };
-  const pointerPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-  };
-  const dispatchStraightenPointer = (
-    event: ReactPointerEvent<HTMLDivElement>,
-    type: 'pointer-ended' | 'pointer-moved' | 'pointer-started',
-  ) => {
-    if (session === null || session.tool !== 'straighten') return;
-    event.preventDefault();
-    event.stopPropagation();
-    applyTransition(
-      type === 'pointer-started'
-        ? controller.dispatch({
-            identity: session,
-            point: pointerPoint(event),
-            pointerId: event.pointerId,
-            renderSize: { height: cropHeight ?? 0, width: cropWidth ?? 0 },
-            rotationDegrees,
-            type,
-          })
-        : controller.dispatch({
-            identity: session,
-            point: pointerPoint(event),
-            pointerId: event.pointerId,
-            type,
-          }),
-    );
-  };
+  const cropWidth = descriptor?.renderSize.width;
+  const cropHeight = descriptor?.renderSize.height;
 
   const getCropDimensions = () => {
     if (!crop || !cropWidth || !cropHeight) return { height: 0, width: 0 };
@@ -184,14 +65,15 @@ export function CropOverlaySurface({
   return (
     <div
       className="absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200"
-      data-controller-image-session={session?.imageSessionId}
-      data-controller-installed-tool={controller.getState().session?.tool}
-      data-controller-operation-generation={session?.operationGeneration}
-      data-controller-source-identity={session?.sourceIdentity}
-      data-controller-source-revision={session?.sourceRevision}
-      data-controller-tool={session?.tool}
+      data-controller-installed-tool={descriptor?.tool}
+      data-controller-image-session={descriptor?.sessionKey.imageSessionId}
+      data-controller-operation-generation={descriptor?.sessionKey.operationGeneration}
+      data-controller-session={descriptor?.sessionFingerprint}
+      data-controller-source-identity={descriptor?.sessionKey.sourceIdentity}
+      data-controller-source-revision={descriptor?.sessionKey.sourceRevision}
+      data-controller-tool={descriptor?.tool}
       data-crop-view-visible={String(isCropViewVisible)}
-      data-overlay-geometry-epoch={geometry.geometryEpoch}
+      data-overlay-geometry-epoch={descriptor?.geometryEpoch}
       data-overlay-geometry-space="oriented-pixels"
       data-testid="crop-overlay-surface"
       style={{ opacity: isCropViewVisible ? 1 : 0, pointerEvents: isCropViewVisible ? 'auto' : 'none' }}
@@ -212,13 +94,16 @@ export function CropOverlaySurface({
           </span>
         </div>
       )}
-      {cropPreviewUrl && cropRenderSize && (
-        <div onPointerDown={dispatchCropStarted} style={{ height: cropHeight, position: 'relative', width: cropWidth }}>
+      {cropPreviewUrl && descriptor && (
+        <div
+          data-viewer-input-tool={descriptor.tool}
+          style={{ height: cropHeight, position: 'relative', width: cropWidth }}
+        >
           <CropOverlay
             aspect={aspectRatio}
             crop={crop ?? emptyCrop}
-            onChange={dispatchCropChanged}
-            onComplete={dispatchCropCompleted}
+            onChange={setCrop}
+            onComplete={handleCropComplete}
             ruleOfThirds={false}
             renderSelectionAddon={() => {
               const { height, width } = getCropDimensions();
@@ -256,54 +141,28 @@ export function CropOverlaySurface({
             <div
               aria-label={t('editor.crop.tooltips.straighten')}
               className="absolute inset-0"
-              data-controller-geometry-epoch={session?.geometryEpoch}
-              data-controller-image-session={session?.imageSessionId}
-              data-controller-operation-generation={session?.operationGeneration}
-              data-controller-source-identity={session?.sourceIdentity}
-              data-controller-source-revision={session?.sourceRevision}
+              data-controller-session={descriptor.sessionFingerprint}
+              data-controller-image-session={descriptor.sessionKey.imageSessionId}
+              data-controller-operation-generation={descriptor.sessionKey.operationGeneration}
+              data-controller-source-identity={descriptor.sessionKey.sourceIdentity}
+              data-controller-source-revision={descriptor.sessionKey.sourceRevision}
               data-testid="crop-straighten-input-surface"
-              onLostPointerCapture={(event) => {
-                if (intentionalPointerReleasesRef.current.delete(event.pointerId)) return;
-                applyTransition(
-                  controller.dispatch({
-                    ...(session === null ? {} : { identity: session }),
-                    pointerId: event.pointerId,
-                    reason: 'lost-pointer-capture',
-                    type: 'cancelled',
-                  }),
-                );
-              }}
-              onPointerCancel={(event) =>
-                applyTransition(
-                  controller.dispatch({
-                    ...(session === null ? {} : { identity: session }),
-                    pointerId: event.pointerId,
-                    reason: 'pointer-cancel',
-                    type: 'cancelled',
-                  }),
-                )
-              }
-              onPointerDown={(event) => {
-                if (event.button === 0) dispatchStraightenPointer(event, 'pointer-started');
-              }}
-              onPointerMove={(event) => dispatchStraightenPointer(event, 'pointer-moved')}
-              onPointerUp={(event) => dispatchStraightenPointer(event, 'pointer-ended')}
-              ref={straightenInputRef}
+              data-viewer-input-tool="straighten"
               role="application"
               style={{ cursor: 'crosshair', touchAction: 'none', zIndex: 50 }}
             >
               <svg aria-hidden="true" className="h-full w-full overflow-visible" data-testid="crop-straighten-overlay">
-                {controllerOverlay !== null && (
+                {descriptor.straightenLine !== null && (
                   <line
-                    data-overlay-geometry-epoch={controllerOverlay.geometryEpoch}
+                    data-overlay-geometry-epoch={descriptor.straightenLine.geometryEpoch}
                     data-testid="crop-straighten-guide"
                     stroke="var(--editor-accent)"
                     strokeDasharray="4 4"
                     strokeWidth="2"
-                    x1={controllerOverlay.start.x}
-                    x2={controllerOverlay.end.x}
-                    y1={controllerOverlay.start.y}
-                    y2={controllerOverlay.end.y}
+                    x1={descriptor.straightenLine.start.x}
+                    x2={descriptor.straightenLine.end.x}
+                    y1={descriptor.straightenLine.start.y}
+                    y2={descriptor.straightenLine.end.y}
                   />
                 )}
               </svg>

@@ -1,6 +1,7 @@
 import {
   type ResolveViewerInputInput,
   resolveViewerInput,
+  type ViewerActiveTool,
   type ViewerGestureOwner,
   type ViewerInputResolution,
   type ViewerPointerType,
@@ -10,7 +11,8 @@ export type ViewerInputEvent =
   | { type: 'pointerdown'; pointerId: number; input: ResolveViewerInputInput; sample?: ViewerPointerSample }
   | { type: 'pointermove'; pointerId: number; sample?: ViewerPointerSample }
   | { type: 'pointerup' | 'pointercancel' | 'lostpointercapture'; pointerId: number; sample?: ViewerPointerSample }
-  | { type: 'blur' | 'escape' | 'session-invalidated' };
+  | { type: 'blur' | 'escape' | 'session-invalidated' }
+  | { type: 'doubleclick' | 'keydown' };
 
 export interface ViewerPointerSample {
   readonly altKey?: boolean;
@@ -42,10 +44,22 @@ export interface ViewerSurfacePointerEvent {
     readonly x: number;
     readonly y: number;
   };
+  readonly targetTool?: ViewerActiveTool;
   readonly type: 'lostpointercapture' | 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup';
 }
 
-export type ViewerSurfaceInputEvent = ViewerSurfacePointerEvent | { readonly type: 'blur' | 'escape' };
+export type ViewerSurfaceInputEvent =
+  | ViewerSurfacePointerEvent
+  | { readonly targetTool?: ViewerActiveTool; readonly type: 'blur' | 'doubleclick' | 'escape' }
+  | {
+      readonly key: string;
+      readonly shiftKey: boolean;
+      readonly targetTool?: ViewerActiveTool;
+      readonly type: 'keydown';
+    };
+
+export const isViewerSurfacePointerEvent = (event: ViewerSurfaceInputEvent): event is ViewerSurfacePointerEvent =>
+  'pointerId' in event;
 
 export const normalizeViewerSurfacePointerEvent = (event: {
   altKey?: boolean;
@@ -59,6 +73,7 @@ export const normalizeViewerSurfacePointerEvent = (event: {
   pressure?: number;
   shiftKey?: boolean;
   surfaceRect?: ViewerSurfacePointerEvent['surfaceRect'];
+  targetTool?: ViewerActiveTool;
   type: ViewerSurfacePointerEvent['type'];
 }): ViewerSurfacePointerEvent => ({
   altKey: event.altKey ?? false,
@@ -72,6 +87,7 @@ export const normalizeViewerSurfacePointerEvent = (event: {
   pressure: Math.min(1, Math.max(0, event.pressure ?? 0)),
   shiftKey: event.shiftKey ?? false,
   ...(event.surfaceRect === undefined ? {} : { surfaceRect: event.surfaceRect }),
+  ...(event.targetTool === undefined ? {} : { targetTool: event.targetTool }),
   type: event.type,
 });
 
@@ -106,6 +122,9 @@ export const reduceViewerInputRouter = (
   state: ViewerInputRouterState,
   event: ViewerInputEvent,
 ): ViewerInputRouterTransition => {
+  if (event.type === 'doubleclick' || event.type === 'keydown') {
+    return { state, resolution: null, ignored: false };
+  }
   if (event.type === 'pointerdown') {
     if (state.activePointerId !== null) return { state, resolution: null, ignored: true };
     const resolution = resolveViewerInput(event.input);
