@@ -442,7 +442,7 @@ test('viewport transitions retain the last canonical pixels and reject the cance
   ]);
 });
 
-test('display generation invalidates visible artifacts before a replacement render', () => {
+test('display generation accepts only newer identities and releases reordered completions exactly once', () => {
   let state = createPreviewCoordinatorState();
   const started = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
   state = transition(started.state, { type: 'operation-started', identity: started.state.settled.identity! }).state;
@@ -451,14 +451,50 @@ test('display generation invalidates visible artifacts before a replacement rend
     identity: started.state.settled.identity!,
     type: 'operation-completed',
   }).state;
-  const invalidated = transition(state, { generation: 2, type: 'display-generation-changed' });
-  expect(invalidated.effects).toContainEqual({
-    type: 'release-url',
-    url: 'blob:display-old',
-    reason: 'display-generation-changed',
+  const replacement = transition(state, {
+    identity: session({ adjustmentRevision: 2 }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
   });
+  state = transition(replacement.state, {
+    identity: replacement.state.settled.identity!,
+    type: 'operation-started',
+  }).state;
+
+  const invalidated = transition(state, { generation: 3, type: 'display-generation-changed' });
+  expect(invalidated.effects).toEqual([
+    {
+      identity: replacement.state.settled.identity,
+      reason: 'display-generation-changed',
+      type: 'cancel',
+    },
+    {
+      reason: 'display-generation-changed',
+      type: 'release-url',
+      url: 'blob:display-old',
+    },
+  ]);
   expect(invalidated.state.visibleArtifact).toBeNull();
-  expect(invalidated.state.displayGeneration).toBe(2);
+  expect(invalidated.state.displayGeneration).toBe(3);
+
+  const reordered = transition(invalidated.state, { generation: 2, type: 'display-generation-changed' });
+  expect(reordered.effects).toEqual([]);
+  expect(reordered.state.displayGeneration).toBe(3);
+  expect(reordered.state.lastTransition?.reason).toBe('display-generation-stale');
+
+  const late = transition(reordered.state, {
+    artifact: artifact(replacement.state.settled.identity!, 'blob:display-late'),
+    identity: replacement.state.settled.identity!,
+    type: 'operation-completed',
+  });
+  expect(late.effects).toEqual([{ reason: 'artifact-not-presented', type: 'release-url', url: 'blob:display-late' }]);
+  expect(late.state.visibleArtifact).toBeNull();
+  expect(late.state.staleCompletionCount).toBe(1);
+
+  const duplicate = transition(late.state, { generation: 3, type: 'display-generation-changed' });
+  expect(duplicate.effects).toEqual([]);
+  expect(duplicate.state.displayGeneration).toBe(3);
+  expect(duplicate.state.staleCompletionCount).toBe(1);
 });
 
 test('quality decisions are translated once and ROI fingerprints are resolution-stable', () => {

@@ -16,7 +16,6 @@ import {
 } from '../../utils/adaptivePreviewQuality';
 import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
-import { isNewDisplayResourceGeneration } from '../../utils/displayTargetChange';
 import {
   EditedPreviewEffectRunner,
   type EditedPreviewExecutionContext,
@@ -121,7 +120,6 @@ export function useImageProcessing() {
   previewCoordinatorRef.current = previewCoordinator;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<MaterializedEditedPreviewValue> | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
-  const displayResourceGenerationRef = useRef(1);
 
   const dispatchPreviewCoordinator = useCallback(
     (event: PreviewCoordinatorEvent) => {
@@ -357,7 +355,7 @@ export function useImageProcessing() {
       return {
         adjustmentRevision: positive(scope.adjustmentRevision),
         backend: scope.backend,
-        displayGeneration: positive(displayResourceGenerationRef.current),
+        displayGeneration: positive(previewCoordinator.snapshot().displayGeneration),
         geometryRevision: positive(Number(scope.geometryIdentity)),
         graphRevision: scope.graphIdentity,
         imageSessionId: positive(scope.imageSessionId),
@@ -372,7 +370,7 @@ export function useImageProcessing() {
         viewportRevision: positive(scope.viewportIdentity),
       };
     },
-    [],
+    [previewCoordinator],
   );
 
   const calculateROI = useCallback((): PreviewRoi | null => {
@@ -611,16 +609,12 @@ export function useImageProcessing() {
     void listen<unknown>(DISPLAY_TARGET_CHANGED_EVENT, (event) => {
       if (!active) return;
       const parsed = displayTargetChangePayloadSchema.safeParse(event.payload);
-      if (
-        !parsed.success ||
-        !isNewDisplayResourceGeneration(displayResourceGenerationRef.current, parsed.data.displayResourceGeneration)
-      )
-        return;
-      displayResourceGenerationRef.current = parsed.data.displayResourceGeneration;
-      dispatchPreviewCoordinator({
+      if (!parsed.success) return;
+      const transition = dispatchPreviewCoordinator({
         generation: parsed.data.displayResourceGeneration,
         type: 'display-generation-changed',
       });
+      if (transition.state.lastTransition?.reason !== 'display-generation-changed') return;
       applyAdjustments(useEditorStore.getState().adjustments, false);
     }).then((stop) => {
       if (active) unlisten = stop;
