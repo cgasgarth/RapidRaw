@@ -22,6 +22,7 @@ export interface RunOptions {
   noCache: boolean;
   verifyCache: boolean;
   explainCache: boolean;
+  hostBudgetCapacity?: number;
   root: string;
   resourceCoordinatorRoot?: string;
   resourceOwnerId?: string;
@@ -440,6 +441,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   };
 
   const start = async (node: ValidationNode): Promise<void> => {
+    const nodeHostBudgetOwnerId = `${runOwnerId}:${node.id}:${crypto.randomUUID()}`;
     const dependencyKeys = node.dependencies.map((id) => completed.get(id)?.key ?? 'missing');
     const key = await nodeCacheKey(node, options.root, dependencyKeys, undefined, snapshot);
     const recordPath = join(cacheDirectory, `${node.id}-${key}.json`);
@@ -475,6 +477,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         ? await acquireResourceLease({
             capacity: capacities[node.resourceClass],
             label: `validation-class-${node.resourceClass}:${node.id}`,
+            hostBudgetCapacity: options.hostBudgetCapacity,
+            hostBudgetOwnerId: nodeHostBudgetOwnerId,
             resource: `validation-class-${node.resourceClass}`,
             root: resourceCoordinatorRoot,
             ownerId: runOwnerId,
@@ -486,6 +490,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
         commandResourceLeases.push(
           await acquireResourceLease({
             label: `validation-resource-${resource}:${node.id}`,
+            hostBudgetCapacity: options.hostBudgetCapacity,
+            hostBudgetOwnerId: nodeHostBudgetOwnerId,
             resource,
             root: resourceCoordinatorRoot,
             ownerId: runOwnerId,
@@ -516,6 +522,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           ...process.env,
           RAWENGINE_RESOURCE_OWNER_ID: runOwnerId,
           RAWENGINE_RESOURCE_OWNER_ROOT: resourceCoordinatorRoot,
+          RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID: nodeHostBudgetOwnerId,
+          RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT: resourceCoordinatorRoot,
         },
         detached: true,
       });

@@ -1,6 +1,10 @@
 #!/usr/bin/env bun
 
-import { acquireResourceLease, resolveResourceCoordinatorRoot } from '../lib/ci/resource-coordinator';
+import {
+  acquireResourceLease,
+  resolveResourceCoordinatorRoot,
+  resolveValidationHostBudgetCapacity,
+} from '../lib/ci/resource-coordinator';
 
 const args = process.argv.slice(2);
 const separator = args.indexOf('--');
@@ -80,7 +84,11 @@ if (!resource || !label || separator < 0 || separator === args.length - 1) {
   process.exit(1);
 }
 const command = args.slice(separator + 1);
-const lease = await acquireResourceLease({ label, resource });
+const lease = await acquireResourceLease({
+  hostBudgetCapacity: resource === 'native-heavy' ? await resolveValidationHostBudgetCapacity() : undefined,
+  label,
+  resource,
+});
 try {
   const child = Bun.spawn(['bun', import.meta.path, '--supervise-child-of', String(process.pid), '--', ...command], {
     detached: true,
