@@ -24,8 +24,23 @@ export interface LensCorrectionCommitIdentity {
 export interface LensCorrectionEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: LensCorrectionEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const captureLensCorrectionCommitIdentity = (
+  state: LensCorrectionEditTransactionState,
+): LensCorrectionCommitIdentity | null =>
+  state.selectedImage === null
+    ? null
+    : {
+        adjustmentRevision: state.adjustmentRevision,
+        imageSessionId: currentImageSessionId(state),
+        sourceIdentity: state.selectedImage.path,
+      };
 
 export const isManualLensCorrectionAdjustment = (key: keyof Adjustments): key is ManualLensCorrectionAdjustment =>
   MANUAL_LENS_CORRECTION_ADJUSTMENTS.some((candidate) => candidate === key);
@@ -35,7 +50,7 @@ export const isCurrentLensCorrectionIdentity = (
   identity: LensCorrectionCommitIdentity,
 ): boolean =>
   state.adjustmentRevision === identity.adjustmentRevision &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.selectedImage?.path === identity.sourceIdentity;
 
 export const isCurrentLensProfileRequest = (
@@ -54,9 +69,9 @@ const assertCurrentLensCorrectionIdentity = (
       `lens_correction_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `lens_correction_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `lens_correction_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
