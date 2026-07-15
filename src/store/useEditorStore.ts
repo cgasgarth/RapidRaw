@@ -605,6 +605,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
       const historyTargetIndex = request.history === 'navigation' ? request.historyTargetIndex : undefined;
+      const compensationHistory =
+        request.history === 'compensation' && request.compensationHistory !== undefined
+          ? {
+              checkpoints: structuredClone([...request.compensationHistory.checkpoints]),
+              entries: structuredClone([...request.compensationHistory.entries]),
+              historyIndex: request.compensationHistory.historyIndex,
+            }
+          : undefined;
       if (request.history === 'navigation') {
         if (
           historyTargetIndex === undefined ||
@@ -616,6 +624,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       } else if (request.historyTargetIndex !== undefined) {
         throw new Error('edit_transaction.history_target_requires_navigation');
+      }
+      if (request.history === 'compensation') {
+        if (
+          compensationHistory === undefined ||
+          !Number.isInteger(compensationHistory.historyIndex) ||
+          compensationHistory.historyIndex < 0 ||
+          compensationHistory.historyIndex >= compensationHistory.entries.length ||
+          compensationHistory.checkpoints.some(
+            (checkpoint) =>
+              !Number.isInteger(checkpoint.historyIndex) ||
+              checkpoint.historyIndex < 0 ||
+              checkpoint.historyIndex >= compensationHistory.entries.length,
+          )
+        ) {
+          throw new Error('edit_transaction.invalid_compensation_history');
+        }
+      } else if (request.compensationHistory !== undefined) {
+        throw new Error('edit_transaction.compensation_history_requires_compensation');
       }
       if (
         nativeHistoryBaseline !== undefined &&
@@ -644,6 +670,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ) {
         throw new Error('edit_transaction.history_target_mismatch');
       }
+      if (
+        compensationHistory !== undefined &&
+        !areAdjustmentsEqual(
+          compensationHistory.entries[compensationHistory.historyIndex] ?? state.adjustments,
+          nextResult.after,
+        )
+      ) {
+        throw new Error('edit_transaction.compensation_history_target_mismatch');
+      }
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
         request.history === 'coalesced-interaction' &&
@@ -668,26 +703,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
           ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
-          : request.history === 'reset'
-            ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
-            : coalescedReceipt
-              ? {
-                  history: state.history.map((entry, index) =>
-                    index === state.historyIndex ? nextResult.after : entry,
-                  ),
-                  checkpoints: state.historyCheckpoints,
-                  historyIndex: state.historyIndex,
-                }
-              : pushEditHistoryEntryWithCheckpoints(
-                  reconcilesHydratedNativeCommit
-                    ? state.history.map((entry, index) =>
-                        index === state.historyIndex ? nativeHistoryBaseline : entry,
-                      )
-                    : state.history,
-                  state.historyIndex,
-                  nextResult.after,
-                  state.historyCheckpoints,
-                );
+          : compensationHistory !== undefined
+            ? {
+                history: structuredClone(compensationHistory.entries),
+                checkpoints: structuredClone(compensationHistory.checkpoints),
+                historyIndex: compensationHistory.historyIndex,
+              }
+            : request.history === 'reset'
+              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
+              : coalescedReceipt
+                ? {
+                    history: state.history.map((entry, index) =>
+                      index === state.historyIndex ? nextResult.after : entry,
+                    ),
+                    checkpoints: state.historyCheckpoints,
+                    historyIndex: state.historyIndex,
+                  }
+                : pushEditHistoryEntryWithCheckpoints(
+                    reconcilesHydratedNativeCommit
+                      ? state.history.map((entry, index) =>
+                          index === state.historyIndex ? nativeHistoryBaseline : entry,
+                        )
+                      : state.history,
+                    state.historyIndex,
+                    nextResult.after,
+                    state.historyCheckpoints,
+                  );
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),

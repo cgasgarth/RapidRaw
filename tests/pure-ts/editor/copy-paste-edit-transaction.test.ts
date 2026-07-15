@@ -143,26 +143,62 @@ describe('copy/paste edit transaction', () => {
 
   test('compensates an exact native failure without overwriting a newer edit', () => {
     const before = useEditorStore.getState();
-    const target = captureCopyPasteCompensationTarget(before, targetPath);
+    before.createHistoryCheckpoint('Before paste');
+    const expectedHistory = structuredClone(useEditorStore.getState().history);
+    const expectedCheckpoints = structuredClone(useEditorStore.getState().historyCheckpoints);
+    const target = captureCopyPasteCompensationTarget(useEditorStore.getState(), targetPath);
     const request = buildCopyPasteEditTransaction(before, targetPath, { exposure: 0.75 }, 'paste-failure');
     const result = before.applyEditTransaction(request);
     const persistence = buildEditTransactionPersistenceContext(request, result);
+    expect(useEditorStore.getState().history).toHaveLength(2);
     const compensation = buildCopyPastePersistenceCompensation(useEditorStore.getState(), persistence, target);
 
     expect(compensation).toMatchObject({
       baseAdjustmentRevision: 1,
-      history: 'single-entry',
+      history: 'compensation',
       imageSessionId: session.id,
       persistence: 'native-committed',
       source: 'copy-paste',
       transactionId: 'paste-failure:compensate',
     });
     if (compensation === null) throw new Error('Expected exact native failure compensation.');
+    if (compensation.compensationHistory === undefined) throw new Error('Expected compensation history authority.');
+    const beforeMalformed = useEditorStore.getState();
+    expect(() =>
+      beforeMalformed.applyEditTransaction({
+        ...compensation,
+        compensationHistory: {
+          ...compensation.compensationHistory,
+          checkpoints: compensation.compensationHistory.checkpoints.map((checkpoint) => ({
+            ...checkpoint,
+            historyIndex: 99,
+          })),
+        },
+        transactionId: 'paste-failure:malformed-compensation',
+      }),
+    ).toThrow('edit_transaction.invalid_compensation_history');
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: beforeMalformed.adjustmentRevision,
+      adjustments: { exposure: 0.75 },
+      historyIndex: beforeMalformed.historyIndex,
+      lastEditApplicationReceipt: { transactionId: 'paste-failure' },
+    });
+    expect(useEditorStore.getState().history).toEqual(beforeMalformed.history);
+    expect(useEditorStore.getState().historyCheckpoints).toEqual(beforeMalformed.historyCheckpoints);
+    const capturedEntry = target.history[0];
+    const capturedCheckpoint = target.historyCheckpoints[0];
+    if (capturedEntry === undefined || capturedCheckpoint === undefined) {
+      throw new Error('Expected captured compensation history and checkpoint.');
+    }
+    capturedEntry.exposure = 4;
+    capturedCheckpoint.historyIndex = 99;
     useEditorStore.getState().applyEditTransaction(compensation);
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 2,
       adjustments: { brightness: 0.2, exposure: 0.1 },
-      historyIndex: 2,
+      history: expectedHistory,
+      historyCheckpoints: expectedCheckpoints,
+      historyIndex: 0,
       lastEditApplicationReceipt: {
         adjustmentRevision: 2,
         persistence: 'native-committed',
@@ -170,6 +206,21 @@ describe('copy/paste edit transaction', () => {
         transactionId: 'paste-failure:compensate',
       },
     });
+    expect(useEditorStore.getState().history).toEqual(expectedHistory);
+    expect(useEditorStore.getState().historyCheckpoints).toEqual(expectedCheckpoints);
+    const compensatedRevision = useEditorStore.getState().adjustmentRevision;
+    useEditorStore.getState().undo();
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: compensatedRevision,
+      adjustments: { brightness: 0.2, exposure: 0.1 },
+      history: expectedHistory,
+      historyCheckpoints: expectedCheckpoints,
+      historyIndex: 0,
+      lastEditApplicationReceipt: { transactionId: 'paste-failure:compensate' },
+    });
+    expect(useEditorStore.getState().history).toEqual(expectedHistory);
+    expect(useEditorStore.getState().historyCheckpoints).toEqual(expectedCheckpoints);
 
     const nextState = useEditorStore.getState();
     const nextTarget = captureCopyPasteCompensationTarget(nextState, targetPath);

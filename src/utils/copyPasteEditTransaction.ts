@@ -1,4 +1,5 @@
 import type { Adjustments } from './adjustments';
+import type { EditHistoryCheckpoint } from './editHistory';
 import {
   buildAdjustmentMutationOperations,
   type EditApplicationReceipt,
@@ -18,6 +19,9 @@ export interface CopyPasteEditTransactionState {
 export interface CopyPasteCompensationTarget {
   adjustmentRevision: number;
   adjustments: Adjustments;
+  history: Adjustments[];
+  historyCheckpoints: EditHistoryCheckpoint[];
+  historyIndex: number;
   imageSessionId: string;
   targetPath: string;
 }
@@ -49,7 +53,11 @@ export const buildCopyPasteEditTransaction = (
 };
 
 export const captureCopyPasteCompensationTarget = (
-  state: CopyPasteEditTransactionState,
+  state: CopyPasteEditTransactionState & {
+    history: Adjustments[];
+    historyCheckpoints: EditHistoryCheckpoint[];
+    historyIndex: number;
+  },
   targetPath: string,
 ): CopyPasteCompensationTarget => {
   if (state.selectedImage?.path !== targetPath) {
@@ -58,6 +66,9 @@ export const captureCopyPasteCompensationTarget = (
   return {
     adjustmentRevision: state.adjustmentRevision,
     adjustments: structuredClone(state.adjustments),
+    history: structuredClone(state.history),
+    historyCheckpoints: structuredClone(state.historyCheckpoints),
+    historyIndex: state.historyIndex,
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
     targetPath,
   };
@@ -111,7 +122,12 @@ export const buildCopyPastePersistenceCompensation = (
 
   return {
     baseAdjustmentRevision: state.adjustmentRevision,
-    history: 'single-entry',
+    compensationHistory: {
+      checkpoints: structuredClone(target.historyCheckpoints),
+      entries: structuredClone(target.history),
+      historyIndex: target.historyIndex,
+    },
+    history: 'compensation',
     imageSessionId: target.imageSessionId,
     operations: buildAdjustmentMutationOperations(state.adjustments, target.adjustments),
     persistence: 'native-committed',

@@ -5,6 +5,7 @@ import {
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import { legacyAdjustmentsToEditDocumentV2, updateEditDocumentV2Node } from './editDocumentV2';
+import type { EditHistoryCheckpoint } from './editHistory';
 
 /** The caller's intent, kept explicit so new mutation paths can be audited. */
 export type EditMutationSource =
@@ -24,7 +25,13 @@ export type EditMutationSource =
   | 'hydration'
   | 'migration';
 
-export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'navigation' | 'none' | 'reset';
+export type EditTransactionHistory =
+  | 'single-entry'
+  | 'coalesced-interaction'
+  | 'navigation'
+  | 'compensation'
+  | 'none'
+  | 'reset';
 export type EditTransactionPersistence = 'commit' | 'native-committed' | 'preview-only';
 
 /**
@@ -50,6 +57,12 @@ export interface EditTransactionRequest {
   history: EditTransactionHistory;
   /** Required only for history navigation; points at the canonical entry installed by this transaction. */
   historyTargetIndex?: number;
+  /** Required only for compensation; restores the exact authority captured before a failed optimistic commit. */
+  compensationHistory?: {
+    checkpoints: readonly EditHistoryCheckpoint[];
+    entries: readonly Adjustments[];
+    historyIndex: number;
+  };
   persistence: EditTransactionPersistence;
   /**
    * Native commits can win a same-path reopen race before the editor installs
