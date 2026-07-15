@@ -152,6 +152,8 @@ pub struct AppServices {
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
+    #[cfg(feature = "ai")]
+    pub(crate) ai: Arc<crate::ai::runtime_service::AiRuntimeService>,
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
@@ -167,6 +169,10 @@ impl AppServices {
         let native_caches =
             Arc::new(crate::render::native_cache_service::NativeCacheService::default());
         let cache_budget = native_caches.budget();
+        #[cfg(feature = "ai")]
+        let ai = Arc::new(crate::ai::runtime_service::AiRuntimeService::new(
+            Arc::clone(&cache_budget),
+        ));
         crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
         Self {
             editor: Arc::default(),
@@ -194,6 +200,8 @@ impl AppServices {
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
             native_caches,
+            #[cfg(feature = "ai")]
+            ai,
             interactive_gpu_pressure: Arc::default(),
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             smart_previews: crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),

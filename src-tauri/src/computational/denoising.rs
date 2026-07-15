@@ -126,12 +126,11 @@ pub fn execute_denoising(
         if method == "ai" {
             let lease_result = {
                 let managed_state = app_handle.state::<AppState>();
-                crate::ai::ai_processing::acquire_ort_model(
-                    &app_handle,
-                    &managed_state.ai_model_registry,
-                    crate::ai::model_registry::AiModelId::Denoise,
-                )
-                .await
+                managed_state
+                    .services
+                    .ai
+                    .acquire_ort_model(&app_handle, crate::ai::model_registry::AiModelId::Denoise)
+                    .await
             };
             let lease = match lease_result {
                 Ok(lease) => lease,
@@ -228,13 +227,12 @@ pub async fn batch_denoise_images(
         return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
         #[cfg(feature = "ai")]
         {
-            let lease = crate::ai::ai_processing::acquire_ort_model(
-                &app_handle,
-                &state.ai_model_registry,
-                crate::ai::model_registry::AiModelId::Denoise,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
+            let lease = state
+                .services
+                .ai
+                .acquire_ort_model(&app_handle, crate::ai::model_registry::AiModelId::Denoise)
+                .await
+                .map_err(|e| e.to_string())?;
             ai_session = Some(lease.ort()?);
             ai_lease = Some(lease);
         }

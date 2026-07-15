@@ -3,11 +3,6 @@ use std::sync::Arc;
 use image::DynamicImage;
 use serde::Serialize;
 
-#[cfg(feature = "ai")]
-use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
-#[cfg(feature = "ai")]
-use crate::render::native_cache::{CachePolicy, MemoryLruCache};
-
 pub struct PreviewJob {
     pub adjustments: Arc<serde_json::Value>,
     pub expected_image_path: String,
@@ -66,44 +61,12 @@ pub struct AnalyticsConfig {
 pub struct AppState {
     /// Narrow service handles are the preferred capability boundary for new commands.
     pub services: Arc<crate::app::services::AppServices>,
-    #[cfg(feature = "ai")]
-    pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
-    #[cfg(feature = "ai")]
-    pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
-    #[cfg(feature = "ai")]
-    pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
 }
 
 impl AppState {
     pub fn new() -> Self {
-        #[cfg(feature = "ai")]
-        let mib = 1024_u64 * 1024;
         let services = Arc::new(crate::app::services::AppServices::new());
-        #[cfg(feature = "ai")]
-        let cache_budget = services.native_caches.budget();
-        #[cfg(feature = "ai")]
-        let policy =
-            |name: &'static str, soft: u64, hard: u64, max_entries: Option<usize>| CachePolicy {
-                name,
-                soft_limit_bytes: soft * mib,
-                hard_limit_bytes: hard * mib,
-                max_entries,
-            };
-        Self {
-            services,
-            #[cfg(feature = "ai")]
-            ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
-            #[cfg(feature = "ai")]
-            ai_embeddings: MemoryLruCache::new(
-                policy("ai_embeddings", 256, 384, Some(4)),
-                Arc::clone(&cache_budget),
-            ),
-            #[cfg(feature = "ai")]
-            ai_depth_maps: MemoryLruCache::new(
-                policy("ai_depth_maps", 128, 192, Some(4)),
-                Arc::clone(&cache_budget),
-            ),
-        }
+        Self { services }
     }
 }
 
