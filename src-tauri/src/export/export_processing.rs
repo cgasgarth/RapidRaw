@@ -559,7 +559,8 @@ fn decode_export_item(
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
                 state
-                    .source_fingerprint_cache
+                    .services
+                    .source_fingerprints
                     .fingerprint(&revision, &bytes);
                 load_and_composite_with_report(
                     &bytes,
@@ -577,7 +578,10 @@ fn decode_export_item(
             Ok(mmap) => {
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
-                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
+                state
+                    .services
+                    .source_fingerprints
+                    .fingerprint(&revision, &mmap);
                 load_and_composite_with_report(
                     &mmap,
                     &plan.source_path,
@@ -593,7 +597,8 @@ fn decode_export_item(
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
                 state
-                    .source_fingerprint_cache
+                    .services
+                    .source_fingerprints
                     .fingerprint(&revision, &bytes);
                 load_and_composite_with_report(
                     &bytes,
@@ -629,11 +634,12 @@ fn verified_source_digest(
     {
         return Err("source_changed_during_export".to_string());
     }
-    let (sha256, provenance) = match state.source_fingerprint_cache.verified_sha256(revision) {
+    let (sha256, provenance) = match state.services.source_fingerprints.verified_sha256(revision) {
         Some(digest) => (digest, "verifiedRevisionCache"),
         None => (
             state
-                .source_fingerprint_cache
+                .services
+                .source_fingerprints
                 .fingerprint_streaming(revision, Path::new(&item.plan.source_path))?
                 .sha256,
             "boundedStreamingFallback",
@@ -2863,7 +2869,8 @@ async fn export_images_legacy(
                                     SourceRevision::from_path(Path::new(&source_path_str))
                                         .map_err(|error| error.to_string())?;
                                 state
-                                    .source_fingerprint_cache
+                                    .services
+                                    .source_fingerprints
                                     .fingerprint(&revision, &bytes);
                                 load_and_composite_with_report(
                                     &bytes,
@@ -2882,7 +2889,10 @@ async fn export_images_legacy(
                                 let revision =
                                     SourceRevision::from_path(Path::new(&source_path_str))
                                         .map_err(|error| error.to_string())?;
-                                state.source_fingerprint_cache.fingerprint(&revision, &mmap);
+                                state
+                                    .services
+                                    .source_fingerprints
+                                    .fingerprint(&revision, &mmap);
                                 load_and_composite_with_report(
                                     &mmap,
                                     &source_path_str,
@@ -2900,7 +2910,8 @@ async fn export_images_legacy(
                                     SourceRevision::from_path(Path::new(&source_path_str))
                                         .map_err(|error| error.to_string())?;
                                 state
-                                    .source_fingerprint_cache
+                                    .services
+                                    .source_fingerprints
                                     .fingerprint(&revision, &bytes);
                                 load_and_composite_with_report(
                                     &bytes,
@@ -2943,20 +2954,24 @@ async fn export_images_legacy(
                             {
                                 return Err("source_changed_during_export".to_string());
                             }
-                            let (sha256, provenance) =
-                                match state.source_fingerprint_cache.verified_sha256(revision) {
-                                    Some(digest) => (digest, "verifiedRevisionCache"),
-                                    None => (
-                                        state
-                                            .source_fingerprint_cache
-                                            .fingerprint_streaming(
-                                                revision,
-                                                Path::new(&source_path_str),
-                                            )?
-                                            .sha256,
-                                        "boundedStreamingFallback",
-                                    ),
-                                };
+                            let (sha256, provenance) = match state
+                                .services
+                                .source_fingerprints
+                                .verified_sha256(revision)
+                            {
+                                Some(digest) => (digest, "verifiedRevisionCache"),
+                                None => (
+                                    state
+                                        .services
+                                        .source_fingerprints
+                                        .fingerprint_streaming(
+                                            revision,
+                                            Path::new(&source_path_str),
+                                        )?
+                                        .sha256,
+                                    "boundedStreamingFallback",
+                                ),
+                            };
                             Some(VerifiedSourceDigestReceipt {
                                 revision: revision.clone(),
                                 sha256,

@@ -151,6 +151,7 @@ pub struct AppServices {
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
+    pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
@@ -187,6 +188,7 @@ impl AppServices {
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
             native_caches,
+            source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),
@@ -202,6 +204,7 @@ mod tests {
     use crate::merge::computational_job::{
         ComputationalMergeFamily, ComputationalMergeJobId, ComputationalMergeJobStatus,
     };
+    use crate::source_revision::SourceRevision;
     use std::sync::Barrier;
     use std::thread;
 
@@ -323,5 +326,54 @@ mod tests {
             ComputationalMergeJobStatus::Active
         );
         assert!(services.computational_jobs.finish(&focus.job_id).unwrap());
+    }
+
+    #[test]
+    fn source_fingerprint_service_shares_concurrent_digests_and_separates_revisions() {
+        let services = Arc::new(AppServices::new());
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("source.raw");
+        std::fs::write(&path, vec![17_u8; 2 * 1024 * 1024]).unwrap();
+        let first_revision = SourceRevision::from_path(&path).unwrap();
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let services = Arc::clone(&services);
+                let revision = first_revision.clone();
+                let path = path.clone();
+                thread::spawn(move || {
+                    services
+                        .source_fingerprints
+                        .fingerprint_streaming(&revision, &path)
+                        .unwrap()
+                        .sha256
+                })
+            })
+            .collect();
+        let digests: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        assert!(digests.windows(2).all(|pair| pair[0] == pair[1]));
+
+        std::fs::write(&path, vec![23_u8; 2 * 1024 * 1024 + 1]).unwrap();
+        let second_revision = SourceRevision::from_path(&path).unwrap();
+        assert_ne!(first_revision, second_revision);
+        let second = services
+            .source_fingerprints
+            .fingerprint_streaming(&second_revision, &path)
+            .unwrap();
+        assert_ne!(digests[0], second.sha256);
+        assert_eq!(
+            services
+                .source_fingerprints
+                .verified_sha256(&first_revision),
+            Some(digests[0])
+        );
+        assert_eq!(
+            services
+                .source_fingerprints
+                .verified_sha256(&second_revision),
+            Some(second.sha256)
+        );
     }
 }
