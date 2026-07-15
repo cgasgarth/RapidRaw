@@ -11,10 +11,12 @@ use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
+use crate::AppState;
 use crate::color::dehaze::{
     DehazeExecutionStatsV1, DehazeQuality, DehazeReceiptV1, HazeAnalysisCache,
     HazeAnalysisIdentityV1, apply_analysis_to_adjustments, dehaze_receipt, scene_dehaze_is_active,
 };
+use crate::gpu::gpu_processing_service::{GpuImageCache, GpuProcessorState};
 use crate::gpu_readback::{
     RGBA16_FLOAT_BYTES_PER_PIXEL, read_texture_data_roi_with_bytes_per_pixel,
     rgba16float_readback_to_dynamic_image, rgba16float_readback_to_unclamped_dynamic_image,
@@ -29,8 +31,6 @@ use crate::gpu_textures::{
 };
 use crate::image_processing::{AllAdjustments, GpuContext, MAX_MASKS};
 use crate::lut_processing::Lut;
-use crate::render_caches::RenderCaches;
-use crate::{AppState, GpuImageCache};
 
 pub const PRE_GPU_PRECISION_ABI_RGBA16F_V1: u32 = 1;
 const PIXEL_BUFFER_REVISION_ABI_V1: u32 = 1;
@@ -91,14 +91,14 @@ pub fn gpu_input_cache_counters() -> GpuInputCacheCounters {
 
 #[cfg(test)]
 pub fn gpu_input_cache_counters_for_state(state: &AppState) -> GpuInputCacheCounters {
-    *state.gpu_input_cache_counters.lock().unwrap()
+    state.services.gpu_processing.counters()
 }
 
 fn update_state_gpu_input_cache_counters(
     state: &AppState,
     update: impl FnOnce(&mut GpuInputCacheCounters),
 ) {
-    update(&mut state.gpu_input_cache_counters.lock().unwrap());
+    state.services.gpu_processing.update_counters(update);
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -206,12 +206,12 @@ impl PreGpuImageIdentity {
         crate::render::artifact_identity::source_fingerprint_for_path(source)
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "tauri-test")]
     pub fn for_test_source(base_image: &DynamicImage, source: &str) -> Self {
         Self::for_stage(base_image, Self::source_revision(source), 0, 0)
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "tauri-test")]
     pub fn for_source(base_image: &DynamicImage, source: &str) -> Self {
         Self::for_test_source(base_image, source)
     }
@@ -1323,14 +1323,12 @@ impl GpuProcessor {
         self.resources.lock().unwrap().resource_cache.counters
     }
 
+    #[cfg(any(feature = "tauri-test", feature = "validation-harness"))]
     pub fn last_execution_receipt(&self) -> Option<GpuExecutionReceipt> {
         self.resources.lock().unwrap().last_execution_receipt
     }
 
-    pub fn last_dehaze_receipt(&self) -> Option<DehazeReceiptV1> {
-        *self.last_dehaze_receipt.lock().unwrap()
-    }
-
+    #[cfg(feature = "tauri-test")]
     pub fn execution_sequence(&self) -> u64 {
         self.execution_sequence.load(Ordering::Acquire)
     }
@@ -3623,11 +3621,12 @@ mod blur_pass_tests {
         .expect("real GPU executor accepts the compiled graph contract");
 
         assert_eq!(rendered.dimensions(), source.dimensions());
-        let processor_guard = state.gpu_processor.lock().unwrap();
-        let processor = &processor_guard
-            .as_ref()
-            .expect("GPU processor is initialized")
-            .processor;
+        let processor_state = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .expect("GPU processor is initialized");
+        let processor = &processor_state.processor;
         assert_eq!(
             processor.runtime_identity().device_generation,
             context.generation
@@ -3743,7 +3742,13 @@ mod blur_pass_tests {
                 "gpu={gpu} cpu={cpu}"
             );
         }
-        assert!(state.gpu_processor.lock().unwrap().is_some());
+        assert!(
+            state
+                .services
+                .gpu_processing
+                .current_processor_snapshot()
+                .is_some()
+        );
     }
 
     #[cfg(feature = "tauri-test")]
@@ -3927,10 +3932,12 @@ mod blur_pass_tests {
         );
         assert!(scene_referred > legacy + 0.05);
         assert_eq!(scene_referred, scene_referred_warm);
-        let processor = state.gpu_processor.lock().unwrap();
+        let processor = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
         let receipt = processor
-            .as_ref()
-            .unwrap()
             .processor
             .last_execution_receipt()
             .expect("v2 GPU execution publishes a runtime receipt");
@@ -4004,10 +4011,9 @@ mod blur_pass_tests {
         .unwrap();
         assert_eq!(rendered.width(), 2049);
         let receipt = state
-            .gpu_processor
-            .lock()
-            .unwrap()
-            .as_ref()
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
             .unwrap()
             .processor
             .last_execution_receipt()
@@ -4656,8 +4662,12 @@ mod blur_pass_tests {
         };
         assert_eq!(render_clear(0.0), render_clear(0.12));
 
-        let processor_guard = state.gpu_processor.lock().unwrap();
-        let processor = &processor_guard.as_ref().unwrap().processor;
+        let processor_state = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
+        let processor = &processor_state.processor;
         assert_eq!(
             processor
                 .resources
@@ -4809,7 +4819,7 @@ mod blur_pass_tests {
         let cold_started = Instant::now();
         let cold = render();
         let cold_elapsed = cold_started.elapsed();
-        *state.gpu_processor.lock().unwrap() = None;
+        state.services.gpu_processing.clear_processor();
 
         let mut warm_elapsed = Vec::new();
         let mut warm_output = None;
@@ -4817,7 +4827,7 @@ mod blur_pass_tests {
             let started = Instant::now();
             warm_output = Some(render());
             warm_elapsed.push(started.elapsed());
-            *state.gpu_processor.lock().unwrap() = None;
+            state.services.gpu_processing.clear_processor();
         }
         warm_elapsed.sort_unstable();
         let warm_median = warm_elapsed[warm_elapsed.len() / 2];
@@ -4833,10 +4843,9 @@ mod blur_pass_tests {
         let no_flare = render();
         assert!(
             state
-                .gpu_processor
-                .lock()
-                .unwrap()
-                .as_ref()
+                .services
+                .gpu_processing
+                .current_processor_snapshot()
                 .is_some_and(|state| state.processor.flare_resources.get().is_none()),
             "ordinary editor render must not construct optional flare pipelines"
         );
@@ -4859,10 +4868,9 @@ mod blur_pass_tests {
         .expect("optional flare render succeeds");
         assert!(
             state
-                .gpu_processor
-                .lock()
-                .unwrap()
-                .as_ref()
+                .services
+                .gpu_processing
+                .current_processor_snapshot()
                 .is_some_and(|state| state.processor.flare_resources.get().is_some()),
             "first flare request must demand-create its optional pipelines"
         );
@@ -4952,10 +4960,12 @@ mod blur_pass_tests {
         assert_eq!(counters.misses, 1);
         assert_eq!(counters.hits, 999);
         assert_eq!(counters.uploaded_bytes, 16 * 16 * 8);
-        let processor = state.gpu_processor.lock().unwrap();
+        let processor = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
         let blur = processor
-            .as_ref()
-            .unwrap()
             .processor
             .resources
             .lock()
@@ -4988,7 +4998,7 @@ mod blur_pass_tests {
         let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
             .expect("RAWENGINE_PRIVATE_RAW_SOURCE must select a private RAW");
         let bytes = std::fs::read(&source_path).expect("read private RAW bytes");
-        let decoded = crate::load_base_image_from_bytes(
+        let decoded = crate::image_loader::load_base_image_from_bytes(
             &bytes,
             &source_path,
             false,
@@ -5181,8 +5191,12 @@ mod blur_pass_tests {
         for index in 1..20 {
             render(index as f32 / 20.0);
         }
-        let processor_guard = state.gpu_processor.lock().unwrap();
-        let processor = &processor_guard.as_ref().unwrap().processor;
+        let processor_state = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
+        let processor = &processor_state.processor;
         let counters = processor.resource_cache_counters();
         assert_eq!(counters.mask_misses, 1);
         assert_eq!(counters.mask_hits, 19);
@@ -5197,7 +5211,7 @@ mod blur_pass_tests {
         resources.resource_cache = GpuResourceCache::default();
         resources.main_bind_group_cache = None;
         drop(resources);
-        drop(processor_guard);
+        drop(processor_state);
 
         let cold = render(0.0);
         assert_eq!(first.to_rgba16().into_raw(), cold.to_rgba16().into_raw());
@@ -5249,8 +5263,12 @@ mod blur_pass_tests {
 
         render(&[first_mask, second_mask.clone()], adjustments);
         let changed = render(&[changed_mask.clone(), second_mask], adjustments);
-        let processor_guard = state.gpu_processor.lock().unwrap();
-        let processor = &processor_guard.as_ref().unwrap().processor;
+        let processor_state = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
+        let processor = &processor_state.processor;
         let counters = processor.resource_cache_counters();
         assert_eq!(counters.mask_misses, 2);
         assert_eq!(counters.texture_creations, 1);
@@ -5264,7 +5282,7 @@ mod blur_pass_tests {
         resources.resource_cache = GpuResourceCache::default();
         resources.main_bind_group_cache = None;
         drop(resources);
-        drop(processor_guard);
+        drop(processor_state);
         let cold_changed = render(
             &[
                 changed_mask.clone(),
@@ -5279,8 +5297,12 @@ mod blur_pass_tests {
 
         adjustments.mask_count = 1;
         let removed = render(std::slice::from_ref(&changed_mask), adjustments);
-        let processor_guard = state.gpu_processor.lock().unwrap();
-        let processor = &processor_guard.as_ref().unwrap().processor;
+        let processor_state = state
+            .services
+            .gpu_processing
+            .current_processor_snapshot()
+            .unwrap();
+        let processor = &processor_state.processor;
         let counters = processor.resource_cache_counters();
         assert_eq!(counters.texture_creations, 1);
         assert_eq!(counters.mask_partial_upload_bytes, 16 * 16);
@@ -5289,7 +5311,7 @@ mod blur_pass_tests {
         resources.resource_cache = GpuResourceCache::default();
         resources.main_bind_group_cache = None;
         drop(resources);
-        drop(processor_guard);
+        drop(processor_state);
         let cold_removed = render(std::slice::from_ref(&changed_mask), adjustments);
         assert_eq!(
             removed.to_rgba16().into_raw(),
@@ -5427,14 +5449,20 @@ fn process_and_get_dynamic_image_inner(
         .map_err(str::to_owned);
     }
 
-    let mut old_processor = None;
-    let mut reallocated = false;
-
-    let mut processor_lock = state.gpu_processor.lock().unwrap();
-    if processor_lock.is_none()
-        || processor_lock.as_ref().unwrap().width < width
-        || processor_lock.as_ref().unwrap().height < height
-    {
+    let gpu_processing = &state.services.gpu_processing;
+    let processing_permit = gpu_processing.acquire_render();
+    let processing_lease = processing_permit.lease();
+    let existing_processor = gpu_processing.processor_snapshot(processing_lease);
+    let processor_state = if existing_processor.as_ref().is_some_and(|processor| {
+        processor.width >= width
+            && processor.height >= height
+            && processor.processor.runtime_identity().device_generation == device_generation
+    }) {
+        existing_processor.unwrap()
+    } else {
+        let publication = gpu_processing
+            .begin_processor_publication(processing_lease)
+            .ok_or_else(|| "GPU processing lease is stale before processor creation".to_string())?;
         let new_width = (width + 255) & !255;
         let new_height = (height + 255) & !255;
         log::info!(
@@ -5443,47 +5471,49 @@ fn process_and_get_dynamic_image_inner(
             new_height
         );
         let new_processor = GpuProcessor::new(context.clone(), new_width, new_height)?;
-
-        old_processor = processor_lock.take();
-
-        *processor_lock = Some(crate::GpuProcessorState {
+        let candidate = Arc::new(GpuProcessorState {
             processor: new_processor,
             width: new_width,
             height: new_height,
         });
-        reallocated = true;
-    }
-    let processor_state = processor_lock.as_ref().unwrap();
+
+        if let Some(old_state) = existing_processor
+            .as_ref()
+            .filter(|old| old.processor.runtime_identity().device_generation == device_generation)
+        {
+            let mut encoder = device.create_command_encoder(&Default::default());
+            let copy_w = old_state.width.min(candidate.width);
+            let copy_h = old_state.height.min(candidate.height);
+            encoder.copy_texture_to_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &old_state.processor.output_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyTextureInfo {
+                    texture: &candidate.processor.output_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::Extent3d {
+                    width: copy_w,
+                    height: copy_h,
+                    depth_or_array_layers: 1,
+                },
+            );
+            queue.submit(Some(encoder.finish()));
+        }
+        if !gpu_processing.publish_processor(publication, Arc::clone(&candidate)) {
+            return Err("GPU processing lease became stale before processor publication".into());
+        }
+        candidate
+    };
     let processor = &processor_state.processor;
 
-    if reallocated && let Some(old_state) = &old_processor {
-        let mut encoder = device.create_command_encoder(&Default::default());
-        let copy_w = old_state.width.min(processor_state.width);
-        let copy_h = old_state.height.min(processor_state.height);
-
-        encoder.copy_texture_to_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &old_state.processor.output_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyTextureInfo {
-                texture: &processor.output_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width: copy_w,
-                height: copy_h,
-                depth_or_array_layers: 1,
-            },
-        );
-        queue.submit(Some(encoder.finish()));
-    }
-
-    if let Some(cache) = state.gpu_image_cache.lock().unwrap().as_ref() {
+    let existing_cache = gpu_processing.input_snapshot(processing_lease);
+    if let Some(cache) = existing_cache.as_ref() {
         if cache.device_generation != device_generation {
             INPUT_DEVICE_MISSES.fetch_add(1, Ordering::Relaxed);
             update_state_gpu_input_cache_counters(state, |counters| {
@@ -5501,16 +5531,27 @@ fn process_and_get_dynamic_image_inner(
             });
         }
     }
-    RenderCaches::new(state).clear_stale_gpu_image_cache(
-        pre_gpu_identity,
-        device_generation,
-        width,
-        height,
-    );
     processor.prepare_dehaze_plan(base_image, pre_gpu_identity, &mut request.adjustments);
 
-    let mut cache_lock = state.gpu_image_cache.lock().unwrap();
-    if cache_lock.is_none() {
+    let cache_matches = |cache: &GpuImageCache| {
+        cache.pre_gpu_identity == pre_gpu_identity
+            && cache.device_generation == device_generation
+            && cache.width == width
+            && cache.height == height
+    };
+    let cache = if existing_cache
+        .as_ref()
+        .is_some_and(|cache| cache_matches(cache))
+    {
+        INPUT_CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+        update_state_gpu_input_cache_counters(state, |counters| {
+            counters.hits += 1;
+        });
+        existing_cache.unwrap()
+    } else {
+        let publication = gpu_processing
+            .begin_input_publication(processing_lease)
+            .ok_or_else(|| "GPU processing lease is stale before input upload".to_string())?;
         INPUT_CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
         TO_RGBA_F16_CALLS.fetch_add(1, Ordering::Relaxed);
         let img_rgba_f16 = to_rgba_f16(base_image);
@@ -5552,23 +5593,20 @@ fn process_and_get_dynamic_image_inner(
             counters.view_allocations += 1;
         });
 
-        *cache_lock = Some(GpuImageCache {
-            texture,
+        let candidate = Arc::new(GpuImageCache {
+            _texture: texture,
             texture_view,
             width,
             height,
             pre_gpu_identity,
             device_generation,
         });
-    } else {
-        INPUT_CACHE_HITS.fetch_add(1, Ordering::Relaxed);
-        update_state_gpu_input_cache_counters(state, |counters| {
-            counters.hits += 1;
-        });
-    }
+        if !gpu_processing.publish_input(publication, Arc::clone(&candidate)) {
+            return Err("GPU processing lease became stale before input publication".into());
+        }
+        candidate
+    };
     log::debug!("GPU input cache counters: {:?}", gpu_input_cache_counters());
-
-    let cache = cache_lock.as_ref().unwrap();
 
     let skip_readback = output_to_display;
     let frame_identity = GpuFrameIdentity {
@@ -5602,6 +5640,9 @@ fn process_and_get_dynamic_image_inner(
     )?;
     if !execution_lease.is_current(execution_orchestrator.runtime(), frame_identity) {
         return Err("GPU execution lease became stale before publication".to_string());
+    }
+    if !gpu_processing.is_current(processing_lease) {
+        return Err("GPU processing lease became stale before publication".to_string());
     }
 
     let mut final_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -5765,6 +5806,9 @@ fn process_and_get_dynamic_image_inner(
     }
 
     if output_to_display {
+        if !gpu_processing.is_current(processing_lease) {
+            return Err("GPU processing lease became stale before presentation".into());
+        }
         if presentation_is_current.is_some_and(|is_current| !is_current()) {
             return Err("presentation_stale_frame".into());
         }
@@ -5776,9 +5820,10 @@ fn process_and_get_dynamic_image_inner(
         )?;
     }
 
-    drop(old_processor);
-
     if skip_readback {
+        if !gpu_processing.is_current(processing_lease) {
+            return Err("GPU processing lease became stale before display completion".into());
+        }
         let duration = start_time.elapsed();
         let fps = 1.0 / duration.as_secs_f64();
         log::info!(
@@ -5804,6 +5849,10 @@ fn process_and_get_dynamic_image_inner(
         duration,
         fps
     );
+
+    if !gpu_processing.is_current(processing_lease) {
+        return Err("GPU processing lease became stale before readback publication".into());
+    }
 
     if preserve_unclamped_float_readback {
         rgba16float_readback_to_unclamped_dynamic_image(out_w, out_h, processed_pixels)

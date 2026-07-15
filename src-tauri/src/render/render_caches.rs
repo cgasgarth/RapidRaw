@@ -62,27 +62,7 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn clear_gpu_image_cache(&self) {
-        if let Ok(mut gpu_cache) = self.state.gpu_image_cache.lock() {
-            *gpu_cache = None;
-        }
-    }
-
-    pub fn clear_stale_gpu_image_cache(
-        &self,
-        pre_gpu_identity: crate::gpu_processing::PreGpuImageIdentity,
-        device_generation: u64,
-        width: u32,
-        height: u32,
-    ) {
-        if let Ok(mut gpu_cache) = self.state.gpu_image_cache.lock()
-            && let Some(cache) = gpu_cache.as_ref()
-            && (cache.pre_gpu_identity != pre_gpu_identity
-                || cache.device_generation != device_generation
-                || cache.width != width
-                || cache.height != height)
-        {
-            *gpu_cache = None;
-        }
+        self.state.services.gpu_processing.clear_input();
     }
 
     pub fn insert_geometry_cache_entry(&self, key: u64, image: DynamicImage, max_entries: usize) {
