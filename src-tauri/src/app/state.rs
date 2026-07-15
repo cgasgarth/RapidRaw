@@ -146,7 +146,7 @@ pub struct AppState {
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     pub load_image_generation: Arc<AtomicUsize>,
-    pub image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
+    image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
     pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub smart_preview_scheduler:
@@ -154,6 +154,10 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub(crate) fn image_open(&self) -> &crate::image_open_session::ImageOpenCoordinator {
+        &self.image_open_coordinator
+    }
+
     pub(crate) fn export_jobs(&self) -> &crate::export::job_registry::ExportJobRegistry {
         &self.export_jobs
     }
