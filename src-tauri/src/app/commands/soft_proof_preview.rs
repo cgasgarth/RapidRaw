@@ -22,8 +22,8 @@ use crate::lut_processing::Lut;
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
 use crate::render::render_plan::compile_consumer_render_plan;
 use crate::{
-    color, export, generate_transformed_preview, get_or_load_lut, hydrate_adjustments,
-    image_analytics, render_pipeline,
+    color, export, generate_transformed_preview, hydrate_adjustments, image_analytics,
+    render_pipeline,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -419,7 +419,7 @@ fn render_processed_export_soft_proof_preview(
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, loaded_image.is_raw);
     let lut: Option<Arc<Lut>> = adjustments["lutPath"]
         .as_str()
-        .and_then(|path| get_or_load_lut(state, path).ok());
+        .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
         adjustments,
         &loaded_image.path,
