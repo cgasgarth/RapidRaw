@@ -9,12 +9,15 @@ describe('presented preview release coordinator', () => {
 
     coordinator.defer('blob:presented-old', 'base', 'blob:successor-delayed');
     expect(coordinator.pendingCount()).toBe(1);
+    expect(coordinator.hasPendingRelease('blob:presented-old')).toBe(true);
+    expect(coordinator.hasPendingRelease('blob:successor-delayed')).toBe(false);
     expect(released).toEqual([]);
     expect(coordinator.acknowledge('base', 'blob:unrelated', release)).toEqual([]);
     expect(released).toEqual([]);
 
     expect(coordinator.acknowledge('base', 'blob:successor-delayed', release)).toEqual(['blob:presented-old']);
     expect(coordinator.pendingCount()).toBe(0);
+    expect(coordinator.hasPendingRelease('blob:presented-old')).toBe(false);
     expect(coordinator.acknowledge('base', 'blob:successor-delayed', release)).toEqual([]);
     expect(released).toEqual(['blob:presented-old']);
   });

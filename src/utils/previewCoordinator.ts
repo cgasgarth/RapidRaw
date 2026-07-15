@@ -424,11 +424,15 @@ export function reducePreviewCoordinator(
   }
 
   if (event.type === 'display-generation-changed') {
+    const displayGeneration = positiveRevisionSchema.parse(event.generation);
+    if (displayGeneration <= state.displayGeneration) {
+      return { effects, state: withReceipt(state, event, 'display-generation-stale') };
+    }
     state = cancelActiveOperations(state, effects, 'display-generation-changed');
     state = {
       ...state,
       desired: null,
-      displayGeneration: positiveRevisionSchema.parse(event.generation),
+      displayGeneration,
       interactive: idleOperation(),
       original: idleOperation(),
       quality: null,

@@ -530,6 +530,7 @@ const ImageCanvas = memo(
           url === finalPreviewUrl ||
           url === interactivePatch?.url ||
           url === selectedImage.thumbnailUrl ||
+          presentedPreviewReleaseCoordinator.hasPendingRelease(url) ||
           globalImageCache.isProtected(url)
         ) {
           return;

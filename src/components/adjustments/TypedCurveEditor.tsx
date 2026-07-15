@@ -1,18 +1,20 @@
 import { Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEditorStore } from '../../store/useEditorStore';
 import type {
   Adjustments,
   OutputCurveSettingsV1,
   SceneCurvePointV1,
   SceneCurveSettingsV1,
 } from '../../utils/adjustments';
+import { buildTypedCurveEditTransaction, type TypedCurveCommitIdentity } from '../../utils/typedCurveEditTransaction';
 
 type TypedCurveDomain = 'scene' | 'output';
 
 interface TypedCurveEditorProps {
   adjustments: Adjustments;
   domain: TypedCurveDomain;
-  setAdjustments: (updater: (previous: Adjustments) => Adjustments) => void;
 }
 
 const DEFAULT_SCENE_CURVE: SceneCurveSettingsV1 = {
@@ -58,30 +60,21 @@ function sceneAsGeneric(points: ReadonlyArray<SceneCurvePointV1>) {
   return points.map((point) => ({ input: point.xEv, output: point.yEv }));
 }
 
-function commitScene(
-  setAdjustments: TypedCurveEditorProps['setAdjustments'],
-  update: (curve: SceneCurveSettingsV1) => SceneCurveSettingsV1,
-) {
-  setAdjustments((previous) => ({
-    ...previous,
-    rawEngineEditGraphVersion: 2,
-    sceneCurveV1: update(structuredClone(previous.sceneCurveV1 ?? DEFAULT_SCENE_CURVE)),
-  }));
-}
-
-function commitOutput(
-  setAdjustments: TypedCurveEditorProps['setAdjustments'],
-  update: (curve: OutputCurveSettingsV1) => OutputCurveSettingsV1,
-) {
-  setAdjustments((previous) => ({
-    ...previous,
-    rawEngineEditGraphVersion: 2,
-    outputCurveV1: update(structuredClone(previous.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE)),
-  }));
-}
-
-export default function TypedCurveEditor({ adjustments, domain, setAdjustments }: TypedCurveEditorProps) {
+export default function TypedCurveEditor({ adjustments, domain }: TypedCurveEditorProps) {
   const { t } = useTranslation();
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const commitIdentity = useMemo<TypedCurveCommitIdentity | null>(
+    () =>
+      selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImagePath],
+  );
+  const commitIdentityRef = useRef(commitIdentity);
+  commitIdentityRef.current = commitIdentity;
   const scene = adjustments.sceneCurveV1 ?? DEFAULT_SCENE_CURVE;
   const output = adjustments.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE;
   const points = domain === 'scene' ? sceneAsGeneric(scene.points) : output.points;
@@ -90,10 +83,32 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
       ? t('adjustments.curves.typed.sceneAxis', { defaultValue: 'EV relative to middle grey' })
       : t('adjustments.curves.typed.outputAxis', { defaultValue: 'Encoded value relative to SDR white' });
 
+  const commitScene = (update: (curve: SceneCurveSettingsV1) => SceneCurveSettingsV1) => {
+    const identity = commitIdentityRef.current;
+    if (identity === null) return;
+    const state = useEditorStore.getState();
+    const curve = update(structuredClone(state.adjustments.sceneCurveV1 ?? DEFAULT_SCENE_CURVE));
+    const result = applyEditTransaction(
+      buildTypedCurveEditTransaction(state, identity, { curve, domain: 'scene' }, crypto.randomUUID()),
+    );
+    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+  };
+
+  const commitOutput = (update: (curve: OutputCurveSettingsV1) => OutputCurveSettingsV1) => {
+    const identity = commitIdentityRef.current;
+    if (identity === null) return;
+    const state = useEditorStore.getState();
+    const curve = update(structuredClone(state.adjustments.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE));
+    const result = applyEditTransaction(
+      buildTypedCurveEditTransaction(state, identity, { curve, domain: 'output' }, crypto.randomUUID()),
+    );
+    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+  };
+
   const updatePoint = (index: number, key: 'input' | 'output', value: number) => {
     if (!Number.isFinite(value)) return;
     if (domain === 'scene') {
-      commitScene(setAdjustments, (curve) => {
+      commitScene((curve) => {
         const next = curve.points.map((point) => ({ ...point }));
         const point = next[index];
         if (!point) return curve;
@@ -111,7 +126,7 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
       });
       return;
     }
-    commitOutput(setAdjustments, (curve) => {
+    commitOutput((curve) => {
       const next = curve.points.map((point) => ({ ...point }));
       const point = next[index];
       if (!point) return curve;
@@ -136,13 +151,13 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
     if (!lower || !upper) return;
     const point = { input: (lower.input + upper.input) / 2, output: (lower.output + upper.output) / 2 };
     if (domain === 'scene') {
-      commitScene(setAdjustments, (curve) => {
+      commitScene((curve) => {
         const next = [...curve.points];
         next.splice(index, 0, { xEv: point.input, yEv: point.output });
         return { ...curve, points: next };
       });
     } else {
-      commitOutput(setAdjustments, (curve) => {
+      commitOutput((curve) => {
         const next = [...curve.points];
         next.splice(index, 0, point);
         return { ...curve, points: next };
@@ -153,20 +168,20 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
   const removePoint = (index: number) => {
     if (index === 0 || index === points.length - 1) return;
     if (domain === 'scene') {
-      commitScene(setAdjustments, (curve) => ({ ...curve, points: curve.points.filter((_, item) => item !== index) }));
+      commitScene((curve) => ({ ...curve, points: curve.points.filter((_, item) => item !== index) }));
     } else {
-      commitOutput(setAdjustments, (curve) => ({ ...curve, points: curve.points.filter((_, item) => item !== index) }));
+      commitOutput((curve) => ({ ...curve, points: curve.points.filter((_, item) => item !== index) }));
     }
   };
 
   const reset = () => {
     if (domain === 'scene') {
-      commitScene(setAdjustments, (curve) => ({
+      commitScene((curve) => ({
         ...curve,
         points: structuredClone(DEFAULT_SCENE_CURVE.points),
       }));
     } else {
-      commitOutput(setAdjustments, (curve) => {
+      commitOutput((curve) => {
         const maximum = curve.peakNits / curve.sdrReferenceWhiteNits;
         return {
           ...curve,
@@ -180,7 +195,14 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
   };
 
   return (
-    <div className="space-y-3" data-curve-domain={domain} data-testid="typed-curve-editor">
+    <div
+      className="space-y-3"
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-curve-domain={domain}
+      data-testid="typed-curve-editor"
+    >
       <div className="rounded border border-border bg-surface/40 p-2 text-xs text-text-secondary">
         <div className="font-medium text-text-primary">
           {domain === 'scene'
@@ -198,7 +220,7 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
               aria-label="Scene curve channel mode"
               className="mt-1 w-full rounded border border-border bg-surface px-2 py-1 text-text-primary"
               onChange={(event) =>
-                commitScene(setAdjustments, (curve) => ({
+                commitScene((curve) => ({
                   ...curve,
                   channelMode: event.target.value as SceneCurveSettingsV1['channelMode'],
                 }))
@@ -217,7 +239,7 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
             label="Middle grey"
             value={scene.middleGrey}
             onCommit={(value) => {
-              if (value > 0 && value < 1) commitScene(setAdjustments, (curve) => ({ ...curve, middleGrey: value }));
+              if (value > 0 && value < 1) commitScene((curve) => ({ ...curve, middleGrey: value }));
             }}
           />
         </div>
@@ -230,7 +252,7 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
               const headroom = output.peakNits / value;
               const maximumPoint = Math.max(...output.points.flatMap((point) => [point.input, point.output]));
               if (value > 0 && value <= output.peakNits && maximumPoint <= headroom) {
-                commitOutput(setAdjustments, (curve) => ({ ...curve, sdrReferenceWhiteNits: value }));
+                commitOutput((curve) => ({ ...curve, sdrReferenceWhiteNits: value }));
               }
             }}
           />
@@ -241,7 +263,7 @@ export default function TypedCurveEditor({ adjustments, domain, setAdjustments }
               const headroom = value / output.sdrReferenceWhiteNits;
               const maximumPoint = Math.max(...output.points.flatMap((point) => [point.input, point.output]));
               if (value >= output.sdrReferenceWhiteNits && value <= 10_000 && maximumPoint <= headroom) {
-                commitOutput(setAdjustments, (curve) => ({ ...curve, peakNits: value }));
+                commitOutput((curve) => ({ ...curve, peakNits: value }));
               }
             }}
           />

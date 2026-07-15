@@ -9,6 +9,14 @@ export interface BatchAutoAdjustSelectionIdentity {
   path: string;
 }
 
+export type BatchAutoAdjustSessionSource = 'cache' | 'cold-load';
+
+export interface BatchAutoAdjustSuccessorBaseline {
+  adjustments: Adjustments;
+  identity: BatchAutoAdjustSelectionIdentity;
+  source: BatchAutoAdjustSessionSource;
+}
+
 export interface BatchAutoAdjustPersistenceCompensationInput {
   barrierPersisted: boolean;
   captured: BatchAutoAdjustSelectionIdentity;
@@ -34,6 +42,26 @@ export const shouldCompensateBatchAutoAdjustPersistence = ({
 
 export type SelectedBatchAutoAdjustDisposition = 'apply-selected' | 'commit-target-only' | 'reject-stale';
 
+export interface BatchAutoAdjustHydrationProtection {
+  sessionId: string;
+  transactionId: string;
+}
+
+export const resolveBatchAutoAdjustHydrationProtection = ({
+  captured,
+  current,
+  result,
+}: {
+  captured: BatchAutoAdjustSelectionIdentity;
+  current: BatchAutoAdjustSelectionIdentity | null;
+  result: BatchAutoAdjustPathResultV1;
+}): BatchAutoAdjustHydrationProtection | null =>
+  (result.status === 'applied' || result.status === 'no_op') &&
+  result.path === captured.path &&
+  current?.path === captured.path
+    ? { sessionId: current.imageSessionId, transactionId: result.receipt.transactionId }
+    : null;
+
 export const selectedBatchAutoAdjustDisposition = (
   captured: BatchAutoAdjustSelectionIdentity,
   current: BatchAutoAdjustSelectionIdentity | null,
@@ -48,11 +76,15 @@ export const resolveBatchAutoAdjustAcceptanceIdentity = ({
   capturedAdjustments,
   current,
   currentAdjustments,
+  currentSource = null,
+  successorBaseline = null,
 }: {
   captured: BatchAutoAdjustSelectionIdentity;
   capturedAdjustments: Adjustments;
   current: BatchAutoAdjustSelectionIdentity | null;
   currentAdjustments: Adjustments | null;
+  currentSource?: BatchAutoAdjustSessionSource | null;
+  successorBaseline?: BatchAutoAdjustSuccessorBaseline | null;
 }): BatchAutoAdjustSelectionIdentity | null => {
   if (current === null || currentAdjustments === null || current.path !== captured.path) return null;
   if (
@@ -61,7 +93,15 @@ export const resolveBatchAutoAdjustAcceptanceIdentity = ({
   ) {
     return current;
   }
-  return areAdjustmentsEqual(currentAdjustments, capturedAdjustments) ? current : null;
+  if (areAdjustmentsEqual(currentAdjustments, capturedAdjustments)) return current;
+  return successorBaseline !== null &&
+    currentSource === successorBaseline.source &&
+    current.path === successorBaseline.identity.path &&
+    current.imageSessionId === successorBaseline.identity.imageSessionId &&
+    current.adjustmentRevision === successorBaseline.identity.adjustmentRevision &&
+    areAdjustmentsEqual(currentAdjustments, successorBaseline.adjustments)
+    ? current
+    : null;
 };
 
 interface SelectedBatchAutoAdjustInput {

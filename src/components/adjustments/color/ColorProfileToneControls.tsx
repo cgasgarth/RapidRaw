@@ -2,6 +2,7 @@ import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useCameraInputEditCommit } from '../../../hooks/editor/useCameraInputEditCommit';
 import { useCameraProfileRegistry } from '../../../hooks/editor/useCameraProfileRegistry';
 import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
 import type { RawDevelopmentReport } from '../../../schemas/imageLoaderSchemas';
@@ -12,7 +13,6 @@ import {
   DEFAULT_PARAMETRIC_CURVE,
   INITIAL_ADJUSTMENTS,
 } from '../../../utils/adjustments';
-import { applyCameraProfileIdentity } from '../../../utils/color/profile/cameraProfileBrowserRuntime';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
@@ -43,6 +43,7 @@ export const ColorProfileToneControls = ({
   setAdjustments,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
+  const { commitCameraInput, commitIdentity } = useCameraInputEditCommit();
   const profileRegistry = useCameraProfileRegistry(rawDevelopmentReport?.cameraProfile.cameraModel ?? null);
   const profileToneLabels = getProfileToneLabels(adjustments, t);
   const isModified =
@@ -82,10 +83,10 @@ export const ColorProfileToneControls = ({
     : null;
 
   const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
-    setAdjustments((previous) => applyCameraProfileIdentity(previous, cameraProfile));
+    commitCameraInput({ cameraProfile });
   };
   const handleCameraProfileAmountChange = (cameraProfileAmount: number) => {
-    setAdjustments((previous) => ({ ...previous, cameraProfileAmount }));
+    commitCameraInput({ cameraProfileAmount });
   };
 
   const handleToneCurveChange = (toneCurve: ToneCurveId) => {
@@ -116,6 +117,9 @@ export const ColorProfileToneControls = ({
     <section
       className="border-b border-editor-border pb-1.5"
       data-camera-profile={adjustments.cameraProfile}
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
       data-runtime-profile-status={runtimeProfileStatus}
       data-testid="profile-tone-controls"
       data-tone-curve={adjustments.toneCurve}

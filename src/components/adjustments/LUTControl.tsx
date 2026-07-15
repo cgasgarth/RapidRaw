@@ -92,12 +92,14 @@ export default function LUTControl({
 
           {lutName && (
             <button
+              aria-label={t('ui.lut.clearLut')}
               onClick={onClear}
               className="flex items-center justify-center rounded bg-editor-panel-raised p-0.5 hover:bg-editor-selected-quiet
                          w-0 ml-0 opacity-0 group-hover:w-6 group-hover:ml-0 group-hover:opacity-100
                          overflow-hidden pointer-events-none group-hover:pointer-events-auto
                          transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
               data-tooltip={t('ui.lut.clearLut')}
+              data-testid="lut-control-clear"
               type="button"
             >
               <X size={14} />

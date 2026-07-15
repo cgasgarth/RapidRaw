@@ -429,7 +429,7 @@ export default function CurveGraph(props: CurveGraphProps) {
       {domain === 'legacy' ? (
         <LegacyCurveGraph {...props} />
       ) : (
-        <TypedCurveEditor adjustments={props.adjustments} domain={domain} setAdjustments={props.setAdjustments} />
+        <TypedCurveEditor adjustments={props.adjustments} domain={domain} />
       )}
     </div>
   );

@@ -1,4 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import {
+  hasMaterialRenderSizeChange,
+  RENDER_SIZE_SETTLE_MS,
+  type RenderSize,
+  RenderSizePublicationQueue,
+} from '../../utils/renderSizePublication';
+
+export type { RenderSize } from '../../utils/renderSizePublication';
 
 export interface ImageDimensions {
   height: number;
@@ -12,24 +20,7 @@ export interface BaseRenderSize extends ImageDimensions {
   offsetY: number;
 }
 
-export interface RenderSize {
-  height: number;
-  offsetX: number;
-  offsetY: number;
-  scale: number;
-  width: number;
-}
-
 const DEFAULT_SIZE: RenderSize = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
-
-const preserveEqualRenderSize = (current: RenderSize, next: RenderSize): RenderSize =>
-  current.width === next.width &&
-  current.height === next.height &&
-  current.scale === next.scale &&
-  current.offsetX === next.offsetX &&
-  current.offsetY === next.offsetY
-    ? current
-    : next;
 
 export const resolveImageRenderSize = (
   containerSize: ImageDimensions,
@@ -65,26 +56,46 @@ export const useImageRenderSize = (
   imageDimensions: ImageDimensions | null,
 ) => {
   const [renderSize, setRenderSize] = useState<RenderSize>(DEFAULT_SIZE);
-  const renderSizeRef = useRef(renderSize);
+  const publicationQueueRef = useRef<RenderSizePublicationQueue | null>(null);
+  const publicationQueue = publicationQueueRef.current ?? new RenderSizePublicationQueue(DEFAULT_SIZE);
+  publicationQueueRef.current = publicationQueue;
   const imgWidth = imageDimensions?.width;
   const imgHeight = imageDimensions?.height;
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    const commitRenderSize = (next: RenderSize) => {
-      const resolved = preserveEqualRenderSize(renderSizeRef.current, next);
-      if (resolved === renderSizeRef.current) return;
-      renderSizeRef.current = resolved;
-      setRenderSize(resolved);
+    let publicationFrame: number | null = null;
+    let publicationTimer: number | null = null;
+    const flushPublication = () => {
+      publicationFrame = null;
+      publicationTimer = null;
+      const next = publicationQueue.flush();
+      if (next !== null) setRenderSize(next);
+    };
+    const schedulePublication = (next: RenderSize) => {
+      publicationQueue.observe(next);
+      if (hasMaterialRenderSizeChange(publicationQueue.snapshot(), next)) {
+        if (publicationTimer !== null) window.clearTimeout(publicationTimer);
+        publicationTimer = null;
+        publicationFrame ??= window.requestAnimationFrame(flushPublication);
+        return;
+      }
+      if (publicationFrame !== null) window.cancelAnimationFrame(publicationFrame);
+      publicationFrame = null;
+      if (publicationTimer !== null) window.clearTimeout(publicationTimer);
+      publicationTimer = window.setTimeout(flushPublication, RENDER_SIZE_SETTLE_MS);
     };
 
     if (!container || !imgWidth || !imgHeight) {
-      commitRenderSize(DEFAULT_SIZE);
-      return;
+      schedulePublication(DEFAULT_SIZE);
+      return () => {
+        if (publicationFrame !== null) window.cancelAnimationFrame(publicationFrame);
+        if (publicationTimer !== null) window.clearTimeout(publicationTimer);
+      };
     }
 
     const updateSize = () => {
-      commitRenderSize(
+      schedulePublication(
         resolveImageRenderSize(
           { height: container.clientHeight, width: container.clientWidth },
           { height: imgHeight, width: imgWidth },
@@ -102,8 +113,10 @@ export const useImageRenderSize = (
 
     return () => {
       resizeObserver.disconnect();
+      if (publicationFrame !== null) window.cancelAnimationFrame(publicationFrame);
+      if (publicationTimer !== null) window.clearTimeout(publicationTimer);
     };
-  }, [containerRef, imgWidth, imgHeight]);
+  }, [containerRef, imgWidth, imgHeight, publicationQueue]);
 
   return renderSize;
 };
