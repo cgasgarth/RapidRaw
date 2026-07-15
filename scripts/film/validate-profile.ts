@@ -7,21 +7,39 @@ import {
   filmAnalyticVectorSetV1Schema,
   filmNativeAnalyticReportV1Schema,
   filmNativeStochasticOpticalReportV1Schema,
+  filmReleaseApprovalV1Schema,
   filmValidationFixtureV1Schema,
 } from '../../packages/rawengine-schema/src/index.ts';
 import {
+  buildFilmOutputGamutReport,
+  evaluateFilmBaselineApprovalGate,
   evaluateFilmNativeReleaseGate,
+  evaluateFilmOutputGamutGate,
   evaluateFilmStochasticOpticalReleaseGate,
 } from '../../src/utils/film-look/filmReleaseGate.ts';
 
 const root = resolve(import.meta.dir, '../..');
 const manifestPath = resolve(root, 'fixtures/film/validation/reference-film-validation-manifest-v1.json');
+const approvalPath = resolve(root, 'fixtures/film/validation/reference-film-release-approval-v1.json');
 const args = Bun.argv.slice(2);
 const profile = args[args.indexOf('--profile') + 1];
+const nativeProofReceiptIndex = args.indexOf('--native-proof-receipt-sha256');
+const nativeProofReceiptSha256 = nativeProofReceiptIndex >= 0 ? args[nativeProofReceiptIndex + 1] : undefined;
+const productionFilmPixelsChanged = args.includes('--production-film-pixels-changed');
 if (profile !== 'rapidraw.reference_film.v1') throw new Error('Only the governed reference Film profile is available.');
 if (!args.includes('--public-fixtures')) throw new Error('Refusing to run without --public-fixtures.');
 
 const fixture = filmValidationFixtureV1Schema.parse(JSON.parse(await readFile(manifestPath, 'utf8')));
+const storedApproval = filmReleaseApprovalV1Schema.parse(JSON.parse(await readFile(approvalPath, 'utf8')));
+const approval = filmReleaseApprovalV1Schema.parse({
+  ...storedApproval,
+  releasePolicy: {
+    ...storedApproval.releasePolicy,
+    nativeProofReceiptSha256: nativeProofReceiptSha256 ?? storedApproval.releasePolicy.nativeProofReceiptSha256,
+    productionFilmPixelsChanged:
+      productionFilmPixelsChanged || storedApproval.releasePolicy.productionFilmPixelsChanged,
+  },
+});
 if (!fixture.source.publicRepoAllowed || fixture.proofLevel !== 'analytic_numeric')
   throw new Error('Film release gate requires a public analytic fixture.');
 const vectorPath = resolve(root, fixture.source.pathOrPrivateRef);
@@ -78,9 +96,15 @@ if (!result.passed) throw new Error(`Film release gate failed: ${result.failures
 const stochasticOpticalResult = evaluateFilmStochasticOpticalReleaseGate(fixture, stochasticOpticalReport);
 if (!stochasticOpticalResult.passed)
   throw new Error(`Film stochastic/optical release gate failed: ${stochasticOpticalResult.failures.join(',')}`);
+const outputGamutReport = await buildFilmOutputGamutReport(fixture, nativeReport);
+const outputGamutResult = evaluateFilmOutputGamutGate(fixture, nativeReport, outputGamutReport);
+if (!outputGamutResult.passed)
+  throw new Error(`Film output gamut gate failed: ${outputGamutResult.failures.join(',')}`);
+const baselineResult = evaluateFilmBaselineApprovalGate(fixture, nativeReport, stochasticOpticalReport, approval);
+if (!baselineResult.passed) throw new Error(`Film baseline approval gate failed: ${baselineResult.failures.join(',')}`);
 
 console.error(
-  `film release gate ok (${fixture.id}; ${String(nativeReport.samples.length)} vectors; production grain + optical subset; post-Film AP1)`,
+  `film release gate ok (${fixture.id}; ${String(nativeReport.samples.length)} vectors; colorimetric + sRGB/P3 gamut; production grain + optical subset; approved post-Film AP1)`,
 );
 console.log(
   JSON.stringify({
@@ -90,6 +114,11 @@ console.log(
     grainDensityVarianceRatio: stochasticOpticalResult.densityVarianceRatio,
     grainDeterministicHash: stochasticOpticalReport.grain.deterministicHash,
     maxIdentityDeltaE00: result.maxIdentityDeltaE00,
+    maxReferenceDeltaE00: result.maxReferenceDeltaE00,
+    outputGamutHashes: Object.fromEntries(
+      outputGamutReport.targets.map(({ outputHash, target }) => [target, outputHash]),
+    ),
+    approvalCommit: approval.approval.approvalCommit,
     opticalSupportedSubset: stochasticOpticalReport.optical.supportedSubset,
     postFilmHash: nativeReport.deterministicHash,
     profile,
