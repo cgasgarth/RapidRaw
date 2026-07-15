@@ -188,6 +188,14 @@ export interface PreviewSchedulingInputSnapshot {
   readonly ready: boolean;
 }
 
+export interface PreviewInvalidationRequest {
+  readonly displayGeneration: number;
+  readonly reason: 'display-generation-changed' | 'scope-recovery-requested';
+  readonly requestId: number | null;
+  readonly sessionFingerprint: string;
+  readonly targetResolution: number;
+}
+
 export interface PreviewTransitionReceipt {
   event: PreviewCoordinatorEvent['type'];
   operationId?: number;
@@ -202,6 +210,8 @@ export interface PreviewCoordinatorState {
   interactive: PreviewOperationState;
   interactionGeneration: number;
   interactionActive: boolean;
+  invalidationSourceFingerprint: string | null;
+  handledScopeRecoveryRequestId: number | null;
   lastTransition: PreviewTransitionReceipt | null;
   nextOperationId: number;
   original: PreviewOperationState;
@@ -217,6 +227,7 @@ export interface PreviewCoordinatorState {
 }
 
 export type PreviewCoordinatorEffect =
+  | { type: 'capture-invalidation'; invalidation: PreviewInvalidationRequest; scopeRecovery: boolean }
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'clear-original'; reason: string }
   | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
@@ -230,6 +241,7 @@ export type PreviewCoordinatorEvent =
   | { type: 'cancel-session'; reason?: string }
   | { type: 'display-generation-changed'; generation: number }
   | { type: 'image-session-installed'; session: PreviewSessionIdentity }
+  | { type: 'invalidation-source-installed'; scopeRecoveryRequestId: number; session: PreviewSessionIdentity }
   | { type: 'interaction-ended'; settledIdentity?: PreviewSessionIdentity }
   | { type: 'interaction-started' }
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
@@ -237,6 +249,12 @@ export type PreviewCoordinatorEvent =
   | { type: 'original-preview-cleared'; reason: string }
   | { type: 'operation-started'; identity: PreviewOperationIdentity }
   | { type: 'quality-decision-changed'; quality: PreviewQualitySnapshot }
+  | {
+      type: 'preview-invalidation-captured';
+      inputs: PreviewSchedulingInputSnapshot;
+      invalidation: PreviewInvalidationRequest;
+    }
+  | { type: 'preview-invalidation-requested'; invalidation: PreviewInvalidationRequest }
   | { type: 'scheduling-inputs-changed'; inputs: PreviewSchedulingInputSnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
   | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
@@ -256,6 +274,8 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     interactive: idleOperation(),
     interactionGeneration: 1,
     interactionActive: false,
+    invalidationSourceFingerprint: null,
+    handledScopeRecoveryRequestId: null,
     lastTransition: null,
     nextOperationId: 1,
     original: idleOperation(),
@@ -409,6 +429,26 @@ const sameSchedulingSource = (a: PreviewSessionIdentity, b: PreviewSessionIdenti
   a.sourceImagePath === b.sourceImagePath &&
   a.sourceRevision === b.sourceRevision;
 
+const fingerprintInvalidationSource = (session: PreviewSessionIdentity): string =>
+  JSON.stringify({
+    imageSessionId: session.imageSessionId,
+    sourceImagePath: session.sourceImagePath,
+    sourceRevision: session.sourceRevision,
+  });
+
+const sameInvalidationAuthority = (current: PreviewSessionIdentity, captured: PreviewSessionIdentity): boolean =>
+  current.adjustmentRevision === captured.adjustmentRevision &&
+  current.backend === captured.backend &&
+  current.displayGeneration === captured.displayGeneration &&
+  current.geometryRevision === captured.geometryRevision &&
+  current.graphRevision === captured.graphRevision &&
+  current.imageSessionId === captured.imageSessionId &&
+  current.maskRevision === captured.maskRevision &&
+  current.patchRevision === captured.patchRevision &&
+  current.proofRevision === captured.proofRevision &&
+  current.sourceImagePath === captured.sourceImagePath &&
+  current.sourceRevision === captured.sourceRevision;
+
 const clearScheduledOriginal = (
   state: PreviewCoordinatorState,
   effects: PreviewCoordinatorEffect[],
@@ -437,6 +477,101 @@ export function reducePreviewCoordinator(
 ): PreviewCoordinatorTransition {
   let state = input;
   const effects: PreviewCoordinatorEffect[] = [];
+
+  if (event.type === 'invalidation-source-installed') {
+    const installedSession = previewSessionIdentitySchema.parse(event.session);
+    const scopeRecoveryRequestId = revisionSchema.parse(event.scopeRecoveryRequestId);
+    const sourceFingerprint = fingerprintInvalidationSource(installedSession);
+    const installed = reducePreviewCoordinator(state, {
+      session: installedSession,
+      type: 'image-session-installed',
+    });
+    state = {
+      ...installed.state,
+      handledScopeRecoveryRequestId:
+        sourceFingerprint === state.invalidationSourceFingerprint
+          ? state.handledScopeRecoveryRequestId
+          : scopeRecoveryRequestId,
+      invalidationSourceFingerprint: sourceFingerprint,
+    };
+    return {
+      effects: installed.effects,
+      state: withReceipt(state, event, 'invalidation-source-installed'),
+    };
+  }
+
+  if (event.type === 'preview-invalidation-requested') {
+    const invalidation: PreviewInvalidationRequest = {
+      ...event.invalidation,
+      displayGeneration: positiveRevisionSchema.parse(event.invalidation.displayGeneration),
+      requestId: event.invalidation.requestId === null ? null : revisionSchema.parse(event.invalidation.requestId),
+      targetResolution: positiveRevisionSchema.parse(event.invalidation.targetResolution),
+    };
+    const currentSession = state.session;
+    if (
+      currentSession === null ||
+      fingerprintPreviewSessionIdentity(currentSession) !== invalidation.sessionFingerprint
+    ) {
+      return { effects, state: withReceipt(state, event, 'preview-invalidation-stale') };
+    }
+
+    if (invalidation.reason === 'scope-recovery-requested') {
+      if (
+        invalidation.requestId === null ||
+        (state.handledScopeRecoveryRequestId !== null && invalidation.requestId <= state.handledScopeRecoveryRequestId)
+      ) {
+        return { effects, state: withReceipt(state, event, 'scope-recovery-duplicate') };
+      }
+      state = { ...state, handledScopeRecoveryRequestId: invalidation.requestId };
+    } else {
+      if (invalidation.requestId !== null || invalidation.displayGeneration <= state.displayGeneration) {
+        return { effects, state: withReceipt(state, event, 'display-generation-stale') };
+      }
+      const invalidated = reducePreviewCoordinator(state, {
+        generation: invalidation.displayGeneration,
+        type: 'display-generation-changed',
+      });
+      state = invalidated.state;
+      effects.push(...invalidated.effects);
+    }
+
+    effects.push({
+      invalidation,
+      scopeRecovery: invalidation.reason === 'scope-recovery-requested',
+      type: 'capture-invalidation',
+    });
+    return { effects, state: withReceipt(state, event, 'preview-invalidation-current') };
+  }
+
+  if (event.type === 'preview-invalidation-captured') {
+    const invalidation = event.invalidation;
+    const currentSession = state.session;
+    const capturedSession = schedulingSession(event.inputs);
+    const displayAdjustedSession =
+      currentSession === null ? null : { ...currentSession, displayGeneration: state.displayGeneration };
+    const tokenCurrent =
+      currentSession !== null &&
+      state.displayGeneration === invalidation.displayGeneration &&
+      fingerprintPreviewSessionIdentity(currentSession) === invalidation.sessionFingerprint &&
+      (invalidation.reason !== 'scope-recovery-requested' ||
+        state.handledScopeRecoveryRequestId === invalidation.requestId);
+    if (
+      !tokenCurrent ||
+      capturedSession === null ||
+      displayAdjustedSession === null ||
+      !sameInvalidationAuthority(displayAdjustedSession, capturedSession)
+    ) {
+      return { effects, state: withReceipt(state, event, 'captured-invalidation-stale') };
+    }
+    const scheduled = reducePreviewCoordinator(state, {
+      inputs: event.inputs,
+      type: 'scheduling-inputs-changed',
+    });
+    return {
+      effects: scheduled.effects,
+      state: withReceipt(scheduled.state, event, 'captured-invalidation-scheduled'),
+    };
+  }
 
   if (event.type === 'scheduling-inputs-changed') {
     const inputs = event.inputs;
@@ -585,6 +720,8 @@ export function reducePreviewCoordinator(
     state = {
       ...state,
       desired: null,
+      handledScopeRecoveryRequestId: null,
+      invalidationSourceFingerprint: null,
       interactive: idleOperation(),
       original: idleOperation(),
       schedulingInputs: null,
