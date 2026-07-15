@@ -9,6 +9,7 @@ import {
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentNodeEnvelopeV2Schema,
+  editDocumentPerceptualGradingV2Schema,
   editDocumentPointColorV2Schema,
   editDocumentSceneCurveV2Schema,
   editDocumentSourceArtifactsV2Schema,
@@ -85,9 +86,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                           ...(descriptor?.defaultParams ?? {}),
                           ...mappedParams,
                         })
-                      : nodeType === 'layers'
-                        ? { masks: [], ...mappedParams }
-                        : mappedParams;
+                      : nodeType === 'perceptual_grading'
+                        ? editDocumentPerceptualGradingV2Schema.parse({
+                            ...(descriptor?.defaultParams ?? {}),
+                            ...mappedParams,
+                          })
+                        : nodeType === 'layers'
+                          ? { masks: [], ...mappedParams }
+                          : mappedParams;
       return [
         nodeType,
         {
@@ -111,6 +117,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'detail_denoise_dehaze',
       'display_creative',
       'geometry',
+      'perceptual_grading',
       'point_color',
       'scene_curve',
       'tone_equalizer',

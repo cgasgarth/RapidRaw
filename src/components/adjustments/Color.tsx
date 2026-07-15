@@ -341,6 +341,7 @@ export default function ColorPanel({
           <ColorGradingControls
             adjustments={adjustments}
             appSettings={appSettings}
+            isForMask={isForMask}
             onDragStateChange={onDragStateChange}
             setAdjustments={setAdjustments}
           />
