@@ -315,12 +315,7 @@ export default function Editor({
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
   const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
-  const viewportInteractionControllerRef = useRef<ReturnType<typeof createViewerViewportInteractionController> | null>(
-    null,
-  );
-  if (viewportInteractionControllerRef.current === null) {
-    viewportInteractionControllerRef.current = createViewerViewportInteractionController();
-  }
+  const [viewportInteractionController] = useState(createViewerViewportInteractionController);
   const [isTemporaryHand, setIsTemporaryHand] = useState(false);
   const [isViewerGestureDragging, setIsViewerGestureDragging] = useState(false);
   const [viewportLayoutEpoch, setViewportLayoutEpoch] = useState(0);
@@ -1031,7 +1026,7 @@ export default function Editor({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         applyViewportTransition(
-          viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+          viewportInteractionController.dispatch(getViewportInteractionContext(), {
             reason: 'escape',
             type: 'cancel',
           }),
@@ -1042,7 +1037,7 @@ export default function Editor({
       if (!shouldActivateTemporaryHand({ focusContext, key: event.key })) return;
       event.preventDefault();
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           active: true,
           type: 'temporary-hand',
         }),
@@ -1051,7 +1046,7 @@ export default function Editor({
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key !== ' ') return;
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           active: false,
           type: 'temporary-hand',
         }),
@@ -1059,7 +1054,7 @@ export default function Editor({
     };
     const handleWindowBlur = () =>
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           reason: 'blur',
           type: 'cancel',
         }),
@@ -1073,7 +1068,7 @@ export default function Editor({
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
       window.removeEventListener('blur', handleWindowBlur);
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           reason: 'unmount',
           type: 'cancel',
         }),
@@ -1088,7 +1083,7 @@ export default function Editor({
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           altKey: e.altKey,
           clientX: e.clientX,
           clientY: e.clientY,
@@ -1117,7 +1112,7 @@ export default function Editor({
       if (declaredPointerOwner === 'active-tool' && e.pointerType !== 'touch' && e.button !== 1 && !isTemporaryHand)
         return;
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
-      const transition = viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+      const transition = viewportInteractionController.dispatch(getViewportInteractionContext(), {
         button: e.button,
         clientX: e.clientX,
         clientY: e.clientY,
@@ -1135,7 +1130,7 @@ export default function Editor({
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           button: e.button,
           clientX: e.clientX,
           clientY: e.clientY,
@@ -1151,7 +1146,7 @@ export default function Editor({
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      const transition = viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+      const transition = viewportInteractionController.dispatch(getViewportInteractionContext(), {
         button: e.button,
         clientX: e.clientX,
         clientY: e.clientY,
@@ -1171,7 +1166,7 @@ export default function Editor({
   const handlePointerCancel = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           pointerId: e.pointerId,
           type: 'pointercancel',
         }),
@@ -1183,7 +1178,7 @@ export default function Editor({
   const handleLostPointerCapture = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       applyViewportTransition(
-        viewportInteractionControllerRef.current!.dispatch(getViewportInteractionContext(), {
+        viewportInteractionController.dispatch(getViewportInteractionContext(), {
           pointerId: e.pointerId,
           type: 'lostpointercapture',
         }),
@@ -1298,7 +1293,7 @@ export default function Editor({
     if (contextChanged) {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       if (physicsFrameId.current) cancelAnimationFrame(physicsFrameId.current);
-      const cancellation = viewportInteractionControllerRef.current!.synchronize({
+      const cancellation = viewportInteractionController.synchronize({
         ...getViewportInteractionContext(),
         geometryEpoch: viewportLayoutEpochRef.current + 1,
       });
