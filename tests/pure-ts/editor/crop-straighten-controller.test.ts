@@ -3,7 +3,9 @@ import type { Crop, PercentCrop } from 'react-image-crop';
 import {
   type CropStraightenCleanupReason,
   type CropStraightenSessionIdentity,
+  createCropGeometryOverlayDescriptor,
   createCropStraightenController,
+  cropStraightenPointFromSurface,
   initialCropStraightenControllerState,
   reduceCropStraightenController,
   resolveStraightenCorrection,
@@ -193,5 +195,48 @@ describe('crop straighten controller', () => {
     });
     expect(stale.ignored).toBeTrue();
     expect(stale.commands).toEqual([]);
+  });
+
+  test('maps canonical surface input to centered crop-local geometry across DPR/layout scaling', () => {
+    const point = cropStraightenPointFromSurface(
+      {
+        altKey: false,
+        button: 0,
+        clientX: 700,
+        clientY: 450,
+        ctrlKey: false,
+        metaKey: false,
+        pointerId: 4,
+        pointerType: 'touch',
+        pressure: 0.5,
+        shiftKey: false,
+        surfaceRect: { height: 800, layoutHeight: 400, layoutWidth: 800, width: 1600, x: 100, y: 50 },
+        type: 'pointermove',
+      },
+      { height: 200, width: 600 },
+    );
+    expect(point).toEqual({ x: 200, y: 100 });
+  });
+
+  test('publishes exact source/session identity with the same geometry as the straighten line', () => {
+    const session = straightenSession();
+    const controller = createCropStraightenController();
+    controller.dispatch({ session, type: 'session-installed' });
+    const started = controller.dispatch({
+      identity: session,
+      point: { x: 10, y: 20 },
+      pointerId: 9,
+      renderSize: { height: 200, width: 300 },
+      rotationDegrees: 0,
+      type: 'pointer-started',
+    });
+    const descriptor = createCropGeometryOverlayDescriptor(session, { height: 200, width: 300 }, started.overlay);
+    expect(descriptor).toMatchObject({
+      geometryEpoch: 7,
+      renderSize: { height: 200, width: 300 },
+      sessionKey: session,
+      straightenLine: { geometryEpoch: 7, start: { x: 10, y: 20 } },
+      tool: 'straighten',
+    });
   });
 });

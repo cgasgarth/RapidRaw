@@ -1,6 +1,7 @@
 import type { ViewerActiveTool, ViewerFocusContext, ViewerGestureOwner } from './viewerInputResolver';
 import {
   createViewerInputRouter,
+  isViewerSurfacePointerEvent,
   normalizeViewerPointerType,
   type ViewerInputRouterTransition,
   type ViewerSurfaceInputEvent,
@@ -20,6 +21,7 @@ export interface ViewerInteractionContext {
   readonly imageSessionId: string;
   readonly isTemporaryHand: boolean;
   readonly pointerCount: number;
+  readonly sourceIdentity: string;
   readonly sourceRevision: string;
   readonly toolId: ViewerToolId;
   readonly zoomed: boolean;
@@ -46,13 +48,14 @@ export interface ViewerInteractionCoordinator {
 
 type SessionIdentity = Pick<
   ViewerInteractionContext,
-  'activeTool' | 'geometryEpoch' | 'imageSessionId' | 'sourceRevision' | 'toolId'
+  'activeTool' | 'geometryEpoch' | 'imageSessionId' | 'sourceIdentity' | 'sourceRevision' | 'toolId'
 >;
 
 const sameSessionIdentity = (left: SessionIdentity, right: SessionIdentity): boolean =>
   left.activeTool === right.activeTool &&
   left.geometryEpoch === right.geometryEpoch &&
   left.imageSessionId === right.imageSessionId &&
+  left.sourceIdentity === right.sourceIdentity &&
   left.sourceRevision === right.sourceRevision &&
   left.toolId === right.toolId;
 
@@ -90,6 +93,7 @@ export const createViewerInteractionCoordinator = (): ViewerInteractionCoordinat
       activeTool: context.activeTool,
       geometryEpoch: context.geometryEpoch,
       imageSessionId: context.imageSessionId,
+      sourceIdentity: context.sourceIdentity,
       sourceRevision: context.sourceRevision,
       toolId: context.toolId,
     };
@@ -98,9 +102,30 @@ export const createViewerInteractionCoordinator = (): ViewerInteractionCoordinat
   };
 
   const dispatch = (event: ViewerSurfaceInputEvent, context: ViewerInteractionContext): ViewerInteractionTransition => {
-    synchronize(context);
+    const targetTool = event.targetTool;
+    const sessionTool = toolSessions.active()?.key.toolId;
+    const effectiveTool = targetTool ?? sessionTool;
+    const effectiveActiveTool: ViewerActiveTool =
+      effectiveTool === undefined || effectiveTool === 'pan' || effectiveTool === 'viewer-sampler'
+        ? context.activeTool
+        : effectiveTool;
+    const effectiveContext: ViewerInteractionContext =
+      effectiveTool === undefined
+        ? context
+        : { ...context, activeTool: effectiveActiveTool, toolId: resolveViewerToolId(effectiveTool) };
+    synchronize(effectiveContext);
 
-    if (!('pointerId' in event)) {
+    if (!isViewerSurfacePointerEvent(event)) {
+      if (event.type === 'doubleclick' || event.type === 'keydown') {
+        const input = inputRouter.dispatch({ type: event.type });
+        return {
+          ...snapshot(),
+          forwardToTool: true,
+          input,
+          shouldCapturePointer: false,
+          toolCommand: null,
+        };
+      }
       const input = inputRouter.dispatch({ type: event.type });
       const toolCommand = toolSessions.invalidate();
       return {
@@ -118,14 +143,14 @@ export const createViewerInteractionCoordinator = (): ViewerInteractionCoordinat
         ? inputRouter.dispatch({
             type: 'pointerdown',
             input: {
-              activeTool: context.activeTool,
+              activeTool: effectiveContext.activeTool,
               button: event.button,
-              focusContext: context.focusContext,
+              focusContext: effectiveContext.focusContext,
               isDragging: false,
-              isTemporaryHand: context.isTemporaryHand,
-              pointerCount: context.pointerCount,
+              isTemporaryHand: effectiveContext.isTemporaryHand,
+              pointerCount: effectiveContext.pointerCount,
               pointerType: sample.pointerType,
-              zoomed: context.zoomed,
+              zoomed: effectiveContext.zoomed,
             },
             pointerId: event.pointerId,
             sample,
@@ -141,13 +166,15 @@ export const createViewerInteractionCoordinator = (): ViewerInteractionCoordinat
       input.state.owner !== 'blocked'
     ) {
       operationGeneration += 1;
+      const sessionToolId = input.state.owner === 'viewer-pan' ? 'pan' : effectiveContext.toolId;
       toolCommand = toolSessions.begin(
         {
-          geometryEpoch: context.geometryEpoch,
-          imageSessionId: context.imageSessionId,
+          geometryEpoch: effectiveContext.geometryEpoch,
+          imageSessionId: effectiveContext.imageSessionId,
           operationGeneration,
-          sourceRevision: context.sourceRevision,
-          toolId: context.toolId,
+          sourceIdentity: effectiveContext.sourceIdentity,
+          sourceRevision: effectiveContext.sourceRevision,
+          toolId: sessionToolId,
         },
         event.pointerId,
         input.state.owner,

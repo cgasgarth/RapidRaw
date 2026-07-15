@@ -38,6 +38,7 @@ export const useViewerInteractionController = ({
     context.activeTool,
     context.geometryEpoch,
     context.imageSessionId,
+    context.sourceIdentity,
     context.sourceRevision,
     context.toolId,
     coordinator,
@@ -69,6 +70,11 @@ export const useViewerInteractionController = ({
     },
     [coordinator],
   );
+  useEffect(() => {
+    const handleWindowBlur = () => handleInputEvent({ type: 'blur' });
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, [handleInputEvent]);
   const shouldCapturePointer = useCallback((pointerId: number) => {
     const capture = pointerCaptureRef.current;
     return capture?.pointerId === pointerId && capture.shouldCapture;

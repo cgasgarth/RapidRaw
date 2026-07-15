@@ -1,11 +1,41 @@
-import type { FocusEvent, HTMLAttributes, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import {
+  type FocusEvent,
+  type HTMLAttributes,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  useRef,
+} from 'react';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
+import type { ViewerActiveTool } from './viewerInputResolver';
 import {
   normalizeViewerSurfacePointerEvent,
   type ViewerSurfaceInputEvent,
   type ViewerSurfacePointerEvent,
 } from './viewerInputRouter';
+
+const viewerTargetTool = (target: EventTarget | null): ViewerActiveTool | undefined => {
+  if (!(target instanceof Element)) return undefined;
+  const value = target.closest<HTMLElement>('[data-viewer-input-tool]')?.dataset['viewerInputTool'];
+  if (
+    value === 'brush' ||
+    value === 'compare-divider' ||
+    value === 'crop' ||
+    value === 'focus-retouch' ||
+    value === 'mask' ||
+    value === 'none' ||
+    value === 'object-prompt' ||
+    value === 'point-color' ||
+    value === 'retouch' ||
+    value === 'straighten' ||
+    value === 'tone-equalizer' ||
+    value === 'white-balance'
+  )
+    return value;
+  return undefined;
+};
 
 /**
  * Presentation-only boundary for the editor viewer.
@@ -51,6 +81,7 @@ export function ViewerSurface({
   onPointerMove,
   onPointerUp,
   onLostPointerCapture,
+  onDoubleClick,
   onBlur,
   onKeyDown,
   presentation,
@@ -58,8 +89,11 @@ export function ViewerSurface({
   tabIndex,
   ...props
 }: ViewerSurfaceProps) {
+  const lastPointerTargetToolRef = useRef<ViewerActiveTool | undefined>(undefined);
   const dispatchPointerEvent = (event: PointerEvent<HTMLDivElement>, type: ViewerSurfacePointerEvent['type']): void => {
     const rect = event.currentTarget.getBoundingClientRect();
+    const targetTool = viewerTargetTool(event.target);
+    if (type === 'pointerdown') lastPointerTargetToolRef.current = targetTool;
     onInputEvent?.(
       normalizeViewerSurfacePointerEvent({
         altKey: event.altKey,
@@ -80,11 +114,16 @@ export function ViewerSurface({
           x: rect.x,
           y: rect.y,
         },
+        ...(targetTool === undefined ? {} : { targetTool }),
         type,
       }),
     );
   };
-  const dispatchSemanticEvent = (type: 'blur' | 'escape'): void => onInputEvent?.({ type });
+  const dispatchSemanticEvent = (type: 'blur' | 'doubleclick' | 'escape', target: EventTarget | null): void => {
+    const targetTool =
+      viewerTargetTool(target) ?? (type === 'doubleclick' ? lastPointerTargetToolRef.current : undefined);
+    onInputEvent?.({ ...(targetTool === undefined ? {} : { targetTool }), type });
+  };
   const a11y = viewerSurfaceA11yAttributes({ role, tabIndex });
   return (
     <div
@@ -112,13 +151,25 @@ export function ViewerSurface({
         onLostPointerCapture?.(event);
       }}
       onBlur={(event: FocusEvent<HTMLDivElement>) => {
-        dispatchSemanticEvent('blur');
+        dispatchSemanticEvent('blur', event.target);
         onBlur?.(event);
+      }}
+      onDoubleClick={(event: MouseEvent<HTMLDivElement>) => {
+        dispatchSemanticEvent('doubleclick', event.target);
+        onDoubleClick?.(event);
       }}
       onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          dispatchSemanticEvent('escape');
+          dispatchSemanticEvent('escape', event.target);
+        } else {
+          const targetTool = viewerTargetTool(event.target);
+          onInputEvent?.({
+            key: event.key,
+            shiftKey: event.shiftKey,
+            ...(targetTool === undefined ? {} : { targetTool }),
+            type: 'keydown',
+          });
         }
         onKeyDown?.(event);
       }}

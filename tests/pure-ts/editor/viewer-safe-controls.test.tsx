@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { CompareOverlay } from '../../../src/components/panel/editor/CompareOverlay.tsx';
+import { createCompareDividerOverlayDescriptor } from '../../../src/components/panel/editor/compareDividerInteractionController.ts';
 import en from '../../../src/i18n/locales/en.json';
 
 const i18n = i18next.createInstance();
@@ -19,14 +20,21 @@ await i18n.use(initReactI18next).init({
 const imageRect = { height: 400, offsetX: 20, offsetY: 10, scale: 0.1, width: 600 };
 const compareProps = {
   canShowOriginalCompare: true,
-  compareDividerPosition: 0.5,
   compareLabelsVisible: true,
   compareOrientation: 'vertical' as const,
   compareOverlayDisabled: false,
+  descriptor: createCompareDividerOverlayDescriptor({
+    active: true,
+    geometryEpoch: 4,
+    imageRect,
+    imageSessionId: 'image-session:viewer-safe-controls',
+    orientation: 'vertical',
+    position: 0.5,
+    sourceIdentity: '/fixture/a.raw',
+    sourceRevision: 'graph:4',
+  }),
   editedImageRect: imageRect,
   isCompareModeActive: true,
-  onDividerPositionChange: () => undefined,
-  onDividerReset: () => undefined,
   originalImageRect: imageRect,
   originalStatus: 'ready' as const,
 };

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   type CompareDividerCurrentContext,
   type CompareDividerPointerSample,
+  compareDividerPointerSampleFromSurface,
   createCompareDividerInteractionController,
   createCompareDividerOverlayDescriptor,
   resolveCompareDividerPointerPosition,
@@ -127,5 +128,46 @@ describe('compare divider interaction controller', () => {
       sessionFingerprint: '["image-session:12:a","/private/image-a.arw","graph:9",4,"vertical",true,"compare-divider"]',
       zOrder: 'viewer-hud',
     });
+  });
+
+  test('maps canonical surface coordinates through layout scaling into the descriptor image geometry', () => {
+    const current = context({ imageRect: { height: 300, offsetX: 25, offsetY: 50, scale: 1, width: 600 } });
+    const sample = compareDividerPointerSampleFromSurface(
+      {
+        altKey: false,
+        button: 0,
+        clientX: 450,
+        clientY: 300,
+        ctrlKey: false,
+        metaKey: false,
+        pointerId: 17,
+        pointerType: 'pen',
+        pressure: 0.7,
+        shiftKey: false,
+        surfaceRect: { height: 800, layoutHeight: 400, layoutWidth: 800, width: 1600, x: 0, y: 0 },
+        type: 'pointerdown',
+      },
+      current.imageRect,
+    );
+    expect(sample).toEqual({
+      clientX: 450,
+      clientY: 300,
+      imageBounds: { height: 600, left: 50, top: 100, width: 1200 },
+      pointerId: 17,
+      pointerType: 'pen',
+    });
+    expect(sample === null ? null : resolveCompareDividerPointerPosition('vertical', sample)).toBeCloseTo(1 / 3, 8);
+    expect(createCompareDividerOverlayDescriptor(current).geometry.left).toBe(325);
+  });
+
+  test('blur and Escape tear down the exact active gesture idempotently', () => {
+    for (const type of ['blur', 'escape'] as const) {
+      const controller = createCompareDividerInteractionController();
+      controller.dispatch(context(), { ...pointer(2, 'touch'), type: 'pointerdown' });
+      expect(controller.isActive()).toBeTrue();
+      expect(controller.dispatch(context(), { type })).toEqual([]);
+      expect(controller.isActive()).toBeFalse();
+      expect(controller.dispatch(context(), { ...pointer(2, 'touch'), type: 'pointermove' })).toEqual([]);
+    }
   });
 });

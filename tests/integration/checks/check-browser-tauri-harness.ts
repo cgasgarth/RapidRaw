@@ -318,6 +318,7 @@ async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void
 
 async function verifyCompareDividerController(page: Page): Promise<void> {
   const divider = page.getByTestId('editor-compare-split-divider');
+  const surface = page.getByTestId('image-canvas');
   const box = await divider.boundingBox();
   if (box === null) throw new Error('Compare divider did not expose browser geometry.');
   const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -335,6 +336,11 @@ async function verifyCompareDividerController(page: Page): Promise<void> {
   const keyboardValue = Number(await divider.getAttribute('aria-valuenow'));
   if (keyboardValue !== mouseValue + 10) {
     throw new Error(`Keyboard compare-divider command was not semantic: ${String(keyboardValue)}.`);
+  }
+  await divider.dblclick();
+  const resetValue = Number(await divider.getAttribute('aria-valuenow'));
+  if (resetValue !== 50) {
+    throw new Error(`Double-click did not dispatch the semantic compare-divider reset: ${String(resetValue)}.`);
   }
 
   const cdp = await page.context().newCDPSession(page);
@@ -363,14 +369,14 @@ async function verifyCompareDividerController(page: Page): Promise<void> {
   if (!Number.isFinite(touchValue) || touchValue <= keyboardValue) {
     throw new Error(`Touch compare-divider command did not move right: ${String(touchValue)}.`);
   }
-  const capturedPointerId = await divider.evaluate((element) => {
+  const capturedPointerId = await surface.evaluate((element) => {
     for (let pointerId = 1; pointerId <= 32; pointerId += 1) {
       if (element.hasPointerCapture(pointerId)) return pointerId;
     }
     return null;
   });
-  if (capturedPointerId === null) throw new Error('Touch compare-divider gesture did not capture its pointer.');
-  await divider.evaluate((element, pointerId) => element.releasePointerCapture(pointerId), capturedPointerId);
+  if (capturedPointerId === null) throw new Error('Canonical viewer router did not capture the touch pointer.');
+  await surface.evaluate((element, pointerId) => element.releasePointerCapture(pointerId), capturedPointerId);
   await touchMove(touchCenter.x + 120, touchCenter.y);
   if (Number(await divider.getAttribute('aria-valuenow')) !== touchValue) {
     throw new Error('Compare divider continued mutating after lost pointer capture.');
