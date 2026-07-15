@@ -103,9 +103,9 @@ use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_loader::{composite_patches_on_image, load_base_image_from_bytes};
 use crate::image_processing::{
-    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_flip, apply_srgb_to_linear, downscale_f32_image, get_or_init_gpu_context,
-    process_and_get_dynamic_image, resolve_tonemapper_override_from_handle, warp_image_geometry,
+    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_flip, apply_srgb_to_linear,
+    downscale_f32_image, get_or_init_gpu_context, process_and_get_dynamic_image,
+    resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{
@@ -692,87 +692,6 @@ fn compile_consumer_render_plan(
         lut,
     )
     .map_err(|error| error.to_string())
-}
-
-fn validate_original_preview_source(expected: &str, loaded: &str) -> Result<(), String> {
-    if loaded == expected {
-        Ok(())
-    } else {
-        Err(format!(
-            "stale_original_preview_source: expected {} but loaded {}",
-            expected, loaded
-        ))
-    }
-}
-
-#[tauri::command]
-fn generate_original_transformed_preview(
-    js_adjustments: serde_json::Value,
-    expected_image_path: String,
-    target_resolution: Option<u32>,
-    viewer_sample_graph_revision: Option<String>,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("No original image loaded")?;
-    validate_original_preview_source(&expected_image_path, &loaded_image.path)?;
-
-    let mut adjustments_clone = js_adjustments;
-    hydrate_adjustments(&state, &mut adjustments_clone);
-
-    let mut image_for_preview = loaded_image.image.as_ref().clone();
-    if loaded_image.is_raw {
-        apply_cpu_default_raw_processing(&mut image_for_preview);
-    }
-
-    let (transformed_full_res, _unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(&image_for_preview), &adjustments_clone);
-
-    let settings = load_settings_or_default(&app_handle);
-    let default_dim = settings.editor_preview_resolution.unwrap_or(1920);
-    let preview_dim = target_resolution.unwrap_or(default_dim);
-
-    let (w, h) = transformed_full_res.dimensions();
-    let transformed_image = if w > preview_dim || h > preview_dim {
-        downscale_f32_image(transformed_full_res.as_ref(), preview_dim, preview_dim)
-    } else {
-        transformed_full_res.into_owned()
-    };
-
-    if let Some(graph_revision) = viewer_sample_graph_revision {
-        let graph_hash = crate::render::artifact_identity::stable_hash(&graph_revision);
-        let mut artifact_identity =
-            crate::render::artifact_identity::RenderArtifactIdentity::source_geometry(
-                &loaded_image.artifact_source,
-                state.load_image_generation.load(Ordering::SeqCst) as u64,
-                graph_hash,
-                loaded_image.artifact_source.source_fingerprint(),
-                calculate_geometry_hash(&adjustments_clone),
-                transformed_image.width(),
-                transformed_image.height(),
-            );
-        artifact_identity.color_domain =
-            crate::render::artifact_identity::ArtifactColorDomain::ViewEncoded;
-        artifact_identity.completed_stage = "original-view";
-        let frame = CachedViewerSampleFrame {
-            artifact_identity,
-            graph_revision,
-            pixels: SampleablePixels::native(Arc::new(transformed_image.clone())),
-            image_identity: loaded_image.path,
-            space_label: "Original · Display encoded sRGB".to_string(),
-        };
-        state
-            .services
-            .viewer_sampling
-            .publish(ViewerSampleCacheSlot::Original, frame);
-    }
-
-    encode_jpeg_data_url(&transformed_image, 80)
 }
 
 // Transitional helper retained for existing native tests while the command now
@@ -2222,7 +2141,7 @@ pub fn run() {
             resolve_export_soft_proof_transform_metadata,
             app::commands::path_preview::generate_preview_for_path,
             app::commands::negative_lab_dust::analyze_negative_lab_dust_spots,
-            generate_original_transformed_preview,
+            app::commands::original_preview::generate_original_transformed_preview,
             app::commands::viewer_sampling::sample_viewer_pixel,
             generate_preset_preview,
             app::commands::uncropped_preview::generate_uncropped_preview,
@@ -2520,22 +2439,6 @@ mod tests {
     fn preview_dispatch_accepts_the_expected_loaded_image() {
         assert!(
             validate_expected_preview_image("/photos/alaska-a.ARW", "/photos/alaska-a.ARW").is_ok()
-        );
-    }
-
-    #[test]
-    fn original_preview_rejects_a_stale_loaded_source() {
-        let error =
-            validate_original_preview_source("/photos/alaska-a.ARW", "/photos/alaska-b.ARW")
-                .expect_err("original compare must not render B for an A operation");
-
-        assert_eq!(
-            error,
-            "stale_original_preview_source: expected /photos/alaska-a.ARW but loaded /photos/alaska-b.ARW"
-        );
-        assert!(
-            validate_original_preview_source("/photos/alaska-a.ARW", "/photos/alaska-a.ARW")
-                .is_ok()
         );
     }
 

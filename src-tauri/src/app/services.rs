@@ -120,8 +120,7 @@ pub struct AppServices {
         Arc<crate::library::catalog_indexing_service::CatalogIndexingService>,
     pub(crate) thumbnails:
         Arc<crate::library::thumbnail_generation_service::ThumbnailGenerationService>,
-    pub(crate) uncropped_preview:
-        Arc<crate::app::commands::uncropped_preview::UncroppedPreviewService>,
+    pub(crate) preview_session: Arc<crate::app::commands::uncropped_preview::PreviewSessionService>,
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
@@ -147,7 +146,7 @@ impl AppServices {
             import_jobs: Arc::default(),
             catalog_indexing: Arc::default(),
             thumbnails: Arc::default(),
-            uncropped_preview: Arc::default(),
+            preview_session: Arc::default(),
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
             viewer_sampling: Arc::new(
