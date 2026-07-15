@@ -39,7 +39,8 @@ pub fn get_or_init_gpu_context(
     #[cfg(target_os = "windows")]
     let app_handle = _app_handle;
 
-    let context_service = &state.services.gpu_context;
+    let gpu = state.gpu();
+    let context_service = gpu.context();
     if let Some(context) = context_service.context_snapshot() {
         return Ok(context);
     }
@@ -57,7 +58,7 @@ pub fn get_or_init_gpu_context(
         instance_desc.backends = wgpu::Backends::PRIMARY;
     }
 
-    let _crash_marker = state.services.gpu_crash_marker.begin_initialization();
+    let _crash_marker = gpu.begin_initialization();
 
     let instance = wgpu::Instance::new(instance_desc);
 
@@ -183,7 +184,7 @@ pub fn get_or_init_gpu_context(
 pub fn get_or_init_compute_gpu_context_for_tests(
     state: &tauri::State<AppState>,
 ) -> Result<GpuContext, String> {
-    let context_service = &state.services.gpu_context;
+    let context_service = state.gpu().context();
     if let Some(context) = context_service.context_snapshot() {
         return Ok(context);
     }

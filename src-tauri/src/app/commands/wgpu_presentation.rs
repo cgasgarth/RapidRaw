@@ -3,8 +3,6 @@
 //! The command layer only narrows `AppState` to the GPU/presentation service;
 //! mailbox synchronization and sequencing remain owned by the scheduler.
 
-use std::sync::Arc;
-
 use tauri::State;
 
 use crate::AppState;
@@ -62,11 +60,7 @@ pub(crate) async fn flush_wgpu_presentation(
     sequence: u64,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let presentation = state
-        .services
-        .gpu_context
-        .context_snapshot()
-        .map(|context| Arc::clone(&context.presentation));
+    let presentation = state.gpu().presentation_snapshot();
     match presentation {
         Some(presentation) => presentation.flush(sequence).await,
         None => Ok(()),
@@ -77,22 +71,14 @@ pub(crate) async fn flush_wgpu_presentation(
 pub(crate) fn get_wgpu_presentation_report(
     state: State<'_, AppState>,
 ) -> Option<PresentationSchedulerReport> {
-    state
-        .services
-        .gpu_context
-        .context_snapshot()
-        .map(|context| context.presentation.report())
+    state.gpu().presentation_report()
 }
 
 #[tauri::command]
 pub(crate) fn get_gpu_pipeline_report(
     state: State<'_, AppState>,
 ) -> Option<crate::gpu::pipeline_registry::GpuPipelineReport> {
-    state
-        .services
-        .gpu_context
-        .context_snapshot()
-        .map(|context| context.pipeline_registry.report())
+    state.gpu().pipeline_report()
 }
 
 #[cfg(test)]
@@ -153,5 +139,69 @@ mod tests {
             assert_eq!(transform.rect, [10.0, 20.0, 800.0, 600.0]);
             assert!(transform.pixelated);
         }
+    }
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+mod ipc_tests {
+    use super::*;
+    use serde_json::{Value, json};
+    use tauri::{ipc::InvokeBody, webview::InvokeRequest};
+
+    fn invoke(
+        webview: &tauri::WebviewWindow<tauri::test::MockRuntime>,
+        command: &str,
+        body: Value,
+        callback: u32,
+    ) -> Value {
+        tauri::test::get_ipc_response(
+            webview,
+            InvokeRequest {
+                cmd: command.into(),
+                callback: tauri::ipc::CallbackFn(callback),
+                error: tauri::ipc::CallbackFn(callback + 1),
+                url: "tauri://localhost".parse().unwrap(),
+                body: InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.to_string(),
+            },
+        )
+        .unwrap_or_else(|error| panic!("{command} IPC failed: {error}"))
+        .deserialize()
+        .unwrap()
+    }
+
+    #[test]
+    fn production_report_and_flush_commands_use_gpu_capability_without_a_context() {
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .invoke_handler(tauri::generate_handler![
+                flush_wgpu_presentation,
+                get_wgpu_presentation_report,
+                get_gpu_pipeline_report,
+            ])
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            invoke(&webview, "get_wgpu_presentation_report", json!({}), 0),
+            Value::Null
+        );
+        assert_eq!(
+            invoke(&webview, "get_gpu_pipeline_report", json!({}), 2),
+            Value::Null
+        );
+        assert_eq!(
+            invoke(
+                &webview,
+                "flush_wgpu_presentation",
+                json!({ "sequence": 17 }),
+                4,
+            ),
+            Value::Null
+        );
     }
 }

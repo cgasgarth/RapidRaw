@@ -10,25 +10,18 @@ import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
 import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
-import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
+import { getEditorZoomDpr } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
 import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
-import {
-  createPreviewQualityPolicy,
-  fingerprintPreviewRoi,
-  PreviewCoordinator,
-  type PreviewCoordinatorEffect,
-  type PreviewCoordinatorEvent,
-  resolvePreviewViewportRoi,
-} from '../../utils/previewCoordinator';
+import { PreviewCoordinatorRuntime } from '../../utils/previewCoordinatorRuntime';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
 import { PreviewInvalidationEffectRunner } from '../../utils/previewInvalidationEffectRunner';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
 import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
-import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
+import { PreviewViewportQualityController } from '../../utils/previewViewportQualityController';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
@@ -44,6 +37,7 @@ export function useImageProcessing() {
   const displaySize = useEditorStore((state) => state.displaySize);
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const previewViewportTransform = useEditorStore((state) => state.previewViewportTransform);
+  const zoomMode = useEditorStore((state) => state.zoomMode);
   const originalSize = useEditorStore((state) => state.originalSize);
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
   const committedAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
@@ -87,60 +81,32 @@ export function useImageProcessing() {
         : undefined,
     [appSettings?.exportPresets, exportSoftProofRecipeId, isExportSoftProofEnabled],
   );
-  const previewQualityControllerRef = useRef(createPreviewQualityPolicy());
+  const previewQualityControllerRef = useRef<PreviewViewportQualityController | null>(null);
+  const previewQualityController =
+    previewQualityControllerRef.current ?? new PreviewViewportQualityController(previewNow);
+  previewQualityControllerRef.current = previewQualityController;
   const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
     getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
   );
   const [analyticsListenerReady, setAnalyticsListenerReady] = useState(false);
-  const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
-  const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
-  previewCoordinatorRef.current = previewCoordinator;
+  const previewRuntimeRef = useRef<PreviewCoordinatorRuntime | null>(null);
+  const previewRuntime =
+    previewRuntimeRef.current ??
+    new PreviewCoordinatorRuntime({
+      isUrlProtected: (url) => globalImageCache.isProtected(url),
+      publishSurface: (update) => useEditorStore.getState().setEditor(update),
+    });
+  previewRuntimeRef.current = previewRuntime;
   const previewRequestScopeAdapterRef = useRef<PreviewRequestScopeAdapter | null>(null);
   const previewRequestScopeAdapter =
     previewRequestScopeAdapterRef.current ??
     new PreviewRequestScopeAdapter({
-      getDisplayGeneration: () => previewCoordinator.snapshot().displayGeneration,
+      getDisplayGeneration: () => previewRuntime.snapshot().displayGeneration,
     });
   previewRequestScopeAdapterRef.current = previewRequestScopeAdapter;
-  const previewUrlReleaseAuthorityRef = useRef<PreviewUrlReleaseAuthority | null>(null);
-  const previewUrlReleaseAuthority =
-    previewUrlReleaseAuthorityRef.current ??
-    new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) });
-  previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
-  const previewInvalidationRunnerRef = useRef<PreviewInvalidationEffectRunner | null>(null);
-  const previewAnalyticsRunnerRef = useRef<PreviewAnalyticsEffectRunner | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
-  const schedulingEffectExecutorRef = useRef<((effect: PreviewCoordinatorEffect) => void) | null>(null);
-
-  const dispatchPreviewCoordinator = useCallback(
-    (event: PreviewCoordinatorEvent) => {
-      const previous = previewCoordinator.snapshot();
-      const transition = previewCoordinator.dispatch(event);
-      previewAnalyticsRunnerRef.current?.consume(transition.effects);
-      editedPreviewRunnerRef.current?.consume(transition.effects);
-      previewInvalidationRunnerRef.current?.consume(transition.effects);
-      originalPreviewRunnerRef.current?.consume(transition.effects);
-      for (const effect of transition.effects) {
-        schedulingEffectExecutorRef.current?.(effect);
-        if (effect.type === 'clear-original') {
-          setEditor({ transformedOriginalUrl: null });
-          continue;
-        }
-        if (effect.type !== 'publish') continue;
-        if (effect.identity.kind === 'settled') {
-          setEditor({ finalPreviewUrl: effect.artifact.url, presentedPreviewArtifact: effect.artifact });
-        } else if (effect.identity.kind === 'interactive') {
-          setEditor({ presentedPreviewArtifact: effect.artifact });
-        } else if (effect.identity.kind === 'original') {
-          setEditor({ transformedOriginalUrl: effect.artifact.url });
-        }
-      }
-      previewUrlReleaseAuthority.consume(previous, transition);
-      return transition;
-    },
-    [previewCoordinator, previewUrlReleaseAuthority, setEditor],
-  );
+  const dispatchPreviewCoordinator = previewRuntime.dispatch;
   const previewAnalyticsRunner = useMemo(
     () =>
       new PreviewAnalyticsEffectRunner({
@@ -157,20 +123,18 @@ export function useImageProcessing() {
       }),
     [dispatchPreviewCoordinator, setEditor],
   );
-  previewAnalyticsRunnerRef.current = previewAnalyticsRunner;
   const previewInvalidationRunner = useMemo(
     () =>
       new PreviewInvalidationEffectRunner({
         dispatch: dispatchPreviewCoordinator,
-        getState: () => previewCoordinator.snapshot(),
+        getState: () => previewRuntime.snapshot(),
       }),
-    [dispatchPreviewCoordinator, previewCoordinator],
+    [dispatchPreviewCoordinator, previewRuntime],
   );
-  previewInvalidationRunnerRef.current = previewInvalidationRunner;
   const previewPresentationAdapter = useMemo(
     () =>
       new PreviewPresentationAdapter({
-        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getCoordinatorState: () => previewRuntime.snapshot(),
         getPresentationState: () => {
           const editor = useEditorStore.getState();
           return {
@@ -179,24 +143,24 @@ export function useImageProcessing() {
           };
         },
         publish: setEditor,
-        recordTiming: (sample) => previewQualityControllerRef.current.record(sample),
+        recordTiming: (sample) => previewQualityController.record(sample),
       }),
-    [previewCoordinator, setEditor],
+    [previewQualityController, previewRuntime, setEditor],
   );
   const previewMaterializationAdapter = useMemo(
     () =>
       new PreviewMaterializationAdapter({
-        releaseUrl: (url) => previewUrlReleaseAuthority.release(url),
+        releaseUrl: (url) => previewRuntime.releaseUnpresentedUrl(url),
       }),
-    [previewUrlReleaseAuthority],
+    [previewRuntime],
   );
   const previewFailureAdapter = useMemo(
     () =>
       new PreviewFailureAdapter({
-        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getCoordinatorState: () => previewRuntime.snapshot(),
         publish: setEditor,
       }),
-    [previewCoordinator, setEditor],
+    [previewRuntime, setEditor],
   );
 
   const originalPreviewRunner =
@@ -245,16 +209,40 @@ export function useImageProcessing() {
       },
       releaseMaterialized: (result) => {
         if (result.value.kind === 'patch' || result.value.kind === 'full') {
-          previewUrlReleaseAuthority.release(result.value.url);
+          previewRuntime.releaseUnpresentedUrl(result.value.url);
         }
       },
     });
   editedPreviewRunnerRef.current = editedPreviewRunner;
 
-  const calculateROI = useCallback((): PreviewRoi | null => {
-    const roi = resolvePreviewViewportRoi(baseRenderSize, previewViewportTransform);
-    return roi === null ? null : [...roi];
-  }, [baseRenderSize, previewViewportTransform]);
+  const previewViewportQuality = useMemo(
+    () =>
+      previewQualityController.snapshot({
+        baseRenderSize,
+        crop: adjustments.crop,
+        devicePixelRatio,
+        enableZoomHifi: appSettings?.enableZoomHifi ?? true,
+        highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1,
+        orientationSteps: adjustments.orientationSteps,
+        originalSize,
+        previewResolution: appSettings?.editorPreviewResolution || 1920,
+        transform: previewViewportTransform,
+        zoomMode,
+      }),
+    [
+      adjustments.crop,
+      adjustments.orientationSteps,
+      appSettings?.editorPreviewResolution,
+      appSettings?.enableZoomHifi,
+      appSettings?.highResZoomMultiplier,
+      baseRenderSize,
+      devicePixelRatio,
+      originalSize,
+      previewQualityController,
+      previewViewportTransform,
+      zoomMode,
+    ],
+  );
 
   const capturePreviewRequestScope = useCallback(
     (targetResolution: number, roi: PreviewRoi | null) => {
@@ -269,11 +257,6 @@ export function useImageProcessing() {
     (requestedTargetResolution: number, interacting: boolean) => {
       const editor = useEditorStore.getState();
       const settings = useSettingsStore.getState().appSettings;
-      const sourceSize = getEditorZoomSourceSize({
-        crop: editor.adjustments.crop,
-        orientationSteps: editor.adjustments.orientationSteps,
-        originalSize: editor.originalSize,
-      });
       const backend = settings?.useWgpuRenderer !== false && editor.hasRenderedFirstFrame ? 'wgpu' : 'cpu';
       const operationClass: PreviewOperationClass =
         activeRightPanel === Panel.Crop
@@ -281,26 +264,15 @@ export function useImageProcessing() {
           : activeRightPanel === Panel.Masks || editor.adjustments.masks.length > 0
             ? 'mask'
             : 'standard';
-      const semanticZoom =
-        editor.zoomMode.kind === 'fit'
-          ? 'fit'
-          : editor.zoomMode.kind === 'ratio' && editor.zoomMode.devicePixelsPerImagePixel >= 1
-            ? 'inspection'
-            : 'viewport';
-      if (interacting) previewQualityControllerRef.current.noteInput(previewNow());
-      return previewQualityControllerRef.current.decide({
+      return previewQualityController.decide({
         backend,
-        devicePixelRatio,
         interacting,
         operationClass,
         requestedTargetResolution,
-        semanticZoom,
-        sourceHeight: sourceSize.height,
-        sourceWidth: sourceSize.width,
-        visibleRoi: calculateROI(),
+        viewport: previewViewportQuality,
       });
     },
-    [activeRightPanel, calculateROI, devicePixelRatio],
+    [activeRightPanel, previewQualityController, previewViewportQuality],
   );
   const previewRequestIntentAdapter = useMemo(
     () =>
@@ -357,8 +329,8 @@ export function useImageProcessing() {
   }, []);
 
   useEffect(() => {
-    previewQualityControllerRef.current.reset();
-  }, [selectedImage?.path]);
+    previewQualityController.reset();
+  }, [previewQualityController, selectedImage?.path]);
 
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
@@ -374,68 +346,25 @@ export function useImageProcessing() {
     [selectedImage?.isReady],
   );
 
-  const calculateTargetRes = useCallback(() => {
-    const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
-    if (!(appSettings?.enableZoomHifi ?? true) || baseRenderSize.width === 0) {
-      return baseTargetRes;
-    }
+  const calculatedTargetResolution = previewViewportQuality.requestedTargetResolution;
+  const calculatedRoiFingerprint = previewViewportQuality.roiFingerprint;
 
-    const sharpnessFactor = 1.25;
-    const zoomMultiplier = appSettings?.highResZoomMultiplier || 1.0;
-    const sourceSize = getEditorZoomSourceSize({
-      crop: adjustments.crop,
-      orientationSteps: adjustments.orientationSteps,
-      originalSize,
-    });
-    const resolvedZoom = resolveEditorZoom({
-      devicePixelRatio,
-      mode: useEditorStore.getState().zoomMode,
-      renderSize: {
-        height: baseRenderSize.height,
-        scale: baseRenderSize.width / Math.max(sourceSize.width, 1),
-        width: baseRenderSize.width,
-      },
-      sourceSize,
-      viewportSize: { height: baseRenderSize.containerHeight, width: baseRenderSize.containerWidth },
-    });
-
-    let targetRes = Math.max(baseTargetRes, resolvedZoom.requiredPreviewResolution * sharpnessFactor * zoomMultiplier);
-    targetRes = Math.max(targetRes, 512);
-
-    if (originalSize.width > 0 && originalSize.height > 0) {
-      const origMax = Math.max(originalSize.width, originalSize.height);
-      targetRes = Math.min(targetRes, origMax);
-      if (targetRes >= origMax * 0.8) {
-        targetRes = origMax;
+  previewRuntime.installEffectConsumers([
+    (effects) => previewAnalyticsRunner.consume(effects),
+    (effects) => editedPreviewRunner.consume(effects),
+    (effects) => previewInvalidationRunner.consume(effects),
+    (effects) => originalPreviewRunner.consume(effects),
+    (effects) => {
+      for (const effect of effects) {
+        if (effect.type === 'schedule-edited') {
+          previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
+        } else if (effect.type === 'schedule-original') {
+          dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
+          originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
+        }
       }
-    }
-
-    if (targetRes !== Math.max(originalSize.width, originalSize.height)) {
-      targetRes = Math.ceil(targetRes / 256) * 256;
-    }
-
-    return Math.round(targetRes);
-  }, [
-    appSettings?.enableZoomHifi,
-    appSettings?.editorPreviewResolution,
-    appSettings?.highResZoomMultiplier,
-    adjustments.crop,
-    adjustments.orientationSteps,
-    baseRenderSize,
-    devicePixelRatio,
-    originalSize,
+    },
   ]);
-  const calculatedTargetResolution = calculateTargetRes();
-  const calculatedRoiFingerprint = fingerprintPreviewRoi(calculateROI());
-
-  schedulingEffectExecutorRef.current = (effect) => {
-    if (effect.type === 'schedule-edited') {
-      previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
-    } else if (effect.type === 'schedule-original') {
-      dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
-      originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
-    }
-  };
 
   useEffect(() => {
     if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {

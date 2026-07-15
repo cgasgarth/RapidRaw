@@ -10,3 +10,4 @@ pub(crate) mod gpu_readback;
 pub(crate) mod gpu_runtime;
 pub(crate) mod gpu_textures;
 pub(crate) mod pipeline_registry;
+pub(crate) mod runtime_services;

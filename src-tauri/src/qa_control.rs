@@ -254,8 +254,8 @@ fn scheduler_metrics(app_state: &AppState) -> Value {
 
 fn gpu_execution_receipt(app_state: &AppState) -> Value {
     app_state
-        .services
-        .gpu_processing
+        .gpu()
+        .processing()
         .current_processor_snapshot()
         .and_then(|processor| processor.processor.last_execution_receipt())
         .map(|receipt| {

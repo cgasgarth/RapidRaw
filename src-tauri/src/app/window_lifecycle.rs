@@ -232,9 +232,7 @@ fn sync_publication_directory(_directory: &Path) -> Result<(), String> {
 pub(crate) fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     if let tauri::WindowEvent::Resized(size) = event {
         let state = window.state::<AppState>();
-        if let Some(context) = state.services.gpu_context.context_snapshot() {
-            context.presentation.resize(size.width, size.height);
-        }
+        state.gpu().resize_presentation(size.width, size.height);
         #[cfg(target_os = "macos")]
         crate::app::display_target::request_for_state(&state);
     } else if matches!(
