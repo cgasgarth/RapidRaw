@@ -556,6 +556,8 @@ struct DetailDenoiseDehazeV2 {
     local_contrast_midtone_mask: Option<f64>,
     local_contrast_radius_px: Option<f64>,
     sharpness: f64,
+    // Optional only for v2 documents persisted before Sharpness Threshold ownership.
+    sharpness_threshold: Option<f64>,
     structure: Option<f64>,
 }
 
@@ -1436,6 +1438,7 @@ impl DetailDenoiseDehazeV2 {
                 96.0,
             ),
             ("structure", self.structure, -100.0, 100.0),
+            ("sharpnessThreshold", self.sharpness_threshold, 0.0, 80.0),
         ] {
             if value
                 .is_some_and(|value| !value.is_finite() || !(minimum..=maximum).contains(&value))
@@ -2691,7 +2694,8 @@ mod tests {
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
     use crate::render::cpu_edit_graph::{
-        apply_creative_color, apply_hsl_panel, apply_hue_shift, apply_luma_levels,
+        apply_creative_color, apply_hsl_panel, apply_hue_shift, apply_local_contrast,
+        apply_luma_levels,
     };
 
     fn scene_curve_params() -> Value {
@@ -2756,6 +2760,7 @@ mod tests {
             "localContrastRadiusPx": 36,
             "lumaNoiseReduction": 5,
             "sharpness": 24,
+            "sharpnessThreshold": 20,
             "structure": 21
         })
     }
@@ -3307,6 +3312,7 @@ mod tests {
         expected["localContrastHaloGuard"] = json!(62);
         expected["localContrastMidtoneMask"] = json!(44);
         expected["localContrastRadiusPx"] = json!(36);
+        expected["sharpnessThreshold"] = json!(20);
         expected["structure"] = json!(21);
         expected["effectsEnabled"] = json!(true);
         expected["sectionVisibility"] =
@@ -3776,6 +3782,16 @@ mod tests {
             .into_render_adjustments()
             .expect("pre-Deblur v2 document remains compilable");
 
+        let mut pre_threshold = document_with_legacy(json!({ "sharpnessThreshold": 20 }));
+        pre_threshold["nodes"]["detail_denoise_dehaze"]["params"]
+            .as_object_mut()
+            .expect("detail params object")
+            .remove("sharpnessThreshold");
+        serde_json::from_value::<EditDocumentV2>(pre_threshold)
+            .expect("pre-threshold v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-threshold v2 document remains compilable");
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["detail_denoise_dehaze"]["params"]["futureDetail"] = json!(true);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)
@@ -3802,6 +3818,19 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range detail field must fail");
         assert!(error.contains("lumaNoiseReduction"));
+
+        for invalid in [json!(-1), json!(81), json!("high")] {
+            let mut invalid_threshold = document_with_legacy(json!({}));
+            invalid_threshold["nodes"]["detail_denoise_dehaze"]["params"]["sharpnessThreshold"] =
+                invalid;
+            let error = serde_json::from_value::<EditDocumentV2>(invalid_threshold)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("invalid sharpness threshold must fail");
+            assert!(
+                error.contains("sharpnessThreshold") || error.contains("detail_denoise_dehaze")
+            );
+        }
 
         for (field, invalid) in [
             ("deblurSigmaPx", json!(0.44)),
@@ -3833,6 +3862,63 @@ mod tests {
                 .expect_err("invalid local-contrast field must fail");
             assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
         }
+    }
+
+    #[test]
+    fn sharpness_threshold_node_drives_native_pixel_output_with_legacy_parity() {
+        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
+            .expect("valid sharpness-threshold document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("sharpness-threshold document compiles");
+        assert_eq!(compiled["sharpnessThreshold"], json!(20));
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        assert!((adjustments.global.sharpness_threshold - 0.2).abs() <= f32::EPSILON);
+
+        let input = Vec3::splat(0.5);
+        let blurred = Vec3::splat(0.4);
+        let output = apply_local_contrast(
+            input,
+            blurred,
+            adjustments.global.sharpness,
+            true,
+            0,
+            adjustments.global.sharpness_threshold,
+        );
+        assert!(
+            output.distance(input) > 1.0e-4,
+            "node threshold must admit and sharpen the synthetic edge: {output:?}"
+        );
+        let blocked =
+            apply_local_contrast(input, blurred, adjustments.global.sharpness, true, 0, 0.8);
+        assert_eq!(
+            blocked, input,
+            "a higher threshold must reject the same edge"
+        );
+
+        let mut legacy_document = document_with_legacy(json!({ "sharpnessThreshold": 20 }));
+        legacy_document["nodes"]["detail_denoise_dehaze"]["params"]
+            .as_object_mut()
+            .expect("detail params object")
+            .remove("sharpnessThreshold");
+        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
+            .expect("pre-threshold-node v2 document remains parseable");
+        let legacy_compiled = legacy
+            .into_render_adjustments()
+            .expect("legacy sharpness threshold compiles");
+        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
+        let legacy_output = apply_local_contrast(
+            input,
+            blurred,
+            legacy_adjustments.global.sharpness,
+            true,
+            0,
+            legacy_adjustments.global.sharpness_threshold,
+        );
+        assert!(
+            output.distance(legacy_output) <= f32::EPSILON,
+            "node and legacy threshold authority must remain pixel-identical"
+        );
     }
 
     #[test]

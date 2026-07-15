@@ -5,6 +5,7 @@ import {
   EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
@@ -29,6 +30,7 @@ import {
   editDocumentPointColorV2Schema,
   editDocumentSceneCurveV2Schema,
   editDocumentSelectiveColorMixerV2Schema,
+  editDocumentSharpnessThresholdV2Schema,
   editDocumentSourceArtifactsV2Schema,
   editDocumentToneEqualizerV2Schema,
   editDocumentV2Schema,
@@ -44,6 +46,7 @@ const LOCAL_CONTRAST_FIELDS = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELD
 const MANUAL_CHROMATIC_ABERRATION_FIELDS = new Set<string>(EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS);
 const LUMA_LEVELS_FIELDS = new Set<string>(EDIT_DOCUMENT_LUMA_LEVELS_FIELDS);
 const COLOR_PRESENCE_FIELDS = new Set<string>(EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS);
+const SHARPNESS_THRESHOLD_FIELDS = new Set<string>(EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS);
 
 const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (COLOR_PRESENCE_FIELDS.has(key)) {
@@ -65,6 +68,9 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   }
   if (key === 'perspectiveCorrection') {
     return editDocumentPerspectiveCorrectionV2Schema.shape.perspectiveCorrection;
+  }
+  if (SHARPNESS_THRESHOLD_FIELDS.has(key)) {
+    return editDocumentSharpnessThresholdV2Schema.shape.sharpnessThreshold;
   }
   return undefined;
 };
