@@ -36,7 +36,7 @@ import { NegativeConversionModal } from '../../components/modals/negative-lab/Ne
 import BottomBar from '../../components/panel/BottomBar';
 import EditorNavigator, { type EditorTransformController } from '../../components/panel/editor/EditorNavigator';
 import EditorToolbar from '../../components/panel/editor/EditorToolbar';
-import ImageCanvas from '../../components/panel/editor/ImageCanvas';
+import ImageCanvas, { type ViewerToolRuntimeDescriptor } from '../../components/panel/editor/ImageCanvas';
 import ViewerFooter from '../../components/panel/editor/ViewerFooter';
 import type { ViewerInitialMaskDrawCommand } from '../../components/panel/editor/viewerInitialMaskDrawInteractionController';
 import type { ViewerMaskOverlayDescriptor } from '../../components/panel/editor/viewerMaskOverlayController';
@@ -137,6 +137,61 @@ import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmok
 const ignoreInitialMaskDrawCommit = (_command: ViewerInitialMaskDrawCommand): void => {};
 const ignoreParametricMaskTargetCommit = (_command: ViewerParametricMaskTargetCommand): void => {};
 const ignoreRetouchCommand = (_command: ViewerRetouchCommand): void => {};
+
+type VisualToolRuntimeOverrides = Partial<Omit<ViewerToolRuntimeDescriptor, 'commands' | 'compare' | 'crop'>> & {
+  readonly commands?: Partial<ViewerToolRuntimeDescriptor['commands']>;
+  readonly compare?: Partial<ViewerToolRuntimeDescriptor['compare']>;
+  readonly crop?: Partial<ViewerToolRuntimeDescriptor['crop']>;
+};
+
+const visualToolRuntime = (overrides: VisualToolRuntimeOverrides = {}): ViewerToolRuntimeDescriptor => {
+  const { commands = {}, compare = {}, crop = {}, ...runtimeOverrides } = overrides;
+  return {
+    activeAiPatchContainerId: null,
+    activeAiSubMaskId: null,
+    activeMaskContainerId: null,
+    activeMaskId: null,
+    adjustmentGeometryRevision: 1,
+    adjustmentRevision: 0,
+    brushImageSessionId: 'visual-smoke:image-session',
+    brushSettings: null,
+    imageSessionId: null,
+    isAiEditing: false,
+    isMaskControlHovered: false,
+    isMasking: false,
+    isRotationActive: false,
+    ...runtimeOverrides,
+    commands: {
+      commitAiMaskBox: () => undefined,
+      commitBrush: () => undefined,
+      commitInitialMaskDraw: ignoreInitialMaskDrawCommit,
+      commitParametricMaskTarget: ignoreParametricMaskTargetCommit,
+      commitRetouch: ignoreRetouchCommand,
+      commitStraighten: () => undefined,
+      selectAiSubMask: () => undefined,
+      selectMask: () => undefined,
+      setMaskHovered: () => undefined,
+      setMaskTouchInteracting: () => undefined,
+      updateSubMask: () => undefined,
+      ...commands,
+    },
+    compare: {
+      dividerPosition: 0.5,
+      labelsVisible: true,
+      mode: 'off',
+      orientation: 'vertical',
+      ...compare,
+    },
+    crop: {
+      active: false,
+      onChange: () => undefined,
+      onComplete: () => undefined,
+      straightenActive: false,
+      value: null,
+      ...crop,
+    },
+  };
+};
 const visualMaskOverlay = (url: string | null): ViewerMaskOverlayDescriptor => ({
   identity: JSON.stringify({ imageSessionId: 'visual-smoke', status: url === null ? 'none' : 'current' }),
   imageSessionId: 'visual-smoke',
@@ -2468,24 +2523,14 @@ function BrushMaskCanvasVisualSmoke() {
           <div className="grid place-items-center bg-[#0b0d10] p-8">
             <div className="relative h-[360px] w-[640px] overflow-hidden rounded border border-white/10 bg-black">
               <ImageCanvas
-                adjustmentRevision={0}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={brushMaskCanvasContainerId}
-                activeMaskId={brushMaskCanvasSubMaskId}
                 adjustments={adjustments}
                 appSettings={null}
-                brushSettings={brushSettings}
-                brushImageSessionId="editor-image-session:51"
-                crop={null}
                 cursorStyle="crosshair"
                 exportSoftProofRecipeId={null}
                 exportSoftProofTransform={null}
                 finalPreviewUrl={brushMaskCanvasImageDataUrl}
                 gamutWarningOverlay={null}
-                handleCropComplete={() => {}}
                 hasRenderedFirstFrame
-                imageSessionId={null}
                 imageRenderSize={{
                   height: brushMaskCanvasImageHeight,
                   offsetX: 0,
@@ -2493,46 +2538,39 @@ function BrushMaskCanvasVisualSmoke() {
                   scale: 1,
                   width: brushMaskCanvasImageWidth,
                 }}
-                isAiEditing={false}
-                isCropping={false}
                 isExportSoftProofEnabled={false}
-                isMaskControlHovered={false}
-                isMasking
                 isMaxZoom={false}
-                isRotationActive={false}
                 isGamutWarningOverlayVisible={false}
                 isSliderDragging={false}
-                isStraightenActive={false}
                 maskOverlay={visualMaskOverlay(buildBrushMaskCanvasOverlayUrl(activeSubMask))}
-                onAiMaskBoxCommit={() => {}}
-                onBrushCommit={(command) => {
-                  if (
-                    command.key.containerId !== brushMaskCanvasContainerId ||
-                    command.key.maskId !== brushMaskCanvasSubMaskId
-                  ) {
-                    return;
-                  }
-                  setSubMask((current) => ({ ...current, parameters: command.parameters }));
-                  setLivePreview(null);
-                }}
-                onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
-                onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
-                onRetouchCommand={ignoreRetouchCommand}
-                onLiveMaskPreview={(preview) => {
-                  if (isMaskContainer(preview)) setLivePreview(preview);
-                }}
-                onSelectAiSubMask={() => {}}
-                onSelectMask={() => {}}
-                onStraighten={() => {}}
                 selectedImage={brushMaskCanvasImage}
-                setCrop={() => {}}
-                setIsMaskHovered={() => {}}
-                setIsMaskTouchInteracting={() => {}}
                 showOriginal={false}
                 transformState={{ positionX: 0, positionY: 0, scale: 1 }}
                 transformedOriginalUrl={brushMaskCanvasImageDataUrl}
                 uncroppedAdjustedPreviewUrl={brushMaskCanvasImageDataUrl}
-                updateSubMask={updateSubMask}
+                toolRuntime={visualToolRuntime({
+                  activeMaskContainerId: brushMaskCanvasContainerId,
+                  activeMaskId: brushMaskCanvasSubMaskId,
+                  brushImageSessionId: 'editor-image-session:51',
+                  brushSettings,
+                  commands: {
+                    commitBrush: (command) => {
+                      if (
+                        command.key.containerId !== brushMaskCanvasContainerId ||
+                        command.key.maskId !== brushMaskCanvasSubMaskId
+                      ) {
+                        return;
+                      }
+                      setSubMask((current) => ({ ...current, parameters: command.parameters }));
+                      setLivePreview(null);
+                    },
+                    liveMaskPreview: (preview) => {
+                      if (isMaskContainer(preview)) setLivePreview(preview);
+                    },
+                    updateSubMask,
+                  },
+                  isMasking: true,
+                })}
               />
             </div>
           </div>
@@ -2685,60 +2723,43 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
               style={{ maxHeight: 520, maxWidth: 920 }}
             >
               <ImageCanvas
-                adjustmentRevision={0}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={null}
-                activeMaskId={null}
                 adjustments={adjustments}
                 appSettings={null}
-                brushSettings={null}
-                brushImageSessionId="visual-smoke:crop-transform"
-                crop={crop}
                 cursorStyle="default"
                 exportSoftProofRecipeId={null}
                 exportSoftProofTransform={null}
                 finalPreviewUrl={brushMaskCanvasImageDataUrl}
                 gamutWarningOverlay={null}
-                handleCropComplete={(nextCrop: Crop) => {
-                  setCropState(nextCrop);
-                }}
                 hasRenderedFirstFrame
-                imageSessionId="visual-smoke:crop-transform"
                 imageRenderSize={{ height: 405, offsetX: 0, offsetY: 0, scale: 1, width: 720 }}
-                isAiEditing={false}
-                isCropping={true}
                 isExportSoftProofEnabled={false}
                 isGamutWarningOverlayVisible={false}
-                isMaskControlHovered={false}
-                isMasking={false}
                 isMaxZoom={false}
-                isRotationActive={false}
                 isSliderDragging={false}
-                isStraightenActive={isStraightenActive}
                 liveRotation={liveRotation}
                 maskOverlay={visualMaskOverlay(null)}
-                onAiMaskBoxCommit={() => {}}
-                onBrushCommit={() => {}}
-                onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
-                onParametricMaskTargetCommit={ignoreParametricMaskTargetCommit}
-                onRetouchCommand={ignoreRetouchCommand}
-                onSelectAiSubMask={() => {}}
-                onSelectMask={() => {}}
-                onStraighten={() => {}}
                 overlayMode={overlayMode}
                 overlayRotation={overlayRotation}
                 selectedImage={cropTransformSmokeImage}
-                setCrop={(nextCrop: Crop, _percentageCrop: PercentCrop) => {
-                  setCropState(nextCrop);
-                }}
-                setIsMaskHovered={() => {}}
-                setIsMaskTouchInteracting={() => {}}
                 showOriginal={false}
                 transformState={{ positionX: 0, positionY: 0, scale: 1 }}
                 transformedOriginalUrl={brushMaskCanvasImageDataUrl}
                 uncroppedAdjustedPreviewUrl={brushMaskCanvasImageDataUrl}
-                updateSubMask={() => {}}
+                toolRuntime={visualToolRuntime({
+                  brushImageSessionId: 'visual-smoke:crop-transform',
+                  crop: {
+                    active: true,
+                    onChange: (nextCrop: Crop, _percentageCrop: PercentCrop) => {
+                      setCropState(nextCrop);
+                    },
+                    onComplete: (nextCrop: Crop) => {
+                      setCropState(nextCrop);
+                    },
+                    straightenActive: isStraightenActive,
+                    value: crop,
+                  },
+                  imageSessionId: 'visual-smoke:crop-transform',
+                })}
               />
             </div>
           </div>
@@ -2900,43 +2921,28 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
   const brushOverlayUrl = buildBrushMaskCanvasOverlayUrl(professionalCanvasBrushSubMask);
 
   const baseCanvasProps = {
-    adjustmentRevision: 0,
     appSettings: professionalCanvasAppSettings,
-    brushImageSessionId: 'visual-smoke:professional-canvas',
     cursorStyle: 'default',
     exportSoftProofRecipeId: null,
     exportSoftProofTransform: null,
     finalPreviewUrl: brushMaskCanvasImageDataUrl,
     gamutWarningOverlay: null,
-    handleCropComplete: () => {},
     hasRenderedFirstFrame: true,
-    imageSessionId: 'visual-smoke:professional-canvas',
     imageRenderSize,
     isExportSoftProofEnabled: false,
     isGamutWarningOverlayVisible: false,
-    isMaskControlHovered: false,
     isMaxZoom: false,
-    isRotationActive: false,
     isSliderDragging: false,
-    isStraightenActive: false,
     liveRotation: null,
-    onAiMaskBoxCommit: () => {},
-    onBrushCommit: () => {},
-    onInitialMaskDrawCommit: ignoreInitialMaskDrawCommit,
-    onParametricMaskTargetCommit: ignoreParametricMaskTargetCommit,
-    onRetouchCommand: ignoreRetouchCommand,
-    onSelectAiSubMask: () => {},
-    onSelectMask: () => {},
-    onStraighten: () => {},
     selectedImage: brushMaskCanvasImage,
-    setCrop: () => {},
-    setIsMaskHovered: () => {},
-    setIsMaskTouchInteracting: () => {},
     showOriginal: false,
     transformState: { positionX: 0, positionY: 0, scale: 1.35 },
     transformedOriginalUrl: brushMaskCanvasImageDataUrl,
     uncroppedAdjustedPreviewUrl: brushMaskCanvasImageDataUrl,
-    updateSubMask: () => {},
+    toolRuntime: visualToolRuntime({
+      brushImageSessionId: 'visual-smoke:professional-canvas',
+      imageSessionId: 'visual-smoke:professional-canvas',
+    }),
   } satisfies Partial<Parameters<typeof ImageCanvas>[0]>;
 
   return (
@@ -2968,39 +2974,37 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-crop">
               <ImageCanvas
                 {...baseCanvasProps}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={null}
-                activeMaskId={null}
                 adjustments={{ ...INITIAL_ADJUSTMENTS, aspectRatio: 16 / 9 }}
-                brushSettings={null}
-                crop={crop}
                 imageRenderSize={cropRenderSize}
-                isAiEditing={false}
-                isCropping
-                isMasking={false}
                 maskOverlay={visualMaskOverlay(null)}
                 overlayMode="phiGrid"
                 overlayRotation={1}
-                setCrop={(nextCrop: Crop) => {
-                  setCropState(nextCrop);
-                }}
+                toolRuntime={visualToolRuntime({
+                  brushImageSessionId: 'visual-smoke:professional-canvas',
+                  crop: {
+                    active: true,
+                    onChange: (nextCrop: Crop) => {
+                      setCropState(nextCrop);
+                    },
+                    value: crop,
+                  },
+                  imageSessionId: 'visual-smoke:professional-canvas',
+                })}
               />
             </div>
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-mask-brush">
               <ImageCanvas
                 {...baseCanvasProps}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={brushMaskCanvasContainerId}
-                activeMaskId={brushMaskCanvasSubMaskId}
                 adjustments={{ ...INITIAL_ADJUSTMENTS, masks: [brushContainer] }}
-                brushSettings={{ feather: 58, size: 82, tool: ToolType.Brush }}
-                crop={null}
-                isAiEditing={false}
-                isCropping={false}
-                isMasking
                 maskOverlay={visualMaskOverlay(brushOverlayUrl)}
+                toolRuntime={visualToolRuntime({
+                  activeMaskContainerId: brushMaskCanvasContainerId,
+                  activeMaskId: brushMaskCanvasSubMaskId,
+                  brushImageSessionId: 'visual-smoke:professional-canvas',
+                  brushSettings: { feather: 58, size: 82, tool: ToolType.Brush },
+                  imageSessionId: 'visual-smoke:professional-canvas',
+                  isMasking: true,
+                })}
               />
             </div>
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-retouch-remove">
@@ -3023,17 +3027,15 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
               </Button>
               <ImageCanvas
                 {...baseCanvasProps}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={professionalCanvasRetouchLayerId}
-                activeMaskId={professionalCanvasRetouchTargetMaskId}
                 adjustments={retouchAdjustments}
-                brushSettings={null}
-                crop={null}
-                isAiEditing={false}
-                isCropping={false}
-                isMasking
                 maskOverlay={visualMaskOverlay(null)}
+                toolRuntime={visualToolRuntime({
+                  activeMaskContainerId: professionalCanvasRetouchLayerId,
+                  activeMaskId: professionalCanvasRetouchTargetMaskId,
+                  brushImageSessionId: 'visual-smoke:professional-canvas',
+                  imageSessionId: 'visual-smoke:professional-canvas',
+                  isMasking: true,
+                })}
               />
             </div>
             <div
@@ -3095,22 +3097,13 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
             <div className={cardClassName}>
               <ImageCanvas
                 {...baseCanvasProps}
-                activeAiPatchContainerId={null}
-                activeAiSubMaskId={null}
-                activeMaskContainerId={null}
-                activeMaskId={null}
                 adjustments={INITIAL_ADJUSTMENTS}
-                brushSettings={null}
-                crop={null}
                 exportSoftProofRecipeId="professional-canvas-proof"
                 exportSoftProofTransform={professionalCanvasProofTransform}
                 gamutWarningOverlay={professionalCanvasGamutOverlay}
                 imageRenderSize={{ height: 252, offsetX: 0, offsetY: 0, scale: 0.7, width: 448 }}
-                isAiEditing={false}
-                isCropping={false}
                 isExportSoftProofEnabled
                 isGamutWarningOverlayVisible
-                isMasking={false}
                 maskOverlay={visualMaskOverlay(null)}
                 transformState={{ positionX: -42, positionY: 18, scale: 1.6 }}
               />

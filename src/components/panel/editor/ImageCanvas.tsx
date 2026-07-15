@@ -19,7 +19,6 @@ import {
   type EditorOverlayGeometry,
   overlayPoint,
 } from '../../../utils/editorOverlayGeometry';
-import { resolveEditorOverlayBlocker, resolveEditorOverlayVisibility } from '../../../utils/editorOverlayVisibility';
 import {
   advanceRendererHandoff,
   createEditorPresentationDescriptor,
@@ -55,19 +54,7 @@ import { getEdgeFadeStyle, MaskOverlay, OptimizedBrushLine } from './MaskOverlay
 import { type CanvasOverlayStatus, canvasOverlayTokens } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
-import { useCompareDividerController } from './useCompareDividerController';
-import { useCropStraightenController } from './useCropStraightenController';
-import { useViewerAiMaskBoxController } from './useViewerAiMaskBoxController';
-import { useViewerBrushController } from './useViewerBrushController';
-import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
-import { useViewerInitialMaskDrawController } from './useViewerInitialMaskDrawController';
-import { useViewerInteractionController } from './useViewerInteractionController';
-import { useViewerMaskShapeController } from './useViewerMaskShapeController';
-import { useViewerParametricMaskTargetController } from './useViewerParametricMaskTargetController';
-import { useViewerPickerControllers } from './useViewerPickerControllers';
-import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
-import { useViewerSamplerController } from './useViewerSamplerController';
-import { useViewerWhiteBalanceController } from './useViewerWhiteBalanceController';
+import { useViewerToolRuntimeController } from './useViewerToolRuntimeController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
 import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
@@ -82,7 +69,6 @@ import type {
   ViewerInitialMaskDrawCurrentContext,
 } from './viewerInitialMaskDrawInteractionController';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import { type ViewerInteractionContext, viewerInteractionToolId } from './viewerInteractionCoordinator';
 import type { ViewerMaskOverlayDescriptor } from './viewerMaskOverlayController';
 import type { ViewerMaskShapeCurrentContext } from './viewerMaskShapeInteractionController';
 import type {
@@ -146,70 +132,85 @@ export interface ViewerWhiteBalanceRuntimeDescriptor {
   readonly lastReceipt: WhiteBalancePickerRuntimeReceipt | null;
 }
 
+export interface ViewerToolRuntimeDescriptor {
+  readonly activeAiPatchContainerId: string | null;
+  readonly activeAiSubMaskId: string | null;
+  readonly activeMaskContainerId: string | null;
+  readonly activeMaskId: string | null;
+  readonly adjustmentGeometryRevision: number;
+  readonly adjustmentRevision: number;
+  readonly brushImageSessionId: string;
+  readonly brushSettings: BrushSettings | null;
+  readonly commands: {
+    readonly commitAiMaskBox: (command: ViewerAiMaskBoxCommand) => void;
+    readonly commitBrush: (command: ViewerBrushCommitResult) => void;
+    readonly commitInitialMaskDraw: (command: ViewerInitialMaskDrawCommand) => void;
+    readonly commitParametricMaskTarget: (command: ViewerParametricMaskTargetCommand) => void;
+    readonly commitPicker?: (command: ViewerPickerCommitResult) => void;
+    readonly commitRetouch: (command: ViewerRetouchCommand) => void;
+    readonly commitStraighten: (value: number, identity: CropStraightenSessionIdentity) => void;
+    readonly liveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
+    readonly selectAiSubMask: (id: string | null) => void;
+    readonly selectMask: (id: string | null) => void;
+    readonly setMaskHovered: (isHovered: boolean) => void;
+    readonly setMaskTouchInteracting: (isInteracting: boolean) => void;
+    readonly updateSubMask: (
+      id: string | null,
+      subMask: Partial<SubMask>,
+      identity: SubMaskInteractionIdentity,
+    ) => void;
+  };
+  readonly compare: {
+    readonly dividerPosition: number;
+    readonly labelsVisible: boolean;
+    readonly mode: EditorCompareMode;
+    readonly onDividerPositionChange?: (position: number) => void;
+    readonly onDividerReset?: () => void;
+    readonly orientation: EditorCompareOrientation;
+  };
+  readonly crop: {
+    readonly active: boolean;
+    readonly onChange: (crop: Crop, percentCrop: PercentCrop) => void;
+    readonly onComplete: (crop: Crop, percentCrop: PercentCrop, identity: CropStraightenSessionIdentity) => void;
+    readonly onStart?: () => void;
+    readonly straightenActive: boolean;
+    readonly value: Crop | null;
+  };
+  readonly imageSessionId: string | null;
+  readonly input?: { readonly activeTool: ViewerActiveTool; readonly isTemporaryHand: boolean };
+  readonly isAiEditing: boolean;
+  readonly isMaskControlHovered: boolean;
+  readonly isMasking: boolean;
+  readonly isRotationActive: boolean;
+  readonly onSamplerStateChange?: (state: ViewerSamplerState) => void;
+  readonly whiteBalance?: ViewerWhiteBalanceRuntimeDescriptor;
+}
+
 interface ImageCanvasProps {
-  adjustmentRevision: number;
   appSettings: AppSettings | null;
-  activeAiPatchContainerId: string | null;
-  activeAiSubMaskId: string | null;
-  activeMaskContainerId: string | null;
-  activeMaskId: string | null;
   adjustments: Adjustments;
-  adjustmentGeometryRevision?: number;
-  brushImageSessionId: string;
-  brushSettings: BrushSettings | null;
-  crop: Crop | null;
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
   finalPreviewUrl: string | null;
   provisionalPreviewUrl?: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
-  handleCropComplete: (c: Crop, cp: PercentCrop, identity: CropStraightenSessionIdentity) => void;
-  handleCropStart?: () => void;
-  imageSessionId: string | null;
   imageRenderSize: RenderSize;
   originalImageRenderSize?: RenderSize;
   overlayGeometry?: EditorOverlayGeometry;
-  isAiEditing: boolean;
-  isCropping: boolean;
-  isMaskControlHovered: boolean;
-  isMasking: boolean;
   isSliderDragging: boolean;
   isExportSoftProofEnabled: boolean;
   isGamutWarningOverlayVisible: boolean;
-  isStraightenActive: boolean;
-  isRotationActive?: boolean;
   maskOverlay: ViewerMaskOverlayDescriptor;
-  onAiMaskBoxCommit: (command: ViewerAiMaskBoxCommand) => void;
-  onBrushCommit: (command: ViewerBrushCommitResult) => void;
-  onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
-  onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
-  onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
-  onPickerCommit?: (command: ViewerPickerCommitResult) => void;
-  onRetouchCommand: (command: ViewerRetouchCommand) => void;
-  onSelectAiSubMask: (id: string | null) => void;
-  onSelectMask: (id: string | null) => void;
-  onStraighten: (val: number, identity: CropStraightenSessionIdentity) => void;
   selectedImage: SelectedImage;
-  setCrop: (crop: Crop, perfentCrop: PercentCrop) => void;
-  setIsMaskHovered: (isHovered: boolean) => void;
-  setIsMaskTouchInteracting: (isInteracting: boolean) => void;
-  compareMode?: EditorCompareMode;
-  compareDividerPosition?: number;
-  compareLabelsVisible?: boolean;
-  compareOrientation?: EditorCompareOrientation;
-  onCompareDividerPositionChange?: (position: number) => void;
-  onCompareDividerReset?: () => void;
   showOriginal: boolean;
   transformedOriginalUrl: string | null;
   comparisonLabel?: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
-  updateSubMask: (id: string | null, subMask: Partial<SubMask>, identity: SubMaskInteractionIdentity) => void;
   interactivePatch?: InteractivePatch | null;
-  whiteBalanceRuntime?: ViewerWhiteBalanceRuntimeDescriptor;
+  toolRuntime: ViewerToolRuntimeDescriptor;
   overlayMode?: OverlayMode;
   overlayRotation?: number;
   cursorStyle: string;
-  viewerInputState?: { activeTool: ViewerActiveTool; isTemporaryHand: boolean };
   isMaxZoom?: boolean;
   liveRotation?: number | null;
   transformState: { scale: number; positionX: number; positionY: number };
@@ -218,7 +219,6 @@ interface ImageCanvasProps {
   wgpuFrameSerial?: number;
   wgpuFailureSerial?: number;
   viewerSampleGraphRevision?: string;
-  onViewerSamplerStateChange?: (state: ViewerSamplerState) => void;
 }
 
 const ignoreViewerPickerCommit = (): void => undefined;
@@ -226,68 +226,29 @@ const ignoreViewerPickerCommit = (): void => undefined;
 export const ImageCanvas = memo(
   ({
     appSettings,
-    activeAiPatchContainerId,
-    activeAiSubMaskId,
-    activeMaskContainerId,
-    activeMaskId,
-    adjustmentRevision,
     adjustments,
-    adjustmentGeometryRevision = 1,
-    brushImageSessionId,
-    brushSettings,
-    crop,
     exportSoftProofRecipeId,
     exportSoftProofTransform,
     finalPreviewUrl,
     provisionalPreviewUrl = null,
     gamutWarningOverlay,
-    handleCropComplete,
-    handleCropStart = () => undefined,
-    imageSessionId,
     imageRenderSize,
     originalImageRenderSize = imageRenderSize,
     overlayGeometry: providedOverlayGeometry,
     interactivePatch,
-    isAiEditing,
-    isCropping,
-    isMaskControlHovered,
-    isMasking,
     isSliderDragging,
     isExportSoftProofEnabled,
     isGamutWarningOverlayVisible,
-    isStraightenActive,
-    isRotationActive,
     maskOverlay,
-    onAiMaskBoxCommit,
-    onBrushCommit,
-    onInitialMaskDrawCommit,
-    onLiveMaskPreview,
-    onParametricMaskTargetCommit,
-    onPickerCommit = ignoreViewerPickerCommit,
-    onRetouchCommand,
-    onSelectAiSubMask,
-    onSelectMask,
-    onStraighten,
     selectedImage,
-    setCrop,
-    setIsMaskHovered,
-    setIsMaskTouchInteracting,
-    compareMode = 'off',
-    compareDividerPosition = 0.5,
-    compareLabelsVisible = true,
-    compareOrientation = 'vertical',
-    onCompareDividerPositionChange = () => undefined,
-    onCompareDividerReset = () => undefined,
     showOriginal,
     transformedOriginalUrl,
     comparisonLabel = null,
     uncroppedAdjustedPreviewUrl,
-    updateSubMask,
-    whiteBalanceRuntime,
+    toolRuntime,
     overlayRotation,
     overlayMode,
     cursorStyle,
-    viewerInputState,
     isMaxZoom,
     liveRotation,
     transformState,
@@ -296,9 +257,60 @@ export const ImageCanvas = memo(
     wgpuFrameSerial = 0,
     wgpuFailureSerial = 0,
     viewerSampleGraphRevision = 'viewer-sample-unbound',
-    onViewerSamplerStateChange,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
+    const {
+      activeAiPatchContainerId,
+      activeAiSubMaskId,
+      activeMaskContainerId,
+      activeMaskId,
+      adjustmentGeometryRevision,
+      adjustmentRevision,
+      brushImageSessionId,
+      brushSettings,
+      commands,
+      compare,
+      crop: cropRuntime,
+      imageSessionId,
+      input: viewerInputState,
+      isAiEditing,
+      isMaskControlHovered,
+      isMasking,
+      isRotationActive,
+      onSamplerStateChange: onViewerSamplerStateChange,
+      whiteBalance: whiteBalanceRuntime,
+    } = toolRuntime;
+    const {
+      commitAiMaskBox: onAiMaskBoxCommit,
+      commitBrush: onBrushCommit,
+      commitInitialMaskDraw: onInitialMaskDrawCommit,
+      commitParametricMaskTarget: onParametricMaskTargetCommit,
+      commitPicker: onPickerCommit = ignoreViewerPickerCommit,
+      commitRetouch: onRetouchCommand,
+      commitStraighten: onStraighten,
+      liveMaskPreview: onLiveMaskPreview,
+      selectAiSubMask: onSelectAiSubMask,
+      selectMask: onSelectMask,
+      setMaskHovered: setIsMaskHovered,
+      setMaskTouchInteracting: setIsMaskTouchInteracting,
+      updateSubMask,
+    } = commands;
+    const {
+      dividerPosition: compareDividerPosition,
+      labelsVisible: compareLabelsVisible,
+      mode: compareMode,
+      onDividerPositionChange: onCompareDividerPositionChange = () => undefined,
+      onDividerReset: onCompareDividerReset = () => undefined,
+      orientation: compareOrientation,
+    } = compare;
+    const {
+      active: isCropping,
+      onChange: setCrop,
+      onComplete: handleCropComplete,
+      onStart: handleCropStart = () => undefined,
+      straightenActive: isStraightenActive,
+      value: crop,
+    } = cropRuntime;
     const isWbPickerActive = whiteBalanceRuntime?.active ?? false;
     const lastWhiteBalancePickerReceipt = whiteBalanceRuntime?.lastReceipt ?? null;
     const pickerImageSessionId =
@@ -413,39 +425,6 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
-    const pickerControllers = useViewerPickerControllers({
-      adjustmentRevision,
-      adjustments,
-      geometry: overlayGeometry,
-      imageSessionId: pickerImageSessionId,
-      onCommit: onPickerCommit,
-      presentation: presentationDescriptor,
-    });
-    const focusRetouchController = useViewerFocusRetouchController({
-      geometry: overlayGeometry,
-      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
-      presentation: presentationDescriptor,
-    });
-    const whiteBalanceController = useViewerWhiteBalanceController({
-      active: isWbPickerActive,
-      baseWhiteBalance: whiteBalanceRuntime?.baseWhiteBalance ?? {
-        temperature: adjustments.temperature,
-        tint: adjustments.tint,
-      },
-      geometry: overlayGeometry,
-      imageSessionId: pickerImageSessionId,
-      ...(whiteBalanceRuntime?.commands.commit === undefined ? {} : { onCommit: whiteBalanceRuntime.commands.commit }),
-      ...(whiteBalanceRuntime?.commands.preview === undefined
-        ? {}
-        : { onPreview: whiteBalanceRuntime.commands.preview }),
-      ...(whiteBalanceRuntime?.commands.cancelPreview === undefined
-        ? {}
-        : { onPreviewCancel: whiteBalanceRuntime.commands.cancelPreview }),
-      presentation: presentationDescriptor,
-      previewUrl: finalPreviewUrl,
-      selectedImagePath: selectedImage.path,
-    });
-
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
     const [surfacePreviewUrlReleaseAuthority] = useState(
       () => new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) }),
@@ -632,26 +611,6 @@ export const ImageCanvas = memo(
       sourceRevision: presentationDescriptor.graphRevision,
       toolId: 'brush',
     };
-    const viewerBrushBinding = useViewerBrushController({
-      activeContainer: activeContainer ?? null,
-      activeSubMask: activeSubMask ?? null,
-      context: viewerBrushContext,
-      geometry: overlayGeometry,
-      groupOffsetX,
-      groupOffsetY,
-      imagePath: selectedImage.path,
-      imageSize: effectiveImageDimensions,
-      maxSafeScale,
-      onCommit: onBrushCommit,
-      ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
-      parameters: activeSubMaskParameters,
-      settings: {
-        canonicalTool: canonicalBrushTool === ToolType.Eraser ? 'eraser' : 'brush',
-        feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-        ...(activeLineFlow === undefined ? {} : { flow: activeLineFlow }),
-        imageSpaceSize: brushImageSpaceSize,
-      },
-    });
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
       const feather = Math.max(0, Math.min(1, (brushSettings?.feather ?? 0) / 100));
@@ -738,15 +697,6 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
-    const viewerAiMaskBoxBinding = useViewerAiMaskBoxController({
-      baselineParameters: activeSubMaskParameters,
-      context: viewerAiMaskBoxContext,
-      geometry: overlayGeometry,
-      groupOffsetX,
-      groupOffsetY,
-      maxSafeScale,
-      onCommit: onAiMaskBoxCommit,
-    });
     const isParametricActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance);
     const activeParametricMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
@@ -770,30 +720,6 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
-    const viewerParametricMaskTargetBinding = useViewerParametricMaskTargetController({
-      baselineParameters: activeSubMaskParameters,
-      context: viewerParametricMaskTargetContext,
-      geometry: overlayGeometry,
-      groupOffsetX,
-      groupOffsetY,
-      maxSafeScale,
-      onCommit: onParametricMaskTargetCommit,
-      settings: {
-        flipHorizontal: adjustments.flipHorizontal ?? false,
-        flipVertical: adjustments.flipVertical ?? false,
-        orientationSteps: adjustments.orientationSteps ?? 0,
-        rotation: adjustments.rotation ?? 0,
-      },
-    });
-    const viewerParametricMaskTargetOverlayPoint = useMemo(() => {
-      const descriptor = viewerParametricMaskTargetBinding.overlay;
-      if (descriptor === null) return null;
-      return overlayGeometry.cropToView(
-        overlayGeometry.orientedToCrop(
-          overlayPoint<'oriented-pixels'>(descriptor.imagePoint.x, descriptor.imagePoint.y),
-        ),
-      );
-    }, [overlayGeometry, viewerParametricMaskTargetBinding.overlay]);
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
     const activeInitialMaskDrawId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerInitialMaskDrawContext = useMemo<ViewerInitialMaskDrawCurrentContext>(
@@ -819,20 +745,6 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
-    const viewerInitialMaskDrawBinding = useViewerInitialMaskDrawController({
-      activeContainer: activeContainer ?? null,
-      activeSubMask: activeSubMask ?? null,
-      baselineParameters: activeSubMaskParameters,
-      context: viewerInitialMaskDrawContext,
-      geometry: overlayGeometry,
-      groupOffsetX,
-      groupOffsetY,
-      imageSize: effectiveImageDimensions,
-      maxSafeScale,
-      onCommit: onInitialMaskDrawCommit,
-      ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
-    });
-
     const isObjectPromptActive = isMasking && activeSubMask?.type === Mask.AiObject;
     const isToolActive =
       isBrushActive || isAiSubjectActive || isInitialDrawing || isObjectPromptActive || isParametricActive;
@@ -858,49 +770,6 @@ export const ImageCanvas = memo(
         selectedImage.path,
       ],
     );
-    const viewerMaskShapeBinding = useViewerMaskShapeController({
-      activeContainer: activeContainer ?? null,
-      context: viewerMaskShapeContext,
-      isToolActive,
-      onCommit: updateSubMask,
-      onHoverChange: setIsMaskHovered,
-      ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
-      onSelectAiSubMask,
-      onSelectMask,
-      onTouchInteractionChange: setIsMaskTouchInteracting,
-    });
-    const effectiveMaskInteractionActive = viewerMaskShapeBinding.active;
-    const samplerSuppressed =
-      isCropping ||
-      isMasking ||
-      isAiEditing ||
-      isSliderDragging ||
-      isStraightenActive ||
-      Boolean(isRotationActive) ||
-      isWbPickerActive ||
-      pickerControllers.activeTool !== null ||
-      effectiveMaskInteractionActive ||
-      isToolActive ||
-      (viewerInputState?.activeTool !== undefined && viewerInputState.activeTool !== 'none');
-    const viewerSamplerController = useViewerSamplerController({
-      backend: wgpuPreviewVisibility.previewBackend,
-      compareDividerPosition,
-      compareMode,
-      compareOrientation,
-      displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
-      editedRenderSize: imageRenderSize,
-      geometryEpoch: overlayGeometry.geometryEpoch,
-      graphRevision: viewerSampleGraphRevision,
-      imageIdentity: selectedImage.path,
-      imageSessionId: imageSessionId ?? pickerImageSessionId,
-      ...(onViewerSamplerStateChange === undefined ? {} : { onStateChange: onViewerSamplerStateChange }),
-      originalRenderSize: originalImageRenderSize,
-      proofEnabled: isExportSoftProofEnabled,
-      proofRecipeId: exportSoftProofRecipeId ?? null,
-      sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
-      suppressed: samplerSuppressed,
-    });
-
     const displayedMaskUrl = resolveDisplayedMaskUrl({ isAiEditing, isMasking, maskOverlayUrl: maskOverlay.url });
 
     const sortedSubMasks = useMemo(() => {
@@ -934,14 +803,6 @@ export const ImageCanvas = memo(
       },
       [onSelectMask, onSelectAiSubMask, isMasking, isAiEditing, isToolActive],
     );
-
-    const handleMouseEnter = useCallback(() => {
-      viewerBrushBinding.handleMouseEnter();
-    }, [viewerBrushBinding]);
-
-    const handleMouseLeave = useCallback(() => {
-      viewerBrushBinding.handleMouseLeave();
-    }, [viewerBrushBinding]);
 
     const cropPreviewUrl = uncroppedAdjustedPreviewUrl || selectedImage.thumbnailUrl;
     const isCropViewVisible = resolveCropPreviewVisibility({ cropPreviewUrl, isCropping, loadedCropPreviewUrl });
@@ -977,56 +838,6 @@ export const ImageCanvas = memo(
       isExportSoftProofEnabled,
       selectedImagePath: selectedImage.path,
     });
-    const overlayBlocker = resolveEditorOverlayBlocker({
-      hasActiveRemoveSource: activeRemoveSource !== null,
-      hasActiveRetouchSource: activeRetouchSource !== null,
-      isAiEditing,
-      isCropping,
-      isMasking,
-      isWbPickerActive: Boolean(isWbPickerActive),
-    });
-    const overlayVisibility = resolveEditorOverlayVisibility({
-      blocker: overlayBlocker,
-      canShowOriginalCompare,
-      compareMode,
-      hasDisplayedMask: Boolean(displayedMaskUrl),
-      isCurrentGamutWarningOverlay,
-      isExportSoftProofEnabled,
-      isGamutWarningOverlayVisible,
-      isMaskControlHovered,
-      isMaskInteractionActive: effectiveMaskInteractionActive,
-      isSliderDragging,
-      showOriginal,
-    });
-    const {
-      compareOverlayDisabled,
-      compareOverlayDisabledReason,
-      isCompareModeActive,
-      isShowingOriginal,
-      isSideBySideCompare,
-      showGamutWarningOverlay,
-      showOriginalCompare,
-      showRetouchRemoveHandles,
-      showSideBySideCompare,
-      showSplitCompare,
-    } = overlayVisibility;
-    const retouchHandlesController = useViewerRetouchHandlesController({
-      activeCloneLayer: activeRetouchLayer,
-      activeRemoveLayer,
-      activeRemoveTargetSubMask,
-      altPressed: isAltPressed,
-      geometry: overlayGeometry,
-      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
-      onCommit: onRetouchCommand,
-      presentation: presentationDescriptor,
-      visible: showRetouchRemoveHandles && imageRenderSize.width > 0 && imageRenderSize.height > 0,
-    });
-    const showInteractiveToolOverlayStage =
-      (isMasking || isAiEditing) &&
-      retouchHandlesController.activeMode === null &&
-      !isCompareModeActive &&
-      !showGamutWarningOverlay;
-
     const patchGeometryIdentity = adjustmentGeometryRevision;
     const patchScopeKey = [
       selectedImage.path,
@@ -1077,30 +888,251 @@ export const ImageCanvas = memo(
           : null,
       [uncroppedImageRenderSize],
     );
-    const compareDividerController = useCompareDividerController({
-      context: {
-        active: showSplitCompare,
-        geometryEpoch: overlayGeometry.geometryEpoch,
-        imageRect: imageRenderSize,
+    const toolControllerRuntime = useViewerToolRuntimeController({
+      aiMaskBox: {
+        baselineParameters: activeSubMaskParameters,
+        context: viewerAiMaskBoxContext,
+        geometry: overlayGeometry,
+        groupOffsetX,
+        groupOffsetY,
+        maxSafeScale,
+        onCommit: onAiMaskBoxCommit,
+      },
+      brush: {
+        activeContainer: activeContainer ?? null,
+        activeSubMask: activeSubMask ?? null,
+        context: viewerBrushContext,
+        geometry: overlayGeometry,
+        groupOffsetX,
+        groupOffsetY,
+        imagePath: selectedImage.path,
+        imageSize: effectiveImageDimensions,
+        maxSafeScale,
+        onCommit: onBrushCommit,
+        ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
+        parameters: activeSubMaskParameters,
+        settings: {
+          canonicalTool: canonicalBrushTool === ToolType.Eraser ? 'eraser' : 'brush',
+          feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
+          ...(activeLineFlow === undefined ? {} : { flow: activeLineFlow }),
+          imageSpaceSize: brushImageSpaceSize,
+        },
+      },
+      compareDivider: {
+        context: {
+          geometryEpoch: overlayGeometry.geometryEpoch,
+          imageRect: imageRenderSize,
+          imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+          orientation: compareOrientation,
+          position: compareDividerPosition,
+          sourceIdentity: presentationDescriptor.sourceIdentity,
+          sourceRevision: presentationDescriptor.graphRevision,
+        },
+        onPositionChange: onCompareDividerPositionChange,
+        onReset: onCompareDividerReset,
+      },
+      cropStraighten: {
+        onCropChange: setCrop,
+        onCropComplete: handleCropComplete,
+        onCropStart: handleCropStart,
+        onStraighten,
+        renderSize: cropRenderSize,
+        rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
+        session: cropStraightenSession,
+      },
+      focusRetouch: {
+        geometry: overlayGeometry,
         imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
-        orientation: compareOrientation,
-        position: compareDividerPosition,
+        presentation: presentationDescriptor,
+      },
+      initialMaskDraw: {
+        activeContainer: activeContainer ?? null,
+        activeSubMask: activeSubMask ?? null,
+        baselineParameters: activeSubMaskParameters,
+        context: viewerInitialMaskDrawContext,
+        geometry: overlayGeometry,
+        groupOffsetX,
+        groupOffsetY,
+        imageSize: effectiveImageDimensions,
+        maxSafeScale,
+        onCommit: onInitialMaskDrawCommit,
+        ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
+      },
+      interaction: {
+        geometryEpoch: overlayGeometry.geometryEpoch,
+        imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+        isCropping,
+        isMaxZoom: isMaxZoom ?? false,
+        isSliderDragging,
+        isStraightenActive,
+        isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
+        requestedActiveTool: viewerInputState?.activeTool,
         sourceIdentity: presentationDescriptor.sourceIdentity,
         sourceRevision: presentationDescriptor.graphRevision,
       },
-      onPositionChange: onCompareDividerPositionChange,
-      onReset: onCompareDividerReset,
+      maskShape: {
+        activeContainer: activeContainer ?? null,
+        context: viewerMaskShapeContext,
+        isToolActive,
+        onCommit: updateSubMask,
+        onHoverChange: setIsMaskHovered,
+        ...(onLiveMaskPreview === undefined ? {} : { onLiveMaskPreview }),
+        onSelectAiSubMask,
+        onSelectMask,
+        onTouchInteractionChange: setIsMaskTouchInteracting,
+      },
+      overlayBlocker: {
+        hasActiveRemoveSource: activeRemoveSource !== null,
+        hasActiveRetouchSource: activeRetouchSource !== null,
+        isAiEditing,
+        isCropping,
+        isMasking,
+        isWbPickerActive: Boolean(isWbPickerActive),
+      },
+      overlayVisibility: {
+        canShowOriginalCompare,
+        compareMode,
+        hasDisplayedMask: Boolean(displayedMaskUrl),
+        isCurrentGamutWarningOverlay,
+        isExportSoftProofEnabled,
+        isGamutWarningOverlayVisible,
+        isMaskControlHovered,
+        isSliderDragging,
+        showOriginal,
+      },
+      parametricMaskTarget: {
+        baselineParameters: activeSubMaskParameters,
+        context: viewerParametricMaskTargetContext,
+        geometry: overlayGeometry,
+        groupOffsetX,
+        groupOffsetY,
+        maxSafeScale,
+        onCommit: onParametricMaskTargetCommit,
+        settings: {
+          flipHorizontal: adjustments.flipHorizontal ?? false,
+          flipVertical: adjustments.flipVertical ?? false,
+          orientationSteps: adjustments.orientationSteps ?? 0,
+          rotation: adjustments.rotation ?? 0,
+        },
+      },
+      picker: {
+        adjustmentRevision,
+        adjustments,
+        geometry: overlayGeometry,
+        imageSessionId: pickerImageSessionId,
+        onCommit: onPickerCommit,
+        presentation: presentationDescriptor,
+      },
+      retouchHandles: {
+        activeCloneLayer: activeRetouchLayer,
+        activeRemoveLayer,
+        activeRemoveTargetSubMask,
+        altPressed: isAltPressed,
+        geometry: overlayGeometry,
+        imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+        onCommit: onRetouchCommand,
+        presentation: presentationDescriptor,
+        renderable: imageRenderSize.width > 0 && imageRenderSize.height > 0,
+      },
+      sampler: {
+        backend: wgpuPreviewVisibility.previewBackend,
+        compareDividerPosition,
+        compareMode,
+        compareOrientation,
+        displayedImageRect: overlayGeometry.displayedImageRectInViewCssPixels,
+        editedRenderSize: imageRenderSize,
+        geometryEpoch: overlayGeometry.geometryEpoch,
+        graphRevision: viewerSampleGraphRevision,
+        imageIdentity: selectedImage.path,
+        imageSessionId: imageSessionId ?? pickerImageSessionId,
+        ...(onViewerSamplerStateChange === undefined ? {} : { onStateChange: onViewerSamplerStateChange }),
+        originalRenderSize: originalImageRenderSize,
+        proofEnabled: isExportSoftProofEnabled,
+        proofRecipeId: exportSoftProofRecipeId ?? null,
+        sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
+      },
+      suppression: {
+        isAiEditing,
+        isCropping,
+        isMasking,
+        isRotationActive: Boolean(isRotationActive),
+        isSliderDragging,
+        isStraightenActive,
+        isToolActive,
+        isWhiteBalanceActive: isWbPickerActive,
+        requestedActiveTool: viewerInputState?.activeTool,
+      },
+      whiteBalance: {
+        active: isWbPickerActive,
+        baseWhiteBalance: whiteBalanceRuntime?.baseWhiteBalance ?? {
+          temperature: adjustments.temperature,
+          tint: adjustments.tint,
+        },
+        geometry: overlayGeometry,
+        imageSessionId: pickerImageSessionId,
+        ...(whiteBalanceRuntime?.commands.commit === undefined
+          ? {}
+          : { onCommit: whiteBalanceRuntime.commands.commit }),
+        ...(whiteBalanceRuntime?.commands.preview === undefined
+          ? {}
+          : { onPreview: whiteBalanceRuntime.commands.preview }),
+        ...(whiteBalanceRuntime?.commands.cancelPreview === undefined
+          ? {}
+          : { onPreviewCancel: whiteBalanceRuntime.commands.cancelPreview }),
+        presentation: presentationDescriptor,
+        previewUrl: finalPreviewUrl,
+        selectedImagePath: selectedImage.path,
+      },
     });
-    const cropStraightenController = useCropStraightenController({
-      onCropChange: setCrop,
-      onCropComplete: handleCropComplete,
-      onCropStart: handleCropStart,
-      onStraighten,
-      renderSize: cropRenderSize,
-      rotationDegrees: liveRotation ?? adjustments.rotation ?? 0,
-      session: cropStraightenSession,
-    });
-
+    const {
+      aiMaskBox: viewerAiMaskBoxBinding,
+      brush: viewerBrushBinding,
+      compareDivider: compareDividerController,
+      cropStraighten: cropStraightenController,
+      focusRetouch: focusRetouchController,
+      initialMaskDraw: viewerInitialMaskDrawBinding,
+      interaction: viewerInteraction,
+      maskShape: viewerMaskShapeBinding,
+      overlayBlocker,
+      overlayVisibility,
+      parametricMaskTarget: viewerParametricMaskTargetBinding,
+      picker: pickerControllers,
+      retouchHandles: retouchHandlesController,
+      sampler: viewerSamplerController,
+      whiteBalance: whiteBalanceController,
+    } = toolControllerRuntime;
+    const effectiveMaskInteractionActive = viewerMaskShapeBinding.active;
+    const {
+      compareOverlayDisabled,
+      compareOverlayDisabledReason,
+      isCompareModeActive,
+      isShowingOriginal,
+      isSideBySideCompare,
+      showGamutWarningOverlay,
+      showOriginalCompare,
+      showSideBySideCompare,
+      showSplitCompare,
+    } = overlayVisibility;
+    const showInteractiveToolOverlayStage =
+      (isMasking || isAiEditing) &&
+      retouchHandlesController.activeMode === null &&
+      !isCompareModeActive &&
+      !showGamutWarningOverlay;
+    const viewerParametricMaskTargetOverlayPoint = useMemo(() => {
+      const descriptor = viewerParametricMaskTargetBinding.overlay;
+      if (descriptor === null) return null;
+      return overlayGeometry.cropToView(
+        overlayGeometry.orientedToCrop(
+          overlayPoint<'oriented-pixels'>(descriptor.imagePoint.x, descriptor.imagePoint.y),
+        ),
+      );
+    }, [overlayGeometry, viewerParametricMaskTargetBinding.overlay]);
+    const handleMouseEnter = useCallback(() => {
+      viewerBrushBinding.handleMouseEnter();
+    }, [viewerBrushBinding]);
+    const handleMouseLeave = useCallback(() => {
+      viewerBrushBinding.handleMouseLeave();
+    }, [viewerBrushBinding]);
     const cropImageTransforms = useMemo(() => {
       const rotation = (liveRotation !== null ? liveRotation : adjustments.rotation) ?? 0;
       return `rotate(${svgNumber(rotation)}deg)`;
@@ -1147,49 +1179,6 @@ export const ImageCanvas = memo(
                       : showGamutWarningOverlay
                         ? 'soft-proof'
                         : 'pan-zoom';
-    const viewerActiveTool: ViewerActiveTool = isCropping
-      ? isStraightenActive
-        ? 'straighten'
-        : 'crop'
-      : (pickerControllers.activeTool ??
-        (whiteBalanceController.active ? 'white-balance' : null) ??
-        (focusRetouchController.active ? 'focus-retouch' : null) ??
-        (retouchHandlesController.activeMode === null ? null : 'retouch') ??
-        viewerInputState?.activeTool ??
-        'none');
-    const viewerInteractionContext: ViewerInteractionContext = {
-      activeTool: viewerActiveTool,
-      focusContext: isSliderDragging ? 'editable' : 'viewer',
-      geometryEpoch: overlayGeometry.geometryEpoch,
-      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
-      isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
-      pointerCount: 1,
-      sourceIdentity: presentationDescriptor.sourceIdentity,
-      sourceRevision: presentationDescriptor.graphRevision,
-      toolId: retouchHandlesController.activeMode === null ? viewerInteractionToolId(viewerActiveTool) : 'retouch',
-      zoomed: isMaxZoom ?? false,
-    };
-    const viewerInteraction = useViewerInteractionController({
-      context: viewerInteractionContext,
-      handlers: {
-        lifecycle: [
-          viewerBrushBinding.handleInputEvent,
-          viewerAiMaskBoxBinding.handleInputEvent,
-          viewerInitialMaskDrawBinding.handleInputEvent,
-        ],
-        observers: [viewerSamplerController.handleInputEvent],
-        tools: {
-          'compare-divider': compareDividerController.handleInputEvent,
-          crop: cropStraightenController.handleInputEvent,
-          'focus-retouch': focusRetouchController.handleInputEvent,
-          'point-color': pickerControllers.handleInputEvent,
-          retouch: retouchHandlesController.handleInputEvent,
-          straighten: cropStraightenController.handleInputEvent,
-          'tone-equalizer': pickerControllers.handleInputEvent,
-          'white-balance': whiteBalanceController.handleInputEvent,
-        },
-      },
-    });
     const activeCanvasOverlayStatus: CanvasOverlayStatus =
       isShowingOriginal || compareOverlayDisabled
         ? 'disabled'
