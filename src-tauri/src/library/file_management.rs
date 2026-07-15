@@ -2650,6 +2650,18 @@ fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
 }
 
 fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
+    let section_visibility = metadata
+        .adjustments
+        .get("sectionVisibility")
+        .and_then(Value::as_object)
+        .map(|visibility| {
+            visibility
+                .iter()
+                .filter(|(section, value)| section.as_str() != "effects" && value.is_boolean())
+                .map(|(section, value)| (section.clone(), value.clone()))
+                .collect::<serde_json::Map<String, Value>>()
+        })
+        .filter(|visibility| !visibility.is_empty());
     let effects_enabled = metadata
         .adjustments
         .get("effectsEnabled")
@@ -2664,6 +2676,9 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
     let mut reset_adjustments = serde_json::Map::new();
     if let Some(enabled) = effects_enabled {
         reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
+    }
+    if let Some(visibility) = section_visibility {
+        reset_adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
     }
     metadata.adjustments = Value::Object(reset_adjustments);
     metadata.edit_document_v2 = None;

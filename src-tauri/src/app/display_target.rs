@@ -1,5 +1,8 @@
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 use std::sync::{Arc, Condvar, Mutex};
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 use std::thread::JoinHandle;
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -28,6 +31,7 @@ pub struct DisplayTargetIdentity {
     pub hdr_capability_fingerprint: u64,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 #[derive(Clone)]
 pub struct ResolvedDisplayTarget {
     pub identity: DisplayTargetIdentity,
@@ -37,6 +41,7 @@ pub struct ResolvedDisplayTarget {
     snapshot: Arc<crate::display_profile::DisplayPreviewTransformSnapshot>,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 impl ResolvedDisplayTarget {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     fn materialize(self) -> Result<Self, String> {
@@ -57,6 +62,7 @@ impl ResolvedDisplayTarget {
     }
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 #[derive(Clone)]
 struct DisplayResources {
     device_generation: u64,
@@ -94,6 +100,7 @@ pub struct DisplayTargetReport {
     pub interaction_churn_duration_micros: u64,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayTargetChange {
@@ -102,6 +109,7 @@ pub struct DisplayTargetChange {
     pub target: DisplayTargetIdentity,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 struct CoordinatorState {
     report: DisplayTargetReport,
     latest_revision: u64,
@@ -111,6 +119,7 @@ struct CoordinatorState {
     stopped: bool,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 struct CoordinatorShared {
     state: Mutex<CoordinatorState>,
     wake: Condvar,
@@ -119,11 +128,13 @@ struct CoordinatorShared {
     publisher: Arc<dyn Fn(DisplayTargetChange) + Send + Sync>,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 pub struct DisplayTargetCoordinator {
     shared: Arc<CoordinatorShared>,
     owner: Mutex<Option<JoinHandle<()>>>,
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 impl DisplayTargetCoordinator {
     #[cfg(any(test, feature = "validation-harness"))]
     pub fn new(
@@ -221,6 +232,19 @@ impl DisplayTargetCoordinator {
     }
 }
 
+#[cfg(not(any(test, target_os = "macos", feature = "validation-harness")))]
+pub struct DisplayTargetCoordinator;
+
+#[cfg(not(any(test, target_os = "macos", feature = "validation-harness")))]
+impl DisplayTargetCoordinator {
+    pub fn report(&self) -> DisplayTargetReport {
+        DisplayTargetReport {
+            process_id: std::process::id(),
+            ..DisplayTargetReport::default()
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub fn request_for_state(state: &crate::AppState) {
     let device_generation = state
@@ -233,6 +257,7 @@ pub fn request_for_state(state: &crate::AppState) {
     }
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 impl Drop for DisplayTargetCoordinator {
     fn drop(&mut self) {
         {
@@ -246,6 +271,7 @@ impl Drop for DisplayTargetCoordinator {
     }
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 fn resolver_loop(shared: Arc<CoordinatorShared>) {
     loop {
         let (revision, device_generation) = {
@@ -427,6 +453,7 @@ fn validate_color_contract(
     Ok(())
 }
 
+#[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
 fn validate_hdr_capability_contract(
     identity: &DisplayTargetIdentity,
     capability: &HdrDisplayCapabilityV1,
