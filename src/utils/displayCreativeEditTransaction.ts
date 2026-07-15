@@ -1,7 +1,14 @@
-import { Effect } from './adjustments';
+import { CreativeAdjustment, Effect } from './adjustments';
 import type { EditTransactionRequest } from './editTransaction';
 
-export const DISPLAY_CREATIVE_NODE_ADJUSTMENTS = [Effect.VignetteAmount] as const;
+export const DISPLAY_CREATIVE_NODE_ADJUSTMENTS = [
+  CreativeAdjustment.FlareAmount,
+  Effect.LutIntensity,
+  Effect.VignetteAmount,
+  Effect.VignetteFeather,
+  Effect.VignetteMidpoint,
+  Effect.VignetteRoundness,
+] as const;
 
 export type DisplayCreativeNodeAdjustment = (typeof DISPLAY_CREATIVE_NODE_ADJUSTMENTS)[number];
 

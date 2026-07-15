@@ -13,7 +13,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ vignetteAmount: z.literal(-32) }).passthrough(),
+    adjustments: z.object({ vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) }).passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -35,7 +35,9 @@ const renderCallSchema = z.object({
               nodes: z
                 .object({
                   display_creative: z
-                    .object({ params: z.object({ vignetteAmount: z.number() }).passthrough() })
+                    .object({
+                      params: z.object({ vignetteAmount: z.number(), vignetteMidpoint: z.number() }).passthrough(),
+                    })
                     .passthrough(),
                 })
                 .passthrough(),
@@ -110,7 +112,7 @@ const waitForCommandCount = async (page: Page, command: string, expected: number
   );
 };
 
-const waitForRenderedVignette = async (page: Page, expected: number) => {
+const waitForRenderedVignette = async (page: Page, expectedAmount: number, expectedMidpoint: number) => {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const call = renderCallSchema.safeParse(
@@ -123,12 +125,15 @@ const waitForRenderedVignette = async (page: Page, expected: number) => {
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.display_creative.params.vignetteAmount === expected
+      call.data.args.request.editDocumentV2.nodes.display_creative.params.vignetteAmount === expectedAmount &&
+      call.data.args.request.editDocumentV2.nodes.display_creative.params.vignetteMidpoint === expectedMidpoint
     )
       return;
     await page.waitForTimeout(50);
   }
-  throw new Error(`Timed out waiting for rendered Vignette Amount ${String(expected)}.`);
+  throw new Error(
+    `Timed out waiting for rendered Vignette Amount ${String(expectedAmount)} and Midpoint ${String(expectedMidpoint)}.`,
+  );
 };
 
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
@@ -179,10 +184,10 @@ try {
   const baselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
   const baselineApplies = await commandCount(page, 'apply_adjustments');
   await page.evaluate(() => {
-    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push({
-      color: [24, 200, 80],
-      delayMs: 20,
-    });
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [24, 200, 80], delayMs: 20 },
+      { color: [60, 120, 220], delayMs: 20 },
+    );
   });
   await page.getByTestId('effects-control-vignette-amount-value').click();
   const input = page.getByTestId('effects-control-vignette-amount-input');
@@ -193,6 +198,17 @@ try {
   await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 1);
   if ((await page.getByTestId('effects-control-vignette-amount-value').textContent())?.trim() !== '-32') {
     throw new Error('Vignette Amount was not visibly committed.');
+  }
+  await waitForRenderedVignette(page, -32, 50);
+
+  await page.getByTestId('effects-control-vignette-midpoint-value').click();
+  const midpointInput = page.getByTestId('effects-control-vignette-midpoint-input');
+  await midpointInput.fill('63');
+  await midpointInput.press('Enter');
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 2);
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 2);
+  if ((await page.getByTestId('effects-control-vignette-midpoint-value').textContent())?.trim() !== '63') {
+    throw new Error('Vignette Midpoint was not visibly committed.');
   }
 
   const persisted = persistenceSchema.parse(
@@ -205,23 +221,38 @@ try {
   );
   if (
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
-    persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
+    persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) + 1 ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
-    throw new Error(`Vignette did not persist one source-bound display revision: ${JSON.stringify(persisted)}`);
+    throw new Error(
+      `Vignette controls did not persist sequential source-bound revisions: ${JSON.stringify(persisted)}`,
+    );
   }
-  await waitForRenderedVignette(page, -32);
+  await waitForRenderedVignette(page, -32, 63);
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
-  if (!(await undo.isEnabled())) throw new Error('Vignette commit did not create an undo boundary.');
+  if (!(await undo.isEnabled())) throw new Error('Vignette commits did not create undo boundaries.');
+  await undo.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="effects-control-vignette-midpoint-value"]')?.textContent?.trim() === '50',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 3);
+  await waitForRenderedVignette(page, -32, 50);
+  if ((await page.getByTestId('effects-control-vignette-amount-value').textContent())?.trim() !== '-32') {
+    throw new Error('Undo of Midpoint crossed the prior Vignette Amount history boundary.');
+  }
+
   await undo.click();
   await page.waitForFunction(
     () => document.querySelector('[data-testid="effects-control-vignette-amount-value"]')?.textContent?.trim() === '0',
     undefined,
     { timeout: 10_000 },
   );
-  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 2);
-  await waitForRenderedVignette(page, 0);
+  await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 4);
+  await waitForRenderedVignette(page, 0, 50);
 
   console.log('display creative edit transaction browser ok');
 } catch (error) {
