@@ -23,7 +23,7 @@ export type EditMutationSource =
   | 'hydration'
   | 'migration';
 
-export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'none' | 'reset';
+export type EditTransactionHistory = 'single-entry' | 'coalesced-interaction' | 'navigation' | 'none' | 'reset';
 export type EditTransactionPersistence = 'commit' | 'native-committed' | 'preview-only';
 
 /**
@@ -47,6 +47,8 @@ export interface EditTransactionRequest {
   source: EditMutationSource;
   operations: readonly EditNodeOperation[];
   history: EditTransactionHistory;
+  /** Required only for history navigation; points at the canonical entry installed by this transaction. */
+  historyTargetIndex?: number;
   persistence: EditTransactionPersistence;
   /**
    * Native commits can win a same-path reopen race before the editor installs

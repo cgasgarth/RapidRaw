@@ -206,9 +206,41 @@ try {
   }
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  const redo = page.locator('button[data-command-id="redo"]:visible').first();
+  const savesBeforeUndo = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
   await undo.click();
   await waitForRenderedExposure(page, 0);
-  await page.waitForTimeout(450);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', savesBeforeUndo + 1);
+  const undoPersistence = persistenceSchema.parse(
+    (await calls(page, 'save_metadata_and_update_thumbnail')).at(-1)?.args,
+  );
+  if (
+    undoPersistence.adjustments.exposure !== 0 ||
+    !undoPersistence.transaction.transactionId.startsWith('history:') ||
+    undoPersistence.transaction.baseAdjustmentRevision !== acceptedPersistence.transaction.nextAdjustmentRevision ||
+    undoPersistence.transaction.nextAdjustmentRevision !== undoPersistence.transaction.baseAdjustmentRevision + 1
+  ) {
+    throw new Error(`Undo did not persist one revisioned history transaction: ${JSON.stringify(undoPersistence)}`);
+  }
+
+  await redo.click();
+  await waitForRenderedExposure(page, 0.35);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', savesBeforeUndo + 2);
+  const redoPersistence = persistenceSchema.parse(
+    (await calls(page, 'save_metadata_and_update_thumbnail')).at(-1)?.args,
+  );
+  if (
+    redoPersistence.adjustments.exposure !== 0.35 ||
+    !redoPersistence.transaction.transactionId.startsWith('history:') ||
+    redoPersistence.transaction.baseAdjustmentRevision !== undoPersistence.transaction.nextAdjustmentRevision ||
+    redoPersistence.transaction.nextAdjustmentRevision !== redoPersistence.transaction.baseAdjustmentRevision + 1
+  ) {
+    throw new Error(`Redo did not persist one revisioned history transaction: ${JSON.stringify(redoPersistence)}`);
+  }
+
+  await undo.click();
+  await waitForRenderedExposure(page, 0);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', savesBeforeUndo + 3);
 
   const raceSaves = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
   const raceRenders = (await calls(page, 'apply_adjustments')).length;
