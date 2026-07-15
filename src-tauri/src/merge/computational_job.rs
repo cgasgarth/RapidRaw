@@ -250,6 +250,34 @@ impl ComputationalMergeJobRegistry {
         self.terminal(job_id, ComputationalMergeJobStatus::Failed)
     }
 
+    pub fn settle<T>(
+        &self,
+        job_id: &ComputationalMergeJobId,
+        result: Result<T, String>,
+    ) -> Result<T, String> {
+        match result {
+            Ok(value) => {
+                if self.finish(job_id)? {
+                    Ok(value)
+                } else {
+                    Err("computational_merge_cancelled".to_string())
+                }
+            }
+            Err(error) => {
+                let failed = self.fail(job_id)?;
+                if !failed
+                    && self.progress(job_id).is_some_and(|progress| {
+                        progress.status == ComputationalMergeJobStatus::Cancelled
+                    })
+                {
+                    Err("computational_merge_cancelled".to_string())
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+
     fn terminal(
         &self,
         job_id: &ComputationalMergeJobId,
@@ -382,6 +410,94 @@ mod computational_job_tests {
         assert!(sr.cancellation_token.checkpoint().is_ok());
         registry.finish(&sr.job_id).unwrap();
         assert!(registry.progress(&focus.job_id).is_none());
+    }
+
+    #[test]
+    fn failed_operation_is_terminal_and_retry_succeeds() {
+        let registry = Arc::new(ComputationalMergeJobRegistry::default());
+        let failed = registry
+            .begin(ComputationalMergeFamily::Hdr, "decode", 3, 3)
+            .unwrap();
+        assert_eq!(
+            registry
+                .settle::<()>(&failed.job_id, Err("injected_decode_failure".to_string()))
+                .unwrap_err(),
+            "injected_decode_failure"
+        );
+        assert_eq!(
+            registry.progress(&failed.job_id).unwrap().status,
+            ComputationalMergeJobStatus::Failed
+        );
+
+        let retry = registry
+            .begin(ComputationalMergeFamily::Hdr, "decode", 3, 3)
+            .unwrap();
+        registry.settle(&retry.job_id, Ok(())).unwrap();
+        assert_eq!(
+            registry.progress(&retry.job_id).unwrap().status,
+            ComputationalMergeJobStatus::Succeeded
+        );
+    }
+
+    #[test]
+    fn cancellation_wins_over_a_late_failure() {
+        let registry = ComputationalMergeJobRegistry::default();
+        let cancelled = registry
+            .begin(ComputationalMergeFamily::Hdr, "decode", 3, 3)
+            .unwrap();
+        assert!(registry.cancel(&cancelled.job_id).unwrap());
+        assert_eq!(
+            registry
+                .settle::<()>(&cancelled.job_id, Err("injected_late_failure".to_string()))
+                .unwrap_err(),
+            "computational_merge_cancelled"
+        );
+        assert_eq!(
+            registry.progress(&cancelled.job_id).unwrap().status,
+            ComputationalMergeJobStatus::Cancelled
+        );
+    }
+
+    #[test]
+    fn cancel_settle_race_keeps_result_and_status_consistent() {
+        let registry = Arc::new(ComputationalMergeJobRegistry::default());
+        let raced = registry
+            .begin(ComputationalMergeFamily::Hdr, "decode", 3, 3)
+            .unwrap();
+        let race_barrier = Arc::new(Barrier::new(3));
+        let cancel_worker = {
+            let registry = Arc::clone(&registry);
+            let barrier = Arc::clone(&race_barrier);
+            let job_id = raced.job_id.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                registry.cancel(&job_id)
+            })
+        };
+        let settle_worker = {
+            let registry = Arc::clone(&registry);
+            let barrier = Arc::clone(&race_barrier);
+            let job_id = raced.job_id.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                registry.settle(&job_id, Ok(()))
+            })
+        };
+        race_barrier.wait();
+        let cancel_result = cancel_worker.join().unwrap().unwrap();
+        let settle_result = settle_worker.join().unwrap();
+        let status = registry.progress(&raced.job_id).unwrap().status;
+        match status {
+            ComputationalMergeJobStatus::Succeeded => {
+                assert!(!cancel_result);
+                assert!(settle_result.is_ok());
+            }
+            ComputationalMergeJobStatus::Cancelled => {
+                assert!(cancel_result);
+                assert_eq!(settle_result.unwrap_err(), "computational_merge_cancelled");
+            }
+            other => panic!("unexpected terminal status: {other:?}"),
+        }
     }
 
     #[test]
