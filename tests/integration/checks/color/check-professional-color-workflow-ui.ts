@@ -107,6 +107,7 @@ try {
     }
     await validateOutputFocusEvent(localRendered.container, false);
     await validateMaskPointColorAuthority(localRendered.container);
+    await validateMaskPerceptualGradingAuthority(localRendered.container);
   } finally {
     localRendered.unmount();
   }
@@ -328,6 +329,26 @@ async function validateMaskPointColorAuthority(container: Element) {
     useEditorStore.getState().adjustmentRevision,
     adjustmentRevision,
     'Mask Point Color must not redirect its local edit into the global node document.',
+  );
+}
+
+async function validateMaskPerceptualGradingAuthority(container: Element) {
+  await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-grading'));
+  const adjustmentRevision = useEditorStore.getState().adjustmentRevision;
+  const controls = getByTestId(container, 'color-grading-controls');
+  const presetTrigger = controls.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]');
+  assert.ok(presetTrigger, 'Mask Perceptual Grading preset trigger was not rendered.');
+  await click(presetTrigger);
+  await click(getByTestId<HTMLButtonElement>(controls, 'color-grading-preset-card'));
+  assert.equal(
+    getByTestId<HTMLInputElement>(controls, 'color-grading-balance-range').value,
+    '8',
+    'Mask Perceptual Grading must update its local adjustment state.',
+  );
+  assert.equal(
+    useEditorStore.getState().adjustmentRevision,
+    adjustmentRevision,
+    'Mask Perceptual Grading must not redirect its local edit into the global node document.',
   );
 }
 

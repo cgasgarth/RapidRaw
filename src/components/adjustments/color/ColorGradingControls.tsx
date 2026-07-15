@@ -2,10 +2,15 @@ import cx from 'clsx';
 import { Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { TextVariants } from '../../../types/typography';
-import { ColorGrading, type HueSatLum, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { type Adjustments, ColorGrading, type HueSatLum, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../../utils/color/perceptualGrading';
 import { COLOR_GRADING_PRESETS } from '../../../utils/colorGradingPresets';
+import {
+  buildPerceptualGradingEditTransaction,
+  type PerceptualGradingCommitIdentity,
+} from '../../../utils/perceptualGradingEditTransaction';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -20,6 +25,10 @@ type ColorGradingPreset = (typeof COLOR_GRADING_PRESETS)[number];
 type ColorGradingRange = (typeof colorGradingRangeKeys)[number];
 type ColorGradingView = (typeof colorGradingViews)[number];
 type ThreeWayRange = (typeof threeWayRangeKeys)[number];
+
+interface ColorGradingControlsProps extends ColorPanelGroupProps {
+  isForMask?: boolean;
+}
 
 const areColorGradingWheelValuesEqual = (left: HueSatLum, right: HueSatLum) =>
   left.hue === right.hue && left.saturation === right.saturation && left.luminance === right.luminance;
@@ -53,7 +62,12 @@ const getColorGradingRangeEnum = (range: ColorGradingRange): ColorGrading => {
   }
 };
 
-export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelGroupProps) => {
+export const ColorGradingControls = ({
+  adjustments,
+  isForMask = false,
+  setAdjustments,
+  onDragStateChange,
+}: ColorGradingControlsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const [activeView, setActiveView] = useState<ColorGradingView>('3way');
@@ -63,6 +77,19 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
   const presetMenuId = useId();
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const commitIdentity = useMemo<PerceptualGradingCommitIdentity | null>(
+    () =>
+      !isForMask && imageSessionId !== null && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const commitIdentityRef = useRef(commitIdentity);
+  commitIdentityRef.current = commitIdentity;
   const colorGrading = adjustments.colorGrading;
   const activeRange: ColorGradingRange = activeView === '3way' ? activeThreeWayRange : activeView;
   const activeValue = colorGrading[activeRange];
@@ -89,73 +116,65 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
 
   const getRangeLabel = (range: ColorGradingRange) => t(`adjustments.color.grading.${range}`);
 
-  const handleApplyPreset = (preset: ColorGradingPreset) => {
-    setAdjustments((prev) => {
-      const colorGrading = {
-        balance: preset.balance,
-        blending: preset.blending,
-        global: preset.global,
-        highlights: preset.highlights,
-        midtones: preset.midtones,
-        shadows: preset.shadows,
-      };
-      return {
+  const commitColorGrading = (nextColorGrading: Adjustments['colorGrading']) => {
+    const perceptualGradingV1 = perceptualGradingFromWheelSurface(nextColorGrading);
+    const identity = commitIdentityRef.current;
+    if (identity === null) {
+      setAdjustments((prev) => ({
         ...prev,
-        colorGrading,
-        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
+        colorGrading: nextColorGrading,
+        perceptualGradingV1,
         rawEngineEditGraphVersion: 2,
-      };
+      }));
+      return;
+    }
+    const result = applyEditTransaction(
+      buildPerceptualGradingEditTransaction(
+        useEditorStore.getState(),
+        identity,
+        nextColorGrading,
+        perceptualGradingV1,
+        crypto.randomUUID(),
+      ),
+    );
+    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+  };
+
+  const handleApplyPreset = (preset: ColorGradingPreset) => {
+    commitColorGrading({
+      balance: preset.balance,
+      blending: preset.blending,
+      global: preset.global,
+      highlights: preset.highlights,
+      midtones: preset.midtones,
+      shadows: preset.shadows,
     });
     setIsPresetMenuOpen(false);
     presetTriggerRef.current?.focus();
   };
 
   const handleRangeChange = (range: ColorGradingRange, newValue: HueSatLum) => {
-    setAdjustments((prev) => {
-      const colorGrading = {
-        ...prev.colorGrading,
-        [getColorGradingRangeEnum(range)]: newValue,
-      };
-      return {
-        ...prev,
-        colorGrading,
-        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
-        rawEngineEditGraphVersion: 2,
-      };
+    commitColorGrading({
+      ...colorGrading,
+      [getColorGradingRangeEnum(range)]: newValue,
     });
   };
 
   const handleGlobalChange = (grading: ColorGrading, value: number) => {
-    setAdjustments((prev) => {
-      const colorGrading = {
-        ...prev.colorGrading,
-        [grading]: value,
-      };
-      return {
-        ...prev,
-        colorGrading,
-        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
-        rawEngineEditGraphVersion: 2,
-      };
+    commitColorGrading({
+      ...colorGrading,
+      [grading]: value,
     });
   };
 
   const handleResetAll = () => {
-    setAdjustments((prev) => {
-      const colorGrading = {
-        balance: INITIAL_ADJUSTMENTS.colorGrading.balance,
-        blending: INITIAL_ADJUSTMENTS.colorGrading.blending,
-        global: { ...INITIAL_ADJUSTMENTS.colorGrading.global },
-        highlights: { ...INITIAL_ADJUSTMENTS.colorGrading.highlights },
-        midtones: { ...INITIAL_ADJUSTMENTS.colorGrading.midtones },
-        shadows: { ...INITIAL_ADJUSTMENTS.colorGrading.shadows },
-      };
-      return {
-        ...prev,
-        colorGrading,
-        perceptualGradingV1: perceptualGradingFromWheelSurface(colorGrading),
-        rawEngineEditGraphVersion: 2,
-      };
+    commitColorGrading({
+      balance: INITIAL_ADJUSTMENTS.colorGrading.balance,
+      blending: INITIAL_ADJUSTMENTS.colorGrading.blending,
+      global: { ...INITIAL_ADJUSTMENTS.colorGrading.global },
+      highlights: { ...INITIAL_ADJUSTMENTS.colorGrading.highlights },
+      midtones: { ...INITIAL_ADJUSTMENTS.colorGrading.midtones },
+      shadows: { ...INITIAL_ADJUSTMENTS.colorGrading.shadows },
     });
   };
 
@@ -184,7 +203,13 @@ export const ColorGradingControls = ({ adjustments, setAdjustments, onDragStateC
   };
 
   return (
-    <div className={density.card.panel} data-testid="color-grading-controls">
+    <div
+      className={density.card.panel}
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-testid="color-grading-controls"
+    >
       <div className={cx(density.sectionHeader.root, 'mb-1')}>
         <UiText variant={TextVariants.heading} className={cx(density.sectionHeader.title, 'block')}>
           {t('adjustments.color.colorGrading')}

@@ -176,6 +176,7 @@ export const buildAdjustmentMutationOperations = (
       'tone_equalizer',
       'point_color',
       'lens_correction',
+      'perceptual_grading',
       'geometry',
     ] as const
   ).find((nodeType) => {

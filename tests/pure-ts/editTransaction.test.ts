@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2';
 import {
   buildAdjustmentMutationOperations,
@@ -38,7 +39,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, curve, tone-equalizer, point-color, lens, and geometry changes to nodes', () => {
+  test('routes focused tone, camera, curve, tone-equalizer, point-color, lens, perceptual-grading, and geometry changes', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -129,6 +130,22 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'point_color',
         patch: { pointColor },
+      },
+    ]);
+
+    const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
+    const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
+    expect(
+      buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+        ...INITIAL_ADJUSTMENTS,
+        colorGrading,
+        perceptualGradingV1,
+      }),
+    ).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'perceptual_grading',
+        patch: { colorGrading, perceptualGradingV1 },
       },
     ]);
 
