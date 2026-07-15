@@ -16,6 +16,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
   cancelBackgroundIndexingWithSchema,
   startBackgroundIndexingWithSchema,
@@ -25,8 +26,8 @@ import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
 import {
-  buildChangedImageOpenHydrationEditTransaction,
   buildImageOpenHydrationEditTransaction,
+  publishCurrentImageOpenHydration,
 } from '../../utils/imageOpenHydrationEditTransaction';
 import { beginImageOpenWithSchema, scheduleImagePrefetchWithSchema } from '../../utils/imageOpenInvokes';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
@@ -334,7 +335,7 @@ export function useAppNavigation({
             cacheState,
             { adjustmentRevision: cacheState.adjustmentRevision, imageSessionId: session.id, path },
             cachedReadyEntry.adjustments,
-            `image-cache-hydration:${session.id}`,
+            `cache-open:${session.id}`,
           ),
         );
         setEditor({
@@ -365,67 +366,64 @@ export function useAppNavigation({
           sessionId: { imageSession: session.generation, selectionGeneration: session.generation },
         })
           .then((openResult) => {
-            if (!isEditorImageSessionCurrent(session.id)) return;
-            const result = openResult.decoded;
-            const loadedMetadata = parseLoadedMetadata(
-              metadataWithNegativeLabReopenedSavedPositiveHandoff({
-                imagePath: path,
-                metadata: result.metadata,
-              }),
-            );
-            upsertReopenedDerivedOutputReceipt({
-              imagePath: path,
-              metadata: loadedMetadata,
-              upsert: useUIStore.getState().upsertDerivedOutputReceipt,
-            });
-            isBackendReadyRef.current = true;
-            currentResRef.current = 0;
-            const current = useEditorStore.getState();
-            const metadataAdjustments = loadedMetadata.adjustments;
-            const authoritativeAdjustments =
-              !current.isSliderDragging &&
-              !isNativeCommittedHydrationSession(session.id) &&
-              acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
-              metadataAdjustments !== null &&
-              metadataAdjustments !== undefined &&
-              !metadataAdjustments.is_null
-                ? normalizeLoadedAdjustments(metadataAdjustments)
-                : null;
-            if (
-              authoritativeAdjustments !== null &&
-              current.imageSession?.id === backgroundHydrationIdentity.imageSessionId &&
-              current.selectedImage?.path === backgroundHydrationIdentity.path &&
-              current.adjustmentRevision === backgroundHydrationIdentity.adjustmentRevision
-            ) {
-              const transaction = buildChangedImageOpenHydrationEditTransaction(
-                current,
-                backgroundHydrationIdentity,
-                authoritativeAdjustments,
-                `image-cache-metadata-hydration:${session.id}:${openResult.metadataFingerprint}`,
+            publishCurrentImageOpenHydration(useEditorStore.getState(), backgroundHydrationIdentity, (current) => {
+              const result = openResult.decoded;
+              const selectedImage = current.selectedImage;
+              const loadedMetadata = parseLoadedMetadata(
+                metadataWithNegativeLabReopenedSavedPositiveHandoff({
+                  imagePath: path,
+                  metadata: result.metadata,
+                }),
               );
-              if (transaction !== null) current.applyEditTransaction(transaction);
-            }
-            setEditor((state) => ({
-              originalSize: { width: result.width, height: result.height },
-              selectedImage:
-                state.selectedImage?.path === path
-                  ? {
-                      ...state.selectedImage,
-                      exif: result.exif ?? state.selectedImage.exif,
-                      height: result.height,
-                      isOfflineSmartPreview: result.is_offline_smart_preview === true,
-                      isRaw: result.is_raw,
-                      metadata: loadedMetadata ?? state.selectedImage.metadata,
-                      rawDevelopmentReport: result.raw_development_report ?? null,
-                      width: result.width,
-                    }
-                  : state.selectedImage,
-            }));
-            const currentAdjustments = useEditorStore.getState().adjustments;
-            prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
-            globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
-            consumePendingNegativeConversionDustHealLayers(path);
-            consumePendingNegativeConversionSavedPositiveHandoff(path);
+              upsertReopenedDerivedOutputReceipt({
+                imagePath: path,
+                metadata: loadedMetadata,
+                upsert: useUIStore.getState().upsertDerivedOutputReceipt,
+              });
+              const metadataAdjustments = loadedMetadata.adjustments;
+              const authoritativeAdjustments =
+                !current.isSliderDragging &&
+                !isNativeCommittedHydrationSession(session.id) &&
+                acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
+                metadataAdjustments !== null &&
+                metadataAdjustments !== undefined &&
+                !metadataAdjustments.is_null
+                  ? normalizeLoadedAdjustments(metadataAdjustments)
+                  : null;
+              if (
+                authoritativeAdjustments !== null &&
+                !areAdjustmentsEqual(current.adjustments, authoritativeAdjustments)
+              ) {
+                current.applyEditTransaction(
+                  buildImageOpenHydrationEditTransaction(
+                    current,
+                    backgroundHydrationIdentity,
+                    authoritativeAdjustments,
+                    `cache-meta:${session.id}:${openResult.metadataFingerprint}`,
+                  ),
+                );
+              }
+              setEditor({
+                originalSize: { width: result.width, height: result.height },
+                selectedImage: {
+                  ...selectedImage,
+                  exif: result.exif ?? selectedImage.exif,
+                  height: result.height,
+                  isOfflineSmartPreview: result.is_offline_smart_preview === true,
+                  isRaw: result.is_raw,
+                  metadata: loadedMetadata ?? selectedImage.metadata,
+                  rawDevelopmentReport: result.raw_development_report ?? null,
+                  width: result.width,
+                },
+              });
+              isBackendReadyRef.current = true;
+              currentResRef.current = 0;
+              const currentAdjustments = useEditorStore.getState().adjustments;
+              prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
+              globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
+              consumePendingNegativeConversionDustHealLayers(path);
+              consumePendingNegativeConversionSavedPositiveHandoff(path);
+            });
           })
           .catch((err: unknown) => {
             if (!isEditorImageSessionCurrent(session.id)) return;
