@@ -104,6 +104,11 @@ import {
   type ViewerInteractionTransition,
   viewerInteractionToolId,
 } from './viewerInteractionCoordinator';
+import {
+  createViewerParametricMaskTargetInteractionController,
+  type ViewerParametricMaskTargetCommand,
+  type ViewerParametricMaskTargetCurrentContext,
+} from './viewerParametricMaskTargetInteractionController';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import {
@@ -229,6 +234,7 @@ interface ImageCanvasProps {
   onGenerateAiMask: (id: string | null, start: Coord, end: Coord) => void;
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
+  onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
   onQuickErase: (subMaskId: string | null, startPoint: Coord, endpoint: Coord) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
@@ -308,6 +314,7 @@ const ImageCanvas = memo(
     onGenerateAiMask,
     onInitialMaskDrawCommit,
     onLiveMaskPreview,
+    onParametricMaskTargetCommit,
     onQuickErase,
     onSelectAiSubMask,
     onSelectMask,
@@ -370,6 +377,10 @@ const ImageCanvas = memo(
       null,
     );
     const viewerBrushController = useMemo(() => createViewerBrushInteractionController(), []);
+    const viewerParametricMaskTargetController = useMemo(
+      () => createViewerParametricMaskTargetInteractionController(),
+      [],
+    );
     const viewerBrushCommands = useMemo(
       () => createViewerBrushCommandAdapter((id, patch) => viewerAdjustmentCommandServices.updateSubMask(id, patch)),
       [viewerAdjustmentCommandServices],
@@ -869,6 +880,27 @@ const ImageCanvas = memo(
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
     const isParametricActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance);
+    const activeParametricMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
+    const viewerParametricMaskTargetContext = useMemo<ViewerParametricMaskTargetCurrentContext>(
+      () => ({
+        active: isParametricActive && activeParametricMaskId !== null,
+        geometryEpoch: overlayGeometry.geometryEpoch,
+        imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+        maskId: activeParametricMaskId ?? 'parametric-mask:none',
+        sourceIdentity: selectedImage.path,
+        sourceRevision: presentationDescriptor.graphRevision,
+        tool: activeSubMask?.type === Mask.Color ? 'color' : 'luminance',
+      }),
+      [
+        activeParametricMaskId,
+        activeSubMask?.type,
+        imageSessionId,
+        isParametricActive,
+        overlayGeometry.geometryEpoch,
+        presentationDescriptor.graphRevision,
+        selectedImage.path,
+      ],
+    );
     const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
     const activeInitialMaskDrawId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerInitialMaskDrawContext: ViewerInitialMaskDrawCurrentContext = {
@@ -1300,22 +1332,23 @@ const ImageCanvas = memo(
           if (!activeSubMaskParameters) return;
           const pos = getCanvasPointer(e.target.getStage());
           if (!pos) return;
-
-          const imagePoint = getImageSpacePoint(pos);
-          const x = imagePoint.x;
-          const y = imagePoint.y;
-
-          const newParams: MaskParameters = { ...activeSubMaskParameters };
-          newParams.targetX = x;
-          newParams.targetY = y;
-          newParams.rotation = adjustments.rotation || 0;
-          newParams['flipHorizontal'] = adjustments.flipHorizontal || false;
-          newParams['flipVertical'] = adjustments.flipVertical || false;
-          newParams['orientationSteps'] = adjustments.orientationSteps || 0;
-          delete newParams.isInitialDraw;
-
-          const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-          viewerAdjustmentCommandServices.updateSubMask(activeId, { parameters: newParams });
+          const pointer = viewerBrushPointerMetadata(e.evt);
+          const command = viewerParametricMaskTargetController.activate(
+            viewerParametricMaskTargetContext,
+            {
+              imagePoint: getImageSpacePoint(pos),
+              pointerId: pointer.pointerId,
+              pointerType: pointer.pointerType,
+            },
+            {
+              baselineParameters: activeSubMaskParameters,
+              flipHorizontal: adjustments.flipHorizontal ?? false,
+              flipVertical: adjustments.flipVertical ?? false,
+              orientationSteps: adjustments.orientationSteps ?? 0,
+              rotation: adjustments.rotation ?? 0,
+            },
+          );
+          if (command) onParametricMaskTargetCommit(command);
           return;
         }
 
@@ -1395,6 +1428,7 @@ const ImageCanvas = memo(
         activeAiSubMaskId,
         activeSubMask,
         activeSubMaskParameters,
+        getImageSpacePoint,
         effectiveImageDimensions,
         isToolActive,
         brushImageSpaceSize,
@@ -1408,6 +1442,9 @@ const ImageCanvas = memo(
         viewerInitialMaskDrawController,
         viewerBrushContext,
         viewerBrushController,
+        viewerParametricMaskTargetContext,
+        viewerParametricMaskTargetController,
+        onParametricMaskTargetCommit,
       ],
     );
 
@@ -2016,6 +2053,9 @@ const ImageCanvas = memo(
           lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.averageRgb.red) : undefined
         }
         data-wgpu-frame-health={wgpuPreviewVisibility.health}
+        data-parametric-mask-context-active={String(viewerParametricMaskTargetContext.active)}
+        data-parametric-mask-context-id={viewerParametricMaskTargetContext.maskId}
+        data-parametric-mask-context-tool={viewerParametricMaskTargetContext.tool}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
           const isCancellation =
