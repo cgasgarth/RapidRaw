@@ -6,6 +6,7 @@ pub(crate) mod display_target;
 pub(crate) mod events;
 pub(crate) mod hdr_display_capability;
 pub(crate) mod preview_session_service;
+pub(crate) mod runtime_environment;
 pub(crate) mod services;
 pub(crate) mod settings;
 pub(crate) mod startup;
