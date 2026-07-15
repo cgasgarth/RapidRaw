@@ -8,9 +8,9 @@ use tauri::{Emitter, ipc::Response};
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_state::{
     AnalyticsFrameId, AnalyticsJob, AnalyticsProducts, AnalyticsSamplingPolicy, AppState,
-    LoadedImage,
 };
 use crate::cache_utils::{calculate_geometry_hash, calculate_transform_hash};
+use crate::editor::image_service::LoadedImage;
 use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
@@ -74,10 +74,9 @@ pub(crate) fn generate_export_soft_proof_preview(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No original image loaded")?;
     if let Some(expected_image_path) = request.expected_image_path.as_deref() {
         validate_expected_preview_image(&loaded_image.path, expected_image_path)
@@ -146,10 +145,9 @@ pub(crate) fn generate_export_soft_proof_preview(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .original_image
-                .lock()
-                .unwrap()
-                .as_ref()
+                .services
+                .editor
+                .image_snapshot()
                 .map(|image| {
                     (
                         Some(image.path.clone()),
@@ -320,10 +318,9 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No original image loaded")?;
     let session = SoftProofPreviewSession {
         generation: state.services.preview_session.current_generation(),
@@ -352,10 +349,9 @@ pub(crate) fn resolve_export_soft_proof_transform_metadata(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .original_image
-                .lock()
-                .unwrap()
-                .as_ref()
+                .services
+                .editor
+                .image_snapshot()
                 .map(|image| {
                     (
                         Some(image.path.clone()),
