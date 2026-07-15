@@ -17,6 +17,24 @@ import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 
+export const EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS = {
+  hue: 0,
+  saturation: 0,
+  vibrance: 0,
+} as const;
+
+export const EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS = Object.keys(
+  EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS,
+) as (keyof typeof EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS)[];
+
+export const editDocumentColorPresenceV2Schema = z
+  .object({
+    hue: z.number().finite().min(-180).max(180),
+    saturation: z.number().finite().min(-100).max(100),
+    vibrance: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
 export const sceneGlobalColorToneParamsV2Schema = z
   .object({
     blacks: z.number().finite().min(-100).max(100),
@@ -24,7 +42,6 @@ export const sceneGlobalColorToneParamsV2Schema = z
     contrast: z.number().finite().min(-100).max(100),
     exposure: z.number().finite().min(-5).max(5),
     highlights: z.number().finite().min(-100).max(100),
-    saturation: z.number().finite().min(-100).max(100),
     shadows: z.number().finite().min(-100).max(100),
     whites: z.number().finite().min(-100).max(100),
   })
@@ -504,15 +521,24 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       contrast: 0,
       exposure: 0,
       highlights: 0,
-      saturation: 0,
       shadows: 0,
       whites: 0,
     },
     editorSection: 'basic',
-    legacyFields: ['blacks', 'brightness', 'contrast', 'exposure', 'highlights', 'saturation', 'shadows', 'whites'],
+    legacyFields: ['blacks', 'brightness', 'contrast', 'exposure', 'highlights', 'shadows', 'whites'],
     nodeType: 'scene_global_color_tone',
     process: 'scene_referred_v2',
     renderStage: 'scene_global_color_tone',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS,
+    editorSection: 'color',
+    legacyFields: EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
+    nodeType: 'color_presence',
+    process: 'scene_referred_v2',
+    renderStage: 'hue_saturation_vibrance',
     implementationVersion: 1,
   },
   {
@@ -1573,7 +1599,35 @@ export const editDocumentV2Schema = z.preprocess((value) => {
   let document = value;
   const nodes = document['nodes'];
   if (!isEditDocumentRecord(nodes)) return value;
-  const layersNode = nodes['layers'];
+  const legacySceneNode = nodes['scene_global_color_tone'];
+  const legacySceneParams = isEditDocumentRecord(legacySceneNode) ? legacySceneNode['params'] : undefined;
+  if (
+    nodes['color_presence'] === undefined &&
+    isEditDocumentRecord(legacySceneNode) &&
+    isEditDocumentRecord(legacySceneParams)
+  ) {
+    const extensions = document['extensions'];
+    const legacyAdjustments = isEditDocumentRecord(extensions) ? extensions['legacyAdjustments'] : undefined;
+    if (isEditDocumentRecord(extensions) && isEditDocumentRecord(legacyAdjustments)) {
+      const migratedPresence = Object.fromEntries(
+        EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS.flatMap((field) =>
+          Object.hasOwn(legacySceneParams, field) ? [[field, legacySceneParams[field]]] : [],
+        ),
+      );
+      const nextSceneParams = { ...legacySceneParams };
+      for (const field of EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS) delete nextSceneParams[field];
+      document = {
+        ...document,
+        extensions: {
+          ...extensions,
+          legacyAdjustments: { ...legacyAdjustments, ...migratedPresence },
+        },
+        nodes: { ...nodes, scene_global_color_tone: { ...legacySceneNode, params: nextSceneParams } },
+      };
+    }
+  }
+  const currentNodes = isEditDocumentRecord(document['nodes']) ? document['nodes'] : nodes;
+  const layersNode = currentNodes['layers'];
   if (isEditDocumentRecord(layersNode)) {
     const rawLayers = document['layers'];
     const rawNodeParams = layersNode['params'];
@@ -1585,11 +1639,22 @@ export const editDocumentV2Schema = z.preprocess((value) => {
         document = {
           ...document,
           layers: parsedLayers.data,
-          nodes: { ...nodes, layers: { ...layersNode, params: parsedLayers.data } },
+          nodes: { ...currentNodes, layers: { ...layersNode, params: parsedLayers.data } },
         };
       }
     }
   }
+  document = normalizeLegacyNodeOwnership(document, {
+    createNode: {
+      enabledFromNodeType: 'channel_mixer',
+      implementationVersion: 1,
+      process: 'scene_referred_v2',
+    },
+    defaults: EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS,
+    fields: EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
+    nodeType: 'color_presence',
+    schemas: editDocumentColorPresenceV2Schema.shape,
+  });
   document = normalizeLegacyNodeOwnership(document, {
     defaults: EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
     fields: EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,

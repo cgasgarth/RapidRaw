@@ -1792,7 +1792,7 @@ fn apply_filmic_exposure(color: Vec3, brightness: f32) -> Vec3 {
     Vec3::splat(new_luma) + chroma * base_chroma_scale * highlight_rolloff
 }
 
-fn apply_creative_color(color: Vec3, saturation: f32, vibrance: f32) -> Vec3 {
+pub(crate) fn apply_creative_color(color: Vec3, saturation: f32, vibrance: f32) -> Vec3 {
     let luma = scene_luminance(color);
     let mut processed = Vec3::splat(luma).lerp(color, 1.0 + saturation);
     let c_max = processed.max_element();
@@ -1942,7 +1942,7 @@ fn apply_color_calibration(color: Vec3, settings: ColorCalibrationSettings) -> V
     calibrated
 }
 
-fn apply_hue_shift(color: Vec3, shift: f32) -> Vec3 {
+pub(crate) fn apply_hue_shift(color: Vec3, shift: f32) -> Vec3 {
     if shift.abs() < 0.01 {
         return color;
     }
