@@ -42,13 +42,13 @@ export const ColorAdvancedControls = ({
   const [activePrimary, setActivePrimary] = useState('red');
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const commitIdentity = useMemo<ColorCalibrationCommitIdentity | null>(
     () =>
-      imageSessionId !== null && selectedImagePath !== null
-        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
-        : null,
+      selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,
     [adjustmentRevision, imageSessionId, selectedImagePath],
   );
   const commitIdentityRef = useRef(commitIdentity);
