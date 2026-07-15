@@ -364,6 +364,17 @@ describe('reduceEditTransaction', () => {
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 7, request, 'session-layer');
     const persistence = buildEditTransactionPersistenceContext(request, result);
 
+    expect(request.operations).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'layers',
+        patch: { masks: next.masks },
+      },
+    ]);
+    expect(request.operations.some((operation) => operation.type === 'replace-adjustments')).toBe(false);
+    expect(result.afterEditDocumentV2.layers).toEqual({ masks: next.masks });
+    expect(result.afterEditDocumentV2.nodes.layers?.params).toEqual(result.afterEditDocumentV2.layers);
+
     expect(result.applicationReceipt).toMatchObject({
       transactionId: 'layer-persist-1',
       imageSessionId: 'session-layer',
