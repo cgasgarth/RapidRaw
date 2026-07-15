@@ -642,13 +642,14 @@ fn encode_preview_response(
 ) -> Result<Vec<u8>, String> {
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let display_snapshot = app_handle.map(|app| {
-        let services = &app.state::<AppState>().services;
-        services
-            .gpu_context
+        let state = app.state::<AppState>();
+        state
+            .gpu()
             .coordinator_snapshot()
             .and_then(|coordinator| coordinator.current_snapshot())
             .unwrap_or_else(|| {
-                services
+                state
+                    .services
                     .display_profile
                     .preview_transform_snapshot_for_app(app)
             })

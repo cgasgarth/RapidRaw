@@ -3354,8 +3354,8 @@ mod tests {
         let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
         let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
         let v2_receipt = state
-            .services
-            .gpu_processing
+            .gpu()
+            .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
             .expect("real RAW v2 render publishes a GPU execution receipt");
