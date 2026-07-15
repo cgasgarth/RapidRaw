@@ -1144,7 +1144,7 @@ pub(crate) async fn load_image_prepared(
 
     let path_clone = source_path_str.clone();
     let expected_revision = raw_processing_cache_key.source_revision.clone();
-    let fingerprint_cache = state.source_fingerprint_cache.clone();
+    let fingerprint_cache = Arc::clone(&state.services.source_fingerprints);
 
     let cached_data = state
         .services
