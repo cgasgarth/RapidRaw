@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle, Link2, Loader2, Move, Star, Tag, Trash2, Unlink, Users, XCircle } from 'lucide-react';
 import {
@@ -12,10 +11,12 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import type { CullingSettings, CullingSuggestions, ImageAnalysisResult, Progress } from '../../ui/AppProperties';
 import Button from '../../ui/primitives/Button';
 import Dropdown from '../../ui/primitives/Dropdown';
@@ -45,6 +46,53 @@ const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf',
 const SETUP_PREVIEW_LIMIT = 6;
 const COMPARE_PAN_STEP = 10;
 const COMPARE_ZOOM_STEPS = [50, 100, 200] as const;
+const finiteNumberSchema = z.number().finite();
+const imageAnalysisResultSchema = z
+  .object({
+    path: z.string().min(1),
+    qualityScore: finiteNumberSchema,
+    sharpnessMetric: finiteNumberSchema,
+    centerFocusMetric: finiteNumberSchema,
+    faceSharpnessMetric: finiteNumberSchema,
+    eyeSharpnessMetric: finiteNumberSchema,
+    exposureMetric: finiteNumberSchema,
+    focusScore: finiteNumberSchema,
+    focusConfidence: finiteNumberSchema,
+    focusRegion: z.string().min(1),
+    focusRegionProvider: z.string().min(1).nullish(),
+    detectedEyeConfidence: finiteNumberSchema.nullish(),
+    detectedFaceConfidence: finiteNumberSchema.nullish(),
+    width: z.number().int().nonnegative(),
+    height: z.number().int().nonnegative(),
+  })
+  .strict();
+const cullingSuggestionsSchema = z
+  .object({
+    similarGroups: z.array(
+      z
+        .object({
+          representative: imageAnalysisResultSchema,
+          duplicates: z.array(imageAnalysisResultSchema),
+        })
+        .strict(),
+    ),
+    blurryImages: z.array(imageAnalysisResultSchema),
+    focusRankings: z.array(imageAnalysisResultSchema),
+    failedPaths: z.array(z.string().min(1)),
+    latencyReport: z
+      .object({
+        analysisModeCount: z.number().int().nonnegative(),
+        averageAnalysisMs: finiteNumberSchema.nonnegative(),
+        failedCount: z.number().int().nonnegative(),
+        maxAnalysisMs: z.number().int().nonnegative(),
+        sourceCount: z.number().int().nonnegative(),
+        successfulCount: z.number().int().nonnegative(),
+        totalElapsedMs: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
 
 interface CompareViewport {
   linked: boolean;
@@ -402,7 +450,11 @@ function CullingSession({
   const handleStartCulling = useCallback(async () => {
     const token = ++requestToken.current;
     try {
-      const resolvedSuggestions = await invoke<CullingSuggestions>(Invokes.CullImages, { paths: imagePaths, settings });
+      const resolvedSuggestions = await invokeWithSchema(
+        Invokes.CullImages,
+        { paths: imagePaths, settings },
+        cullingSuggestionsSchema,
+      );
       if (!isSessionActive.current || requestToken.current !== token) return;
       dispatchDecision({ paths: imagePaths, type: 'suggestionsResolved', suggestions: resolvedSuggestions });
     } catch (err) {

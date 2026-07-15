@@ -7,6 +7,7 @@ import { chromium, type Locator, type Page } from '@playwright/test';
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
+import { Invokes } from '../../../src/tauri/commands';
 
 const host = '127.0.0.1';
 const portOverride =
@@ -134,6 +135,45 @@ async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
     () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length === 0,
     { timeout: 10_000 },
   );
+}
+
+async function verifySchemaOwnedTauriTransport(page: Page): Promise<void> {
+  const proof = await page.evaluate(
+    async ({ checkStatusCommand, saveMetadataCommand }) => {
+      const invoke = window.__TAURI_INTERNALS__?.invoke;
+      if (invoke === undefined) throw new Error('Browser Tauri transport is unavailable.');
+      const status = await invoke(checkStatusCommand);
+      const receipt = await invoke(saveMetadataCommand, {
+        adjustments: {
+          exposure: 0.5,
+          omittedByJsonTransport: undefined,
+          rawEngineArtifacts: { schemaVersion: 1 },
+        },
+        path: '/tmp/rawengine-browser-harness/schema-boundary.ARW',
+        transaction: null,
+      });
+      const adjustments = typeof receipt === 'object' && receipt !== null ? Reflect.get(receipt, 'adjustments') : null;
+      return {
+        artifactSchemaVersion:
+          typeof adjustments === 'object' && adjustments !== null
+            ? Reflect.get(Reflect.get(adjustments, 'rawEngineArtifacts') ?? {}, 'schemaVersion')
+            : null,
+        hasOmittedProperty:
+          typeof adjustments === 'object' && adjustments !== null
+            ? Object.hasOwn(adjustments, 'omittedByJsonTransport')
+            : true,
+        status,
+      };
+    },
+    {
+      checkStatusCommand: Invokes.CheckAIConnectorStatus,
+      saveMetadataCommand: Invokes.SaveMetadataAndUpdateThumbnail,
+    },
+  );
+  if (proof.status !== null) throw new Error('AI connector status command did not preserve its native unit response.');
+  if (proof.hasOmittedProperty || proof.artifactSchemaVersion !== 1) {
+    throw new Error(`Persistence receipt did not preserve native JSON transport semantics: ${JSON.stringify(proof)}`);
+  }
 }
 
 async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
@@ -1737,6 +1777,7 @@ try {
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
+  await verifySchemaOwnedTauriTransport(page);
   await page.getByRole('button', { name: /Open Folder/u }).click();
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })

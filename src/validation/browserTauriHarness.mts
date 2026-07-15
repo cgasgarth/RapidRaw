@@ -345,6 +345,8 @@ let harnessImages: BrowserHarnessImage[] = [
 
 const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';
 
+const roundTripTauriJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
 export const installBrowserTauriHarness = (): void => {
   if (!harnessEnabled || window.__TAURI_INTERNALS__ !== undefined) return;
 
@@ -715,7 +717,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.cancelThumbnailGeneration:
       return Promise.resolve(true);
     case commandNames.applyAdjustmentsToPaths: {
-      const adjustments = args?.['adjustments'] ?? null;
+      const adjustments = roundTripTauriJson(args?.['adjustments'] ?? null);
       const paths = getStringArrayArg(args, 'paths');
       for (const path of paths) harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
       return new Promise((resolve) => {
@@ -750,7 +752,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
           }
           if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
           resolve({
-            adjustments: args?.['adjustments'] ?? null,
+            adjustments: roundTripTauriJson(args?.['adjustments'] ?? null),
             adjustmentRevision:
               (args?.['transaction'] as { nextAdjustmentRevision?: unknown } | undefined)?.nextAdjustmentRevision ??
               null,
@@ -1092,7 +1094,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         storage: 'temp_cache',
       });
     case commandNames.checkAiConnectorStatus:
-      return Promise.resolve({ connected: false });
+      return Promise.resolve(null);
     case commandNames.testAiConnectorConnection:
       return Promise.resolve(null);
     case commandNames.getSupportedFileTypes:

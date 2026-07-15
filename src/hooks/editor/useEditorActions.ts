@@ -1,7 +1,8 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
 
+import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -37,6 +38,10 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../utils/copyPasteEditTransaction';
+import {
+  editorPersistenceReceiptArraySchema,
+  editorPersistenceReceiptSchema,
+} from '../../utils/editorPersistenceEffectRunner';
 import {
   awaitMatchingEditorPersistence,
   beginEditorPersistenceBarrier,
@@ -74,6 +79,7 @@ import {
   isCurrentResetEditCommitIdentity,
   resetAdjustmentsResultsSchema,
 } from '../../utils/resetEditTransaction';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
@@ -89,11 +95,11 @@ export const debouncedSave = debounce(
     void trackEditorPersistence(
       path,
       adjustmentsToSave,
-      invoke(Invokes.SaveMetadataAndUpdateThumbnail, {
-        path,
-        adjustments: adjustmentsToSave,
-        transaction,
-      }),
+      invokeWithSchema(
+        Invokes.SaveMetadataAndUpdateThumbnail,
+        { path, adjustments: adjustmentsToSave, transaction },
+        editorPersistenceReceiptSchema,
+      ),
     ).catch((err: unknown) => {
       console.error('Auto-save failed:', err);
       toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
@@ -112,13 +118,9 @@ export const awaitMatchingEditorSave = async (
   adjustments: Adjustments,
 ): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, adjustments);
 
-type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
-
-interface MetadataResponse {
-  adjustments?: LoadedMetadataAdjustments | null;
-}
-
 const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
+const lutLoadResponseSchema = z.object({ size: z.number().int().positive() }).strict();
+const androidContentUriNameSchema = z.string().min(1);
 let contextAutoAdjustRequestGeneration = 0;
 
 const createOperationId = (): string => crypto.randomUUID();
@@ -205,7 +207,7 @@ export function useEditorActions() {
     if (base === null) return;
     const requestGeneration = ++contextAutoAdjustRequestGeneration;
     try {
-      const patch = contextAutoAdjustPatchSchema.parse(await invoke<unknown>(Invokes.CalculateAutoAdjustments));
+      const patch = await invokeWithSchema(Invokes.CalculateAutoAdjustments, {}, contextAutoAdjustPatchSchema);
       const state = useEditorStore.getState();
       if (!isCurrentContextAutoAdjustRequest(state, base, requestGeneration, contextAutoAdjustRequestGeneration))
         return;
@@ -230,9 +232,9 @@ export function useEditorActions() {
       const identity = captureLutCommitIdentity(useEditorStore.getState());
       if (identity === null) return;
       try {
-        const result: { size: number } = await invoke(Invokes.LoadAndParseLut, { path });
+        const result = await invokeWithSchema(Invokes.LoadAndParseLut, { path }, lutLoadResponseSchema);
         const name = isAndroid
-          ? await invoke<string>(Invokes.ResolveAndroidContentUriName, { uriStr: path })
+          ? await invokeWithSchema(Invokes.ResolveAndroidContentUriName, { uriStr: path }, androidContentUriNameSchema)
           : path.split(/[\\/]/).pop() || 'LUT';
         const state = useEditorStore.getState();
         applyEditTransaction(
@@ -275,8 +277,10 @@ export function useEditorActions() {
       beginEditorPersistenceAuthorityBarrier();
 
       try {
-        const results = resetAdjustmentsResultsSchema.parse(
-          await invoke<unknown>(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset }),
+        const results = await invokeWithSchema(
+          Invokes.ResetAdjustmentsForPaths,
+          { paths: pathsToReset },
+          resetAdjustmentsResultsSchema,
         );
         assertResetAdjustmentsResultCoverage(results, pathsToReset);
         useProcessStore.getState().invalidateThumbnails(pathsToReset);
@@ -316,7 +320,7 @@ export function useEditorActions() {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
         try {
-          const meta = await invoke<MetadataResponse>(Invokes.LoadMetadata, { path: pathToCopyFrom });
+          const meta = await invokeWithSchema(Invokes.LoadMetadata, { path: pathToCopyFrom }, loadedMetadataSchema);
           if (meta.adjustments && !meta.adjustments.is_null) {
             sourceAdjustments = normalizeLoadedAdjustments(meta.adjustments);
           } else {
@@ -404,11 +408,11 @@ export function useEditorActions() {
         transaction = buildEditTransactionPersistenceContext(request, result);
       }
 
-      invoke<Array<{ adjustments?: Adjustments; path: string }>>(Invokes.ApplyAdjustmentsToPaths, {
-        adjustments: adjustmentsToApply,
-        paths: pathsToUpdate,
-        transaction,
-      })
+      invokeWithSchema(
+        Invokes.ApplyAdjustmentsToPaths,
+        { adjustments: adjustmentsToApply, paths: pathsToUpdate, transaction },
+        editorPersistenceReceiptArraySchema,
+      )
         .then((receipts) => {
           const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
           if (selectedReceipt?.adjustments && selectedImage && pathsToUpdate.includes(selectedImage.path)) {

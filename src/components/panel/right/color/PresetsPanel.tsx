@@ -8,7 +8,6 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import cx from 'clsx';
 import {
@@ -55,6 +54,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
@@ -70,6 +70,7 @@ import {
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../../utils/color/style/colorStylePresetCatalog';
 import { buildReceiptSafePresetApplication } from '../../../../utils/referenceMatchTransfer';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
@@ -567,12 +568,16 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       if (!item || previewsRef.current[item.preset.id] !== undefined) continue;
 
       try {
-        const imageData = await invoke<Uint8Array>(Invokes.GeneratePresetPreview, {
-          jsAdjustments: {
-            ...INITIAL_ADJUSTMENTS,
-            ...bindTypedCurveGraphVersion(item.preset.adjustments),
+        const imageData = await invokeWithSchema(
+          Invokes.GeneratePresetPreview,
+          {
+            jsAdjustments: {
+              ...INITIAL_ADJUSTMENTS,
+              ...bindTypedCurveGraphVersion(item.preset.adjustments),
+            },
           },
-        });
+          z.instanceof(Uint8Array),
+        );
         if (imagePathAtStart !== currentImagePathRef.current) break;
         const previewUrl = URL.createObjectURL(createBlobFromUint8Array(imageData, 'image/jpeg'));
         setPreviews((current) => {

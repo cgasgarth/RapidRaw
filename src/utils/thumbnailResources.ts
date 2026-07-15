@@ -1,5 +1,8 @@
-import { invoke } from '@tauri-apps/api/core';
+import { z } from 'zod';
 import { Invokes } from '../tauri/commands';
+import { invokeWithSchema } from './tauriSchemaInvoke';
+
+const thumbnailResourceBufferSchema = z.instanceof(ArrayBuffer);
 
 export type ThumbnailResourceKind = 'thumbnail' | 'smartPreview';
 
@@ -53,11 +56,15 @@ export class ThumbnailResourceCache {
     const current = this.entries.get(path);
     if (current && current.descriptor.generation > descriptor.generation) return current.url;
     if (current?.objectUrl && current.descriptor.revision === descriptor.revision) return current.url;
-    const bytes = await invoke<ArrayBuffer>(Invokes.GetThumbnailResource, {
-      kind,
-      resourceId: descriptor.resourceId,
-      revision: descriptor.revision,
-    });
+    const bytes = await invokeWithSchema(
+      Invokes.GetThumbnailResource,
+      {
+        kind,
+        resourceId: descriptor.resourceId,
+        revision: descriptor.revision,
+      },
+      thumbnailResourceBufferSchema,
+    );
     const objectUrl = URL.createObjectURL(new Blob([bytes], { type: descriptor.mimeType }));
     this.revoke(current);
     this.entries.set(path, { descriptor, objectUrl, url: objectUrl });

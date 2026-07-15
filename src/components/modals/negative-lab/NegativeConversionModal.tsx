@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
@@ -292,6 +291,33 @@ type BaseSampleDecisionLabelKey =
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const NEGATIVE_LAB_PROFILE_CANDIDATE_RENDER_LIMIT = 3;
+const byteSchema = z.number().int().min(0).max(255);
+const previewByteResponseSchema = z
+  .union([z.instanceof(Uint8Array), z.array(byteSchema)])
+  .transform((bytes) => (bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes)));
+const negativePreviewDataUrlSchema = z.string().startsWith('data:image/');
+const negativeLabDustSpotCandidateListSchema = z.array(
+  z
+    .object({
+      areaPixels: z.number().int().positive(),
+      candidateId: z.string().min(1),
+      confidence: z.number().min(0).max(1),
+      detectorVersion: z.string().min(1),
+      geometry: z
+        .object({
+          coordinateSpace: z.literal('normalized_frame'),
+          height: z.number().positive().max(1),
+          width: z.number().positive().max(1),
+          x: z.number().min(0).max(1),
+          y: z.number().min(0).max(1),
+        })
+        .strict(),
+      polarity: z.enum(['dark', 'light', 'mixed']),
+      rejectionReasons: z.array(z.string().min(1)),
+      supportCount: z.number().int().positive(),
+    })
+    .strict(),
+);
 const DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS = {
   algorithm_version: 1,
   anchor_density: 0.5,
@@ -1365,16 +1391,11 @@ function NegativeLabSession({
     const frame = frameHealthReport.frames[effectiveActivePathIndex];
     if (frame === undefined) return;
     let cancelled = false;
-    void invoke<
-      Array<{
-        candidateId: string;
-        confidence: number;
-        detectorVersion: string;
-        geometry: { coordinateSpace: 'normalized_frame'; height: number; width: number; x: number; y: number };
-        polarity: 'dark' | 'light' | 'mixed';
-        supportCount: number;
-      }>
-    >(Invokes.AnalyzeNegativeLabDustSpots, { path: selectedImagePath })
+    void invokeWithSchema(
+      Invokes.AnalyzeNegativeLabDustSpots,
+      { path: selectedImagePath },
+      negativeLabDustSpotCandidateListSchema,
+    )
       .then((candidates) => {
         if (cancelled) return;
         setNativeDustCandidatesByFrameId((current) => ({
@@ -2347,10 +2368,11 @@ function NegativeLabSession({
     }
     setOriginalUrl(null);
 
-    void invoke<number[]>(Invokes.GeneratePreviewForPath, {
-      path: selectedImagePath,
-      jsAdjustments: {},
-    })
+    void invokeWithSchema(
+      Invokes.GeneratePreviewForPath,
+      { path: selectedImagePath, jsAdjustments: {} },
+      previewByteResponseSchema,
+    )
       .then((bytes) => {
         if (disposed || requestSequence !== sourcePreviewRequestSequenceRef.current) return;
         const nextUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }));
@@ -2432,11 +2454,15 @@ function NegativeLabSession({
         const baseSampleId = getNegativeLabProfileBaseSampleId(candidateParams);
 
         try {
-          const url: string = await invoke(Invokes.PreviewNegativeConversion, {
-            crosstalkProfile: row.selectedProfileSnapshot.crosstalkProfile,
-            params: candidateParams,
-            path: selectedImagePath,
-          });
+          const url = await invokeWithSchema(
+            Invokes.PreviewNegativeConversion,
+            {
+              crosstalkProfile: row.selectedProfileSnapshot.crosstalkProfile,
+              params: candidateParams,
+              path: selectedImagePath,
+            },
+            negativePreviewDataUrlSchema,
+          );
           const imageHash = buildNegativeLabRenderedCandidateHash({
             pipeline: Invokes.PreviewNegativeConversion,
             profileProvenanceHash: row.selectedProfileSnapshot.profileProvenanceHash,

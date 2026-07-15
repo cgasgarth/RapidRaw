@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
 import type { ViewerAiMaskBoxCommand } from '../../components/panel/editor/viewerAiMaskBoxInteractionController';
 import type { SubMask } from '../../components/panel/right/layers/Masks';
 import { AiProviderId, type AiProviderId as AiProviderIdType } from '../../schemas/ai/aiProviderSchemas';
@@ -9,9 +9,34 @@ import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch } from '../adjustments';
 import { formatUnknownError } from '../errorFormatting';
 import { mergeMaskParameters } from '../mask/maskParameterAccess';
-import { prepareAiSubjectMaskAppServerTool, type AiSubjectMaskToolAppliedResult } from './aiSubjectMaskAppServerTool';
+import { invokeWithSchema } from '../tauriSchemaInvoke';
+import { type AiSubjectMaskToolAppliedResult, prepareAiSubjectMaskAppServerTool } from './aiSubjectMaskAppServerTool';
 
 type SubMaskParameters = Record<string, unknown>;
+
+const aiSubjectMaskParametersSchema = z.union([
+  z
+    .object({
+      startX: z.number().finite(),
+      startY: z.number().finite(),
+      endX: z.number().finite(),
+      endY: z.number().finite(),
+      maskDataBase64: z.string().min(1).nullable(),
+      rotation: z.number().finite().nullable(),
+      flipHorizontal: z.boolean().nullable(),
+      flipVertical: z.boolean().nullable(),
+      orientationSteps: z.number().int().min(0).max(7).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      generatedMaskArtifactId: z.string().min(1),
+      generatedMaskCoverage: z.number().min(0).max(1),
+    })
+    .strict(),
+]);
+
+const generativePatchDataJsonSchema = z.string().min(1);
 
 export interface AiMaskBoxAsyncRequest {
   readonly command: ViewerAiMaskBoxCommand;
@@ -71,16 +96,20 @@ export const runQuickEraseBoxOperation = async (
   setEditor({ isGeneratingAi: true });
 
   try {
-    const newMaskParams = await invoke<SubMaskParameters>(Invokes.GenerateAiSubjectMask, {
-      jsAdjustments: getTransformAdjustments(adjustments),
-      endPoint: [command.endPoint.x, command.endPoint.y],
-      flipHorizontal: adjustments.flipHorizontal,
-      flipVertical: adjustments.flipVertical,
-      orientationSteps: adjustments.orientationSteps,
-      path: selectedImage.path,
-      rotation: adjustments.rotation,
-      startPoint: [command.startPoint.x, command.startPoint.y],
-    });
+    const newMaskParams = await invokeWithSchema(
+      Invokes.GenerateAiSubjectMask,
+      {
+        jsAdjustments: getTransformAdjustments(adjustments),
+        endPoint: [command.endPoint.x, command.endPoint.y],
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        path: selectedImage.path,
+        rotation: adjustments.rotation,
+        startPoint: [command.startPoint.x, command.startPoint.y],
+      },
+      aiSubjectMaskParametersSchema,
+    );
     if (!isCurrent()) return;
     const finalSubMaskParams: SubMaskParameters = {
       ...((subMaskToUpdate.parameters as SubMaskParameters | undefined) ?? {}),
@@ -101,13 +130,17 @@ export const runQuickEraseBoxOperation = async (
       ),
     };
     const patchDefinitionForBackend = updatedAdjustmentsForBackend.aiPatches.find((patch) => patch.id === patchId);
-    const newPatchDataJson = await invoke<string>(Invokes.InvokeGenerativeReplaceWithMaskDef, {
-      currentAdjustments: updatedAdjustmentsForBackend,
-      patchDefinition: { ...patchDefinitionForBackend, prompt: '' },
-      path: selectedImage.path,
-      token: token || null,
-      useFastInpaint: true,
-    });
+    const newPatchDataJson = await invokeWithSchema(
+      Invokes.InvokeGenerativeReplaceWithMaskDef,
+      {
+        currentAdjustments: updatedAdjustmentsForBackend,
+        patchDefinition: { ...patchDefinitionForBackend, prompt: '' },
+        path: selectedImage.path,
+        token: token || null,
+        useFastInpaint: true,
+      },
+      generativePatchDataJsonSchema,
+    );
     if (!isCurrent() || findCommandSubMask(useEditorStore.getState().adjustments, command) === null) return;
     const newPatchData = parseAiPatchDataJson(newPatchDataJson);
     patchResidency.remove(patchId);
@@ -167,16 +200,20 @@ export const runAiSubjectBoxOperation = async (
       return;
     }
 
-    const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiSubjectMask, {
-      jsAdjustments: getTransformAdjustments(adjustments),
-      endPoint: [command.endPoint.x, command.endPoint.y],
-      flipHorizontal: adjustments.flipHorizontal,
-      flipVertical: adjustments.flipVertical,
-      orientationSteps: adjustments.orientationSteps,
-      path: selectedImage.path,
-      rotation: adjustments.rotation,
-      startPoint: [command.startPoint.x, command.startPoint.y],
-    });
+    const newParameters = await invokeWithSchema(
+      Invokes.GenerateAiSubjectMask,
+      {
+        jsAdjustments: getTransformAdjustments(adjustments),
+        endPoint: [command.endPoint.x, command.endPoint.y],
+        flipHorizontal: adjustments.flipHorizontal,
+        flipVertical: adjustments.flipVertical,
+        orientationSteps: adjustments.orientationSteps,
+        path: selectedImage.path,
+        rotation: adjustments.rotation,
+        startPoint: [command.startPoint.x, command.startPoint.y],
+      },
+      aiSubjectMaskParametersSchema,
+    );
     if (!isCurrent()) return;
     const subjectMaskToolResult = await subjectMaskToolSession.apply();
     if (!isCurrent()) return;

@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { CheckCircle, Images, ShieldCheck, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +18,7 @@ import {
   type HdrRuntimePlan,
   type HdrToneMappingPreset,
 } from '../../../schemas/computational-merge/hdrMergeUiSchemas';
+import { emptyTauriResponseSchema } from '../../../schemas/tauriResponseSchemas';
 import { type HdrModalState, useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
 import { TextColors, TextVariants } from '../../../types/typography';
@@ -27,6 +27,7 @@ import { buildHdrDerivedOutputReceipt, deriveDerivedOutputReceiptState } from '.
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../../utils/hdrBracketPreflight';
 import { buildHdrEditableHandoffSummary } from '../../../utils/hdrEditableHandoff';
 import { buildHdrReviewDiagnostics } from '../../../utils/hdrReviewDiagnostics';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import Dropdown, { type OptionItem } from '../../ui/primitives/Dropdown';
 import UiText from '../../ui/primitives/Text';
 import ComputationalMergeAppServerBadge from './ComputationalMergeAppServerBadge';
@@ -315,7 +316,7 @@ function HdrMergeSession({
 
   const handleClose = useCallback(() => {
     if (isSaving) return;
-    if (isProcessing) void invoke(Invokes.CancelHdrPlan);
+    if (isProcessing) void invokeWithSchema(Invokes.CancelHdrPlan, {}, emptyTauriResponseSchema);
     onClose();
   }, [isProcessing, onClose, isSaving]);
 

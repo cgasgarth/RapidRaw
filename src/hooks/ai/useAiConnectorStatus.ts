@@ -1,18 +1,19 @@
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { parseAiConnectorStatusPayload } from '../../schemas/tauriEventSchemas';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useNativeCapabilityStore } from '../../store/useNativeCapabilityStore';
 import { Invokes } from '../../tauri/commands';
 import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from '../../utils/tauriEventNames';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 export const AI_CONNECTOR_STATUS_POLL_INTERVAL_MS = 10_000;
 
 const checkAiConnectorStatus = async (): Promise<void> => {
-  await invoke(Invokes.CheckAIConnectorStatus);
+  await invokeWithSchema(Invokes.CheckAIConnectorStatus, {}, emptyTauriResponseSchema);
 };
 
 const logAiConnectorStatusError = (message: string, error: unknown): void => {
