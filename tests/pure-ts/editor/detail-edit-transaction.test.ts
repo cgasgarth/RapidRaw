@@ -182,18 +182,16 @@ describe('detail edit transaction', () => {
         return 0;
       },
     });
-    runner.submit({
+    runner.installSession({
       adjustmentRevision: 0,
       adjustments: { ...committed.adjustments, structure: 0 },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
-      interactionActive: false,
-      multiSelection: null,
       path: sourcePath,
-      receipt: null,
       sessionGeneration: session.generation,
     });
-    runner.submit({
+    if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed detail receipt');
+    runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
       adjustments: committed.adjustments,
       editDocumentV2: committed.editDocumentV2,

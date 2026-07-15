@@ -91,14 +91,12 @@ const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersisten
 });
 
 const prime = (runner: EditorPersistenceEffectRunner, overrides: Partial<EditorPersistenceInput> = {}): void => {
-  runner.submit(
+  runner.installSession(
     input({
       adjustmentRevision: 0,
       adjustments: adjustments(0),
-      receipt: null,
       ...overrides,
     }),
-    0,
   );
 };
 
@@ -148,10 +146,10 @@ describe('editor persistence effect runner', () => {
       executions += 1;
       return receipt(value.path);
     });
-    const primed = input({ adjustmentRevision: 0, adjustments: adjustments(0), receipt: null });
+    const primed = input({ adjustmentRevision: 0, adjustments: adjustments(0) });
 
-    runner.submit(primed);
-    runner.submit(primed);
+    runner.installSession(primed);
+    runner.installSession(primed);
     clock.advance(100);
 
     expect(executions).toBe(0);
@@ -166,9 +164,9 @@ describe('editor persistence effect runner', () => {
     });
 
     prime(runner);
-    runner.submit(input({ interactionActive: true }));
+    runner.submitCommitted(input({ interactionActive: true }));
     expect(clock.pending()).toBe(0);
-    runner.submit(input({ interactionActive: false }));
+    runner.submitCommitted(input({ interactionActive: false }));
     clock.advance(49);
     expect(executions).toHaveLength(0);
     clock.advance(1);
@@ -185,7 +183,7 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
     prime(runner);
-    runner.submit(
+    runner.submitCommitted(
       input({
         adjustments: { ...adjustments(1), contrast: 25 },
         multiSelection: { includedAdjustments: ['exposure'], paths: ['/fixtures/b.raw'] },
@@ -201,7 +199,7 @@ describe('editor persistence effect runner', () => {
     });
   });
 
-  test('passes transaction authority only for an exact receipt and skips native-committed work', async () => {
+  test('rejects inferred snapshot work, requires exact transaction authority, and skips native-committed work', async () => {
     const executions: EditorPersistenceExecution[] = [];
     const { clock, runner, snapshots } = harness(async (value) => {
       executions.push(value);
@@ -209,29 +207,31 @@ describe('editor persistence effect runner', () => {
     });
 
     prime(runner);
-    runner.submit(input({ receipt: editReceipt('stale-session', 1) }), 0);
+    expect(runner.submitCommitted(input({ receipt: editReceipt('stale-session', 1) }), 0)).toBe(false);
     clock.advance(0);
     await flush();
-    expect(executions[0]?.transaction).toBeUndefined();
+    expect(executions).toHaveLength(0);
 
-    runner.submit(
-      input({
-        adjustmentRevision: 2,
-        adjustments: adjustments(2),
-        receipt: editReceipt('session-a', 2),
-      }),
-      0,
-    );
+    expect(
+      runner.submitCommitted(
+        input({
+          adjustmentRevision: 2,
+          adjustments: adjustments(2),
+          receipt: editReceipt('session-a', 2),
+        }),
+        0,
+      ),
+    ).toBe(true);
     clock.advance(0);
     await flush();
-    expect(executions[1]?.transaction).toEqual({
+    expect(executions[0]?.transaction).toEqual({
       baseAdjustmentRevision: 1,
       imageSessionId: 'session-a',
       nextAdjustmentRevision: 2,
       transactionId: 'transaction-session-a-2',
     });
 
-    runner.submit(
+    runner.submitCommitted(
       input({
         adjustmentRevision: 3,
         adjustments: adjustments(3),
@@ -239,11 +239,11 @@ describe('editor persistence effect runner', () => {
       }),
     );
     clock.advance(100);
-    expect(executions).toHaveLength(2);
+    expect(executions).toHaveLength(1);
     expect(snapshots.at(-1)).toEqual({ adjustments: adjustments(3), path: '/fixtures/a.raw' });
   });
 
-  test('reversed revision completions publish only the newest save', async () => {
+  test('serializes revisions so a delayed predecessor cannot overwrite the newest sidecar', async () => {
     const first = deferred<EditorPersistenceReceipt>();
     const second = deferred<EditorPersistenceReceipt>();
     const pending = [first.promise, second.promise];
@@ -254,18 +254,21 @@ describe('editor persistence effect runner', () => {
     });
 
     prime(runner);
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
-    runner.submit(
+    runner.submitCommitted(
       input({ adjustmentRevision: 2, adjustments: adjustments(2), receipt: editReceipt('session-a', 2) }),
       0,
     );
     clock.advance(0);
-    expect(signals[0]?.aborted).toBe(true);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
 
-    second.resolve(receipt('/fixtures/a.raw', 2));
-    await flush();
     first.resolve(receipt('/fixtures/a.raw', 1));
+    await flush();
+    clock.advance(0);
+    expect(signals).toHaveLength(2);
+    second.resolve(receipt('/fixtures/a.raw', 2));
     await flush();
 
     expect(accepted.map(({ execution }) => execution.revision)).toEqual([2]);
@@ -277,16 +280,18 @@ describe('editor persistence effect runner', () => {
     const firstA = deferred<EditorPersistenceReceipt>();
     const b = deferred<EditorPersistenceReceipt>();
     const successorA = deferred<EditorPersistenceReceipt>();
-    const pending = [firstA.promise, b.promise, successorA.promise];
-    const { accepted, clock, failures, runner } = harness(
-      async () => pending.shift() ?? Promise.reject(new Error('unexpected execution')),
-    );
+    const { accepted, clock, failures, runner } = harness(async (value) => {
+      if (value.imageSessionId === 'session-a') return firstA.promise;
+      if (value.imageSessionId === 'session-b') return b.promise;
+      if (value.imageSessionId === 'session-a-successor') return successorA.promise;
+      throw new Error('unexpected execution');
+    });
 
     prime(runner);
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
     prime(runner, { imageSessionId: 'session-b', path: '/fixtures/b.raw', sessionGeneration: 2 });
-    runner.submit(
+    runner.submitCommitted(
       input({
         imageSessionId: 'session-b',
         path: '/fixtures/b.raw',
@@ -297,7 +302,7 @@ describe('editor persistence effect runner', () => {
     );
     clock.advance(0);
     prime(runner, { imageSessionId: 'session-a-successor', sessionGeneration: 3 });
-    runner.submit(
+    runner.submitCommitted(
       input({
         imageSessionId: 'session-a-successor',
         receipt: editReceipt('session-a-successor', 1),
@@ -309,6 +314,8 @@ describe('editor persistence effect runner', () => {
 
     firstA.reject(new Error('stale A failed'));
     b.resolve(receipt('/fixtures/b.raw'));
+    await flush();
+    clock.advance(0);
     successorA.resolve(receipt('/fixtures/a.raw', 3));
     await flush();
 
@@ -326,13 +333,13 @@ describe('editor persistence effect runner', () => {
     });
 
     prime(runner);
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
     await flush();
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
     await flush();
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
     await flush();
 
@@ -354,13 +361,13 @@ describe('editor persistence effect runner', () => {
     });
 
     prime(runner);
-    runner.submit(input(), 25);
+    runner.submitCommitted(input(), 25);
     runner.cancel();
     clock.advance(25);
     expect(executions).toBe(0);
 
     prime(runner);
-    runner.submit(input(), 0);
+    runner.submitCommitted(input(), 0);
     clock.advance(0);
     runner.cancel();
     expect(signal?.aborted).toBe(true);
@@ -373,7 +380,7 @@ describe('editor persistence effect runner', () => {
   test('a persistence barrier cancels queued work without aborting an already-running matching save', () => {
     const queued = harness();
     prime(queued.runner);
-    queued.runner.submit(input(), 50);
+    queued.runner.submitCommitted(input(), 50);
     queued.runner.cancelQueuedForBarrier();
     queued.clock.advance(50);
     expect(queued.accepted).toHaveLength(0);
@@ -383,7 +390,7 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
     prime(running.runner);
-    running.runner.submit(input(), 0);
+    running.runner.submitCommitted(input(), 0);
     running.clock.advance(0);
     running.runner.cancelQueuedForBarrier();
     expect(running.clock.pending()).toBe(0);

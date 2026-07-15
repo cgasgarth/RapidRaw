@@ -42,9 +42,14 @@ export interface EditorPersistenceInput {
     paths: readonly string[];
   } | null;
   path: string;
-  receipt: EditApplicationReceipt | null;
+  receipt: EditApplicationReceipt;
   sessionGeneration: number;
 }
+
+export type EditorPersistenceSessionInput = Omit<
+  EditorPersistenceInput,
+  'interactionActive' | 'multiSelection' | 'receipt'
+>;
 
 export interface EditorPersistenceExecution {
   adjustments: Adjustments;
@@ -119,6 +124,7 @@ export class EditorPersistenceEffectRunner {
   private readonly onCurrentFailure: NonNullable<EditorPersistenceEffectRunnerOptions['onCurrentFailure']>;
   private readonly onSnapshot: NonNullable<EditorPersistenceEffectRunnerOptions['onSnapshot']>;
   private readonly setTimer: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+  private queued: { delayMs: number; execution: EditorPersistenceExecution; token: number } | null = null;
   private sessionKey: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -131,37 +137,43 @@ export class EditorPersistenceEffectRunner {
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
   }
 
-  submit(input: EditorPersistenceInput, delayMs = 50): void {
+  installSession(input: EditorPersistenceSessionInput): void {
     if (this.disposed) throw new Error('Editor persistence runner is disposed.');
     const nextSessionKey = `${String(input.sessionGeneration)}:${input.imageSessionId}:${input.path}`;
-    if (this.sessionKey !== nextSessionKey) {
-      this.cancelPending();
-      this.activeToken += 1;
-      this.sessionKey = nextSessionKey;
-      this.baseline = null;
-    }
+    if (this.sessionKey === nextSessionKey) return;
+    this.cancelPending();
+    this.activeToken += 1;
+    this.sessionKey = nextSessionKey;
+    this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
+  }
 
-    if (this.baseline === null) {
-      this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
-      return;
+  submitCommitted(input: EditorPersistenceInput, delayMs = 50): boolean {
+    if (this.disposed) throw new Error('Editor persistence runner is disposed.');
+    const nextSessionKey = `${String(input.sessionGeneration)}:${input.imageSessionId}:${input.path}`;
+    if (
+      this.sessionKey !== nextSessionKey ||
+      this.baseline === null ||
+      input.receipt.imageSessionId !== input.imageSessionId ||
+      input.receipt.adjustmentRevision !== input.adjustmentRevision
+    ) {
+      return false;
     }
     if (
       areAdjustmentsEqual(this.baseline.adjustments, input.adjustments) &&
       this.baseline.editDocumentV2 === input.editDocumentV2
     )
-      return;
+      return true;
 
-    this.cancelPending();
+    this.cancelQueued();
     this.activeToken += 1;
-    if (input.interactionActive) return;
-    const receipt =
-      input.receipt?.imageSessionId === input.imageSessionId &&
-      input.receipt.adjustmentRevision === input.adjustmentRevision
-        ? input.receipt
-        : null;
-    if (receipt?.persistence === 'native-committed') {
+    if (input.interactionActive) {
+      this.activeController?.abort();
+      return true;
+    }
+    const receipt = input.receipt;
+    if (receipt.persistence === 'native-committed') {
       this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
-      return;
+      return true;
     }
     const token = this.activeToken;
     const execution: EditorPersistenceExecution = {
@@ -172,24 +184,15 @@ export class EditorPersistenceEffectRunner {
       multiSelection: this.resolveMultiSelection(input),
       path: input.path,
       revision: input.adjustmentRevision,
-      ...(receipt === null
-        ? {}
-        : {
-            transaction: {
-              baseAdjustmentRevision: receipt.baseAdjustmentRevision,
-              imageSessionId: receipt.imageSessionId,
-              nextAdjustmentRevision: receipt.adjustmentRevision,
-              transactionId: receipt.transactionId,
-            },
-          }),
-    };
-    this.timer = this.setTimer(
-      () => {
-        this.timer = null;
-        void this.executeCurrent(execution, token);
+      transaction: {
+        baseAdjustmentRevision: receipt.baseAdjustmentRevision,
+        imageSessionId: receipt.imageSessionId,
+        nextAdjustmentRevision: receipt.adjustmentRevision,
+        transactionId: receipt.transactionId,
       },
-      Math.max(0, delayMs),
-    );
+    };
+    this.schedule(execution, token, delayMs);
+    return true;
   }
 
   cancel(): void {
@@ -200,9 +203,8 @@ export class EditorPersistenceEffectRunner {
   }
 
   cancelQueuedForBarrier(): void {
-    if (this.timer === null) return;
-    this.clearTimer(this.timer);
-    this.timer = null;
+    if (this.timer === null && this.queued === null) return;
+    this.cancelQueued();
     this.activeToken += 1;
   }
 
@@ -212,10 +214,14 @@ export class EditorPersistenceEffectRunner {
   }
 
   private cancelPending(): void {
+    this.cancelQueued();
+    this.activeController?.abort();
+  }
+
+  private cancelQueued(): void {
     if (this.timer !== null) this.clearTimer(this.timer);
     this.timer = null;
-    this.activeController?.abort();
-    this.activeController = null;
+    this.queued = null;
   }
 
   private current(token: number, execution: EditorPersistenceExecution): boolean {
@@ -236,8 +242,29 @@ export class EditorPersistenceEffectRunner {
     } catch (error) {
       if (this.current(token, execution)) this.onCurrentFailure(error, execution);
     } finally {
-      if (this.activeController === controller) this.activeController = null;
+      if (this.activeController === controller) {
+        this.activeController = null;
+        const queued = this.queued;
+        this.queued = null;
+        if (queued !== null && this.current(queued.token, queued.execution)) {
+          this.schedule(queued.execution, queued.token, queued.delayMs);
+        }
+      }
     }
+  }
+
+  private schedule(execution: EditorPersistenceExecution, token: number, delayMs: number): void {
+    if (this.activeController !== null) {
+      this.queued = { delayMs, execution, token };
+      return;
+    }
+    this.timer = this.setTimer(
+      () => {
+        this.timer = null;
+        void this.executeCurrent(execution, token);
+      },
+      Math.max(0, delayMs),
+    );
   }
 
   private publishSnapshot(path: string, adjustments: Adjustments, editDocumentV2: EditDocumentV2): void {

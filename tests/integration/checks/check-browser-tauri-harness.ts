@@ -3125,6 +3125,7 @@ try {
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === persistenceCommand) ?? [];
       return {
         firstEndedAtMs: saves[firstIndex]?.endedAtMs ?? null,
+        secondStartedAtMs: saves[secondIndex]?.startedAtMs ?? null,
         secondEndedAtMs: saves[secondIndex]?.endedAtMs ?? null,
         secondTransaction: saves[secondIndex]?.args?.['transaction'] ?? null,
       };
@@ -3137,11 +3138,12 @@ try {
   );
   if (
     reorderedPersistenceProof.firstEndedAtMs === null ||
+    reorderedPersistenceProof.secondStartedAtMs === null ||
     reorderedPersistenceProof.secondEndedAtMs === null ||
-    reorderedPersistenceProof.secondEndedAtMs >= reorderedPersistenceProof.firstEndedAtMs
+    reorderedPersistenceProof.secondStartedAtMs < reorderedPersistenceProof.firstEndedAtMs
   ) {
     throw new Error(
-      `Persistence completions did not reverse as injected: ${JSON.stringify(reorderedPersistenceProof)}`,
+      `Successor persistence overlapped its delayed predecessor: ${JSON.stringify(reorderedPersistenceProof)}`,
     );
   }
   if (reorderedPersistenceProof.secondTransaction === null) {
@@ -3149,6 +3151,72 @@ try {
   }
   if ((await exposureValue.textContent())?.trim() !== '0.90') {
     throw new Error('A stale persistence completion displaced the current editor adjustment.');
+  }
+  if (browserScenario === 'persistence-session-authority') {
+    const saveCount = persistenceBaseline + 2;
+    await page.getByTestId('viewer-footer-zoom-select').selectOption('1');
+    await waitForStablePreview(page);
+    await page.waitForTimeout(100);
+    const savesAfterPreview = await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'save_metadata_and_update_thumbnail',
+        ).length ?? 0,
+    );
+    if (savesAfterPreview !== saveCount) {
+      throw new Error('Preview/zoom execution acquired persistence authority without a committed edit transaction.');
+    }
+    await page
+      .locator('button[data-command-id="back-to-library"]:visible')
+      .first()
+      .evaluate((element) => {
+        if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+        element.click();
+      });
+    await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+    await page
+      .getByRole('button', { name: /browser-harness\.ARW/u })
+      .first()
+      .dblclick();
+    await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
+    await page.getByTestId('image-canvas').waitFor({ timeout: 10_000 });
+    await page.getByTestId('embedded-preview-provisional-badge').waitFor({ state: 'hidden', timeout: 10_000 });
+    await waitForStablePreview(page);
+    const reopenedInspector = page.getByTestId('adjustments-inspector');
+    if (!(await reopenedInspector.isVisible())) {
+      await page.getByTestId('right-panel-switcher-button-adjustments').click();
+    }
+    await reopenedInspector.waitFor({ timeout: 10_000 });
+    const reopenedExposure = page.getByTestId('basic-control-exposure-value');
+    await reopenedExposure.waitFor({ timeout: 10_000 });
+    if ((await reopenedExposure.textContent())?.trim() !== '0.90') {
+      throw new Error('Reopened session did not hydrate the newest serialized sidecar revision.');
+    }
+    const reopenedProof = await page.evaluate(() => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const request = calls.filter(({ command }) => command === 'apply_adjustments').at(-1)?.args?.['request'];
+      const saves = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length;
+      return { request, saves };
+    });
+    const reopenedDocument = editDocumentV2Schema.parse(
+      typeof reopenedProof.request === 'object' && reopenedProof.request !== null
+        ? reopenedProof.request['editDocumentV2']
+        : null,
+    );
+    if (reopenedDocument.nodes.scene_global_color_tone?.params.exposure !== 0.9) {
+      throw new Error('Reopened preview did not render the newest persisted edit document.');
+    }
+    if (reopenedProof.saves !== saveCount) {
+      throw new Error('Session reopen/native hydration emitted a duplicate persistence write.');
+    }
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected persistence-session browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('persistence session authority browser proof passed');
+    process.exit(0);
   }
   const editDocumentPreviewProof = await page.evaluate(() => {
     const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
