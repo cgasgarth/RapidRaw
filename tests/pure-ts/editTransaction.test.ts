@@ -286,7 +286,7 @@ describe('reduceEditTransaction', () => {
     const operations = buildEditorSectionNodeEnablementOperations(document, 'color', false);
     const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 4, request({ operations }), undefined, document);
 
-    expect(operations).toHaveLength(9);
+    expect(operations).toHaveLength(10);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
     expect(result.after).toBe(INITIAL_ADJUSTMENTS);
