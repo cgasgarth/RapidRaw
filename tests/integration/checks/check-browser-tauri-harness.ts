@@ -212,8 +212,10 @@ async function verifyEditorRenderAuthorityBoundary(page: Page): Promise<void> {
 
 async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
   await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
-  const recover = page.locator('[data-testid$="-analytics-header-recover-scopes"]').first();
-  if ((await recover.count()) > 0 && (await recover.isEnabled())) await recover.click();
+  await page.locator('[data-testid$="-analytics-header-recover-scopes"]').evaluateAll((buttons) => {
+    const recover = buttons[0];
+    if (recover instanceof HTMLButtonElement && !recover.disabled) recover.click();
+  });
   await page.waitForFunction(() => {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
     return calls.some(({ args, command }) => {
