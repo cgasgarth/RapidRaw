@@ -76,6 +76,7 @@ try{${script}}finally{clearInterval(lifecycle)}`;
     Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${lifecycle}`], {
       env: {
         ...Bun.env,
+        RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
         RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
         RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
         RAWENGINE_TEST_PARENT_PID: String(process.pid),
@@ -110,6 +111,7 @@ const coordinated = (root: string, label: string, script: string) =>
       {
         env: {
           ...Bun.env,
+          RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
           RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
           RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
         },
@@ -190,7 +192,12 @@ await lease.release();`,
 
   test('aborted queued acquisition removes its waiter without touching the live owner', async () => {
     const root = await temporaryRoot();
-    const holder = await acquireResourceLease({ label: 'holder', resource: 'native-heavy', root });
+    const holder = await acquireResourceLease({
+      label: 'holder',
+      ownerId: 'cancel-holder',
+      resource: 'native-heavy',
+      root,
+    });
     const controller = new AbortController();
     let markQueued: (() => void) | undefined;
     const queued = new Promise<void>((resolve) => {
@@ -199,6 +206,7 @@ await lease.release();`,
     const waiting = acquireResourceLease({
       label: 'cancelled-waiter',
       onQueued: () => markQueued?.(),
+      ownerId: 'cancel-waiter',
       pollMs: 1,
       resource: 'native-heavy',
       root,
@@ -254,6 +262,141 @@ await lease.release();`,
     expect(publishAt).toBeLessThanOrEqual(secondAt);
     expect(benchmarkOutput).toContain('benchmark-reacquire waiting for native-heavy: publish-waiter pid=');
     expect(await queuedLabels(root)).toEqual([]);
+  });
+
+  test('reenters a same-owner native build for a nested performance bisect without queueing', async () => {
+    const root = await temporaryRoot();
+    let nestedQueued = false;
+    const nativeBuild = await acquireResourceLease({ label: 'native-build', resource: 'native-heavy', root });
+    const performanceBisect = await acquireResourceLease({
+      label: 'performance-bisect',
+      onQueued: () => {
+        nestedQueued = true;
+      },
+      resource: 'native-heavy',
+      root,
+    });
+
+    const owner = JSON.parse(await readFile(join(root, 'native-heavy.owner.json'), 'utf8')) as {
+      label: string;
+      leases: Array<{ label: string }>;
+      ownerId: string;
+    };
+    expect(nestedQueued).toBeFalse();
+    expect(performanceBisect.ownerId).toBe(nativeBuild.ownerId);
+    expect(owner.label).toBe('performance-bisect');
+    expect(owner.leases.map((lease) => lease.label)).toEqual(['native-build', 'performance-bisect']);
+
+    await performanceBisect.release();
+    expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('native-build')).toBeTrue();
+    await nativeBuild.release();
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  });
+
+  test('propagates wrapper ownership so its command can reenter the coordinated resource', async () => {
+    const root = await temporaryRoot();
+    const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
+    const child = coordinated(
+      root,
+      'native-build',
+      `const {acquireResourceLease}=await import(${JSON.stringify(modulePath)});
+const nested=await acquireResourceLease({resource:'native-heavy',label:'performance-bisect'});
+console.log('nested-wrapper-owner '+nested.ownerId); await nested.release();`,
+    );
+
+    await expectSuccessfulExit(child);
+    expect(await new Response(child.stdout).text()).toContain('nested-wrapper-owner ');
+    expect(await queuedLabels(root)).toEqual([]);
+  });
+
+  test('keeps the outer lock until the last nested release while unrelated owners remain FIFO', async () => {
+    const root = await temporaryRoot();
+    const outer = await acquireResourceLease({ label: 'outer', resource: 'native-heavy', root });
+    const nested = await acquireResourceLease({ label: 'nested', resource: 'native-heavy', root });
+    const first = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'first-follower'});
+console.log('first-acquired'); await lease.release();`,
+    );
+    await waitFor(async () => (await queuedLabels(root)).includes('first-follower'), 'first follower never queued');
+    const second = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'second-follower'});
+console.log('second-acquired'); await lease.release();`,
+    );
+    await waitFor(async () => (await queuedLabels(root)).includes('second-follower'), 'second follower never queued');
+
+    await outer.release();
+    expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('nested')).toBeTrue();
+    expect(first.exitCode).toBeNull();
+    await nested.release();
+    await Promise.all([expectSuccessfulExit(first), expectSuccessfulExit(second)]);
+    expect(await new Response(first.stdout).text()).toContain('first-acquired');
+    expect(await new Response(second.stdout).text()).toContain('second-acquired');
+    expect(await queuedLabels(root)).toEqual([]);
+  });
+
+  test('recovers an interrupted owner with nested frames and admits the next owner', async () => {
+    const root = await temporaryRoot();
+    const nestedReady = join(root, 'nested-ready');
+    const interrupted = directLease(
+      root,
+      `const outer=await acquireResourceLease({resource:'native-heavy',label:'interrupted-outer'});
+const nested=await acquireResourceLease({resource:'native-heavy',label:'interrupted-nested'});
+await Bun.write(${JSON.stringify(nestedReady)},'ready');
+while(true) await Bun.sleep(10);`,
+    );
+    await waitFor(async () => await Bun.file(nestedReady).exists(), 'nested owner never became ready');
+    interrupted.kill('SIGKILL');
+    await interrupted.exited;
+
+    const follower = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'post-interrupt'});
+console.log('post-interrupt-acquired'); await lease.release();`,
+    );
+    await expectSuccessfulExit(follower);
+    expect(await new Response(follower.stdout).text()).toContain('post-interrupt-acquired');
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+  });
+
+  test('completes three concurrent precommit-shaped owners with reentrant native gates in FIFO order', async () => {
+    const root = await temporaryRoot();
+    const release = (index: number) => join(root, `release-${index}`);
+    const acquired = (index: number) => join(root, `acquired-${index}`);
+    const worker = (index: number) =>
+      directLease(
+        root,
+        `const outer=await acquireResourceLease({resource:'native-heavy',label:'precommit-${index}:native-build'});
+const nested=await acquireResourceLease({resource:'native-heavy',label:'precommit-${index}:performance-bisect'});
+await Bun.write(${JSON.stringify(acquired(index))},'acquired');
+while(!(await Bun.file(${JSON.stringify(release(index))}).exists())) await Bun.sleep(10);
+await nested.release(); await outer.release();`,
+      );
+    const workers = [worker(0)];
+    await waitFor(async () => await Bun.file(acquired(0)).exists(), 'first precommit owner did not acquire');
+    workers.push(worker(1));
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('precommit-1:native-build'),
+      'second precommit owner did not queue',
+    );
+    workers.push(worker(2));
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('precommit-2:native-build'),
+      'third precommit owner did not queue',
+    );
+    expect(await Bun.file(acquired(1)).exists()).toBeFalse();
+    expect(await Bun.file(acquired(2)).exists()).toBeFalse();
+    for (let index = 0; index < workers.length; index += 1) {
+      await writeFile(release(index), 'release\n');
+      await expectSuccessfulExit(workers[index] as ReturnType<typeof Bun.spawn>);
+      if (index + 1 < workers.length)
+        await waitFor(
+          async () => await Bun.file(acquired(index + 1)).exists(),
+          `precommit owner ${index + 1} did not acquire`,
+        );
+    }
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
 
   test('reaps a killed oldest waiter without skipping the next live ticket', async () => {

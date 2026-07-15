@@ -84,6 +84,7 @@ const lease = await acquireResourceLease({ label, resource });
 try {
   const child = Bun.spawn(['bun', import.meta.path, '--supervise-child-of', String(process.pid), '--', ...command], {
     detached: true,
+    env: { ...Bun.env, RAWENGINE_RESOURCE_OWNER_ID: lease.ownerId },
     stderr: 'inherit',
     stdout: 'inherit',
   });

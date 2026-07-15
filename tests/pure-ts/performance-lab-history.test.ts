@@ -313,6 +313,7 @@ exit 1
         await rm(evaluatorMilestone, { force: true });
         const holder = await acquireResourceLease({
           label: `synthetic-native-load-${repetition}`,
+          ownerId: `synthetic-native-load-${repetition}`,
           resource: 'native-heavy',
           root: coordinationRoot,
         });
@@ -346,6 +347,7 @@ exit 1
     const coordinationRoot = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-wait-cancel-'));
     const holder = await acquireResourceLease({
       label: 'native-build',
+      ownerId: 'unrelated-native-build',
       resource: 'native-heavy',
       root: coordinationRoot,
     });

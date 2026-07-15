@@ -424,9 +424,19 @@ console.log(JSON.stringify({waitedMs:Date.now()-started}));
 await Bun.sleep(180);
 await lease.release();`;
     const env = { ...process.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: coordinator };
-    const first = Bun.spawn(['bun', '-e', script], { cwd: firstWorktree, env, stdout: 'pipe', stderr: 'pipe' });
+    const first = Bun.spawn(['bun', '-e', script], {
+      cwd: firstWorktree,
+      env: { ...env, RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID() },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
     await Bun.sleep(25);
-    const second = Bun.spawn(['bun', '-e', script], { cwd: secondWorktree, env, stdout: 'pipe', stderr: 'pipe' });
+    const second = Bun.spawn(['bun', '-e', script], {
+      cwd: secondWorktree,
+      env: { ...env, RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID() },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
     const [firstOutput, secondOutput, firstExit, secondExit] = await Promise.all([
       new Response(first.stdout).text(),
       new Response(second.stdout).text(),

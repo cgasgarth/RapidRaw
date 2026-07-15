@@ -5,9 +5,16 @@ import { isAbsolute, join, resolve } from 'node:path';
 interface LeaseOwner {
   hostname: string;
   label: string;
+  leases?: LeaseFrame[];
+  ownerId?: string;
   pid: number;
   startedAt: string;
   worktree: string;
+}
+
+interface LeaseFrame {
+  id: string;
+  label: string;
 }
 
 interface LeaseWaiter extends LeaseOwner {
@@ -18,6 +25,7 @@ export interface ResourceLeaseOptions {
   capacity?: number;
   label: string;
   onQueued?: () => void;
+  ownerId?: string;
   resource: string;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -26,13 +34,16 @@ export interface ResourceLeaseOptions {
 }
 
 export interface ResourceLease {
+  ownerId: string;
   release: () => Promise<void>;
   updateOwnerPid: (pid: number) => Promise<void>;
 }
 
+const processOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID ?? crypto.randomUUID();
+
 const compactOwner = (owner: LeaseOwner | null): string =>
   owner
-    ? `${owner.label} pid=${owner.pid} worktree=${owner.worktree} since=${owner.startedAt}`
+    ? `${owner.leases?.map((lease) => lease.label).join(' → ') || owner.label} pid=${owner.pid} worktree=${owner.worktree} since=${owner.startedAt}`
     : 'owner metadata unavailable';
 
 const processIsAlive = (pid: number): boolean => {
@@ -148,6 +159,8 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error(`invalid resource capacity: ${capacity}`);
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
+  const ownerId = options.ownerId ?? processOwnerId;
+  const leaseFrame: LeaseFrame = { id: crypto.randomUUID(), label: options.label };
   const root = coordinatorRoot(options.root);
   const slotSuffix = (slot: number): string => (capacity === 1 ? '' : `.slot-${slot}`);
   const lockPaths = Array.from({ length: capacity }, (_, slot) =>
@@ -160,6 +173,47 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   const queueMutexPath = join(root, `${options.resource}.queue.lock`);
   const ticketPath = join(root, `${options.resource}.ticket`);
   await mkdir(root, { recursive: true });
+
+  const nested = await withQueueMutex(queueMutexPath, pollMs, async () => {
+    for (let slot = 0; slot < capacity; slot += 1) {
+      const lockPath = lockPaths[slot];
+      const ownerPath = ownerPaths[slot];
+      if (!lockPath || !ownerPath) throw new Error(`missing resource slot ${slot}`);
+      const owner = await readOwner(ownerPath);
+      const lockPid = await readLockPid(lockPath);
+      if (owner?.ownerId !== ownerId || lockPid === null || !processIsAlive(lockPid)) continue;
+      const leases = [...(owner.leases ?? [{ id: `legacy-${ownerId}`, label: owner.label }]), leaseFrame];
+      const updated = { ...owner, label: leaseFrame.label, leases };
+      await replaceFile(ownerPath, `${JSON.stringify(updated)}\n`);
+      return { lockPath, ownerPath };
+    }
+    return undefined;
+  });
+  if (nested) {
+    let released = false;
+    return {
+      ownerId,
+      release: async () => {
+        if (released) return;
+        released = true;
+        await withQueueMutex(queueMutexPath, pollMs, async () => {
+          const owner = await readOwner(nested.ownerPath);
+          if (owner?.ownerId !== ownerId) return;
+          const leases = (owner.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
+          if (leases.length > 0) {
+            await replaceFile(
+              nested.ownerPath,
+              `${JSON.stringify({ ...owner, label: leases.at(-1)?.label ?? owner.label, leases })}\n`,
+            );
+            return;
+          }
+          await rm(nested.ownerPath, { force: true });
+          await releasePidLock(nested.lockPath, owner.pid);
+        });
+      },
+      updateOwnerPid: async () => {},
+    };
+  }
   await mkdir(queuePath, { recursive: true });
   const waitStartedAt = Date.now();
   let lastDiagnosticAt = 0;
@@ -214,6 +268,8 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         let owner: LeaseOwner = {
           hostname: hostname(),
           label: options.label,
+          leases: [leaseFrame],
+          ownerId,
           pid: process.pid,
           startedAt: new Date().toISOString(),
           worktree: process.cwd(),
@@ -224,18 +280,35 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         if (waitedMs >= pollMs) console.log(`${options.label} acquired ${options.resource} after ${waitedMs}ms`);
         let released = false;
         return {
+          ownerId,
           release: async () => {
             if (released) return;
             released = true;
-            if ((await readLockPid(lockPath)) === owner.pid) {
-              await rm(ownerPath, { force: true });
-              await releasePidLock(lockPath, owner.pid);
-            }
+            await withQueueMutex(queueMutexPath, pollMs, async () => {
+              const current = await readOwner(ownerPath);
+              if (current?.ownerId !== ownerId) return;
+              const leases = (current.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
+              if (leases.length > 0) {
+                await replaceFile(
+                  ownerPath,
+                  `${JSON.stringify({ ...current, label: leases.at(-1)?.label ?? current.label, leases })}\n`,
+                );
+                return;
+              }
+              if ((await readLockPid(lockPath)) === current.pid) {
+                await rm(ownerPath, { force: true });
+                await releasePidLock(lockPath, current.pid);
+              }
+            });
           },
           updateOwnerPid: async (pid: number) => {
-            owner = { ...owner, pid };
-            await replaceFile(lockPidPath(lockPath), `${pid}\n`);
-            await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+            await withQueueMutex(queueMutexPath, pollMs, async () => {
+              const current = await readOwner(ownerPath);
+              if (current?.ownerId !== ownerId || !current.leases?.some((lease) => lease.id === leaseFrame.id)) return;
+              owner = { ...current, pid };
+              await replaceFile(lockPidPath(lockPath), `${pid}\n`);
+              await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+            });
           },
         };
       } catch (error) {
