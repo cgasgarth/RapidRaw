@@ -522,13 +522,6 @@ const ImageCanvas = memo(
       },
       [releasePresentedPreviewUrl],
     );
-    useEffect(
-      () => () => {
-        presentedPreviewReleaseCoordinator.cancel(releasePresentedPreviewUrl);
-      },
-      [releasePresentedPreviewUrl],
-    );
-
     const retainPreviewLayerUrl = useCallback(
       (owner: string, url: string) => {
         interactivePreviewUrlRegistry.claim(owner, url);

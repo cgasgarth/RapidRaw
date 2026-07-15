@@ -24,6 +24,7 @@ import {
 } from '../../utils/editedPreviewEffectRunner';
 import { resolveEditorPreviewSource } from '../../utils/editorImagePreviewSource';
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
+import { globalImageCache } from '../../utils/ImageLRUCache';
 import {
   decodeInteractivePreviewUrl,
   type InteractivePreviewScope,
@@ -491,6 +492,9 @@ export function useImageProcessing() {
       dispatchPreviewCoordinator({ reason: 'editor-unmounted', type: 'cancel-session' });
       editedPreviewRunner.cancel();
       originalPreviewRunner.dispose();
+      presentedPreviewReleaseCoordinator.cancel((url) => {
+        if (!globalImageCache.isProtected(url)) URL.revokeObjectURL(url);
+      });
     },
     [dispatchPreviewCoordinator, editedPreviewRunner, originalPreviewRunner],
   );
