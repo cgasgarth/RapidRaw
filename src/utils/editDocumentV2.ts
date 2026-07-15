@@ -202,6 +202,10 @@ export const updateEditDocumentV2Node = (
     ...document,
     layers: nodeType === 'layers' ? editDocumentLayersV2Schema.parse(nextNode.params) : document.layers,
     nodes: { ...document.nodes, [nodeType]: nextNode },
+    sourceArtifacts:
+      nodeType === 'source_artifacts'
+        ? editDocumentSourceArtifactsV2Schema.parse(nextNode.params)
+        : document.sourceArtifacts,
   };
   editDocumentV2Schema.parse(next);
   return next;
@@ -220,12 +224,16 @@ export const prepareEditDocumentV2ForRender = (
   const nodes = { ...prepared.nodes };
   let geometry = prepared.geometry;
   let layers = prepared.layers;
+  let sourceArtifacts = prepared.sourceArtifacts;
   for (const nodeType of authoritativeNodeTypes) {
     const authoritativeNode = authoritativeDocument.nodes[nodeType];
     if (authoritativeNode === undefined) continue;
     nodes[nodeType] = authoritativeNode;
     if (nodeType === 'geometry') geometry = editDocumentGeometryV2Schema.parse(authoritativeNode.params);
     if (nodeType === 'layers') layers = editDocumentLayersV2Schema.parse(authoritativeNode.params);
+    if (nodeType === 'source_artifacts') {
+      sourceArtifacts = editDocumentSourceArtifactsV2Schema.parse(authoritativeNode.params);
+    }
   }
   // Explicit domains travel with their authoritative nodes; publishing only the
   // envelope would create an ambiguous render document rejected by native code.
@@ -234,6 +242,7 @@ export const prepareEditDocumentV2ForRender = (
     geometry,
     layers,
     nodes,
+    sourceArtifacts,
   };
   editDocumentV2Schema.parse(next);
   return next;

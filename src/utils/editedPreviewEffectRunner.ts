@@ -222,6 +222,7 @@ const executeNativeEditedPreview = async (
           'point_color',
           'scene_curve',
           'scene_global_color_tone',
+          'source_artifacts',
           'tone_equalizer',
         ]),
         expectedImagePath: request.session.sourceImagePath,

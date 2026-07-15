@@ -171,6 +171,7 @@ export function useImageLoader() {
             }
             return state;
           });
+          if (decodedAdjustments !== null && isEditorImageSessionCurrent(sessionId)) resetHistory(decodedAdjustments);
           if (!isEditorImageSessionCurrent(sessionId)) return;
           const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(selectedImagePath);
           if (savedPositiveHandoff !== null) {

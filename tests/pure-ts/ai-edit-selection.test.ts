@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../src/components/panel/right/layers/Masks.tsx';
-import { useEditorStore } from '../../src/store/useEditorStore.ts';
+import { createEditorImageSession, useEditorStore } from '../../src/store/useEditorStore.ts';
+import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots.ts';
 import type { AiPatch } from '../../src/utils/adjustments.ts';
 import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments.ts';
 import {
@@ -8,6 +9,23 @@ import {
   selectionAfterPatchDeletion,
   selectionAfterSubMaskDeletion,
 } from '../../src/utils/aiEditSelection.ts';
+import { buildAiSourceArtifactEditTransaction } from '../../src/utils/aiSourceArtifactEditTransaction.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2.ts';
+
+const sourcePath = '/fixture/ai-source-artifacts.ARW';
+const imageSession = createEditorImageSession({ generation: 12, path: sourcePath, source: 'cache' });
+const selectedImage = {
+  exif: null,
+  height: 3000,
+  isRaw: true,
+  isReady: true,
+  metadata: null,
+  originalUrl: null,
+  path: sourcePath,
+  rawDevelopmentReport: null,
+  thumbnailUrl: '',
+  width: 4000,
+};
 
 const subMask = (id: string): SubMask => ({
   id,
@@ -29,15 +47,33 @@ const patch = (id: string, subMaskIds: Array<string> = []): AiPatch => ({
   visible: true,
 });
 
-afterEach(() => {
+const seedEditor = (adjustments = structuredClone(INITIAL_ADJUSTMENTS)): void => {
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.setState({
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
-    adjustments: structuredClone(INITIAL_ADJUSTMENTS),
+    adjustmentRevision: 0,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+    adjustments,
     brushSettings: { feather: 50, size: 50, tool: ToolType.Brush },
-    history: [structuredClone(INITIAL_ADJUSTMENTS)],
+    editDocumentV2,
+    history: [adjustments],
+    historyCheckpoints: [],
     historyIndex: 0,
+    imageSession,
+    imageSessionId: imageSession.generation,
+    lastEditApplicationReceipt: null,
+    selectedImage,
   });
+};
+
+const required = <T>(value: T | null): T => {
+  if (value === null) throw new Error('Expected value.');
+  return value;
+};
+
+afterEach(() => {
+  seedEditor();
 });
 
 describe('AI edit selection resolver', () => {
@@ -101,13 +137,11 @@ describe('AI edit store command', () => {
   test('commits patch identity, child selection, brush tool, and history together', () => {
     const initialPatch = patch('first');
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [initialPatch] };
+    seedEditor(initial);
     useEditorStore.setState({
-      adjustments: initial,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: null,
       brushSettings: { feather: 25, size: 20, tool: ToolType.Eraser },
-      history: [initial],
-      historyIndex: 0,
     });
 
     const createdSubMask = subMask('created');
@@ -130,17 +164,22 @@ describe('AI edit store command', () => {
     expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
     expect(state.editDocumentV2.nodes.source_artifacts?.params).toEqual(state.editDocumentV2.sourceArtifacts);
     expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
+    expect(state.adjustmentRevision).toBe(1);
+    expect(state.lastEditApplicationReceipt).toMatchObject({
+      adjustmentRevision: 1,
+      baseAdjustmentRevision: 0,
+      persistence: 'commit',
+      source: 'ai-edit',
+    });
   });
 
   test('rejects a stale pending command without changing patches, selection, or history', () => {
     const initialPatch = patch('survivor', ['child']);
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [initialPatch] };
+    seedEditor(initial);
     useEditorStore.setState({
-      adjustments: initial,
       activeAiPatchContainerId: 'survivor',
       activeAiSubMaskId: 'child',
-      history: [initial],
-      historyIndex: 0,
     });
 
     const committed = useEditorStore.getState().applyAiEditCommand(({ aiPatches }) => {
@@ -162,12 +201,10 @@ describe('AI edit store command', () => {
   test('resolves an invalid requested child in the same commit that removes it', () => {
     const initialPatch = patch('first', ['removed']);
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [initialPatch] };
+    seedEditor(initial);
     useEditorStore.setState({
-      adjustments: initial,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: 'removed',
-      history: [initial],
-      historyIndex: 0,
     });
 
     useEditorStore.getState().applyAiEditCommand(({ aiPatches, selection }) => ({
@@ -178,6 +215,80 @@ describe('AI edit store command', () => {
 
     expect(state.activeAiPatchContainerId).toBe('first');
     expect(state.activeAiSubMaskId).toBeNull();
+  });
+
+  test('commits visibility and deletion as independent source-artifact revisions with Undo', () => {
+    const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [patch('first'), patch('second')] };
+    seedEditor(initial);
+
+    useEditorStore.getState().applyAiEditCommand(({ aiPatches, selection }) => ({
+      aiPatches: aiPatches.map((candidate) =>
+        candidate.id === 'first' ? { ...candidate, visible: false } : candidate,
+      ),
+      selection,
+    }));
+    expect(useEditorStore.getState().adjustments.aiPatches[0]?.visible).toBeFalse();
+    expect(useEditorStore.getState().adjustmentRevision).toBe(1);
+    expect(useEditorStore.getState().history).toHaveLength(2);
+
+    useEditorStore.getState().applyAiEditCommand(({ aiPatches, selection }) => ({
+      aiPatches: aiPatches.filter((candidate) => candidate.id !== 'second'),
+      selection,
+    }));
+    expect(useEditorStore.getState().adjustments.aiPatches.map((candidate) => candidate.id)).toEqual(['first']);
+    expect(useEditorStore.getState().adjustmentRevision).toBe(2);
+    expect(useEditorStore.getState().history).toHaveLength(3);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.aiPatches.map((candidate) => candidate.id)).toEqual([
+      'first',
+      'second',
+    ]);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.aiPatches[0]?.visible).toBeTrue();
+    expect(useEditorStore.getState().editDocumentV2.nodes.source_artifacts?.params.aiPatches).toEqual(
+      useEditorStore.getState().adjustments.aiPatches,
+    );
+  });
+
+  test('refuses a source-artifact transaction without a matching selected-image session', () => {
+    const state = useEditorStore.getState();
+    const matching = buildAiSourceArtifactEditTransaction(state, [patch('first')], 'matching');
+    expect(matching).toMatchObject({
+      baseAdjustmentRevision: 0,
+      imageSessionId: imageSession.id,
+      source: 'ai-edit',
+    });
+    expect(
+      buildAiSourceArtifactEditTransaction(
+        { ...state, imageSession: { ...imageSession, path: '/fixture/other.ARW' } },
+        [patch('first')],
+        'stale-source',
+      ),
+    ).toBeNull();
+
+    useEditorStore.setState({
+      imageSession: createEditorImageSession({ generation: 99, path: sourcePath, source: 'cache' }),
+    });
+    expect(() => useEditorStore.getState().applyEditTransaction(required(matching))).toThrow(
+      'edit_transaction.stale_session',
+    );
+  });
+
+  test('treats an identical AI patch command as an exact transaction no-op', () => {
+    const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [patch('first')] };
+    seedEditor(initial);
+
+    const committed = useEditorStore.getState().applyAiEditCommand(({ aiPatches, selection }) => ({
+      aiPatches,
+      selection,
+    }));
+    const state = useEditorStore.getState();
+
+    expect(committed).toEqual({ containerId: null, subMaskId: null });
+    expect(state.adjustmentRevision).toBe(0);
+    expect(state.history).toHaveLength(1);
+    expect(state.lastEditApplicationReceipt).toBeNull();
   });
 
   test('normalizes selection synchronously for reset, navigation, and history snapshots', () => {
