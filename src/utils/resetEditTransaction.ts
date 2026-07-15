@@ -41,17 +41,21 @@ export interface ResetEditCommitIdentity {
 export interface ResetEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { isReady: boolean; path: string } | null;
 }
+
+const currentImageSessionId = (state: ResetEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
 export const captureResetEditCommitIdentity = (
   state: ResetEditTransactionState,
   targetPath: string,
 ): ResetEditCommitIdentity | null =>
-  state.selectedImage?.isReady === true && state.selectedImage.path === targetPath && state.imageSession !== null
+  state.selectedImage?.isReady === true && state.selectedImage.path === targetPath
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        imageSessionId: state.imageSession.id,
+        imageSessionId: currentImageSessionId(state),
         sourceIdentity: targetPath,
       }
     : null;
@@ -61,7 +65,7 @@ export const isCurrentResetEditCommitIdentity = (
   identity: ResetEditCommitIdentity,
 ): boolean =>
   state.selectedImage?.path === identity.sourceIdentity &&
-  state.imageSession?.id === identity.imageSessionId &&
+  currentImageSessionId(state) === identity.imageSessionId &&
   state.adjustmentRevision === identity.adjustmentRevision;
 
 export const buildResetEditTransaction = (
@@ -79,10 +83,8 @@ export const buildResetEditTransaction = (
       `reset_edit_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
-    throw new Error(
-      `reset_edit_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
-    );
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
+    throw new Error(`reset_edit_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`);
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
     throw new Error(

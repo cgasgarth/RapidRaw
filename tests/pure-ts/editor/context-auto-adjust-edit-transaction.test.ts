@@ -143,4 +143,51 @@ describe('context Auto Adjust edit transaction', () => {
     expect(result.noOp).toBe(true);
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 0, historyIndex: 0 });
   });
+
+  test('commits through fallback authority and rejects delayed A to B to A requests', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-context-auto-before',
+      imageSession: null,
+      imageSessionId: 121,
+    });
+    const state = useEditorStore.getState();
+    const base = captureContextAutoAdjustBase(state);
+    if (base === null) throw new Error('Expected fallback context Auto Adjust base');
+    expect(base.imageSessionId).toBe('editor-image-session:121');
+    expect(isCurrentContextAutoAdjustRequest(state, base, 4, 4)).toBeTrue();
+    expect(isCurrentContextAutoAdjustRequest(state, base, 3, 4)).toBeFalse();
+    expect(
+      isCurrentContextAutoAdjustRequest(
+        {
+          ...state,
+          imageSessionId: 122,
+          selectedImage: { isReady: true, path: '/fixture/B.ARW', rawDevelopmentReport: null },
+        },
+        base,
+        4,
+        4,
+      ),
+    ).toBeFalse();
+    expect(isCurrentContextAutoAdjustRequest({ ...state, imageSessionId: 123 }, base, 4, 4)).toBeFalse();
+    expect(isCurrentContextAutoAdjustRequest({ ...state, adjustmentRevision: 1 }, base, 4, 4)).toBeFalse();
+
+    const result = state.applyEditTransaction(
+      buildContextAutoAdjustEditTransaction(state, base, patch, 'fallback-context-auto'),
+    );
+    expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'auto-edit' });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: base.imageSessionId,
+        transactionId: 'fallback-context-auto',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(() =>
+      buildContextAutoAdjustEditTransaction({ ...state, imageSessionId: 123 }, base, patch, 'stale-reopened-a'),
+    ).toThrow('context_auto_adjust_transaction.stale_session');
+  });
 });
