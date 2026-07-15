@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use tauri::{Emitter, Manager};
@@ -7,9 +6,7 @@ use tauri::{Emitter, Manager};
 use crate::AppState;
 #[cfg(any(windows, target_os = "linux"))]
 use crate::WindowState;
-use crate::app::startup::{
-    FrontendStartupPhase, frontend_ready_manages_native_window, record_frontend_phase_with_followup,
-};
+use crate::app::startup::{FrontendStartupPhase, frontend_ready_manages_native_window};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::app::startup::{
     InitializationPriority, request_gpu_initialization, request_lens_initialization,
@@ -61,7 +58,7 @@ fn frontend_ready_impl(
     window: tauri::Window,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let is_first_run = !state.window_setup_complete.swap(true, Ordering::Relaxed);
+    let is_first_run = state.services.startup.claim_first_window_setup();
     #[cfg(target_os = "android")]
     let _ = (is_first_run, &window);
 
@@ -148,7 +145,7 @@ fn frontend_ready_impl(
 pub(crate) fn get_startup_trace(
     state: tauri::State<'_, AppState>,
 ) -> crate::app::startup::StartupTraceSnapshot {
-    state.startup_trace.snapshot()
+    state.services.startup.snapshot()
 }
 
 #[tauri::command]
@@ -160,15 +157,12 @@ pub(crate) fn record_frontend_startup_phase(
     state: tauri::State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<crate::app::startup::StartupTraceSnapshot, String> {
-    record_frontend_phase_with_followup(
-        &state.startup_trace,
-        &trace_id,
-        phase,
-        &status,
-        detail,
-        |snapshot| {
+    state
+        .services
+        .startup
+        .record_frontend_phase(&trace_id, phase, &status, detail, |snapshot| {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if state.startup_trace.arm_idle_warm_after(phase) {
+            if state.services.startup.arm_idle_warm_after(phase) {
                 let idle_services = app.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(Duration::from_millis(1_500)).await;
@@ -188,6 +182,5 @@ pub(crate) fn record_frontend_startup_phase(
                 request_gpu_initialization(app, InitializationPriority::IdleWarm);
             }
             let _ = snapshot;
-        },
-    )
+        })
 }
