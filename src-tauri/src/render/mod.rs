@@ -32,6 +32,7 @@ pub(crate) mod interactive_gpu_pressure;
 pub(crate) mod mask_generation;
 pub(crate) mod measured_reversal;
 pub(crate) mod native_cache;
+pub(crate) mod native_cache_service;
 pub(crate) mod preview_frame_cache_service;
 pub(crate) mod preview_runtime_service;
 pub(crate) mod preview_scheduler;

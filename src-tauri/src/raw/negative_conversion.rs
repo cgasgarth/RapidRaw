@@ -4217,7 +4217,7 @@ fn load_negative_lab_preview_processing_image(
     app_handle: &AppHandle,
 ) -> Result<DynamicImage, String> {
     let cache_key = build_negative_lab_preview_cache_key(source_path_str);
-    if let Some(cached_img) = state.geometry_cache.get(&cache_key) {
+    if let Some(cached_img) = state.services.native_caches.geometry(cache_key) {
         return Ok(cached_img.as_ref().clone());
     }
 
@@ -4258,11 +4258,10 @@ fn load_negative_lab_preview_processing_image(
     };
 
     let downscaled = downscale_f32_image(&image_to_downscale, 1080, 1080);
-    state.geometry_cache.insert(
-        cache_key,
-        Arc::new(downscaled.clone()),
-        downscaled.as_bytes().len() as u64,
-    );
+    state
+        .services
+        .native_caches
+        .insert_geometry(cache_key, Arc::new(downscaled.clone()));
     Ok(downscaled)
 }
 

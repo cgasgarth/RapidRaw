@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use image::{DynamicImage, GrayImage};
+use image::DynamicImage;
 use serde::Serialize;
 
 #[cfg(feature = "ai")]
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
-use crate::cache_utils::DecodedImageCache;
-use crate::lut_processing::{CachedLutPath, Lut};
-use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
+#[cfg(feature = "ai")]
+use crate::render::native_cache::{CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
 
 pub struct PreviewJob {
@@ -76,16 +75,9 @@ pub struct AppState {
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
-    pub cache_budget: Arc<CacheBudgetCoordinator>,
-    pub lut_cache: MemoryLruCache<String, CachedLutPath>,
-    pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
-    pub mask_cache: MemoryLruCache<u64, GrayImage>,
-    pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
-    pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
     image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
-    pub decoded_image_cache: DecodedImageCache,
     pub source_fingerprint_cache: Arc<FingerprintCache>,
     pub smart_preview_scheduler:
         Arc<crate::library::smart_preview_scheduler::SmartPreviewScheduler>,
@@ -101,19 +93,21 @@ impl AppState {
     }
 
     pub fn new() -> Self {
-        let mib = 1024 * 1024;
-        let cache_budget = CacheBudgetCoordinator::new(768 * mib, 1024 * mib);
-        crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
-        let policy = |name, soft, hard, max_entries| CachePolicy {
-            name,
-            soft_limit_bytes: soft * mib,
-            hard_limit_bytes: hard * mib,
-            max_entries,
-        };
+        #[cfg(feature = "ai")]
+        let mib = 1024_u64 * 1024;
+        let services = Arc::new(crate::app::services::AppServices::new());
+        #[cfg(feature = "ai")]
+        let cache_budget = services.native_caches.budget();
+        #[cfg(feature = "ai")]
+        let policy =
+            |name: &'static str, soft: u64, hard: u64, max_entries: Option<usize>| CachePolicy {
+                name,
+                soft_limit_bytes: soft * mib,
+                hard_limit_bytes: hard * mib,
+                max_entries,
+            };
         Self {
-            services: Arc::new(crate::app::services::AppServices::new(Arc::clone(
-                &cache_budget,
-            ))),
+            services,
             #[cfg(feature = "ai")]
             ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
             #[cfg(feature = "ai")]
@@ -129,30 +123,8 @@ impl AppState {
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
-            cache_budget: Arc::clone(&cache_budget),
-            lut_cache: MemoryLruCache::new(
-                policy("lut_paths", 1, 2, Some(64)),
-                Arc::clone(&cache_budget),
-            ),
-            lut_content_cache: MemoryLruCache::new(
-                policy("lut_cpu", 64, 96, Some(32)),
-                Arc::clone(&cache_budget),
-            ),
             interactive_gpu_pressure: Arc::default(),
-            mask_cache: MemoryLruCache::new(
-                policy("masks", 96, 128, Some(64)),
-                Arc::clone(&cache_budget),
-            ),
-            geometry_cache: MemoryLruCache::new(
-                policy("geometry", 256, 384, Some(16)),
-                Arc::clone(&cache_budget),
-            ),
-            thumbnail_geometry_cache: MemoryLruCache::new(
-                policy("thumbnail_geometry", 192, 256, Some(96)),
-                Arc::clone(&cache_budget),
-            ),
             image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
-            decoded_image_cache: DecodedImageCache::new(5, Arc::clone(&cache_budget)),
             source_fingerprint_cache: Arc::new(FingerprintCache::new(64)),
             smart_preview_scheduler:
                 crate::library::smart_preview_scheduler::SmartPreviewScheduler::new(64),

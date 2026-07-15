@@ -9,8 +9,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::render::native_cache::CacheBudgetCoordinator;
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct OperationId(u64);
 
@@ -150,13 +148,18 @@ pub struct AppServices {
     pub(crate) preview_session: Arc<crate::app::preview_session_service::PreviewSessionService>,
     pub(crate) analytics: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
     pub(crate) full_warp_cache: Arc<crate::render::full_warp_cache_service::FullWarpCacheService>,
+    pub(crate) native_caches: Arc<crate::render::native_cache_service::NativeCacheService>,
     pub(crate) viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
     pub(crate) tether: Arc<crate::library::tethering::TetherSessionService>,
     pub jobs: Arc<JobCoordinator>,
 }
 
 impl AppServices {
-    pub(crate) fn new(cache_budget: Arc<CacheBudgetCoordinator>) -> Self {
+    pub(crate) fn new() -> Self {
+        let native_caches =
+            Arc::new(crate::render::native_cache_service::NativeCacheService::default());
+        let cache_budget = native_caches.budget();
+        crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
         Self {
             editor: Arc::default(),
             startup: Arc::default(),
@@ -180,6 +183,7 @@ impl AppServices {
             preview_session: Arc::default(),
             analytics: Arc::default(),
             full_warp_cache: Arc::default(),
+            native_caches,
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),

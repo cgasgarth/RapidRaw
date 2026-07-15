@@ -886,7 +886,10 @@ pub fn is_image_cached(path: String, state: tauri::State<'_, AppState>) -> bool 
     let Ok(revision) = SourceRevision::from_path(&source_path) else {
         return false;
     };
-    state.decoded_image_cache.contains_revision(&revision)
+    state
+        .services
+        .native_caches
+        .contains_decoded_revision(&revision)
 }
 
 #[tauri::command]
@@ -1143,7 +1146,10 @@ pub(crate) async fn load_image_prepared(
     let expected_revision = raw_processing_cache_key.source_revision.clone();
     let fingerprint_cache = state.source_fingerprint_cache.clone();
 
-    let cached_data = state.decoded_image_cache.get(&raw_processing_cache_key);
+    let cached_data = state
+        .services
+        .native_caches
+        .decoded(&raw_processing_cache_key);
 
     let mut is_offline_smart_preview = false;
 
@@ -1368,7 +1374,7 @@ pub(crate) async fn load_image_prepared(
 
             let arc_img = Arc::new(pristine_img);
 
-            state.decoded_image_cache.insert(
+            state.services.native_caches.insert_decoded(
                 raw_processing_cache_key,
                 arc_img.clone(),
                 exif_data_loaded.clone(),

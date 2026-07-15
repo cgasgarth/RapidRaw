@@ -150,7 +150,7 @@ pub(crate) use editor::preview_geometry_service::{
 
 pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String> {
     let fingerprint = lut_processing::source_fingerprint(path).map_err(|e| e.to_string())?;
-    if let Some(entry) = state.lut_cache.get(&path.to_string())
+    if let Some(entry) = state.services.native_caches.lut_path(path)
         && entry.fingerprint == fingerprint
     {
         return Ok(Arc::clone(&entry.lut));
@@ -159,22 +159,24 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
     let parsed = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
     let content_hash = parsed.content_hash;
     let arc_lut = state
-        .lut_content_cache
-        .get(&content_hash)
+        .services
+        .native_caches
+        .lut_content(&content_hash)
         .unwrap_or_else(|| {
             let lut = Arc::new(parsed);
-            state
-                .lut_content_cache
-                .insert(content_hash, Arc::clone(&lut), lut.retained_bytes());
+            state.services.native_caches.insert_lut_content(
+                content_hash,
+                Arc::clone(&lut),
+                lut.retained_bytes(),
+            );
             lut
         });
-    state.lut_cache.insert(
+    state.services.native_caches.insert_lut_path(
         path.to_string(),
         Arc::new(crate::lut_processing::CachedLutPath {
             fingerprint,
             lut: Arc::clone(&arc_lut),
         }),
-        256,
     );
     Ok(arc_lut)
 }
