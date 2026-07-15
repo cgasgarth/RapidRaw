@@ -45,7 +45,6 @@ impl SourceArtifactIdentity {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ArtifactColorDomain {
-    SourceDecoded,
     SceneLinear,
     ViewEncoded,
     DisplayEncoded,
@@ -54,18 +53,11 @@ pub enum ArtifactColorDomain {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ArtifactScope {
     FullFrame,
-    Roi {
-        x: u32,
-        y: u32,
-        width: u32,
-        height: u32,
-    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PreviewQualityIdentity {
     Settled,
-    Interactive { divisor_bits: u32 },
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -130,7 +122,8 @@ impl RenderArtifactIdentity {
         }
     }
 
-    pub fn fingerprint(&self) -> u64 {
+    #[cfg(test)]
+    fn fingerprint(&self) -> u64 {
         stable_hash(self)
     }
 }
@@ -264,19 +257,6 @@ mod tests {
         let base =
             RenderArtifactIdentity::source_geometry(&source("a.raw", 1), 1, 9, 2, 3, 100, 80);
         let mut changed = base.clone();
-        changed.scope = ArtifactScope::Roi {
-            x: 1,
-            y: 2,
-            width: 20,
-            height: 10,
-        };
-        assert_ne!(base, changed);
-        changed = base.clone();
-        changed.quality = PreviewQualityIdentity::Interactive {
-            divisor_bits: 1.5_f32.to_bits(),
-        };
-        assert_ne!(base, changed);
-        changed = base.clone();
         changed.backend_generation += 1;
         assert_ne!(base, changed);
         changed = base.clone();
