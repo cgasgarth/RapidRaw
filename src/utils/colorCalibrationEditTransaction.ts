@@ -10,8 +10,20 @@ export interface ColorCalibrationCommitIdentity {
 export interface ColorCalibrationEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: ColorCalibrationEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const isCurrentColorCalibrationIdentity = (
+  state: ColorCalibrationEditTransactionState,
+  identity: ColorCalibrationCommitIdentity,
+): boolean =>
+  state.adjustmentRevision === identity.adjustmentRevision &&
+  currentImageSessionId(state) === identity.imageSessionId &&
+  state.selectedImage?.path === identity.sourceIdentity;
 
 export const buildColorCalibrationEditTransaction = (
   state: ColorCalibrationEditTransactionState,
@@ -24,9 +36,9 @@ export const buildColorCalibrationEditTransaction = (
       `color_calibration_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `color_calibration_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `color_calibration_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

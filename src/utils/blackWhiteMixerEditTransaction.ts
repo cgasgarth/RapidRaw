@@ -10,8 +10,20 @@ export interface BlackWhiteMixerCommitIdentity {
 export interface BlackWhiteMixerEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: BlackWhiteMixerEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const isCurrentBlackWhiteMixerIdentity = (
+  state: BlackWhiteMixerEditTransactionState,
+  identity: BlackWhiteMixerCommitIdentity,
+): boolean =>
+  state.adjustmentRevision === identity.adjustmentRevision &&
+  currentImageSessionId(state) === identity.imageSessionId &&
+  state.selectedImage?.path === identity.sourceIdentity;
 
 export const buildBlackWhiteMixerEditTransaction = (
   state: BlackWhiteMixerEditTransactionState,
@@ -24,9 +36,9 @@ export const buildBlackWhiteMixerEditTransaction = (
       `black_white_mixer_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `black_white_mixer_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `black_white_mixer_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {

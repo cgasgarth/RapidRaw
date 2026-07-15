@@ -124,7 +124,9 @@ export default function ColorPanel({
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
-  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  );
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -139,7 +141,7 @@ export default function ColorPanel({
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
   const blackWhiteMixerCommitIdentity = useMemo<BlackWhiteMixerCommitIdentity | null>(
     () =>
-      !isForMask && selectedImagePath !== null && imageSessionId !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
@@ -170,7 +172,7 @@ export default function ColorPanel({
   );
   const channelMixerCommitIdentity = useMemo<ChannelMixerCommitIdentity | null>(
     () =>
-      !isForMask && selectedImagePath !== null && imageSessionId !== null
+      !isForMask && selectedImagePath !== null
         ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
         : null,
     [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],

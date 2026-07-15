@@ -6,6 +6,7 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildColorCalibrationEditTransaction,
   type ColorCalibrationCommitIdentity,
+  isCurrentColorCalibrationIdentity,
 } from '../../../src/utils/colorCalibrationEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -86,5 +87,69 @@ describe('color calibration edit transaction', () => {
     expect(() =>
       buildColorCalibrationEditTransaction(state, identity({ adjustmentRevision: 1 }), calibration, 'stale-revision'),
     ).toThrow('color_calibration_transaction.stale_revision');
+  });
+
+  test('commits through fallback authority and rejects stale A to B to A identities', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-calibration-before',
+      imageSession: null,
+      imageSessionId: 87,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: ColorCalibrationCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:87',
+      sourceIdentity: sourcePath,
+    };
+    const noOp = state.applyEditTransaction(
+      buildColorCalibrationEditTransaction(
+        state,
+        fallbackIdentity,
+        structuredClone(INITIAL_ADJUSTMENTS.colorCalibration),
+        'fallback-calibration-no-op',
+      ),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-calibration-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const next = { ...INITIAL_ADJUSTMENTS.colorCalibration, redHue: 22 };
+    const result = state.applyEditTransaction(
+      buildColorCalibrationEditTransaction(state, fallbackIdentity, next, 'fallback-calibration'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['colorCalibration'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-calibration',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.colorCalibration).toEqual(INITIAL_ADJUSTMENTS.colorCalibration);
+
+    expect(isCurrentColorCalibrationIdentity(state, fallbackIdentity)).toBeTrue();
+    expect(
+      isCurrentColorCalibrationIdentity(
+        { ...state, imageSessionId: 88, selectedImage: { path: '/fixture/B.ARW' } },
+        fallbackIdentity,
+      ),
+    ).toBeFalse();
+    expect(isCurrentColorCalibrationIdentity({ ...state, imageSessionId: 89 }, fallbackIdentity)).toBeFalse();
+    expect(isCurrentColorCalibrationIdentity({ ...state, adjustmentRevision: 1 }, fallbackIdentity)).toBeFalse();
+    expect(() =>
+      buildColorCalibrationEditTransaction(
+        { ...state, imageSessionId: 89 },
+        fallbackIdentity,
+        next,
+        'stale-reopened-a',
+      ),
+    ).toThrow('color_calibration_transaction.stale_session');
   });
 });
