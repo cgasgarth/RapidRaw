@@ -36,6 +36,5 @@ process.exit(
     verifyCache: args.includes('--verify-cache'),
     explainCache: args.includes('--explain-cache'),
     root,
-    resourceOwnerId: Bun.env.RAWENGINE_RESOURCE_OWNER_ID,
   }),
 );
