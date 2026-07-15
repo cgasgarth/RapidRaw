@@ -87,6 +87,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-detail-effects-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentDetailEffectsApplyRequestSchema.safeParse({
@@ -197,6 +198,23 @@ if (
 }
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.detail_effects.apply must create undo history and invalidate stale preview output.');
+}
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'agent_detail_effects_3168_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.detail_effects.apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity !== 9 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpness !== 18 ||
+  state.editDocumentV2.nodes.display_creative?.params.grainAmount !== 18 ||
+  state.editDocumentV2.nodes.display_creative.params.vignetteAmount !== -14
+) {
+  throw new Error('agent.detail_effects.apply did not update canonical detail and display nodes.');
 }
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.detail_effects.apply did not update preview render identity.');
