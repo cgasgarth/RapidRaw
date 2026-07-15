@@ -2645,7 +2645,37 @@ fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
 }
 
 fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
-    metadata.adjustments = serde_json::json!({});
+    let effects_enabled = metadata
+        .adjustments
+        .get("effectsEnabled")
+        .and_then(Value::as_bool)
+        .or_else(|| {
+            metadata
+                .adjustments
+                .get("sectionVisibility")
+                .and_then(|visibility| visibility.get("effects"))
+                .and_then(Value::as_bool)
+        });
+    let section_visibility = metadata
+        .adjustments
+        .get("sectionVisibility")
+        .and_then(Value::as_object)
+        .map(|visibility| {
+            visibility
+                .iter()
+                .filter(|(section, value)| section.as_str() != "effects" && value.is_boolean())
+                .map(|(section, value)| (section.clone(), value.clone()))
+                .collect::<serde_json::Map<String, Value>>()
+        })
+        .filter(|visibility| !visibility.is_empty());
+    let mut reset_adjustments = serde_json::Map::new();
+    if let Some(enabled) = effects_enabled {
+        reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
+    }
+    if let Some(visibility) = section_visibility {
+        reset_adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
+    }
+    metadata.adjustments = Value::Object(reset_adjustments);
     if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
         artifacts.hdr_merge_artifacts.clear();
         artifacts.negative_lab_artifacts.clear();
@@ -5303,7 +5333,12 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
             "Camera".to_string(),
             "Control".to_string(),
         )])),
-        adjustments: serde_json::json!({"exposure": 1, "lutPath": "/tmp/cast.cube"}),
+        adjustments: serde_json::json!({
+            "effectsEnabled": false,
+            "exposure": 1,
+            "lutPath": "/tmp/cast.cube",
+            "sectionVisibility": { "basic": false, "effects": false }
+        }),
         raw_engine_artifacts: Some(RawEngineArtifacts {
             ai_provenance_entries: vec![serde_json::json!({"receipt": "keep"})],
             layer_stack_sidecars: vec![serde_json::json!({"layers": [{"exposure": 2}]})],
@@ -5316,7 +5351,13 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
 
     clear_render_authority_for_reset(&mut metadata);
 
-    assert_eq!(metadata.adjustments, serde_json::json!({}));
+    assert_eq!(
+        metadata.adjustments,
+        serde_json::json!({
+            "effectsEnabled": false,
+            "sectionVisibility": { "basic": false }
+        })
+    );
     assert_eq!(metadata.rating, 4);
     assert_eq!(
         metadata.tags.as_deref(),

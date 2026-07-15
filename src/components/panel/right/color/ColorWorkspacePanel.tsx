@@ -80,28 +80,22 @@ export default function ColorWorkspacePanel() {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...resetValues,
-      sectionVisibility: {
-        ...prev.sectionVisibility,
-        color: true,
-      },
     }));
   }, [setAdjustments]);
 
   return (
     <InspectorPanelFrame
       actions={
-        <>
-          <button
-            aria-label={resetColorLabel}
-            className={density.frame.actionButton}
-            disabled={!selectedImage}
-            onClick={handleResetColor}
-            data-tooltip={resetColorLabel}
-            type="button"
-          >
-            <RotateCcw size={PANEL_ACTION_ICON_SIZE} />
-          </button>
-        </>
+        <button
+          aria-label={resetColorLabel}
+          className={density.frame.actionButton}
+          disabled={!selectedImage}
+          onClick={handleResetColor}
+          data-tooltip={resetColorLabel}
+          type="button"
+        >
+          <RotateCcw size={PANEL_ACTION_ICON_SIZE} />
+        </button>
       }
       icon={Palette}
       label={colorLabel}

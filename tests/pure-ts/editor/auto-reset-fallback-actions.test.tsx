@@ -18,7 +18,6 @@ const autoPatch = {
   dehaze: 5,
   exposure: 0.35,
   highlights: -10,
-  sectionVisibility: { basic: true, color: true, effects: true },
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
@@ -59,7 +58,7 @@ afterEach(() => {
 
 test('useEditorActions routes Auto Adjust and native Reset through fallback authority', async () => {
   installDom();
-  const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.6 };
+  const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, exposure: 0.6 };
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.setState({
     adjustmentRevision: 0,
@@ -107,6 +106,7 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
     },
   });
   expect(useEditorStore.getState().adjustments.exposure).toBe(0.35);
+  expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
 
   useEditorStore.setState({ finalPreviewUrl: 'blob:fallback-reset-action-before' });
   await act(async () => actions?.handleResetAdjustments([sourcePath]));
@@ -121,6 +121,7 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
     },
   });
   expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+  expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
   expect(invoke).toHaveBeenCalledTimes(2);
 });
 

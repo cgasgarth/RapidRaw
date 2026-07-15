@@ -9,7 +9,6 @@ export interface LutCommitIdentity {
 
 export interface LutEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'sectionVisibility'>;
   imageSession: { id: string } | null;
   selectedImage: { path: string } | null;
 }
@@ -67,10 +66,6 @@ export const buildLutLoadEditTransaction = (
           lutSize: lut.size,
         },
         type: 'patch-edit-document-node',
-      },
-      {
-        patch: { sectionVisibility: { ...state.adjustments.sectionVisibility, effects: true } },
-        type: 'patch-adjustments',
       },
     ],
     persistence: 'commit',

@@ -2959,6 +2959,7 @@ function ContainerRow({
               label: item.name || item.preset?.name || '',
               onClick: () => {
                 const newAdj = { ...container.adjustments, ...presetAdjustments };
+                newAdj.effectsEnabled = container.adjustments.effectsEnabled;
                 newAdj.sectionVisibility = { ...container.adjustments.sectionVisibility, ...newAdj.sectionVisibility };
                 updateContainer(container.id, { adjustments: newAdj });
               },
@@ -3582,6 +3583,7 @@ function SettingsPanel({
     const newMaskAdjustments = {
       ...currentAdjustments,
       ...presetAdjustments,
+      effectsEnabled: currentAdjustments.effectsEnabled,
       sectionVisibility: {
         ...currentAdjustments.sectionVisibility,
         ...(presetAdjustments.sectionVisibility || {}),
@@ -3792,6 +3794,10 @@ function SettingsPanel({
   const handleToggleVisibility = (sectionName: string) => {
     if (!isActive) return;
     const cur = container.adjustments;
+    if (sectionName === 'effects') {
+      updateContainer(container.id, { adjustments: { ...cur, effectsEnabled: !cur.effectsEnabled } });
+      return;
+    }
     const vis = cur.sectionVisibility;
     updateContainer(container.id, {
       adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
@@ -3823,10 +3829,6 @@ function SettingsPanel({
       setMaskContainerAdjustments((prev: Adjustments) => ({
         ...prev,
         ...copiedSectionAdjustments.values,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -3841,10 +3843,6 @@ function SettingsPanel({
       setMaskContainerAdjustments((prev: Adjustments) => ({
         ...prev,
         ...resetValues,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -4246,7 +4244,11 @@ function SettingsPanel({
               key={sectionName}
               title={title}
               isOpen={collapsibleState[sectionName] ?? false}
-              isContentVisible={sectionVisibility[sectionName] ?? true}
+              isContentVisible={
+                sectionName === 'effects'
+                  ? displayContainer.adjustments.effectsEnabled
+                  : (sectionVisibility[sectionName] ?? true)
+              }
               isDirty={hasAdjustmentValueChanges(
                 ADJUSTMENT_SECTIONS[sectionName] ?? [],
                 displayAdjustments,

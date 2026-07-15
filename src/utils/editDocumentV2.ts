@@ -51,8 +51,19 @@ const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
   return descriptor?.nodeType ?? null;
 };
 
+const readEffectsEnabled = (adjustments: Readonly<Record<string, unknown>>): boolean => {
+  // biome-ignore lint/complexity/useLiteralKeys: the migration adapter intentionally accepts an index signature.
+  if (typeof adjustments['effectsEnabled'] === 'boolean') return adjustments['effectsEnabled'];
+  // biome-ignore lint/complexity/useLiteralKeys: the migration adapter intentionally accepts an index signature.
+  const legacyVisibility = adjustments['sectionVisibility'];
+  return hasRecordShape(legacyVisibility) && typeof legacyVisibility['effects'] === 'boolean'
+    ? legacyVisibility['effects']
+    : true;
+};
+
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
+  const effectsEnabled = readEffectsEnabled(adjustments);
   const mapped = entries
     .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
     .filter((entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } => entry.nodeType !== null);
@@ -115,7 +126,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       return [
         nodeType,
         {
-          enabled: true,
+          enabled: nodeType === 'display_creative' ? effectsEnabled : true,
           implementationVersion: descriptor?.implementationVersion ?? 1,
           params,
           process: descriptor?.process ?? 'scene_referred_v2',
@@ -125,7 +136,9 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     }),
   );
   const legacyAdjustments = Object.fromEntries(
-    entries.filter(([key]) => nodeTypeForField(key) === null && !PROVENANCE_FIELDS.has(key)),
+    entries.filter(
+      ([key]) => key !== 'effectsEnabled' && nodeTypeForField(key) === null && !PROVENANCE_FIELDS.has(key),
+    ),
   );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
@@ -161,9 +174,13 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     layers: nodes['layers']?.params ?? {},
     migration: {
       defaulted: [...defaultedNodeParams, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
-      disabled: [],
+      disabled: effectsEnabled ? [] : ['display_creative'],
       mapped: [
         ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
+        ...(Object.hasOwn(adjustments, 'effectsEnabled') ||
+        (hasRecordShape(adjustments['sectionVisibility']) && Object.hasOwn(adjustments['sectionVisibility'], 'effects'))
+          ? ['display_creative.enabled']
+          : []),
         ...(entries.some(([key]) => PROVENANCE_FIELDS.has(key)) ? ['provenance.referenceMatchApplicationReceipt'] : []),
       ].sort(),
       quarantined: Object.keys(legacyAdjustments).sort(),
@@ -185,6 +202,7 @@ export const editDocumentV2ToLegacyAdjustments = (document: EditDocumentV2): Adj
   return Object.fromEntries([
     ...Object.entries(legacy && typeof legacy === 'object' ? legacy : {}),
     ...nodeValues,
+    ['effectsEnabled', parsed.nodes['display_creative']?.enabled ?? true],
     ['referenceMatchApplicationReceipt', parsed.provenance.referenceMatchApplicationReceipt],
   ]) as Adjustments;
 };
@@ -223,6 +241,20 @@ export const updateEditDocumentV2Node = (
   };
   editDocumentV2Schema.parse(next);
   return next;
+};
+
+export const setEditDocumentV2NodeEnabled = (
+  document: EditDocumentV2,
+  nodeType: EditDocumentNodeTypeV2,
+  enabled: boolean,
+): EditDocumentV2 => {
+  const node = document.nodes[nodeType];
+  if (node === undefined || node.enabled === enabled) return document;
+  const next: EditDocumentV2 = {
+    ...document,
+    nodes: { ...document.nodes, [nodeType]: { ...node, enabled } },
+  };
+  return editDocumentV2Schema.parse(next);
 };
 
 /**

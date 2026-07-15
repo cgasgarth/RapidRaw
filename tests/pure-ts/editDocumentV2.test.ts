@@ -21,6 +21,7 @@ import {
   prepareEditDocumentV2ForRender,
   replaceEditDocumentV2SourceArtifacts,
   resetEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
   updateEditDocumentV2Node,
 } from '../../src/utils/editDocumentV2';
 
@@ -212,6 +213,26 @@ describe('EditDocumentV2 legacy adapter', () => {
       true,
     );
     expect(editDocumentV2ToLegacyAdjustments(first).customFutureField).toEqual({ enabled: true });
+  });
+
+  test('migrates legacy Effects visibility into render node enablement without losing latent parameters', () => {
+    const legacy = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      effectsEnabled: undefined,
+      grainAmount: 42,
+      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility, effects: false },
+    });
+
+    expect(legacy.nodes.display_creative.enabled).toBeFalse();
+    expect(legacy.nodes.display_creative.params.grainAmount).toBe(42);
+    expect(legacy.migration).toMatchObject({ disabled: ['display_creative'] });
+    expect(legacy.migration?.mapped).toContain('display_creative.enabled');
+    expect(legacy.extensions.legacyAdjustments).not.toHaveProperty('effectsEnabled');
+
+    const reenabled = setEditDocumentV2NodeEnabled(legacy, 'display_creative', true);
+    expect(reenabled.nodes.display_creative.enabled).toBeTrue();
+    expect(reenabled.nodes.display_creative.params).toEqual(legacy.nodes.display_creative.params);
+    expect(editDocumentV2ToLegacyAdjustments(reenabled)).toMatchObject({ effectsEnabled: true, grainAmount: 42 });
   });
 
   test('separates strict source artifacts from provenance and round-trips idempotently', () => {

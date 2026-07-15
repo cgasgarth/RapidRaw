@@ -28,7 +28,6 @@ const patch = {
   dehaze: 5,
   exposure: 0.35,
   highlights: -10,
-  sectionVisibility: { basic: true, color: true, effects: true },
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
@@ -48,6 +47,7 @@ describe('context Auto Adjust edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     adjustments.sectionVisibility.curves = false;
+    adjustments.effectsEnabled = false;
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.setState({
       adjustmentRevision: 0,
@@ -73,7 +73,9 @@ describe('context Auto Adjust edit transaction', () => {
 
     expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35, whiteBalanceMigration: 'native_v1' });
     expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
-    expect(result.after.sectionVisibility).toMatchObject({ basic: true, color: true, curves: false, effects: true });
+    expect(result.after.sectionVisibility).toEqual({ basic: true, color: true, curves: false, details: true });
+    expect(result.after.effectsEnabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',
@@ -117,6 +119,9 @@ describe('context Auto Adjust edit transaction', () => {
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, exposure: Number.NaN }).success).toBe(false);
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, brightness: 5.01 }).success).toBe(false);
     expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, unexpected: true }).success).toBe(false);
+    expect(contextAutoAdjustPatchSchema.safeParse({ ...patch, sectionVisibility: { effects: true } }).success).toBe(
+      false,
+    );
     const state = useEditorStore.getState();
     const base = captureContextAutoAdjustBase(state);
     if (base === null) throw new Error('Expected context Auto Adjust base');

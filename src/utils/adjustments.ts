@@ -303,6 +303,8 @@ export interface Adjustments {
   dustSpotOverlayEnabled: boolean;
   dustSpotSensitivity: number;
   dehaze: number;
+  /** Render-authoritative enablement for the display-creative node. */
+  effectsEnabled: boolean;
   exposure: number;
   flipHorizontal: boolean;
   flipVertical: boolean;
@@ -576,6 +578,7 @@ export interface MaskAdjustments {
   curveMode?: 'point' | 'parametric';
   perceptualGradingV1?: PerceptualGradingSettingsV1;
   dehaze: number;
+  effectsEnabled: boolean;
   exposure: number;
   flareAmount: number;
   glowAmount: number;
@@ -732,7 +735,6 @@ export interface SectionVisibility {
   curves: boolean;
   color: boolean;
   details: boolean;
-  effects: boolean;
 }
 
 export const COLOR_LABELS: Array<Color> = [
@@ -898,6 +900,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
   dehaze: 0,
+  effectsEnabled: true,
   exposure: 0,
   flareAmount: 0,
   glowAmount: 0,
@@ -922,7 +925,6 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
     curves: true,
     color: true,
     details: true,
-    effects: true,
   },
   shadows: 0,
   sharpness: 0,
@@ -983,6 +985,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   dustSpotMinRadiusPx: 2,
   dustSpotOverlayEnabled: false,
   dustSpotSensitivity: 50,
+  effectsEnabled: true,
   dehaze: 0,
   exposure: 0,
   flipHorizontal: false,
@@ -1038,7 +1041,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     curves: true,
     color: true,
     details: true,
-    effects: true,
   },
   shadows: 0,
   sharpness: 0,
@@ -1172,9 +1174,20 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
           ? deepCloneParametric(containerAdjustments.parametricCurve)
           : getDefaultParametricCurve(),
         curveMode: containerAdjustments.curveMode ?? 'point',
+        effectsEnabled:
+          containerAdjustments.effectsEnabled ??
+          (typeof containerAdjustments.sectionVisibility === 'object' &&
+          containerAdjustments.sectionVisibility !== null &&
+          'effects' in containerAdjustments.sectionVisibility &&
+          // biome-ignore lint/complexity/useLiteralKeys: legacy Effects lived only in the visibility index signature.
+          typeof containerAdjustments.sectionVisibility['effects'] === 'boolean'
+            ? containerAdjustments.sectionVisibility['effects']
+            : true),
         sectionVisibility: {
-          ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...containerAdjustments.sectionVisibility,
+          basic: containerAdjustments.sectionVisibility?.basic ?? true,
+          color: containerAdjustments.sectionVisibility?.color ?? true,
+          curves: containerAdjustments.sectionVisibility?.curves ?? true,
+          details: containerAdjustments.sectionVisibility?.details ?? true,
         },
         sharpnessThreshold: containerAdjustments.sharpnessThreshold,
         toneEqualizer: normalizeToneEqualizer(containerAdjustments.toneEqualizer),
@@ -1331,9 +1344,20 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     dustSpotSensitivity: loadedAdjustments.dustSpotSensitivity ?? INITIAL_ADJUSTMENTS.dustSpotSensitivity,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
+    effectsEnabled:
+      loadedAdjustments.effectsEnabled ??
+      (typeof loadedAdjustments.sectionVisibility === 'object' &&
+      loadedAdjustments.sectionVisibility !== null &&
+      'effects' in loadedAdjustments.sectionVisibility &&
+      // biome-ignore lint/complexity/useLiteralKeys: legacy Effects lived only in the visibility index signature.
+      typeof loadedAdjustments.sectionVisibility['effects'] === 'boolean'
+        ? loadedAdjustments.sectionVisibility['effects']
+        : true),
     sectionVisibility: {
-      ...INITIAL_ADJUSTMENTS.sectionVisibility,
-      ...(loadedAdjustments.sectionVisibility || {}),
+      basic: loadedAdjustments.sectionVisibility?.basic ?? true,
+      color: loadedAdjustments.sectionVisibility?.color ?? true,
+      curves: loadedAdjustments.sectionVisibility?.curves ?? true,
+      details: loadedAdjustments.sectionVisibility?.details ?? true,
     },
     sharpnessThreshold: loadedAdjustments.sharpnessThreshold ?? INITIAL_ADJUSTMENTS.sharpnessThreshold,
   };
