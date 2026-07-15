@@ -3,6 +3,7 @@ import {
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  type EditDocumentV2CopyPayload,
   editDocumentBlackWhiteMixerV2Schema,
   editDocumentCameraInputV2Schema,
   editDocumentChannelMixerV2Schema,
@@ -350,10 +351,7 @@ export const replaceEditDocumentV2SourceArtifacts = (
 export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeTypeV2) =>
   descriptorFor(nodeType)?.capabilities;
 
-export interface EditDocumentV2CopyPayload {
-  readonly nodes: Partial<Record<EditDocumentNodeTypeV2, EditDocumentNodeEnvelopeV2>>;
-  readonly schemaVersion: 2;
-}
+export type { EditDocumentV2CopyPayload };
 
 export const EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS = EDIT_DOCUMENT_NODE_DESCRIPTORS.filter(
   ({ capabilities }) => capabilities.copy && capabilities.paste && capabilities.provenance === 'strip',

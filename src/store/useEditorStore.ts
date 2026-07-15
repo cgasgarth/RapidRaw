@@ -94,7 +94,9 @@ export interface CopiedSectionAdjustments {
 
 interface PresetApplication {
   before: Adjustments;
+  beforeEditDocumentV2: EditDocumentV2;
   expected: Adjustments;
+  expectedEditDocumentV2: EditDocumentV2;
   id: string;
   imagePath: string | null;
   name: string;

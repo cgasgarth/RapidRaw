@@ -2,7 +2,7 @@
 
 import { evaluateFallowHealthOutput } from '../../lib/ci/fallow-health-gate';
 
-const command = ['bunx', 'fallow', 'health', '--score', '--format', 'json', '--quiet'];
+const command = ['bunx', 'fallow', 'health', '--score', '--format', 'json', '--quiet', '--no-cache'];
 const result = Bun.spawnSync(command, {
   env: { ...process.env, FALLOW_UPDATE_CHECK: 'off' },
   stderr: 'pipe',

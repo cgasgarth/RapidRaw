@@ -56,6 +56,7 @@ import { useViewerAiMaskBoxController } from './useViewerAiMaskBoxController';
 import { useViewerBrushController } from './useViewerBrushController';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
 import { useViewerInitialMaskDrawController } from './useViewerInitialMaskDrawController';
+import { useViewerInteractionController } from './useViewerInteractionController';
 import { useViewerMaskShapeController } from './useViewerMaskShapeController';
 import { useViewerParametricMaskTargetController } from './useViewerParametricMaskTargetController';
 import { useViewerPickerControllers } from './useViewerPickerControllers';
@@ -76,13 +77,7 @@ import type {
   ViewerInitialMaskDrawCurrentContext,
 } from './viewerInitialMaskDrawInteractionController';
 import type { ViewerActiveTool } from './viewerInputResolver';
-import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
-import {
-  createViewerInteractionCoordinator,
-  type ViewerInteractionContext,
-  type ViewerInteractionTransition,
-  viewerInteractionToolId,
-} from './viewerInteractionCoordinator';
+import { type ViewerInteractionContext, viewerInteractionToolId } from './viewerInteractionCoordinator';
 import type { ViewerMaskShapeCurrentContext } from './viewerMaskShapeInteractionController';
 import type {
   ViewerParametricMaskTargetCommand,
@@ -306,18 +301,6 @@ export const ImageCanvas = memo(
       status: 'error' | 'ready';
       url: string;
     } | null>(null);
-    const viewerInteractionCoordinator = useMemo(() => createViewerInteractionCoordinator(), []);
-    const viewerInteractionTransitionRef = useRef<ViewerInteractionTransition | null>(null);
-    const [viewerInputOwnerState, setViewerInputOwnerState] = useState<'active-tool' | 'blocked' | 'viewer-pan' | null>(
-      null,
-    );
-    useEffect(
-      () => () => {
-        viewerInteractionCoordinator.dispose();
-      },
-      [viewerInteractionCoordinator],
-    );
-
     const overlayGeometry = useMemo(
       () =>
         providedOverlayGeometry ??
@@ -1135,17 +1118,24 @@ export const ImageCanvas = memo(
         retouchHandlesController.activeMode === null ? viewerInteractionToolId(activeCanvasOverlayTool) : 'retouch',
       zoomed: isMaxZoom ?? false,
     };
-    useEffect(() => {
-      viewerInteractionCoordinator.synchronize(viewerInteractionContext);
-      setViewerInputOwnerState(viewerInteractionCoordinator.snapshot().owner);
-    }, [
-      viewerInteractionContext.activeTool,
-      viewerInteractionContext.geometryEpoch,
-      viewerInteractionContext.imageSessionId,
-      viewerInteractionContext.sourceRevision,
-      viewerInteractionContext.toolId,
-      viewerInteractionCoordinator,
-    ]);
+    const viewerInteraction = useViewerInteractionController({
+      context: viewerInteractionContext,
+      handlers: {
+        lifecycle: [
+          viewerBrushBinding.handleInputEvent,
+          viewerAiMaskBoxBinding.handleInputEvent,
+          viewerInitialMaskDrawBinding.handleInputEvent,
+        ],
+        observers: [viewerSamplerController.handleInputEvent],
+        tools: {
+          'focus-retouch': focusRetouchController.handleInputEvent,
+          'point-color': pickerControllers.handleInputEvent,
+          retouch: retouchHandlesController.handleInputEvent,
+          'tone-equalizer': pickerControllers.handleInputEvent,
+          'white-balance': whiteBalanceController.handleInputEvent,
+        },
+      },
+    });
     const activeCanvasOverlayStatus: CanvasOverlayStatus =
       isShowingOriginal || compareOverlayDisabled
         ? 'disabled'
@@ -1170,8 +1160,7 @@ export const ImageCanvas = memo(
       isMaskInteractionActive: effectiveMaskInteractionActive,
       isToolActive,
     });
-    const viewerInputOwner =
-      viewerInputOwnerState ?? viewerInteractionCoordinator.snapshot().owner ?? canvasPointerOwner;
+    const viewerInputOwner = viewerInteraction.owner ?? canvasPointerOwner;
 
     return (
       <ViewerSurface
@@ -1284,30 +1273,13 @@ export const ImageCanvas = memo(
         data-viewer-sampler-suppressed={String(viewerSamplerController.state.suppressed)}
         data-viewer-sampler-target={viewerSamplerController.state.target}
         data-testid="image-canvas"
-        onInputEvent={(event: ViewerSurfaceInputEvent) => {
-          viewerSamplerController.handleInputEvent(event);
-          viewerBrushBinding.handleInputEvent(event);
-          viewerAiMaskBoxBinding.handleInputEvent(event);
-          viewerInitialMaskDrawBinding.handleInputEvent(event);
-          const transition = viewerInteractionCoordinator.dispatch(event, viewerInteractionContext);
-          viewerInteractionTransitionRef.current = transition;
-          setViewerInputOwnerState(transition.owner);
-          if (transition.forwardToTool) {
-            pickerControllers.handleInputEvent(event);
-            focusRetouchController.handleInputEvent(event);
-            retouchHandlesController.handleInputEvent(event);
-            whiteBalanceController.handleInputEvent(event);
-          } else if (event.type === 'pointermove' && whiteBalanceController.active) {
-            whiteBalanceController.handleInputEvent(event);
-          }
-        }}
+        onInputEvent={viewerInteraction.handleInputEvent}
         onPointerLeave={() => {
           viewerSamplerController.handlePointerLeave();
           whiteBalanceController.cancelPreview();
         }}
         onPointerDown={(event) => {
-          const transition = viewerInteractionTransitionRef.current;
-          if (transition?.shouldCapturePointer && event.nativeEvent.isTrusted) {
+          if (viewerInteraction.shouldCapturePointer(event.pointerId) && event.nativeEvent.isTrusted) {
             event.currentTarget.setPointerCapture(event.pointerId);
           }
           if (pickerControllers.activeTool !== null || whiteBalanceController.active) {

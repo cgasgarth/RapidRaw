@@ -1004,6 +1004,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       batch: false,
       copy: false,
       paste: false,
+      preset: 'exclude',
       provenance: 'regenerate',
       reset: false,
     });
