@@ -23,6 +23,33 @@ export const viewerRetouchNormalizedToView = (
     ),
   );
 
+export const viewerRetouchSurfacePointToView = (
+  geometry: EditorOverlayGeometry,
+  pointer: { readonly clientX: number; readonly clientY: number },
+  surfaceRect: {
+    readonly height: number;
+    readonly layoutHeight: number;
+    readonly layoutWidth: number;
+    readonly width: number;
+    readonly x: number;
+    readonly y: number;
+  },
+): ViewerRetouchPoint | null => {
+  if (
+    surfaceRect.width <= 0 ||
+    surfaceRect.height <= 0 ||
+    surfaceRect.layoutWidth <= 0 ||
+    surfaceRect.layoutHeight <= 0
+  ) {
+    return null;
+  }
+  const imageRect = geometry.displayedImageRectInViewCssPixels;
+  return {
+    x: (pointer.clientX - surfaceRect.x) * (surfaceRect.layoutWidth / surfaceRect.width) - imageRect.x,
+    y: (pointer.clientY - surfaceRect.y) * (surfaceRect.layoutHeight / surfaceRect.height) - imageRect.y,
+  };
+};
+
 export const resolveViewerRetouchFootprint = ({
   featherRadiusPx,
   handleRadius,

@@ -1305,6 +1305,159 @@ async function verifyObjectPromptController(page: Page): Promise<void> {
   await page.getByTestId('object-prompt-pending-box-anchor').waitFor({ state: 'visible', timeout: 10_000 });
 }
 
+async function verifyRetouchController(page: Page): Promise<void> {
+  const settledCallCount = (command: string) =>
+    page.evaluate(async (expected) => {
+      const read = () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === expected).length ?? 0;
+      let previous = read();
+      let stableFrames = 0;
+      for (let frame = 0; frame < 60 && stableFrames < 8; frame += 1) {
+        await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+        const current = read();
+        stableFrames = current === previous ? stableFrames + 1 : 0;
+        previous = current;
+      }
+      return previous;
+    }, command);
+  await page.setViewportSize({ height: 2000, width: viewport.width });
+  await page.getByTestId('right-panel-switcher-button-masks').click();
+  await page.getByTestId('layer-create-clone-layer').click();
+  const handles = page.getByTestId('image-canvas-retouch-handles');
+  await handles.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > 0,
+  );
+
+  const imageCanvas = page.getByTestId('image-canvas');
+  const pointAt = (x: number, y: number) =>
+    page.getByTestId('editor-image-preview-panel').evaluate(
+      (element, point) => {
+        const bounds = element.getBoundingClientRect();
+        const left = Number(element.getAttribute('data-editor-image-rect-left'));
+        const top = Number(element.getAttribute('data-editor-image-rect-top'));
+        const width = Number(element.getAttribute('data-editor-image-rect-width'));
+        const height = Number(element.getAttribute('data-editor-image-rect-height'));
+        if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+          throw new Error('Retouch surface omitted canonical image geometry.');
+        }
+        return { x: bounds.left + left + width * point.x, y: bounds.top + top + height * point.y };
+      },
+      { x, y },
+    );
+  const readHandlePoint = async (handle: 'source' | 'target') => ({
+    x: Number(await handles.getAttribute(`data-retouch-handle-${handle}-x`)),
+    y: Number(await handles.getAttribute(`data-retouch-handle-${handle}-y`)),
+  });
+
+  const mouseTarget = await pointAt(0.68, 0.62);
+  const savesBeforeMouse = await settledCallCount('save_metadata_and_update_thumbnail');
+  await page.mouse.move(mouseTarget.x, mouseTarget.y);
+  await page.mouse.down();
+  const capturedPointerId = await imageCanvas.evaluate((element) => {
+    for (let pointerId = 1; pointerId <= 32; pointerId += 1) {
+      if (element.hasPointerCapture(pointerId)) return pointerId;
+    }
+    return null;
+  });
+  if (capturedPointerId === null) {
+    const context = await imageCanvas.evaluate((element) => ({
+      activeTool: element.getAttribute('data-viewer-active-tool'),
+      canvasTool: element.getAttribute('data-canvas-overlay-tool'),
+      owner: element.getAttribute('data-viewer-input-owner'),
+    }));
+    throw new Error(`Retouch gesture did not use canonical pointer capture: ${JSON.stringify(context)}.`);
+  }
+  await page.mouse.up();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-retouch-last-commit-status') !==
+      'none',
+  );
+  const mouseCommitStatus = await imageCanvas.getAttribute('data-retouch-last-commit-status');
+  if (!mouseCommitStatus?.startsWith('committed:')) {
+    throw new Error(`Mouse retouch command was rejected: ${String(mouseCommitStatus)}.`);
+  }
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > baseline,
+    savesBeforeMouse,
+    { timeout: 10_000 },
+  );
+  const mouseCommittedTarget = await readHandlePoint('target');
+
+  const touchTarget = await pointAt(0.76, 0.7);
+  const savesBeforeTouch = await settledCallCount('save_metadata_and_update_thumbnail');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 19, radiusX: 1, radiusY: 1, x: touchTarget.x, y: touchTarget.y }],
+    type: 'touchStart',
+  });
+  await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  await page.waitForFunction(
+    (baseline) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > baseline,
+    savesBeforeTouch,
+    { timeout: 10_000 },
+  );
+
+  const proof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    const handles = document.querySelector('[data-testid="image-canvas-retouch-handles"]');
+    const preview = document.querySelector('[data-testid="editor-image-preview-panel"]');
+    return {
+      overlay: {
+        sourceX: Number(handles?.getAttribute('data-retouch-handle-source-x')),
+        sourceY: Number(handles?.getAttribute('data-retouch-handle-source-y')),
+        targetX: Number(handles?.getAttribute('data-retouch-handle-target-x')),
+        targetY: Number(handles?.getAttribute('data-retouch-handle-target-y')),
+      },
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      receipt: {
+        source: preview?.getAttribute('data-last-edit-source'),
+        transactionId: preview?.getAttribute('data-last-edit-transaction-id'),
+      },
+      render: latest('apply_adjustments'),
+    };
+  });
+  const persistedAdjustments = proof.persistence?.['adjustments'];
+  const persistedLayer = persistedAdjustments?.['masks']?.find(
+    (layer: Record<string, unknown>) => typeof layer['retouchCloneSource'] === 'object',
+  );
+  const persistedSource = persistedLayer?.['retouchCloneSource'];
+  const renderDocument = editDocumentV2Schema.parse(proof.render?.['request']?.['editDocumentV2']);
+  const renderedLayer = renderDocument.layers.masks.find((layer) => layer.retouchCloneSource !== undefined);
+  if (
+    proof.receipt.source !== 'layer-command' ||
+    !proof.receipt.transactionId?.startsWith('retouch-handle:') ||
+    typeof persistedSource !== 'object' ||
+    persistedSource === null ||
+    renderedLayer?.retouchCloneSource === undefined ||
+    JSON.stringify(persistedSource['targetPoint']) !== JSON.stringify(renderedLayer.retouchCloneSource.targetPoint) ||
+    proof.overlay.targetX !== renderedLayer.retouchCloneSource.targetPoint.x ||
+    proof.overlay.targetY !== renderedLayer.retouchCloneSource.targetPoint.y
+  ) {
+    throw new Error(`Retouch persistence, render, overlay, and command receipt diverged: ${JSON.stringify(proof)}.`);
+  }
+
+  await page.locator('button[data-command-id="undo"]:visible').first().click();
+  await page.waitForFunction(({ x, y }) => {
+    const handles = document.querySelector('[data-testid="image-canvas-retouch-handles"]');
+    return (
+      Number(handles?.getAttribute('data-retouch-handle-target-x')) === x &&
+      Number(handles?.getAttribute('data-retouch-handle-target-y')) === y
+    );
+  }, mouseCommittedTarget);
+}
+
 async function waitForDevServer(server: ReturnType<typeof spawn>): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 45_000) {
@@ -1371,7 +1524,8 @@ try {
       browserScenario === 'initial-mask-draw-controller' ||
       browserScenario === 'ai-mask-box-controller' ||
       browserScenario === 'object-prompt-controller' ||
-      browserScenario === 'parametric-mask-target-controller',
+      browserScenario === 'parametric-mask-target-controller' ||
+      browserScenario === 'retouch-controller',
     viewport,
   });
   const consoleErrors: string[] = [];
@@ -1474,6 +1628,20 @@ try {
     browser = undefined;
     await stopServer(server);
     console.log('AI mask box browser controller proof passed');
+    process.exit(0);
+  }
+  if (browserScenario === 'retouch-controller') {
+    await verifyRetouchController(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected retouch browser errors: ${consoleErrors.join('\n')}`);
+    }
+    if (consoleWarnings.length > 0) {
+      throw new Error(`Unexpected retouch browser warnings: ${consoleWarnings.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('retouch browser controller proof passed');
     process.exit(0);
   }
   await verifyPreviewBoundsScenario(page, boundsSamples);

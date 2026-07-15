@@ -83,6 +83,19 @@ describe('viewer focus retouch interaction controller', () => {
     }
   });
 
+  test('never revives a delayed A operation after A to B to A replacement', () => {
+    const controller = createViewerFocusRetouchInteractionController();
+    controller.begin(current(), 1, { x: 1, y: 2 }, settings);
+    const delayedA = controller.end(current(), 1);
+    if (delayedA === null) throw new Error('expected delayed A command');
+    controller.synchronize(current({ imageSessionId: 'image-session:13:b', sourceRevision: 'graph:b' }));
+    controller.synchronize(current({ imageSessionId: 'image-session:14:a', sourceRevision: 'graph:10' }));
+    expect(
+      controller.receive(delayedA.key, current({ imageSessionId: 'image-session:14:a', sourceRevision: 'graph:10' })),
+    ).toBe(false);
+    expect(controller.overlays()).toEqual([]);
+  });
+
   test('cancels active and pending work on blur, Escape, lost capture, and unmount cleanup', () => {
     for (const _reason of ['blur', 'escape', 'lostpointercapture', 'unmount']) {
       const controller = createViewerFocusRetouchInteractionController();
