@@ -200,18 +200,33 @@ fn persist_window_state(path: &Path, state: &WindowState) -> Result<(), String> 
         .parent()
         .ok_or_else(|| "window state path has no parent".to_string())?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
-    let result = (|| {
-        let bytes = serde_json::to_vec(state).map_err(|error| error.to_string())?;
-        let mut file = std::fs::File::create(&temporary).map_err(|error| error.to_string())?;
-        file.write_all(&bytes).map_err(|error| error.to_string())?;
-        file.sync_all().map_err(|error| error.to_string())?;
-        std::fs::rename(&temporary, path).map_err(|error| error.to_string())
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
-    }
-    result
+    let bytes = serde_json::to_vec(state).map_err(|error| error.to_string())?;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
+    temporary
+        .as_file_mut()
+        .write_all(&bytes)
+        .map_err(|error| error.to_string())?;
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| error.to_string())?;
+    temporary
+        .persist(path)
+        .map_err(|error| error.error.to_string())?;
+    sync_publication_directory(parent)
+}
+
+#[cfg(unix)]
+fn sync_publication_directory(directory: &Path) -> Result<(), String> {
+    std::fs::File::open(directory)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(not(unix))]
+fn sync_publication_directory(_directory: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 pub(crate) fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
@@ -292,9 +307,17 @@ mod tests {
     fn persisted_window_state_is_atomic_and_round_trips() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("window_state.json");
-        let expected = WindowState {
+        let first = WindowState {
             x: 20,
             y: 30,
+            ..state()
+        };
+        persist_window_state(&path, &first).unwrap();
+        let expected = WindowState {
+            width: 1_600,
+            height: 900,
+            x: 40,
+            y: 50,
             ..state()
         };
         persist_window_state(&path, &expected).unwrap();
