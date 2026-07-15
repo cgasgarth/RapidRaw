@@ -23,12 +23,23 @@ describe('editor render-authority boundary', () => {
     const state = useEditorStore.getState();
     const adjustmentUpdate = { adjustments: { ...state.adjustments, exposure: 0.75 } };
     const historyUpdate = { history: [state.adjustments] };
+    const adjustmentUpdater = () => adjustmentUpdate;
+    const historyUpdater = () => historyUpdate;
 
     expect(() => Reflect.apply(state.setEditor, undefined, [adjustmentUpdate])).toThrow(
       'editor.setEditor.render_authority_forbidden:adjustments',
     );
     expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdate])).toThrow(
       'editor.setState.render_authority_forbidden:history',
+    );
+    expect(() => Reflect.apply(state.setEditor, undefined, [adjustmentUpdater])).toThrow(
+      'editor.setEditor.render_authority_forbidden:adjustments',
+    );
+    expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdater])).toThrow(
+      'editor.setState.render_authority_forbidden:history',
+    );
+    expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [state, true])).toThrow(
+      'editor.setState.replace_forbidden',
     );
     expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
     expect(useEditorStore.getState().history).toHaveLength(1);
