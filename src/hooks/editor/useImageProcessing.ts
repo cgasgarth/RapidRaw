@@ -694,6 +694,7 @@ export function useImageProcessing() {
     originalSize,
   ]);
   const calculatedTargetResolution = calculateTargetRes();
+  const calculatedRoiFingerprint = fingerprintPreviewRoi(calculateROI());
 
   const requestOriginalPreview = useCallback(
     (targetRes: number, delayMs: number): void => {
@@ -735,6 +736,7 @@ export function useImageProcessing() {
     selectedImage?.isReady,
     isSliderDragging,
     calculatedTargetResolution,
+    calculatedRoiFingerprint,
     appSettings?.enableLivePreviews,
   ]);
 
