@@ -138,9 +138,9 @@ impl Default for ImageMetadata {
     }
 }
 
+pub use crate::geometry::Crop;
 #[cfg(test)]
-pub use crate::geometry::get_geometry_params_from_json;
-pub use crate::geometry::{Crop, GeometryParams};
+pub use crate::geometry::{GeometryParams, get_geometry_params_from_json};
 
 pub use crate::render::resample::downscale_f32_image_cow;
 

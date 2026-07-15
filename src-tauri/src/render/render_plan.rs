@@ -583,6 +583,35 @@ pub fn content_revision(
     }
 }
 
+/// Compiles a render plan for native consumers that do not own an editor session id.
+///
+/// Source identity and runtime settings remain explicit inputs so callers cannot
+/// accidentally reuse a plan across images or tonemapper configurations.
+pub(crate) fn compile_consumer_render_plan(
+    adjustments: &Value,
+    source_identity: &str,
+    is_raw: bool,
+    tonemapper_override: Option<u32>,
+    lut: Option<Arc<Lut>>,
+) -> Result<Arc<CompiledRenderPlan>, String> {
+    let revision = content_revision(
+        adjustments,
+        0,
+        crate::render::artifact_identity::source_fingerprint_for_path(source_identity),
+        u64::from(tonemapper_override.unwrap_or(0)),
+    );
+    compile_render_plan_cached(
+        adjustments,
+        CompileRenderPlanContext {
+            revision,
+            is_raw,
+            tonemapper_override,
+        },
+        lut,
+    )
+    .map_err(|error| error.to_string())
+}
+
 fn fingerprints(
     source_revision: u64,
     effective: &Value,
@@ -1607,6 +1636,34 @@ mod tests {
         assert!(!Arc::ptr_eq(&first, &second));
         assert_ne!(first.fingerprints.source, second.fingerprints.source);
         assert_ne!(first.fingerprints.full, second.fingerprints.full);
+    }
+
+    #[test]
+    fn consumer_plan_cache_identity_includes_source_and_runtime_settings() {
+        let raw = json!({"exposure": 17, "contrast": 3});
+        let first =
+            compile_consumer_render_plan(&raw, "/fixtures/consumer-a.raw", true, None, None)
+                .unwrap();
+        let warm = compile_consumer_render_plan(&raw, "/fixtures/consumer-a.raw", true, None, None)
+            .unwrap();
+        let other_source =
+            compile_consumer_render_plan(&raw, "/fixtures/consumer-b.raw", true, None, None)
+                .unwrap();
+        let other_settings =
+            compile_consumer_render_plan(&raw, "/fixtures/consumer-a.raw", true, Some(4), None)
+                .unwrap();
+
+        assert!(Arc::ptr_eq(&first, &warm));
+        assert_ne!(
+            first.revision.source_revision,
+            other_source.revision.source_revision
+        );
+        assert_ne!(
+            first.revision.settings_revision,
+            other_settings.revision.settings_revision
+        );
+        assert!(!Arc::ptr_eq(&first, &other_source));
+        assert!(!Arc::ptr_eq(&first, &other_settings));
     }
 
     #[test]

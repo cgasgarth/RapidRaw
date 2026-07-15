@@ -16,10 +16,8 @@ use crate::image_processing::{
     resolve_tonemapper_override_from_handle,
 };
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
-use crate::{
-    AppState, adjustment_fields, compile_consumer_render_plan, get_or_load_lut,
-    hydrate_adjustments, render_pipeline,
-};
+use crate::render::render_plan::compile_consumer_render_plan;
+use crate::{AppState, adjustment_fields, get_or_load_lut, hydrate_adjustments, render_pipeline};
 
 #[tauri::command]
 pub(crate) fn generate_uncropped_preview(

@@ -20,9 +20,10 @@ use crate::image_processing::{
 };
 use crate::lut_processing::Lut;
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
+use crate::render::render_plan::compile_consumer_render_plan;
 use crate::{
-    color, compile_consumer_render_plan, export, generate_transformed_preview, get_or_load_lut,
-    hydrate_adjustments, image_analytics, render_pipeline,
+    color, export, generate_transformed_preview, get_or_load_lut, hydrate_adjustments,
+    image_analytics, render_pipeline,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
