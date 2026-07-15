@@ -387,13 +387,11 @@ pub fn calculate_auto_adjustments(
     state: tauri::State<AppState>,
 ) -> Result<serde_json::Value, String> {
     let original_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .as_ref()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No image loaded for auto adjustments")?
-        .image
-        .clone();
+        .image;
 
     let results = perform_auto_analysis(&original_image);
 

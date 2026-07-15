@@ -161,12 +161,11 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     hydrate_adjustments(&state, &mut adjustments_json);
     cancellation_checkpoint(cancellation, PreviewStage::Source)?;
 
-    let loaded_image_guard = state.original_image.lock().unwrap();
-    let loaded_image = loaded_image_guard
-        .as_ref()
-        .ok_or("No original image loaded")?
-        .clone();
-    drop(loaded_image_guard);
+    let loaded_image = state
+        .services
+        .editor
+        .image_snapshot()
+        .ok_or("No original image loaded")?;
     state
         .services
         .preview_session

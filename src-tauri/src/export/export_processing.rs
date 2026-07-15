@@ -547,7 +547,7 @@ fn decode_export_item(
         Some(plan.source_revision.clone())
     };
     let (base_image, raw_development_report) = if plan.is_current_edit {
-        match get_full_image_for_processing(&state) {
+        match state.services.editor.clone_image_pixels() {
             Ok((orig_data, _)) => (
                 composite_patches_on_image(&orig_data, &adjustments)
                     .map_err(|error| format!("Failed to composite AI patches: {error}"))?
@@ -799,8 +799,7 @@ impl<W: Write> Write for DigestingWriter<W> {
 use crate::render_pipeline::apply_pre_gpu_detail_stages;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings_or_default,
-    resolve_warped_image_for_masks,
+    get_or_load_lut, hydrate_adjustments, load_settings_or_default, resolve_warped_image_for_masks,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2850,7 +2849,7 @@ async fn export_images_legacy(
                         return Ok(ExportItemResult::Cancelled(None));
                     }
                     let (base_image, raw_development_report) = if is_current_edit {
-                        match get_full_image_for_processing(&state) {
+                        match state.services.editor.clone_image_pixels() {
                             Ok((orig_data, _)) => {
                                 let image = composite_patches_on_image(&orig_data, &js_adjustments)
                                     .map_err(|e| format!("Failed to composite AI patches: {}", e))?
@@ -3368,10 +3367,9 @@ pub async fn estimate_export_sizes(
         (is_current_edit, current_edit_adjustments)
     {
         let loaded_image = state
-            .original_image
-            .lock()
-            .unwrap()
-            .clone()
+            .services
+            .editor
+            .image_snapshot()
             .ok_or("No original image loaded")?;
         hydrate_adjustments(&state, &mut adjustments_clone);
 

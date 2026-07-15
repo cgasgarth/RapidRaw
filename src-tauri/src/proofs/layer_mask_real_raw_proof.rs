@@ -12,7 +12,8 @@ use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 use crate::app_settings::AppSettings;
-use crate::app_state::{AppState, LoadedImage};
+use crate::app_state::AppState;
+use crate::editor::image_service::LoadedImage;
 use crate::export::export_processing::{
     prepare_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
 };
@@ -146,7 +147,7 @@ fn run_private_layer_mask_real_raw_proof(
     let context = get_or_init_compute_gpu_context_for_tests(&state)?;
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    *state.original_image.lock().unwrap() = Some(LoadedImage {
+    state.services.editor.install_image(LoadedImage {
         image: Arc::new(base_image.clone()),
         is_raw,
         path: source_path_string.clone(),

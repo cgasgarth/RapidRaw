@@ -294,10 +294,10 @@ fn gpu_execution_receipt(app_state: &AppState) -> Value {
 
 fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
     let active_native_source = app_state
-        .original_image
-        .lock()
-        .ok()
-        .and_then(|image| image.as_ref().map(|image| image.path.clone()));
+        .services
+        .editor
+        .try_image_snapshot()
+        .map(|image| image.path);
     let cache_report = RenderCaches::new(app_state).native_cache_report();
     let preview = app_state.cached_preview.lock().ok().and_then(|preview| {
         preview.as_ref().map(|preview| {

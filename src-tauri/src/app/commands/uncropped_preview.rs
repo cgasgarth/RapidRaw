@@ -30,10 +30,9 @@ pub(crate) fn generate_uncropped_preview(
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No original image loaded")?;
     let request = state
         .services
@@ -170,11 +169,10 @@ pub(crate) fn generate_uncropped_preview(
                         &request,
                         || {
                             state
-                                .original_image
-                                .lock()
-                                .unwrap()
-                                .as_ref()
-                                .map(|image| image.path.clone())
+                                .services
+                                .editor
+                                .image_snapshot()
+                                .map(|image| image.path)
                         },
                         || {
                             let _ =

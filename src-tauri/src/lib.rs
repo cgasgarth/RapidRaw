@@ -56,16 +56,11 @@ pub use render::resample::{
 };
 pub(crate) use render::*;
 
-use std::borrow::Cow;
 use std::fs;
 use std::io::Cursor;
 use std::panic;
-#[cfg(test)]
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-use image::DynamicImage;
 
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -84,7 +79,6 @@ use crate::editor::preview_geometry::preview_geometry_transform;
 use crate::file_management::parse_virtual_path;
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
-use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::{
     Crop, RenderRequest, apply_srgb_to_linear, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image, resolve_tonemapper_override_from_handle,
@@ -146,38 +140,13 @@ pub struct WgpuTransformPayload {
     pub pixelated: bool,
 }
 
-pub(crate) use editor::preview_geometry_service::generate_transformed_preview_cancellable;
 pub use editor::preview_geometry_service::{
     PreviewGeometryPipeline, PreviewGeometryReceipt, PreviewGeometryRequest, PreviewGeometryResult,
-    PreviewGeometryService, generate_transformed_preview,
+    PreviewGeometryService,
 };
-
-/// Authoritative full-resolution geometry/retouch path for export and pixel-critical operations.
-/// Normal editor previews must use [`generate_transformed_preview`] instead.
-#[cfg(test)]
-static FULL_TRANSFORM_INVOCATIONS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
-
-pub fn compute_full_transformed_res(
-    loaded_image: &LoadedImage,
-    adjustments: &serde_json::Value,
-) -> Result<(Arc<DynamicImage>, (f32, f32)), String> {
-    #[cfg(test)]
-    FULL_TRANSFORM_INVOCATIONS.fetch_add(1, Ordering::Relaxed);
-    let has_patches = adjustments
-        .get("aiPatches")
-        .and_then(|v| v.as_array())
-        .is_some_and(|a| !a.is_empty());
-    let patched_original_image = if has_patches {
-        composite_patches_on_image(&loaded_image.image, adjustments)
-            .map_err(|e| format!("Failed to composite AI patches: {}", e))?
-    } else {
-        Cow::Borrowed(loaded_image.image.as_ref())
-    };
-
-    let (transformed_img, offset) = apply_all_transformations(patched_original_image, adjustments);
-    Ok((Arc::new(transformed_img.into_owned()), offset))
-}
+pub(crate) use editor::preview_geometry_service::{
+    generate_transformed_preview, generate_transformed_preview_cancellable,
+};
 
 pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String> {
     let fingerprint = lut_processing::source_fingerprint(path).map_err(|e| e.to_string())?;
@@ -208,19 +177,6 @@ pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String>
         256,
     );
     Ok(arc_lut)
-}
-
-pub fn get_full_image_for_processing(
-    state: &tauri::State<AppState>,
-) -> Result<(DynamicImage, bool), String> {
-    let original_image_lock = state.original_image.lock().unwrap();
-    let loaded_image = original_image_lock
-        .as_ref()
-        .ok_or("No original image loaded")?;
-    Ok((
-        loaded_image.image.clone().as_ref().clone(),
-        loaded_image.is_raw,
-    ))
 }
 
 fn setup_logging(app_handle: &tauri::AppHandle) {
