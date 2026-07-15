@@ -26,6 +26,11 @@ export interface CameraInputEditTransactionState {
   selectedImage: { path: string } | null;
 }
 
+export interface AutoWhiteBalanceRequestConfiguration {
+  enabled: boolean;
+  inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
+}
+
 export const captureCameraInputCommitIdentity = (
   state: CameraInputEditTransactionState,
 ): CameraInputCommitIdentity | null =>
@@ -36,6 +41,34 @@ export const captureCameraInputCommitIdentity = (
         sourceIdentity: state.selectedImage.path,
       }
     : null;
+
+export const isCurrentCameraInputCommitIdentity = (
+  state: CameraInputEditTransactionState,
+  identity: CameraInputCommitIdentity,
+): boolean =>
+  state.selectedImage?.path === identity.sourceIdentity &&
+  state.imageSession?.id === identity.imageSessionId &&
+  state.adjustmentRevision === identity.adjustmentRevision;
+
+export const isCurrentCameraInputAsyncRequest = (
+  state: CameraInputEditTransactionState,
+  identity: CameraInputCommitIdentity,
+  requestGeneration: number,
+  currentRequestGeneration: number,
+): boolean => requestGeneration === currentRequestGeneration && isCurrentCameraInputCommitIdentity(state, identity);
+
+export const isCurrentAutoWhiteBalanceRequest = (
+  state: CameraInputEditTransactionState,
+  identity: CameraInputCommitIdentity,
+  requestGeneration: number,
+  currentRequestGeneration: number,
+  requestedConfiguration: AutoWhiteBalanceRequestConfiguration,
+  currentConfiguration: AutoWhiteBalanceRequestConfiguration,
+): boolean =>
+  requestedConfiguration.enabled &&
+  currentConfiguration.enabled &&
+  requestedConfiguration.inputSemantics === currentConfiguration.inputSemantics &&
+  isCurrentCameraInputAsyncRequest(state, identity, requestGeneration, currentRequestGeneration);
 
 export const buildCameraInputEditTransaction = (
   state: CameraInputEditTransactionState,

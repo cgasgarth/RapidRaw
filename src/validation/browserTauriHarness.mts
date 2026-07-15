@@ -51,6 +51,12 @@ interface BrowserHarnessInvokeResponse {
   value: unknown;
 }
 
+interface BrowserHarnessAutoAdjustResponse {
+  delayMs: number;
+  failure?: string;
+  value?: unknown;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -68,6 +74,7 @@ declare global {
       emitEvent: (event: string, payload: unknown) => void;
       failNextSettingsSave: boolean;
       applyAdjustmentsToPathsDelayMs: number;
+      autoAdjustResponses: Array<BrowserHarnessAutoAdjustResponse>;
       applyPreviewResponses: Array<BrowserHarnessApplyPreviewResponse>;
       originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
       revokedObjectUrls: Array<string>;
@@ -102,6 +109,7 @@ const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === 
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'analyzeAutoEdit'
+  | 'calculateAutoAdjustments'
   | 'applyAutoAdjustmentsToPaths'
   | 'commitBatchAutoAdjustment'
   | 'applyAutoEditProposal'
@@ -164,6 +172,7 @@ const commandNames: Record<
   string
 > = {
   analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
+  calculateAutoAdjustments: Invokes.CalculateAutoAdjustments,
   applyAutoAdjustmentsToPaths: Invokes.ApplyAutoAdjustmentsToPaths,
   commitBatchAutoAdjustment: Invokes.CommitBatchAutoAdjustment,
   applyAutoEditProposal: Invokes.ApplyAutoEditProposal,
@@ -311,6 +320,7 @@ export const installBrowserTauriHarness = (): void => {
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
     applyAdjustmentsToPathsDelayMs: 0,
     applyPreviewResponses: [],
+    autoAdjustResponses: [],
     batchAutoAdjustCommitDelayMs: 0,
     batchAutoAdjustPrepareDelayMs: 0,
     calls,
@@ -361,6 +371,31 @@ export const installBrowserTauriHarness = (): void => {
 
 const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   switch (command) {
+    case commandNames.calculateAutoAdjustments: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.autoAdjustResponses.shift() ?? {
+        delayMs: 0,
+        value: {
+          whiteBalanceTechnical: {
+            adaptation: 'cat16_v1',
+            confidence: 0.82,
+            contract: 'rapidraw.white_balance.v1',
+            duv: 0.006,
+            kelvin: 4725,
+            mode: 'auto',
+            sampleCount: 384,
+            source: 'auto',
+            x: 0.35,
+            y: 0.36,
+          },
+        },
+      };
+      return new Promise((resolve, reject) => {
+        window.setTimeout(() => {
+          if (response.failure !== undefined) reject(new Error(response.failure));
+          else resolve(response.value);
+        }, response.delayMs);
+      });
+    }
     case commandNames.analyzeAutoEdit: {
       const request = args?.['request'] as { graphRevision?: string; imageSessionId?: string } | undefined;
       return Promise.resolve({

@@ -7,6 +7,8 @@ import type { CameraInputCommitIdentity } from '../../../src/utils/cameraInputEd
 import {
   buildCameraInputEditTransaction,
   captureCameraInputCommitIdentity,
+  isCurrentAutoWhiteBalanceRequest,
+  isCurrentCameraInputAsyncRequest,
 } from '../../../src/utils/cameraInputEditTransaction';
 import { buildTechnicalWhiteBalance } from '../../../src/utils/color/whiteBalance';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -156,5 +158,42 @@ describe('camera input edit transaction', () => {
     expect(noOp.noOp).toBeTrue();
     expect(useEditorStore.getState().history).toHaveLength(1);
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
+  });
+
+  test('accepts only the latest Auto white-balance request for the captured source, session, and revision', () => {
+    const state = useEditorStore.getState();
+    expect(isCurrentCameraInputAsyncRequest(state, identity(), 5, 5)).toBeTrue();
+    expect(isCurrentCameraInputAsyncRequest(state, identity(), 4, 5)).toBeFalse();
+    expect(isCurrentCameraInputAsyncRequest(state, identity({ adjustmentRevision: 1 }), 5, 5)).toBeFalse();
+    expect(
+      isCurrentCameraInputAsyncRequest(
+        { ...state, selectedImage: { path: '/fixture/successor.ARW' } },
+        identity(),
+        5,
+        5,
+      ),
+    ).toBeFalse();
+    expect(
+      isCurrentCameraInputAsyncRequest(
+        { ...state, imageSession: { id: 'editor-image-session:successor' } },
+        identity(),
+        5,
+        5,
+      ),
+    ).toBeFalse();
+    const rawConfiguration = { enabled: true, inputSemantics: 'raw_scene_linear' } as const;
+    expect(isCurrentAutoWhiteBalanceRequest(state, identity(), 5, 5, rawConfiguration, rawConfiguration)).toBeTrue();
+    expect(
+      isCurrentAutoWhiteBalanceRequest(state, identity(), 5, 5, rawConfiguration, {
+        enabled: true,
+        inputSemantics: 'rendered_scene_linear_approximation',
+      }),
+    ).toBeFalse();
+    expect(
+      isCurrentAutoWhiteBalanceRequest(state, identity(), 5, 5, rawConfiguration, {
+        ...rawConfiguration,
+        enabled: false,
+      }),
+    ).toBeFalse();
   });
 });

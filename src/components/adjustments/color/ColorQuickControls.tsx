@@ -1,6 +1,8 @@
 import cx from 'clsx';
 import { Pipette, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
+import { useAutoWhiteBalanceEditCommit } from '../../../hooks/editor/useAutoWhiteBalanceEditCommit';
 import { useCameraInputEditCommit } from '../../../hooks/editor/useCameraInputEditCommit';
 import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import {
@@ -9,6 +11,7 @@ import {
   WHITE_BALANCE_PRESETS,
   type WhiteBalanceMode,
 } from '../../../utils/color/whiteBalance';
+import { formatUnknownError } from '../../../utils/errorFormatting';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -19,7 +22,6 @@ interface ColorQuickControlsProps extends ColorPanelGroupProps {
   isWbPickerActive: boolean;
   isWgpuEnabled: boolean;
   inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
-  resolveAutoWhiteBalance?: () => void;
   toggleWbPicker?: () => void;
 }
 
@@ -30,12 +32,15 @@ export const ColorQuickControls = ({
   isWgpuEnabled,
   inputSemantics,
   onDragStateChange,
-  resolveAutoWhiteBalance,
   setAdjustments,
   toggleWbPicker,
 }: ColorQuickControlsProps) => {
   const { t } = useTranslation();
   const { commitCameraInput, commitIdentity } = useCameraInputEditCommit(!isForMask);
+  const { invalidatePendingAutoWhiteBalance, resolveAutoWhiteBalance } = useAutoWhiteBalanceEditCommit(
+    !isForMask,
+    inputSemantics,
+  );
   const density = professionalInspectorDensityTokens;
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
   const isWhiteBalanceModified = isForMask
@@ -53,6 +58,7 @@ export const ColorQuickControls = ({
   };
 
   const resetWhiteBalance = () => {
+    invalidatePendingAutoWhiteBalance();
     if (!isForMask) {
       commitCameraInput({
         whiteBalanceTechnical: {
@@ -73,6 +79,7 @@ export const ColorQuickControls = ({
   };
 
   const updateTechnicalWhiteBalance = (mode: WhiteBalanceMode, kelvin: number, duv: number) => {
+    invalidatePendingAutoWhiteBalance();
     commitCameraInput({
       whiteBalanceTechnical: buildTechnicalWhiteBalance(
         mode,
@@ -201,8 +208,10 @@ export const ColorQuickControls = ({
                 data-testid="color-white-balance-mode"
                 onChange={(event) => {
                   const mode = event.target.value as WhiteBalanceMode;
-                  if (mode === 'auto' && resolveAutoWhiteBalance) {
-                    resolveAutoWhiteBalance();
+                  if (mode === 'auto') {
+                    void resolveAutoWhiteBalance().catch((error: unknown) => {
+                      toast.error(`Failed to calculate Auto white balance: ${formatUnknownError(error)}`);
+                    });
                     return;
                   }
                   updateTechnicalWhiteBalance(
@@ -231,7 +240,8 @@ export const ColorQuickControls = ({
                       aria-label={t('adjustments.color.preset', { defaultValue: 'Preset' })}
                       className="h-6 rounded border border-editor-border bg-editor-panel px-1.5 text-xs text-text-primary"
                       data-testid="color-white-balance-preset"
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        invalidatePendingAutoWhiteBalance();
                         commitCameraInput((previous) => ({
                           whiteBalanceTechnical: buildTechnicalWhiteBalancePreset(
                             event.target.value as (typeof WHITE_BALANCE_PRESETS)[number]['id'],
@@ -239,8 +249,8 @@ export const ColorQuickControls = ({
                             inputSemantics,
                           ),
                           whiteBalanceMigration: 'native_v1',
-                        }))
-                      }
+                        }));
+                      }}
                       value={adjustments.whiteBalanceTechnical.presetId ?? 'daylight'}
                     >
                       {WHITE_BALANCE_PRESETS.map((preset) => (
