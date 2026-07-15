@@ -129,9 +129,9 @@ describe('editor persistence effect runner', () => {
       imageId: 'path:a',
       imageSessionId: 'session-a',
       path: '/fixtures/a.raw',
-      renderFingerprint: 42,
+      renderFingerprint: 'u64:000000000000002a',
       sidecarRevision: `sha256:${'a'.repeat(64)}`,
-      thumbnailRevision: `sha256:${'b'.repeat(64)}`,
+      thumbnailRevision: 'b'.repeat(64),
       transactionId: 'transaction-a-1',
     };
 

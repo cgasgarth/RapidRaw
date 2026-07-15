@@ -2216,7 +2216,7 @@ pub struct MetadataSaveReceipt {
     pub image_id: String,
     pub path: String,
     pub sidecar_revision: String,
-    pub render_fingerprint: u64,
+    pub render_fingerprint: String,
     pub thumbnail_revision: String,
     pub catalog_revision: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2264,7 +2264,7 @@ fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveRe
         image_id: format!("path:{}", blake3::hash(path.as_bytes()).to_hex()),
         path: path.to_string(),
         sidecar_revision,
-        render_fingerprint: u64::from_le_bytes(fingerprint_bytes),
+        render_fingerprint: format!("u64:{:016x}", u64::from_le_bytes(fingerprint_bytes)),
         thumbnail_revision,
         catalog_revision: None,
         transaction_id: None,
@@ -2803,7 +2803,7 @@ fn batch_auto_adjust_receipt(
             adjustment_document_revision: persisted.sidecar_revision.clone(),
             adjustments: metadata.adjustments.clone(),
             engine: LEGACY_AUTO_ADJUST_ENGINE_V1.to_string(),
-            render_fingerprint: format!("u64:{:016x}", persisted.render_fingerprint),
+            render_fingerprint: persisted.render_fingerprint.clone(),
             source_identity: source_path.to_string_lossy().to_string(),
             source_revision,
             thumbnail_revision: persisted.thumbnail_revision.clone(),
@@ -4501,6 +4501,32 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
 mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
+
+    #[test]
+    fn metadata_save_receipt_serializes_lossless_render_and_thumbnail_identities() {
+        let receipt = metadata_save_receipt("/fixtures/image.raw", &ImageMetadata::default());
+        let serialized = serde_json::to_value(&receipt).expect("serialize metadata save receipt");
+        let render_fingerprint = serialized["renderFingerprint"]
+            .as_str()
+            .expect("render fingerprint must be a string");
+        let thumbnail_revision = serialized["thumbnailRevision"]
+            .as_str()
+            .expect("thumbnail revision must be a string");
+
+        assert_eq!(render_fingerprint.len(), 20);
+        assert!(render_fingerprint.starts_with("u64:"));
+        assert!(
+            render_fingerprint[4..]
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        );
+        assert_eq!(thumbnail_revision.len(), 64);
+        assert!(
+            thumbnail_revision
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        );
+    }
 
     #[test]
     fn batch_auto_adjust_merge_is_idempotent_and_discards_disclosure_metadata() {

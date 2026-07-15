@@ -16,9 +16,9 @@ export const editorPersistenceReceiptSchema = z
     imageId: z.string().min(1),
     imageSessionId: z.string().min(1).nullish(),
     path: z.string().trim().min(1),
-    renderFingerprint: z.number().int().nonnegative(),
+    renderFingerprint: z.string().regex(/^u64:[0-9a-f]{16}$/u),
     sidecarRevision: z.string().trim().startsWith('sha256:'),
-    thumbnailRevision: z.string().trim().startsWith('sha256:'),
+    thumbnailRevision: z.string().regex(/^[0-9a-f]{64}$/u),
     transactionId: z.string().min(1).nullish(),
   })
   .strict();
