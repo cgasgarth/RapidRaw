@@ -101,7 +101,7 @@ use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
-use crate::file_management::{parse_virtual_path, read_file_mapped};
+use crate::file_management::parse_virtual_path;
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_loader::{
@@ -110,7 +110,7 @@ use crate::image_loader::{
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
     apply_flip, apply_geometry_warp, apply_srgb_to_linear, downscale_f32_image,
-    get_or_init_gpu_context, process_and_get_dynamic_image, resolve_tonemapper_override,
+    get_or_init_gpu_context, process_and_get_dynamic_image,
     resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
@@ -1950,133 +1950,6 @@ async fn save_collage(base64_data: String, first_path_str: String) -> Result<Str
 }
 
 #[tauri::command]
-fn generate_preview_for_path(
-    path: String,
-    js_adjustments: Value,
-    target_resolution: Option<u32>,
-    jpeg_quality: Option<u8>,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<Response, String> {
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
-    let is_raw = is_raw_file(&source_path_str);
-    let settings = load_settings_or_default(&app_handle);
-
-    let base_image = match read_file_mapped(&source_path) {
-        Ok(mmap) => load_and_composite(
-            &mmap,
-            &source_path_str,
-            &js_adjustments,
-            false,
-            &settings,
-            None,
-        )
-        .map_err(|e| e.to_string())?,
-        Err(e) => {
-            log::warn!(
-                "Failed to memory-map file '{}': {}. Falling back to standard read.",
-                source_path_str,
-                e
-            );
-            let bytes = fs::read(&source_path).map_err(|io_err| io_err.to_string())?;
-            load_and_composite(
-                &bytes,
-                &source_path_str,
-                &js_adjustments,
-                false,
-                &settings,
-                None,
-            )
-            .map_err(|e| e.to_string())?
-        }
-    };
-
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(&base_image), &js_adjustments);
-    let (img_w, img_h) = transformed_image.dimensions();
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-
-    let warped_image = resolve_warped_image_for_masks(&state, &js_adjustments, &mask_definitions);
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            generate_mask_bitmap(
-                def,
-                img_w,
-                img_h,
-                1.0,
-                unscaled_crop_offset,
-                warped_image.as_deref(),
-            )
-        })
-        .collect();
-
-    let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
-    let lut_path = render_adjustments["lutPath"].as_str();
-    let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
-    let render_plan = compile_consumer_render_plan(
-        render_adjustments.as_ref(),
-        &source_path_str,
-        is_raw,
-        tm_override,
-        lut,
-    )?;
-    let pre_gpu_stage_hash = calculate_transform_hash(render_adjustments.as_ref());
-    let source_revision = crate::render::artifact_identity::stable_hash(&(
-        crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_str),
-        crate::image_loader::raw_processing_profile_key(&settings),
-    ));
-    let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
-        transformed_image.as_ref(),
-        pre_gpu_stage_hash,
-        render_adjustments.as_ref(),
-        is_raw,
-    );
-    let mut gpu_adjustments = render_plan.adjustments;
-    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
-        detail_stage.owns_legacy_global_detail,
-    );
-    let final_image = process_and_get_dynamic_image(
-        &context,
-        &state,
-        detail_stage.image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::for_stage(
-            detail_stage.image.as_ref(),
-            source_revision,
-            detail_stage.render_hash,
-            detail_stage.render_hash,
-        ),
-        RenderRequest {
-            adjustments: gpu_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut: render_plan.lut.clone(),
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-                &render_plan.edit_graph,
-            )),
-        },
-        "generate_preview_for_path",
-    )?;
-    let preview_image = match target_resolution {
-        Some(max_edge) => final_image.resize(
-            max_edge.clamp(256, 4096),
-            max_edge.clamp(256, 4096),
-            image::imageops::FilterType::Lanczos3,
-        ),
-        None => final_image,
-    };
-    encode_jpeg_response(&preview_image, jpeg_quality.unwrap_or(92).clamp(50, 95))
-}
-
-#[tauri::command]
 fn analyze_negative_lab_dust_spots(
     path: String,
     state: tauri::State<AppState>,
@@ -2597,7 +2470,7 @@ pub fn run() {
             apply_adjustments,
             generate_export_soft_proof_preview,
             resolve_export_soft_proof_transform_metadata,
-            generate_preview_for_path,
+            app::commands::path_preview::generate_preview_for_path,
             analyze_negative_lab_dust_spots,
             generate_original_transformed_preview,
             app::commands::viewer_sampling::sample_viewer_pixel,
