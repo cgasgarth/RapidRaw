@@ -481,10 +481,12 @@ const originalSchedulingFingerprint = (inputs: PreviewSchedulingInputSnapshot | 
   const session = inputs.original.session;
   return JSON.stringify({
     devicePixelRatio: inputs.devicePixelRatio,
+    displayGeneration: session.displayGeneration,
     displayHeight: inputs.displayHeight,
     displayWidth: inputs.displayWidth,
     geometryRevision: session.geometryRevision,
     imageSessionId: session.imageSessionId,
+    proofRevision: session.proofRevision,
     sourceImagePath: session.sourceImagePath,
     sourceRevision: session.sourceRevision,
     targetHeight: session.targetHeight,
