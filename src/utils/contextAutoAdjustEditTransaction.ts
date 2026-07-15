@@ -17,7 +17,6 @@ export const contextAutoAdjustPatchSchema = z
     dehaze: percentAdjustmentSchema,
     exposure: stopAdjustmentSchema,
     highlights: percentAdjustmentSchema,
-    sectionVisibility: z.object({ basic: z.literal(true), color: z.literal(true), effects: z.literal(true) }).strict(),
     shadows: percentAdjustmentSchema,
     vibrance: percentAdjustmentSchema,
     vignetteAmount: percentAdjustmentSchema,
@@ -93,7 +92,6 @@ export const buildContextAutoAdjustEditTransaction = (
   }
   const adjustments = mergeAutoEditAdjustments(base.adjustments, {
     ...patch,
-    sectionVisibility: { ...base.adjustments.sectionVisibility, ...patch.sectionVisibility },
     whiteBalanceTechnical: {
       ...patch.whiteBalanceTechnical,
       inputSemantics: base.inputSemantics,

@@ -200,6 +200,39 @@ describe('reduceEditTransaction', () => {
         adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.5, temperature: 10 },
       },
     ]);
+
+    expect(
+      buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+        ...INITIAL_ADJUSTMENTS,
+        effectsEnabled: false,
+      }),
+    ).toEqual([{ enabled: false, nodeType: 'display_creative', type: 'set-edit-document-node-enabled' }]);
+  });
+
+  test('toggles Effects as one render-node revision while preserving latent parameters', () => {
+    const before = { ...structuredClone(INITIAL_ADJUSTMENTS), grainAmount: 42 };
+    const document = legacyAdjustmentsToEditDocumentV2(before);
+    const result = reduceEditTransaction(
+      before,
+      4,
+      request({
+        operations: buildAdjustmentMutationOperations(before, { ...before, effectsEnabled: false }),
+      }),
+      undefined,
+      document,
+    );
+
+    expect(result).toMatchObject({ changedKeys: ['effectsEnabled'], nextAdjustmentRevision: 5, noOp: false });
+    expect(result.after.effectsEnabled).toBeFalse();
+    expect(result.after.grainAmount).toBe(42);
+    expect(result.afterEditDocumentV2.nodes.display_creative).toMatchObject({
+      enabled: false,
+      params: { grainAmount: 42 },
+    });
+    expect(result.afterEditDocumentV2.nodes.display_creative.params).toEqual(
+      result.beforeEditDocumentV2.nodes.display_creative.params,
+    );
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
   });
 
   test('applies semantic patch operations and advances the revision once', () => {

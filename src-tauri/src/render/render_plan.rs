@@ -660,6 +660,12 @@ fn fingerprints(
     let output = hash_parts(&[
         b"output",
         &FINGERPRINT_VERSION.to_le_bytes(),
+        &hash_json(
+            effective
+                .get("effectsEnabled")
+                .unwrap_or(&Value::Bool(true)),
+        )
+        .to_le_bytes(),
         &adjustments.global.show_clipping.to_le_bytes(),
         &adjustments.global.tonemapper_mode.to_le_bytes(),
     ]);
@@ -996,6 +1002,25 @@ mod tests {
         let clipping =
             compile_render_plan(&json!({"showClipping":true}), context(6), None).unwrap();
         assert_ne!(base.fingerprints.output, clipping.fingerprints.output);
+
+        let effects_disabled = compile_render_plan(
+            &json!({"effectsEnabled": false, "grainAmount": 42}),
+            context(7),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            base.fingerprints.geometry,
+            effects_disabled.fingerprints.geometry
+        );
+        assert_eq!(
+            base.fingerprints.pre_gpu_base,
+            effects_disabled.fingerprints.pre_gpu_base
+        );
+        assert_ne!(
+            base.fingerprints.output,
+            effects_disabled.fingerprints.output
+        );
 
         let rapid_view = compile_render_plan(
             &json!({

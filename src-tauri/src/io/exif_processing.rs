@@ -851,6 +851,7 @@ fn validate_adjustments(
         "dustSpotOverlayEnabled",
         "dustSpotSensitivity",
         "dehaze",
+        "effectsEnabled",
         "exposure",
         "flipHorizontal",
         "flipVertical",

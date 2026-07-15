@@ -40,6 +40,7 @@ export interface ResetEditCommitIdentity {
 
 export interface ResetEditTransactionState {
   adjustmentRevision: number;
+  adjustments: Adjustments;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { isReady: boolean; path: string } | null;
@@ -93,6 +94,13 @@ export const buildResetEditTransaction = (
   }
 
   const normalized = normalizeLoadedAdjustments(result.adjustments);
+  const resultVisibility = result.adjustments.sectionVisibility;
+  if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && resultVisibility?.['effects'] === undefined) {
+    normalized.effectsEnabled = state.adjustments.effectsEnabled;
+  }
+  if (!Object.hasOwn(result.adjustments, 'sectionVisibility')) {
+    normalized.sectionVisibility = structuredClone(state.adjustments.sectionVisibility);
+  }
   const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : null;
   const resetAdjustments: Adjustments = {
     ...structuredClone(INITIAL_ADJUSTMENTS),

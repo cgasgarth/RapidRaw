@@ -4,7 +4,11 @@ import {
   getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
-import { legacyAdjustmentsToEditDocumentV2, updateEditDocumentV2Node } from './editDocumentV2';
+import {
+  legacyAdjustmentsToEditDocumentV2,
+  setEditDocumentV2NodeEnabled,
+  updateEditDocumentV2Node,
+} from './editDocumentV2';
 import type { EditHistoryCheckpoint } from './editHistory';
 
 /** The caller's intent, kept explicit so new mutation paths can be audited. */
@@ -45,6 +49,7 @@ export type EditNodeOperation =
       nodeType: EditDocumentNodeTypeV2;
       patch: Readonly<Record<string, unknown>>;
     }
+  | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
   | { type: 'patch-adjustments'; patch: Partial<Adjustments> }
   | { type: 'replace-adjustments'; adjustments: Adjustments };
 
@@ -183,6 +188,8 @@ const projectEditDocumentNodeToAdjustments = (
   for (const field of descriptor.legacyFields) {
     if (Object.hasOwn(node.params, field)) projected[field] = structuredClone(node.params[field]);
   }
+  // biome-ignore lint/complexity/useLiteralKeys: projected is an intentional index-signature bridge.
+  if (nodeType === 'display_creative') projected['effectsEnabled'] = node.enabled;
   return { ...before, ...projected };
 };
 
@@ -192,6 +199,15 @@ export const buildAdjustmentMutationOperations = (
   after: Adjustments,
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
+  if (keys.length === 1 && keys[0] === 'effectsEnabled') {
+    return [
+      {
+        enabled: after.effectsEnabled,
+        nodeType: 'display_creative',
+        type: 'set-edit-document-node-enabled',
+      },
+    ];
+  }
   const focusedNodeType = (
     [
       'black_white_mixer',
@@ -256,6 +272,11 @@ export const reduceEditTransaction = (
         ...params,
         ...structuredClone(operation.patch),
       }));
+      after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+      continue;
+    }
+    if (operation.type === 'set-edit-document-node-enabled') {
+      afterEditDocumentV2 = setEditDocumentV2NodeEnabled(afterEditDocumentV2, operation.nodeType, operation.enabled);
       after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
       continue;
     }

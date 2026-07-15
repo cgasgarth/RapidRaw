@@ -39,7 +39,12 @@ if (receipt === undefined) throw new Error('Expected Reset receipt fixture');
 
 describe('Reset edit transaction', () => {
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
+    const adjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      effectsEnabled: false,
+      exposure: 1.25,
+      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility, details: false },
+    };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.setState({
       adjustmentRevision: 4,
@@ -63,7 +68,13 @@ describe('Reset edit transaction', () => {
     const result = state.applyEditTransaction(request);
 
     expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed', source: 'reset' });
-    expect(result.after).toMatchObject({ aiPatches: [], aspectRatio: 1.5, exposure: 0 });
+    expect(result.after).toMatchObject({
+      aiPatches: [],
+      aspectRatio: 1.5,
+      effectsEnabled: false,
+      exposure: 0,
+      sectionVisibility: { details: false },
+    });
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 5,
       baseAdjustmentRevision: 4,

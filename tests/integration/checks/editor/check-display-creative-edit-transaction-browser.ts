@@ -58,6 +58,15 @@ const halationPersistenceSchema = z
     transaction: persistenceSchema.shape.transaction,
   })
   .passthrough();
+const effectsEnablementPersistenceSchema = z
+  .object({
+    adjustments: z
+      .object({ effectsEnabled: z.boolean(), vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) })
+      .passthrough(),
+    path: z.literal(sourcePath),
+    transaction: persistenceSchema.shape.transaction,
+  })
+  .passthrough();
 const renderCallSchema = z.object({
   args: z
     .object({
@@ -69,6 +78,7 @@ const renderCallSchema = z.object({
                 .object({
                   display_creative: z
                     .object({
+                      enabled: z.boolean(),
                       params: z
                         .object({
                           grainAmount: z.number(),
@@ -206,6 +216,27 @@ const waitForRenderedFilmEffects = async (
   throw new Error(`Timed out waiting for rendered film effects ${JSON.stringify(expected)}.`);
 };
 
+const waitForRenderedEffectsEnabled = async (page: Page, enabled: boolean) => {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const call = renderCallSchema.safeParse(
+      await page.evaluate(() =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_adjustments')
+          .at(-1),
+      ),
+    );
+    if (
+      call.success &&
+      call.data.endedAtMs !== null &&
+      call.data.args.request.editDocumentV2.nodes.display_creative.enabled === enabled
+    )
+      return call.data.args.request.editDocumentV2.nodes.display_creative;
+    await page.waitForTimeout(50);
+  }
+  throw new Error(`Timed out waiting for rendered Effects enabled=${String(enabled)}.`);
+};
+
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 try {
   await waitForServer();
@@ -259,6 +290,17 @@ try {
 
   const baselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
   const baselineApplies = await commandCount(page, 'apply_adjustments');
+  await disclosure.click();
+  await page.waitForTimeout(250);
+  if (
+    (await disclosure.getAttribute('aria-expanded')) !== 'false' ||
+    (await commandCount(page, 'save_metadata_and_update_thumbnail')) !== baselineSaves ||
+    (await commandCount(page, 'apply_adjustments')) !== baselineApplies
+  ) {
+    throw new Error('Collapsing Effects caused an edit, persistence write, or render.');
+  }
+  await disclosure.click();
+  await controls.waitFor({ state: 'visible', timeout: 10_000 });
   await page.evaluate(() => {
     window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
       { color: [24, 200, 80], delayMs: 20 },
@@ -379,6 +421,96 @@ try {
   });
   if ((await page.getByTestId('effects-active-summary').textContent())?.includes('72%') !== true) {
     throw new Error('Undo of manual Halation did not visibly restore the prior Film Look identity.');
+  }
+
+  const enablementBaselineApplies = await commandCount(page, 'apply_adjustments');
+  const enablementBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  const previewLayer = page.getByTestId('svg-preview-base-layer').last();
+  const enabledPreviewUrl = await previewLayer.getAttribute('href');
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [210, 60, 120], delayMs: 20 },
+      { color: [60, 210, 120], delayMs: 20 },
+      { color: [120, 60, 210], delayMs: 20 },
+      { color: [210, 120, 60], delayMs: 20 },
+    );
+  });
+  await effectsSection.getByRole('button', { name: 'Disable Section' }).click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 1);
+  await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 1);
+  await page.waitForTimeout(200);
+  if (
+    (await commandCount(page, 'save_metadata_and_update_thumbnail')) !== enablementBaselineSaves + 1 ||
+    (await commandCount(page, 'apply_adjustments')) !== enablementBaselineApplies + 1
+  ) {
+    throw new Error('Disabling Effects did not produce exactly one edit transaction.');
+  }
+  const disabledNode = await waitForRenderedEffectsEnabled(page, false);
+  if (disabledNode.params.vignetteAmount !== -32 || disabledNode.params.vignetteMidpoint !== 63) {
+    throw new Error(`Disabling Effects lost latent parameters: ${JSON.stringify(disabledNode.params)}`);
+  }
+  const disabledPreviewUrl = await page.getByTestId('svg-preview-base-layer').last().getAttribute('href');
+  if (enabledPreviewUrl === null || disabledPreviewUrl === null || disabledPreviewUrl === enabledPreviewUrl) {
+    throw new Error('Disabling Effects did not replace the visible preview output.');
+  }
+  const disabledPersistence = effectsEnablementPersistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args,
+    ),
+  );
+  if (
+    disabledPersistence.adjustments.effectsEnabled !== false ||
+    disabledPersistence.adjustments.vignetteAmount !== -32
+  ) {
+    throw new Error(
+      `Effects disablement was not persisted with latent parameters: ${JSON.stringify(disabledPersistence)}`,
+    );
+  }
+
+  await effectsSection.getByRole('button', { name: 'Enable Section' }).click();
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 2);
+  await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 2);
+  const reenabledNode = await waitForRenderedEffectsEnabled(page, true);
+  if (reenabledNode.params.vignetteAmount !== -32 || reenabledNode.params.vignetteMidpoint !== 63) {
+    throw new Error(`Re-enabling Effects did not restore latent parameters: ${JSON.stringify(reenabledNode.params)}`);
+  }
+
+  await undo.click();
+  await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 3);
+  await waitForRenderedEffectsEnabled(page, false);
+  if ((await effectsSection.getByRole('button', { name: 'Enable Section' }).count()) !== 1) {
+    throw new Error('Undo did not restore disabled Effects UI state.');
+  }
+
+  const redoBaselineApplies = await commandCount(page, 'apply_adjustments');
+  const redoBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  const undoPreviewUrl = await page.getByTestId('svg-preview-base-layer').last().getAttribute('href');
+  const redo = page.locator('button[data-command-id="redo"]:visible').first();
+  if (!(await redo.isEnabled())) throw new Error('Effects enablement Undo did not create a Redo boundary.');
+  await redo.click();
+  await waitForCommandCount(page, 'apply_adjustments', redoBaselineApplies + 1);
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', redoBaselineSaves + 1);
+  await page.waitForTimeout(200);
+  if (
+    (await commandCount(page, 'apply_adjustments')) !== redoBaselineApplies + 1 ||
+    (await commandCount(page, 'save_metadata_and_update_thumbnail')) !== redoBaselineSaves + 1
+  ) {
+    throw new Error('Redoing Effects enablement did not produce exactly one render and persistence transaction.');
+  }
+  const redoneNode = await waitForRenderedEffectsEnabled(page, true);
+  if (
+    redoneNode.params.vignetteAmount !== -32 ||
+    redoneNode.params.vignetteMidpoint !== 63 ||
+    (await effectsSection.getByRole('button', { name: 'Disable Section' }).count()) !== 1
+  ) {
+    throw new Error(`Redo did not restore enabled Effects with latent parameters: ${JSON.stringify(redoneNode)}`);
+  }
+  const redoPreviewUrl = await page.getByTestId('svg-preview-base-layer').last().getAttribute('href');
+  if (undoPreviewUrl === null || redoPreviewUrl === null || redoPreviewUrl === undoPreviewUrl) {
+    throw new Error('Redoing Effects enablement did not restore a new visible preview output.');
   }
 
   console.log('display creative edit transaction browser ok');

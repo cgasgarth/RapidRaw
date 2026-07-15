@@ -20,6 +20,11 @@ use serde::Deserialize;
 type JsonValue = serde_json::Value;
 
 fn section_is_visible(value: &JsonValue, section: &str) -> bool {
+    if section == "effects"
+        && let Some(enabled) = value.get("effectsEnabled").and_then(JsonValue::as_bool)
+    {
+        return enabled;
+    }
     value
         .get("sectionVisibility")
         .and_then(|v| v.get(section))
@@ -1010,6 +1015,42 @@ pub fn get_all_adjustments_from_json_with_masks(
 mod tests {
     use super::get_all_adjustments_from_json;
     use serde_json::json;
+
+    #[test]
+    fn effects_enablement_controls_render_values_and_preserves_legacy_migration() {
+        let active = get_all_adjustments_from_json(
+            &json!({
+                "effectsEnabled": true,
+                "grainAmount": 42,
+                "glowAmount": 18,
+                "sectionVisibility": { "effects": false }
+            }),
+            true,
+            None,
+        );
+        assert!(active.global.grain_amount > 0.0);
+        assert!(active.global.glow_amount > 0.0);
+
+        let disabled = get_all_adjustments_from_json(
+            &json!({ "effectsEnabled": false, "grainAmount": 42, "glowAmount": 18 }),
+            true,
+            None,
+        );
+        assert_eq!(disabled.global.grain_amount, 0.0);
+        assert_eq!(disabled.global.glow_amount, 0.0);
+
+        let legacy_disabled = get_all_adjustments_from_json(
+            &json!({
+                "grainAmount": 42,
+                "glowAmount": 18,
+                "sectionVisibility": { "effects": false }
+            }),
+            true,
+            None,
+        );
+        assert_eq!(legacy_disabled.global.grain_amount, 0.0);
+        assert_eq!(legacy_disabled.global.glow_amount, 0.0);
+    }
 
     #[test]
     fn parses_supported_mask_container_blend_modes() {

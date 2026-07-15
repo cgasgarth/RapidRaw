@@ -1227,6 +1227,9 @@ export default function Controls() {
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     setAdjustments((prev: Adjustments) => {
+      if (sectionName === 'effects') {
+        return { ...prev, effectsEnabled: !prev.effectsEnabled };
+      }
       const currentVisibility = prev.sectionVisibility;
       return {
         ...prev,
@@ -1244,7 +1247,6 @@ export default function Controls() {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...resetValues,
-      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
     }));
   };
 
@@ -1290,10 +1292,6 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...copiedSection.values,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -1302,10 +1300,6 @@ export default function Controls() {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         ...resetValues,
-        sectionVisibility: {
-          ...prev.sectionVisibility,
-          [sectionName]: true,
-        },
       }));
     };
 
@@ -1694,7 +1688,11 @@ export default function Controls() {
           const sectionVisibility = adjustments.sectionVisibility;
           const sectionActions = buildSectionActions(sectionName);
           const canToggleVisibility = sectionName !== 'transformLens';
-          const isContentVisible = canToggleVisibility ? sectionVisibility[sectionName] : true;
+          const isContentVisible = canToggleVisibility
+            ? sectionName === 'effects'
+              ? adjustments.effectsEnabled
+              : sectionVisibility[sectionName]
+            : true;
 
           return (
             <div className="shrink-0 group" data-testid={`adjustments-section-${sectionName}`} key={sectionName}>
