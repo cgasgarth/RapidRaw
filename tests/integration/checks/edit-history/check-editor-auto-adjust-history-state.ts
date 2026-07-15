@@ -9,8 +9,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import type { SelectedImage } from '../../../../src/components/ui/AppProperties.tsx';
-import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { createEditorImageSession, useEditorStore } from '../../../../src/store/useEditorStore.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import type { ContextAutoAdjustPatch } from '../../../../src/utils/contextAutoAdjustEditTransaction.ts';
 
 type RenderedHarness = {
   container: HTMLDivElement;
@@ -21,11 +22,28 @@ type RenderedHarness = {
 const failures: string[] = [];
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const autoAdjustments = {
-  ...structuredClone(INITIAL_ADJUSTMENTS),
-  brightness: 12,
+  blacks: -4,
+  brightness: 1.2,
+  clarity: 8,
   contrast: 18,
+  dehaze: 5,
   exposure: 0.35,
-} satisfies Adjustments;
+  highlights: -10,
+  sectionVisibility: { basic: true, color: true, effects: true },
+  shadows: 12,
+  vibrance: 16,
+  vignetteAmount: -3,
+  whiteBalanceMigration: 'native_v1',
+  whiteBalanceTechnical: {
+    ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+    confidence: 0.8,
+    mode: 'auto',
+    sampleCount: 256,
+    source: 'auto',
+  },
+  whites: 6,
+  centré: 2,
+} satisfies ContextAutoAdjustPatch;
 
 mock.module('@tauri-apps/api/core', () => ({
   invoke: async () => structuredClone(autoAdjustments),
@@ -39,15 +57,15 @@ const { useEditorActions } = await import('../../../../src/hooks/editor/useEdito
 
 const i18n = await createTestI18n(locale);
 const rendered = await renderHarness();
-const undoLabel = locale.editor?.toolbar?.tooltips?.undo ?? 'Undo';
+const undoLabelPrefix = String(locale.editor?.toolbar?.tooltips?.undo ?? 'Undo').split('{{shortcut}}')[0] ?? 'Undo';
 
-assertDisabledState(rendered.container, undoLabel, true, 'undo should begin disabled before auto adjust');
+assertDisabledState(rendered.container, undoLabelPrefix, true, 'undo should begin disabled before auto adjust');
 await act(async () => {
   rendered.container.querySelector<HTMLButtonElement>('[data-testid="apply-auto-adjust"]')?.click();
   await flushPromises();
 });
 
-assertDisabledState(rendered.container, undoLabel, false, 'undo should enable immediately after auto adjust');
+assertDisabledState(rendered.container, undoLabelPrefix, false, 'undo should enable immediately after auto adjust');
 assertHistoryState();
 
 rendered.unmount();
@@ -65,6 +83,13 @@ async function renderHarness(): Promise<RenderedHarness> {
   useEditorStore.getState().setEditor({
     adjustments: structuredClone(INITIAL_ADJUSTMENTS),
     selectedImage: createSelectedImage(),
+  });
+  useEditorStore.setState({
+    imageSession: createEditorImageSession({
+      generation: 1,
+      path: '/library/history/auto-adjust.ARW',
+      source: 'selection',
+    }),
   });
 
   const container = document.createElement('div');
@@ -129,10 +154,10 @@ function AutoAdjustHarness() {
   );
 }
 
-function assertDisabledState(container: HTMLElement, label: string, expected: boolean, message: string) {
-  const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+function assertDisabledState(container: HTMLElement, labelPrefix: string, expected: boolean, message: string) {
+  const button = container.querySelector<HTMLButtonElement>(`button[aria-label^="${labelPrefix}"]`);
   if (!button) {
-    failures.push(`missing button: ${label}`);
+    failures.push(`missing button with label prefix: ${labelPrefix}`);
     return;
   }
 
