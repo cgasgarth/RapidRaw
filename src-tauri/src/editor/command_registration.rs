@@ -1,0 +1,61 @@
+macro_rules! with_commands {
+    ($callback:ident [$($entries:tt)*]) => {
+        $callback!([
+            $($entries)*
+            ("editor", crate::editor::preview_geometry::preview_geometry_transform),
+            ("editor", crate::editor::picker_commands::analyze_tone_equalizer_placement),
+            ("editor", crate::editor::picker_commands::sample_tone_equalizer_picker),
+            ("editor", crate::editor::picker_commands::sample_point_color_picker),
+            ("editor", crate::denoise_api::dry_run_denoise_controls),
+            ("editor", crate::denoising::apply_denoising),
+            ("editor", crate::denoising::execute_denoising),
+            ("editor", crate::denoising::cancel_denoising),
+            ("editor", crate::denoising::batch_denoise_images),
+            ("editor", crate::denoising::save_denoised_image),
+            ("editor", crate::color::camera_profile::registry::list_camera_profiles),
+            ("editor", crate::color::camera_profile::registry::import_camera_profile),
+            ("editor", crate::color::camera_profile::registry::remove_camera_profile),
+            ("editor", crate::color::camera_profile::registry::reveal_camera_profile),
+            ("editor", crate::color::calibration::fit_and_publish_chart_calibration),
+            ("editor", crate::color::calibration::fit_chart_calibration_report),
+            ("editor", crate::color::calibration::list_supported_chart_definitions),
+            ("editor", crate::color::calibration::validate_chart_capture_geometry),
+            ("editor", crate::image_loader::compare_raw_reconstruction_modes),
+            ("editor", crate::image_loader::load_image),
+            ("editor", crate::image_open_session::begin_image_open),
+            ("editor", crate::image_open_session::schedule_image_prefetch),
+            ("editor", crate::image_open_session::get_image_open_diagnostics),
+            ("editor", crate::image_loader::is_image_cached),
+            ("editor", crate::auto_adjust::calculate_auto_adjustments),
+            ("editor", crate::auto_adjust::calculate_legacy_auto_adjustments_v1),
+            ("editor", crate::color::auto_edit::analyze_auto_edit),
+            ("editor", crate::color::auto_edit::preview_auto_edit_proposal),
+            ("editor", crate::color::auto_edit::apply_auto_edit_proposal),
+            ("editor", crate::color::auto_edit::cancel_auto_edit_analysis),
+            ("editor", crate::mask_generation::generate_mask_overlay),
+            #[cfg(feature = "validation-harness")]
+            ("editor", crate::color_gpu_readback_probe::run_color_gpu_readback_probe),
+            #[cfg(feature = "validation-harness")]
+            ("editor", crate::raw_open_edit_export_proof::run_raw_open_edit_export_proof),
+            ("editor", crate::deblur_api::dry_run_deblur_controls),
+            ("editor", crate::lens_correction::get_lensfun_makers),
+            ("editor", crate::lens_correction::get_lensfun_lenses_for_maker),
+            ("editor", crate::lens_correction::autodetect_lens),
+            ("editor", crate::lens_correction::get_lens_distortion_params),
+            ("editor", crate::negative_conversion::preview_negative_conversion),
+            ("editor", crate::negative_conversion::preflight_negative_lab_source),
+            ("editor", crate::negative_conversion::fit_negative_lab_measured_profile),
+            ("editor", crate::negative_conversion::lock_negative_lab_roll_bounds),
+            ("editor", crate::negative_conversion::render_negative_lab_dry_run_preview_artifact),
+            ("editor", crate::negative_conversion::estimate_negative_base_fog),
+            ("editor", crate::negative_conversion::suggest_negative_lab_neutral_patch_rgb_balance),
+            ("editor", crate::negative_conversion::suggest_negative_lab_highlight_patch_exposure),
+            ("editor", crate::negative_conversion::suggest_negative_lab_shadow_patch_black_point),
+            ("editor", crate::negative_conversion::convert_negatives),
+            ("editor", crate::negative_lab_profiles::read_negative_lab_measured_profile_library),
+            ("editor", crate::negative_lab_profiles::write_negative_lab_measured_profile_library),
+        ]);
+    };
+}
+
+pub(crate) use with_commands;

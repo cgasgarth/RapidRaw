@@ -1,3 +1,4 @@
+pub(crate) mod command_registration;
 pub(crate) mod image_service;
 pub(crate) mod picker_commands;
 pub(crate) mod preview_geometry;
