@@ -14,6 +14,7 @@ import { globalImageCache } from '../../utils/ImageLRUCache';
 export function useEditorPersistence(): void {
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useEditorStore((state) => state.adjustments);
+  const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const imageSession = useEditorStore((state) => state.imageSession);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
@@ -50,6 +51,7 @@ export function useEditorPersistence(): void {
     runner.submit({
       adjustmentRevision,
       adjustments,
+      editDocumentV2,
       imageSessionId: imageSession.id,
       interactionActive,
       multiSelection,
@@ -60,6 +62,7 @@ export function useEditorPersistence(): void {
   }, [
     adjustmentRevision,
     adjustments,
+    editDocumentV2,
     imageSession,
     imageSessionId,
     interactionActive,

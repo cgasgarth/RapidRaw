@@ -161,7 +161,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
@@ -170,6 +170,7 @@ jobs:
           bunx playwright install chromium
           bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
           bun tests/integration/checks/check-browser-tauri-harness.ts
+          bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts
 
   fast-js-security:
     name: 'pr fast: JavaScript audit'

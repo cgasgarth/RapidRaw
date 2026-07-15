@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import type { EditHistoryCheckpoint } from './editHistory';
 import {
@@ -11,6 +12,7 @@ import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransf
 export interface CopyPasteEditTransactionState {
   adjustmentRevision: number;
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -19,6 +21,8 @@ export interface CopyPasteEditTransactionState {
 export interface CopyPasteCompensationTarget {
   adjustmentRevision: number;
   adjustments: Adjustments;
+  editDocumentHistory: EditDocumentV2[];
+  editDocumentV2: EditDocumentV2;
   history: Adjustments[];
   historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
@@ -54,6 +58,7 @@ export const buildCopyPasteEditTransaction = (
 
 export const captureCopyPasteCompensationTarget = (
   state: CopyPasteEditTransactionState & {
+    editDocumentHistory: EditDocumentV2[];
     history: Adjustments[];
     historyCheckpoints: EditHistoryCheckpoint[];
     historyIndex: number;
@@ -66,6 +71,8 @@ export const captureCopyPasteCompensationTarget = (
   return {
     adjustmentRevision: state.adjustmentRevision,
     adjustments: structuredClone(state.adjustments),
+    editDocumentHistory: structuredClone(state.editDocumentHistory),
+    editDocumentV2: structuredClone(state.editDocumentV2),
     history: structuredClone(state.history),
     historyCheckpoints: structuredClone(state.historyCheckpoints),
     historyIndex: state.historyIndex,
@@ -124,12 +131,19 @@ export const buildCopyPastePersistenceCompensation = (
     baseAdjustmentRevision: state.adjustmentRevision,
     compensationHistory: {
       checkpoints: structuredClone(target.historyCheckpoints),
+      editDocumentEntries: structuredClone(target.editDocumentHistory),
       entries: structuredClone(target.history),
       historyIndex: target.historyIndex,
     },
     history: 'compensation',
     imageSessionId: target.imageSessionId,
-    operations: buildAdjustmentMutationOperations(state.adjustments, target.adjustments),
+    operations: [
+      {
+        adjustments: structuredClone(target.adjustments),
+        editDocumentV2: structuredClone(target.editDocumentV2),
+        type: 'replace-edit-authority',
+      },
+    ],
     persistence: 'native-committed',
     source: 'copy-paste',
     transactionId: `${transaction.transactionId}:compensate`,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
@@ -26,12 +27,14 @@ export const editorPersistenceReceiptArraySchema = z.array(editorPersistenceRece
 
 export interface EditorPersistenceSnapshot {
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   path: string;
 }
 
 export interface EditorPersistenceInput {
   adjustmentRevision: number;
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   imageSessionId: string;
   interactionActive: boolean;
   multiSelection: {
@@ -45,6 +48,7 @@ export interface EditorPersistenceInput {
 
 export interface EditorPersistenceExecution {
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   authorityKey: string;
   imageSessionId: string;
   multiSelection: {
@@ -83,6 +87,7 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
       Invokes.SaveMetadataAndUpdateThumbnail,
       {
         adjustments: input.adjustments,
+        editDocumentV2: input.editDocumentV2,
         path: input.path,
         ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
       },
@@ -137,10 +142,14 @@ export class EditorPersistenceEffectRunner {
     }
 
     if (this.baseline === null) {
-      this.publishSnapshot(input.path, input.adjustments);
+      this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
       return;
     }
-    if (areAdjustmentsEqual(this.baseline.adjustments, input.adjustments)) return;
+    if (
+      areAdjustmentsEqual(this.baseline.adjustments, input.adjustments) &&
+      this.baseline.editDocumentV2 === input.editDocumentV2
+    )
+      return;
 
     this.cancelPending();
     this.activeToken += 1;
@@ -151,12 +160,13 @@ export class EditorPersistenceEffectRunner {
         ? input.receipt
         : null;
     if (receipt?.persistence === 'native-committed') {
-      this.publishSnapshot(input.path, input.adjustments);
+      this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
       return;
     }
     const token = this.activeToken;
     const execution: EditorPersistenceExecution = {
       adjustments: input.adjustments,
+      editDocumentV2: input.editDocumentV2,
       authorityKey: nextSessionKey,
       imageSessionId: input.imageSessionId,
       multiSelection: this.resolveMultiSelection(input),
@@ -221,7 +231,7 @@ export class EditorPersistenceEffectRunner {
       if (receipt.path !== execution.path) {
         throw new Error(`editor_persistence.receipt_path_mismatch:${receipt.path}:${execution.path}`);
       }
-      this.publishSnapshot(execution.path, execution.adjustments);
+      this.publishSnapshot(execution.path, execution.adjustments, execution.editDocumentV2);
       this.onAccepted(execution, receipt);
     } catch (error) {
       if (this.current(token, execution)) this.onCurrentFailure(error, execution);
@@ -230,8 +240,8 @@ export class EditorPersistenceEffectRunner {
     }
   }
 
-  private publishSnapshot(path: string, adjustments: Adjustments): void {
-    this.baseline = { adjustments, path };
+  private publishSnapshot(path: string, adjustments: Adjustments, editDocumentV2: EditDocumentV2): void {
+    this.baseline = { adjustments, editDocumentV2, path };
     this.onSnapshot(this.baseline);
   }
 

@@ -3586,6 +3586,7 @@ mod tests {
             version: 1,
             rating: 0,
             adjustments: serde_json::Value::Null,
+            edit_document_v2: None,
             tags: None,
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {

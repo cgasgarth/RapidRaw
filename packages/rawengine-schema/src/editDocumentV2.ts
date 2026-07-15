@@ -388,6 +388,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       shadows: 0,
       whites: 0,
     },
+    editorSection: 'basic',
     legacyFields: ['blacks', 'brightness', 'contrast', 'exposure', 'highlights', 'saturation', 'shadows', 'whites'],
     nodeType: 'scene_global_color_tone',
     process: 'scene_referred_v2',
@@ -403,6 +404,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       pointCurves: DEFAULT_EDIT_DOCUMENT_CURVES_V2,
       toneCurve: 'auto_filmic',
     },
+    editorSection: 'curves',
     legacyFields: [
       'curveMode',
       'curves',
@@ -434,6 +436,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         smoothingRadius: 32,
       },
     },
+    editorSection: 'basic',
     legacyFields: ['toneEqualizer'],
     nodeType: 'tone_equalizer',
     process: 'scene_referred_v2',
@@ -459,6 +462,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       vignetteMidpoint: 50,
       vignetteRoundness: 0,
     },
+    editorSection: 'effects',
     legacyFields: [
       'flareAmount',
       'glowAmount',
@@ -497,6 +501,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       lumaNoiseReduction: 0,
       sharpness: 0,
     },
+    editorSection: 'details',
     legacyFields: [
       'clarity',
       'colorNoiseReduction',
@@ -536,6 +541,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         visualizeMode: 'image',
       },
     },
+    editorSection: 'color',
     legacyFields: ['pointColor'],
     nodeType: 'point_color',
     process: 'scene_referred_v2',
@@ -562,6 +568,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         },
       },
     },
+    editorSection: 'color',
     legacyFields: ['blackWhiteMixer'],
     nodeType: 'black_white_mixer',
     process: 'scene_referred_v2',
@@ -579,6 +586,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         red: { blue: 0, constant: 0, green: 0, red: 100 },
       },
     },
+    editorSection: 'color',
     legacyFields: ['channelMixer'],
     nodeType: 'channel_mixer',
     process: 'scene_referred_v2',
@@ -611,6 +619,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         skinProtection: 0,
       },
     },
+    editorSection: 'color',
     legacyFields: ['colorGrading', 'perceptualGradingV1'],
     nodeType: 'perceptual_grading',
     process: 'scene_referred_v2',
@@ -643,6 +652,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         y: 0.33767,
       },
     },
+    editorSection: 'color',
     legacyFields: [
       'cameraProfile',
       'cameraProfileAmount',
@@ -673,6 +683,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       lensVignetteAmount: 100,
       lensVignetteEnabled: true,
     },
+    editorSection: null,
     legacyFields: [
       'lensCorrectionMode',
       'lensDistortionAmount',
@@ -703,6 +714,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
         shadowsTint: 0,
       },
     },
+    editorSection: 'color',
     legacyFields: ['colorCalibration'],
     nodeType: 'color_calibration',
     process: 'scene_referred_v2',
@@ -727,6 +739,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       transformXOffset: 0,
       transformYOffset: 0,
     },
+    editorSection: null,
     legacyFields: [
       'aspectRatio',
       'crop',
@@ -751,6 +764,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: false, copy: false, paste: false, provenance: 'preserve', reset: false },
     defaultParams: { masks: [] },
+    editorSection: null,
     legacyFields: ['masks'],
     nodeType: 'layers',
     process: 'scene_referred_v2',
@@ -760,6 +774,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: false, copy: false, paste: false, provenance: 'regenerate', reset: false },
     defaultParams: { aiPatches: [] },
+    editorSection: null,
     legacyFields: ['aiPatches'],
     nodeType: 'source_artifacts',
     process: 'scene_referred_v2',
@@ -779,6 +794,7 @@ export const editDocumentNodeCapabilitySchema = z.object({
 export const editDocumentNodeDescriptorSchema = z.object({
   capabilities: editDocumentNodeCapabilitySchema,
   defaultParams: z.record(z.string(), z.unknown()),
+  editorSection: z.enum(['basic', 'color', 'curves', 'details', 'effects']).nullable(),
   legacyFields: z.array(z.string()),
   nodeType: z.string(),
   process: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
@@ -902,10 +918,27 @@ export const editDocumentLayerBlendModeV2Schema = z.enum([
   'color',
 ]);
 
-export const editDocumentLayerV2Schema = z
+export const editDocumentMaskNodeTypeV2Schema = z.enum(['basic', 'color', 'curves', 'details']);
+export const editDocumentMaskNodeEnvelopeV2Schema = z.object({ enabled: z.boolean() }).strict();
+export const editDocumentMaskNodesV2Schema = z
+  .record(editDocumentMaskNodeTypeV2Schema, editDocumentMaskNodeEnvelopeV2Schema)
+  .refine(
+    (nodes) => editDocumentMaskNodeTypeV2Schema.options.every((nodeType) => nodes[nodeType] !== undefined),
+    'Mask edit nodes must contain every supported node type.',
+  );
+
+const defaultEditDocumentMaskNodesV2 = () =>
+  editDocumentMaskNodesV2Schema.parse(
+    Object.fromEntries(editDocumentMaskNodeTypeV2Schema.options.map((nodeType) => [nodeType, { enabled: true }])),
+  );
+
+const editDocumentLayerV2ObjectSchema = z
   .object({
     adjustments: z.record(z.string(), editDocumentJsonValueSchema),
     blendMode: editDocumentLayerBlendModeV2Schema.optional(),
+    editNodes: editDocumentMaskNodesV2Schema,
+    editNodeQuarantine: z.record(z.string(), editDocumentJsonValueSchema).optional(),
+    editNodeSchemaVersion: z.literal(1),
     id: z.string().trim().min(1),
     invert: z.boolean(),
     layerGroupId: z.string().trim().min(1).optional(),
@@ -925,6 +958,42 @@ export const editDocumentLayerV2Schema = z
       context.addIssue({ code: 'custom', message: 'Layer sub-mask IDs must be unique.', path: ['subMasks'] });
     }
   });
+
+export const editDocumentLayerV2Schema = z.preprocess((value) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const layer = value as Readonly<Record<string, unknown>>;
+  const adjustments =
+    layer['adjustments'] !== null && typeof layer['adjustments'] === 'object' && !Array.isArray(layer['adjustments'])
+      ? (layer['adjustments'] as Readonly<Record<string, unknown>>)
+      : {};
+  const legacyVisibility =
+    adjustments['sectionVisibility'] !== null &&
+    typeof adjustments['sectionVisibility'] === 'object' &&
+    !Array.isArray(adjustments['sectionVisibility'])
+      ? (adjustments['sectionVisibility'] as Readonly<Record<string, unknown>>)
+      : null;
+  const { sectionVisibility: _legacyVisibility, ...pixelAdjustments } = adjustments;
+  const parsedNodes = editDocumentMaskNodesV2Schema.safeParse(layer['editNodes']);
+  const migratedNodes = parsedNodes.success
+    ? parsedNodes.data
+    : editDocumentMaskNodesV2Schema.parse(
+        Object.fromEntries(
+          editDocumentMaskNodeTypeV2Schema.options.map((nodeType) => [
+            nodeType,
+            { enabled: typeof legacyVisibility?.[nodeType] === 'boolean' ? legacyVisibility[nodeType] : true },
+          ]),
+        ),
+      );
+  return {
+    ...layer,
+    adjustments: pixelAdjustments,
+    editNodes: migratedNodes,
+    ...(layer['editNodes'] !== undefined && !parsedNodes.success
+      ? { editNodeQuarantine: { invalidEditNodes: layer['editNodes'] } }
+      : {}),
+    editNodeSchemaVersion: 1,
+  };
+}, editDocumentLayerV2ObjectSchema);
 
 export const editDocumentLayersV2Schema = z
   .object({ masks: z.array(editDocumentLayerV2Schema) })
@@ -1137,7 +1206,7 @@ const editDocumentMigrationReceiptV2Schema = z
   })
   .strict();
 
-export const editDocumentV2Schema = z
+const editDocumentV2ObjectSchema = z
   .object({
     extensions: z.record(z.string(), z.unknown()),
     geometry: editDocumentGeometryV2Schema,
@@ -1167,6 +1236,35 @@ export const editDocumentV2Schema = z
       context.addIssue({ code: 'custom', message: 'Layers domain disagrees with its node params.' });
     }
   });
+
+export const editDocumentV2Schema = z.preprocess((value) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  const document = value as Readonly<Record<string, unknown>>;
+  const nodes = document['nodes'];
+  if (nodes === null || typeof nodes !== 'object' || Array.isArray(nodes)) return value;
+  const layersNode = (nodes as Readonly<Record<string, unknown>>)['layers'];
+  if (layersNode === null || typeof layersNode !== 'object' || Array.isArray(layersNode)) return value;
+  const rawLayers = document['layers'];
+  const rawNodeParams = (layersNode as Readonly<Record<string, unknown>>)['params'];
+  if (!sameJsonValue(rawLayers, rawNodeParams)) return value;
+  const parsedLayers = editDocumentLayersV2Schema.safeParse(rawLayers);
+  if (!parsedLayers.success) return value;
+
+  // Legacy V2 documents duplicated the same pre-envelope layer domain in the
+  // graph node. Normalize both copies together so reopen is deterministic,
+  // while genuine domain/node disagreement continues to fail closed.
+  return {
+    ...document,
+    layers: parsedLayers.data,
+    nodes: {
+      ...(nodes as Readonly<Record<string, unknown>>),
+      layers: {
+        ...(layersNode as Readonly<Record<string, unknown>>),
+        params: parsedLayers.data,
+      },
+    },
+  };
+}, editDocumentV2ObjectSchema);
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
@@ -1288,6 +1386,15 @@ export const parseEditDocumentV2WithQuarantine = (
 
 export const getEditDocumentNodeDescriptor = (nodeType: EditDocumentNodeTypeV2) =>
   EDIT_DOCUMENT_NODE_DESCRIPTORS.find((descriptor) => descriptor.nodeType === nodeType);
+
+export type EditDocumentEditorSection = NonNullable<(typeof EDIT_DOCUMENT_NODE_DESCRIPTORS)[number]['editorSection']>;
+
+export const getEditDocumentNodeTypesForEditorSection = (
+  section: EditDocumentEditorSection,
+): readonly EditDocumentNodeTypeV2[] =>
+  EDIT_DOCUMENT_NODE_DESCRIPTORS.filter((descriptor) => descriptor.editorSection === section).map(
+    ({ nodeType }) => nodeType,
+  );
 
 const hasFiniteJsonValues = (value: unknown): boolean => {
   if (typeof value === 'number') return Number.isFinite(value);

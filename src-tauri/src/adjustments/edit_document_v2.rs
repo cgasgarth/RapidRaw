@@ -50,6 +50,22 @@ impl EditNodeTypeV2 {
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
         }
     }
+
+    fn editor_section(self) -> Option<&'static str> {
+        match self {
+            Self::SceneGlobalColorTone | Self::ToneEqualizer => Some("basic"),
+            Self::SceneCurve => Some("curves"),
+            Self::DetailDenoiseDehaze => Some("details"),
+            Self::DisplayCreative => Some("effects"),
+            Self::PointColor
+            | Self::BlackWhiteMixer
+            | Self::ChannelMixer
+            | Self::PerceptualGrading
+            | Self::CameraInput
+            | Self::ColorCalibration => Some("color"),
+            Self::LensCorrection | Self::Geometry | Self::Layers | Self::SourceArtifacts => None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1455,6 +1471,12 @@ enum LayerBlendModeV2 {
 struct LayerV2 {
     adjustments: BTreeMap<String, Value>,
     blend_mode: Option<LayerBlendModeV2>,
+    #[serde(default = "default_mask_edit_nodes")]
+    edit_nodes: BTreeMap<MaskEditNodeTypeV2, MaskEditNodeEnvelopeV2>,
+    #[serde(default)]
+    edit_node_quarantine: BTreeMap<String, Value>,
+    #[serde(default = "mask_edit_node_schema_version")]
+    edit_node_schema_version: u8,
     id: String,
     invert: bool,
     layer_group_id: Option<String>,
@@ -1466,6 +1488,37 @@ struct LayerV2 {
     retouch_remove_source: Option<Map<String, Value>>,
     sub_masks: Vec<SourceArtifactSubMaskV2>,
     visible: bool,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+enum MaskEditNodeTypeV2 {
+    Basic,
+    Color,
+    Curves,
+    Details,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MaskEditNodeEnvelopeV2 {
+    enabled: bool,
+}
+
+fn mask_edit_node_schema_version() -> u8 {
+    1
+}
+
+fn default_mask_edit_nodes() -> BTreeMap<MaskEditNodeTypeV2, MaskEditNodeEnvelopeV2> {
+    [
+        MaskEditNodeTypeV2::Basic,
+        MaskEditNodeTypeV2::Color,
+        MaskEditNodeTypeV2::Curves,
+        MaskEditNodeTypeV2::Details,
+    ]
+    .into_iter()
+    .map(|node_type| (node_type, MaskEditNodeEnvelopeV2 { enabled: true }))
+    .collect()
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -1561,6 +1614,27 @@ impl EditDocumentV2 {
             }
         }
 
+        let section_visibility = ["basic", "color", "curves", "details"]
+            .into_iter()
+            .map(|section| {
+                let enabled = self
+                    .nodes
+                    .iter()
+                    .filter(|(node_type, _)| node_type.editor_section() == Some(section))
+                    .all(|(_, node)| node.enabled);
+                (section.to_string(), Value::Bool(enabled))
+            })
+            .collect();
+        adjustments.insert(
+            "sectionVisibility".to_string(),
+            Value::Object(section_visibility),
+        );
+        let effects_enabled = self
+            .nodes
+            .get(&EditNodeTypeV2::DisplayCreative)
+            .is_none_or(|node| node.enabled);
+        adjustments.insert("effectsEnabled".to_string(), Value::Bool(effects_enabled));
+
         for (node_key, node) in self.nodes {
             validate_node_contract(node_key, &node)?;
             let compiled_params = compile_node_params(node_key, &node)?;
@@ -1613,6 +1687,12 @@ impl EditDocumentV2 {
         }
         Ok(())
     }
+}
+
+pub(crate) fn validate_edit_document_v2(value: &Value) -> Result<(), String> {
+    let document: EditDocumentV2 = serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 persistence payload is invalid: {error}"))?;
+    document.validate_document_contract()
 }
 
 fn compile_node_params(
@@ -1684,9 +1764,65 @@ fn compile_node_params(
         }
         EditNodeTypeV2::Layers => {
             parse_layers(&node.params)?;
-            Ok(node.params.clone())
+            compile_layers_legacy_projection(&node.params)
         }
     }
+}
+
+fn compile_layers_legacy_projection(
+    params: &Map<String, Value>,
+) -> Result<Map<String, Value>, String> {
+    let mut compiled = params.clone();
+    let Some(masks) = compiled.get_mut("masks").and_then(Value::as_array_mut) else {
+        return Err("EditDocumentV2 layers masks must be an array".to_string());
+    };
+    for mask in masks {
+        let Some(mask_object) = mask.as_object_mut() else {
+            return Err("EditDocumentV2 layer must be an object".to_string());
+        };
+        let edit_nodes = mask_object
+            .remove("editNodes")
+            .and_then(|nodes| nodes.as_object().cloned())
+            .unwrap_or_else(|| {
+                let legacy_visibility = mask_object
+                    .get("adjustments")
+                    .and_then(|adjustments| adjustments.get("sectionVisibility"))
+                    .and_then(Value::as_object);
+                ["basic", "color", "curves", "details"]
+                    .into_iter()
+                    .map(|node_type| {
+                        let enabled = legacy_visibility
+                            .and_then(|visibility| visibility.get(node_type))
+                            .and_then(Value::as_bool)
+                            .unwrap_or(true);
+                        (
+                            node_type.to_string(),
+                            serde_json::json!({ "enabled": enabled }),
+                        )
+                    })
+                    .collect()
+            });
+        let visibility = edit_nodes
+            .into_iter()
+            .map(|(node_type, envelope)| {
+                let enabled = envelope
+                    .get("enabled")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        format!("EditDocumentV2 layer node '{node_type}' enabled must be boolean")
+                    })?;
+                Ok((node_type, Value::Bool(enabled)))
+            })
+            .collect::<Result<Map<String, Value>, String>>()?;
+        let adjustments = mask_object
+            .get_mut("adjustments")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| "EditDocumentV2 layer adjustments must be an object".to_string())?;
+        adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
+        mask_object.remove("editNodeQuarantine");
+        mask_object.remove("editNodeSchemaVersion");
+    }
+    Ok(compiled)
 }
 
 fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, String> {
@@ -1866,6 +2002,13 @@ fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
         if !(0.0..=100.0).contains(&layer.opacity) {
             return Err("EditDocumentV2 layer opacity must be within 0..=100".to_string());
         }
+        if layer.edit_nodes.len() != 4 {
+            return Err("EditDocumentV2 layer must contain every mask edit node".to_string());
+        }
+        if layer.edit_node_schema_version != 1 {
+            return Err("EditDocumentV2 layer editNodeSchemaVersion must be 1".to_string());
+        }
+        let _ = &layer.edit_node_quarantine;
         if layer
             .layer_group_id
             .as_ref()
@@ -2394,7 +2537,7 @@ mod tests {
         let legacy = json!({
             "futureField": { "enabled": true },
             "rawEngineEditGraphVersion": 2,
-            "sectionVisibility": { "basic": true, "color": true, "details": true, "effects": true },
+            "sectionVisibility": { "basic": true, "color": true, "curves": true, "details": true },
             "toneMapper": "basic",
             "vibrance": 11
         });
@@ -2438,7 +2581,7 @@ mod tests {
             "rawEngineEditGraphVersion": 2,
             "rotation": 0.5,
             "saturation": 7,
-            "sectionVisibility": { "basic": true, "color": true, "details": true, "effects": true },
+            "effectsEnabled": true,
             "shadows": 14,
             "sharpness": 24,
             "temperature": 12,
@@ -2448,6 +2591,9 @@ mod tests {
             "whites": 9
         });
         expected["cameraProfileAmount"] = json!(100);
+        expected["effectsEnabled"] = json!(true);
+        expected["sectionVisibility"] =
+            json!({ "basic": true, "color": true, "curves": true, "details": true });
         expected["channelMixer"] = channel_mixer_params()["channelMixer"].clone();
         expected["lensCorrectionMode"] = json!("manual");
         expected["lensDistortionAmount"] = json!(100);
@@ -2596,6 +2742,83 @@ mod tests {
             .expect("compiled document");
         assert!(compiled.get("exposure").is_none());
         assert_eq!(compiled["vibrance"], json!(12));
+    }
+
+    #[test]
+    fn editor_section_enablement_compiles_to_render_authority_once() {
+        let mut value = document_with_legacy(json!({}));
+        for node_type in [
+            "scene_global_color_tone",
+            "tone_equalizer",
+            "scene_curve",
+            "detail_denoise_dehaze",
+            "point_color",
+            "black_white_mixer",
+            "channel_mixer",
+            "perceptual_grading",
+            "camera_input",
+            "color_calibration",
+            "display_creative",
+        ] {
+            value["nodes"][node_type]["enabled"] = json!(false);
+        }
+        let document: EditDocumentV2 = serde_json::from_value(value).expect("valid document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("compiled disabled document");
+
+        assert_eq!(
+            compiled["sectionVisibility"],
+            json!({ "basic": false, "color": false, "curves": false, "details": false })
+        );
+        assert_eq!(compiled["effectsEnabled"], false);
+        assert!(compiled.get("exposure").is_none());
+        assert!(compiled.get("sceneCurveV1").is_none());
+        assert!(compiled.get("clarity").is_none());
+        assert!(compiled.get("cameraProfile").is_none());
+        assert!(compiled.get("grainAmount").is_none());
+        assert_eq!(
+            serde_json::to_string(&compiled)
+                .expect("compiled JSON")
+                .matches("effectsEnabled")
+                .count(),
+            1,
+            "Effects render authority must project exactly once"
+        );
+    }
+
+    #[test]
+    fn pre_envelope_layer_visibility_compiles_without_losing_the_mask() {
+        let legacy_layer = json!({
+            "adjustments": {
+                "exposure": 0.4,
+                "sectionVisibility": { "basic": false, "color": true, "curves": false, "details": true }
+            },
+            "id": "legacy-layer",
+            "invert": false,
+            "name": "Legacy layer",
+            "opacity": 72,
+            "subMasks": [],
+            "visible": true
+        });
+        let mut value = document_with_legacy(json!({}));
+        value["layers"] = json!({ "masks": [legacy_layer] });
+        value["nodes"]["layers"]["params"] = json!({ "masks": [legacy_layer] });
+        let document: EditDocumentV2 =
+            serde_json::from_value(value).expect("valid legacy document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("compiled legacy layer");
+        let layer = &compiled["masks"][0];
+
+        assert_eq!(layer["id"], "legacy-layer");
+        assert_eq!(layer["adjustments"]["exposure"], 0.4);
+        assert_eq!(
+            layer["adjustments"]["sectionVisibility"],
+            json!({ "basic": false, "color": true, "curves": false, "details": true })
+        );
+        assert!(layer.get("editNodes").is_none());
+        assert!(layer.get("editNodeSchemaVersion").is_none());
     }
 
     #[test]

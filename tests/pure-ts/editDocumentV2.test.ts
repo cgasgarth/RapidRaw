@@ -7,7 +7,7 @@ import {
   parseEditDocumentV2WithQuarantine,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
 import {
   batchUpdateEditDocumentV2Nodes,
@@ -90,7 +90,8 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.nodes.scene_global_color_tone?.params.exposure).toBe(0.75);
     expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
-    expect(document.migration?.quarantined).toContain('sectionVisibility');
+    expect(document.migration?.quarantined).not.toContain('sectionVisibility');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('sectionVisibility');
   });
 
   test('owns strict black-and-white mixer state and excludes it from quarantined legacy fields', () => {
@@ -220,7 +221,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       effectsEnabled: undefined,
       grainAmount: 42,
-      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility, effects: false },
+      sectionVisibility: { basic: true, color: true, curves: true, details: true, effects: false },
     });
 
     expect(legacy.nodes.display_creative.enabled).toBeFalse();
@@ -283,7 +284,8 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       masks: [layer],
     });
-    expect(document.layers.masks).toEqual([layer]);
+    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
+    expect(document.layers.masks).toEqual([migratedLayer]);
     expect(compileEditDocumentNodeV2(document.nodes.layers).params).toEqual(document.layers);
 
     expect(() =>
@@ -301,6 +303,66 @@ describe('EditDocumentV2 legacy adapter', () => {
       }),
     ).toThrow();
     expect(() => editDocumentV2Schema.parse({ ...document, layers: { masks: [] } })).toThrow('disagrees');
+  });
+
+  test('reopens pre-envelope V2 layers losslessly and quarantines corrupt edit nodes idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      masks: [
+        {
+          adjustments: { exposure: 0.4 },
+          id: 'legacy-v2-layer',
+          invert: false,
+          name: 'Legacy V2 layer',
+          opacity: 72,
+          subMasks: [],
+          visible: true,
+        },
+      ],
+    });
+    const {
+      editNodes: _editNodes,
+      editNodeSchemaVersion: _editNodeSchemaVersion,
+      ...legacyLayerEnvelope
+    } = document.layers.masks[0] ?? {};
+    const legacyLayer = {
+      ...legacyLayerEnvelope,
+      adjustments: { exposure: 0.4, sectionVisibility: { basic: false, color: true, curves: false, details: true } },
+    };
+    const reopened = editDocumentV2Schema.parse({
+      ...document,
+      layers: { masks: [legacyLayer] },
+      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [legacyLayer] } } },
+    });
+    expect(reopened.layers.masks[0]).toMatchObject({
+      adjustments: { exposure: 0.4 },
+      editNodeSchemaVersion: 1,
+      editNodes: {
+        basic: { enabled: false },
+        color: { enabled: true },
+        curves: { enabled: false },
+        details: { enabled: true },
+      },
+    });
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptLayer = { ...legacyLayer, editNodes: { basic: { enabled: 'not-boolean' } } };
+    const quarantined = editDocumentV2Schema.parse({
+      ...document,
+      layers: { masks: [corruptLayer] },
+      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [corruptLayer] } } },
+    });
+    expect(quarantined.layers.masks[0]).toMatchObject({
+      adjustments: { exposure: 0.4 },
+      editNodeQuarantine: { invalidEditNodes: corruptLayer.editNodes },
+      editNodes: {
+        basic: { enabled: false },
+        color: { enabled: true },
+        curves: { enabled: false },
+        details: { enabled: true },
+      },
+    });
+    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
   });
 
   test('rejects malformed, duplicate, and ambiguous source artifacts', () => {
@@ -1184,9 +1246,10 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     const prepared = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] };
     const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['layers']);
+    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
 
     expect(renderDocument.nodes.layers).toBe(authoritative.nodes.layers);
-    expect(renderDocument.layers).toEqual({ masks: [layer] });
+    expect(renderDocument.layers).toEqual({ masks: [migratedLayer] });
     expect(renderDocument.nodes.layers?.params).toEqual(renderDocument.layers);
   });
 

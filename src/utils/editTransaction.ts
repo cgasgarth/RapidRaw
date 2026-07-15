@@ -1,7 +1,9 @@
 import {
+  type EditDocumentEditorSection,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   getEditDocumentNodeDescriptor,
+  getEditDocumentNodeTypesForEditorSection,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import {
@@ -51,7 +53,19 @@ export type EditNodeOperation =
     }
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
   | { type: 'patch-adjustments'; patch: Partial<Adjustments> }
+  | { type: 'replace-edit-authority'; adjustments: Adjustments; editDocumentV2: EditDocumentV2 }
   | { type: 'replace-adjustments'; adjustments: Adjustments };
+
+export const buildEditorSectionNodeEnablementOperations = (
+  document: EditDocumentV2,
+  section: EditDocumentEditorSection,
+  enabled: boolean,
+): readonly EditNodeOperation[] =>
+  getEditDocumentNodeTypesForEditorSection(section).flatMap((nodeType) =>
+    document.nodes[nodeType]?.enabled === enabled
+      ? []
+      : [{ enabled, nodeType, type: 'set-edit-document-node-enabled' as const }],
+  );
 
 export interface EditTransactionRequest {
   transactionId: string;
@@ -65,6 +79,7 @@ export interface EditTransactionRequest {
   /** Required only for compensation; restores the exact authority captured before a failed optimistic commit. */
   compensationHistory?: {
     checkpoints: readonly EditHistoryCheckpoint[];
+    editDocumentEntries: readonly EditDocumentV2[];
     entries: readonly Adjustments[];
     historyIndex: number;
   };
@@ -75,6 +90,7 @@ export interface EditTransactionRequest {
    * already-hydrated result still becomes one atomic, undoable transaction.
    */
   nativeCommittedHistoryBaseline?: Adjustments;
+  nativeCommittedEditDocumentHistoryBaseline?: EditDocumentV2;
 }
 
 export interface EditTransactionResult {
@@ -165,6 +181,9 @@ const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
   );
 };
 
+export const areEditDocumentsEqual = (before: EditDocumentV2 | undefined, after: EditDocumentV2 | undefined): boolean =>
+  before !== undefined && after !== undefined && sameAdjustmentValue(before, after);
+
 const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
   [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
     (key) => !sameAdjustmentValue(before[key as keyof Adjustments], after[key as keyof Adjustments]),
@@ -191,6 +210,21 @@ const projectEditDocumentNodeToAdjustments = (
   // biome-ignore lint/complexity/useLiteralKeys: projected is an intentional index-signature bridge.
   if (nodeType === 'display_creative') projected['effectsEnabled'] = node.enabled;
   return { ...before, ...projected };
+};
+
+const replaceLegacyAdjustmentsPreservingNodeEnablement = (
+  adjustments: Adjustments,
+  currentDocument: EditDocumentV2,
+): EditDocumentV2 => {
+  let replacement = legacyAdjustmentsToEditDocumentV2(adjustments);
+  for (const nodeType of Object.keys(replacement.nodes) as EditDocumentNodeTypeV2[]) {
+    // Effects has an explicit flat compatibility field; every other enabled
+    // bit remains node-owned across a legacy flat mutation boundary.
+    if (nodeType === 'display_creative') continue;
+    const enabled = currentDocument.nodes[nodeType]?.enabled;
+    if (enabled !== undefined) replacement = setEditDocumentV2NodeEnabled(replacement, nodeType, enabled);
+  }
+  return replacement;
 };
 
 /** Route a focused migrated-node edit without widening it back into flat replacement authority. */
@@ -260,32 +294,76 @@ export const reduceEditTransaction = (
 
   let after = before;
   let afterEditDocumentV2 = currentEditDocumentV2;
+  const documentChangedKeys: string[] = [];
   for (const operation of request.operations) {
-    if (operation.type === 'replace-adjustments') {
+    if (operation.type === 'replace-edit-authority') {
       after = structuredClone(operation.adjustments);
-      afterEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(after);
+      afterEditDocumentV2 = structuredClone(operation.editDocumentV2);
+      continue;
+    }
+    if (operation.type === 'replace-adjustments') {
+      const replacedAdjustments = structuredClone(operation.adjustments);
+      if (changedKeys(after, replacedAdjustments).length > 0) {
+        after = replacedAdjustments;
+        afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(after, afterEditDocumentV2);
+      } else {
+        after = replacedAdjustments;
+      }
       continue;
     }
     if (operation.type === 'patch-edit-document-node') {
       assertNodePatch(operation.nodeType, operation.patch);
-      afterEditDocumentV2 = updateEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, (params) => ({
+      const patchedDocument = updateEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, (params) => ({
         ...params,
         ...structuredClone(operation.patch),
       }));
-      after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+      const patchMatchesFlatAuthority = Object.entries(operation.patch).every(([key, value]) =>
+        sameAdjustmentValue(after[key as keyof Adjustments], value),
+      );
+      if (!sameAdjustmentValue(afterEditDocumentV2, patchedDocument) || !patchMatchesFlatAuthority) {
+        afterEditDocumentV2 = patchedDocument;
+        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+      }
       continue;
     }
     if (operation.type === 'set-edit-document-node-enabled') {
+      const previousEnabled = afterEditDocumentV2.nodes[operation.nodeType]?.enabled;
       afterEditDocumentV2 = setEditDocumentV2NodeEnabled(afterEditDocumentV2, operation.nodeType, operation.enabled);
-      after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+      // Effects has an explicit compatibility field. Other node enablement is
+      // document-only authority and must not churn the flat adjustment bag.
+      if (operation.nodeType === 'display_creative') {
+        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
+      }
+      if (previousEnabled !== undefined && previousEnabled !== operation.enabled) {
+        documentChangedKeys.push(`nodes.${operation.nodeType}.enabled`);
+      }
       continue;
     }
     assertFinitePatch(operation.patch);
-    after = { ...after, ...structuredClone(operation.patch) };
-    afterEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(after);
+    const patchedAdjustments = { ...after, ...structuredClone(operation.patch) };
+    if (changedKeys(after, patchedAdjustments).length > 0) {
+      after = patchedAdjustments;
+      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(after, afterEditDocumentV2);
+    }
   }
 
-  const keys = changedKeys(before, after);
+  const flatChangedKeys = changedKeys(before, after);
+  for (const nodeType of Object.keys({
+    ...currentEditDocumentV2.nodes,
+    ...afterEditDocumentV2.nodes,
+  }) as EditDocumentNodeTypeV2[]) {
+    if (currentEditDocumentV2.nodes[nodeType]?.enabled !== afterEditDocumentV2.nodes[nodeType]?.enabled) {
+      documentChangedKeys.push(`nodes.${nodeType}.enabled`);
+    }
+  }
+  if (
+    flatChangedKeys.length === 0 &&
+    documentChangedKeys.length === 0 &&
+    !sameAdjustmentValue(currentEditDocumentV2, afterEditDocumentV2)
+  ) {
+    documentChangedKeys.push('editDocumentV2');
+  }
+  const keys = [...new Set([...flatChangedKeys, ...documentChangedKeys])];
   const invalidatedStages: EditInvalidationStage[] = keys.length === 0 ? [] : ['preview', 'navigator', 'thumbnail'];
   if (
     keys.some((key) =>

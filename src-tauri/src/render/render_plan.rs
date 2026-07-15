@@ -636,18 +636,11 @@ fn fingerprints(
         effective,
         crate::adjustment_fields::CPU_COLOR_RENDER_HASH_KEYS,
     );
-    let color_section_visibility = hash_json(
-        effective
-            .get("sectionVisibility")
-            .and_then(|visibility| visibility.get("color"))
-            .unwrap_or(&Value::Bool(true)),
-    );
     let pre_gpu_base = hash_parts(&[
         b"pre-gpu-base",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &geometry.to_le_bytes(),
         &pre_gpu_color.to_le_bytes(),
-        &color_section_visibility.to_le_bytes(),
     ]);
     let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
     let retouch = pre_gpu_retouch_fingerprint(effective);

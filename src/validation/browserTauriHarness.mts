@@ -294,7 +294,6 @@ const createHarnessAutoAdjustments = (exposure: number): Record<string, unknown>
   exposure,
   highlights: -10,
   effectsEnabled: true,
-  sectionVisibility: { basic: true, color: true },
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,

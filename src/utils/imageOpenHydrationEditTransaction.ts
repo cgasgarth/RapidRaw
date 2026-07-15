@@ -1,4 +1,5 @@
 import type { Adjustments } from './adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 import type { EditApplicationReceipt, EditTransactionRequest } from './editTransaction';
 
 export interface ImageOpenHydrationIdentity {
@@ -55,6 +56,7 @@ export const buildImageOpenHydrationEditTransaction = (
   identity: ImageOpenHydrationIdentity,
   adjustments: Adjustments,
   transactionId: string,
+  editDocumentV2?: EditDocumentV2,
 ): EditTransactionRequest => {
   if (!isImageOpenHydrationIdentityCurrent(state, identity)) {
     throw new Error('image_open_hydration.stale_identity');
@@ -64,9 +66,17 @@ export const buildImageOpenHydrationEditTransaction = (
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'reset',
     imageSessionId: identity.imageSessionId,
-    operations: [{ adjustments: structuredClone(adjustments), type: 'replace-adjustments' }],
+    operations: [
+      {
+        adjustments: structuredClone(adjustments),
+        editDocumentV2: structuredClone(editDocumentV2 ?? legacyAdjustmentsToEditDocumentV2(adjustments)),
+        type: 'replace-edit-authority',
+      },
+    ],
     persistence: 'native-committed',
     source: 'hydration',
     transactionId,
   };
 };
+
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';

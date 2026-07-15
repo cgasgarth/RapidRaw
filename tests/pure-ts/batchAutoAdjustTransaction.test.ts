@@ -18,6 +18,7 @@ import {
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../src/utils/batchAutoAdjustTransaction';
+import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../src/utils/editDocumentV2';
 
 const path = '/fixtures/batch-auto.raw';
 const session = createEditorImageSession({ generation: 4, path, source: 'cache' });
@@ -167,11 +168,23 @@ describe('Batch Auto Adjust transaction boundary', () => {
       currentAdjustments: acceptedAdjustments,
     });
     expect(historyBaseline).toEqual(capturedAdjustments);
+    const historyEditDocumentBaseline = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2(capturedAdjustments),
+      'scene_curve',
+      false,
+    );
+    const acceptedEditDocument = setEditDocumentV2NodeEnabled(
+      legacyAdjustmentsToEditDocumentV2(acceptedAdjustments),
+      'scene_curve',
+      false,
+    );
 
     useEditorStore.setState({
       adjustmentRevision: successor.adjustmentRevision,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, acceptedAdjustments),
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, acceptedAdjustments, acceptedEditDocument),
       adjustments: acceptedAdjustments,
+      editDocumentHistory: [acceptedEditDocument],
+      editDocumentV2: acceptedEditDocument,
       history: [acceptedAdjustments],
       historyCheckpoints: [],
       historyIndex: 0,
@@ -183,6 +196,7 @@ describe('Batch Auto Adjust transaction boundary', () => {
       captured: identity,
       current: successor,
       historyBaseline: historyBaseline ?? undefined,
+      historyEditDocumentBaseline,
       result: applied,
     });
     if (transaction === null) throw new Error('Expected reconciled Batch Auto Adjust transaction.');
@@ -190,9 +204,11 @@ describe('Batch Auto Adjust transaction boundary', () => {
     expect(result.noOp).toBe(false);
     expect(result.beforeEditDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(0.55);
     expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(0.65);
+    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
     expect(useEditorStore.getState().history.map(({ exposure }) => exposure)).toEqual([0.55, 0.65]);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.exposure).toBe(0.55);
+    expect(useEditorStore.getState().editDocumentV2.nodes.scene_curve.enabled).toBeFalse();
   });
 
   test('does not reconcile a captured session, another path, or a divergent successor edit', () => {

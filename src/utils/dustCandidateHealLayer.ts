@@ -4,7 +4,12 @@ import {
   type NegativeLabDustScratchReviewReport,
   parseNegativeLabDustHealCorrectionMetrics,
 } from '../schemas/negative-lab/negativeLabWorkspaceSchemas';
-import { DEFAULT_LAYER_BLEND_MODE, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from './adjustments';
+import {
+  createDefaultMaskEditNodes,
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from './adjustments';
 import { buildNegativeLabPlanHash } from './negative-lab/negativeLabPlanIdentity';
 
 type DustScratchFrame = NegativeLabDustScratchReviewReport['frames'][number];
@@ -136,6 +141,8 @@ export const buildDustCandidateHealLayer = ({
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId ?? `${candidate.candidateId}_heal_layer`,
     invert: false,
     name: `Dust heal ${candidate.candidateId}`,

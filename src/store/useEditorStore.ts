@@ -59,6 +59,7 @@ import {
 } from '../utils/editorTeardownTransaction';
 import { DEFAULT_EDITOR_ZOOM_MODE, type EditorZoomMode } from '../utils/editorZoom';
 import {
+  areEditDocumentsEqual,
   type EditApplicationReceipt,
   type EditTransactionRequest,
   type EditTransactionResult,
@@ -193,6 +194,7 @@ interface EditorState {
 
   // History State
   history: Adjustments[];
+  editDocumentHistory: EditDocumentV2[];
   historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
 
@@ -425,6 +427,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastBasicToneCommand: null,
   basicToneSliderInteraction: null,
   history: [initialAdjustments],
+  editDocumentHistory: [initialEditDocumentV2],
   historyCheckpoints: [],
   historyIndex: 0,
 
@@ -672,6 +675,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         hasRenderedFirstFrame: false,
         histogram: null,
         history: [structuredClone(adjustments)],
+        editDocumentHistory: [structuredClone(editDocumentV2)],
         historyCheckpoints: [],
         historyIndex: 0,
         imageSession: null,
@@ -703,15 +707,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.preview_requires_proposal');
       }
       const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
+      const nativeEditDocumentHistoryBaseline = request.nativeCommittedEditDocumentHistoryBaseline;
       const historyTargetIndex = request.history === 'navigation' ? request.historyTargetIndex : undefined;
       const compensationHistory =
         request.history === 'compensation' && request.compensationHistory !== undefined
           ? {
               checkpoints: structuredClone([...request.compensationHistory.checkpoints]),
+              editDocumentEntries: structuredClone([...request.compensationHistory.editDocumentEntries]),
               entries: structuredClone([...request.compensationHistory.entries]),
               historyIndex: request.compensationHistory.historyIndex,
             }
           : undefined;
+      const currentEditDocumentHistory = state.history.map((entry, index) => {
+        const existing = state.editDocumentHistory[index];
+        if (index === state.historyIndex && !areEditDocumentsEqual(existing, state.editDocumentV2)) {
+          return state.editDocumentV2;
+        }
+        return existing ?? legacyAdjustmentsToEditDocumentV2(entry);
+      });
       if (request.history === 'navigation') {
         if (
           historyTargetIndex === undefined ||
@@ -730,6 +743,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           !Number.isInteger(compensationHistory.historyIndex) ||
           compensationHistory.historyIndex < 0 ||
           compensationHistory.historyIndex >= compensationHistory.entries.length ||
+          compensationHistory.editDocumentEntries.length !== compensationHistory.entries.length ||
           compensationHistory.checkpoints.some(
             (checkpoint) =>
               !Number.isInteger(checkpoint.historyIndex) ||
@@ -743,8 +757,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.compensation_history_requires_compensation');
       }
       if (
-        nativeHistoryBaseline !== undefined &&
-        (request.persistence !== 'native-committed' || request.history !== 'single-entry')
+        (nativeHistoryBaseline !== undefined || nativeEditDocumentHistoryBaseline !== undefined) &&
+        (nativeHistoryBaseline === undefined ||
+          nativeEditDocumentHistoryBaseline === undefined ||
+          request.persistence !== 'native-committed' ||
+          request.history !== 'single-entry')
       ) {
         throw new Error('edit_transaction.native_history_baseline_requires_native_single_entry');
       }
@@ -754,9 +771,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         state.adjustmentRevision,
         request,
         currentImageSessionId,
-        nativeHistoryBaseline === undefined
-          ? state.editDocumentV2
-          : legacyAdjustmentsToEditDocumentV2(nativeHistoryBaseline),
+        nativeHistoryBaseline === undefined ? state.editDocumentV2 : nativeEditDocumentHistoryBaseline,
       );
       const reconcilesHydratedNativeCommit =
         nativeHistoryBaseline !== undefined && !areAdjustmentsEqual(state.adjustments, nativeHistoryBaseline);
@@ -777,6 +792,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         )
       ) {
         throw new Error('edit_transaction.compensation_history_target_mismatch');
+      }
+      if (
+        compensationHistory !== undefined &&
+        !areEditDocumentsEqual(
+          compensationHistory.editDocumentEntries[compensationHistory.historyIndex],
+          nextResult.afterEditDocumentV2,
+        )
+      ) {
+        throw new Error('edit_transaction.compensation_edit_document_history_target_mismatch');
       }
       const activeInteractionReceipt = state.lastEditApplicationReceipt;
       const coalescedReceipt =
@@ -803,6 +827,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return {
             ...historyNavigationPreviewInvalidation,
             history: [structuredClone(nextResult.after)],
+            editDocumentHistory: [structuredClone(nextResult.afterEditDocumentV2)],
             historyCheckpoints: [],
             historyIndex: 0,
           };
@@ -838,6 +863,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                     nextResult.after,
                     state.historyCheckpoints,
                   );
+      const nextEditDocumentHistory =
+        request.history === 'none' || request.history === 'navigation'
+          ? currentEditDocumentHistory
+          : request.history === 'compensation'
+            ? structuredClone(compensationHistory?.editDocumentEntries ?? [])
+            : request.history === 'reset'
+              ? [nextResult.afterEditDocumentV2]
+              : coalescedReceipt
+                ? currentEditDocumentHistory.map((entry, index) =>
+                    index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
+                  )
+                : [
+                    ...(reconcilesHydratedNativeCommit && nativeEditDocumentHistoryBaseline !== undefined
+                      ? currentEditDocumentHistory.map((entry, index) =>
+                          index === state.historyIndex ? nativeEditDocumentHistoryBaseline : entry,
+                        )
+                      : currentEditDocumentHistory
+                    ).slice(0, state.historyIndex + 1),
+                    nextResult.afterEditDocumentV2,
+                  ].slice(-nextHistory.history.length);
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),
@@ -846,6 +891,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isSliderDragging: false,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
+        editDocumentHistory: nextEditDocumentHistory,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
         ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
@@ -990,6 +1036,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       return {
         history: nextHistory.history,
+        editDocumentHistory: [
+          ...state.editDocumentHistory.slice(0, state.historyIndex + 1),
+          state.editDocumentV2,
+        ].slice(-nextHistory.history.length),
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,
       };
@@ -1029,11 +1079,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   resetHistory: (initialState) => {
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initialState);
     set((state) => ({
       history: [initialState],
+      editDocumentHistory: [editDocumentV2],
       historyCheckpoints: [],
       historyIndex: 0,
-      ...publishAdjustmentState(state, initialState),
+      ...publishAdjustmentState(state, initialState, editDocumentV2),
       ...resolveAiSelectionState(state, initialState),
     }));
   },

@@ -10,6 +10,7 @@ import {
 import { Mask, SubMaskMode } from '../../../components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -191,6 +192,8 @@ const buildRetouchLayer = (
   const baseLayer: MaskContainer = {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: layerId,
     invert: false,
     name: `Agent ${request.mode}`,

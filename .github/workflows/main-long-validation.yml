@@ -43,6 +43,7 @@ jobs:
           bun scripts/checks/ci/check-schema-contract-gate.ts
           bun run check:docs
           bun run check:browser-harness
+          bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts
 
       - name: Run browser visual smoke
         run: bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library

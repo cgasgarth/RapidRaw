@@ -23,6 +23,7 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import {
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type LayerBlendMode,
@@ -823,6 +824,8 @@ export function LayerStackPanel({
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: layerId,
       invert: false,
       name: t('editor.layers.newAdjustmentLayerName', { count: masks.length + 1 }),
@@ -916,6 +919,8 @@ export function LayerStackPanel({
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: layerId,
       invert: false,
       name: t('editor.layers.newCloneLayerName', { count: masks.length + 1 }),
@@ -960,6 +965,8 @@ export function LayerStackPanel({
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: layerId,
       invert: false,
       name: t('editor.layers.newHealLayerName', { count: masks.length + 1 }),
@@ -1002,6 +1009,8 @@ export function LayerStackPanel({
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
       blendMode: DEFAULT_LAYER_BLEND_MODE,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: layerId,
       invert: false,
       name: t('editor.layers.newRemoveLayerName', { count: masks.length + 1 }),

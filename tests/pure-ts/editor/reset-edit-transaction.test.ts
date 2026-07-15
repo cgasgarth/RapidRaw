@@ -43,7 +43,7 @@ describe('Reset edit transaction', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       effectsEnabled: false,
       exposure: 1.25,
-      sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility, details: false },
+      sectionVisibility: { basic: true, color: true, curves: true, details: false },
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.setState({
@@ -51,6 +51,7 @@ describe('Reset edit transaction', () => {
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
       editDocumentV2,
+      editDocumentHistory: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
       history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
       historyCheckpoints: [],
       historyIndex: 1,
@@ -73,8 +74,8 @@ describe('Reset edit transaction', () => {
       aspectRatio: 1.5,
       effectsEnabled: false,
       exposure: 0,
-      sectionVisibility: { details: false },
     });
+    expect(result.after).not.toHaveProperty('sectionVisibility');
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 5,
       baseAdjustmentRevision: 4,

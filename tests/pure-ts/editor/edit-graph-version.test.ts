@@ -30,7 +30,7 @@ describe('persisted edit graph version', () => {
 
     expect(normalized.effectsEnabled).toBeFalse();
     expect(normalized.grainAmount).toBe(37);
-    expect(normalized.sectionVisibility).toEqual({ basic: false, color: true, curves: true, details: false });
+    expect(normalized).not.toHaveProperty('sectionVisibility');
     expect(normalizeLoadedAdjustments(JSON.parse(JSON.stringify(normalized)))).toMatchObject({
       effectsEnabled: false,
       grainAmount: 37,

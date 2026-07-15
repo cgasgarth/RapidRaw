@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { BatchAutoAdjustPathResultV1 } from '../schemas/batchAutoAdjustSchemas';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
@@ -109,6 +110,7 @@ interface SelectedBatchAutoAdjustInput {
   captured: BatchAutoAdjustSelectionIdentity;
   current: BatchAutoAdjustSelectionIdentity | null;
   historyBaseline?: Adjustments;
+  historyEditDocumentBaseline?: EditDocumentV2;
   result: BatchAutoAdjustPathResultV1;
 }
 
@@ -117,8 +119,12 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
   captured,
   current,
   historyBaseline,
+  historyEditDocumentBaseline,
   result,
 }: SelectedBatchAutoAdjustInput): EditTransactionRequest | null => {
+  if ((historyBaseline === undefined) !== (historyEditDocumentBaseline === undefined)) {
+    throw new Error('batch_auto_adjust.history_authority_incomplete');
+  }
   if (
     (result.status !== 'applied' && result.status !== 'no_op') ||
     result.path !== captured.path ||
@@ -134,7 +140,12 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
     imageSessionId: current.imageSessionId,
     operations: [{ adjustments: acceptedAdjustments, type: 'replace-adjustments' }],
     persistence: 'native-committed',
-    ...(historyBaseline === undefined ? {} : { nativeCommittedHistoryBaseline: historyBaseline }),
+    ...(historyBaseline === undefined || historyEditDocumentBaseline === undefined
+      ? {}
+      : {
+          nativeCommittedEditDocumentHistoryBaseline: historyEditDocumentBaseline,
+          nativeCommittedHistoryBaseline: historyBaseline,
+        }),
     source: 'auto-edit',
     transactionId: result.receipt.transactionId,
   };

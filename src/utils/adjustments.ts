@@ -8,6 +8,7 @@ import {
   type PointColorPlanV1,
   pointColorPlanV1Schema,
 } from '../../packages/rawengine-schema/src/color/pointColorSchemas';
+import { editDocumentMaskNodesV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { filmEmulationNodeV1Schema } from '../../packages/rawengine-schema/src/film/filmEmulationSchemas';
 import type { FilmEmulationNodeV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
@@ -33,6 +34,8 @@ import {
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
+
+const cloneJsonValue = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
 
 export enum ActiveChannel {
   Blue = 'blue',
@@ -355,7 +358,6 @@ export interface Adjustments {
   orientationSteps: number;
   rotation: number;
   saturation: number;
-  sectionVisibility: SectionVisibility;
   shadows: number;
   sharpness: number;
   sharpnessThreshold: number;
@@ -589,7 +591,6 @@ export interface MaskAdjustments {
   id?: string;
   lumaNoiseReduction: number;
   saturation: number;
-  sectionVisibility: SectionVisibility;
   shadows: number;
   sharpness: number;
   sharpnessThreshold: number;
@@ -615,9 +616,26 @@ export const LAYER_BLEND_MODES = [
 export type LayerBlendMode = (typeof LAYER_BLEND_MODES)[number];
 export const DEFAULT_LAYER_BLEND_MODE: LayerBlendMode = 'normal';
 
+export const MASK_EDIT_NODE_TYPES = ['basic', 'color', 'curves', 'details'] as const;
+export type MaskEditNodeType = (typeof MASK_EDIT_NODE_TYPES)[number];
+export interface MaskEditNodeEnvelope {
+  enabled: boolean;
+}
+export type MaskEditNodeMap = Record<MaskEditNodeType, MaskEditNodeEnvelope>;
+
+export const createDefaultMaskEditNodes = (): MaskEditNodeMap => ({
+  basic: { enabled: true },
+  color: { enabled: true },
+  curves: { enabled: true },
+  details: { enabled: true },
+});
+
 export interface MaskContainer {
   adjustments: MaskAdjustments;
   blendMode?: LayerBlendMode;
+  editNodes: MaskEditNodeMap;
+  editNodeQuarantine?: Record<string, JsonValue>;
+  editNodeSchemaVersion: 1;
   id: string;
   invert: boolean;
   layerGroupId?: string;
@@ -727,14 +745,6 @@ export interface Sections {
   details: Array<string>;
   effects: Array<string>;
   transformLens: Array<string>;
-}
-
-export interface SectionVisibility {
-  [index: string]: boolean;
-  basic: boolean;
-  curves: boolean;
-  color: boolean;
-  details: boolean;
 }
 
 export const COLOR_LABELS: Array<Color> = [
@@ -920,12 +930,6 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
   selectiveColorRangeControls: structuredClone(DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS),
   lumaNoiseReduction: 0,
   saturation: 0,
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-  },
   shadows: 0,
   sharpness: 0,
   sharpnessThreshold: 15,
@@ -940,6 +944,8 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
 export const INITIAL_MASK_CONTAINER: MaskContainer = {
   adjustments: INITIAL_MASK_ADJUSTMENTS,
   blendMode: DEFAULT_LAYER_BLEND_MODE,
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: '',
   invert: false,
   name: 'New Mask',
@@ -1036,12 +1042,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   orientationSteps: 0,
   rotation: 0,
   saturation: 0,
-  sectionVisibility: {
-    basic: true,
-    curves: true,
-    color: true,
-    details: true,
-  },
   shadows: 0,
   sharpness: 0,
   sharpnessThreshold: 15,
@@ -1144,9 +1144,22 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     }));
   };
 
+  const legacyGlobalVisibility =
+    typeof loadedAdjustments['sectionVisibility'] === 'object' && loadedAdjustments['sectionVisibility'] !== null
+      ? (loadedAdjustments['sectionVisibility'] as Readonly<Record<string, unknown>>)
+      : null;
+  const { sectionVisibility: _legacyGlobalVisibility, ...loadedPixelAdjustments } = loadedAdjustments;
+
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
     const containerAdjustments = maskContainer.adjustments;
+    const legacyMaskVisibility =
+      typeof containerAdjustments['sectionVisibility'] === 'object' &&
+      containerAdjustments['sectionVisibility'] !== null
+        ? (containerAdjustments['sectionVisibility'] as Readonly<Record<string, unknown>>)
+        : null;
+    const { sectionVisibility: _legacyMaskVisibility, ...maskPixelAdjustments } = containerAdjustments;
     const normalizedSubMasks = normalizeSubMasks(maskContainer.subMasks);
+    const parsedMaskEditNodes = editDocumentMaskNodesV2Schema.safeParse(maskContainer.editNodes);
 
     const parsedLayerReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
       maskContainer.referenceMatchApplicationReceipt,
@@ -1154,10 +1167,24 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     const normalizedMask: MaskContainer = {
       ...INITIAL_MASK_CONTAINER,
       ...maskContainer,
+      editNodes: parsedMaskEditNodes.success
+        ? parsedMaskEditNodes.data
+        : (Object.fromEntries(
+            MASK_EDIT_NODE_TYPES.map((nodeType) => [
+              nodeType,
+              {
+                enabled: typeof legacyMaskVisibility?.[nodeType] === 'boolean' ? legacyMaskVisibility[nodeType] : true,
+              },
+            ]),
+          ) as MaskEditNodeMap),
+      ...(maskContainer.editNodes !== undefined && !parsedMaskEditNodes.success
+        ? { editNodeQuarantine: { invalidEditNodes: cloneJsonValue(maskContainer.editNodes) } }
+        : {}),
+      editNodeSchemaVersion: 1,
       id: maskContainer.id || crypto.randomUUID(),
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
-        ...containerAdjustments,
+        ...maskPixelAdjustments,
         flareAmount: containerAdjustments.flareAmount,
         glowAmount: containerAdjustments.glowAmount,
         halationAmount: containerAdjustments.halationAmount,
@@ -1176,19 +1203,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
         curveMode: containerAdjustments.curveMode ?? 'point',
         effectsEnabled:
           containerAdjustments.effectsEnabled ??
-          (typeof containerAdjustments.sectionVisibility === 'object' &&
-          containerAdjustments.sectionVisibility !== null &&
-          'effects' in containerAdjustments.sectionVisibility &&
-          // biome-ignore lint/complexity/useLiteralKeys: legacy Effects lived only in the visibility index signature.
-          typeof containerAdjustments.sectionVisibility['effects'] === 'boolean'
-            ? containerAdjustments.sectionVisibility['effects']
-            : true),
-        sectionVisibility: {
-          basic: containerAdjustments.sectionVisibility?.basic ?? true,
-          color: containerAdjustments.sectionVisibility?.color ?? true,
-          curves: containerAdjustments.sectionVisibility?.curves ?? true,
-          details: containerAdjustments.sectionVisibility?.details ?? true,
-        },
+          (typeof legacyMaskVisibility?.['effects'] === 'boolean' ? legacyMaskVisibility['effects'] : true),
         sharpnessThreshold: containerAdjustments.sharpnessThreshold,
         toneEqualizer: normalizeToneEqualizer(containerAdjustments.toneEqualizer),
       },
@@ -1228,7 +1243,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
 
   return {
     ...INITIAL_ADJUSTMENTS,
-    ...loadedAdjustments,
+    ...loadedPixelAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     filmEmulation: parsedFilmEmulation.success ? parsedFilmEmulation.data : INITIAL_ADJUSTMENTS.filmEmulation,
     filmLookId: loadedAdjustments.filmLookId ?? INITIAL_ADJUSTMENTS.filmLookId,
@@ -1346,19 +1361,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     aiPatches: normalizedAiPatches,
     effectsEnabled:
       loadedAdjustments.effectsEnabled ??
-      (typeof loadedAdjustments.sectionVisibility === 'object' &&
-      loadedAdjustments.sectionVisibility !== null &&
-      'effects' in loadedAdjustments.sectionVisibility &&
-      // biome-ignore lint/complexity/useLiteralKeys: legacy Effects lived only in the visibility index signature.
-      typeof loadedAdjustments.sectionVisibility['effects'] === 'boolean'
-        ? loadedAdjustments.sectionVisibility['effects']
-        : true),
-    sectionVisibility: {
-      basic: loadedAdjustments.sectionVisibility?.basic ?? true,
-      color: loadedAdjustments.sectionVisibility?.color ?? true,
-      curves: loadedAdjustments.sectionVisibility?.curves ?? true,
-      details: loadedAdjustments.sectionVisibility?.details ?? true,
-    },
+      (typeof legacyGlobalVisibility?.['effects'] === 'boolean' ? legacyGlobalVisibility['effects'] : true),
     sharpnessThreshold: loadedAdjustments.sharpnessThreshold ?? INITIAL_ADJUSTMENTS.sharpnessThreshold,
   };
 };

@@ -26,6 +26,7 @@ import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
+import { hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
 import {
   buildImageOpenHydrationEditTransaction,
   publishCurrentImageOpenHydration,
@@ -363,9 +364,14 @@ export function useAppNavigation({
                 !metadataAdjustments.is_null
                   ? normalizeLoadedAdjustments(metadataAdjustments)
                   : null;
+              const authoritativeEditDocument =
+                authoritativeAdjustments === null
+                  ? null
+                  : hydrateImageOpenEditDocumentV2(loadedMetadata, authoritativeAdjustments);
               if (
                 authoritativeAdjustments !== null &&
-                !areAdjustmentsEqual(current.adjustments, authoritativeAdjustments)
+                (!areAdjustmentsEqual(current.adjustments, authoritativeAdjustments) ||
+                  JSON.stringify(current.editDocumentV2) !== JSON.stringify(authoritativeEditDocument))
               ) {
                 current.applyEditTransaction(
                   buildImageOpenHydrationEditTransaction(
@@ -373,6 +379,7 @@ export function useAppNavigation({
                     backgroundHydrationIdentity,
                     authoritativeAdjustments,
                     `cache-meta:${session.id}:${openResult.metadataFingerprint}`,
+                    authoritativeEditDocument ?? undefined,
                   ),
                 );
               }

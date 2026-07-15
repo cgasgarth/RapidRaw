@@ -10,7 +10,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
-import { hydrateImageOpenAdjustments } from '../../utils/imageOpenAdjustmentHydration';
+import { hydrateImageOpenAdjustments, hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
 import {
   buildImageOpenHydrationEditTransaction,
   canContinueImageOpenHydration,
@@ -55,6 +55,7 @@ export function useImageLoader() {
             { adjustmentRevision: state.adjustmentRevision, imageSessionId: sessionId, path: selectedImagePath },
             hydratedAdjustments,
             `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
+            hydrateImageOpenEditDocumentV2(metadata.metadata, hydratedAdjustments),
           ),
         );
       };
@@ -187,6 +188,9 @@ export function useImageLoader() {
                 canHydrateDecodedAdjustments
                   ? `decoded-open:${sessionId}:${openResult.metadataFingerprint}`
                   : `decoded-aspect:${sessionId}`,
+                canHydrateDecodedAdjustments
+                  ? hydrateImageOpenEditDocumentV2(loadedMetadata, hydratedAdjustments)
+                  : undefined,
               ),
             );
           }

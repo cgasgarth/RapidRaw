@@ -2,6 +2,7 @@ import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-sch
 import { matchLookProposalV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import {
   type Adjustments,
+  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -214,6 +215,8 @@ export const createReferenceMatchAdjustmentLayer = ({
   return {
     adjustments,
     blendMode: DEFAULT_LAYER_BLEND_MODE,
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id,
     invert: false,
     name,

@@ -488,6 +488,7 @@ export function useImageProcessing() {
     applyAdjustments(false, calculatedTargetResolution, false, 50);
   }, [
     adjustments,
+    adjustmentSnapshot.adjustmentRevision,
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
