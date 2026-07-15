@@ -12,6 +12,7 @@ import {
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
 } from '../../utils/displayCreativeEditTransaction';
+import { filmEmulationCanonicalHash } from '../../utils/film-look/filmEmulationOperation';
 import {
   buildFilmLookPresetDraft,
   type FilmLookBrowserItem,
@@ -106,7 +107,17 @@ export default function EffectsPanel({
   const imageSessionId = useEditorStore(
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
+  const proofRevision = useEditorStore((state) => state.proofRevision);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const filmThumbnailViewOutputSha256 = useMemo(
+    () =>
+      filmEmulationCanonicalHash({
+        displayTarget: 'display_p3',
+        proofRevision,
+        viewTransform: 'rawengine_agx_v1',
+      }),
+    [proofRevision],
+  );
   const displayCreativeCommitIdentity = useMemo<DisplayCreativeCommitIdentity | null>(
     () =>
       !isForMask && selectedImagePath !== null
@@ -381,9 +392,13 @@ export default function EffectsPanel({
               <FilmLookBrowser
                 activeLookId={adjustments.filmLookId}
                 activeStrength={adjustments.filmLookStrength}
+                baseAdjustments={adjustments}
+                graphRevision={adjustmentRevision}
                 onApplyLook={handleFilmLookApply}
                 onSaveLook={handleFilmLookSave}
                 onShareLook={handleFilmLookShare}
+                selectedImageId={selectedImagePath === null ? null : imageSessionId}
+                viewOutputSha256={filmThumbnailViewOutputSha256}
               />
             </Suspense>
             {filmLookPresetStatus !== null && (

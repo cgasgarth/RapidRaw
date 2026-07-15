@@ -25,6 +25,7 @@ pub(crate) mod film_render_scheduler;
 pub(crate) mod film_residual_lut;
 pub(crate) mod film_resource_cache;
 pub(crate) mod film_runtime_proof;
+pub(crate) mod film_runtime_services;
 pub(crate) mod film_thumbnail_cache;
 pub(crate) mod image_analytics;
 pub(crate) mod image_processing;

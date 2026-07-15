@@ -31,7 +31,7 @@ for (const marker of [
   'data-testid="film-look-compare-readiness"',
   'data-testid="film-look-compare-render-preview"',
   'data-testid="film-look-active-state"',
-  'data-testid="film-look-active-render-preview"',
+  'testId="film-look-active-render-preview"',
   'data-compare-ready-count={comparisonReadyCount}',
   'data-comparison-ready={String(isComparisonReady)}',
   'data-active-look-id={activeLook.id}',
