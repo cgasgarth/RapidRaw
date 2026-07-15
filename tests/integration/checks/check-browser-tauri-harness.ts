@@ -1042,6 +1042,28 @@ async function verifyAiMaskBoxController(page: Page): Promise<void> {
   if ((await callCount('save_metadata_and_update_thumbnail')) !== saveBeforeCancel) {
     throw new Error('A cancelled AI mask box gesture persisted a semantic transaction.');
   }
+  for (const cancellation of ['lostpointercapture', 'escape'] as const) {
+    const saveBeforeLifecycleCancel = await callCount('save_metadata_and_update_thumbnail');
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y);
+    if ((await imageCanvas.getAttribute('data-ai-mask-box-active')) !== 'true') {
+      throw new Error(`AI Subject ${cancellation} proof did not begin a box gesture.`);
+    }
+    if (cancellation === 'lostpointercapture') {
+      await imageCanvas.dispatchEvent('lostpointercapture', { pointerId: 1, pointerType: 'mouse' });
+    } else {
+      await imageCanvas.focus();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForFunction(
+      () => document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-ai-mask-box-active') === 'false',
+    );
+    await page.mouse.up();
+    if ((await callCount('save_metadata_and_update_thumbnail')) !== saveBeforeLifecycleCancel) {
+      throw new Error(`AI Subject ${cancellation} cancellation persisted a semantic transaction.`);
+    }
+  }
 
   const staleWithoutSuccessor = {
     native: await callCount('generate_ai_subject_mask'),
@@ -1248,6 +1270,148 @@ async function verifyAiMaskBoxController(page: Page): Promise<void> {
   );
   if ((await callCount('save_metadata_and_update_thumbnail')) !== sourceReplacementBaseline.saves) {
     throw new Error('A delayed source-A result persisted after an A→B→A image-session replacement.');
+  }
+
+  await page.getByTestId('right-panel-switcher-button-ai').click();
+  await page.getByTestId('inpaint-workspace-panel').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.getByRole('button', { name: /Create New Quick Erase Edit/iu }).click();
+  await page.waitForFunction(
+    () => {
+      const canvas = document.querySelector('[data-testid="image-canvas"]');
+      return (
+        canvas?.getAttribute('data-ai-mask-box-context-active') === 'true' &&
+        canvas.getAttribute('data-ai-mask-box-context-tool') === 'quick-eraser'
+      );
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
+  const quickEraseStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const quickEraseBox = await quickEraseStage.boundingBox();
+  if (quickEraseBox === null) throw new Error('Quick Eraser proof could not resolve the Konva input surface.');
+  const quickEraseStart = {
+    x: quickEraseBox.x + quickEraseBox.width * 0.31,
+    y: quickEraseBox.y + quickEraseBox.height * 0.34,
+  };
+  const quickEraseEnd = {
+    x: quickEraseBox.x + quickEraseBox.width * 0.66,
+    y: quickEraseBox.y + quickEraseBox.height * 0.64,
+  };
+  const quickEraseBaseline = {
+    generation: await callCount('generate_ai_subject_mask'),
+    inpaint: await callCount('invoke_generative_replace_with_mask_def'),
+    renders: await callCount('apply_adjustments'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  await page.mouse.move(quickEraseStart.x, quickEraseStart.y);
+  await page.mouse.down();
+  await page.mouse.move(quickEraseEnd.x, quickEraseEnd.y);
+  if (
+    (await imageCanvas.getAttribute('data-ai-mask-box-active')) !== 'true' ||
+    (await imageCanvas.getAttribute('data-ai-mask-box-context-tool')) !== 'quick-eraser'
+  ) {
+    throw new Error('Quick Eraser did not publish a declarative box overlay in its keyed tool context.');
+  }
+  await page.mouse.up();
+  await page.waitForFunction(
+    ({ generation, inpaint, renders, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const receipt = document.querySelector('[data-testid="editor-image-preview-panel"]');
+      return (
+        receipt?.getAttribute('data-last-edit-source') === 'ai-edit' &&
+        calls.filter(({ command }) => command === 'generate_ai_subject_mask').length === generation + 1 &&
+        calls.filter(({ command }) => command === 'invoke_generative_replace_with_mask_def').length === inpaint + 1 &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length === saves + 1 &&
+        calls.filter(({ command }) => command === 'apply_adjustments').length > renders
+      );
+    },
+    quickEraseBaseline,
+    { timeout: 10_000 },
+  );
+  const quickEraseProof = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    const latest = (command: string) => calls.filter((call) => call.command === command).at(-1)?.args ?? null;
+    return {
+      generation: latest('generate_ai_subject_mask'),
+      inpaint: latest('invoke_generative_replace_with_mask_def'),
+      persistence: latest('save_metadata_and_update_thumbnail'),
+      render: latest('apply_adjustments'),
+    };
+  });
+  const quickErasePersistedPatch = quickEraseProof.persistence?.['adjustments']?.['aiPatches']?.find(
+    (patch: Record<string, unknown>) =>
+      Array.isArray(patch['subMasks']) &&
+      patch['subMasks'].some((subMask: Record<string, unknown>) => subMask['type'] === 'quick-eraser'),
+  );
+  const quickErasePersisted = quickErasePersistedPatch?.['subMasks']?.find(
+    (subMask: Record<string, unknown>) => subMask['type'] === 'quick-eraser',
+  )?.['parameters'];
+  const quickEraseDocument = editDocumentV2Schema.parse(quickEraseProof.render?.['request']?.['editDocumentV2']);
+  const quickEraseRenderedPatch = quickEraseDocument.sourceArtifacts.aiPatches.find((patch) =>
+    patch.subMasks.some((subMask) => subMask.type === 'quick-eraser'),
+  );
+  const quickEraseRendered = quickEraseRenderedPatch?.subMasks.find(
+    (subMask) => subMask.type === 'quick-eraser',
+  )?.parameters;
+  const quickEraseNativeStart = quickEraseProof.generation?.['startPoint'];
+  const quickEraseNativeEnd = quickEraseProof.generation?.['endPoint'];
+  if (
+    typeof quickErasePersisted !== 'object' ||
+    quickErasePersisted === null ||
+    JSON.stringify(quickErasePersisted) !== JSON.stringify(quickEraseRendered) ||
+    JSON.stringify(quickErasePersistedPatch?.['patchData']) !== JSON.stringify(quickEraseRenderedPatch?.patchData) ||
+    quickErasePersistedPatch?.['patchData']?.['browserHarnessQuickErase'] !== true ||
+    !Array.isArray(quickEraseNativeStart) ||
+    !Array.isArray(quickEraseNativeEnd) ||
+    quickErasePersisted['startX'] !== quickEraseNativeStart[0] ||
+    quickErasePersisted['startY'] !== quickEraseNativeStart[1] ||
+    quickErasePersisted['endX'] !== quickEraseNativeEnd[0] ||
+    quickErasePersisted['endY'] !== quickEraseNativeEnd[1] ||
+    quickEraseProof.inpaint?.['useFastInpaint'] !== true
+  ) {
+    throw new Error(
+      `Quick Eraser native, semantic persistence, and rendered output diverged: ${JSON.stringify({
+        nativeEnd: quickEraseNativeEnd,
+        nativeStart: quickEraseNativeStart,
+        persisted: quickErasePersisted,
+        rendered: quickEraseRendered,
+      })}.`,
+    );
+  }
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('generate_ai_subject_mask')) !== quickEraseBaseline.generation + 1 ||
+    (await callCount('invoke_generative_replace_with_mask_def')) !== quickEraseBaseline.inpaint + 1 ||
+    (await callCount('save_metadata_and_update_thumbnail')) !== quickEraseBaseline.saves + 1
+  ) {
+    throw new Error('Quick Eraser box release produced more than one native or semantic commit.');
+  }
+
+  const unmountBaseline = {
+    native: await callCount('generate_ai_subject_mask'),
+    saves: await callCount('save_metadata_and_update_thumbnail'),
+  };
+  const currentStage = page.locator('[data-initial-mask-draw-stage="true"]');
+  const currentBox = await currentStage.boundingBox();
+  if (currentBox === null) throw new Error('AI mask unmount proof could not resolve the input surface.');
+  await page.mouse.move(currentBox.x + currentBox.width * 0.3, currentBox.y + currentBox.height * 0.35);
+  await page.mouse.down();
+  await page.mouse.move(currentBox.x + currentBox.width * 0.65, currentBox.y + currentBox.height * 0.62);
+  await page
+    .locator('button[data-command-id="back-to-library"]:visible')
+    .first()
+    .evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error('Back to library is not a button.');
+      element.click();
+    });
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ state: 'detached', timeout: 10_000 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  if (
+    (await callCount('generate_ai_subject_mask')) !== unmountBaseline.native ||
+    (await callCount('save_metadata_and_update_thumbnail')) !== unmountBaseline.saves
+  ) {
+    throw new Error('AI mask box published a native or persistence command after ImageCanvas unmount.');
   }
 }
 

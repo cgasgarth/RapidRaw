@@ -1,29 +1,29 @@
-import type { ViewerBrushPointerType } from './viewerBrushInteractionController';
+export type ViewerPointerType = 'mouse' | 'pen' | 'touch';
 
-interface ActiveViewerBrushPointer {
+interface ActiveViewerPointer {
   readonly pointerId: number;
-  readonly pointerType: ViewerBrushPointerType;
+  readonly pointerType: ViewerPointerType;
 }
 
-export interface ViewerBrushPointerLifecycleSnapshot {
-  readonly active: ActiveViewerBrushPointer | null;
+export interface ViewerPointerLifecycleSnapshot {
+  readonly active: ActiveViewerPointer | null;
   readonly compatibilityMouseSuppressed: boolean;
 }
 
-export interface ViewerBrushPointerLifecycle {
-  begin(pointerType: ViewerBrushPointerType, pointerId: number): boolean;
+export interface ViewerPointerLifecycle {
+  begin(pointerType: ViewerPointerType, pointerId: number): boolean;
   cancel(): void;
-  end(pointerType: ViewerBrushPointerType, pointerId: number): boolean;
-  move(pointerType: ViewerBrushPointerType, pointerId: number): boolean;
+  end(pointerType: ViewerPointerType, pointerId: number): boolean;
+  move(pointerType: ViewerPointerType, pointerId: number): boolean;
   releaseCompatibilityMouse(): void;
-  snapshot(): ViewerBrushPointerLifecycleSnapshot;
+  snapshot(): ViewerPointerLifecycleSnapshot;
 }
 
-/** Filters compatibility mouse events and competing pointers before they reach one brush session. */
-export const createViewerBrushPointerLifecycle = (): ViewerBrushPointerLifecycle => {
-  let active: ActiveViewerBrushPointer | null = null;
+/** Filters compatibility mouse events and competing pointers for one viewer gesture session. */
+export const createViewerPointerLifecycle = (): ViewerPointerLifecycle => {
+  let active: ActiveViewerPointer | null = null;
   let compatibilityMouseSuppressed = false;
-  const matches = (pointerType: ViewerBrushPointerType, pointerId: number) =>
+  const matches = (pointerType: ViewerPointerType, pointerId: number) =>
     active?.pointerId === pointerId && active.pointerType === pointerType;
   return {
     begin: (pointerType, pointerId) => {
