@@ -189,6 +189,10 @@ impl AppState {
     ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {
         self.services.computational()
     }
+
+    pub(crate) fn export(&self) -> &crate::export::runtime_services::ExportRuntimeServices {
+        self.services.export()
+    }
 }
 
 impl Default for AppState {
