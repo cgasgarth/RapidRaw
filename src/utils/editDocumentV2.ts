@@ -4,6 +4,7 @@ import {
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   editDocumentCameraInputV2Schema,
+  editDocumentColorCalibrationV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
   editDocumentGeometryV2Schema,
@@ -91,9 +92,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                             ...(descriptor?.defaultParams ?? {}),
                             ...mappedParams,
                           })
-                        : nodeType === 'layers'
-                          ? { masks: [], ...mappedParams }
-                          : mappedParams;
+                        : nodeType === 'color_calibration'
+                          ? editDocumentColorCalibrationV2Schema.parse({
+                              ...(descriptor?.defaultParams ?? {}),
+                              ...mappedParams,
+                            })
+                          : nodeType === 'layers'
+                            ? { masks: [], ...mappedParams }
+                            : mappedParams;
       return [
         nodeType,
         {
@@ -114,6 +120,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   const defaultedNodeParams = (
     [
       'camera_input',
+      'color_calibration',
       'detail_denoise_dehaze',
       'display_creative',
       'geometry',

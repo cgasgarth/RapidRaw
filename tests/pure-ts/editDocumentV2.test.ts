@@ -79,6 +79,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'perceptual_grading',
       'camera_input',
       'lens_correction',
+      'color_calibration',
       'geometry',
       'layers',
       'source_artifacts',
@@ -633,6 +634,32 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
+  test('color calibration defaults legacy state and rejects malformed render authority', () => {
+    const { colorCalibration: _colorCalibration, ...legacyCalibration } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyCalibration);
+    expect(defaulted.nodes.color_calibration?.params).toEqual({
+      colorCalibration: INITIAL_ADJUSTMENTS.colorCalibration,
+    });
+    expect(defaulted.migration?.defaulted).toContain('color_calibration.colorCalibration');
+    expect(compileEditDocumentNodeV2(defaulted.nodes.color_calibration).params).toEqual(
+      defaulted.nodes.color_calibration?.params,
+    );
+
+    const node = defaulted.nodes.color_calibration;
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...defaulted,
+        nodes: {
+          ...defaulted.nodes,
+          color_calibration: {
+            ...node,
+            params: { colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, redHue: 101 } },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   test('scene curves default legacy state and reject malformed render authority', () => {
     const {
       curveMode: _curveMode,
@@ -997,6 +1024,20 @@ describe('EditDocumentV2 legacy adapter', () => {
       colorGrading: { balance: 20, midtones: { hue: 35, luminance: 5, saturation: 24 } },
       perceptualGradingV1: { balance: 0.2, perceptualModel: 'oklab_d65_from_acescg_v1' },
     });
+    expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
+  });
+
+  test('render preparation overlays the authoritative color-calibration envelope', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, redHue: 18 },
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['color_calibration']);
+
+    expect(renderDocument.nodes.color_calibration).toBe(authoritative.nodes.color_calibration);
+    expect(renderDocument.nodes.color_calibration?.params).toMatchObject({ colorCalibration: { redHue: 18 } });
     expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
   });
 

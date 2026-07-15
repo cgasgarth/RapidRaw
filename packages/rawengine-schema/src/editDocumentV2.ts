@@ -89,6 +89,22 @@ export const editDocumentPerceptualGradingV2Schema = z
   })
   .strict();
 
+export const editDocumentColorCalibrationV2Schema = z
+  .object({
+    colorCalibration: z
+      .object({
+        blueHue: z.number().finite().min(-100).max(100),
+        blueSaturation: z.number().finite().min(-100).max(100),
+        greenHue: z.number().finite().min(-100).max(100),
+        greenSaturation: z.number().finite().min(-100).max(100),
+        redHue: z.number().finite().min(-100).max(100),
+        redSaturation: z.number().finite().min(-100).max(100),
+        shadowsTint: z.number().finite().min(-100).max(100),
+      })
+      .strict(),
+  })
+  .strict();
+
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
   .strict();
@@ -619,6 +635,25 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
     defaultParams: {
+      colorCalibration: {
+        blueHue: 0,
+        blueSaturation: 0,
+        greenHue: 0,
+        greenSaturation: 0,
+        redHue: 0,
+        redSaturation: 0,
+        shadowsTint: 0,
+      },
+    },
+    legacyFields: ['colorCalibration'],
+    nodeType: 'color_calibration',
+    process: 'scene_referred_v2',
+    renderStage: 'color_calibration',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
       aspectRatio: null,
       crop: null,
       flipHorizontal: false,
@@ -946,6 +981,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'color_calibration') {
+        const colorCalibration = editDocumentColorCalibrationV2Schema.safeParse(node.params);
+        if (!colorCalibration.success) {
+          for (const issue of colorCalibration.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -1038,6 +1081,7 @@ export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCr
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
+export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type EditDocumentLensCorrectionV2 = z.infer<typeof editDocumentLensCorrectionV2Schema>;
@@ -1068,6 +1112,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
+  if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'lens_correction') editDocumentLensCorrectionV2Schema.parse(envelope.params);
