@@ -17,7 +17,7 @@ use crate::image_processing::{
 };
 use crate::mask_generation::{MaskDefinition, get_cached_or_generate_mask};
 use crate::render::render_plan::compile_consumer_render_plan;
-use crate::{AppState, adjustment_fields, get_or_load_lut, hydrate_adjustments, render_pipeline};
+use crate::{AppState, adjustment_fields, hydrate_adjustments, render_pipeline};
 
 #[tauri::command]
 pub(crate) fn generate_uncropped_preview(
@@ -116,7 +116,7 @@ pub(crate) fn generate_uncropped_preview(
         let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
         let lut = render_adjustments["lutPath"]
             .as_str()
-            .and_then(|path| get_or_load_lut(&state, path).ok());
+            .and_then(|path| state.services.native_caches.get_or_load_lut(path).ok());
         let render_plan = match compile_consumer_render_plan(
             render_adjustments.as_ref(),
             &loaded_image.path,

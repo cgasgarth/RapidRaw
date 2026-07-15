@@ -62,7 +62,6 @@ use std::panic;
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::Serialize;
 use tauri::{Emitter, Manager};
 
 #[cfg(feature = "ai")]
@@ -83,7 +82,6 @@ use crate::image_processing::{
     Crop, RenderRequest, apply_srgb_to_linear, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image, resolve_tonemapper_override_from_handle,
 };
-use crate::lut_processing::Lut;
 use crate::mask_generation::{
     MaskDefinition, generate_mask_bitmap, get_cached_or_generate_mask,
     resolve_warped_image_for_masks,
@@ -110,11 +108,6 @@ pub fn register_exit_handler() {
 
 #[cfg(not(target_os = "macos"))]
 pub fn register_exit_handler() {}
-
-#[derive(Serialize)]
-struct LutParseResult {
-    size: u32,
-}
 
 #[derive(serde::Serialize)]
 struct ImageDimensions {
@@ -147,39 +140,6 @@ pub use editor::preview_geometry_service::{
 pub(crate) use editor::preview_geometry_service::{
     generate_transformed_preview, generate_transformed_preview_cancellable,
 };
-
-pub fn get_or_load_lut(state: &AppState, path: &str) -> Result<Arc<Lut>, String> {
-    let fingerprint = lut_processing::source_fingerprint(path).map_err(|e| e.to_string())?;
-    if let Some(entry) = state.services.native_caches.lut_path(path)
-        && entry.fingerprint == fingerprint
-    {
-        return Ok(Arc::clone(&entry.lut));
-    }
-
-    let parsed = lut_processing::parse_lut_file(path).map_err(|e| e.to_string())?;
-    let content_hash = parsed.content_hash;
-    let arc_lut = state
-        .services
-        .native_caches
-        .lut_content(&content_hash)
-        .unwrap_or_else(|| {
-            let lut = Arc::new(parsed);
-            state.services.native_caches.insert_lut_content(
-                content_hash,
-                Arc::clone(&lut),
-                lut.retained_bytes(),
-            );
-            lut
-        });
-    state.services.native_caches.insert_lut_path(
-        path.to_string(),
-        Arc::new(crate::lut_processing::CachedLutPath {
-            fingerprint,
-            lut: Arc::clone(&arc_lut),
-        }),
-    );
-    Ok(arc_lut)
-}
 
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
@@ -699,40 +659,4 @@ pub fn run() {
                 _ => {}
             }
         });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn write_test_lut(path: &std::path::Path, middle: f32) {
-        let mut cube = String::from("LUT_3D_SIZE 2\n");
-        for _ in 0..8 {
-            cube.push_str(&format!("0 {middle} 1\n"));
-        }
-        std::fs::write(path, cube).unwrap();
-    }
-
-    #[test]
-    fn lut_processing_cache_reuses_content_and_invalidates_replaced_path() {
-        let temp = tempfile::tempdir().unwrap();
-        let first_path = temp.path().join("first.cube");
-        let alias_path = temp.path().join("alias.cube");
-        write_test_lut(&first_path, 0.5);
-        write_test_lut(&alias_path, 0.5);
-        let state = AppState::new();
-
-        let first = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
-        let warm = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
-        let alias = get_or_load_lut(&state, alias_path.to_str().unwrap()).unwrap();
-        assert!(Arc::ptr_eq(&first, &warm));
-        assert!(Arc::ptr_eq(&first, &alias));
-
-        let replacement = temp.path().join("replacement.cube");
-        write_test_lut(&replacement, 0.25);
-        std::fs::rename(&replacement, &first_path).unwrap();
-        let changed = get_or_load_lut(&state, first_path.to_str().unwrap()).unwrap();
-        assert!(!Arc::ptr_eq(&first, &changed));
-        assert_ne!(first.content_hash, changed.content_hash);
-    }
 }
