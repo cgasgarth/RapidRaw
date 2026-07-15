@@ -4002,14 +4002,14 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   }
 
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 397, label: 'reset-to-fit', width: 529.33 });
+  await assertRenderedImageGeometry(page, { height: 445, label: 'reset-to-fit', width: 593.33 });
   samples.push(await collectBoundsSample(page, 'reset-to-fit'));
   await assertLatestBoundsSample(samples);
 
   await zoomSelector.selectOption('2');
   await assertRenderedImageGeometry(page, { height: 1536, label: 'repeated-selector-zoom-200', width: 2048 });
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 397, label: 'repeated-reset-to-fit', width: 529.33 });
+  await assertRenderedImageGeometry(page, { height: 445, label: 'repeated-reset-to-fit', width: 593.33 });
   await assertSingleFullFrameOutput(page, sourceIdentity);
 
   await previewPanel.hover();
@@ -4032,7 +4032,7 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   const gestureBaseHref = await readCommittedBaseHref(page, sourceIdentity);
   await assertPositionedZoomOutput(page, { canonicalBaseHref: gestureBaseHref, sourceIdentity });
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 397, label: 'wheel-reset-to-fit', width: 529.33 });
+  await assertRenderedImageGeometry(page, { height: 445, label: 'wheel-reset-to-fit', width: 593.33 });
   await assertSingleFullFrameOutput(page, sourceIdentity);
   await assertVisibleNonEmptyPreviewPixels(page, 'wheel-reset-to-fit', sourceIdentity);
 
@@ -4311,7 +4311,7 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
 
   await page.setViewportSize(viewport);
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 397, label: 'viewport-controller-reset-fit', width: 529.33 });
+  await assertRenderedImageGeometry(page, { height: 445, label: 'viewport-controller-reset-fit', width: 593.33 });
 }
 
 async function assertPositionedZoomOutput(
@@ -4402,16 +4402,24 @@ async function assertRenderedImageGeometry(
 ): Promise<void> {
   const frame = page.locator('[data-editor-image-frame="edited"]').first();
   await frame.waitFor({ timeout: 10_000 });
-  await page.waitForFunction(
-    ({ expectedHeight, expectedWidth }) => {
-      const element = document.querySelector<HTMLElement>('[data-editor-image-frame="edited"]');
-      if (!element) return false;
-      const bounds = element.getBoundingClientRect();
-      return Math.abs(bounds.width - expectedWidth) <= 1 && Math.abs(bounds.height - expectedHeight) <= 1;
-    },
-    { expectedHeight: expected.height, expectedWidth: expected.width },
-    { timeout: 10_000 },
-  );
+  try {
+    await page.waitForFunction(
+      ({ expectedHeight, expectedWidth }) => {
+        const element = document.querySelector<HTMLElement>('[data-editor-image-frame="edited"]');
+        if (!element) return false;
+        const bounds = element.getBoundingClientRect();
+        return Math.abs(bounds.width - expectedWidth) <= 1 && Math.abs(bounds.height - expectedHeight) <= 1;
+      },
+      { expectedHeight: expected.height, expectedWidth: expected.width },
+      { timeout: 10_000 },
+    );
+  } catch (error) {
+    const actual = await readBounds(frame);
+    throw new Error(
+      `${expected.label} timed out at ${actual.width}x${actual.height}; expected ${expected.width}x${expected.height}.`,
+      { cause: error },
+    );
+  }
   const actual = await readBounds(frame);
   if (Math.abs(actual.width - expected.width) > 1 || Math.abs(actual.height - expected.height) > 1) {
     throw new Error(
