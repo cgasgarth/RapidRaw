@@ -889,11 +889,9 @@ pub async fn analyze_auto_edit(
 ) -> Result<AutoEditProposalV1, String> {
     let generation = ANALYSIS_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
     let loaded = state
-        .original_image
-        .lock()
-        .unwrap()
-        .as_ref()
-        .cloned()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     if loaded.path != request.expected_image_path {
         return Err("auto_edit_stale_source_identity".into());
@@ -961,9 +959,10 @@ pub fn preview_auto_edit_proposal(
     request: CompileAutoEditRequestV1,
     state: tauri::State<AppState>,
 ) -> Result<AutoEditPreviewV1, String> {
-    let loaded = state.original_image.lock().unwrap();
-    let loaded = loaded
-        .as_ref()
+    let loaded = state
+        .services
+        .editor
+        .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     let source_revision = loaded.artifact_source.revision.identity();
     preview_compiled_request(request, &loaded.path, &source_revision)
@@ -974,9 +973,10 @@ pub fn apply_auto_edit_proposal(
     request: CompileAutoEditRequestV1,
     state: tauri::State<AppState>,
 ) -> Result<AppliedAutoEditV1, String> {
-    let loaded = state.original_image.lock().unwrap();
-    let loaded = loaded
-        .as_ref()
+    let loaded = state
+        .services
+        .editor
+        .image_snapshot()
         .ok_or_else(|| "auto_edit_no_image_loaded".to_string())?;
     let source_revision = loaded.artifact_source.revision.identity();
     apply_compiled_request(request, &loaded.path, &source_revision)

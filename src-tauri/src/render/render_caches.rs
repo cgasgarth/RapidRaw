@@ -115,9 +115,7 @@ impl<'a> RenderCaches<'a> {
     }
 
     pub fn clear_active_image_render_state(&self) {
-        if let Ok(mut original_image) = self.state.original_image.lock() {
-            *original_image = None;
-        }
+        self.state.services.editor.clear_image();
         self.state.services.full_warp_cache.clear_session();
         self.state.services.viewer_sampling.clear_session();
         self.clear_gpu_dependent_preview();

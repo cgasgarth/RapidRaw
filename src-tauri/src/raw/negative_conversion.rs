@@ -4222,12 +4222,11 @@ fn load_negative_lab_preview_processing_image(
     }
 
     let image_to_downscale = {
-        let original_lock = state.original_image.lock().unwrap();
-        if let Some(loaded) = original_lock.as_ref() {
+        let original_image = state.services.editor.image_snapshot();
+        if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
             } else {
-                drop(original_lock);
                 let settings = load_settings_or_default(app_handle);
 
                 match read_file_mapped(Path::new(source_path_str)) {
@@ -4243,7 +4242,6 @@ fn load_negative_lab_preview_processing_image(
                 .map_err(|error| error.to_string())?
             }
         } else {
-            drop(original_lock);
             let settings = load_settings_or_default(app_handle);
 
             match read_file_mapped(Path::new(source_path_str)) {
@@ -4667,12 +4665,11 @@ pub async fn estimate_negative_base_fog(
     let source_path_str = source_path.to_string_lossy().to_string();
 
     let image = {
-        let original_lock = state.original_image.lock().unwrap();
-        if let Some(loaded) = original_lock.as_ref() {
+        let original_image = state.services.editor.image_snapshot();
+        if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
             } else {
-                drop(original_lock);
                 let settings = load_settings_or_default(&app_handle);
                 match read_file_mapped(Path::new(&source_path_str)) {
                     Ok(mmap) => {
@@ -4687,7 +4684,6 @@ pub async fn estimate_negative_base_fog(
                 .map_err(|e| e.to_string())?
             }
         } else {
-            drop(original_lock);
             let settings = load_settings_or_default(&app_handle);
             match read_file_mapped(Path::new(&source_path_str)) {
                 Ok(mmap) => {
@@ -4739,12 +4735,11 @@ pub async fn suggest_negative_lab_highlight_patch_exposure(
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let image = {
-        let original_lock = state.original_image.lock().unwrap();
-        if let Some(loaded) = original_lock.as_ref() {
+        let original_image = state.services.editor.image_snapshot();
+        if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
             } else {
-                drop(original_lock);
                 let settings = load_settings_or_default(&app_handle);
                 match read_file_mapped(Path::new(&source_path_str)) {
                     Ok(mmap) => {
@@ -4759,7 +4754,6 @@ pub async fn suggest_negative_lab_highlight_patch_exposure(
                 .map_err(|e| e.to_string())?
             }
         } else {
-            drop(original_lock);
             let settings = load_settings_or_default(&app_handle);
             match read_file_mapped(Path::new(&source_path_str)) {
                 Ok(mmap) => {
@@ -4796,12 +4790,11 @@ pub async fn suggest_negative_lab_shadow_patch_black_point(
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let image = {
-        let original_lock = state.original_image.lock().unwrap();
-        if let Some(loaded) = original_lock.as_ref() {
+        let original_image = state.services.editor.image_snapshot();
+        if let Some(loaded) = original_image.as_ref() {
             if loaded.path == source_path_str {
                 loaded.image.clone().as_ref().clone()
             } else {
-                drop(original_lock);
                 let settings = load_settings_or_default(&app_handle);
                 match read_file_mapped(Path::new(&source_path_str)) {
                     Ok(mmap) => {
@@ -4816,7 +4809,6 @@ pub async fn suggest_negative_lab_shadow_patch_black_point(
                 .map_err(|e| e.to_string())?
             }
         } else {
-            drop(original_lock);
             let settings = load_settings_or_default(&app_handle);
             match read_file_mapped(Path::new(&source_path_str)) {
                 Ok(mmap) => {

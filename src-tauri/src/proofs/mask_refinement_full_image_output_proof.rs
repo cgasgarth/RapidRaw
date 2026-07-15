@@ -13,7 +13,8 @@ use tauri::Manager;
 use walkdir::WalkDir;
 
 use crate::app_settings::AppSettings;
-use crate::app_state::{AppState, LoadedImage};
+use crate::app_state::AppState;
+use crate::editor::image_service::LoadedImage;
 use crate::export::export_processing::{
     prepare_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
 };
@@ -278,7 +279,7 @@ fn run_mask_refinement_full_image_output_proof(
     let state = app.state::<AppState>();
     let context = get_or_init_compute_gpu_context_for_tests(&state)?;
     let tm_override = resolve_tonemapper_override(&settings, is_raw);
-    *state.original_image.lock().unwrap() = Some(LoadedImage {
+    state.services.editor.install_image(LoadedImage {
         image: Arc::new(base_image.clone()),
         is_raw,
         path: source_path.to_string(),

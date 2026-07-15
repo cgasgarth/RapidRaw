@@ -1,9 +1,10 @@
 use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings_or_default};
-use crate::app_state::{AppState, LoadedImage};
+use crate::app_state::AppState;
 use crate::color::white_balance::{
     WhiteBalancePlanInputV1, WhiteBalancePlanV1, compile_white_balance_plan,
 };
+use crate::editor::image_service::LoadedImage;
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
@@ -1406,7 +1407,7 @@ pub(crate) async fn load_image_prepared(
                     .services
                     .full_warp_cache
                     .install_session(operation.generation(), &artifact_source);
-                *state.original_image.lock().unwrap() = Some(LoadedImage {
+                state.services.editor.install_image(LoadedImage {
                     path: path.clone(),
                     image: pristine_arc,
                     is_raw: loaded_is_raw,

@@ -61,6 +61,7 @@ impl OperationRegistry {
 #[derive(Clone, Default)]
 pub struct EditorRuntimeService {
     operations: Arc<OperationRegistry>,
+    image: Arc<crate::editor::image_service::EditorImageService>,
 }
 
 impl EditorRuntimeService {
@@ -75,6 +76,27 @@ impl EditorRuntimeService {
     }
     pub fn is_current(&self, id: OperationId) -> bool {
         self.operations.is_current(id)
+    }
+
+    pub(crate) fn install_image(&self, image: crate::editor::image_service::LoadedImage) {
+        self.image.install(image);
+    }
+
+    pub(crate) fn image_snapshot(&self) -> Option<crate::editor::image_service::LoadedImage> {
+        self.image.snapshot()
+    }
+
+    #[cfg(feature = "validation-harness")]
+    pub(crate) fn try_image_snapshot(&self) -> Option<crate::editor::image_service::LoadedImage> {
+        self.image.try_snapshot()
+    }
+
+    pub(crate) fn clone_image_pixels(&self) -> Result<(image::DynamicImage, bool), String> {
+        self.image.clone_pixels()
+    }
+
+    pub(crate) fn clear_image(&self) {
+        self.image.clear();
     }
 }
 

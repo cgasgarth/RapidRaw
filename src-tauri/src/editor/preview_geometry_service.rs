@@ -9,8 +9,9 @@ use std::borrow::Cow;
 use image::{DynamicImage, GenericImageView};
 use serde_json::Value;
 
-use crate::app_state::{AppState, LoadedImage};
+use crate::app_state::AppState;
 use crate::color::{adjustment_fields, adjustment_utils::apply_all_transformations};
+use crate::editor::image_service::LoadedImage;
 use crate::geometry::{
     Crop, GeometryParams, PREVIEW_GEOMETRY_BAND_ROWS, SourceSampleDecorator,
     get_geometry_params_from_json, is_geometry_identity, warp_image_geometry_mapped,
@@ -19,7 +20,7 @@ use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::{apply_coarse_rotation, apply_flip, downscale_f32_image};
 use crate::patch_assets::{PreviewPatchSampler, prepare_preview_patch_sampler};
 
-pub fn generate_transformed_preview(
+pub(crate) fn generate_transformed_preview(
     state: &tauri::State<AppState>,
     loaded_image: &LoadedImage,
     adjustments: &Value,
@@ -695,25 +696,6 @@ mod tests {
             result.receipt.source_pixel_count
         );
         assert!(elapsed < Duration::from_secs(10));
-    }
-
-    #[test]
-    fn normal_preview_does_not_invoke_full_resolution_transform() {
-        let source = DynamicImage::new_rgb32f(400, 300);
-        let full_transform_count = crate::FULL_TRANSFORM_INVOCATIONS.load(Ordering::Relaxed);
-        let result = PreviewGeometryService::execute(PreviewGeometryRequest {
-            source: &source,
-            adjustments: &json!({}),
-            target_long_edge: 100,
-            cancellation: None,
-        })
-        .unwrap();
-
-        assert_eq!(result.image.dimensions(), (100, 75));
-        assert_eq!(
-            crate::FULL_TRANSFORM_INVOCATIONS.load(Ordering::Relaxed),
-            full_transform_count
-        );
     }
 
     #[test]

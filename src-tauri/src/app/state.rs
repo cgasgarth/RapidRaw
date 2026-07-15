@@ -26,14 +26,6 @@ pub struct WindowState {
 }
 
 #[derive(Clone)]
-pub struct LoadedImage {
-    pub path: String,
-    pub image: Arc<DynamicImage>,
-    pub is_raw: bool,
-    pub artifact_source: crate::render::artifact_identity::SourceArtifactIdentity,
-}
-
-#[derive(Clone)]
 pub struct CachedPreview {
     pub image: crate::gpu_processing::RevisionedImage,
     pub small_image: crate::gpu_processing::RevisionedImage,
@@ -121,7 +113,6 @@ pub struct AppState {
     pub gpu_initialization: InitializationService,
     pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
-    pub original_image: Mutex<Option<LoadedImage>>,
     pub cached_preview: Mutex<Option<CachedPreview>>,
     pub gpu_context: Mutex<Option<GpuContext>>,
     pub display_target_coordinator:
@@ -179,7 +170,6 @@ impl AppState {
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
-            original_image: Mutex::new(None),
             cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
             display_target_coordinator: Mutex::new(None),

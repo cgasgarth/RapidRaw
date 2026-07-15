@@ -16,10 +16,9 @@ pub(crate) fn analyze_perspective_correction(
     state: tauri::State<AppState>,
 ) -> Result<PerspectiveAnalysisResult, String> {
     let loaded = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or_else(|| "perspective.no_loaded_image".to_string())?;
     let orientation = adjustments
         .get("orientationSteps")

@@ -28,9 +28,7 @@ use crate::formats::png_data_url;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
-use crate::{
-    get_cached_full_warped_image, get_full_image_for_processing, resolve_warped_image_for_masks,
-};
+use crate::{get_cached_full_warped_image, resolve_warped_image_for_masks};
 
 fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
     let mut buf = Cursor::new(Vec::new());
@@ -660,7 +658,7 @@ pub async fn invoke_generative_replace_with_mask_def(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
-    let (base_image, _) = get_full_image_for_processing(&state)?;
+    let (base_image, _) = state.services.editor.clone_image_pixels()?;
     let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 

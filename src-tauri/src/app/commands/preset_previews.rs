@@ -66,10 +66,9 @@ pub(crate) fn generate_preset_preview(
     let context = get_or_init_gpu_context(&state, &app_handle)?;
 
     let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No original image loaded for preset preview")?;
     let is_raw = loaded_image.is_raw;
 

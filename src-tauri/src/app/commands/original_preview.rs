@@ -55,10 +55,9 @@ pub(crate) fn generate_original_transformed_preview(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let loaded_image = state
-        .original_image
-        .lock()
-        .unwrap()
-        .clone()
+        .services
+        .editor
+        .image_snapshot()
         .ok_or("No original image loaded")?;
     validate_source_identity(&expected_image_path, &loaded_image.path)?;
     let session = OriginalPreviewSession {
@@ -96,10 +95,9 @@ pub(crate) fn generate_original_transformed_preview(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.services.preview_session.current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .original_image
-                .lock()
-                .unwrap()
-                .as_ref()
+                .services
+                .editor
+                .image_snapshot()
                 .map(|image| {
                     (
                         Some(image.path.clone()),
