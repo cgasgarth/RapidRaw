@@ -102,6 +102,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-color-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentColorApplyRequestSchema.safeParse({
@@ -355,6 +356,23 @@ if (
 }
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.color.apply must create undo history and invalidate stale preview output.');
+}
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'agent_color_3167_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.color.apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.camera_input?.params.cameraProfile !== 'camera_portrait' ||
+  state.editDocumentV2.nodes.camera_input.params.temperature !== 8 ||
+  state.editDocumentV2.nodes.perceptual_grading?.params.colorGrading.highlights.saturation !== 7 ||
+  state.editDocumentV2.nodes.scene_global_color_tone?.params.saturation !== 5
+) {
+  throw new Error('agent.color.apply did not update canonical color nodes.');
 }
 if (
   parsedResult.receipt.typedCommands.length !== 2 ||

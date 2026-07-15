@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import type {
+  EditCommandBusContext,
+  EditCommandDispatchResult,
+} from '../../../packages/rawengine-schema/src/editCommandBus';
+import { RawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { ToolType } from '../../../src/components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -8,6 +13,36 @@ import { applyAgentColor } from '../../../src/utils/agent/tools/agentColorApplyT
 
 const selectedPath = '/fixtures/agent-color-apply/DSC_4751.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 3));
+
+class DeferredColorBridge extends RawEngineLocalAppServerBridge {
+  private releaseApplyGate: () => void = () => undefined;
+  private signalApplyEntered: () => void = () => undefined;
+  readonly applyEntered = new Promise<void>((resolve) => {
+    this.signalApplyEntered = resolve;
+  });
+  private readonly applyGate = new Promise<void>((resolve) => {
+    this.releaseApplyGate = resolve;
+  });
+
+  releaseApply(): void {
+    this.releaseApplyGate();
+  }
+
+  override async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
+    if (
+      typeof command === 'object' &&
+      command !== null &&
+      'commandType' in command &&
+      command.commandType === 'toneColor.adjustHsl' &&
+      'dryRun' in command &&
+      command.dryRun === false
+    ) {
+      this.signalApplyEntered();
+      await this.applyGate;
+    }
+    return super.dispatch(command, context);
+  }
+}
 
 const seedEditor = () => {
   useEditorStore.getState().setEditor({
@@ -72,5 +107,62 @@ describe('agent color apply preview refresh', () => {
     expect(useEditorStore.getState().uncroppedAdjustedPreviewUrl).toBeNull();
     expect(useEditorStore.getState().adjustments.hsl.oranges.saturation).toBe(12);
     expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.oranges.widthDegrees).toBe(52);
+  });
+
+  test('rejects an accepted typed color result after an intervening editor revision', async () => {
+    const beforeSnapshot = buildAgentImageContextSnapshot();
+    const bridge = new DeferredColorBridge();
+    const pending = applyAgentColor(
+      {
+        color: { hsl: { oranges: { hue: 5, luminance: 2, saturation: 12 } } },
+        expectedRecipeHash: beforeSnapshot.initialPreview.recipeHash,
+        operationId: 'agent_color_delayed',
+        requestId: 'agent-color-delayed',
+        sessionId: 'agent-color-delayed',
+      },
+      bridge,
+    );
+    await bridge.applyEntered;
+    const state = useEditorStore.getState();
+    const baseRevision = state.adjustmentRevision;
+    if (state.imageSession === null) throw new Error('Expected seeded image session.');
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: state.imageSession.id,
+      operations: [{ patch: { exposure: 0.2 }, type: 'patch-adjustments' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'intervening-color-edit',
+    });
+    bridge.releaseApply();
+
+    await expect(pending).rejects.toThrow(
+      `agent_tool_transaction.stale_revision:${String(baseRevision)}:${String(baseRevision + 1)}`,
+    );
+    const after = useEditorStore.getState();
+    expect(after.adjustments.exposure).toBe(0.2);
+    expect(after.adjustments.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
+    expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-color-edit');
+  });
+
+  test('treats an exact repeat as zero pixel, history, and persistence work', async () => {
+    const beforeSnapshot = buildAgentImageContextSnapshot();
+    const before = useEditorStore.getState();
+    const result = await applyAgentColor({
+      color: { vibrance: INITIAL_ADJUSTMENTS.vibrance },
+      expectedRecipeHash: beforeSnapshot.initialPreview.recipeHash,
+      operationId: 'agent_color_no_op',
+      requestId: 'agent-color-no-op',
+      sessionId: 'agent-color-no-op',
+    });
+    const after = useEditorStore.getState();
+
+    expect(result.adjustedFields).toEqual([]);
+    expect(result.changedPixelCount).toBe(0);
+    expect(result.beforePreviewHash).toBe(result.afterPreviewHash);
+    expect(after.adjustmentRevision).toBe(before.adjustmentRevision);
+    expect(after.historyIndex).toBe(before.historyIndex);
+    expect(after.lastEditApplicationReceipt).toBe(before.lastEditApplicationReceipt);
   });
 });

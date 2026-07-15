@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   type ToneColorMutationResultV1,
   toneColorDryRunResultV1Schema,
@@ -11,7 +12,7 @@ import { cameraProfileIdSchema, toneCurveIdSchema } from '../../../schemas/color
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';
-import { pushEditHistoryEntry } from '../../editHistory';
+import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -155,11 +156,11 @@ export const agentColorApplyRequestSchema = z
 
 export const agentColorApplyResponseSchema = z
   .object({
-    adjustedFields: z.array(z.string().trim().min(1)).min(1),
+    adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
     beforePreviewHash: z.string().trim().min(1),
-    changedPixelCount: z.number().int().positive(),
+    changedPixelCount: z.number().int().nonnegative(),
     previewAfter: z
       .object({
         artifactId: z.string().trim().min(1),
@@ -170,7 +171,7 @@ export const agentColorApplyResponseSchema = z
       .strict(),
     receipt: z
       .object({
-        adjustedFields: z.array(z.string().trim().min(1)).min(1),
+        adjustedFields: z.array(z.string().trim().min(1)),
         appliedGraphRevision: z.string().trim().min(1),
         operationId: z.string().trim().min(1),
         sessionId: z.string().trim().min(1),
@@ -326,7 +327,7 @@ const estimateChangedPixels = ({
   const changedFieldCount = COLOR_PATCH_KEYS.filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   ).length;
-  return Math.max(1, Math.round((imageArea / 384) * Math.max(1, changedFieldCount)));
+  return changedFieldCount === 0 ? 0 : Math.max(1, Math.round((imageArea / 384) * changedFieldCount));
 };
 
 const buildSelectiveColorPayloads = (base: Adjustments, patch: AgentColorPatch): SelectiveColorAdjustmentPayload[] => {
@@ -346,19 +347,20 @@ const buildSelectiveColorPayloads = (base: Adjustments, patch: AgentColorPatch):
 };
 
 const dispatchSelectiveColorPayloads = async ({
+  bridge,
   expectedGraphRevision,
   imagePath,
   operationId,
   payloads,
   sessionId,
 }: {
+  bridge: RawEngineLocalAppServerBridge;
   expectedGraphRevision: string;
   imagePath: string;
   operationId: string;
   payloads: readonly SelectiveColorAdjustmentPayload[];
   sessionId: string;
 }): Promise<{ applyCommands: SelectiveColorCommandEnvelope[]; mutations: ToneColorMutationResultV1[] }> => {
-  const bridge = createLiveEditorAppServerBridge();
   const mutations: ToneColorMutationResultV1[] = [];
   const applyCommands: SelectiveColorCommandEnvelope[] = [];
 
@@ -394,7 +396,10 @@ const dispatchSelectiveColorPayloads = async ({
   return { applyCommands, mutations };
 };
 
-export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<AgentColorApplyResponse> => {
+export const applyAgentColor = async (
+  request: AgentColorApplyRequest,
+  bridge: RawEngineLocalAppServerBridge = createLiveEditorAppServerBridge(),
+): Promise<AgentColorApplyResponse> => {
   const parsedRequest = agentColorApplyRequestSchema.parse(request);
   const snapshot = buildAgentImageContextSnapshot();
   if (parsedRequest.expectedRecipeHash !== snapshot.initialPreview.recipeHash) {
@@ -404,10 +409,13 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent color apply requires a selected image.');
+  const commitIdentity = captureAgentToolCommitIdentity(state);
+  if (commitIdentity === null) throw new Error('Agent color apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
   const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustments, parsedRequest.color);
   const { applyCommands, mutations: typedMutations } = await dispatchSelectiveColorPayloads({
+    bridge,
     expectedGraphRevision: undoGraphRevision,
     imagePath: selectedImage.path,
     operationId: parsedRequest.operationId,
@@ -421,28 +429,32 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
   const nextAdjustments = applyColorPatchToAdjustments(typedAdjustments, parsedRequest.color, {
     includeSelectiveColor: false,
   });
-  const history = pushEditHistoryEntry(state.history, state.historyIndex, nextAdjustments);
-  useEditorStore.setState({
-    adjustments: nextAdjustments,
-    history: history.history,
-    historyIndex: history.historyIndex,
-    uncroppedAdjustedPreviewUrl: null,
-  });
+  const currentState = useEditorStore.getState();
+  currentState.applyEditTransaction(
+    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+  );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
-  const previewRefresh = renderAgentReadOnlyPreview({
-    expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
-    purpose: 'refresh',
-    requestId: `${parsedRequest.requestId}:preview_refresh`,
-    sourceToolName: AGENT_COLOR_APPLY_TOOL_NAME,
-    turn: useEditorStore.getState().historyIndex,
-  });
-  const adjustedFields = COLOR_PATCH_KEYS.filter((key) => parsedRequest.color[key] !== undefined);
+  const adjustedFields = COLOR_PATCH_KEYS.filter(
+    (key) =>
+      parsedRequest.color[key] !== undefined &&
+      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+  );
+  const previewAfter =
+    adjustedFields.length === 0
+      ? snapshot.initialPreview
+      : renderAgentReadOnlyPreview({
+          expectedRecipeHash: afterSnapshot.initialPreview.recipeHash,
+          purpose: 'refresh',
+          requestId: `${parsedRequest.requestId}:preview_refresh`,
+          sourceToolName: AGENT_COLOR_APPLY_TOOL_NAME,
+          turn: useEditorStore.getState().historyIndex,
+        }).preview;
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
   return agentColorApplyResponseSchema.parse({
     adjustedFields,
-    afterPreviewHash: previewRefresh.preview.renderHash,
+    afterPreviewHash: previewAfter.renderHash,
     appliedGraphRevision,
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
@@ -451,10 +463,10 @@ export const applyAgentColor = async (request: AgentColorApplyRequest): Promise<
       imageArea: selectedImage.width * selectedImage.height,
     }),
     previewAfter: {
-      artifactId: previewRefresh.preview.artifactId,
-      purpose: previewRefresh.preview.purpose,
-      recipeHash: previewRefresh.preview.recipeHash,
-      renderHash: previewRefresh.preview.renderHash,
+      artifactId: previewAfter.artifactId,
+      purpose: previewAfter.purpose,
+      recipeHash: previewAfter.recipeHash,
+      renderHash: previewAfter.renderHash,
     },
     receipt: {
       adjustedFields,
