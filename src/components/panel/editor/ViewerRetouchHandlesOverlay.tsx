@@ -1,16 +1,13 @@
-import type { KonvaEventObject } from 'konva/lib/Node';
-import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Circle, Group, Text as KonvaText, Label, Layer, Line, Rect, Stage, Tag } from 'react-konva';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import { imageCanvasLayerZIndex } from './imageCanvasContracts';
 import { canvasOverlayStatusColor, canvasOverlayTokens } from './overlays/canvasOverlayTokens';
-import type { ViewerRetouchHandlesControllerBinding } from './useViewerRetouchHandlesController';
+import type { ViewerRetouchOverlayDescriptor } from './useViewerRetouchHandlesController';
 import { resolveViewerRetouchFootprint, viewerRetouchNormalizedToView } from './viewerRetouchGeometry';
-import type { ViewerRetouchHandle, ViewerRetouchPoint, ViewerRetouchPointer } from './viewerRetouchHandlesController';
 
 interface ViewerRetouchHandlesOverlayProps {
-  readonly binding: ViewerRetouchHandlesControllerBinding;
+  readonly descriptor: ViewerRetouchOverlayDescriptor | null;
   readonly geometry: EditorOverlayGeometry;
   readonly groupOffsetX: number;
   readonly groupOffsetY: number;
@@ -22,17 +19,6 @@ interface ViewerRetouchHandlesOverlayProps {
   readonly zoomScale: number;
 }
 
-type RetouchKonvaEvent = KonvaEventObject<MouseEvent | PointerEvent | TouchEvent | DragEvent>;
-const pointerFrom = (event: RetouchKonvaEvent): ViewerRetouchPointer => {
-  const native = event.evt;
-  const touch = 'touches' in native ? (native.touches[0] ?? native.changedTouches[0]) : undefined;
-  const type = 'pointerType' in native ? native.pointerType : touch === undefined ? 'mouse' : 'touch';
-  return {
-    id: 'pointerId' in native ? native.pointerId : touch ? touch.identifier + 1 : 1,
-    pressure: 'pressure' in native ? Math.max(0, Math.min(1, native.pressure)) : 0,
-    type: type === 'pen' || type === 'touch' ? type : 'mouse',
-  };
-};
 const statusColor = (status: 'fallback_unchanged' | 'needs_regeneration' | 'ready' | 'stale'): string =>
   status === 'ready'
     ? canvasOverlayStatusColor('ready')
@@ -70,7 +56,7 @@ const RetouchPlacementSurface = ({ height, testId, width }: RetouchPlacementSurf
 );
 
 export const ViewerRetouchHandlesOverlay = ({
-  binding,
+  descriptor,
   geometry,
   groupOffsetX,
   groupOffsetY,
@@ -82,17 +68,13 @@ export const ViewerRetouchHandlesOverlay = ({
   zoomScale,
 }: ViewerRetouchHandlesOverlayProps) => {
   const { t } = useTranslation();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const descriptor = binding.descriptor;
   const toView = (point: { readonly x: number; readonly y: number }) => viewerRetouchNormalizedToView(geometry, point);
   const handleRadius = Math.max(6, Math.min(10, 7 / Math.max(0.75, zoomScale)));
   const strokeWidth = Math.max(1.5, 2 / Math.max(0.75, zoomScale));
-  const routingRef = useRef({ binding, descriptor, geometry, groupOffsetX, groupOffsetY, handleRadius, strokeWidth });
-  routingRef.current = { binding, descriptor, geometry, groupOffsetX, groupOffsetY, handleRadius, strokeWidth };
   const frameStyle = {
     height: stageHeight * maxSafeScale,
     left: stageLeft,
-    pointerEvents: 'auto' as const,
+    pointerEvents: descriptor?.pointerPolicy === 'capture' ? ('auto' as const) : ('none' as const),
     top: stageTop,
     touchAction: 'none',
     transform: `scale(${String(1 / maxSafeScale)})`,
@@ -101,79 +83,6 @@ export const ViewerRetouchHandlesOverlay = ({
     width: stageWidth * maxSafeScale,
     zIndex: imageCanvasLayerZIndex('toolGeometry'),
   };
-  const stop = (event: RetouchKonvaEvent) => {
-    event.cancelBubble = true;
-    event.evt.stopPropagation();
-  };
-  const viewPointFromKonva = (event: RetouchKonvaEvent): ViewerRetouchPoint => {
-    const pointer = event.target.getStage()?.getPointerPosition();
-    return pointer === undefined || pointer === null
-      ? { x: event.target.x(), y: event.target.y() }
-      : {
-          x: pointer.x / maxSafeScale - groupOffsetX,
-          y: pointer.y / maxSafeScale - groupOffsetY,
-        };
-  };
-  const startDrag = (handle: ViewerRetouchHandle, event: RetouchKonvaEvent) => {
-    stop(event);
-    binding.begin(handle, pointerFrom(event), viewPointFromKonva(event));
-  };
-  const moveDrag = (event: RetouchKonvaEvent) => {
-    stop(event);
-    binding.move(pointerFrom(event), viewPointFromKonva(event));
-  };
-  const endDrag = (event: RetouchKonvaEvent) => {
-    stop(event);
-    binding.end(pointerFrom(event), viewPointFromKonva(event));
-  };
-  const suppressHandlePlacement = (event: RetouchKonvaEvent) => {
-    stop(event);
-  };
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container === null) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!event.isPrimary || event.button !== 0) return;
-      const hit = document.elementFromPoint(event.clientX, event.clientY);
-      if (hit === null || !container.contains(hit)) return;
-      const routing = routingRef.current;
-      const bounds = container.getBoundingClientRect();
-      const viewPoint = {
-        x: event.clientX - bounds.x - routing.groupOffsetX,
-        y: event.clientY - bounds.y - routing.groupOffsetY,
-      };
-      const imageRect = routing.geometry.displayedImageRectInViewCssPixels;
-      if (viewPoint.x < 0 || viewPoint.y < 0 || viewPoint.x > imageRect.width || viewPoint.y > imageRect.height) return;
-      const handlePoints =
-        routing.descriptor?.kind === 'clone'
-          ? [
-              viewerRetouchNormalizedToView(routing.geometry, routing.descriptor.sourcePoint),
-              viewerRetouchNormalizedToView(routing.geometry, routing.descriptor.targetPoint),
-            ]
-          : routing.descriptor?.kind === 'remove'
-            ? [viewerRetouchNormalizedToView(routing.geometry, routing.descriptor.targetPoint)]
-            : [];
-      const handleHitRadius = routing.handleRadius + Math.max(4, routing.strokeWidth);
-      if (handlePoints.some((point) => Math.hypot(point.x - viewPoint.x, point.y - viewPoint.y) <= handleHitRadius)) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      routing.binding.place(
-        event.altKey,
-        {
-          id: event.pointerId,
-          pressure: Math.max(0, Math.min(1, event.pressure)),
-          type: event.pointerType === 'pen' || event.pointerType === 'touch' ? event.pointerType : 'mouse',
-        },
-        viewPoint,
-      );
-    };
-    window.addEventListener('pointerdown', onPointerDown, true);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown, true);
-    };
-  }, [descriptor?.kind]);
   if (descriptor === null || stageWidth <= 0 || stageHeight <= 0) return null;
 
   if (descriptor.kind === 'clone') {
@@ -217,7 +126,6 @@ export const ViewerRetouchHandlesOverlay = ({
         data-retouch-handle-target-x={descriptor.targetPoint.x}
         data-retouch-handle-target-y={descriptor.targetPoint.y}
         data-testid="image-canvas-retouch-handles"
-        ref={containerRef}
         style={frameStyle}
       >
         <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
@@ -301,16 +209,8 @@ export const ViewerRetouchHandlesOverlay = ({
                   return (
                     <Group key={handle}>
                       <Circle
-                        draggable
                         fill={color}
-                        onDragEnd={endDrag}
-                        onDragMove={moveDrag}
-                        onDragStart={(event) => startDrag(handle, event)}
-                        onClick={stop}
-                        onMouseDown={suppressHandlePlacement}
-                        onPointerDown={suppressHandlePlacement}
-                        onTap={stop}
-                        onTouchStart={suppressHandlePlacement}
+                        listening={false}
                         radius={handleRadius + (selected ? Math.max(1, strokeWidth) : 0)}
                         shadowBlur={canvasOverlayTokens.shadow.blur}
                         shadowColor={canvasOverlayTokens.shadow.color}
@@ -383,7 +283,6 @@ export const ViewerRetouchHandlesOverlay = ({
       data-remove-handle-target-x={descriptor.targetPoint.x * geometry.orientedSize.width}
       data-remove-handle-target-y={descriptor.targetPoint.y * geometry.orientedSize.height}
       data-testid="image-canvas-remove-handles"
-      ref={containerRef}
       style={frameStyle}
     >
       <Stage height={stageHeight * maxSafeScale} width={stageWidth * maxSafeScale}>
@@ -481,16 +380,8 @@ export const ViewerRetouchHandlesOverlay = ({
               />
               <Circle
                 {...shadow}
-                draggable
                 fill={color}
-                onDragEnd={endDrag}
-                onDragMove={moveDrag}
-                onDragStart={(event) => startDrag('targetPoint', event)}
-                onClick={stop}
-                onMouseDown={suppressHandlePlacement}
-                onPointerDown={suppressHandlePlacement}
-                onTap={stop}
-                onTouchStart={suppressHandlePlacement}
+                listening={false}
                 radius={handleRadius}
                 stroke={canvasOverlayTokens.colors.neutral}
                 strokeScaleEnabled={false}

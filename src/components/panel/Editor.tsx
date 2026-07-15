@@ -82,6 +82,7 @@ import {
 import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
 import {
   buildSubMaskInteractionEditTransaction,
@@ -125,6 +126,7 @@ import {
   getViewerLightsOutLabel,
   resolveViewerFramePresentation,
 } from './editor/viewerPresentationContracts';
+import type { ViewerRetouchCommand } from './editor/viewerRetouchHandlesController';
 import type {
   ViewerViewportCurrentContext,
   ViewerViewportInputEvent,
@@ -741,6 +743,24 @@ export default function Editor({
       );
     },
     [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
+  const handleRetouchCommand = useCallback(
+    (command: ViewerRetouchCommand) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildRetouchHandleEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command,
+          overlayGeometry.orientedSize,
+          `retouch-handle:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, overlayGeometry.orientedSize, viewerSampleGraphRevision],
   );
   const presentationDescriptor = useMemo(
     () =>
@@ -2336,6 +2356,7 @@ export default function Editor({
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
                 onLiveMaskPreview={handleLiveMaskPreview}
                 onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
+                onRetouchCommand={handleRetouchCommand}
                 onSelectAiSubMask={(id) => {
                   setEditor({ activeAiSubMaskId: id });
                 }}

@@ -127,6 +127,7 @@ import {
   type ViewerParametricMaskTargetCommand,
   type ViewerParametricMaskTargetCurrentContext,
 } from './viewerParametricMaskTargetInteractionController';
+import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
 import {
@@ -253,6 +254,7 @@ interface ImageCanvasProps {
   onInitialMaskDrawCommit: (command: ViewerInitialMaskDrawCommand) => void;
   onLiveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
   onParametricMaskTargetCommit: (command: ViewerParametricMaskTargetCommand) => void;
+  onRetouchCommand: (command: ViewerRetouchCommand) => void;
   onSelectAiSubMask: (id: string | null) => void;
   onSelectMask: (id: string | null) => void;
   onStraighten: (val: number, identity: CropStraightenSessionIdentity) => void;
@@ -332,6 +334,7 @@ export const ImageCanvas = memo(
     onInitialMaskDrawCommit,
     onLiveMaskPreview,
     onParametricMaskTargetCommit,
+    onRetouchCommand,
     onSelectAiSubMask,
     onSelectMask,
     onStraighten,
@@ -1849,10 +1852,10 @@ export const ImageCanvas = memo(
       activeCloneLayer: activeRetouchLayer,
       activeRemoveLayer,
       activeRemoveTargetSubMask,
-      adjustments: viewerAdjustmentCommandServices,
       altPressed: isAltPressed,
       geometry: overlayGeometry,
       imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+      onCommit: onRetouchCommand,
       presentation: presentationDescriptor,
       visible: showRetouchRemoveHandles && imageRenderSize.width > 0 && imageRenderSize.height > 0,
     });
@@ -2035,6 +2038,7 @@ export const ImageCanvas = memo(
       activeTool:
         pickerControllers.activeTool ??
         (focusRetouchController.active ? 'focus-retouch' : null) ??
+        (retouchHandlesController.activeMode === null ? null : 'retouch') ??
         viewerInputState?.activeTool ??
         'none',
       focusContext: isSliderDragging ? 'editable' : 'viewer',
@@ -2043,7 +2047,8 @@ export const ImageCanvas = memo(
       isTemporaryHand: viewerInputState?.isTemporaryHand ?? false,
       pointerCount: 1,
       sourceRevision: presentationDescriptor.graphRevision,
-      toolId: viewerInteractionToolId(activeCanvasOverlayTool),
+      toolId:
+        retouchHandlesController.activeMode === null ? viewerInteractionToolId(activeCanvasOverlayTool) : 'retouch',
       zoomed: isMaxZoom ?? false,
     };
     useEffect(() => {
@@ -2158,6 +2163,8 @@ export const ImageCanvas = memo(
         data-ai-mask-box-pointer-id={aiMaskBoxOverlay?.input.pointerId ?? ''}
         data-ai-mask-box-pointer-type={aiMaskBoxOverlay?.input.pointerType ?? ''}
         data-ai-mask-box-transition={aiMaskBoxTransitionRef.current}
+        data-retouch-interaction-active={String(retouchHandlesController.interactionActive)}
+        data-retouch-last-commit-status={retouchHandlesController.lastCommitStatus}
         data-testid="image-canvas"
         onInputEvent={(event: ViewerSurfaceInputEvent) => {
           const isCancellation =
@@ -2174,6 +2181,7 @@ export const ImageCanvas = memo(
           if (transition.forwardToTool) {
             pickerControllers.handleInputEvent(event);
             focusRetouchController.handleInputEvent(event);
+            retouchHandlesController.handleInputEvent(event);
           }
         }}
         onPointerLeave={handleViewerSamplerPointerLeave}
@@ -2309,7 +2317,7 @@ export const ImageCanvas = memo(
           </PreviewSurface>
 
           <ViewerRetouchHandlesOverlay
-            binding={retouchHandlesController}
+            descriptor={retouchHandlesController.descriptor}
             geometry={overlayGeometry}
             groupOffsetX={groupOffsetX}
             groupOffsetY={groupOffsetY}
