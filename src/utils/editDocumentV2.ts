@@ -3,6 +3,7 @@ import {
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  editDocumentBlackWhiteMixerV2Schema,
   editDocumentCameraInputV2Schema,
   editDocumentColorCalibrationV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
@@ -87,19 +88,24 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                           ...(descriptor?.defaultParams ?? {}),
                           ...mappedParams,
                         })
-                      : nodeType === 'perceptual_grading'
-                        ? editDocumentPerceptualGradingV2Schema.parse({
+                      : nodeType === 'black_white_mixer'
+                        ? editDocumentBlackWhiteMixerV2Schema.parse({
                             ...(descriptor?.defaultParams ?? {}),
                             ...mappedParams,
                           })
-                        : nodeType === 'color_calibration'
-                          ? editDocumentColorCalibrationV2Schema.parse({
+                        : nodeType === 'perceptual_grading'
+                          ? editDocumentPerceptualGradingV2Schema.parse({
                               ...(descriptor?.defaultParams ?? {}),
                               ...mappedParams,
                             })
-                          : nodeType === 'layers'
-                            ? { masks: [], ...mappedParams }
-                            : mappedParams;
+                          : nodeType === 'color_calibration'
+                            ? editDocumentColorCalibrationV2Schema.parse({
+                                ...(descriptor?.defaultParams ?? {}),
+                                ...mappedParams,
+                              })
+                            : nodeType === 'layers'
+                              ? { masks: [], ...mappedParams }
+                              : mappedParams;
       return [
         nodeType,
         {
@@ -120,6 +126,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   const defaultedNodeParams = (
     [
       'camera_input',
+      'black_white_mixer',
       'color_calibration',
       'detail_denoise_dehaze',
       'display_creative',

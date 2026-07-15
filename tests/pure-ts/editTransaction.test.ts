@@ -144,6 +144,22 @@ describe('reduceEditTransaction', () => {
       },
     ]);
 
+    const blackWhiteMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
+      enabled: true,
+      process: 'continuous_sensitivity_v1' as const,
+      weights: { ...INITIAL_ADJUSTMENTS.blackWhiteMixer.weights, reds: 30 },
+    };
+    expect(buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, blackWhiteMixer })).toEqual(
+      [
+        {
+          type: 'patch-edit-document-node',
+          nodeType: 'black_white_mixer',
+          patch: { blackWhiteMixer },
+        },
+      ],
+    );
+
     const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
     const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
     expect(

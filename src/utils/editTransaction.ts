@@ -171,6 +171,7 @@ export const buildAdjustmentMutationOperations = (
   const keys = changedKeys(before, after);
   const focusedNodeType = (
     [
+      'black_white_mixer',
       'scene_global_color_tone',
       'camera_input',
       'color_calibration',

@@ -19,6 +19,7 @@ enum EditNodeTypeV2 {
     DisplayCreative,
     DetailDenoiseDehaze,
     PointColor,
+    BlackWhiteMixer,
     PerceptualGrading,
     CameraInput,
     LensCorrection,
@@ -38,6 +39,7 @@ impl EditNodeTypeV2 {
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
+            Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
             Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
@@ -551,6 +553,105 @@ impl PointColorPlanV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum BlackWhiteMixerProcessV2 {
+    LegacyFixedBandV1,
+    NeutralPanchromaticV1,
+    ContinuousSensitivityV1,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum BlackWhiteMixerPresetV2 {
+    Manual,
+    NeutralPanchromatic,
+    YellowFilter,
+    OrangeFilter,
+    RedFilter,
+    GreenFilter,
+    BlueFilter,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum BlackWhiteMixerSourceClassV2 {
+    ColorSource,
+    MonochromeSensor,
+    EncodedGrayscale,
+    AlreadyMonochromeWorking,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct BlackWhiteMixerWeightsV2 {
+    aquas: f64,
+    blues: f64,
+    greens: f64,
+    magentas: f64,
+    oranges: f64,
+    purples: f64,
+    reds: f64,
+    yellows: f64,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BlackWhiteMixerSettingsV2 {
+    enabled: bool,
+    preset_id: BlackWhiteMixerPresetV2,
+    process: BlackWhiteMixerProcessV2,
+    source_class: BlackWhiteMixerSourceClassV2,
+    weights: BlackWhiteMixerWeightsV2,
+}
+
+impl BlackWhiteMixerSettingsV2 {
+    fn validate(&self) -> Result<(), String> {
+        let weights = [
+            self.weights.aquas,
+            self.weights.blues,
+            self.weights.greens,
+            self.weights.magentas,
+            self.weights.oranges,
+            self.weights.purples,
+            self.weights.reds,
+            self.weights.yellows,
+        ];
+        if weights
+            .iter()
+            .any(|value| !value.is_finite() || !(-100.0..=100.0).contains(value))
+        {
+            return Err(
+                "EditDocumentV2 black_white_mixer weights must be finite within [-100, 100]"
+                    .to_string(),
+            );
+        }
+        if self.enabled
+            && self.process == BlackWhiteMixerProcessV2::LegacyFixedBandV1
+            && weights.iter().all(|value| *value == 0.0)
+        {
+            return Err(
+                "EditDocumentV2 enabled legacy black_white_mixer requires a non-zero channel response"
+                    .to_string(),
+            );
+        }
+        let _ = (&self.preset_id, &self.source_class);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BlackWhiteMixerV2 {
+    black_white_mixer: BlackWhiteMixerSettingsV2,
+}
+
+impl BlackWhiteMixerV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.black_white_mixer.validate()
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -1478,6 +1579,10 @@ fn compile_node_params(
             parse_point_color(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::BlackWhiteMixer => {
+            parse_black_white_mixer(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::PerceptualGrading => {
             parse_perceptual_grading(&node.params)?;
             Ok(node.params.clone())
@@ -1544,6 +1649,14 @@ fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String
         .map_err(|error| format!("EditDocumentV2 point_color is invalid: {error}"))?;
     point_color.validate()?;
     Ok(point_color)
+}
+
+fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixerV2, String> {
+    let black_white_mixer: BlackWhiteMixerV2 =
+        serde_json::from_value(Value::Object(params.clone()))
+            .map_err(|error| format!("EditDocumentV2 black_white_mixer is invalid: {error}"))?;
+    black_white_mixer.validate()?;
+    Ok(black_white_mixer)
 }
 
 fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGradingV2, String> {
@@ -1738,6 +1851,7 @@ mod tests {
 
     use super::super::parse::get_all_adjustments_from_json;
     use super::EditDocumentV2;
+    use crate::color::mixer_render::apply_black_white_mixer;
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -1881,6 +1995,27 @@ mod tests {
         })
     }
 
+    fn black_white_mixer_params() -> Value {
+        json!({
+            "blackWhiteMixer": {
+                "enabled": true,
+                "presetId": "orange_filter",
+                "process": "continuous_sensitivity_v1",
+                "sourceClass": "color_source",
+                "weights": {
+                    "aquas": -12,
+                    "blues": -30,
+                    "greens": 5,
+                    "magentas": 8,
+                    "oranges": 38,
+                    "purples": -6,
+                    "reds": 24,
+                    "yellows": 20
+                }
+            }
+        })
+    }
+
     fn perceptual_grading_params() -> Value {
         let range = json!({
             "brilliance": 0,
@@ -2006,6 +2141,13 @@ mod tests {
                     "params": point_color_params(),
                     "process": "scene_referred_v2",
                     "type": "point_color"
+                },
+                "black_white_mixer": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": black_white_mixer_params(),
+                    "process": "scene_referred_v2",
+                    "type": "black_white_mixer"
                 },
                 "perceptual_grading": {
                     "enabled": true,
@@ -2165,6 +2307,7 @@ mod tests {
             "aiPatches": [],
             "aspectRatio": null,
             "blacks": -4,
+            "blackWhiteMixer": black_white_mixer_params()["blackWhiteMixer"].clone(),
             "brightness": 0.1,
             "cameraProfile": "camera_standard",
             "clarity": 16,
@@ -2285,6 +2428,12 @@ mod tests {
             expected_render.global.grain_amount
         );
         assert_eq!(compiled_render.mask_count, expected_render.mask_count);
+        let source = [4.0, 0.4, 0.08];
+        let monochrome =
+            apply_black_white_mixer(source, compiled_render.global.black_white_mixer, true);
+        assert_eq!(monochrome, [monochrome[0]; 3]);
+        assert_ne!(monochrome, source);
+        assert!(monochrome[0].is_finite());
     }
 
     #[test]
@@ -2571,6 +2720,55 @@ mod tests {
             .into_render_adjustments()
             .expect_err("wrong tone-equalizer band count must fail");
         assert!(error.contains("array of length 9"));
+    }
+
+    #[test]
+    fn black_white_mixer_compiler_rejects_unowned_missing_and_invalid_params() {
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["futureResponse"] =
+            json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned monochrome field must fail");
+        assert!(error.contains("unknown field `futureResponse`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]
+            .as_object_mut()
+            .expect("black-and-white settings object")
+            .remove("sourceClass");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing source class must fail");
+        assert!(error.contains("missing field `sourceClass`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["weights"]["reds"] =
+            json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range monochrome response must fail");
+        assert!(error.contains("weights must be finite"));
+
+        let mut legacy_zero = document_with_legacy(json!({}));
+        legacy_zero["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
+            "enabled": true,
+            "presetId": "manual",
+            "process": "legacy_fixed_band_v1",
+            "sourceClass": "color_source",
+            "weights": {
+                "aquas": 0, "blues": 0, "greens": 0, "magentas": 0,
+                "oranges": 0, "purples": 0, "reds": 0, "yellows": 0
+            }
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(legacy_zero)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("enabled legacy zero response must fail");
+        assert!(error.contains("requires a non-zero channel response"));
     }
 
     #[test]

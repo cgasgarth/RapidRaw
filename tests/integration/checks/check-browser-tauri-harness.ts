@@ -402,6 +402,7 @@ try {
   await verifySceneCurveTransaction(page);
   await verifyColorCalibrationTransaction(page);
   await verifyViewerPickerControllers(page);
+  await verifyBlackWhiteMixerTransaction(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
   if (await viewerFooterOverflow.isVisible()) {
@@ -1289,6 +1290,103 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   if ((await pointPicker.getAttribute('aria-pressed')) !== 'false') {
     throw new Error('Point Color picker did not deactivate after committing its one-shot sample.');
   }
+}
+
+async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
+  const disclosure = page.getByTestId('black-white-mixer-disclosure');
+  await disclosure.scrollIntoViewIfNeeded();
+  if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
+  const controls = page.getByTestId('black-white-mixer-controls');
+  await controls.waitFor({ state: 'visible', timeout: 10_000 });
+  const identity = await controls.evaluate((element) => ({
+    adjustmentRevision: element.dataset.commitAdjustmentRevision,
+    imageSessionId: element.dataset.commitImageSession,
+    sourceIdentity: element.dataset.commitSourceIdentity,
+  }));
+  if (
+    identity.sourceIdentity !== '/tmp/rawengine-browser-harness/browser-harness.ARW' ||
+    identity.imageSessionId === undefined ||
+    identity.adjustmentRevision === undefined
+  ) {
+    throw new Error(`Black & White Mixer did not expose complete commit identity: ${JSON.stringify(identity)}`);
+  }
+  const baseline = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      previews: calls.filter(({ command }) => command === 'apply_adjustments').length,
+      saves: calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length,
+    };
+  });
+
+  await page.getByTestId('black-white-mixer-toggle').click();
+  await page.getByTestId('black-white-mixer-contribution-value').click();
+  const responseInput = page.getByTestId('black-white-mixer-contribution-input');
+  await responseInput.fill('32');
+  await responseInput.press('Enter');
+  await page.waitForFunction(
+    ({ previews, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const previewCalls = calls.filter(({ command }) => command === 'apply_adjustments');
+      const request = previewCalls.at(-1)?.args?.['request'];
+      const editDocument = typeof request === 'object' && request !== null ? request['editDocumentV2'] : null;
+      const nodes = typeof editDocument === 'object' && editDocument !== null ? editDocument['nodes'] : null;
+      const node = typeof nodes === 'object' && nodes !== null ? nodes['black_white_mixer'] : null;
+      const params = typeof node === 'object' && node !== null ? node['params'] : null;
+      const mixer = typeof params === 'object' && params !== null ? params['blackWhiteMixer'] : null;
+      const weights = typeof mixer === 'object' && mixer !== null ? mixer['weights'] : null;
+      return (
+        previewCalls.length > previews &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length >= saves + 1 &&
+        typeof request === 'object' &&
+        request !== null &&
+        !('jsAdjustments' in request) &&
+        typeof mixer === 'object' &&
+        mixer !== null &&
+        mixer['enabled'] === true &&
+        mixer['process'] === 'continuous_sensitivity_v1' &&
+        typeof weights === 'object' &&
+        weights !== null &&
+        weights['reds'] === 32
+      );
+    },
+    baseline,
+    { timeout: 10_000 },
+  );
+  const persistence = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+      .at(-1);
+    return call?.args ?? null;
+  });
+  const persistedMixer = persistence?.['adjustments']?.['blackWhiteMixer'];
+  const transaction = persistence?.['transaction'];
+  if (
+    persistedMixer?.['enabled'] !== true ||
+    persistedMixer?.['weights']?.['reds'] !== 32 ||
+    transaction?.['imageSessionId'] !== identity.imageSessionId ||
+    typeof transaction?.['baseAdjustmentRevision'] !== 'number' ||
+    transaction['nextAdjustmentRevision'] !== transaction['baseAdjustmentRevision'] + 1
+  ) {
+    throw new Error(`Black & White Mixer did not persist node authority: ${JSON.stringify(persistence)}`);
+  }
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  if (!(await undo.isEnabled())) throw new Error('Black & White Mixer edits did not create Undo boundaries.');
+  await undo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
+    undefined,
+    { timeout: 10_000 },
+  );
+  if ((await page.getByTestId('black-white-mixer-toggle').getAttribute('aria-checked')) !== 'true') {
+    throw new Error('Black & White response Undo crossed the prior enable history boundary.');
+  }
+  await undo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false',
+    undefined,
+    { timeout: 10_000 },
+  );
 }
 
 async function verifyColorRangeLocalAdjustmentTransaction(page: Page): Promise<void> {
