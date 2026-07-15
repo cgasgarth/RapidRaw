@@ -68,7 +68,7 @@ const queuedLabels = async (root: string, resource = 'native-heavy'): Promise<st
   return labels.filter((label): label is string => label !== null);
 };
 
-const directLease = (root: string, script: string, cwd?: string) => {
+const directLease = (root: string, script: string, cwd?: string, environment: NodeJS.ProcessEnv = {}) => {
   const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
   const lifecycle = `const {existsSync}=await import('node:fs');
 const lifecycleParent=Number(Bun.env.RAWENGINE_TEST_PARENT_PID);
@@ -84,6 +84,7 @@ try{${script}}finally{clearInterval(lifecycle)}`;
         RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
         RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
         RAWENGINE_TEST_PARENT_PID: String(process.pid),
+        ...environment,
       },
       cwd,
       stderr: 'pipe',
@@ -648,6 +649,51 @@ console.log('nested-wrapper-owner '+nested.ownerId); await nested.release();`,
     } finally {
       await outer.release();
     }
+  });
+
+  test('shared inherited identity across worktrees queues normally without reserving host capacity', async () => {
+    const root = await temporaryRoot();
+    const firstWorktree = join(root, 'shared-owner-first-worktree');
+    const secondWorktree = join(root, 'shared-owner-second-worktree');
+    const releaseFirst = join(root, 'release-shared-owner-first');
+    const secondAcquired = join(root, 'shared-owner-second-acquired');
+    await Promise.all([mkdir(firstWorktree), mkdir(secondWorktree)]);
+    const sharedEnvironment = { RAWENGINE_RESOURCE_OWNER_ID: 'shared-shell-owner' };
+    const first = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'shared-owner-first'});
+while(!(await Bun.file(${JSON.stringify(releaseFirst)}).exists())) await Bun.sleep(10);
+await lease.release();`,
+      firstWorktree,
+      sharedEnvironment,
+    );
+    await waitFor(
+      async () =>
+        (await readFile(join(root, 'native-heavy.owner.json'), 'utf8').catch(() => '')).includes('shared-owner-first'),
+      'first worktree did not acquire the shared inherited owner lease',
+    );
+
+    const second = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'shared-owner-second',hostBudgetCapacity:4,hostBudgetOwnerId:'second-node-owner',ownerId:'shared-shell-owner'});
+await Bun.write(${JSON.stringify(secondAcquired)},'acquired'); await lease.release();`,
+      secondWorktree,
+      sharedEnvironment,
+    );
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('shared-owner-second'),
+      'second worktree errored instead of queueing behind the legitimate owner',
+    );
+    expect(second.exitCode).toBeNull();
+    expect(await Bun.file(secondAcquired).exists()).toBeFalse();
+    expect(await queuedLabels(root, 'validation-host-heavy')).toEqual([]);
+    expect(
+      (await readdir(root)).some((entry) => entry.startsWith('validation-host-heavy') && entry.endsWith('.owner.json')),
+    ).toBeFalse();
+
+    await writeFile(releaseFirst, 'release\n');
+    await Promise.all([expectSuccessfulExit(first), expectSuccessfulExit(second)]);
+    expect(await Bun.file(secondAcquired).exists()).toBeTrue();
   });
 
   test('keeps the outer lock until the last nested release while unrelated owners remain FIFO', async () => {
