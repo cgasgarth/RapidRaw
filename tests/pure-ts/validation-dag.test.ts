@@ -618,6 +618,56 @@ describe('affected validation DAG', () => {
     await rm(directory, { force: true, recursive: true });
   });
 
+  test('native validation node completes an exact nested clippy wrapper without self-queueing', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-native-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    const runner = join(import.meta.dir, '../../scripts/ci/run-resource-coordinated.ts');
+    try {
+      await mkdir(root);
+      expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
+      await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
+      const nestedClippyNode: ValidationNode = {
+        id: 'rust-clippy',
+        command: [
+          'bun',
+          runner,
+          '--resource',
+          'native-heavy',
+          '--label',
+          'rust-clippy',
+          '--',
+          'bun',
+          '-e',
+          "console.log('nested-clippy-ran')",
+        ],
+        dependencies: [],
+        inputs: ['rust'],
+        resourceClass: 'native-heavy',
+        cachePolicy: 'none',
+        modes: ['commit'],
+        queueResources: ['native-heavy'],
+        queueTimeoutMs: 2_000,
+        timeoutMs: 2_000,
+      };
+      expect(
+        await runValidation([nestedClippyNode], {
+          mode: 'commit',
+          changedPaths: ['input.rs'],
+          noCache: true,
+          verifyCache: false,
+          explainCache: false,
+          hostBudgetCapacity: 4,
+          root,
+          resourceCoordinatorRoot: coordinator,
+        }),
+      ).toBe(0);
+      expect((await readdir(coordinator)).some((entry) => entry.endsWith('.lock'))).toBeFalse();
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
   test('parallel nodes in one validation run reserve independent cross-class host weight', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-node-budget-'));
     const root = join(directory, 'worktree');
