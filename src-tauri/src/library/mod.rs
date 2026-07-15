@@ -1,6 +1,7 @@
 pub(crate) mod catalog;
 pub(crate) mod catalog_indexing_service;
 pub(crate) mod changefeed;
+pub(crate) mod command_registration;
 pub(crate) mod delete_plan;
 pub(crate) mod file_management;
 pub(crate) mod import_job_service;
