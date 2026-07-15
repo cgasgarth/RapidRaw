@@ -112,14 +112,6 @@ export function useImageProcessing() {
     () =>
       new PreviewAnalyticsEffectRunner({
         dispatch: dispatchPreviewCoordinator,
-        getPresentationState: () => {
-          const editor = useEditorStore.getState();
-          return {
-            exportSoftProofTransform: editor.exportSoftProofTransform,
-            isExportSoftProofEnabled: editor.isExportSoftProofEnabled,
-            selectedImagePath: editor.selectedImage?.path ?? null,
-          };
-        },
         publish: setEditor,
       }),
     [dispatchPreviewCoordinator, setEditor],
@@ -197,7 +189,7 @@ export function useImageProcessing() {
         });
       },
       onPresented: (result, context) => {
-        previewPresentationAdapter.present(result, {
+        const presented = previewPresentationAdapter.present(result, {
           createdAt: context.request.createdAt,
           identity: context.identity,
           inputToDispatchMs: context.inputToDispatchMs,
@@ -206,6 +198,12 @@ export function useImageProcessing() {
           renderMs: context.renderMs,
           scopeRecovery: context.request.scopeRecovery,
           targetResolution: context.request.targetResolution,
+        });
+        if (!presented) return;
+        previewAnalyticsRunner.bindPresentation(context.identity, {
+          exportSoftProofTransform: result.value.kind === 'full' ? result.value.transform : null,
+          isExportSoftProofEnabled: context.request.proof !== null,
+          selectedImagePath: context.request.session.sourceImagePath,
         });
       },
       releaseMaterialized: (result) => {
