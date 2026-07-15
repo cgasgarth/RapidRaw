@@ -89,6 +89,7 @@ declare global {
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
+      aiSubjectMaskResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
       perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
       tonePlacementResponses: Array<BrowserHarnessTonePlacementResponse>;
@@ -136,6 +137,7 @@ const commandNames: Record<
   | 'recordFrontendStartupPhase'
   | 'generateOriginalTransformedPreview'
   | 'generateMaskOverlay'
+  | 'generateAiSubjectMask'
   | 'generateUncroppedPreview'
   | 'generatePreviewForPath'
   | 'applyAdjustments'
@@ -167,6 +169,7 @@ const commandNames: Record<
   | 'loadSettings'
   | 'mergeHdr'
   | 'previewNegativeConversion'
+  | 'precomputeAiSubjectMask'
   | 'previewAutoEditProposal'
   | 'planHdr'
   | 'renderNegativeLabDryRunPreviewArtifact'
@@ -207,6 +210,7 @@ const commandNames: Record<
   recordFrontendStartupPhase: Invokes.RecordFrontendStartupPhase,
   generateOriginalTransformedPreview: Invokes.GenerateOriginalTransformedPreview,
   generateMaskOverlay: Invokes.GenerateMaskOverlay,
+  generateAiSubjectMask: Invokes.GenerateAiSubjectMask,
   generateUncroppedPreview: Invokes.GenerateUncroppedPreview,
   generatePreviewForPath: Invokes.GeneratePreviewForPath,
   getLensfunMakers: Invokes.GetLensfunMakers,
@@ -234,6 +238,7 @@ const commandNames: Record<
   loadSettings: Invokes.LoadSettings,
   mergeHdr: Invokes.MergeHdr,
   previewNegativeConversion: Invokes.PreviewNegativeConversion,
+  precomputeAiSubjectMask: Invokes.PrecomputeAiSubjectMask,
   previewAutoEditProposal: Invokes.PreviewAutoEditProposal,
   planHdr: Invokes.PlanHdr,
   renderNegativeLabDryRunPreviewArtifact: Invokes.RenderNegativeLabDryRunPreviewArtifact,
@@ -364,6 +369,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
+    aiSubjectMaskResponses: [],
     applyAdjustmentsToPathsDelayMs: 0,
     applyPreviewResponses: [],
     autoAdjustResponses: [],
@@ -965,6 +971,20 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     }
     case commandNames.generateMaskOverlay:
       return Promise.resolve(`data:image/jpeg;base64,${harnessPreviewJpegBase64}`);
+    case commandNames.generateAiSubjectMask: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.aiSubjectMaskResponses.shift() ?? {
+        delayMs: 0,
+        value: {
+          generatedMaskArtifactId: 'browser-harness-ai-subject-mask',
+          generatedMaskCoverage: 0.42,
+        },
+      };
+      return new Promise((resolve) =>
+        window.setTimeout(() => resolve(structuredClone(response.value)), response.delayMs),
+      );
+    }
+    case commandNames.precomputeAiSubjectMask:
+      return Promise.resolve(null);
     case commandNames.generateUncroppedPreview:
       window.setTimeout(() => {
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.emitEvent(

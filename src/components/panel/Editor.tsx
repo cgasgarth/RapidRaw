@@ -4,6 +4,8 @@ import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
   type MouseEvent,
   type RefObject,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -94,8 +96,12 @@ import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
-import ImageCanvas from './editor/ImageCanvas';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import type {
+  ViewerAiMaskBoxCommand,
+  ViewerAiMaskBoxCurrentContext,
+  ViewerAiMaskBoxSessionKey,
+} from './editor/viewerAiMaskBoxInteractionController';
 import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
@@ -125,6 +131,9 @@ import { applyViewerViewportMotionCancellation } from './editor/viewerViewportMo
 import { Mask, type SubMask } from './right/layers/Masks';
 
 const viewerViewportInteractionControllerModule = import('./editor/viewerViewportInteractionController.js');
+const aiMaskBoxEditTransactionModule = import('../../utils/aiMaskBoxEditTransaction.js');
+const imageCanvasModule = import('./editor/ImageCanvas.js').then((module) => ({ default: module.ImageCanvas }));
+const ImageCanvas = lazy(() => imageCanvasModule);
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -148,6 +157,17 @@ interface MaskOverlayRuntimeState {
   identity: string | null;
   status: 'current' | 'none' | 'stale-ignored';
 }
+
+const isAiMaskBoxKeyCurrent = (key: ViewerAiMaskBoxSessionKey, context: ViewerAiMaskBoxCurrentContext): boolean =>
+  context.active &&
+  key.containerFamily === context.containerFamily &&
+  key.containerId === context.containerId &&
+  key.geometryEpoch === context.geometryEpoch &&
+  key.imageSessionId === context.imageSessionId &&
+  key.maskId === context.maskId &&
+  key.sourceIdentity === context.sourceIdentity &&
+  key.sourceRevision === context.sourceRevision &&
+  key.tool === context.tool;
 
 interface EditorProps {
   isContiguousShell?: boolean;
@@ -181,6 +201,8 @@ export default function Editor({
   const setDefaultEditorCompareMode = useUIStore((s) => s.setDefaultEditorCompareMode);
   const setEditorLightsOutLevel = useUIStore((s) => s.setEditorLightsOutLevel);
   const isLoading = useLibraryStore((s) => s.isViewLoading);
+  const isGeneratingAi = useEditorStore((s) => s.isGeneratingAi);
+  const isGeneratingAiMask = useEditorStore((s) => s.isGeneratingAiMask);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const imageSessionStatus = useEditorStore((s) => s.imageSession?.status ?? null);
   const editorImageSession = useEditorStore((s) => s.imageSession);
@@ -297,6 +319,8 @@ export default function Editor({
   const { handleGenerateAiMask, handleQuickErase } = useAiMasking();
   const [cropInteraction, setCropInteraction] = useState<CropInteraction>({ kind: 'idle' });
   const [objectPromptController] = useState(createViewerObjectPromptInteractionController);
+  const latestAiMaskBoxKeyRef = useRef<ViewerAiMaskBoxSessionKey | null>(null);
+  const aiMaskBoxContextRef = useRef<ViewerAiMaskBoxCurrentContext | null>(null);
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
@@ -316,6 +340,7 @@ export default function Editor({
   const lightsOutRestoreFocusRef = useRef<HTMLElement | null>(null);
   const pendingZoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const suppressDoubleClickUntilRef = useRef(0);
+  const suppressCompatibilityClickUntilRef = useRef(0);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const latestOverlayRequestIdentityRef = useRef<string | null>(null);
@@ -782,6 +807,50 @@ export default function Editor({
     },
     [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
   );
+  const handleAiMaskBoxCommit = useCallback(
+    (command: ViewerAiMaskBoxCommand) => {
+      const initialContext = aiMaskBoxContextRef.current;
+      if (initialContext === null || !isAiMaskBoxKeyCurrent(command.key, initialContext)) return;
+      latestAiMaskBoxKeyRef.current = command.key;
+      const isCurrent = () => {
+        const currentContext = aiMaskBoxContextRef.current;
+        return (
+          latestAiMaskBoxKeyRef.current === command.key &&
+          currentContext !== null &&
+          isAiMaskBoxKeyCurrent(command.key, currentContext)
+        );
+      };
+      const isLatestOperation = () => latestAiMaskBoxKeyRef.current === command.key;
+      const commitParameters = (parameters: Readonly<Record<string, unknown>>) => {
+        if (!isCurrent()) return;
+        void aiMaskBoxEditTransactionModule.then(({ buildAiMaskBoxEditTransaction }) => {
+          if (!isCurrent()) return;
+          const state = useEditorStore.getState();
+          const currentContext = aiMaskBoxContextRef.current;
+          if (currentContext === null) return;
+          applyEditTransaction(
+            buildAiMaskBoxEditTransaction(
+              {
+                ...state,
+                geometryEpoch: currentContext.geometryEpoch,
+                sourceRevision: currentContext.sourceRevision,
+              },
+              command.key,
+              parameters,
+              `ai-mask-box:${crypto.randomUUID()}`,
+            ),
+          );
+        });
+      };
+      const request = { command, commitParameters, isCurrent, isLatestOperation };
+      if (command.key.tool === 'quick-eraser') {
+        void handleQuickErase(request);
+      } else {
+        void handleGenerateAiMask(request);
+      }
+    },
+    [applyEditTransaction, handleGenerateAiMask, handleQuickErase],
+  );
 
   const zoomToCenter = useCallback(
     (newScale: number, duration: number) => {
@@ -920,6 +989,22 @@ export default function Editor({
     [activeSubMask?.parameters],
   );
   const isObjectPromptActive = isMasking && activeSubMask?.type === Mask.AiObject;
+  aiMaskBoxContextRef.current = {
+    active:
+      (isMasking || isAiEditing) &&
+      (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser) &&
+      (isMasking
+        ? activeMaskContainerId !== null && activeMaskId !== null
+        : activeAiPatchContainerId !== null && activeAiSubMaskId !== null),
+    containerFamily: isMasking ? 'masks' : 'aiPatches',
+    containerId: (isMasking ? activeMaskContainerId : activeAiPatchContainerId) ?? 'ai-mask-box-container:none',
+    geometryEpoch: overlayGeometry.geometryEpoch,
+    imageSessionId: editorImageSession?.id ?? `viewer-source:${selectedImage?.path ?? ''}`,
+    maskId: (isMasking ? activeMaskId : activeAiSubMaskId) ?? 'ai-mask-box:none',
+    sourceIdentity: selectedImage?.path ?? '',
+    sourceRevision: viewerSampleGraphRevision,
+    tool: activeSubMask?.type === Mask.QuickEraser ? 'quick-eraser' : 'ai-subject',
+  };
   const activeObjectPromptState = useMemo(
     () => (isObjectPromptActive ? readObjectPromptCanvasState(activeSubMask.parameters) : null),
     [activeSubMask, isObjectPromptActive],
@@ -1256,6 +1341,7 @@ export default function Editor({
       });
       applyViewportTransition(transition);
       if (e.pointerType !== 'mouse' && transition?.dragged !== true) {
+        suppressCompatibilityClickUntilRef.current = performance.now() + 800;
         void commitObjectPromptAt(e.clientX, e.clientY, e.pointerId, viewerPointerType(e.pointerType));
       }
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -1294,6 +1380,7 @@ export default function Editor({
       if (e.detail > 1) return;
       if (e.button !== 0) return;
       if (performance.now() < suppressDoubleClickUntilRef.current) return;
+      if (performance.now() < suppressCompatibilityClickUntilRef.current) return;
       const nativePointer =
         typeof PointerEvent !== 'undefined' && e.nativeEvent instanceof PointerEvent ? e.nativeEvent : null;
       if (nativePointer !== null && viewerPointerType(nativePointer.pointerType) !== 'mouse') return;
@@ -2198,6 +2285,8 @@ export default function Editor({
           data-editor-zoom-mode={zoomMode.kind}
           data-last-edit-source={lastEditApplicationReceipt?.source ?? ''}
           data-last-edit-transaction-id={lastEditApplicationReceipt?.transactionId ?? ''}
+          data-is-generating-ai={String(isGeneratingAi)}
+          data-is-generating-ai-mask={String(isGeneratingAiMask)}
           data-viewer-active-tool={activeViewerTool}
           data-viewer-gesture-state={isViewerGestureDragging ? 'dragging' : 'idle'}
           data-viewer-temporary-hand={String(isTemporaryHand)}
@@ -2214,96 +2303,92 @@ export default function Editor({
               transform: `translate(${transformState.positionX}px, ${transformState.positionY}px) scale(${transformState.scale})`,
             }}
           >
-            <ImageCanvas
-              appSettings={appSettings}
-              activeAiPatchContainerId={activeAiPatchContainerId}
-              activeAiSubMaskId={activeAiSubMaskId}
-              activeMaskContainerId={activeMaskContainerId}
-              activeMaskId={activeMaskId}
-              adjustments={renderAdjustments}
-              adjustmentGeometryRevision={adjustmentGeometryRevision}
-              brushSettings={brushSettings}
-              crop={crop}
-              exportSoftProofRecipeId={exportSoftProofRecipeId}
-              exportSoftProofTransform={exportSoftProofTransform}
-              finalPreviewUrl={finalPreviewUrl}
-              provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
-              gamutWarningOverlay={gamutWarningOverlay}
-              handleCropComplete={handleCropComplete}
-              handleCropStart={handleCropStart}
-              imageSessionId={editorImageSession?.id ?? null}
-              imageRenderSize={imageRenderSize}
-              originalImageRenderSize={comparePaneLayout.original}
-              overlayGeometry={overlayGeometry}
-              interactivePatch={interactivePatch}
-              isAiEditing={isAiEditing}
-              isCropping={isCropping}
-              isMaskControlHovered={isMaskControlHovered}
-              isMasking={isMasking}
-              isStraightenActive={isStraightenActive}
-              isExportSoftProofEnabled={isExportSoftProofEnabled}
-              isRotationActive={isRotationActive}
-              isSliderDragging={isSliderDragging}
-              isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
-              maskOverlayUrl={maskOverlayUrl}
-              maskOverlayRuntimeState={maskOverlayRuntimeState}
-              onGenerateAiMask={(id, start, end) => {
-                if (!id) return;
-                void handleGenerateAiMask(id, start, end);
-              }}
-              onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
-              onLiveMaskPreview={handleLiveMaskPreview}
-              onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
-              onQuickErase={(id, start, end) => {
-                void handleQuickErase(id, start, end);
-              }}
-              onSelectAiSubMask={(id) => {
-                setEditor({ activeAiSubMaskId: id });
-              }}
-              onSelectMask={(id) => {
-                setEditor({ activeMaskId: id });
-              }}
-              onStraighten={handleStraighten}
-              selectedImage={selectedImage}
-              setCrop={handleCropChange}
-              setIsMaskHovered={setIsMaskHovered}
-              setIsMaskTouchInteracting={setIsMaskTouchInteracting}
-              compareMode={compare.mode}
-              compareOrientation={compare.orientation}
-              compareDividerPosition={compare.dividerPosition}
-              compareLabelsVisible={compare.labelsVisible}
-              onCompareDividerPositionChange={(position) => {
-                dispatchCompare({ position, type: 'set-divider' });
-              }}
-              onCompareDividerReset={() => {
-                dispatchCompare({ type: 'reset-divider' });
-              }}
-              showOriginal={compare.isOriginalHeld}
-              transformedOriginalUrl={referenceCompareSource?.renderUrl ?? transformedOriginalUrl}
-              comparisonLabel={referenceCompareSource?.label ?? null}
-              uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
-              updateSubMask={updateSubMaskLocal}
-              isWbPickerActive={isWbPickerActive}
-              lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
-              onWbPicked={handleWbPicked}
-              onWbPreview={handleWbPreview}
-              onWbPreviewCancel={handleWbPreviewCancel}
-              wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
-              setAdjustments={setAdjustments}
-              overlayRotation={overlayRotation}
-              overlayMode={overlayMode}
-              cursorStyle={cursorStyle}
-              viewerInputState={{ activeTool: activeViewerTool, isTemporaryHand }}
-              isMaxZoom={isMaxZoom}
-              liveRotation={liveRotation}
-              transformState={transformState}
-              hasRenderedFirstFrame={hasRenderedFirstFrame}
-              presentationDescriptor={presentationDescriptor}
-              wgpuFrameSerial={wgpuFrameSerial}
-              wgpuFailureSerial={wgpuFailureSerial}
-              viewerSampleGraphRevision={viewerSampleGraphRevision}
-              onViewerSamplerStateChange={setViewerSamplerState}
-            />
+            <Suspense fallback={null}>
+              <ImageCanvas
+                appSettings={appSettings}
+                activeAiPatchContainerId={activeAiPatchContainerId}
+                activeAiSubMaskId={activeAiSubMaskId}
+                activeMaskContainerId={activeMaskContainerId}
+                activeMaskId={activeMaskId}
+                adjustments={renderAdjustments}
+                adjustmentGeometryRevision={adjustmentGeometryRevision}
+                brushSettings={brushSettings}
+                crop={crop}
+                exportSoftProofRecipeId={exportSoftProofRecipeId}
+                exportSoftProofTransform={exportSoftProofTransform}
+                finalPreviewUrl={finalPreviewUrl}
+                provisionalPreviewUrl={provisionalPreviewFrame?.url ?? null}
+                gamutWarningOverlay={gamutWarningOverlay}
+                handleCropComplete={handleCropComplete}
+                handleCropStart={handleCropStart}
+                imageSessionId={editorImageSession?.id ?? null}
+                imageRenderSize={imageRenderSize}
+                originalImageRenderSize={comparePaneLayout.original}
+                overlayGeometry={overlayGeometry}
+                interactivePatch={interactivePatch}
+                isAiEditing={isAiEditing}
+                isCropping={isCropping}
+                isMaskControlHovered={isMaskControlHovered}
+                isMasking={isMasking}
+                isStraightenActive={isStraightenActive}
+                isExportSoftProofEnabled={isExportSoftProofEnabled}
+                isRotationActive={isRotationActive}
+                isSliderDragging={isSliderDragging}
+                isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
+                maskOverlayUrl={maskOverlayUrl}
+                maskOverlayRuntimeState={maskOverlayRuntimeState}
+                onAiMaskBoxCommit={handleAiMaskBoxCommit}
+                onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
+                onLiveMaskPreview={handleLiveMaskPreview}
+                onParametricMaskTargetCommit={handleParametricMaskTargetCommit}
+                onSelectAiSubMask={(id) => {
+                  setEditor({ activeAiSubMaskId: id });
+                }}
+                onSelectMask={(id) => {
+                  setEditor({ activeMaskId: id });
+                }}
+                onStraighten={handleStraighten}
+                selectedImage={selectedImage}
+                setCrop={handleCropChange}
+                setIsMaskHovered={setIsMaskHovered}
+                setIsMaskTouchInteracting={setIsMaskTouchInteracting}
+                compareMode={compare.mode}
+                compareOrientation={compare.orientation}
+                compareDividerPosition={compare.dividerPosition}
+                compareLabelsVisible={compare.labelsVisible}
+                onCompareDividerPositionChange={(position) => {
+                  dispatchCompare({ position, type: 'set-divider' });
+                }}
+                onCompareDividerReset={() => {
+                  dispatchCompare({ type: 'reset-divider' });
+                }}
+                showOriginal={compare.isOriginalHeld}
+                transformedOriginalUrl={referenceCompareSource?.renderUrl ?? transformedOriginalUrl}
+                comparisonLabel={referenceCompareSource?.label ?? null}
+                uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
+                updateSubMask={updateSubMaskLocal}
+                isWbPickerActive={isWbPickerActive}
+                lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
+                onWbPicked={handleWbPicked}
+                onWbPreview={handleWbPreview}
+                onWbPreviewCancel={handleWbPreviewCancel}
+                wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
+                setAdjustments={setAdjustments}
+                overlayRotation={overlayRotation}
+                overlayMode={overlayMode}
+                cursorStyle={cursorStyle}
+                viewerInputState={{ activeTool: activeViewerTool, isTemporaryHand }}
+                isMaxZoom={isMaxZoom}
+                liveRotation={liveRotation}
+                transformState={transformState}
+                hasRenderedFirstFrame={hasRenderedFirstFrame}
+                presentationDescriptor={presentationDescriptor}
+                wgpuFrameSerial={wgpuFrameSerial}
+                wgpuFailureSerial={wgpuFailureSerial}
+                viewerSampleGraphRevision={viewerSampleGraphRevision}
+                onViewerSamplerStateChange={setViewerSamplerState}
+              />
+            </Suspense>
             {provisionalPreviewFrame !== null && !selectedImage.isReady && (
               <div
                 className="pointer-events-none absolute right-3 top-3 rounded bg-black/70 px-2 py-1 text-xs text-white"
