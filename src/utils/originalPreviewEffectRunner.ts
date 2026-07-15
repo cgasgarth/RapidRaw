@@ -129,6 +129,10 @@ export class OriginalPreviewEffectRunner {
   consume(effects: readonly PreviewCoordinatorEffect[]): void {
     for (const effect of effects) {
       if (effect.type === 'cancel' && effect.identity.kind === 'original') this.cancelIdentity(effect.identity);
+      if (effect.type === 'clear-original') {
+        this.cancelActive();
+        this.presented = null;
+      }
     }
   }
 

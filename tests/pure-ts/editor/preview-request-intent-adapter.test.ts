@@ -106,6 +106,32 @@ const harness = () => {
 };
 
 describe('preview request intent adapter', () => {
+  test('preparing an immutable intent has no scheduling or publication side effects', () => {
+    const { adapter, coordinator, scheduled, updates } = harness();
+    const before = coordinator.snapshot();
+    const prepared = adapter.prepare({
+      activeWaveformChannel: null,
+      delayMs: 75,
+      dragging: false,
+      isWaveformVisible: false,
+      proofRecipe: null,
+      requestedTargetResolution: 1200,
+      scopeRecovery: false,
+    });
+
+    expect(prepared).not.toBeNull();
+    expect(prepared?.delayMs).toBe(75);
+    expect(scheduled).toEqual([]);
+    expect(updates).toEqual([]);
+    expect(coordinator.snapshot()).toEqual(before);
+
+    if (prepared === null) throw new Error('Expected a prepared preview intent.');
+    const identity = adapter.schedulePrepared(prepared, 25);
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0]?.delayMs).toBe(25);
+    expect(updates[0]?.previewQualityStatus.requestId).toBe(identity.operationId);
+  });
+
   test('settled intent captures one exact scope, proof recipe, and pending receipt', () => {
     const { adapter, coordinator, scheduled, setNow, updates } = harness();
     setNow(321);
