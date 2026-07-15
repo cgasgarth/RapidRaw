@@ -111,6 +111,7 @@ pub struct AppServices {
     pub(crate) burst_sr:
         Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
     pub(crate) panorama: Arc<crate::merge::panorama_stitching::service::PanoramaService>,
+    pub(crate) preview_runtime: Arc<crate::render::preview_runtime_service::PreviewRuntimeService>,
     pub(crate) import_jobs: Arc<crate::library::import_job_service::ImportJobService>,
     pub(crate) catalog_indexing:
         Arc<crate::library::catalog_indexing_service::CatalogIndexingService>,
@@ -135,6 +136,7 @@ impl AppServices {
             hdr: Arc::default(),
             burst_sr: Arc::default(),
             panorama: Arc::default(),
+            preview_runtime: Arc::default(),
             import_jobs: Arc::default(),
             catalog_indexing: Arc::default(),
             thumbnails: Arc::default(),

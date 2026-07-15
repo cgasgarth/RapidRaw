@@ -31,6 +31,7 @@ pub(crate) mod image_processing;
 pub(crate) mod mask_generation;
 pub(crate) mod measured_reversal;
 pub(crate) mod native_cache;
+pub(crate) mod preview_runtime_service;
 pub(crate) mod preview_scheduler;
 pub(crate) mod preview_worker;
 pub(crate) mod render_caches;
