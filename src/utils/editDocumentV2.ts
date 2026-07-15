@@ -1,5 +1,7 @@
+import type { z } from 'zod';
 import {
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
+  EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
@@ -13,7 +15,9 @@ import {
   editDocumentDisplayCreativeV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
+  editDocumentLensCorrectionV2Schema,
   editDocumentLocalContrastV2Schema,
+  editDocumentManualChromaticAberrationV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentPerceptualGradingV2Schema,
   editDocumentPointColorV2Schema,
@@ -29,9 +33,19 @@ import type { Adjustments } from './adjustments';
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
 const LOCAL_CONTRAST_FIELDS = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
+const MANUAL_CHROMATIC_ABERRATION_FIELDS = new Set<string>(EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS);
 
-const isLocalContrastField = (key: string): key is (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number] =>
-  LOCAL_CONTRAST_FIELDS.has(key);
+const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
+  if (LOCAL_CONTRAST_FIELDS.has(key)) {
+    return editDocumentLocalContrastV2Schema.shape[key as (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number]];
+  }
+  if (MANUAL_CHROMATIC_ABERRATION_FIELDS.has(key)) {
+    return editDocumentManualChromaticAberrationV2Schema.shape[
+      key as (typeof EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS)[number]
+    ];
+  }
+  return undefined;
+};
 
 const hasRecordShape = (value: unknown): value is Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -86,11 +100,11 @@ const normalizeLegacyLayers = (params: Readonly<Record<string, unknown>>) =>
 
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
   const entries = Object.entries(adjustments);
-  const quarantinedDetailEntries = entries.filter(
-    (entry): entry is [(typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number], unknown] =>
-      isLocalContrastField(entry[0]) && !editDocumentLocalContrastV2Schema.shape[entry[0]].safeParse(entry[1]).success,
-  );
-  const quarantinedDetailFields = new Set<string>(quarantinedDetailEntries.map(([key]) => key));
+  const quarantinedOwnedEntries = entries.filter(([key, value]) => {
+    const schema = migratedOwnedFieldSchema(key);
+    return schema !== undefined && !schema.safeParse(value).success;
+  });
+  const quarantinedOwnedFields = new Set<string>(quarantinedOwnedEntries.map(([key]) => key));
   const effectsEnabled = readEffectsEnabled(adjustments);
   const disabledNodeTypes = new Set<EditDocumentNodeTypeV2>(
     (['basic', 'color', 'curves', 'details'] as const).flatMap((section) =>
@@ -101,7 +115,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
     .filter(
       (entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } =>
-        entry.nodeType !== null && !quarantinedDetailFields.has(entry.key),
+        entry.nodeType !== null && !quarantinedOwnedFields.has(entry.key),
     );
   const nodes = Object.fromEntries(
     EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
@@ -121,44 +135,49 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                     ...(descriptor?.defaultParams ?? {}),
                     ...mappedParams,
                   })
-                : nodeType === 'display_creative'
-                  ? editDocumentDisplayCreativeV2Schema.parse({
+                : nodeType === 'lens_correction'
+                  ? editDocumentLensCorrectionV2Schema.parse({
                       ...(descriptor?.defaultParams ?? {}),
                       ...mappedParams,
                     })
-                  : nodeType === 'tone_equalizer'
-                    ? editDocumentToneEqualizerV2Schema.parse({
+                  : nodeType === 'display_creative'
+                    ? editDocumentDisplayCreativeV2Schema.parse({
                         ...(descriptor?.defaultParams ?? {}),
                         ...mappedParams,
                       })
-                    : nodeType === 'point_color'
-                      ? editDocumentPointColorV2Schema.parse({
+                    : nodeType === 'tone_equalizer'
+                      ? editDocumentToneEqualizerV2Schema.parse({
                           ...(descriptor?.defaultParams ?? {}),
                           ...mappedParams,
                         })
-                      : nodeType === 'black_white_mixer'
-                        ? editDocumentBlackWhiteMixerV2Schema.parse({
+                      : nodeType === 'point_color'
+                        ? editDocumentPointColorV2Schema.parse({
                             ...(descriptor?.defaultParams ?? {}),
                             ...mappedParams,
                           })
-                        : nodeType === 'channel_mixer'
-                          ? editDocumentChannelMixerV2Schema.parse({
+                        : nodeType === 'black_white_mixer'
+                          ? editDocumentBlackWhiteMixerV2Schema.parse({
                               ...(descriptor?.defaultParams ?? {}),
                               ...mappedParams,
                             })
-                          : nodeType === 'perceptual_grading'
-                            ? editDocumentPerceptualGradingV2Schema.parse({
+                          : nodeType === 'channel_mixer'
+                            ? editDocumentChannelMixerV2Schema.parse({
                                 ...(descriptor?.defaultParams ?? {}),
                                 ...mappedParams,
                               })
-                            : nodeType === 'color_calibration'
-                              ? editDocumentColorCalibrationV2Schema.parse({
+                            : nodeType === 'perceptual_grading'
+                              ? editDocumentPerceptualGradingV2Schema.parse({
                                   ...(descriptor?.defaultParams ?? {}),
                                   ...mappedParams,
                                 })
-                              : nodeType === 'layers'
-                                ? normalizeLegacyLayers({ masks: [], ...mappedParams })
-                                : mappedParams;
+                              : nodeType === 'color_calibration'
+                                ? editDocumentColorCalibrationV2Schema.parse({
+                                    ...(descriptor?.defaultParams ?? {}),
+                                    ...mappedParams,
+                                  })
+                                : nodeType === 'layers'
+                                  ? normalizeLegacyLayers({ masks: [], ...mappedParams })
+                                  : mappedParams;
       return [
         nodeType,
         {
@@ -191,6 +210,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'detail_denoise_dehaze',
       'display_creative',
       'geometry',
+      'lens_correction',
       'perceptual_grading',
       'point_color',
       'scene_curve',
@@ -199,7 +219,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   ).flatMap((nodeType) => {
     const descriptor = descriptorFor(nodeType);
     return Object.keys(descriptor?.defaultParams ?? {})
-      .filter((field) => !Object.hasOwn(adjustments, field) || quarantinedDetailFields.has(field))
+      .filter((field) => !Object.hasOwn(adjustments, field) || quarantinedOwnedFields.has(field))
       .map((field) => `${nodeType}.${field}`);
   });
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
@@ -208,8 +228,8 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   return editDocumentV2Schema.parse({
     extensions: {
       legacyAdjustments,
-      ...(quarantinedDetailEntries.length > 0
-        ? { quarantinedLegacyAdjustments: Object.fromEntries(quarantinedDetailEntries) }
+      ...(quarantinedOwnedEntries.length > 0
+        ? { quarantinedLegacyAdjustments: Object.fromEntries(quarantinedOwnedEntries) }
         : {}),
       ...(hasRecordShape(adjustments['sectionVisibility'])
         ? { legacyDisclosureMetadata: { sectionVisibility: adjustments['sectionVisibility'] } }
@@ -233,7 +253,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       ].sort(),
       quarantined: [
         ...Object.keys(legacyAdjustments),
-        ...quarantinedDetailFields,
+        ...quarantinedOwnedFields,
         ...(hasRecordShape(adjustments['sectionVisibility']) ? ['sectionVisibility'] : []),
       ].sort(),
       sourceSchemaVersion: 1,

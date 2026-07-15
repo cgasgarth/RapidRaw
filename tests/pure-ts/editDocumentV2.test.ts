@@ -166,6 +166,8 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
     const document = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
+      chromaticAberrationBlueYellow: -18,
+      chromaticAberrationRedCyan: 27,
       lensDistortionAmount: 125,
       lensDistortionParams: {
         k1: 0.1,
@@ -182,13 +184,19 @@ describe('EditDocumentV2 legacy adapter', () => {
       lensModel: '35mm Prime',
     });
     expect(document.nodes.lens_correction?.params).toMatchObject({
+      chromaticAberrationBlueYellow: -18,
+      chromaticAberrationRedCyan: 27,
       lensDistortionAmount: 125,
       lensMaker: 'Fixture Optics',
       lensModel: '35mm Prime',
     });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('chromaticAberrationBlueYellow');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('chromaticAberrationRedCyan');
     expect(document.extensions.legacyAdjustments).not.toHaveProperty('lensDistortionAmount');
 
     for (const [field, value] of [
+      ['chromaticAberrationBlueYellow', -101],
+      ['chromaticAberrationRedCyan', 101],
       ['lensDistortionAmount', 100.5],
       ['lensTcaAmount', 201],
       ['lensVignetteAmount', -1],
@@ -645,6 +653,51 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ localContrastRadiusPx: Number.NaN });
     expect(corruptFlat.migration?.defaulted).toContain('detail_denoise_dehaze.localContrastRadiusPx');
     expect(corruptFlat.migration?.mapped).not.toContain('detail_denoise_dehaze.localContrastRadiusPx');
+  });
+
+  test('promotes pre-manual-CA V2 state and quarantines corrupt legacy values idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      chromaticAberrationBlueYellow: -22,
+      chromaticAberrationRedCyan: 17,
+    });
+    const oldV2 = structuredClone(document);
+    const lensParams = oldV2.nodes.lens_correction.params;
+    const legacyAdjustments = oldV2.extensions.legacyAdjustments as Record<string, unknown>;
+    const migration = oldV2.migration;
+    if (migration === undefined) throw new Error('fixture migration receipt is required');
+    for (const field of ['chromaticAberrationBlueYellow', 'chromaticAberrationRedCyan'] as const) {
+      legacyAdjustments[field] = lensParams[field];
+      delete lensParams[field];
+      migration.mapped = migration.mapped.filter((path) => path !== `lens_correction.${field}`);
+      migration.quarantined.push(field);
+    }
+    legacyAdjustments.chromaticAberrationRedCyan = 500;
+
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.lens_correction.params).toMatchObject({
+      chromaticAberrationBlueYellow: -22,
+      chromaticAberrationRedCyan: 0,
+    });
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('chromaticAberrationBlueYellow');
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('chromaticAberrationRedCyan');
+    expect(reopened.extensions.quarantinedLegacyAdjustments).toEqual({ chromaticAberrationRedCyan: 500 });
+    expect(reopened.migration?.mapped).toContain('lens_correction.chromaticAberrationBlueYellow');
+    expect(reopened.migration?.defaulted).toContain('lens_correction.chromaticAberrationRedCyan');
+    expect(reopened.migration?.quarantined).toContain('chromaticAberrationRedCyan');
+    expect(reopened.migration?.quarantined).not.toContain('chromaticAberrationBlueYellow');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      chromaticAberrationBlueYellow: Number.NaN,
+    });
+    expect(corruptFlat.nodes.lens_correction.params.chromaticAberrationBlueYellow).toBe(0);
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({
+      chromaticAberrationBlueYellow: Number.NaN,
+    });
+    expect(corruptFlat.migration?.defaulted).toContain('lens_correction.chromaticAberrationBlueYellow');
+    expect(corruptFlat.migration?.mapped).not.toContain('lens_correction.chromaticAberrationBlueYellow');
   });
 
   test('display creative owns current Effects state and quarantines stale fields', () => {
