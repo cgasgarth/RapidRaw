@@ -6,6 +6,7 @@ import { chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
+import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../../src/utils/editDocumentV2';
 
 const host = '127.0.0.1';
 const port = await allocateFreeTcpPort(host);
@@ -14,6 +15,15 @@ const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
     adjustments: z.object({ brightness: z.number(), exposure: z.number() }).passthrough(),
+    editDocumentV2: z
+      .object({
+        nodes: z
+          .object({
+            scene_global_color_tone: z.object({ enabled: z.boolean(), params: z.object({ exposure: z.number() }) }),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -134,12 +144,45 @@ try {
   if ((await adjustmentsPanelButton.getAttribute('aria-pressed')) !== 'true') await adjustmentsPanelButton.click();
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
 
+  const transferZone = page.getByTestId('editor-bottom-transfer-zone');
+  await transferZone.getByRole('button', { exact: true, name: 'Copy & Paste Settings' }).click();
+  const settingsDialog = page.getByRole('dialog', { name: 'Copy & Paste Settings' });
+  await settingsDialog.waitFor({ timeout: 10_000 });
+  if (
+    (await settingsDialog.getByRole('checkbox').count()) !== EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES.length ||
+    (await settingsDialog.getByText('Tone', { exact: true }).count()) !== 1 ||
+    (await settingsDialog.getByText('Profile & Tone', { exact: true }).count()) !== 1 ||
+    (await settingsDialog.getByText('Masks', { exact: true }).count()) !== 0
+  ) {
+    throw new Error('Copy/paste settings did not expose exactly the descriptor-approved creative nodes.');
+  }
+  await settingsDialog.getByRole('button', { name: 'Cancel' }).click();
+
   let saves = await saveCount(page);
   await commitNumericControl(page, 'basic-control-exposure', '0.65');
   await waitForSaveCount(page, saves + 1);
   saves += 1;
-  const transferZone = page.getByTestId('editor-bottom-transfer-zone');
   await transferZone.getByRole('button', { exact: true, name: 'Copy Settings' }).click();
+
+  const noOpApplyBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'apply_adjustments_to_paths',
+      ).length ?? 0,
+  );
+  await transferZone.getByRole('button', { exact: true, name: 'Paste Settings' }).click();
+  await page.waitForTimeout(300);
+  if (
+    (await saveCount(page)) !== saves ||
+    (await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'apply_adjustments_to_paths',
+        ).length ?? 0,
+    )) !== noOpApplyBaseline
+  ) {
+    throw new Error('Selected-only no-op paste produced persistence or native side effects.');
+  }
 
   await commitNumericControl(page, 'basic-control-exposure', '0.15');
   await waitForSaveCount(page, saves + 1);
@@ -169,11 +212,31 @@ try {
   );
   if (
     pasteSave.adjustments.exposure !== 0.65 ||
+    pasteSave.editDocumentV2.nodes.scene_global_color_tone.params.exposure !== 0.65 ||
+    !pasteSave.editDocumentV2.nodes.scene_global_color_tone.enabled ||
     pasteSave.transaction.nextAdjustmentRevision !== pasteSave.transaction.baseAdjustmentRevision + 1
   ) {
     throw new Error(`Paste did not persist one canonical revision: ${JSON.stringify(pasteSave)}`);
   }
   saves += 1;
+  const nativePaste = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'apply_adjustments_to_paths')
+        .at(-1)?.args.adjustments ?? null,
+  );
+  if (
+    typeof nativePaste !== 'object' ||
+    nativePaste === null ||
+    Reflect.get(nativePaste, 'exposure') !== pasteSave.adjustments.exposure ||
+    Reflect.get(nativePaste, 'referenceMatchApplicationReceipt') !== null ||
+    Reflect.has(nativePaste, 'masks') ||
+    Reflect.has(nativePaste, 'aiPatches')
+  ) {
+    throw new Error(
+      `Native compatibility lowering diverged from canonical document output or leaked provenance: ${JSON.stringify(nativePaste)}`,
+    );
+  }
 
   await commitNumericControl(page, 'basic-control-brightness', '0.25');
   await waitForSaveCount(page, saves + 1);

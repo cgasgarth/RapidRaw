@@ -100,6 +100,8 @@ test('cancelled preset and copy/paste edits are discarded by the next keyed draf
   await runtime.click(runtime.button('modals.copyPaste.save'));
   expect(settingsSave).toHaveBeenCalledTimes(1);
   expect(settingsSave.mock.calls[0]?.[0]).toMatchObject({ mode: PasteMode.Replace });
+  expect(settingsSave.mock.calls[0]?.[0].includedAdjustments).toEqual(['scene_global_color_tone']);
+  expect(settingsSave.mock.calls[0]?.[0].knownAdjustments).not.toContain('layers');
 });
 
 test('same-source close and reopen replaces each shell draft before it becomes visible', async () => {

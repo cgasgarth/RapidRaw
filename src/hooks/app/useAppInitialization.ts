@@ -21,7 +21,8 @@ import { useNativeCapabilityStore } from '../../store/useNativeCapabilityStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../../utils/adjustments';
+import { DisplayMode, PasteMode } from '../../utils/adjustments';
+import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../utils/editDocumentV2';
 import { frontendStartupReporter } from '../../utils/startup/startupTraceReporter';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { clampPanelScopesHeight } from '../../utils/waveformSizing';
@@ -201,8 +202,8 @@ export const useAppInitialization = ({
         if (!settings.copyPasteSettings || settings.copyPasteSettings.includedAdjustments.length === 0) {
           settings.copyPasteSettings = {
             mode: PasteMode.Merge,
-            includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
-            knownAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+            includedAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+            knownAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
           };
         }
 

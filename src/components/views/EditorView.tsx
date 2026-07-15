@@ -246,7 +246,7 @@ export default function EditorView({
       isFilmstripVisible={uiVisibility.filmstrip}
       isLoading={isViewLoading}
       isPasted={isPasted}
-      isPasteDisabled={useEditorStore.getState().copiedAdjustments === null}
+      isPasteDisabled={useEditorStore.getState().copiedEditDocumentV2 === null}
       isRatingDisabled={!selectedImage}
       isResizing={isResizing}
       multiSelectedPaths={multiSelectedPaths}

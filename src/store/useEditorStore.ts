@@ -36,7 +36,7 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import { legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
+import { type EditDocumentV2CopyPayload, legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -271,7 +271,7 @@ interface EditorState {
   // Clipboard
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
   copiedMask: MaskContainer | null;
-  copiedAdjustments: Partial<Adjustments> | null;
+  copiedEditDocumentV2: EditDocumentV2CopyPayload | null;
   presetApplication: PresetApplication | null;
 
   // Actions
@@ -682,7 +682,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   copiedSectionAdjustments: null,
   copiedMask: null,
   brushSettings: { size: 50, feather: 50, tool: ToolType.Brush },
-  copiedAdjustments: null,
+  copiedEditDocumentV2: null,
   presetApplication: null,
 
   isGeneratingAiMask: false,
