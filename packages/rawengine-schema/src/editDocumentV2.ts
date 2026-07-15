@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { blackWhiteMixerSettingsSchema } from './color/blackWhiteMixerSchemas.js';
+import { channelMixerSettingsSchema } from './color/channelMixerSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import {
@@ -69,6 +70,7 @@ export const editDocumentPointColorV2Schema = z.object({ pointColor: pointColorP
 export const editDocumentBlackWhiteMixerV2Schema = z
   .object({ blackWhiteMixer: blackWhiteMixerSettingsSchema })
   .strict();
+export const editDocumentChannelMixerV2Schema = z.object({ channelMixer: channelMixerSettingsSchema }).strict();
 
 const legacyColorGradingRangeV2Schema = z
   .object({
@@ -561,6 +563,23 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
     defaultParams: {
+      channelMixer: {
+        blue: { blue: 100, constant: 0, green: 0, red: 0 },
+        enabled: false,
+        green: { blue: 0, constant: 0, green: 100, red: 0 },
+        preserveLuminance: false,
+        red: { blue: 0, constant: 0, green: 0, red: 100 },
+      },
+    },
+    legacyFields: ['channelMixer'],
+    nodeType: 'channel_mixer',
+    process: 'scene_referred_v2',
+    renderStage: 'channel_mixer',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
       colorGrading: {
         balance: 0,
         blending: 50,
@@ -1012,6 +1031,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'channel_mixer') {
+        const channelMixer = editDocumentChannelMixerV2Schema.safeParse(node.params);
+        if (!channelMixer.success) {
+          for (const issue of channelMixer.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'perceptual_grading') {
         const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
         if (!perceptualGrading.success) {
@@ -1120,6 +1147,7 @@ export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCr
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
 export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhiteMixerV2Schema>;
+export type EditDocumentChannelMixerV2 = z.infer<typeof editDocumentChannelMixerV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
@@ -1152,6 +1180,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
   if (envelope.type === 'black_white_mixer') editDocumentBlackWhiteMixerV2Schema.parse(envelope.params);
+  if (envelope.type === 'channel_mixer') editDocumentChannelMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);

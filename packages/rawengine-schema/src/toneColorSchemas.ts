@@ -8,6 +8,10 @@ import {
   monochromeProcessSchema as toneColorMonochromeProcessV1Schema,
   monochromeSourceClassSchema as toneColorMonochromeSourceClassV1Schema,
 } from './color/blackWhiteMixerSchemas.js';
+import {
+  channelMixerRowSchema as toneColorChannelMixerRowV1Schema,
+  channelMixerSettingsSchema as toneColorChannelMixerSettingsV1Schema,
+} from './color/channelMixerSchemas.js';
 
 export type ToneColorSchemaDependenciesV1 = {
   approvalClass: {
@@ -59,15 +63,6 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
       hueDegrees: z.number().min(0).lt(360),
       luminance: z.number().min(-100).max(100),
       saturation: z.number().min(0).max(100),
-    })
-    .strict();
-
-  const toneColorChannelMixerRowV1Schema = z
-    .object({
-      blue: z.number().min(-200).max(200),
-      constant: z.number().min(-100).max(100),
-      green: z.number().min(-200).max(200),
-      red: z.number().min(-200).max(200),
     })
     .strict();
 
@@ -252,32 +247,7 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
       toneColorCommandBaseV1Schema
         .extend({
           commandType: z.literal('toneColor.setChannelMixer'),
-          parameters: z
-            .object({
-              blue: toneColorChannelMixerRowV1Schema,
-              enabled: z.boolean(),
-              green: toneColorChannelMixerRowV1Schema,
-              preserveLuminance: z.boolean(),
-              red: toneColorChannelMixerRowV1Schema,
-            })
-            .strict()
-            .superRefine((parameters, context) => {
-              const rows = [parameters.red, parameters.green, parameters.blue];
-              const changed = rows.some(
-                (row, index) =>
-                  row.red !== (index === 0 ? 100 : 0) ||
-                  row.green !== (index === 1 ? 100 : 0) ||
-                  row.blue !== (index === 2 ? 100 : 0) ||
-                  row.constant !== 0,
-              );
-              if (parameters.enabled && !changed) {
-                context.addIssue({
-                  code: 'custom',
-                  message: 'Enabled channel mixer requires at least one non-identity output row.',
-                  path: ['enabled'],
-                });
-              }
-            }),
+          parameters: toneColorChannelMixerSettingsV1Schema,
         })
         .strict(),
       toneColorCommandBaseV1Schema

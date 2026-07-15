@@ -160,6 +160,19 @@ describe('reduceEditTransaction', () => {
       ],
     );
 
+    const channelMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      enabled: true,
+      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 30 },
+    };
+    expect(buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, channelMixer })).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'channel_mixer',
+        patch: { channelMixer },
+      },
+    ]);
+
     const colorGrading = { ...structuredClone(INITIAL_ADJUSTMENTS.colorGrading), balance: 20 };
     const perceptualGradingV1 = { ...perceptualGradingFromWheelSurface(colorGrading) };
     expect(

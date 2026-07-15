@@ -499,6 +499,7 @@ try {
   await verifyColorCalibrationTransaction(page);
   await verifyViewerPickerControllers(page);
   await verifyBlackWhiteMixerTransaction(page);
+  await verifyChannelMixerTransaction(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
   const viewerFooterOverflow = page.getByTestId('viewer-footer-overflow');
   if (await viewerFooterOverflow.isVisible()) {
@@ -1583,6 +1584,108 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
     () =>
       document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false' &&
       document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
+    undefined,
+    { timeout: 10_000 },
+  );
+}
+
+async function verifyChannelMixerTransaction(page: Page): Promise<void> {
+  const disclosure = page.getByTestId('channel-mixer-disclosure');
+  await disclosure.scrollIntoViewIfNeeded();
+  if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
+  const controls = page.getByTestId('channel-mixer-controls');
+  await controls.waitFor({ state: 'visible', timeout: 10_000 });
+  const identity = await controls.evaluate((element) => ({
+    adjustmentRevision: element.dataset.commitAdjustmentRevision,
+    imageSessionId: element.dataset.commitImageSession,
+    sourceIdentity: element.dataset.commitSourceIdentity,
+  }));
+  if (
+    identity.sourceIdentity !== '/tmp/rawengine-browser-harness/browser-harness.ARW' ||
+    identity.imageSessionId === undefined ||
+    identity.adjustmentRevision === undefined
+  ) {
+    throw new Error(`Channel Mixer did not expose complete commit identity: ${JSON.stringify(identity)}`);
+  }
+  const baseline = await page.evaluate(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return {
+      previews: calls.filter(({ command }) => command === 'apply_adjustments').length,
+      saves: calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length,
+    };
+  });
+
+  await page.getByTestId('channel-mixer-toggle').click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="channel-mixer-toggle"]')?.getAttribute('aria-checked') === 'true' &&
+      document.querySelector('[data-testid="channel-mixer-red-value"]')?.textContent?.trim() === '110',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.getByTestId('channel-mixer-green-range').press('ArrowRight');
+  await page.waitForFunction(
+    ({ previews, saves }) => {
+      const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+      const previewCalls = calls.filter(({ command }) => command === 'apply_adjustments');
+      const request = previewCalls.at(-1)?.args?.['request'];
+      const editDocument = typeof request === 'object' && request !== null ? request['editDocumentV2'] : null;
+      const nodes = typeof editDocument === 'object' && editDocument !== null ? editDocument['nodes'] : null;
+      const node = typeof nodes === 'object' && nodes !== null ? nodes['channel_mixer'] : null;
+      const params = typeof node === 'object' && node !== null ? node['params'] : null;
+      const mixer = typeof params === 'object' && params !== null ? params['channelMixer'] : null;
+      const red = typeof mixer === 'object' && mixer !== null ? mixer['red'] : null;
+      return (
+        previewCalls.length > previews &&
+        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length >= saves + 1 &&
+        typeof request === 'object' &&
+        request !== null &&
+        !('jsAdjustments' in request) &&
+        typeof mixer === 'object' &&
+        mixer !== null &&
+        mixer['enabled'] === true &&
+        typeof red === 'object' &&
+        red !== null &&
+        red['red'] === 110 &&
+        red['green'] === 1
+      );
+    },
+    baseline,
+    { timeout: 10_000 },
+  );
+  const persistence = await page.evaluate(() => {
+    const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+      .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+      .at(-1);
+    return call?.args ?? null;
+  });
+  const persistedMixer = persistence?.['adjustments']?.['channelMixer'];
+  const transaction = persistence?.['transaction'];
+  if (
+    persistedMixer?.['enabled'] !== true ||
+    persistedMixer?.['red']?.['red'] !== 110 ||
+    persistedMixer?.['red']?.['green'] !== 1 ||
+    transaction?.['imageSessionId'] !== identity.imageSessionId ||
+    typeof transaction?.['baseAdjustmentRevision'] !== 'number' ||
+    transaction['nextAdjustmentRevision'] !== transaction['baseAdjustmentRevision'] + 1
+  ) {
+    throw new Error(`Channel Mixer did not persist node authority: ${JSON.stringify(persistence)}`);
+  }
+
+  const undo = page.locator('button[data-command-id="undo"]:visible').first();
+  if (!(await undo.isEnabled())) throw new Error('Channel Mixer edits did not create Undo boundaries.');
+  await undo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="channel-mixer-green-value"]')?.textContent?.trim() === '0',
+    undefined,
+    { timeout: 10_000 },
+  );
+  if ((await page.getByTestId('channel-mixer-toggle').getAttribute('aria-checked')) !== 'true') {
+    throw new Error('Channel Mixer coefficient Undo crossed the prior enable history boundary.');
+  }
+  await undo.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="channel-mixer-toggle"]')?.getAttribute('aria-checked') === 'false',
     undefined,
     { timeout: 10_000 },
   );

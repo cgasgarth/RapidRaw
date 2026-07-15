@@ -77,6 +77,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'detail_denoise_dehaze',
       'point_color',
       'black_white_mixer',
+      'channel_mixer',
       'perceptual_grading',
       'camera_input',
       'lens_correction',
@@ -119,6 +120,38 @@ describe('EditDocumentV2 legacy adapter', () => {
       outOfRange.nodes.black_white_mixer.params.blackWhiteMixer = {
         ...blackWhiteMixer,
         weights: { ...blackWhiteMixer.weights, reds: 101 },
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
+  });
+
+  test('owns strict channel mixer state and excludes it from quarantined legacy fields', () => {
+    const channelMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      enabled: true,
+      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 24 },
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      channelMixer,
+    });
+
+    expect(document.nodes.channel_mixer?.params).toEqual({ channelMixer });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('channelMixer');
+    expect(document.migration?.mapped).toContain('channel_mixer.channelMixer');
+    expect(compileEditDocumentNodeV2(document.nodes.channel_mixer).params).toEqual({ channelMixer });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.channel_mixer) {
+      unknown.nodes.channel_mixer.params.channelMixer = { ...channelMixer, futureMatrix: true };
+    }
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.channel_mixer) {
+      outOfRange.nodes.channel_mixer.params.channelMixer = {
+        ...channelMixer,
+        red: { ...channelMixer.red, green: 201 },
       };
     }
     expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
@@ -1055,6 +1088,25 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     expect(renderDocument.nodes.black_white_mixer).toBe(authoritative.nodes.black_white_mixer);
     expect(renderDocument.nodes.black_white_mixer?.params).toEqual({ blackWhiteMixer });
+    expect(renderDocument.nodes.point_color).toEqual(preparedDocument.nodes.point_color);
+  });
+
+  test('render preparation overlays the authoritative channel mixer envelope', () => {
+    const channelMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      enabled: true,
+      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 24 },
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      channelMixer,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['channel_mixer']);
+
+    expect(renderDocument.nodes.channel_mixer).toBe(authoritative.nodes.channel_mixer);
+    expect(renderDocument.nodes.channel_mixer?.params).toEqual({ channelMixer });
     expect(renderDocument.nodes.point_color).toEqual(preparedDocument.nodes.point_color);
   });
 
