@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
@@ -52,6 +53,7 @@ export const editDocumentDisplayCreativeV2Schema = z
   .strict();
 
 export const editDocumentToneEqualizerV2Schema = z.object({ toneEqualizer: toneEqualizerSettingsV1Schema }).strict();
+export const editDocumentPointColorV2Schema = z.object({ pointColor: pointColorPlanV1Schema }).strict();
 
 const editDocumentLegacyCurvePointV2Schema = z
   .object({ x: z.number().finite().min(0).max(255), y: z.number().finite().min(0).max(255) })
@@ -427,6 +429,32 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
     defaultParams: {
+      pointColor: {
+        enabled: false,
+        points: [],
+        process: 'rawengine.point-color.oklab-ap1.v1',
+        selectedPointId: null,
+        skinUniformity: {
+          chromaUniformity: 0,
+          enabled: false,
+          hueUniformity: 0,
+          lightnessUniformity: 0,
+          preserveExtremes: 0.5,
+          range: null,
+          target: null,
+        },
+        visualizeMode: 'image',
+      },
+    },
+    legacyFields: ['pointColor'],
+    nodeType: 'point_color',
+    process: 'scene_referred_v2',
+    renderStage: 'point_color',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
       creativeTemperature: 0,
@@ -780,6 +808,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'point_color') {
+        const pointColor = editDocumentPointColorV2Schema.safeParse(node.params);
+        if (!pointColor.success) {
+          for (const issue of pointColor.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'camera_input') {
         const cameraInput = editDocumentCameraInputV2Schema.safeParse(node.params);
         if (!cameraInput.success) {
@@ -862,6 +898,7 @@ export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
+export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
@@ -889,6 +926,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
+  if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);

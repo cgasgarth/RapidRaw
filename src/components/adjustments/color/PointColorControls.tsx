@@ -1,12 +1,21 @@
 import { Crosshair, Plus, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { POINT_COLOR_MAX_POINTS_V1 } from '../../../../packages/rawengine-schema/src/color/pointColorSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import type { Adjustments } from '../../../utils/adjustments';
+import {
+  buildPointColorEditTransaction,
+  type PointColorCommitIdentity,
+} from '../../../utils/pointColorEditTransaction';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import AdjustmentSlider from '../AdjustmentSlider';
 import type { ColorPanelGroupProps } from './types';
+
+interface PointColorControlsProps extends ColorPanelGroupProps {
+  isForMask?: boolean;
+}
 
 const createPoint = (index: number): Adjustments['pointColor']['points'][number] => {
   const id = crypto.randomUUID();
@@ -37,10 +46,28 @@ const createPoint = (index: number): Adjustments['pointColor']['points'][number]
   };
 };
 
-export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustments }: ColorPanelGroupProps) => {
+export const PointColorControls = ({
+  adjustments,
+  isForMask = false,
+  onDragStateChange,
+  setAdjustments,
+}: PointColorControlsProps) => {
   const { t } = useTranslation();
   const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
   const setUI = useUIStore((state) => state.setUI);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const commitIdentity = useMemo<PointColorCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const commitIdentityRef = useRef(commitIdentity);
+  commitIdentityRef.current = commitIdentity;
   const plan = adjustments.pointColor;
   const selected = useMemo(
     () => plan.points.find((point) => point.id === plan.selectedPointId) ?? plan.points[0] ?? null,
@@ -49,7 +76,15 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
   const sample = selected?.samples[0] ?? null;
 
   const updatePlan = (update: Partial<Adjustments['pointColor']>) => {
-    setAdjustments((previous) => ({ ...previous, pointColor: { ...previous.pointColor, ...update } }));
+    const identity = commitIdentityRef.current;
+    if (identity === null) {
+      setAdjustments((previous) => ({ ...previous, pointColor: { ...previous.pointColor, ...update } }));
+      return;
+    }
+    const result = applyEditTransaction(
+      buildPointColorEditTransaction(useEditorStore.getState(), identity, update, crypto.randomUUID()),
+    );
+    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
   };
   const updateSelected = (update: Partial<NonNullable<typeof selected>>) => {
     if (selected === null) return;
@@ -68,7 +103,14 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
   };
 
   return (
-    <details className="group border-b border-editor-border" data-testid="point-color-controls" open>
+    <details
+      className="group border-b border-editor-border"
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-testid="point-color-controls"
+      open
+    >
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <CompactInspectorSectionHeader
           modified={plan.enabled || plan.points.length > 0}
@@ -82,6 +124,7 @@ export const PointColorControls = ({ adjustments, onDragStateChange, setAdjustme
           <button
             aria-pressed={plan.enabled}
             className="rounded border border-editor-border px-2 py-1 text-xs"
+            data-testid="point-color-enable"
             onClick={() => updatePlan({ enabled: !plan.enabled })}
             type="button"
           >
