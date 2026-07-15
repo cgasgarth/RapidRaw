@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   createViewerParametricMaskTargetInteractionController,
+  isViewerParametricMaskTargetKeyCurrent,
   type ViewerParametricMaskTargetCurrentContext,
 } from '../../../src/components/panel/editor/viewerParametricMaskTargetInteractionController';
 
@@ -24,14 +25,24 @@ const settings = {
   orientationSteps: 3,
   rotation: 1.5,
 };
+const mouse = { imagePoint: { x: 812, y: 614 }, pointerId: 4, pointerType: 'mouse' as const };
 
 describe('viewer parametric mask target interaction controller', () => {
-  test('emits one source-bound semantic Color target command', () => {
+  test('publishes a declarative target then emits one exact source-bound semantic command on owned release', () => {
     const controller = createViewerParametricMaskTargetInteractionController();
-    expect(
-      controller.activate(context(), { imagePoint: { x: 812, y: 614 }, pointerId: 4, pointerType: 'mouse' }, settings),
-    ).toEqual({
-      key: { ...context(), operationGeneration: 1 },
+    const overlay = controller.begin(context(), mouse, settings);
+    expect(overlay).toEqual({
+      id: 'parametric-mask-target:image-session:12:a:1',
+      imagePoint: { x: 812, y: 614 },
+      key: { ...context(), operationGeneration: 1, pointerId: 4, pointerType: 'mouse' },
+      pointerPolicy: 'capture',
+      zOrder: 'tool-geometry',
+    });
+    expect(controller.overlays()).toEqual([overlay]);
+    expect(controller.end(context(), 99, 'mouse')).toBeNull();
+    expect(controller.isActive()).toBeTrue();
+    expect(controller.end(context(), 4, 'mouse')).toEqual({
+      key: { ...context(), operationGeneration: 1, pointerId: 4, pointerType: 'mouse' },
       parameters: {
         flipHorizontal: true,
         flipVertical: false,
@@ -42,73 +53,66 @@ describe('viewer parametric mask target interaction controller', () => {
         targetY: 614,
       },
     });
+    expect(controller.end(context(), 4, 'mouse')).toBeNull();
+    expect(controller.overlays()).toEqual([]);
   });
 
-  test('supports Luminance touch and increments operation identity', () => {
+  test('supports touch then pen as separate operation generations', () => {
     const controller = createViewerParametricMaskTargetInteractionController();
     const luminance = context({ maskId: 'mask:luminance', tool: 'luminance' });
-    const first = controller.activate(
-      luminance,
-      { imagePoint: { x: 100, y: 200 }, pointerId: 9, pointerType: 'touch' },
-      settings,
-    );
-    const second = controller.activate(
-      luminance,
-      { imagePoint: { x: 300, y: 400 }, pointerId: 10, pointerType: 'pen' },
-      settings,
-    );
-    expect(first).toMatchObject({
-      key: { operationGeneration: 1, tool: 'luminance' },
-    });
-    expect(second).toMatchObject({
-      key: { operationGeneration: 2, tool: 'luminance' },
-      parameters: { targetX: 300, targetY: 400 },
-    });
-  });
-
-  test('rejects inactive and non-finite inputs without consuming a generation', () => {
-    const controller = createViewerParametricMaskTargetInteractionController();
     expect(
-      controller.activate(
-        context({ active: false }),
-        { imagePoint: { x: 1, y: 2 }, pointerId: 1, pointerType: 'mouse' },
-        settings,
-      ),
-    ).toBeNull();
-    expect(
-      controller.activate(
-        context(),
-        { imagePoint: { x: Number.NaN, y: 2 }, pointerId: 1, pointerType: 'mouse' },
-        settings,
-      ),
-    ).toBeNull();
-    expect(
-      controller.activate(
-        context(),
-        { imagePoint: { x: 1, y: 2 }, pointerId: 1, pointerType: 'mouse' },
-        { ...settings, rotation: Number.POSITIVE_INFINITY },
-      ),
-    ).toBeNull();
-    expect(
-      controller.activate(context(), { imagePoint: { x: 1, y: 2 }, pointerId: 1, pointerType: 'mouse' }, settings)?.key
+      controller.begin(luminance, { imagePoint: { x: 100, y: 200 }, pointerId: 9, pointerType: 'touch' }, settings)?.key
         .operationGeneration,
     ).toBe(1);
+    expect(controller.end(luminance, 9, 'touch')?.parameters).toMatchObject({ targetX: 100, targetY: 200 });
+    expect(
+      controller.begin(luminance, { imagePoint: { x: 300, y: 400 }, pointerId: 10, pointerType: 'pen' }, settings)?.key,
+    ).toMatchObject({ operationGeneration: 2, pointerId: 10, pointerType: 'pen', tool: 'luminance' });
   });
 
-  test('captures exact A to B to A source, graph, geometry, and tool identities', () => {
+  test('rejects inactive, non-finite, invalid-pointer, and concurrent inputs without consuming a generation', () => {
     const controller = createViewerParametricMaskTargetInteractionController();
-    const sourceA = context();
-    const sourceB = context({
-      geometryEpoch: 8,
-      imageSessionId: 'image-session:13:b',
-      maskId: 'mask:luminance',
-      sourceIdentity: '/private/image-b.arw',
-      sourceRevision: 'graph:10',
-      tool: 'luminance',
-    });
-    const sample = { imagePoint: { x: 5, y: 6 }, pointerId: 1, pointerType: 'mouse' as const };
-    expect(controller.activate(sourceA, sample, settings)?.key).toEqual({ ...sourceA, operationGeneration: 1 });
-    expect(controller.activate(sourceB, sample, settings)?.key).toEqual({ ...sourceB, operationGeneration: 2 });
-    expect(controller.activate(sourceA, sample, settings)?.key).toEqual({ ...sourceA, operationGeneration: 3 });
+    expect(controller.begin(context({ active: false }), mouse, settings)).toBeNull();
+    expect(controller.begin(context(), { ...mouse, imagePoint: { x: Number.NaN, y: 2 } }, settings)).toBeNull();
+    expect(controller.begin(context(), { ...mouse, pointerId: 0 }, settings)).toBeNull();
+    expect(controller.begin(context(), mouse, { ...settings, rotation: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(controller.begin(context(), mouse, settings)?.key.operationGeneration).toBe(1);
+    expect(controller.begin(context(), { ...mouse, pointerId: 5 }, settings)).toBeNull();
+  });
+
+  test('invalidates every exact key dimension and never revives predecessor A after A to B to successor A', () => {
+    const dimensions: Array<Partial<ViewerParametricMaskTargetCurrentContext>> = [
+      { active: false },
+      { geometryEpoch: 8 },
+      { imageSessionId: 'successor-session' },
+      { maskId: 'successor-mask' },
+      { sourceIdentity: '/private/image-b.arw' },
+      { sourceRevision: 'graph:10' },
+      { tool: 'luminance' },
+    ];
+    for (const replacement of dimensions) {
+      const controller = createViewerParametricMaskTargetInteractionController();
+      const overlay = controller.begin(context(), mouse, settings);
+      expect(overlay).not.toBeNull();
+      if (overlay === null) throw new Error('Expected an active target descriptor.');
+      expect(isViewerParametricMaskTargetKeyCurrent(overlay.key, context(replacement))).toBeFalse();
+      expect(controller.synchronize(context(replacement))).toEqual(overlay.key);
+      expect(controller.end(context(), 4, 'mouse')).toBeNull();
+    }
+
+    const controller = createViewerParametricMaskTargetInteractionController();
+    const predecessor = controller.begin(context(), mouse, settings);
+    expect(controller.synchronize(context({ imageSessionId: 'image-session:13:b' }))).toEqual(predecessor?.key ?? null);
+    expect(controller.synchronize(context())).toBeNull();
+    expect(controller.end(context(), 4, 'mouse')).toBeNull();
+    expect(controller.begin(context(), mouse, settings)?.key.operationGeneration).toBe(2);
+  });
+
+  test('cancel removes the draft and rejects late release without a command', () => {
+    const controller = createViewerParametricMaskTargetInteractionController();
+    const overlay = controller.begin(context(), mouse, settings);
+    expect(controller.cancel()).toEqual(overlay?.key ?? null);
+    expect(controller.overlays()).toEqual([]);
+    expect(controller.end(context(), 4, 'mouse')).toBeNull();
   });
 });
