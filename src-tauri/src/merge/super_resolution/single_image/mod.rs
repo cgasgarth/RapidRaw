@@ -95,7 +95,7 @@ pub async fn preview_single_image_x2(
         let source = frame.pixels.image().to_rgb32f();
         let tile_count =
             inference::tile_count(source.width(), source.height(), request.memory_budget_bytes)?;
-        let job = state.services.computational_jobs.begin(
+        let job = state.computational().jobs().begin(
             ComputationalMergeFamily::SuperResolution,
             "single_image_x2_inference",
             tile_count,
@@ -128,13 +128,13 @@ pub async fn preview_single_image_x2(
         let (baseline, output, review) = match result {
             Ok(value) => value,
             Err(error) => {
-                let _ = state.services.computational_jobs.fail(&job.job_id);
+                let _ = state.computational().jobs().fail(&job.job_id);
                 return Err(error);
             }
         };
         job.cancellation_token.checkpoint()?;
         current_frame(&state, &request)?;
-        if !state.services.computational_jobs.finish(&job.job_id)? {
+        if !state.computational().jobs().finish(&job.job_id)? {
             return Err("single_image_x2_cancelled_before_publish".to_string());
         }
         Ok(SingleImageX2Preview {
@@ -156,8 +156,8 @@ pub async fn preview_single_image_x2(
 #[tauri::command]
 pub fn cancel_single_image_x2_preview(state: tauri::State<'_, AppState>) -> Result<bool, String> {
     state
-        .services
-        .computational_jobs
+        .computational()
+        .jobs()
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)
 }
 

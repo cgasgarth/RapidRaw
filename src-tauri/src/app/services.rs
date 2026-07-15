@@ -125,23 +125,14 @@ pub struct AppServices {
         Arc<crate::app::display_profile_service::DisplayProfileRuntimeService>,
     pub(crate) startup: Arc<crate::app::startup::StartupRuntimeService>,
     pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
-    pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
+    computational: crate::computational::runtime_services::ComputationalRuntimeServices,
     pub(crate) payload_residency:
         Arc<crate::color::payload_residency_service::PayloadResidencyService>,
     pub(crate) gpu_crash_marker: Arc<crate::gpu::crash_marker_service::GpuCrashMarkerService>,
     pub(crate) gpu_processing: Arc<crate::gpu::gpu_processing_service::GpuProcessingService>,
     pub(crate) gpu_context: Arc<crate::gpu::gpu_context_service::GpuContextService>,
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
-    pub(crate) focus_stack:
-        Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
-    pub(crate) focus_stack_results: Arc<crate::merge::focus_stack::job::FocusStackResultService>,
-    pub(crate) computational_jobs:
-        Arc<crate::merge::computational_job::ComputationalMergeJobRegistry>,
     pub(crate) export_jobs: Arc<crate::export::job_registry::ExportJobRegistry>,
-    pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
-    pub(crate) burst_sr:
-        Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
-    pub(crate) panorama: Arc<crate::merge::panorama_stitching::service::PanoramaService>,
     pub(crate) preview_runtime: Arc<crate::render::preview_runtime_service::PreviewRuntimeService>,
     pub(crate) preview_frames:
         Arc<crate::render::preview_frame_cache_service::PreviewFrameCacheService>,
@@ -175,19 +166,13 @@ impl AppServices {
             display_profile: Arc::default(),
             startup: Arc::default(),
             startup_files: Arc::default(),
-            denoise: Arc::default(),
+            computational: Default::default(),
             payload_residency: Arc::default(),
             gpu_crash_marker: Arc::default(),
             gpu_processing: Arc::default(),
             gpu_context: Arc::default(),
             lens_database: Arc::default(),
-            focus_stack: Arc::default(),
-            focus_stack_results: Arc::default(),
-            computational_jobs: Arc::default(),
             export_jobs: Arc::default(),
-            hdr: Arc::default(),
-            burst_sr: Arc::default(),
-            panorama: Arc::default(),
             preview_runtime: Arc::default(),
             preview_frames: Arc::default(),
             library: Default::default(),
@@ -209,6 +194,12 @@ impl AppServices {
 
     pub(crate) fn library(&self) -> &crate::library::runtime_services::LibraryRuntimeServices {
         &self.library
+    }
+
+    pub(crate) fn computational(
+        &self,
+    ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {
+        &self.computational
     }
 }
 
@@ -258,15 +249,18 @@ mod tests {
     fn computational_job_service_keeps_concurrent_families_independent() {
         let services = Arc::new(AppServices::new());
         let hdr = services
-            .computational_jobs
+            .computational()
+            .jobs()
             .begin(ComputationalMergeFamily::Hdr, "decode", 2, 2)
             .unwrap();
         let focus = services
-            .computational_jobs
+            .computational()
+            .jobs()
             .begin(ComputationalMergeFamily::FocusStack, "align", 2, 2)
             .unwrap();
         let super_resolution = services
-            .computational_jobs
+            .computational()
+            .jobs()
             .begin(ComputationalMergeFamily::SuperResolution, "register", 2, 2)
             .unwrap();
         let barrier = Arc::new(Barrier::new(4));
@@ -277,7 +271,8 @@ mod tests {
             thread::spawn(move || {
                 barrier.wait();
                 services
-                    .computational_jobs
+                    .computational()
+                    .jobs()
                     .cancel_active_family(ComputationalMergeFamily::Hdr)
             })
         };
@@ -288,7 +283,8 @@ mod tests {
             thread::spawn(move || {
                 barrier.wait();
                 services
-                    .computational_jobs
+                    .computational()
+                    .jobs()
                     .publish_progress(&job_id, "merge", 1, 2, 1, None)
             })
         };
@@ -298,7 +294,7 @@ mod tests {
             let job_id = super_resolution.job_id;
             thread::spawn(move || {
                 barrier.wait();
-                services.computational_jobs.finish(&job_id)
+                services.computational().jobs().finish(&job_id)
             })
         };
 
@@ -307,10 +303,11 @@ mod tests {
         assert_eq!(advance_focus.join().unwrap().unwrap().fraction, 0.5);
         assert!(finish_super_resolution.join().unwrap().unwrap());
         assert!(hdr.cancellation_token.checkpoint().is_err());
-        assert!(!services.computational_jobs.finish(&hdr.job_id).unwrap());
+        assert!(!services.computational().jobs().finish(&hdr.job_id).unwrap());
         assert_eq!(
             services
-                .computational_jobs
+                .computational()
+                .jobs()
                 .progress(&hdr.job_id)
                 .unwrap()
                 .status,
@@ -318,14 +315,16 @@ mod tests {
         );
         assert_eq!(
             services
-                .computational_jobs
+                .computational()
+                .jobs()
                 .cancel_active_family(ComputationalMergeFamily::Hdr)
                 .unwrap_err(),
             "computational_merge_job_not_found"
         );
         assert_eq!(
             services
-                .computational_jobs
+                .computational()
+                .jobs()
                 .cancel(&ComputationalMergeJobId::from_string(
                     "stale-job-id".to_string()
                 ))
@@ -334,13 +333,20 @@ mod tests {
         );
         assert_eq!(
             services
-                .computational_jobs
+                .computational()
+                .jobs()
                 .progress(&focus.job_id)
                 .unwrap()
                 .status,
             ComputationalMergeJobStatus::Active
         );
-        assert!(services.computational_jobs.finish(&focus.job_id).unwrap());
+        assert!(
+            services
+                .computational()
+                .jobs()
+                .finish(&focus.job_id)
+                .unwrap()
+        );
     }
 
     #[test]

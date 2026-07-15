@@ -62,7 +62,7 @@ mod command_tests {
             .build()
             .unwrap();
         let state = app.state::<AppState>();
-        let handle = state.services.burst_sr.begin_plan();
+        let handle = state.computational().burst_sr().begin_plan();
 
         let _ = tauri::test::get_ipc_response(
             &webview,
@@ -77,6 +77,6 @@ mod command_tests {
             },
         );
 
-        assert!(!state.services.burst_sr.is_current(handle));
+        assert!(!state.computational().burst_sr().is_current(handle));
     }
 }

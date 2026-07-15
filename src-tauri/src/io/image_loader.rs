@@ -1108,9 +1108,9 @@ pub(crate) async fn load_image_prepared(
     if install_active {
         RenderCaches::new(state).clear_active_image_render_state();
 
-        state.services.denoise.activate_image(&path);
-        state.services.hdr.cancel();
-        state.services.panorama.reset();
+        state.computational().denoise().activate_image(&path);
+        state.computational().hdr().cancel();
+        state.computational().panorama().reset();
     }
 
     let (source_path, _) = parse_virtual_path(&path);

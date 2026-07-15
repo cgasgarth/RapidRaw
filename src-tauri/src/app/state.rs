@@ -183,6 +183,12 @@ impl AppState {
     pub(crate) fn library(&self) -> &crate::library::runtime_services::LibraryRuntimeServices {
         self.services.library()
     }
+
+    pub(crate) fn computational(
+        &self,
+    ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {
+        self.services.computational()
+    }
 }
 
 impl Default for AppState {

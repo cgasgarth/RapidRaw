@@ -60,8 +60,8 @@ pub fn apply_focus_stack_candidate(
 ) -> Result<FocusStackApplyReceipt, String> {
     validate_request(&request)?;
     let accepted = state
-        .services
-        .focus_stack
+        .computational()
+        .focus_stack()
         .accepted_runtime()
         .map_err(|_| "invalid_candidate_runtime_unavailable")?
         .ok_or("stale_candidate_runtime")?;

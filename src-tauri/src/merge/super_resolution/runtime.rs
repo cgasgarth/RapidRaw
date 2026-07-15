@@ -582,13 +582,13 @@ pub async fn plan_super_resolution(
     if !(2..=8).contains(&paths.len()) {
         return Err("super_resolution_source_count_out_of_range".to_string());
     }
-    let job = state.services.computational_jobs.begin(
+    let job = state.computational().jobs().begin(
         ComputationalMergeFamily::SuperResolution,
         "registration",
         paths.len() as u64,
         paths.len() as u64,
     )?;
-    let service = Arc::clone(&state.services.burst_sr);
+    let service = Arc::clone(state.computational().burst_sr());
     let plan_handle = service.begin_plan();
     let task_token = job.cancellation_token.clone();
     let runtime_paths = paths.clone();
@@ -612,7 +612,7 @@ pub async fn plan_super_resolution(
         .and_then(|result| result);
     if let Ok(plan) = &result {
         if !service.is_current(plan_handle) {
-            let _ = state.services.computational_jobs.fail(&job.job_id);
+            let _ = state.computational().jobs().fail(&job.job_id);
             return Err("super_resolution_registration_stale_completion".to_string());
         }
         let accepted = if plan.accepted {
@@ -649,14 +649,14 @@ pub async fn plan_super_resolution(
         } else {
             None
         };
-        if !state.services.computational_jobs.finish(&job.job_id)? {
+        if !state.computational().jobs().finish(&job.job_id)? {
             return Err("super_resolution_registration_cancelled".to_string());
         }
         service
             .complete_plan(plan_handle, accepted)
             .map_err(str::to_string)?;
     } else {
-        state.services.computational_jobs.fail(&job.job_id)?;
+        state.computational().jobs().fail(&job.job_id)?;
     }
     result
 }
@@ -664,10 +664,10 @@ pub async fn plan_super_resolution(
 pub fn cancel_super_resolution_registration(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    state.services.burst_sr.cancel();
+    state.computational().burst_sr().cancel();
     state
-        .services
-        .computational_jobs
+        .computational()
+        .jobs()
         .cancel_active_family(ComputationalMergeFamily::SuperResolution)
         .map(|_| ())
 }
