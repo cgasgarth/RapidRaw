@@ -1,29 +1,30 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import type { Adjustments } from '../../../utils/adjustments';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
 import { mapViewerPointToImage } from '../../../utils/viewerSampler';
-import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
+import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 import {
-  createViewerPickerInteractionController,
   createViewerPickerContextSynchronizer,
+  createViewerPickerInteractionController,
   resolveViewerPickerPoint,
   type ViewerPickerCommand,
+  type ViewerPickerCommitResult,
   type ViewerPickerCurrentContext,
   type ViewerPickerOverlayDescriptor,
   type ViewerPickerSessionKey,
   type ViewerPickerToolId,
 } from './viewerPickerInteractionControllers';
-import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
 
 interface UseViewerPickerControllersInput {
+  readonly adjustmentRevision: number;
   readonly adjustments: Adjustments;
   readonly geometry: EditorOverlayGeometry;
+  readonly imageSessionId: string;
+  readonly onCommit: (command: ViewerPickerCommitResult) => void;
   readonly presentation: EditorPresentationDescriptor;
-  readonly setAdjustments: (updater: (previous: Adjustments) => Adjustments) => void;
 }
 
 export interface ViewerPickerControllers {
@@ -33,17 +34,16 @@ export interface ViewerPickerControllers {
 }
 
 export const useViewerPickerControllers = ({
+  adjustmentRevision,
   adjustments,
   geometry,
+  imageSessionId,
+  onCommit,
   presentation,
-  setAdjustments,
 }: UseViewerPickerControllersInput): ViewerPickerControllers => {
   const toneEqualizerPickerActive = useUIStore((state) => state.toneEqualizerPickerActive);
   const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
   const setUI = useUIStore((state) => state.setUI);
-  const imageSessionId = useEditorStore(
-    (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-  );
   const activeTool: ViewerPickerToolId | null = pointColorPickerActive
     ? 'point-color'
     : toneEqualizerPickerActive
@@ -52,11 +52,11 @@ export const useViewerPickerControllers = ({
   const controller = useMemo(() => createViewerPickerInteractionController(), []);
   const contextSynchronizer = useMemo(() => createViewerPickerContextSynchronizer(controller), [controller]);
   const pickerCommands = useMemo(() => createViewerPickerCommandServices(), []);
-  const adjustmentCommands = useMemo(() => createViewerAdjustmentCommandServices(setAdjustments), [setAdjustments]);
   const operationGeneration = useRef(0);
   const [, render] = useState(0);
   const currentContext: ViewerPickerCurrentContext = {
     activeTool,
+    adjustmentRevision,
     geometryEpoch: geometry.geometryEpoch,
     imageSessionId,
     sourceIdentity: presentation.sourceIdentity,
@@ -104,10 +104,21 @@ export const useViewerPickerControllers = ({
               });
             break;
           case 'commit-tone-equalizer':
-            adjustmentCommands.commitToneEqualizerPicker(command.baseline, command.result, command.deltaEv);
+            onCommit({
+              baseline: command.baseline,
+              deltaEv: command.deltaEv,
+              key: command.key,
+              kind: 'tone-equalizer',
+              result: command.result,
+            });
             break;
           case 'commit-point-color':
-            adjustmentCommands.commitPointColorPicker(command.result, command.ordinal);
+            onCommit({
+              key: command.key,
+              kind: 'point-color',
+              ordinal: command.ordinal,
+              result: command.result,
+            });
             break;
           case 'deactivate-point-color':
             setUI({ pointColorPickerActive: false });
@@ -142,7 +153,7 @@ export const useViewerPickerControllers = ({
         }
       }
     },
-    [adjustmentCommands, controller, pickerCommands, refresh, setUI],
+    [controller, onCommit, pickerCommands, refresh, setUI],
   );
 
   useLayoutEffect(() => {
@@ -152,6 +163,7 @@ export const useViewerPickerControllers = ({
     refresh();
   }, [
     activeTool,
+    adjustmentRevision,
     contextSynchronizer,
     executeCommands,
     geometry.geometryEpoch,
@@ -199,8 +211,10 @@ export const useViewerPickerControllers = ({
       if (mapped === null) return;
       operationGeneration.current += 1;
       const key = {
+        adjustmentRevision,
         geometryEpoch: geometry.geometryEpoch,
         imageSessionId,
+        normalizedImagePoint: mapped.normalizedImagePoint,
         operationGeneration: operationGeneration.current,
         sourceIdentity: presentation.sourceIdentity,
         sourceRevision: presentation.graphRevision,
@@ -227,6 +241,7 @@ export const useViewerPickerControllers = ({
     },
     [
       activeTool,
+      adjustmentRevision,
       adjustments,
       controller,
       executeCommands,

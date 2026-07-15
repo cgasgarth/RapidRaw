@@ -5,8 +5,10 @@ import type { ToneEqualizerPickerResponse } from '../../../utils/toneEqualizerPi
 export type ViewerPickerToolId = 'point-color' | 'tone-equalizer';
 
 export interface ViewerPickerSessionKey {
+  readonly adjustmentRevision: number;
   readonly geometryEpoch: number;
   readonly imageSessionId: string;
+  readonly normalizedImagePoint: ViewerPickerPoint['normalizedImagePoint'];
   readonly operationGeneration: number;
   readonly sourceIdentity: string;
   readonly sourceRevision: string;
@@ -26,6 +28,21 @@ export interface ViewerPickerOverlayDescriptor extends ViewerPickerPoint {
   readonly toolId: ViewerPickerToolId;
 }
 
+export type ViewerPickerCommitResult =
+  | {
+      readonly baseline: Adjustments;
+      readonly deltaEv: number;
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
+      readonly kind: 'tone-equalizer';
+      readonly result: ToneEqualizerPickerResponse;
+    }
+  | {
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'point-color' };
+      readonly kind: 'point-color';
+      readonly ordinal: number;
+      readonly result: PointColorPickerResponse;
+    };
+
 export type ViewerPickerCommand =
   | {
       readonly adjustments: Adjustments;
@@ -36,10 +53,16 @@ export type ViewerPickerCommand =
   | {
       readonly baseline: Adjustments;
       readonly deltaEv: number;
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
       readonly kind: 'commit-tone-equalizer';
       readonly result: ToneEqualizerPickerResponse;
     }
-  | { readonly kind: 'commit-point-color'; readonly ordinal: number; readonly result: PointColorPickerResponse }
+  | {
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'point-color' };
+      readonly kind: 'commit-point-color';
+      readonly ordinal: number;
+      readonly result: PointColorPickerResponse;
+    }
   | { readonly kind: 'clear-point-color-receipt' | 'clear-tone-equalizer-receipt' }
   | { readonly kind: 'deactivate-point-color' }
   | { readonly kind: 'publish-point-color-receipt'; readonly result: PointColorPickerResponse }
@@ -67,6 +90,7 @@ type PickerSession = PointSession | ToneSession;
 
 export interface ViewerPickerCurrentContext {
   readonly activeTool: ViewerPickerToolId | null;
+  readonly adjustmentRevision: number;
   readonly geometryEpoch: number;
   readonly imageSessionId: string;
   readonly sourceIdentity: string;
@@ -78,10 +102,22 @@ export const isViewerPickerSessionCurrent = (
   current: ViewerPickerCurrentContext,
 ): boolean =>
   current.activeTool === key.toolId &&
+  current.adjustmentRevision === key.adjustmentRevision &&
   current.geometryEpoch === key.geometryEpoch &&
   current.imageSessionId === key.imageSessionId &&
   current.sourceIdentity === key.sourceIdentity &&
   current.sourceRevision === key.sourceRevision;
+
+const sameViewerPickerSessionKey = (left: ViewerPickerSessionKey, right: ViewerPickerSessionKey): boolean =>
+  left.adjustmentRevision === right.adjustmentRevision &&
+  left.geometryEpoch === right.geometryEpoch &&
+  left.imageSessionId === right.imageSessionId &&
+  left.normalizedImagePoint.x === right.normalizedImagePoint.x &&
+  left.normalizedImagePoint.y === right.normalizedImagePoint.y &&
+  left.operationGeneration === right.operationGeneration &&
+  left.sourceIdentity === right.sourceIdentity &&
+  left.sourceRevision === right.sourceRevision &&
+  left.toolId === right.toolId;
 
 export const resolveViewerPickerPoint = (
   normalizedImagePoint: ViewerPickerPoint['normalizedImagePoint'],
@@ -140,6 +176,7 @@ export interface ViewerPickerContextSynchronizer {
 const pickerContextIdentity = (context: ViewerPickerCurrentContext): string =>
   JSON.stringify([
     context.activeTool,
+    context.adjustmentRevision,
     context.geometryEpoch,
     context.imageSessionId,
     context.sourceIdentity,
@@ -174,7 +211,13 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     if (tone.result === null) return [];
     session = null;
     return [
-      { kind: 'commit-tone-equalizer', baseline: tone.baseline, deltaEv: toneDeltaEv(tone), result: tone.result },
+      {
+        kind: 'commit-tone-equalizer',
+        baseline: tone.baseline,
+        deltaEv: toneDeltaEv(tone),
+        key: tone.key,
+        result: tone.result,
+      },
     ];
   };
   return {
@@ -205,7 +248,7 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
       return [command];
     },
     fail: (key, current) => {
-      if (session === null || session.key.operationGeneration !== key.operationGeneration) return [];
+      if (session === null || !sameViewerPickerSessionKey(session.key, key)) return [];
       if (!isViewerPickerSessionCurrent(key, current)) return [];
       const command = clearReceipt(key.toolId);
       session = null;
@@ -231,15 +274,16 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     receivePointColor: (key, result, current) => {
       if (
         session?.toolId !== 'point-color' ||
-        session.key.operationGeneration !== key.operationGeneration ||
+        !sameViewerPickerSessionKey(session.key, key) ||
         !isViewerPickerSessionCurrent(key, current) ||
         !responseMatchesKey(result, key)
       )
         return [];
       const ordinal = session.ordinal;
+      const sessionKey = session.key;
       session = null;
       return [
-        { kind: 'commit-point-color', ordinal, result },
+        { key: sessionKey, kind: 'commit-point-color', ordinal, result },
         { kind: 'deactivate-point-color' },
         { kind: 'publish-point-color-receipt', result },
       ];
@@ -247,7 +291,7 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     receiveToneEqualizer: (key, result, current) => {
       if (
         session?.toolId !== 'tone-equalizer' ||
-        session.key.operationGeneration !== key.operationGeneration ||
+        !sameViewerPickerSessionKey(session.key, key) ||
         !isViewerPickerSessionCurrent(key, current) ||
         !responseMatchesKey(result, key)
       )

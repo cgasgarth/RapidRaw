@@ -13,7 +13,28 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ pointColor: z.object({ enabled: z.boolean() }).passthrough() }).passthrough(),
+    adjustments: z
+      .object({
+        pointColor: z
+          .object({
+            enabled: z.boolean(),
+            points: z.array(
+              z
+                .object({
+                  id: z.string().min(1),
+                  samples: z.array(
+                    z
+                      .object({ graphRevision: z.string().min(1), sourceSceneRevision: z.string().min(1) })
+                      .passthrough(),
+                  ),
+                })
+                .passthrough(),
+            ),
+            selectedPointId: z.string().nullable(),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -219,6 +240,92 @@ try {
   );
   await waitForCommandCount(page, 'apply_adjustments', baselineApplies + 2);
   await waitForRenderedPointColor(page, false);
+
+  const picker = page.getByTestId('point-color-picker');
+  const previewPanel = page.getByTestId('editor-image-preview-panel');
+  const pickerBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  const pickerBaselineApplies = await commandCount(page, 'apply_adjustments');
+  const pickerBaselineSamples = await commandCount(page, 'sample_point_color_picker');
+  const pickerBaselineRevision = Number(await previewPanel.getAttribute('data-editor-adjustment-revision'));
+  if (!Number.isInteger(pickerBaselineRevision)) throw new Error('Editor did not expose its picker base revision.');
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push({ color: [196, 96, 44], delayMs: 20 });
+  });
+  await picker.click();
+  if ((await picker.getAttribute('aria-pressed')) !== 'true') throw new Error('Point Color picker did not activate.');
+  const canvas = page.getByTestId('image-canvas');
+  const canvasBox = await canvas.boundingBox();
+  if (canvasBox === null) throw new Error('Image canvas has no rendered bounds.');
+  await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await waitForCommandCount(page, 'sample_point_color_picker', pickerBaselineSamples + 1);
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', pickerBaselineSaves + 1);
+  await waitForCommandCount(page, 'apply_adjustments', pickerBaselineApplies + 1);
+  await page.waitForTimeout(150);
+  if (
+    (await commandCount(page, 'sample_point_color_picker')) !== pickerBaselineSamples + 1 ||
+    (await commandCount(page, 'save_metadata_and_update_thumbnail')) !== pickerBaselineSaves + 1
+  ) {
+    throw new Error('One Point Color click did not produce exactly one native sample and one persistence commit.');
+  }
+
+  const pickerPersistence = persistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args ?? null,
+    ),
+  );
+  const pickedPoint = pickerPersistence.adjustments.pointColor.points[0];
+  if (
+    pickerPersistence.transaction.nextAdjustmentRevision !== pickerPersistence.transaction.baseAdjustmentRevision + 1 ||
+    !pickerPersistence.transaction.transactionId.startsWith('viewer-picker:point-color:') ||
+    pickedPoint === undefined ||
+    pickerPersistence.adjustments.pointColor.selectedPointId !== pickedPoint.id ||
+    pickedPoint.samples[0]?.graphRevision !== 'browser-harness-graph-fingerprint' ||
+    pickedPoint.samples[0]?.sourceSceneRevision !== 'browser-harness-source-fingerprint'
+  ) {
+    throw new Error(
+      `Point Color picker did not persist its exact native receipt: ${JSON.stringify(pickerPersistence)}`,
+    );
+  }
+  const pickerRendered = await waitForRenderedPointColor(page, true);
+  if (Object.hasOwn(pickerRendered.args.request, 'jsAdjustments')) {
+    throw new Error('Point Color picker render escaped node authority through jsAdjustments.');
+  }
+  const editorReceipt = await previewPanel.evaluate((element) => ({
+    adjustmentRevision: element.dataset.editorAdjustmentRevision,
+    imageSessionId: element.dataset.lastEditImageSession,
+    persistence: element.dataset.lastEditPersistence,
+    receiptRevision: element.dataset.lastEditAdjustmentRevision,
+    source: element.dataset.lastEditSource,
+    transactionId: element.dataset.lastEditTransactionId,
+  }));
+  if (
+    editorReceipt.adjustmentRevision !== String(pickerPersistence.transaction.nextAdjustmentRevision) ||
+    editorReceipt.receiptRevision !== editorReceipt.adjustmentRevision ||
+    editorReceipt.imageSessionId !== pickerPersistence.transaction.imageSessionId ||
+    editorReceipt.persistence !== 'commit' ||
+    editorReceipt.source !== 'picker' ||
+    editorReceipt.transactionId !== pickerPersistence.transaction.transactionId ||
+    (await picker.getAttribute('aria-pressed')) !== 'false'
+  ) {
+    throw new Error(`Editor did not publish the picker transaction receipt: ${JSON.stringify(editorReceipt)}`);
+  }
+  await page.getByTestId('point-color-selected-controls').waitFor({ timeout: 10_000 });
+
+  const redo = page.locator('button[data-command-id="redo"]:visible').first();
+  await undo.click();
+  await waitForRenderedPointColor(page, false);
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="point-color-selected-controls"]') === null,
+    undefined,
+    { timeout: 10_000 },
+  );
+  if (!(await redo.isEnabled())) throw new Error('Picker Undo did not expose Redo.');
+  await redo.click();
+  await waitForRenderedPointColor(page, true);
+  await page.getByTestId('point-color-selected-controls').waitFor({ timeout: 10_000 });
 
   console.log('point color edit transaction browser ok');
 } catch (error) {

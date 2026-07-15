@@ -17,7 +17,9 @@ const toneEqualizerSchema = z
     autoPlacement: z.boolean(),
     enabled: z.boolean(),
     pivotEv: z.number(),
+    previewMode: z.number().int(),
     rangeEv: z.number(),
+    selectedBand: z.number().int(),
   })
   .passthrough();
 const persistenceSchema = z
@@ -428,6 +430,85 @@ try {
     (await countTonePlacementTransactions(page, 3, 9)) !== rejectedManualTransactions
   ) {
     throw new Error('A delayed tone placement replaced a newer manual Tone Equalizer edit.');
+  }
+
+  await ensureAdvancedOpen();
+  const picker = page.getByTestId('tone-equalizer-picker');
+  const previewPanel = page.getByTestId('editor-image-preview-panel');
+  const pickerBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
+  const pickerBaselineApplies = await commandCount(page, 'apply_adjustments');
+  const pickerBaselineSamples = await commandCount(page, 'sample_tone_equalizer_picker');
+  const pickerBaselineRevision = Number(await previewPanel.getAttribute('data-editor-adjustment-revision'));
+  if (!Number.isInteger(pickerBaselineRevision)) throw new Error('Editor did not expose its picker base revision.');
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push({ color: [124, 112, 204], delayMs: 20 });
+  });
+  await picker.click();
+  if ((await picker.getAttribute('aria-pressed')) !== 'true')
+    throw new Error('Tone Equalizer picker did not activate.');
+  const canvas = page.getByTestId('image-canvas');
+  const canvasBox = await canvas.boundingBox();
+  if (canvasBox === null) throw new Error('Image canvas has no rendered bounds.');
+  await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await waitForCommandCount(page, 'sample_tone_equalizer_picker', pickerBaselineSamples + 1);
+  await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', pickerBaselineSaves + 1);
+  await waitForCommandCount(page, 'apply_adjustments', pickerBaselineApplies + 1);
+  await page.waitForTimeout(150);
+  if (
+    (await commandCount(page, 'sample_tone_equalizer_picker')) !== pickerBaselineSamples + 1 ||
+    (await commandCount(page, 'save_metadata_and_update_thumbnail')) !== pickerBaselineSaves + 1
+  ) {
+    throw new Error('One Tone Equalizer click did not produce exactly one native sample and one persistence commit.');
+  }
+  const pickerPersistence = persistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args ?? null,
+    ),
+  );
+  if (
+    pickerPersistence.transaction.nextAdjustmentRevision !== pickerPersistence.transaction.baseAdjustmentRevision + 1 ||
+    !pickerPersistence.transaction.transactionId.startsWith('viewer-picker:tone-equalizer:') ||
+    pickerPersistence.adjustments.toneEqualizer.previewMode !== 2 ||
+    pickerPersistence.adjustments.toneEqualizer.selectedBand !== 4
+  ) {
+    throw new Error(`Tone picker did not persist its exact native selection: ${JSON.stringify(pickerPersistence)}`);
+  }
+  const pickerRender = renderCallSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_adjustments')
+          .at(-1) ?? null,
+    ),
+  );
+  if (
+    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params.toneEqualizer.previewMode !== 2 ||
+    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params.toneEqualizer.selectedBand !== 4 ||
+    Object.hasOwn(pickerRender.args.request, 'jsAdjustments')
+  ) {
+    throw new Error('Tone picker output did not render through exact node authority.');
+  }
+  await page.getByTestId('tone-equalizer-picker-receipt').waitFor({ timeout: 10_000 });
+  const editorReceipt = await previewPanel.evaluate((element) => ({
+    adjustmentRevision: element.dataset.editorAdjustmentRevision,
+    imageSessionId: element.dataset.lastEditImageSession,
+    persistence: element.dataset.lastEditPersistence,
+    receiptRevision: element.dataset.lastEditAdjustmentRevision,
+    source: element.dataset.lastEditSource,
+    transactionId: element.dataset.lastEditTransactionId,
+  }));
+  if (
+    editorReceipt.adjustmentRevision !== String(pickerPersistence.transaction.nextAdjustmentRevision) ||
+    editorReceipt.receiptRevision !== editorReceipt.adjustmentRevision ||
+    editorReceipt.imageSessionId !== pickerPersistence.transaction.imageSessionId ||
+    editorReceipt.persistence !== 'commit' ||
+    editorReceipt.source !== 'picker' ||
+    editorReceipt.transactionId !== pickerPersistence.transaction.transactionId
+  ) {
+    throw new Error(`Editor did not publish the Tone picker transaction receipt: ${JSON.stringify(editorReceipt)}`);
   }
 
   console.log('tone equalizer edit transaction browser ok');
