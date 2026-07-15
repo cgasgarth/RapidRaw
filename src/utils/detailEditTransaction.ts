@@ -16,6 +16,7 @@ export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.LocalContrastMidtoneMask,
   DetailsAdjustment.LocalContrastRadiusPx,
   DetailsAdjustment.Sharpness,
+  DetailsAdjustment.SharpnessThreshold,
   DetailsAdjustment.Structure,
   DetailsAdjustment.Centré,
 ] as const;

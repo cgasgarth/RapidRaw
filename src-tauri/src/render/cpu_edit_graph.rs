@@ -811,7 +811,7 @@ fn apply_ca_correction(
     )
 }
 
-fn apply_local_contrast(
+pub(crate) fn apply_local_contrast(
     color: Vec3,
     blurred_input: Vec3,
     amount: f32,
