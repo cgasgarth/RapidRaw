@@ -137,7 +137,6 @@ pub struct AppState {
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
     export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub computational_merge_jobs: crate::merge::computational_job::ComputationalMergeJobRegistry,
-    pub focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults,
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
@@ -200,8 +199,6 @@ impl AppState {
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             computational_merge_jobs:
                 crate::merge::computational_job::ComputationalMergeJobRegistry::default(),
-            focus_stack_job_results: crate::merge::focus_stack::job::FocusStackJobResults::default(
-            ),
             cache_budget: Arc::clone(&cache_budget),
             lut_cache: MemoryLruCache::new(
                 policy("lut_paths", 1, 2, Some(64)),
