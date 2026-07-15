@@ -91,23 +91,23 @@ export function ViewerSurface({
       {...props}
       {...viewerSurfaceDataAttributes(presentation, geometry)}
       aria-roledescription={props['aria-roledescription'] ?? a11y['aria-roledescription']}
-      onPointerCancel={(event) => {
+      onPointerCancelCapture={(event) => {
         dispatchPointerEvent(event, 'pointercancel');
         onPointerCancel?.(event);
       }}
-      onPointerDown={(event) => {
+      onPointerDownCapture={(event) => {
         dispatchPointerEvent(event, 'pointerdown');
         onPointerDown?.(event);
       }}
-      onPointerMove={(event) => {
+      onPointerMoveCapture={(event) => {
         dispatchPointerEvent(event, 'pointermove');
         onPointerMove?.(event);
       }}
-      onPointerUp={(event) => {
+      onPointerUpCapture={(event) => {
         dispatchPointerEvent(event, 'pointerup');
         onPointerUp?.(event);
       }}
-      onLostPointerCapture={(event) => {
+      onLostPointerCaptureCapture={(event) => {
         dispatchPointerEvent(event, 'lostpointercapture');
         onLostPointerCapture?.(event);
       }}
