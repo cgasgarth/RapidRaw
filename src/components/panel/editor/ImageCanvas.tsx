@@ -7,7 +7,12 @@ import type { Stage as KonvaStage } from 'konva/lib/Stage';
 import { Circle, Group, Layer, Rect, Stage } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
-import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
+import {
+  type EditorCompareMode,
+  type ExportSoftProofTransformState,
+  type InteractivePatch,
+  useEditorStore,
+} from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import {
@@ -36,6 +41,12 @@ import {
   isInteractivePreviewPatchCoherent,
 } from '../../../utils/interactivePreviewPatch';
 import { presentedPreviewReleaseCoordinator } from '../../../utils/presentedPreviewReleaseCoordinator';
+import {
+  captureSubMaskInteractionIdentity,
+  type SubMaskInteractionIdentity,
+  type SubMaskInteractionTarget,
+  scheduleSubMaskInteractionEnd,
+} from '../../../utils/subMaskInteractionEditTransaction';
 import {
   buildViewerSamplerIdentity,
   isViewerSampleResultCurrent,
@@ -79,10 +90,10 @@ import { ViewerSurface } from './ViewerSurface';
 import { createViewerAdjustmentCommandServices } from './viewerAdjustmentCommandService';
 import {
   createViewerAiMaskBoxInteractionController,
-  ViewerAiMaskBoxCommand,
-  ViewerAiMaskBoxCurrentContext,
-  ViewerAiMaskBoxOverlayDescriptor,
-  ViewerAiMaskBoxSample,
+  type ViewerAiMaskBoxCommand,
+  type ViewerAiMaskBoxCurrentContext,
+  type ViewerAiMaskBoxOverlayDescriptor,
+  type ViewerAiMaskBoxSample,
 } from './viewerAiMaskBoxInteractionController';
 import {
   createViewerBrushCommandAdapter,
@@ -259,7 +270,7 @@ interface ImageCanvasProps {
   transformedOriginalUrl: string | null;
   comparisonLabel?: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
-  updateSubMask: (id: string | null, subMask: Partial<SubMask>) => void;
+  updateSubMask: (id: string | null, subMask: Partial<SubMask>, identity: SubMaskInteractionIdentity) => void;
   interactivePatch?: InteractivePatch | null;
   isWbPickerActive?: boolean;
   lastWhiteBalancePickerReceipt?: WhiteBalancePickerRuntimeReceipt | null;
@@ -371,6 +382,7 @@ export const ImageCanvas = memo(
     const [originalLoaded, setOriginalLoaded] = useState<boolean>(false);
     const [originalLoadFailed, setOriginalLoadFailed] = useState(false);
     const [isMaskInteractionActive, setIsMaskInteractionActive] = useState(false);
+    const maskInteractionIdentityRef = useRef<SubMaskInteractionIdentity | null>(null);
     const isDrawing = useRef(false);
     const drawingStageRef = useRef<KonvaStage | null>(null);
     const pointerGeometryEpochRef = useRef<ReturnType<typeof captureGeometryEpoch> | null>(null);
@@ -1962,7 +1974,12 @@ export const ImageCanvas = memo(
     );
 
     const handleMaskInteractionStart = useCallback(
-      (e?: MaskInteractionEvent) => {
+      (target: SubMaskInteractionTarget, e?: MaskInteractionEvent) => {
+        maskInteractionIdentityRef.current = captureSubMaskInteractionIdentity(
+          useEditorStore.getState(),
+          crypto.randomUUID(),
+          target,
+        );
         setIsMaskInteractionActive(true);
         const eventType = e?.evt?.type;
         if (eventType === 'touchstart') {
@@ -1972,9 +1989,25 @@ export const ImageCanvas = memo(
       [setIsMaskTouchInteracting],
     );
 
+    const commitSubMaskInteraction = useCallback(
+      (id: string, patch: Partial<SubMask>) => {
+        const identity = maskInteractionIdentityRef.current;
+        if (identity !== null) updateSubMask(id, patch, identity);
+      },
+      [updateSubMask],
+    );
+
+    useEffect(
+      () => () => {
+        maskInteractionIdentityRef.current = null;
+      },
+      [],
+    );
+
     const handleMaskInteractionEnd = useCallback(() => {
       setIsMaskInteractionActive(false);
       setIsMaskTouchInteracting(false);
+      scheduleSubMaskInteractionEnd(maskInteractionIdentityRef);
     }, [setIsMaskTouchInteracting]);
 
     const activeCanvasOverlayTool = isCropping
@@ -2356,7 +2389,16 @@ export const ImageCanvas = memo(
                                 isSelected={renderSubMask.id === activeId}
                                 isToolActive={isToolActive}
                                 onMaskInteractionEnd={handleMaskInteractionEnd}
-                                onMaskInteractionStart={handleMaskInteractionStart}
+                                onMaskInteractionStart={(event) =>
+                                  handleMaskInteractionStart(
+                                    {
+                                      containerId: activeContainer.id,
+                                      containerKind: isMasking ? 'masks' : 'aiPatches',
+                                      subMaskId: renderSubMask.id,
+                                    },
+                                    event,
+                                  )
+                                }
                                 onMaskMouseEnter={() => {
                                   if (!isToolActive) {
                                     setIsMaskHovered(true);
@@ -2375,7 +2417,7 @@ export const ImageCanvas = memo(
                                     onSelectAiSubMask(renderSubMask.id);
                                   }
                                 }}
-                                onUpdate={updateSubMask}
+                                onUpdate={commitSubMaskInteraction}
                                 subMask={renderSubMask}
                                 offsetX={groupOffsetX}
                                 offsetY={groupOffsetY}

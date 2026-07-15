@@ -2,9 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
+  lazy,
   type MouseEvent,
   type RefObject,
-  lazy,
   Suspense,
   useCallback,
   useEffect,
@@ -74,15 +74,19 @@ import {
 } from '../../utils/mask/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
 import { imagePointFromCanvasClick, readObjectPromptCanvasState } from '../../utils/mask/objectMaskPromptCanvas';
-import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
+import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
+import {
+  buildSubMaskInteractionEditTransaction,
+  type SubMaskInteractionIdentity,
+} from '../../utils/subMaskInteractionEditTransaction';
 import { debounce } from '../../utils/timing';
 import {
   applyWhiteBalancePickerHoverPreview,
@@ -97,24 +101,24 @@ import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import ViewerFooter from './editor/ViewerFooter';
+import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type {
   ViewerAiMaskBoxCommand,
   ViewerAiMaskBoxCurrentContext,
   ViewerAiMaskBoxSessionKey,
 } from './editor/viewerAiMaskBoxInteractionController';
-import ViewerFooter from './editor/ViewerFooter';
-import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
-import {
-  createViewerObjectPromptInteractionController,
-  type ViewerObjectPromptCommand,
-} from './editor/viewerObjectPromptInteractionController';
 import {
   resolveViewerInput,
   shouldActivateTemporaryHand,
   type ViewerActiveTool,
   type ViewerPointerType,
 } from './editor/viewerInputResolver';
+import {
+  createViewerObjectPromptInteractionController,
+  type ViewerObjectPromptCommand,
+} from './editor/viewerObjectPromptInteractionController';
 import type { ViewerParametricMaskTargetCommand } from './editor/viewerParametricMaskTargetInteractionController';
 import {
   getNextViewerLightsOutLevel,
@@ -484,20 +488,11 @@ export default function Editor({
   );
 
   const updateSubMaskLocal = useCallback(
-    (subMaskId: string | null, updatedData: Partial<SubMask>) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        masks: prev.masks.map((c: MaskContainer) => ({
-          ...c,
-          subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-        aiPatches: prev.aiPatches.map((p: AiPatch) => ({
-          ...p,
-          subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-      }));
+    (subMaskId: string | null, updatedData: Partial<SubMask>, identity: SubMaskInteractionIdentity) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(buildSubMaskInteractionEditTransaction(state, identity, subMaskId, updatedData));
     },
-    [setAdjustments],
+    [applyEditTransaction],
   );
 
   const handleWbPicked = useCallback(
