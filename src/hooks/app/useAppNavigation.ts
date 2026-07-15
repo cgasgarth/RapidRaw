@@ -24,6 +24,10 @@ import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
+import {
+  buildChangedImageOpenHydrationEditTransaction,
+  buildImageOpenHydrationEditTransaction,
+} from '../../utils/imageOpenHydrationEditTransaction';
 import { beginImageOpenWithSchema, scheduleImagePrefetchWithSchema } from '../../utils/imageOpenInvokes';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
 import { imagePrefetchScheduler } from '../../utils/imagePrefetchScheduler';
@@ -218,7 +222,7 @@ export function useAppNavigation({
   const handleImageSelect = useCallback(
     async (path: string) => {
       const editorAtNavigation = useEditorStore.getState();
-      const { selectedImage, isSliderDragging, resetHistory, setEditor } = editorAtNavigation;
+      const { selectedImage, setEditor } = editorAtNavigation;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
 
@@ -301,8 +305,8 @@ export function useAppNavigation({
           previewSize: cachedReadyEntry.previewSize,
           histogram: cachedReadyEntry.histogram,
           waveform: cachedReadyEntry.waveform,
-          finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
-          uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
+          finalPreviewUrl: null,
+          uncroppedAdjustedPreviewUrl: null,
         });
         const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(path);
         if (savedPositiveHandoff !== null) {
@@ -324,8 +328,24 @@ export function useAppNavigation({
           }));
         }
 
-        setEditor({ adjustments: cachedReadyEntry.adjustments });
-        resetHistory(cachedReadyEntry.adjustments);
+        const cacheState = useEditorStore.getState();
+        cacheState.applyEditTransaction(
+          buildImageOpenHydrationEditTransaction(
+            cacheState,
+            { adjustmentRevision: cacheState.adjustmentRevision, imageSessionId: session.id, path },
+            cachedReadyEntry.adjustments,
+            `image-cache-hydration:${session.id}`,
+          ),
+        );
+        setEditor({
+          finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
+          uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
+        });
+        const backgroundHydrationIdentity = {
+          adjustmentRevision: useEditorStore.getState().adjustmentRevision,
+          imageSessionId: session.id,
+          path,
+        };
         prevAdjustmentsRef.current = { path, adjustments: cachedReadyEntry.adjustments };
 
         setLibrary({ isViewLoading: false });
@@ -360,15 +380,32 @@ export function useAppNavigation({
             });
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
+            const current = useEditorStore.getState();
+            const metadataAdjustments = loadedMetadata.adjustments;
+            const authoritativeAdjustments =
+              !current.isSliderDragging &&
+              !isNativeCommittedHydrationSession(session.id) &&
+              acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
+              metadataAdjustments !== null &&
+              metadataAdjustments !== undefined &&
+              !metadataAdjustments.is_null
+                ? normalizeLoadedAdjustments(metadataAdjustments)
+                : null;
+            if (
+              authoritativeAdjustments !== null &&
+              current.imageSession?.id === backgroundHydrationIdentity.imageSessionId &&
+              current.selectedImage?.path === backgroundHydrationIdentity.path &&
+              current.adjustmentRevision === backgroundHydrationIdentity.adjustmentRevision
+            ) {
+              const transaction = buildChangedImageOpenHydrationEditTransaction(
+                current,
+                backgroundHydrationIdentity,
+                authoritativeAdjustments,
+                `image-cache-metadata-hydration:${session.id}:${openResult.metadataFingerprint}`,
+              );
+              if (transaction !== null) current.applyEditTransaction(transaction);
+            }
             setEditor((state) => ({
-              adjustments:
-                !isSliderDragging &&
-                !isNativeCommittedHydrationSession(session.id) &&
-                acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
-                loadedMetadata.adjustments &&
-                !loadedMetadata.adjustments['is_null']
-                  ? normalizeLoadedAdjustments(loadedMetadata.adjustments)
-                  : state.adjustments,
               originalSize: { width: result.width, height: result.height },
               selectedImage:
                 state.selectedImage?.path === path
@@ -385,7 +422,6 @@ export function useAppNavigation({
                   : state.selectedImage,
             }));
             const currentAdjustments = useEditorStore.getState().adjustments;
-            resetHistory(currentAdjustments);
             prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
             globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
             consumePendingNegativeConversionDustHealLayers(path);

@@ -1,7 +1,9 @@
 import type { Adjustments } from './adjustments';
+import { areAdjustmentsEqual } from './adjustmentsSnapshot';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface ImageOpenHydrationIdentity {
+  adjustmentRevision: number;
   imageSessionId: string;
   path: string;
 }
@@ -21,7 +23,8 @@ export const buildImageOpenHydrationEditTransaction = (
   if (
     state.imageSession?.id !== identity.imageSessionId ||
     state.imageSession.path !== identity.path ||
-    state.selectedImage?.path !== identity.path
+    state.selectedImage?.path !== identity.path ||
+    state.adjustmentRevision !== identity.adjustmentRevision
   ) {
     throw new Error('image_open_hydration.stale_identity');
   }
@@ -35,4 +38,14 @@ export const buildImageOpenHydrationEditTransaction = (
     source: 'hydration',
     transactionId,
   };
+};
+
+export const buildChangedImageOpenHydrationEditTransaction = (
+  state: ImageOpenHydrationState & { adjustments: Adjustments },
+  identity: ImageOpenHydrationIdentity,
+  adjustments: Adjustments,
+  transactionId: string,
+): EditTransactionRequest | null => {
+  const request = buildImageOpenHydrationEditTransaction(state, identity, adjustments, transactionId);
+  return areAdjustmentsEqual(state.adjustments, adjustments) ? null : request;
 };
