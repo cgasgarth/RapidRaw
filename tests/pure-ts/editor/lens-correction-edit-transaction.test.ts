@@ -6,6 +6,8 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildLensCorrectionEditTransaction,
+  buildLensProfileEditTransaction,
+  isCurrentLensProfileRequest,
   isManualLensCorrectionAdjustment,
   type LensCorrectionCommitIdentity,
   MANUAL_LENS_CORRECTION_ADJUSTMENTS,
@@ -131,5 +133,89 @@ describe('lens correction edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('lens_correction_transaction.stale_revision');
+  });
+
+  test('commits complete profile identity atomically and rejects orphan or stale profile results', () => {
+    const lensDistortionParams = {
+      k1: 0.1,
+      k2: -0.02,
+      k3: 0.003,
+      model: 1,
+      tca_vb: 0.99,
+      tca_vr: 1.01,
+      vig_k1: 0.2,
+      vig_k2: 0.01,
+      vig_k3: 0,
+    };
+    const state = useEditorStore.getState();
+    const request = buildLensProfileEditTransaction(
+      state,
+      identity(),
+      {
+        lensCorrectionMode: 'manual',
+        lensDistortionParams,
+        lensMaker: 'Harness Optics',
+        lensModel: '35mm Prime',
+      },
+      'lens-profile',
+    );
+    const result = state.applyEditTransaction(request);
+
+    expect(request.operations).toEqual([
+      {
+        nodeType: 'lens_correction',
+        patch: {
+          lensCorrectionMode: 'manual',
+          lensDistortionParams,
+          lensMaker: 'Harness Optics',
+          lensModel: '35mm Prime',
+        },
+        type: 'patch-edit-document-node',
+      },
+    ]);
+    expect(result.afterEditDocumentV2.nodes.lens_correction.params).toMatchObject({
+      lensCorrectionMode: 'manual',
+      lensDistortionParams,
+      lensMaker: 'Harness Optics',
+      lensModel: '35mm Prime',
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments).toMatchObject({ lensMaker: null, lensModel: null });
+
+    const restored = useEditorStore.getState();
+    expect(() =>
+      restored.applyEditTransaction(
+        buildLensProfileEditTransaction(restored, identity(), { lensModel: 'Orphan model' }, 'orphan'),
+      ),
+    ).toThrow();
+    expect(() =>
+      buildLensProfileEditTransaction(
+        restored,
+        identity({ adjustmentRevision: 2 }),
+        { lensCorrectionMode: 'auto' },
+        'stale-profile',
+      ),
+    ).toThrow('lens_correction_transaction.stale_revision');
+
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 1 }), 4, 4)).toBe(true);
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 1 }), 3, 4)).toBe(false);
+    expect(isCurrentLensProfileRequest(restored, identity({ adjustmentRevision: 2 }), 4, 4)).toBe(false);
+    expect(
+      isCurrentLensProfileRequest(
+        { ...restored, selectedImage: { path: '/fixtures/other.ARW' } },
+        identity({ adjustmentRevision: 1 }),
+        4,
+        4,
+      ),
+    ).toBe(false);
+    expect(
+      isCurrentLensProfileRequest(
+        { ...restored, imageSession: { id: 'other-session' } },
+        identity({ adjustmentRevision: 1 }),
+        4,
+        4,
+      ),
+    ).toBe(false);
   });
 });
