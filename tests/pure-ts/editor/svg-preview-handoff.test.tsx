@@ -6,7 +6,6 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { SvgPreviewHandoff } from '../../../src/components/panel/editor/SvgPreviewHandoff.tsx';
 import type { InteractivePatch } from '../../../src/store/useEditorStore.ts';
-import { PresentedPreviewReleaseCoordinator } from '../../../src/utils/presentedPreviewReleaseCoordinator.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -44,21 +43,16 @@ test('keeps rendered predecessor and successor SVG base layers until successor o
   expect(rendered.released).toContain('base:/photo.ARW:blob:base-a:blob:base-a');
 });
 
-test('acknowledges a remounted delayed base only after its image load fence', async () => {
-  const coordinator = new PresentedPreviewReleaseCoordinator();
-  const released: string[] = [];
-  coordinator.defer('blob:base-old', 'base', 'blob:base-remounted');
-  const rendered = renderHandoff({
-    baseSource: 'blob:base-remounted',
-    incomingPatch: null,
-    onBasePresented: (url) => coordinator.acknowledge('base', url, (releasedUrl) => released.push(releasedUrl)),
-  });
+test('A to B to exact A reuse discards only B and never duplicates or releases visible A', async () => {
+  const rendered = renderHandoff({ baseSource: 'blob:base-a', incomingPatch: null });
+  await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:base-a');
+  rendered.render({ baseSource: 'blob:base-b', incomingPatch: null });
+  expect(baseSources(rendered.container)).toEqual(['blob:base-a', 'blob:base-b']);
 
-  expect(baseSources(rendered.container)).toEqual(['blob:base-remounted']);
-  expect(released).toEqual([]);
-  await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:base-remounted');
-  expect(rendered.presented).toContain('blob:base-remounted');
-  expect(released).toEqual(['blob:base-old']);
+  rendered.render({ baseSource: 'blob:base-a', incomingPatch: null });
+  expect(baseSources(rendered.container)).toEqual(['blob:base-a']);
+  expect(rendered.released.filter((entry) => entry.endsWith(':blob:base-b'))).toHaveLength(1);
+  expect(rendered.released.some((entry) => entry.endsWith(':blob:base-a'))).toBe(false);
 });
 
 test('discards stale and failed SVG successors while preserving the painted predecessor', async () => {
@@ -72,6 +66,25 @@ test('discards stale and failed SVG successors while preserving the painted pred
   await failLayer(rendered.container, 'svg-preview-base-layer', 'blob:base-c');
   expect(baseSources(rendered.container)).toEqual(['blob:base-a']);
   expect(rendered.released).toContain('base:/photo.ARW:blob:base-c:blob:base-c');
+});
+
+test('reports original successor readiness only from the rendered layer and keeps predecessor on failure', async () => {
+  const rendered = renderHandoff({ baseSource: 'blob:original-a', incomingPatch: null });
+  await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:original-a');
+  expect(rendered.presented).toEqual(['blob:original-a']);
+
+  rendered.render({ baseSource: 'blob:original-b', incomingPatch: null });
+  expect(rendered.presented).not.toContain('blob:original-b');
+  await failLayer(rendered.container, 'svg-preview-base-layer', 'blob:original-b');
+  expect(rendered.failed).toEqual(['blob:original-b']);
+  expect(baseSources(rendered.container)).toEqual(['blob:original-a']);
+  expect(rendered.presented).not.toContain('blob:original-b');
+
+  rendered.render({ baseSource: 'blob:original-c', incomingPatch: null });
+  await loadLayer(rendered.container, 'svg-preview-base-layer', 'blob:original-c');
+  expect(rendered.presented).not.toContain('blob:original-c');
+  await finishOpacityHandoff(rendered.container, 'svg-preview-base-layer', 'blob:original-c');
+  expect(rendered.presented).toContain('blob:original-c');
 });
 
 test('retains an interactive patch until the decoded final SVG layer begins its opacity handoff', async () => {
@@ -158,6 +171,7 @@ function renderHandoff({
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
+  const failed: string[] = [];
   const presented: string[] = [];
   const released: string[] = [];
 
@@ -179,6 +193,7 @@ function renderHandoff({
               incomingPatch: nextIncomingPatch,
               isCpuPreviewVisible: nextIsCpuPreviewVisible,
               isMaxZoom: false,
+              onBaseFailed: (url: string) => failed.push(url),
               onBasePresented: (url: string) => {
                 presented.push(url);
                 onBasePresented?.(url);
@@ -196,7 +211,7 @@ function renderHandoff({
 
   render({ baseSource, incomingPatch, isCpuPreviewVisible, reducedMotion });
   renderedRoot = { container, root };
-  return { container, presented, released, render };
+  return { container, failed, presented, released, render };
 }
 
 function baseSources(container: Element): string[] {

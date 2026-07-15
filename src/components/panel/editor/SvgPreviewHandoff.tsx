@@ -31,8 +31,10 @@ interface SvgPreviewHandoffOptions<T extends PreviewLayerValue> {
   targetKey: string | null;
   reducedMotion: boolean;
   onClaim: (owner: string, url: string) => void;
-  onRelease: (owner: string, url: string) => void;
+  onRelease: (owner: string, url: string, reason: PreviewLayerReleaseReason) => void;
 }
+
+export type PreviewLayerReleaseReason = 'retired' | 'unmounted';
 
 const createSvgPreviewLayer = <T extends PreviewLayerValue>(
   ownerPrefix: string,
@@ -121,8 +123,14 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
         };
       }
 
-      if (current.successor?.id === target.url || (current.active?.id === target.url && !current.successor)) {
+      if (current.successor?.id === target.url) {
         return current;
+      }
+
+      if (current.active?.id === target.url) {
+        return current.successor
+          ? { ...current, retired: [...current.retired, current.successor], successor: null }
+          : current;
       }
 
       const staleSuccessor = current.successor ? [current.successor] : [];
@@ -155,7 +163,7 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
   useEffect(() => {
     if (state.retired.length === 0) return;
     for (const layer of state.retired) {
-      onReleaseRef.current(layer.owner, layer.value.url);
+      onReleaseRef.current(layer.owner, layer.value.url, 'retired');
     }
     setState((current) => (current.retired === state.retired ? { ...current, retired: [] } : current));
   }, [state.retired]);
@@ -163,7 +171,7 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
   useEffect(
     () => () => {
       for (const layer of ownedLayersRef.current) {
-        onReleaseRef.current(layer.owner, layer.value.url);
+        onReleaseRef.current(layer.owner, layer.value.url, 'unmounted');
       }
     },
     [],
@@ -194,7 +202,7 @@ function useSvgPreviewHandoff<T extends PreviewLayerValue>({
 
   useEffect(() => {
     const successor = state.successor;
-    if (!successor || successor.status !== 'loaded') return;
+    if (successor?.status !== 'loaded') return;
 
     let frame2: number | null = null;
     const frame1 = requestAnimationFrame(() => {
@@ -308,10 +316,11 @@ interface SvgPreviewHandoffProps {
   incomingPatch: InteractivePatch | null;
   isCpuPreviewVisible: boolean;
   isMaxZoom: boolean | undefined;
+  onBaseFailed?: ((url: string) => void) | undefined;
   onBasePresented: (url: string) => void;
   patchScopeKey: string;
   reducedMotion?: boolean | undefined;
-  releaseUrl: (owner: string, url: string) => void;
+  releaseUrl: (owner: string, url: string, reason: PreviewLayerReleaseReason) => void;
   retainUrl: (owner: string, url: string) => void;
 }
 
@@ -321,6 +330,7 @@ export function SvgPreviewHandoff({
   incomingPatch,
   isCpuPreviewVisible,
   isMaxZoom,
+  onBaseFailed,
   onBasePresented,
   patchScopeKey,
   reducedMotion: reducedMotionOverride,
@@ -329,6 +339,10 @@ export function SvgPreviewHandoff({
 }: SvgPreviewHandoffProps) {
   const reducedMotionPreference = useReducedMotion();
   const reducedMotion = reducedMotionOverride ?? reducedMotionPreference;
+  const onBasePresentedRef = useRef(onBasePresented);
+  useLayoutEffect(() => {
+    onBasePresentedRef.current = onBasePresented;
+  }, [onBasePresented]);
   const baseTarget = useMemo(() => (baseSource ? { url: baseSource } : null), [baseSource]);
   const baseHandoff = useSvgPreviewHandoff({
     initiallyVisible: true,
@@ -356,8 +370,8 @@ export function SvgPreviewHandoff({
   const presentedBaseUrl = baseHandoff.state.active?.status === 'visible' ? baseHandoff.state.active.value.url : null;
 
   useEffect(() => {
-    if (presentedBaseUrl !== null) onBasePresented(presentedBaseUrl);
-  }, [onBasePresented, presentedBaseUrl]);
+    if (presentedBaseUrl !== null) onBasePresentedRef.current(presentedBaseUrl);
+  }, [presentedBaseUrl]);
 
   useEffect(() => {
     if (!incomingPatch && baseSuccessorIsVisible) {
@@ -389,7 +403,10 @@ export function SvgPreviewHandoff({
           height="100%"
           href={layer.value.url}
           key={`base:${layer.owner}`}
-          onError={() => baseHandoff.handleSuccessorError(layer.id)}
+          onError={() => {
+            onBaseFailed?.(layer.value.url);
+            baseHandoff.handleSuccessorError(layer.id);
+          }}
           onLoad={() => baseHandoff.handleLayerLoad(layer.id)}
           onTransitionEnd={(event) => {
             if (event.propertyName === 'opacity') baseHandoff.handleTransitionEnd(layer.id);
