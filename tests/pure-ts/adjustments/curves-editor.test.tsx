@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
@@ -13,7 +13,10 @@ import CurveGraph, {
 import { Theme } from '../../../src/components/ui/AppProperties.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -101,8 +104,8 @@ test('scene and output domains persist typed V2 curve points without changing le
   await click(getButton(container, 'Scene'));
   expect(container.querySelector('[data-curve-domain="scene"]')).not.toBeNull();
   await click(getButton(container, 'Add point'));
-  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
-  expect(changes.at(-1)?.sceneCurveV1?.points).toEqual([
+  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
+  expect(currentAdjustments().sceneCurveV1?.points).toEqual([
     { xEv: -16, yEv: -16 },
     { xEv: 0, yEv: 0 },
     { xEv: 16, yEv: 16 },
@@ -116,11 +119,11 @@ test('scene and output domains persist typed V2 curve points without changing le
     middleOutput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
     await flushPromises();
   });
-  expect(changes.at(-1)?.sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
+  expect(currentAdjustments().sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
 
   await click(getButton(container, 'Output'));
   await click(getButton(container, 'Add point'));
-  expect(changes.at(-1)?.outputCurveV1).toMatchObject({
+  expect(currentAdjustments().outputCurveV1).toMatchObject({
     domain: 'view_encoded',
     targetIdentity: 'rapid-view-default',
     sdrReferenceWhiteNits: 203,
@@ -139,28 +142,28 @@ test('scene and output domains persist typed V2 curve points without changing le
     middleInput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
     await flushPromises();
   });
-  expect(changes.at(-1)?.outputCurveV1?.points[1]?.input).toBe(1 - 1 / 65_536);
-  expect(changes.at(-1)?.curves).toEqual(legacy);
+  expect(currentAdjustments().outputCurveV1?.points[1]?.input).toBe(1 - 1 / 65_536);
+  expect(currentAdjustments().curves).toEqual(legacy);
 
   await click(getButton(container, 'Reset'));
-  expect(changes.at(-1)?.outputCurveV1?.points).toEqual([
+  expect(currentAdjustments().outputCurveV1?.points).toEqual([
     { input: 0, output: 0 },
     { input: 1, output: 1 },
   ]);
-  expect(changes.at(-1)?.sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
+  expect(currentAdjustments().sceneCurveV1?.points[1]).toEqual({ xEv: 0, yEv: 2 });
 
   await click(getButton(container, 'Scene'));
   await click(getButton(container, 'Reset'));
-  expect(changes.at(-1)?.sceneCurveV1?.points).toEqual([
+  expect(currentAdjustments().sceneCurveV1?.points).toEqual([
     { xEv: -16, yEv: -16 },
     { xEv: 16, yEv: 16 },
   ]);
-  expect(changes.at(-1)?.outputCurveV1?.points).toEqual([
+  expect(currentAdjustments().outputCurveV1?.points).toEqual([
     { input: 0, output: 0 },
     { input: 1, output: 1 },
   ]);
-  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
-  expect(changes.at(-1)?.curves).toEqual(legacy);
+  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
+  expect(currentAdjustments().curves).toEqual(legacy);
 });
 
 test('output curve editing and reset retain extended HDR target identity and headroom', async () => {
@@ -181,10 +184,10 @@ test('output curve editing and reset retain extended HDR target identity and hea
 
   expect(container.querySelector('[data-curve-domain="output"]')).not.toBeNull();
   await click(getButton(container, 'Add point'));
-  expect(changes.at(-1)?.outputCurveV1?.points[1]).toEqual({ input: 5, output: 5 });
+  expect(currentAdjustments().outputCurveV1?.points[1]).toEqual({ input: 5, output: 5 });
 
   await click(getButton(container, 'Reset'));
-  expect(changes.at(-1)?.outputCurveV1).toEqual({
+  expect(currentAdjustments().outputCurveV1).toEqual({
     domain: 'output_encoded',
     targetIdentity: 'rec2100-pq-proof',
     sdrReferenceWhiteNits: 100,
@@ -194,7 +197,7 @@ test('output curve editing and reset retain extended HDR target identity and hea
       { input: 10, output: 10 },
     ],
   });
-  expect(changes.at(-1)?.rawEngineEditGraphVersion).toBe(2);
+  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
 });
 
 test('typed curve editor enforces the native 32-point limit before mutation', async () => {
@@ -417,7 +420,7 @@ function CurveHarness({
   dragStates: boolean[];
   initialAdjustments: Adjustments;
 }) {
-  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(initialAdjustments));
+  const adjustments = useEditorStore((state) => state.adjustments);
   return createElement(
     'div',
     null,
@@ -425,11 +428,9 @@ function CurveHarness({
       adjustments,
       histogram: null,
       setAdjustments: (updater) => {
-        setAdjustments((previous) => {
-          const next = updater(previous);
-          changes.push(next);
-          return next;
-        });
+        const next = updater(useEditorStore.getState().adjustments);
+        changes.push(next);
+        useEditorStore.setState({ adjustments: next });
       },
       theme: Theme.Dark,
       onDragStateChange: (dragging) => dragStates.push(dragging),
@@ -438,17 +439,21 @@ function CurveHarness({
       'button',
       {
         'data-testid': 'parent-curve-update',
-        onClick: () =>
-          setAdjustments((previous) => ({
-            ...previous,
-            curves: {
-              ...previous.curves,
-              luma: [
-                { x: 0, y: 37 },
-                { x: 255, y: 255 },
-              ],
+        onClick: () => {
+          const previous = useEditorStore.getState().adjustments;
+          useEditorStore.setState({
+            adjustments: {
+              ...previous,
+              curves: {
+                ...previous.curves,
+                luma: [
+                  { x: 0, y: 37 },
+                  { x: 255, y: 255 },
+                ],
+              },
             },
-          })),
+          });
+        },
         type: 'button',
       },
       'Parent update',
@@ -467,6 +472,33 @@ async function renderCurveEditor(
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
+  const adjustments = structuredClone(initialAdjustments);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const sourcePath = '/fixture/curves-editor.ARW';
+  const imageSession = createEditorImageSession({ generation: 29, path: sourcePath, source: 'cache' });
+  useEditorStore.setState({
+    adjustmentRevision: 0,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+    adjustments,
+    editDocumentV2,
+    history: [adjustments],
+    historyCheckpoints: [],
+    historyIndex: 0,
+    imageSession,
+    lastEditApplicationReceipt: null,
+    selectedImage: {
+      exif: null,
+      height: 3000,
+      isRaw: true,
+      isReady: true,
+      metadata: null,
+      originalUrl: null,
+      path: sourcePath,
+      rawDevelopmentReport: null,
+      thumbnailUrl: '',
+      width: 4000,
+    },
+  });
 
   await act(async () => {
     root.render(
@@ -486,6 +518,8 @@ async function renderCurveEditor(
   renderedRoot = { container, root };
   return { container, root };
 }
+
+const currentAdjustments = () => useEditorStore.getState().adjustments;
 
 async function click(button: HTMLButtonElement) {
   await act(async () => {
