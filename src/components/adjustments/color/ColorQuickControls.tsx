@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { Pipette, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useCameraInputEditCommit } from '../../../hooks/editor/useCameraInputEditCommit';
 import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import {
   buildTechnicalWhiteBalance,
@@ -34,6 +35,7 @@ export const ColorQuickControls = ({
   toggleWbPicker,
 }: ColorQuickControlsProps) => {
   const { t } = useTranslation();
+  const { commitCameraInput, commitIdentity } = useCameraInputEditCommit(!isForMask);
   const density = professionalInspectorDensityTokens;
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
   const isWhiteBalanceModified = isForMask
@@ -51,25 +53,27 @@ export const ColorQuickControls = ({
   };
 
   const resetWhiteBalance = () => {
+    if (!isForMask) {
+      commitCameraInput({
+        whiteBalanceTechnical: {
+          ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+          inputSemantics,
+        },
+        creativeTemperature: INITIAL_ADJUSTMENTS.creativeTemperature,
+        creativeTint: INITIAL_ADJUSTMENTS.creativeTint,
+        whiteBalanceMigration: 'native_v1',
+      });
+      return;
+    }
     setAdjustments((prev) => ({
       ...prev,
-      ...(isForMask
-        ? { temperature: INITIAL_ADJUSTMENTS.temperature, tint: INITIAL_ADJUSTMENTS.tint }
-        : {
-            whiteBalanceTechnical: {
-              ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
-              inputSemantics,
-            },
-            creativeTemperature: INITIAL_ADJUSTMENTS.creativeTemperature,
-            creativeTint: INITIAL_ADJUSTMENTS.creativeTint,
-            whiteBalanceMigration: 'native_v1' as const,
-          }),
+      temperature: INITIAL_ADJUSTMENTS.temperature,
+      tint: INITIAL_ADJUSTMENTS.tint,
     }));
   };
 
   const updateTechnicalWhiteBalance = (mode: WhiteBalanceMode, kelvin: number, duv: number) => {
-    setAdjustments((previous) => ({
-      ...previous,
+    commitCameraInput({
       whiteBalanceTechnical: buildTechnicalWhiteBalance(
         mode,
         kelvin,
@@ -78,11 +82,17 @@ export const ColorQuickControls = ({
         inputSemantics,
       ),
       whiteBalanceMigration: 'native_v1',
-    }));
+    });
   };
 
   return (
-    <div className={cx('space-y-px px-0.5', density.scrollPadding)} data-testid="quick-color-controls">
+    <div
+      className={cx('space-y-px px-0.5', density.scrollPadding)}
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-testid="quick-color-controls"
+    >
       <section
         className="border-b border-editor-border pb-1.5"
         data-testid="color-quick-white-balance"
@@ -222,8 +232,7 @@ export const ColorQuickControls = ({
                       className="h-6 rounded border border-editor-border bg-editor-panel px-1.5 text-xs text-text-primary"
                       data-testid="color-white-balance-preset"
                       onChange={(event) =>
-                        setAdjustments((previous) => ({
-                          ...previous,
+                        commitCameraInput((previous) => ({
                           whiteBalanceTechnical: buildTechnicalWhiteBalancePreset(
                             event.target.value as (typeof WHITE_BALANCE_PRESETS)[number]['id'],
                             previous.whiteBalanceTechnical.synchronization,
@@ -298,7 +307,7 @@ export const ColorQuickControls = ({
               label={t('adjustments.color.creativeWarmth', { defaultValue: 'Creative Warmth' })}
               max={100}
               min={-100}
-              onValueChange={(value) => setAdjustments((previous) => ({ ...previous, creativeTemperature: value }))}
+              onValueChange={(creativeTemperature) => commitCameraInput({ creativeTemperature })}
               step={1}
               value={adjustments.creativeTemperature}
               trackClassName="temperature-gradient-track"
@@ -310,7 +319,7 @@ export const ColorQuickControls = ({
               label={t('adjustments.color.creativeTint', { defaultValue: 'Creative Tint' })}
               max={100}
               min={-100}
-              onValueChange={(value) => setAdjustments((previous) => ({ ...previous, creativeTint: value }))}
+              onValueChange={(creativeTint) => commitCameraInput({ creativeTint })}
               step={1}
               value={adjustments.creativeTint}
               trackClassName="tint-gradient-track"
