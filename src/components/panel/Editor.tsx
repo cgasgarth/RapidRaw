@@ -257,6 +257,7 @@ export default function Editor({
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
   const wgpuFrameSerial = useEditorStore((s) => s.wgpuFrameSerial);
   const wgpuFailureSerial = useEditorStore((s) => s.wgpuFailureSerial);
+  const publishPreviewViewportTransform = useEditorStore((s) => s.publishPreviewViewportTransform);
 
   const setEditor = useEditorStore((s) => s.setEditor);
   const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
@@ -612,10 +613,10 @@ export default function Editor({
     resolvedZoom,
   });
   const handleZoomed = useCallback(
-    (state: { scale: number }) => {
-      setEditor({ zoom: state.scale });
+    (state: { positionX: number; positionY: number; scale: number }) => {
+      publishPreviewViewportTransform(state);
     },
-    [setEditor],
+    [publishPreviewViewportTransform],
   );
   const {
     animationFrameId,

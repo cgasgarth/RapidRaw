@@ -580,12 +580,7 @@ function App() {
 
   return (
     <>
-      <AppServices
-        imageProcessing={{
-          transformWrapperRef,
-        }}
-        persistence={{ prevAdjustmentsRef }}
-      />
+      <AppServices persistence={{ prevAdjustmentsRef }} />
       <div
         className={cx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',

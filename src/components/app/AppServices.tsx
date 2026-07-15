@@ -5,13 +5,12 @@ import ImageProcessingManager from '../managers/ImageProcessingManager';
 
 interface AppServicesProps {
   persistence: ComponentProps<typeof EditorPersistenceManager>;
-  imageProcessing: ComponentProps<typeof ImageProcessingManager>;
 }
 
-function AppServicesComponent({ imageProcessing, persistence }: AppServicesProps) {
+function AppServicesComponent({ persistence }: AppServicesProps) {
   return (
     <>
-      <ImageProcessingManager {...imageProcessing} />
+      <ImageProcessingManager />
       <EditorPersistenceManager {...persistence} />
       <ImageLoaderManager />
     </>
@@ -20,7 +19,5 @@ function AppServicesComponent({ imageProcessing, persistence }: AppServicesProps
 
 export const AppServices = memo(
   AppServicesComponent,
-  (previous, next) =>
-    previous.imageProcessing.transformWrapperRef === next.imageProcessing.transformWrapperRef &&
-    previous.persistence.prevAdjustmentsRef === next.persistence.prevAdjustmentsRef,
+  (previous, next) => previous.persistence.prevAdjustmentsRef === next.persistence.prevAdjustmentsRef,
 );

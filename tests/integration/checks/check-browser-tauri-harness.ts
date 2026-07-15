@@ -1106,6 +1106,7 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
       `Wheel zoom split visible transform ${String(gestureScale)} from semantic transform ${String(resolvedGestureScale)}.`,
     );
   }
+  await waitForStablePreview(page);
   const gestureBaseHref = await readCommittedBaseHref(page, sourceIdentity);
   await assertPositionedZoomOutput(page, { canonicalBaseHref: gestureBaseHref, sourceIdentity });
   await zoomSelector.selectOption('fit');
