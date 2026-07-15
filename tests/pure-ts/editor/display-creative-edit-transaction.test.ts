@@ -88,17 +88,43 @@ describe('display creative edit transaction', () => {
     expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(true);
   });
 
-  test('owns only the migrated global Vignette control, exact no-ops, and rejects stale identity', () => {
+  test('commits a zero LUT intensity without falling back to the display default', () => {
     const state = useEditorStore.getState();
-    expect(DISPLAY_CREATIVE_NODE_ADJUSTMENTS).toEqual([Effect.VignetteAmount]);
-    expect(isDisplayCreativeNodeAdjustment(Effect.VignetteAmount)).toBeTrue();
+    const result = state.applyEditTransaction(
+      buildDisplayCreativeEditTransaction(state, identity(), Effect.LutIntensity, 0, 'display-creative-lut-zero'),
+    );
+
+    expect(result.changedKeys).toEqual(['lutIntensity']);
+    expect(result.after.lutIntensity).toBe(0);
+    expect(result.afterEditDocumentV2.nodes.display_creative.params.lutIntensity).toBe(0);
+    expect(useEditorStore.getState().history).toHaveLength(2);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.lutIntensity).toBe(100);
+  });
+
+  test('owns non-film-look display controls, exact no-ops, and rejects stale identity', () => {
+    const state = useEditorStore.getState();
+    expect(DISPLAY_CREATIVE_NODE_ADJUSTMENTS).toEqual([
+      CreativeAdjustment.FlareAmount,
+      Effect.LutIntensity,
+      Effect.VignetteAmount,
+      Effect.VignetteFeather,
+      Effect.VignetteMidpoint,
+      Effect.VignetteRoundness,
+    ]);
+    for (const field of DISPLAY_CREATIVE_NODE_ADJUSTMENTS) {
+      expect(isDisplayCreativeNodeAdjustment(field)).toBeTrue();
+      expect(buildDisplayCreativeEditTransaction(state, identity(), field, 37, `field-${field}`).operations).toEqual([
+        { nodeType: 'display_creative', patch: { [field]: 37 }, type: 'patch-edit-document-node' },
+      ]);
+    }
     for (const field of [
       CreativeAdjustment.GlowAmount,
       CreativeAdjustment.HalationAmount,
       Effect.GrainAmount,
       Effect.GrainSize,
-      Effect.LutIntensity,
-      Effect.VignetteFeather,
+      Effect.GrainRoughness,
     ]) {
       expect(isDisplayCreativeNodeAdjustment(field)).toBeFalse();
     }

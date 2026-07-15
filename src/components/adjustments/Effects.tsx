@@ -136,7 +136,7 @@ export default function EffectsPanel({
   };
 
   const handleLutIntensityChange = (intensity: number) => {
-    setAdjustments((prev: Adjustments) => ({ ...prev, lutIntensity: intensity }));
+    handleAdjustmentChange(Effect.LutIntensity, intensity);
   };
 
   const handleLutClear = () => {
@@ -353,6 +353,7 @@ export default function EffectsPanel({
               handleAdjustmentChange(CreativeAdjustment.FlareAmount, value);
             }}
             step={1}
+            testId="effects-control-flare-amount"
             value={adjustments.flareAmount}
             onDragStateChange={onDragStateChange}
           />
@@ -400,7 +401,7 @@ export default function EffectsPanel({
             </UiText>
             <LUTControl
               lutName={adjustments.lutName || null}
-              lutIntensity={adjustments.lutIntensity || 100}
+              lutIntensity={adjustments.lutIntensity ?? 100}
               onLutSelect={handleLutSelect}
               onIntensityChange={handleLutIntensityChange}
               onClear={handleLutClear}
@@ -436,6 +437,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.VignetteMidpoint, value);
                 }}
                 step={1}
+                testId="effects-control-vignette-midpoint"
                 value={adjustments.vignetteMidpoint}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
@@ -449,6 +451,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.VignetteRoundness, value);
                 }}
                 step={1}
+                testId="effects-control-vignette-roundness"
                 value={adjustments.vignetteRoundness}
                 onDragStateChange={onDragStateChange}
               />
@@ -462,6 +465,7 @@ export default function EffectsPanel({
                   handleAdjustmentChange(Effect.VignetteFeather, value);
                 }}
                 step={1}
+                testId="effects-control-vignette-feather"
                 value={adjustments.vignetteFeather}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
