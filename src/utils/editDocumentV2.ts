@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
   EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
+  EDIT_DOCUMENT_FILM_EMULATION_FIELDS,
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
   EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
@@ -18,6 +19,7 @@ import {
   editDocumentColorPresenceV2Schema,
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
+  editDocumentFilmEmulationV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentLensCorrectionV2Schema,
@@ -47,11 +49,13 @@ const MANUAL_CHROMATIC_ABERRATION_FIELDS = new Set<string>(EDIT_DOCUMENT_MANUAL_
 const LUMA_LEVELS_FIELDS = new Set<string>(EDIT_DOCUMENT_LUMA_LEVELS_FIELDS);
 const COLOR_PRESENCE_FIELDS = new Set<string>(EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS);
 const SHARPNESS_THRESHOLD_FIELDS = new Set<string>(EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS);
+const FILM_EMULATION_FIELDS = new Set<string>(EDIT_DOCUMENT_FILM_EMULATION_FIELDS);
 
 const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (COLOR_PRESENCE_FIELDS.has(key)) {
     return editDocumentColorPresenceV2Schema.shape[key as (typeof EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS)[number]];
   }
+  if (FILM_EMULATION_FIELDS.has(key)) return editDocumentFilmEmulationV2Schema.shape.filmEmulation;
   if (LOCAL_CONTRAST_FIELDS.has(key)) {
     return editDocumentLocalContrastV2Schema.shape[key as (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number]];
   }
@@ -134,6 +138,7 @@ const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z
   color_calibration: editDocumentColorCalibrationV2Schema,
   detail_denoise_dehaze: editDocumentDetailDenoiseDehazeV2Schema,
   display_creative: editDocumentDisplayCreativeV2Schema,
+  film_emulation: editDocumentFilmEmulationV2Schema,
   lens_correction: editDocumentLensCorrectionV2Schema,
   luma_levels: editDocumentLumaLevelsV2Schema,
   perceptual_grading: editDocumentPerceptualGradingV2Schema,
