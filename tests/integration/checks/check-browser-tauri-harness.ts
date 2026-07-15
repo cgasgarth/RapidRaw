@@ -1334,6 +1334,11 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   await responseInput.fill('32');
   await responseInput.press('Enter');
   await page.waitForFunction(
+    () => document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '32',
+    undefined,
+    { timeout: 10_000 },
+  );
+  await page.waitForFunction(
     ({ previews, saves }) => {
       const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
       const previewCalls = calls.filter(({ command }) => command === 'apply_adjustments');
