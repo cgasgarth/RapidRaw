@@ -2,6 +2,7 @@
 pub(crate) mod color_gpu_readback_probe;
 pub(crate) mod crash_marker_service;
 pub(crate) mod gpu_context;
+pub(crate) mod gpu_context_service;
 pub(crate) mod gpu_display;
 pub(crate) mod gpu_processing;
 pub(crate) mod gpu_processing_service;

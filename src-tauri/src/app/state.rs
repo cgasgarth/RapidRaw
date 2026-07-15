@@ -1,5 +1,5 @@
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 
 use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::ai::ai_processing::{CachedDepthMap, ImageEmbeddings};
 use crate::app::startup::{InitializationService, StartupTrace};
 use crate::cache_utils::DecodedImageCache;
-use crate::image_processing::GpuContext;
 use crate::lut_processing::{CachedLutPath, Lut};
 use crate::render::native_cache::{CacheBudgetCoordinator, CachePolicy, MemoryLruCache};
 use crate::source_revision::FingerprintCache;
@@ -85,9 +84,6 @@ pub struct AppState {
     pub gpu_initialization: InitializationService,
     pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
-    pub gpu_context: Mutex<Option<GpuContext>>,
-    pub display_target_coordinator:
-        Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
     #[cfg(feature = "ai")]
     pub ai_model_registry: crate::ai::model_registry::AiModelRegistry,
     #[cfg(feature = "ai")]
@@ -138,8 +134,6 @@ impl AppState {
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
-            gpu_context: Mutex::new(None),
-            display_target_coordinator: Mutex::new(None),
             #[cfg(feature = "ai")]
             ai_model_registry: crate::ai::model_registry::AiModelRegistry::new(1536 * 1024 * 1024),
             #[cfg(feature = "ai")]

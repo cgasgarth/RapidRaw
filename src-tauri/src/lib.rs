@@ -362,7 +362,7 @@ pub fn run() {
         .plugin(PinchZoomDisablePlugin)
         .on_window_event(|window, event| if let tauri::WindowEvent::Resized(size) = event {
             let state = window.state::<AppState>();
-            if let Some(ctx) = state.gpu_context.lock().unwrap().as_ref() {
+            if let Some(ctx) = state.services.gpu_context.context_snapshot() {
                 ctx.presentation.resize(size.width, size.height);
             }
             #[cfg(target_os = "macos")]
@@ -525,11 +525,12 @@ pub fn run() {
                             }
                         },
                     );
-                coordinator.request_refresh(0);
-                *app.state::<AppState>()
-                    .display_target_coordinator
-                    .lock()
-                    .unwrap() = Some(coordinator);
+                let state = app.state::<AppState>();
+                let context = state
+                    .services
+                    .gpu_context
+                    .install_coordinator(Arc::clone(&coordinator));
+                coordinator.request_refresh(context.map_or(0, |context| context.generation));
                 #[cfg(feature = "validation-harness")]
                 crate::app::display_target::start_validation_benchmark(app.handle().clone());
             }
