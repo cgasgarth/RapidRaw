@@ -18,6 +18,10 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../utils/color/runtime/gamutWarningDisplay';
+import {
+  buildColorBalanceRgbEditTransaction,
+  type ColorBalanceRgbCommitIdentity,
+} from '../../utils/colorBalanceRgbEditTransaction';
 import { COLOR_OUTPUT_FOCUS_EVENT, COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../utils/colorWorkspaceNavigation';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
@@ -200,6 +204,39 @@ export default function ColorPanel({
       );
       channelMixerRef.current = next;
       channelMixerCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
+  const colorBalanceRgbCommitIdentity = useMemo<ColorBalanceRgbCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const colorBalanceRgbCommitIdentityRef = useRef(colorBalanceRgbCommitIdentity);
+  colorBalanceRgbCommitIdentityRef.current = colorBalanceRgbCommitIdentity;
+  const colorBalanceRgbRef = useRef(adjustments.colorBalanceRgb);
+  colorBalanceRgbRef.current = adjustments.colorBalanceRgb;
+  const commitColorBalanceRgb = useCallback(
+    (update: (current: Adjustments['colorBalanceRgb']) => Adjustments['colorBalanceRgb']) => {
+      const next = update(colorBalanceRgbRef.current);
+      const identity = colorBalanceRgbCommitIdentityRef.current;
+      if (isForMask) {
+        colorBalanceRgbRef.current = next;
+        setAdjustments((previous) => ({ ...previous, colorBalanceRgb: next }));
+        return;
+      }
+      if (identity === null) return;
+
+      const result = applyEditTransaction(
+        buildColorBalanceRgbEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+      );
+      colorBalanceRgbRef.current = next;
+      colorBalanceRgbCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
     },
     [applyEditTransaction, isForMask, setAdjustments],
   );
@@ -410,6 +447,7 @@ export default function ColorPanel({
               isForMask={isForMask}
               commitBlackWhiteMixer={commitBlackWhiteMixer}
               commitChannelMixer={commitChannelMixer}
+              commitColorBalanceRgb={commitColorBalanceRgb}
               commitSelectiveColorMixer={commitSelectiveColorMixer}
               onCreateLocalAdjustmentFromActiveRange={createLocalAdjustmentFromActiveColorRange}
               onDragStateChange={onDragStateChange}
@@ -480,6 +518,7 @@ export default function ColorPanel({
     channelMixerCommitIdentity,
     commitBlackWhiteMixer,
     commitChannelMixer,
+    commitColorBalanceRgb,
     commitSelectiveColorMixer,
     currentGamutWarningOverlay,
     isColorCalibrationVisible,
