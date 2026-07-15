@@ -26,6 +26,29 @@ export const sceneGlobalColorToneParamsV2Schema = z
   })
   .strict();
 
+export const editDocumentLocalContrastV2Schema = z
+  .object({
+    centré: z.number().finite().min(-100).max(100),
+    localContrastHaloGuard: z.number().finite().min(0).max(100),
+    localContrastMidtoneMask: z.number().finite().min(0).max(100),
+    localContrastRadiusPx: z.number().finite().min(4).max(96),
+    structure: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
+export const EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS = {
+  centré: 0,
+  localContrastHaloGuard: 50,
+  localContrastMidtoneMask: 50,
+  localContrastRadiusPx: 24,
+  structure: 0,
+} as const;
+
+export const EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS = Object.keys(
+  EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
+) as (keyof typeof EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS)[];
+const EDIT_DOCUMENT_LOCAL_CONTRAST_FIELD_NAMES = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
+
 export const editDocumentDetailDenoiseDehazeV2Schema = z
   .object({
     clarity: z.number().finite().min(-100).max(100),
@@ -41,6 +64,7 @@ export const editDocumentDetailDenoiseDehazeV2Schema = z
     denoiseShadowBias: z.number().finite().min(-100).max(100),
     lumaNoiseReduction: z.number().finite().min(0).max(100),
     sharpness: z.number().finite().min(-100).max(100),
+    ...editDocumentLocalContrastV2Schema.shape,
   })
   .strict();
 
@@ -488,6 +512,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
+      ...EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
       clarity: 0,
       colorNoiseReduction: 0,
       deblurEnabled: false,
@@ -515,6 +540,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'denoiseShadowBias',
       'lumaNoiseReduction',
       'sharpness',
+      ...EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
     ],
     nodeType: 'detail_denoise_dehaze',
     process: 'scene_referred_v2',
@@ -1284,33 +1310,102 @@ const editDocumentV2ObjectSchema = z
     }
   });
 
-export const editDocumentV2Schema = z.preprocess((value) => {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
-  const document = value as Readonly<Record<string, unknown>>;
-  const nodes = document['nodes'];
-  if (nodes === null || typeof nodes !== 'object' || Array.isArray(nodes)) return value;
-  const layersNode = (nodes as Readonly<Record<string, unknown>>)['layers'];
-  if (layersNode === null || typeof layersNode !== 'object' || Array.isArray(layersNode)) return value;
-  const rawLayers = document['layers'];
-  const rawNodeParams = (layersNode as Readonly<Record<string, unknown>>)['params'];
-  if (!sameJsonValue(rawLayers, rawNodeParams)) return value;
-  const parsedLayers = editDocumentLayersV2Schema.safeParse(rawLayers);
-  if (!parsedLayers.success) return value;
+const isEditDocumentRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
-  // Legacy V2 documents duplicated the same pre-envelope layer domain in the
-  // graph node. Normalize both copies together so reopen is deterministic,
-  // while genuine domain/node disagreement continues to fail closed.
+const normalizeLegacyDetailOwnership = (
+  document: Readonly<Record<string, unknown>>,
+  nodes: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> => {
+  const detailNode = nodes['detail_denoise_dehaze'];
+  if (!isEditDocumentRecord(detailNode) || !isEditDocumentRecord(detailNode['params'])) return document;
+  if (!isEditDocumentRecord(document['extensions'])) return document;
+  const extensions = { ...document['extensions'] };
+  const rawLegacy = extensions['legacyAdjustments'];
+  if (rawLegacy !== undefined && !isEditDocumentRecord(rawLegacy)) return document;
+  const legacyAdjustments = { ...(rawLegacy ?? {}) };
+  const rawQuarantine = extensions['quarantinedLegacyAdjustments'];
+  if (rawQuarantine !== undefined && !isEditDocumentRecord(rawQuarantine)) return document;
+  const quarantinedLegacyAdjustments = { ...(rawQuarantine ?? {}) };
+  const params = { ...detailNode['params'] };
+  const mappedPaths: string[] = [];
+  const defaultedPaths: string[] = [];
+  const quarantinedFields: string[] = [];
+
+  for (const field of EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS) {
+    if (Object.hasOwn(params, field)) continue;
+    const path = `detail_denoise_dehaze.${field}`;
+    if (Object.hasOwn(legacyAdjustments, field)) {
+      const candidate = legacyAdjustments[field];
+      delete legacyAdjustments[field];
+      const parsed = editDocumentLocalContrastV2Schema.shape[field].safeParse(candidate);
+      if (parsed.success) {
+        params[field] = parsed.data;
+        mappedPaths.push(path);
+      } else {
+        params[field] = EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS[field];
+        quarantinedLegacyAdjustments[field] = candidate;
+        defaultedPaths.push(path);
+        quarantinedFields.push(field);
+      }
+    } else {
+      params[field] = EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS[field];
+      defaultedPaths.push(path);
+      if (Object.hasOwn(quarantinedLegacyAdjustments, field)) quarantinedFields.push(field);
+    }
+  }
+  if (mappedPaths.length === 0 && defaultedPaths.length === 0) return document;
+
+  extensions['legacyAdjustments'] = legacyAdjustments;
+  if (Object.keys(quarantinedLegacyAdjustments).length > 0) {
+    extensions['quarantinedLegacyAdjustments'] = quarantinedLegacyAdjustments;
+  }
+  const parsedMigration = editDocumentMigrationReceiptV2Schema.safeParse(document['migration']);
+  const migration = parsedMigration.success
+    ? {
+        ...parsedMigration.data,
+        defaulted: [...new Set([...parsedMigration.data.defaulted, ...defaultedPaths])].sort(),
+        mapped: [...new Set([...parsedMigration.data.mapped, ...mappedPaths])].sort(),
+        quarantined: [
+          ...new Set([
+            ...parsedMigration.data.quarantined.filter((field) => !EDIT_DOCUMENT_LOCAL_CONTRAST_FIELD_NAMES.has(field)),
+            ...quarantinedFields,
+          ]),
+        ].sort(),
+      }
+    : document['migration'];
+
   return {
     ...document,
-    layers: parsedLayers.data,
-    nodes: {
-      ...(nodes as Readonly<Record<string, unknown>>),
-      layers: {
-        ...(layersNode as Readonly<Record<string, unknown>>),
-        params: parsedLayers.data,
-      },
-    },
+    extensions,
+    migration,
+    nodes: { ...nodes, detail_denoise_dehaze: { ...detailNode, params } },
   };
+};
+
+export const editDocumentV2Schema = z.preprocess((value) => {
+  if (!isEditDocumentRecord(value)) return value;
+  let document = value;
+  const nodes = document['nodes'];
+  if (!isEditDocumentRecord(nodes)) return value;
+  const layersNode = nodes['layers'];
+  if (isEditDocumentRecord(layersNode)) {
+    const rawLayers = document['layers'];
+    const rawNodeParams = layersNode['params'];
+    if (sameJsonValue(rawLayers, rawNodeParams)) {
+      const parsedLayers = editDocumentLayersV2Schema.safeParse(rawLayers);
+      if (parsedLayers.success) {
+        // Legacy V2 documents duplicated the same pre-envelope layer domain in
+        // the graph node. Normalize both copies together for deterministic reopen.
+        document = {
+          ...document,
+          layers: parsedLayers.data,
+          nodes: { ...nodes, layers: { ...layersNode, params: parsedLayers.data } },
+        };
+      }
+    }
+  }
+  return normalizeLegacyDetailOwnership(document, document['nodes'] as Readonly<Record<string, unknown>>);
 }, editDocumentV2ObjectSchema);
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;

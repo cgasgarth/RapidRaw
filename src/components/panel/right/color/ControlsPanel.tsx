@@ -77,6 +77,11 @@ import {
   toggleAutoEditGroup,
 } from '../../../../utils/autoEditWorkflow';
 import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
+import {
+  buildDetailEditTransaction,
+  isDetailBooleanNodeAdjustment,
+  isDetailNumberNodeAdjustment,
+} from '../../../../utils/detailEditTransaction';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
@@ -506,10 +511,49 @@ export default function Controls() {
       normalizeDevelopPanelSearchText([getAdjustmentSectionLabel(t, sectionName), label, ...aliases].join(' '));
 
     const handleNumericAdjustmentChange = (key: NumericAdjustmentKey, value: number, truncate = false) => {
-      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: truncate ? Math.trunc(value) : value }));
+      const nextValue = truncate ? Math.trunc(value) : value;
+      if (isDetailNumberNodeAdjustment(key)) {
+        const state = useEditorStore.getState();
+        const sourceIdentity = state.selectedImage?.path;
+        if (sourceIdentity === undefined) return;
+        state.applyEditTransaction(
+          buildDetailEditTransaction(
+            state,
+            {
+              adjustmentRevision: state.adjustmentRevision,
+              imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+              sourceIdentity,
+            },
+            key,
+            nextValue,
+            crypto.randomUUID(),
+          ),
+        );
+        return;
+      }
+      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: nextValue }));
     };
 
     const handleBooleanAdjustmentChange = (key: keyof Adjustments, value: boolean) => {
+      if (isDetailBooleanNodeAdjustment(key)) {
+        const state = useEditorStore.getState();
+        const sourceIdentity = state.selectedImage?.path;
+        if (sourceIdentity === undefined) return;
+        state.applyEditTransaction(
+          buildDetailEditTransaction(
+            state,
+            {
+              adjustmentRevision: state.adjustmentRevision,
+              imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+              sourceIdentity,
+            },
+            key,
+            value,
+            crypto.randomUUID(),
+          ),
+        );
+        return;
+      }
       setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
     };
 

@@ -303,6 +303,8 @@ fn validate_scene_tone_parameter(
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DetailDenoiseDehazeV2 {
+    // Optional only for v2 documents persisted before local-contrast ownership.
+    centré: Option<f64>,
     clarity: f64,
     color_noise_reduction: f64,
     // Optional only for v2 documents persisted before Deblur joined this node.
@@ -315,7 +317,11 @@ struct DetailDenoiseDehazeV2 {
     denoise_natural_grain: f64,
     denoise_shadow_bias: f64,
     luma_noise_reduction: f64,
+    local_contrast_halo_guard: Option<f64>,
+    local_contrast_midtone_mask: Option<f64>,
+    local_contrast_radius_px: Option<f64>,
     sharpness: f64,
+    structure: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -892,6 +898,36 @@ impl DetailDenoiseDehazeV2 {
             ("sharpness", self.sharpness, -100.0, 100.0),
         ] {
             if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 detail_denoise_dehaze field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        for (field, value, minimum, maximum) in [
+            ("centré", self.centré, -100.0, 100.0),
+            (
+                "localContrastHaloGuard",
+                self.local_contrast_halo_guard,
+                0.0,
+                100.0,
+            ),
+            (
+                "localContrastMidtoneMask",
+                self.local_contrast_midtone_mask,
+                0.0,
+                100.0,
+            ),
+            (
+                "localContrastRadiusPx",
+                self.local_contrast_radius_px,
+                4.0,
+                96.0,
+            ),
+            ("structure", self.structure, -100.0, 100.0),
+        ] {
+            if value
+                .is_some_and(|value| !value.is_finite() || !(minimum..=maximum).contains(&value))
+            {
                 return Err(format!(
                     "EditDocumentV2 detail_denoise_dehaze field '{field}' must be finite and within [{minimum}, {maximum}]"
                 ));
@@ -2124,6 +2160,7 @@ mod tests {
 
     fn detail_params() -> Value {
         json!({
+            "centré": -9,
             "clarity": 16,
             "colorNoiseReduction": 0,
             "deblurEnabled": true,
@@ -2134,8 +2171,12 @@ mod tests {
             "denoiseDetail": 50,
             "denoiseNaturalGrain": 0,
             "denoiseShadowBias": 0,
+            "localContrastHaloGuard": 62,
+            "localContrastMidtoneMask": 44,
+            "localContrastRadiusPx": 36,
             "lumaNoiseReduction": 5,
-            "sharpness": 24
+            "sharpness": 24,
+            "structure": 21
         })
     }
 
@@ -2591,6 +2632,11 @@ mod tests {
             "whites": 9
         });
         expected["cameraProfileAmount"] = json!(100);
+        expected["centré"] = json!(-9);
+        expected["localContrastHaloGuard"] = json!(62);
+        expected["localContrastMidtoneMask"] = json!(44);
+        expected["localContrastRadiusPx"] = json!(36);
+        expected["structure"] = json!(21);
         expected["effectsEnabled"] = json!(true);
         expected["sectionVisibility"] =
             json!({ "basic": true, "color": true, "curves": true, "details": true });
@@ -2922,6 +2968,24 @@ mod tests {
 
     #[test]
     fn detail_compiler_rejects_unowned_missing_and_out_of_range_params() {
+        let mut pre_local_contrast = document_with_legacy(json!({}));
+        let params = pre_local_contrast["nodes"]["detail_denoise_dehaze"]["params"]
+            .as_object_mut()
+            .expect("detail params object");
+        for field in [
+            "centré",
+            "localContrastHaloGuard",
+            "localContrastMidtoneMask",
+            "localContrastRadiusPx",
+            "structure",
+        ] {
+            params.remove(field);
+        }
+        serde_json::from_value::<EditDocumentV2>(pre_local_contrast)
+            .expect("pre-local-contrast v2 document remains parseable")
+            .into_render_adjustments()
+            .expect("pre-local-contrast v2 document remains compilable");
+
         let mut pre_deblur = document_with_legacy(json!({}));
         let params = pre_deblur["nodes"]["detail_denoise_dehaze"]["params"]
             .as_object_mut()
@@ -2973,6 +3037,22 @@ mod tests {
                 .expect("document envelope remains parseable")
                 .into_render_adjustments()
                 .expect_err("invalid deblur field must fail");
+            assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
+        }
+        for (field, invalid) in [
+            ("centré", json!(-101)),
+            ("localContrastHaloGuard", json!(101)),
+            ("localContrastMidtoneMask", json!(-1)),
+            ("localContrastRadiusPx", json!(3.9)),
+            ("localContrastRadiusPx", json!(96.1)),
+            ("structure", json!(101)),
+        ] {
+            let mut invalid_local_contrast = document_with_legacy(json!({}));
+            invalid_local_contrast["nodes"]["detail_denoise_dehaze"]["params"][field] = invalid;
+            let error = serde_json::from_value::<EditDocumentV2>(invalid_local_contrast)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("invalid local-contrast field must fail");
             assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
         }
     }
