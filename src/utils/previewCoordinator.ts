@@ -203,8 +203,21 @@ export interface PreviewTransitionReceipt {
   staleCompletion: boolean;
 }
 
+export interface PreviewAnalyticsIntent {
+  readonly identity: PreviewOperationIdentity;
+  readonly receiptId: number;
+}
+
+export interface PreviewAnalyticsTransitionReceipt {
+  readonly action: 'buffered' | 'cleared' | 'discarded' | 'published';
+  readonly operationId: number | null;
+  readonly reason: string;
+  readonly receiptId: number | null;
+}
+
 export interface PreviewCoordinatorState {
   analytics: PreviewOperationState;
+  analyticsTransitions: readonly PreviewAnalyticsTransitionReceipt[];
   desired: PreviewIntent | null;
   displayGeneration: number;
   interactive: PreviewOperationState;
@@ -217,6 +230,7 @@ export interface PreviewCoordinatorState {
   original: PreviewOperationState;
   originalArtifact: PreviewArtifact | null;
   persistence: PreviewOperationState;
+  pendingAnalytics: readonly PreviewAnalyticsIntent[];
   quality: PreviewQualitySnapshot | null;
   schedulingInputs: PreviewSchedulingInputSnapshot | null;
   settled: PreviewOperationState;
@@ -228,6 +242,9 @@ export interface PreviewCoordinatorState {
 
 export type PreviewCoordinatorEffect =
   | { type: 'capture-invalidation'; invalidation: PreviewInvalidationRequest; scopeRecovery: boolean }
+  | { type: 'clear-analytics'; reason: string }
+  | { type: 'discard-analytics'; receiptId: number; reason: string }
+  | { type: 'publish-analytics'; identity: PreviewOperationIdentity; receiptId: number; reason: string }
   | { type: 'cancel'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'clear-original'; reason: string }
   | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
@@ -238,6 +255,7 @@ export type PreviewCoordinatorEffect =
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
 
 export type PreviewCoordinatorEvent =
+  | { type: 'analytics-result-received'; identity: PreviewOperationIdentity; receiptId: number }
   | { type: 'cancel-session'; reason?: string }
   | { type: 'display-generation-changed'; generation: number }
   | { type: 'image-session-installed'; session: PreviewSessionIdentity }
@@ -269,6 +287,7 @@ const idleOperation = (): PreviewOperationState => ({ status: 'idle' });
 export function createPreviewCoordinatorState(): PreviewCoordinatorState {
   return {
     analytics: idleOperation(),
+    analyticsTransitions: [],
     desired: null,
     displayGeneration: 1,
     interactive: idleOperation(),
@@ -281,6 +300,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     original: idleOperation(),
     originalArtifact: null,
     persistence: idleOperation(),
+    pendingAnalytics: [],
     quality: null,
     schedulingInputs: null,
     settled: idleOperation(),
@@ -347,6 +367,37 @@ function withReceipt(
   };
 }
 
+const withAnalyticsReceipt = (
+  state: PreviewCoordinatorState,
+  receipt: PreviewAnalyticsTransitionReceipt,
+): PreviewCoordinatorState => ({
+  ...state,
+  analyticsTransitions: [...state.analyticsTransitions, receipt].slice(-32),
+});
+
+const discardPendingAnalytics = (
+  state: PreviewCoordinatorState,
+  effects: PreviewCoordinatorEffect[],
+  reason: string,
+  predicate: (intent: PreviewAnalyticsIntent) => boolean = () => true,
+): PreviewCoordinatorState => {
+  const discarded = state.pendingAnalytics.filter(predicate);
+  let next = state;
+  for (const intent of discarded) {
+    effects.push({ receiptId: intent.receiptId, reason, type: 'discard-analytics' });
+    next = withAnalyticsReceipt(next, {
+      action: 'discarded',
+      operationId: intent.identity.operationId,
+      reason,
+      receiptId: intent.receiptId,
+    });
+  }
+  return {
+    ...next,
+    pendingAnalytics: state.pendingAnalytics.filter((intent) => !predicate(intent)),
+  };
+};
+
 function cancelActiveOperations(
   state: PreviewCoordinatorState,
   effects: PreviewCoordinatorEffect[],
@@ -358,7 +409,9 @@ function cancelActiveOperations(
   for (const kind of previewOperationKindSchema.options) {
     const operation = operationForKind(next, kind);
     if (operation.identity === undefined || !['queued', 'running'].includes(operation.status)) continue;
-    effects.push({ type: 'cancel', identity: operation.identity, reason });
+    const identity = operation.identity;
+    effects.push({ type: 'cancel', identity, reason });
+    next = discardPendingAnalytics(next, effects, reason, (intent) => sameOperation(intent.identity, identity));
     next = updateOperation(next, kind, { ...operation, status: 'cancelled' });
   }
   if (releaseVisibleArtifact && next.visibleArtifact !== null) {
@@ -371,6 +424,14 @@ function cancelActiveOperations(
       effects.push({ type: 'release-url', url: next.originalArtifact.url, reason });
     }
     next = { ...next, originalArtifact: null };
+  }
+  if (releaseVisibleArtifact) {
+    next = discardPendingAnalytics(next, effects, reason);
+    if (next.analytics.status !== 'idle' || state.visibleArtifact !== null) {
+      effects.push({ reason, type: 'clear-analytics' });
+      next = withAnalyticsReceipt(next, { action: 'cleared', operationId: null, reason, receiptId: null });
+    }
+    next = { ...next, analytics: idleOperation() };
   }
   return next;
 }
@@ -571,6 +632,65 @@ export function reducePreviewCoordinator(
       effects: scheduled.effects,
       state: withReceipt(scheduled.state, event, 'captured-invalidation-scheduled'),
     };
+  }
+
+  if (event.type === 'analytics-result-received') {
+    const identity = previewOperationIdentitySchema.parse(event.identity);
+    const receiptId = positiveRevisionSchema.parse(event.receiptId);
+    const visibleCurrent = state.visibleArtifact !== null && sameOperation(state.visibleArtifact.identity, identity);
+    const alreadyPublished =
+      state.analytics.status === 'presented' && sameOperation(state.analytics.identity, identity);
+    const operation = operationForKind(state, identity.kind);
+    const operationCurrent =
+      identity.kind !== 'original' &&
+      identity.kind !== 'analytics' &&
+      sameOperation(operation.identity, identity) &&
+      ['queued', 'running', 'presented'].includes(operation.status);
+
+    if (alreadyPublished || state.pendingAnalytics.some((intent) => sameOperation(intent.identity, identity))) {
+      effects.push({ receiptId, reason: 'duplicate-analytics-result', type: 'discard-analytics' });
+      state = withAnalyticsReceipt(state, {
+        action: 'discarded',
+        operationId: identity.operationId,
+        reason: 'duplicate-analytics-result',
+        receiptId,
+      });
+      return { effects, state: withReceipt(state, event, 'duplicate-analytics-result', identity.operationId) };
+    }
+    if (visibleCurrent) {
+      effects.push({ identity, receiptId, reason: 'presented-artifact-analytics', type: 'publish-analytics' });
+      state = withAnalyticsReceipt(
+        { ...state, analytics: { identity, status: 'presented' } },
+        {
+          action: 'published',
+          operationId: identity.operationId,
+          reason: 'presented-artifact-analytics',
+          receiptId,
+        },
+      );
+      return { effects, state: withReceipt(state, event, 'analytics-published', identity.operationId) };
+    }
+    if (operationCurrent) {
+      if (state.pendingAnalytics.length >= 4) {
+        const oldest = state.pendingAnalytics[0];
+        if (oldest !== undefined) {
+          state = discardPendingAnalytics(state, effects, 'analytics-buffer-bounded', (intent) => intent === oldest);
+        }
+      }
+      state = withAnalyticsReceipt(
+        { ...state, pendingAnalytics: [...state.pendingAnalytics, { identity, receiptId }] },
+        { action: 'buffered', operationId: identity.operationId, reason: 'analytics-before-presentation', receiptId },
+      );
+      return { effects, state: withReceipt(state, event, 'analytics-buffered', identity.operationId) };
+    }
+    effects.push({ receiptId, reason: 'stale-analytics-result', type: 'discard-analytics' });
+    state = withAnalyticsReceipt(state, {
+      action: 'discarded',
+      operationId: identity.operationId,
+      reason: 'stale-analytics-result',
+      receiptId,
+    });
+    return { effects, state: withReceipt(state, event, 'stale-analytics-result', identity.operationId, true) };
   }
 
   if (event.type === 'scheduling-inputs-changed') {
@@ -883,6 +1003,9 @@ export function reducePreviewCoordinator(
     }
 
     if (event.type === 'operation-failed') {
+      state = discardPendingAnalytics(state, effects, 'analytics-operation-failed', (intent) =>
+        sameOperation(intent.identity, identity),
+      );
       state = updateOperation(state, identity.kind, { error: event.error, identity, status: 'failed' });
       return { effects, state: withReceipt(state, event, 'operation-failed', identity.operationId) };
     }
@@ -925,8 +1048,48 @@ export function reducePreviewCoordinator(
       if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
         effects.push({ type: 'release-url', url: previousUrl, reason: 'artifact-replaced' });
       }
+      if (state.visibleArtifact !== null && !sameOperation(state.visibleArtifact.identity, identity)) {
+        effects.push({ reason: 'presented-artifact-replaced', type: 'clear-analytics' });
+        state = withAnalyticsReceipt(
+          { ...state, analytics: idleOperation() },
+          {
+            action: 'cleared',
+            operationId: state.visibleArtifact.identity.operationId,
+            reason: 'presented-artifact-replaced',
+            receiptId: null,
+          },
+        );
+      }
       effects.push({ type: 'publish', artifact: event.artifact, identity, reason: 'operation-presented' });
       state = { ...state, visibleArtifact: event.artifact };
+      const pending = state.pendingAnalytics.find((intent) => sameOperation(intent.identity, identity));
+      state = discardPendingAnalytics(
+        state,
+        effects,
+        'analytics-artifact-superseded',
+        (intent) => !sameOperation(intent.identity, identity),
+      );
+      if (pending !== undefined) {
+        effects.push({
+          identity,
+          receiptId: pending.receiptId,
+          reason: 'buffered-analytics-presented',
+          type: 'publish-analytics',
+        });
+        state = withAnalyticsReceipt(
+          {
+            ...state,
+            analytics: { identity, status: 'presented' },
+            pendingAnalytics: state.pendingAnalytics.filter((intent) => intent.receiptId !== pending.receiptId),
+          },
+          {
+            action: 'published',
+            operationId: identity.operationId,
+            reason: 'buffered-analytics-presented',
+            receiptId: pending.receiptId,
+          },
+        );
+      }
     }
     return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
   }
