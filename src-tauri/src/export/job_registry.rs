@@ -216,6 +216,42 @@ mod tests {
     }
 
     #[test]
+    fn app_service_preserves_generation_across_concurrent_cancel_and_retry() {
+        let services = Arc::new(crate::app::services::AppServices::new());
+        let barrier = Arc::new(Barrier::new(17));
+        let contenders = (0..16)
+            .map(|_| {
+                let services = Arc::clone(&services);
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    services.export_jobs.admit()
+                })
+            })
+            .collect::<Vec<_>>();
+        barrier.wait();
+        let mut admitted = contenders
+            .into_iter()
+            .filter_map(|contender| contender.join().unwrap().ok());
+        let owner = admitted.next().expect("one export owner");
+        assert!(admitted.next().is_none());
+
+        let acknowledgement = services.export_jobs.request_cancellation().unwrap();
+        assert_eq!(acknowledgement.active_job_id, owner.job_id());
+        assert!(owner.cancellation().is_cancelled());
+        assert!(services.export_jobs.complete(&owner));
+
+        let retry = services.export_jobs.admit().unwrap();
+        assert!(!services.export_jobs.complete(&owner));
+        let snapshot = services.export_jobs.snapshot().unwrap();
+        assert_eq!(snapshot.job_id, retry.job_id());
+        assert_eq!(snapshot.generation, 2);
+        assert!(!snapshot.cancellation_requested);
+        assert!(services.export_jobs.request_cancellation().is_ok());
+        assert!(services.export_jobs.complete(&retry));
+    }
+
+    #[test]
     fn stale_completion_cannot_release_a_newer_job() {
         let registry = ExportJobRegistry::default();
         let first = registry.admit().unwrap();
