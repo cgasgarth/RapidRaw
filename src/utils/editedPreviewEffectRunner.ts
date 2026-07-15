@@ -335,7 +335,7 @@ export class EditedPreviewEffectRunner<T> {
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
   }
 
-  request(request: EditedPreviewRequest, delayMs = 0): PreviewOperationIdentity {
+  request(request: EditedPreviewRequest, delayMs = 0, causalGeneration?: number): PreviewOperationIdentity {
     if (this.disposed) throw new Error('Edited preview runner is disposed.');
     validateRequestIdentity(request);
     const synchronized =
@@ -354,12 +354,16 @@ export class EditedPreviewEffectRunner<T> {
     });
     this.consume(viewportTransition.effects);
     const transition = this.dispatch({
+      ...(causalGeneration === undefined ? {} : { causalGeneration }),
       identity: request.session,
       kind: request.kind,
       reason: request.scopeRecovery ? 'scope-recovery' : `${request.kind}-inputs-changed`,
       type: 'render-inputs-changed',
     });
     this.consume(transition.effects);
+    if (transition.state.lastTransition?.reason === 'stale-render-input-generation') {
+      throw new Error('Edited preview scheduling intent has a stale causal generation.');
+    }
     const identity = transition.state[request.kind].identity;
     if (identity === undefined) throw new Error('PreviewCoordinator did not create an edited preview operation.');
 

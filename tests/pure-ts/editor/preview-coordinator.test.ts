@@ -9,6 +9,7 @@ import {
   fingerprintPreviewSessionIdentity,
   type PreviewArtifact,
   PreviewCoordinator,
+  type PreviewCoordinatorEffect,
   type PreviewSchedulingInputSnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
@@ -202,7 +203,9 @@ test('session-owned scheduling emits interactive work and exactly one settled su
   let state = createPreviewCoordinatorState();
   const initialInputs = prepare();
   const initial = transition(state, { inputs: initialInputs, type: 'scheduling-inputs-changed' });
-  expect(initial.effects).toMatchObject([{ delayMs: 50, reason: 'settled-inputs-changed', type: 'schedule-edited' }]);
+  expect(initial.effects).toMatchObject([
+    { causalGeneration: 1, delayMs: 50, reason: 'settled-inputs-changed', type: 'schedule-edited' },
+  ]);
   state = initial.state;
   expect(transition(state, { inputs: initialInputs, type: 'scheduling-inputs-changed' }).effects).toEqual([]);
 
@@ -211,14 +214,14 @@ test('session-owned scheduling emits interactive work and exactly one settled su
     type: 'scheduling-inputs-changed',
   });
   expect(firstDrag.effects).toMatchObject([
-    { delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
+    { causalGeneration: 2, delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
   ]);
   const secondDrag = transition(firstDrag.state, {
     inputs: prepare({ dragging: true, exposure: 0.2 }),
     type: 'scheduling-inputs-changed',
   });
   expect(secondDrag.effects).toMatchObject([
-    { delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
+    { causalGeneration: 2, delayMs: 0, reason: 'interactive-inputs-changed', type: 'schedule-edited' },
   ]);
 
   const settledInputs = prepare({ dragging: false, exposure: 0.2 });
@@ -227,9 +230,119 @@ test('session-owned scheduling emits interactive work and exactly one settled su
     type: 'scheduling-inputs-changed',
   });
   expect(settled.effects).toMatchObject([
-    { delayMs: 50, reason: 'interaction-settled-successor', type: 'schedule-edited' },
+    { causalGeneration: 3, delayMs: 50, reason: 'interaction-settled-successor', type: 'schedule-edited' },
   ]);
   expect(transition(settled.state, { inputs: settledInputs, type: 'scheduling-inputs-changed' }).effects).toEqual([]);
+});
+
+test('causal generations keep every drag frame together and reject delayed work after the settled successor', () => {
+  const { prepare } = schedulingInputHarness();
+  const requiredSchedule = (effects: readonly PreviewCoordinatorEffect[]) => {
+    const effect = effects.find((candidate) => candidate.type === 'schedule-edited');
+    if (effect?.type !== 'schedule-edited') throw new Error('Expected edited scheduling effect.');
+    return effect;
+  };
+  let state = createPreviewCoordinatorState();
+
+  const initial = transition(state, { inputs: prepare(), type: 'scheduling-inputs-changed' });
+  const initialSchedule = requiredSchedule(initial.effects);
+  const initialQueued = transition(initial.state, {
+    causalGeneration: initialSchedule.causalGeneration,
+    identity: initialSchedule.prepared.request.session,
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+
+  const firstDrag = transition(initialQueued.state, {
+    inputs: prepare({ dragging: true, exposure: 0.1 }),
+    type: 'scheduling-inputs-changed',
+  });
+  const firstDragSchedule = requiredSchedule(firstDrag.effects);
+  const firstDragQueued = transition(firstDrag.state, {
+    causalGeneration: firstDragSchedule.causalGeneration,
+    identity: firstDragSchedule.prepared.request.session,
+    kind: 'interactive',
+    type: 'render-inputs-changed',
+  });
+  const firstDragIdentity = required(firstDragQueued.state.interactive.identity);
+
+  const secondDrag = transition(firstDragQueued.state, {
+    inputs: prepare({ dragging: true, exposure: 0.2 }),
+    type: 'scheduling-inputs-changed',
+  });
+  const secondDragSchedule = requiredSchedule(secondDrag.effects);
+  const secondDragQueued = transition(secondDrag.state, {
+    causalGeneration: secondDragSchedule.causalGeneration,
+    identity: secondDragSchedule.prepared.request.session,
+    kind: 'interactive',
+    type: 'render-inputs-changed',
+  });
+  const secondDragIdentity = required(secondDragQueued.state.interactive.identity);
+  state = transition(secondDragQueued.state, { identity: secondDragIdentity, type: 'operation-started' }).state;
+
+  const released = transition(state, {
+    inputs: prepare({ dragging: false, exposure: 0.2 }),
+    type: 'scheduling-inputs-changed',
+  });
+  const settledSchedule = requiredSchedule(released.effects);
+  const settledQueued = transition(released.state, {
+    causalGeneration: settledSchedule.causalGeneration,
+    identity: settledSchedule.prepared.request.session,
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const settledIdentity = required(settledQueued.state.settled.identity);
+  state = transition(settledQueued.state, { identity: settledIdentity, type: 'operation-started' }).state;
+  const completionEffects: PreviewCoordinatorEffect[] = [];
+  const fakeClock = [
+    {
+      at: 20,
+      event: {
+        artifact: artifact(secondDragIdentity, 'blob:late-interactive'),
+        identity: secondDragIdentity,
+        type: 'operation-completed' as const,
+      },
+    },
+    {
+      at: 10,
+      event: {
+        artifact: artifact(settledIdentity, 'blob:settled-successor'),
+        identity: settledIdentity,
+        type: 'operation-completed' as const,
+      },
+    },
+  ];
+  for (const completion of fakeClock.sort((left, right) => left.at - right.at)) {
+    const completed = transition(state, completion.event);
+    state = completed.state;
+    completionEffects.push(...completed.effects);
+  }
+  const staleIntent = transition(state, {
+    causalGeneration: secondDragSchedule.causalGeneration,
+    identity: secondDragSchedule.prepared.request.session,
+    kind: 'interactive',
+    type: 'render-inputs-changed',
+  });
+
+  expect(firstDragIdentity.generation).toBe(2);
+  expect(secondDragIdentity.generation).toBe(2);
+  expect(secondDragQueued.effects).toContainEqual({
+    identity: firstDragIdentity,
+    reason: 'newer-render-inputs',
+    type: 'cancel',
+  });
+  expect(settledIdentity.generation).toBe(3);
+  expect(state.visibleArtifact?.url).toBe('blob:settled-successor');
+  expect(completionEffects).toContainEqual({
+    reason: 'artifact-not-presented',
+    type: 'release-url',
+    url: 'blob:late-interactive',
+  });
+  expect(staleIntent.effects).toEqual([]);
+  expect(staleIntent.state.lastTransition).toMatchObject({
+    reason: 'stale-render-input-generation',
+    staleCompletion: true,
+  });
 });
 
 test('compare, target, ROI, zoom, and DPR snapshots causally schedule their successors', () => {

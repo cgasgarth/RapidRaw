@@ -6,6 +6,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { EditedPreviewRequest } from '../../../src/utils/editedPreviewEffectRunner';
 import { PreviewCoordinator, type PreviewOperationIdentity } from '../../../src/utils/previewCoordinator';
+import { PreviewInteractionSchedulingEffectRunner } from '../../../src/utils/previewInteractionSchedulingEffectRunner';
 import {
   PreviewRequestIntentAdapter,
   type PreviewRequestPendingUpdate,
@@ -62,7 +63,12 @@ class FakeClock {
 const harness = () => {
   const coordinator = new PreviewCoordinator();
   const scopeAdapter = new PreviewRequestScopeAdapter({ getDisplayGeneration: () => 1 });
-  const scheduled: Array<{ delayMs: number; identity: PreviewOperationIdentity; request: EditedPreviewRequest }> = [];
+  const scheduled: Array<{
+    causalGeneration?: number;
+    delayMs: number;
+    identity: PreviewOperationIdentity;
+    request: EditedPreviewRequest;
+  }> = [];
   const updates: PreviewRequestPendingUpdate[] = [];
   let currentSource = source('/fixtures/a.raw', 1);
   let currentQuality = quality();
@@ -74,8 +80,9 @@ const harness = () => {
     installSession: (scope) => void coordinator.dispatch({ session: scope.session, type: 'image-session-installed' }),
     now: () => now,
     publish: (update) => updates.push(update),
-    schedule: (request, delayMs) => {
+    schedule: (request, delayMs, causalGeneration) => {
       const queued = coordinator.dispatch({
+        ...(causalGeneration === undefined ? {} : { causalGeneration }),
         identity: request.session,
         kind: request.kind,
         reason: 'intent-test',
@@ -84,7 +91,7 @@ const harness = () => {
       const identity = queued.state[request.kind].identity;
       if (identity === undefined) throw new Error('Expected a scheduled preview identity.');
       coordinator.dispatch({ identity, type: 'operation-started' });
-      scheduled.push({ delayMs, identity, request });
+      scheduled.push({ causalGeneration, delayMs, identity, request });
       return identity;
     },
   });
@@ -130,6 +137,43 @@ describe('preview request intent adapter', () => {
     expect(scheduled).toHaveLength(1);
     expect(scheduled[0]?.delayMs).toBe(25);
     expect(updates[0]?.previewQualityStatus.requestId).toBe(identity.operationId);
+  });
+
+  test('executes coordinator-issued schedules with their exact causal generation', () => {
+    const { adapter, coordinator, scheduled } = harness();
+    const prepared = adapter.prepare({
+      activeWaveformChannel: null,
+      delayMs: 0,
+      dragging: true,
+      isWaveformVisible: false,
+      proofRecipe: null,
+      requestedTargetResolution: 1200,
+      scopeRecovery: false,
+    });
+    if (prepared === null) throw new Error('Expected prepared interaction intent.');
+    const scheduling = coordinator.dispatch({
+      inputs: {
+        compareActive: false,
+        devicePixelRatio: 2,
+        displayHeight: 800,
+        displayWidth: 1200,
+        edited: prepared,
+        enableLivePreviews: true,
+        original: null,
+        ready: true,
+      },
+      type: 'scheduling-inputs-changed',
+    });
+    const runner = new PreviewInteractionSchedulingEffectRunner({
+      schedule: (intent, delayMs, causalGeneration) => adapter.schedulePrepared(intent, delayMs, causalGeneration),
+    });
+
+    const identities = runner.consume(scheduling.effects);
+
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0]).toMatchObject({ causalGeneration: 2, delayMs: 0 });
+    expect(identities[0]?.generation).toBe(2);
+    expect(coordinator.snapshot().interactionGeneration).toBe(2);
   });
 
   test('settled intent captures one exact scope, proof recipe, and pending receipt', () => {

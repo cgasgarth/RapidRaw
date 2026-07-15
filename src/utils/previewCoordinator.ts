@@ -250,7 +250,13 @@ export type PreviewCoordinatorEffect =
   | { type: 'present'; identity: PreviewOperationIdentity; reason: string }
   | { type: 'publish'; artifact: PreviewArtifact; identity: PreviewOperationIdentity; reason: string }
   | { type: 'release-url'; url: string; reason: string }
-  | { type: 'schedule-edited'; delayMs: number; prepared: PreparedPreviewRequestIntent; reason: string }
+  | {
+      type: 'schedule-edited';
+      causalGeneration: number;
+      delayMs: number;
+      prepared: PreparedPreviewRequestIntent;
+      reason: string;
+    }
   | { type: 'schedule-original'; delayMs: number; prepared: PreviewSchedulingOriginalRequest; reason: string }
   | { type: 'start'; identity: PreviewOperationIdentity; reason: string };
 
@@ -260,8 +266,6 @@ export type PreviewCoordinatorEvent =
   | { type: 'display-generation-changed'; generation: number }
   | { type: 'image-session-installed'; session: PreviewSessionIdentity }
   | { type: 'invalidation-source-installed'; scopeRecoveryRequestId: number; session: PreviewSessionIdentity }
-  | { type: 'interaction-ended'; settledIdentity?: PreviewSessionIdentity }
-  | { type: 'interaction-started' }
   | { type: 'operation-completed'; artifact?: PreviewArtifact; identity: PreviewOperationIdentity }
   | { type: 'operation-failed'; error: string; identity: PreviewOperationIdentity }
   | { type: 'original-preview-cleared'; reason: string }
@@ -275,7 +279,13 @@ export type PreviewCoordinatorEvent =
   | { type: 'preview-invalidation-requested'; invalidation: PreviewInvalidationRequest }
   | { type: 'scheduling-inputs-changed'; inputs: PreviewSchedulingInputSnapshot }
   | { type: 'viewport-changed'; viewport: PreviewViewportSnapshot }
-  | { identity: PreviewSessionIdentity; kind: PreviewOperationKind; reason?: string; type: 'render-inputs-changed' };
+  | {
+      causalGeneration?: number;
+      identity: PreviewSessionIdentity;
+      kind: PreviewOperationKind;
+      reason?: string;
+      type: 'render-inputs-changed';
+    };
 
 export interface PreviewCoordinatorTransition {
   effects: PreviewCoordinatorEffect[];
@@ -772,6 +782,7 @@ export function reducePreviewCoordinator(
       previous?.enableLivePreviews !== inputs.enableLivePreviews;
     if (editedChanged && (!nextInteraction || inputs.enableLivePreviews)) {
       effects.push({
+        causalGeneration: state.interactionGeneration,
         delayMs: nextInteraction ? 0 : 50,
         prepared: inputs.edited,
         reason: interactionEnded
@@ -864,35 +875,6 @@ export function reducePreviewCoordinator(
     return { effects, state: withReceipt(state, event, event.reason) };
   }
 
-  if (event.type === 'interaction-started') {
-    state = {
-      ...state,
-      interactionActive: true,
-      interactionGeneration: state.interactionGeneration + 1,
-    };
-    return { effects, state: withReceipt(state, event, 'interaction-started') };
-  }
-
-  if (event.type === 'interaction-ended') {
-    state = { ...state, interactionActive: false, interactionGeneration: state.interactionGeneration + 1 };
-    if (event.settledIdentity !== undefined && state.session !== null) {
-      const identity = previewOperationIdentitySchema.parse({
-        generation: state.interactionGeneration,
-        kind: 'settled',
-        operationId: state.nextOperationId,
-        session: event.settledIdentity,
-      });
-      state = {
-        ...state,
-        desired: { identity, reason: 'interaction-ended' },
-        nextOperationId: state.nextOperationId + 1,
-        settled: { identity, status: 'queued' },
-      };
-      effects.push({ type: 'start', identity, reason: 'interaction-ended' });
-    }
-    return { effects, state: withReceipt(state, event, 'interaction-ended') };
-  }
-
   if (event.type === 'display-generation-changed') {
     const displayGeneration = positiveRevisionSchema.parse(event.generation);
     if (displayGeneration <= state.displayGeneration) {
@@ -931,12 +913,22 @@ export function reducePreviewCoordinator(
   }
 
   if (event.type === 'render-inputs-changed') {
+    const causalGeneration =
+      event.causalGeneration === undefined ? undefined : positiveRevisionSchema.parse(event.causalGeneration);
+    if (causalGeneration !== undefined && causalGeneration !== state.interactionGeneration) {
+      return {
+        effects,
+        state: withReceipt(state, event, 'stale-render-input-generation', undefined, true),
+      };
+    }
     const sessionChanged = state.session !== null && !sameSession(state.session, event.identity);
     if (sessionChanged) state = cancelActiveOperations(state, effects, 'render-session-replaced');
     const session = event.identity;
     const kind = event.kind;
+    const nextInteractionGeneration =
+      causalGeneration ?? state.interactionGeneration + (kind === 'interactive' ? 1 : 0);
     const identity = makeOperationIdentity(
-      { ...state, interactionGeneration: state.interactionGeneration + (kind === 'interactive' ? 1 : 0) },
+      { ...state, interactionGeneration: nextInteractionGeneration },
       session,
       kind,
     );
@@ -948,7 +940,7 @@ export function reducePreviewCoordinator(
       ...state,
       session,
       desired: { identity, reason: event.reason ?? 'render-inputs-changed' },
-      interactionGeneration: identity.generation,
+      interactionGeneration: nextInteractionGeneration,
       nextOperationId: state.nextOperationId + 1,
       [kind]: { identity, status: 'queued' },
     };

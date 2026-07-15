@@ -52,7 +52,7 @@ export interface PreviewRequestIntentAdapterOptions {
   installSession: (scope: PreviewRequestScopeSnapshot) => void;
   now?: () => number;
   publish: (update: PreviewRequestPendingUpdate) => void;
-  schedule: (request: EditedPreviewRequest, delayMs: number) => PreviewOperationIdentity;
+  schedule: (request: EditedPreviewRequest, delayMs: number, causalGeneration?: number) => PreviewOperationIdentity;
 }
 
 /** Converts immutable UI intent into one exact scheduled preview request. */
@@ -107,10 +107,14 @@ export class PreviewRequestIntentAdapter {
     };
   }
 
-  schedulePrepared(prepared: PreparedPreviewRequestIntent, delayMs = prepared.delayMs): PreviewOperationIdentity {
+  schedulePrepared(
+    prepared: PreparedPreviewRequestIntent,
+    delayMs = prepared.delayMs,
+    causalGeneration?: number,
+  ): PreviewOperationIdentity {
     this.options.dispatch({ quality: prepared.qualitySnapshot, type: 'quality-decision-changed' });
     this.options.installSession(prepared.scope);
-    const identity = this.options.schedule(prepared.request, Math.max(0, delayMs));
+    const identity = this.options.schedule(prepared.request, Math.max(0, delayMs), causalGeneration);
     this.options.publish({
       ...(prepared.request.kind === 'settled'
         ? { requestedPreviewResolution: prepared.request.quality.requestedTargetResolution }
