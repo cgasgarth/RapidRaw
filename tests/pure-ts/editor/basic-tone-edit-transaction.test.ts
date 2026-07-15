@@ -6,6 +6,7 @@ import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustm
 import {
   type BasicToneCommitIdentity,
   buildBasicToneEditTransaction,
+  captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -121,5 +122,57 @@ describe('basic tone edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('basic_tone_transaction.stale_revision');
+  });
+
+  test('commits through the canonical fallback session and rejects its successor', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-basic-before',
+      imageSession: null,
+      imageSessionId: 37,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: BasicToneCommitIdentity = {
+      adjustmentRevision: 0,
+      imageSessionId: 'editor-image-session:37',
+      sourceIdentity: sourcePath,
+    };
+    expect(captureBasicToneCommitIdentity(state)).toEqual(fallbackIdentity);
+
+    const noOp = state.applyEditTransaction(
+      buildBasicToneEditTransaction(state, fallbackIdentity, BasicAdjustment.Exposure, 0, 'fallback-basic-no-op'),
+    );
+    expect(noOp.noOp).toBeTrue();
+    expect(useEditorStore.getState()).toMatchObject({
+      adjustmentRevision: 0,
+      finalPreviewUrl: 'blob:fallback-basic-before',
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+    });
+
+    const result = state.applyEditTransaction(
+      buildBasicToneEditTransaction(state, fallbackIdentity, BasicAdjustment.Exposure, 0.8, 'fallback-basic'),
+    );
+    expect(result).toMatchObject({ changedKeys: ['exposure'], nextAdjustmentRevision: 1, noOp: false });
+    expect(useEditorStore.getState()).toMatchObject({
+      finalPreviewUrl: null,
+      historyIndex: 1,
+      lastEditApplicationReceipt: {
+        imageSessionId: fallbackIdentity.imageSessionId,
+        transactionId: 'fallback-basic',
+      },
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(() =>
+      buildBasicToneEditTransaction(
+        { ...state, imageSessionId: 38 },
+        fallbackIdentity,
+        BasicAdjustment.Exposure,
+        1,
+        'stale-fallback-basic',
+      ),
+    ).toThrow('basic_tone_transaction.stale_session');
   });
 });
