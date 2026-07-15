@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 import type { QaDaemonIdentity } from './daemon-model';
 
 const hashFiles = async (worktree: string, paths: readonly string[]): Promise<string> => {
@@ -19,16 +20,9 @@ const hashFiles = async (worktree: string, paths: readonly string[]): Promise<st
   return hash.digest('hex');
 };
 
-function gitEnvironment(): Record<string, string> {
-  const environment: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith('GIT_') && value !== undefined) environment[key] = value;
-  }
-  return environment;
-}
-
 export async function createQaDaemonIdentity(worktree: string, headed: boolean): Promise<QaDaemonIdentity> {
-  const git = (args: readonly string[]) => Bun.spawnSync(['git', '-C', worktree, ...args], { env: gitEnvironment() });
+  const git = (args: readonly string[]) =>
+    Bun.spawnSync(['git', '-C', worktree, ...args], { env: isolatedGitEnvironment() });
   const configuration = await hashFiles(worktree, [
     'bun.lock',
     'package.json',

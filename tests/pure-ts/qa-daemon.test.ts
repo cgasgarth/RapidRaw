@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import { qaDaemonLeaseForState } from '../../scripts/qa/daemon-client';
 import { QaDaemonEngine, type QaLifecycleAdapter } from '../../scripts/qa/daemon-engine';
 import type {
@@ -69,16 +70,8 @@ async function temporaryDirectory(): Promise<string> {
   return directory;
 }
 
-function withoutGitEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
-  const isolated: Record<string, string> = {};
-  for (const [key, value] of Object.entries(environment)) {
-    if (!key.startsWith('GIT_') && value !== undefined) isolated[key] = value;
-  }
-  return isolated;
-}
-
 function fixtureGit(worktree: string, args: readonly string[], environment: NodeJS.ProcessEnv = process.env) {
-  return Bun.spawnSync(['git', ...args], { cwd: worktree, env: withoutGitEnvironment(environment) });
+  return Bun.spawnSync(['git', ...args], { cwd: worktree, env: isolatedGitEnvironment(environment) });
 }
 
 async function socketRequest(socketPath: string, value: unknown): Promise<QaDaemonResponse> {
@@ -360,6 +353,9 @@ describe('QA daemon lifecycle', () => {
     const repository = resolve(import.meta.dir, '../..');
     const child = spawnQaDaemon(repository, worktree);
     const state = await waitForDaemonState(child, worktree);
+    await expect(
+      socketRequest(state.socketPath, { id: 'health-before-signal', method: 'health' }),
+    ).resolves.toMatchObject({ id: 'health-before-signal', ok: true });
     child.kill('SIGTERM');
     await Promise.race([
       child.exited,

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runPureTsUnitShards } from '../../../scripts/ci/run-pure-ts-unit';
+import { runPureTsUnitShards, selectPureTsFailureContext } from '../../../scripts/ci/run-pure-ts-unit';
 
 const temporaryRoots: string[] = [];
 
@@ -57,6 +57,22 @@ test('budget ${String(index)}',()=>expect(previous+1).toBeLessThanOrEqual(2));
 };
 
 describe('pure TypeScript unit runner', () => {
+  test('retains the assertion and test location when compacting noisy shard diagnostics', () => {
+    const output = [
+      ...Array.from({ length: 40 }, (_, index) => `leading noise ${String(index)}`),
+      'error: expect(received).toBe(expected)',
+      '      at <anonymous> (/repo/tests/pure-ts/example.test.ts:42:11)',
+      '(fail) example contract',
+      ...Array.from({ length: 40 }, (_, index) => `trailing noise ${String(index)}`),
+    ].join('\n');
+    const context = selectPureTsFailureContext(output);
+    expect(context).toContain('error: expect(received).toBe(expected)');
+    expect(context).toContain('/repo/tests/pure-ts/example.test.ts:42:11');
+    expect(context).toContain('(fail) example contract');
+    expect(context).not.toContain('leading noise 0');
+    expect(context).not.toContain('trailing noise 39');
+  });
+
   test('shards file-process accumulation without reducing total worker concurrency', async () => {
     const root = await temporaryRoot('unit-shard-process-budget');
     const tests = join(root, 'tests');

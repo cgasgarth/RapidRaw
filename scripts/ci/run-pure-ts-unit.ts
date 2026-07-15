@@ -28,6 +28,23 @@ export interface PureTsUnitOptions {
   workersPerShard?: number;
 }
 
+const FAILURE_ANCHOR = /(?:^error:|^\(fail\)|\.test\.[cm]?[jt]sx?:\d+|panic)/u;
+
+export const selectPureTsFailureContext = (output: string): string => {
+  const lines = output.split(/\r?\n/u);
+  const selected = new Set<number>();
+  for (const [index, line] of lines.entries()) {
+    if (!FAILURE_ANCHOR.test(line)) continue;
+    for (let context = Math.max(0, index - 8); context <= Math.min(lines.length - 1, index + 12); context += 1)
+      selected.add(context);
+  }
+  if (selected.size === 0) return output;
+  return [...selected]
+    .sort((left, right) => left - right)
+    .map((index) => lines[index])
+    .join('\n');
+};
+
 const positiveInteger = (value: number, name: string): number => {
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
   return value;
@@ -135,8 +152,17 @@ if (import.meta.main) {
       : `failed exit=${result.exitCode}`;
     console.error(`pure-ts shard ${String(result.shard)}/${String(results.length)} ${disposition}`);
     console.error(`$ ${formatCommandForLog(result.command[0], result.command.slice(1))}`);
-    writeBoundedOutput(`shard ${String(result.shard)} stdout`, result.stdout);
-    writeBoundedOutput(`shard ${String(result.shard)} stderr`, result.stderr);
+    const diagnosticOptions = { headLines: 30, maxChars: 8_000, maxLines: 80, tailLines: 40 };
+    writeBoundedOutput(
+      `shard ${String(result.shard)} stdout`,
+      selectPureTsFailureContext(result.stdout),
+      diagnosticOptions,
+    );
+    writeBoundedOutput(
+      `shard ${String(result.shard)} stderr`,
+      selectPureTsFailureContext(result.stderr),
+      diagnosticOptions,
+    );
   }
   process.exit(1);
 }
