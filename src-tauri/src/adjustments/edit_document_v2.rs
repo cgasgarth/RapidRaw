@@ -4220,6 +4220,19 @@ mod tests {
             .into_render_adjustments()
             .expect("current transform geometry remains compilable");
 
+        let valid_crop = json!({ "height": 1800, "unit": "px", "width": 2400, "x": 400, "y": 300 });
+        let mut valid = document_with_legacy(json!({}));
+        valid["nodes"]["geometry"]["params"]["crop"] = valid_crop.clone();
+        valid["nodes"]["geometry"]["params"]["rotation"] = json!(-5.5);
+        valid["geometry"]["crop"] = valid_crop.clone();
+        valid["geometry"]["rotation"] = json!(-5.5);
+        let compiled = serde_json::from_value::<EditDocumentV2>(valid)
+            .expect("valid straighten geometry document")
+            .into_render_adjustments()
+            .expect("straighten geometry compiles into native render authority");
+        assert_eq!(compiled["crop"], valid_crop);
+        assert_eq!(compiled["rotation"], json!(-5.5));
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["geometry"]["params"]["futureWarp"] = json!(1);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)

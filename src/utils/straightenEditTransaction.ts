@@ -1,7 +1,6 @@
 import type { Adjustments } from './adjustments';
 import { resolveCropForGeometryTransaction } from './cropUtils';
 import type { EditTransactionRequest } from './editTransaction';
-import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
 export interface StraightenEditTransactionState {
   adjustmentRevision: number;
@@ -49,31 +48,24 @@ export const buildStraightenEditTransaction = (
   const previous = state.adjustments;
   const rotation = (previous.rotation || 0) + correctionDegrees;
   const selectedImage = state.selectedImage;
-  const proposed =
-    correctionDegrees === 0
-      ? previous
-      : {
-          ...previous,
-          crop:
-            selectedImage.width > 0 && selectedImage.height > 0
-              ? resolveCropForGeometryTransaction(
-                  previous.crop,
-                  selectedImage.width,
-                  selectedImage.height,
-                  {
-                    aspectRatio: previous.aspectRatio,
-                    orientationSteps: previous.orientationSteps || 0,
-                    rotation: previous.rotation || 0,
-                  },
-                  {
-                    aspectRatio: previous.aspectRatio,
-                    orientationSteps: previous.orientationSteps || 0,
-                    rotation,
-                  },
-                )
-              : previous.crop,
-          rotation,
-        };
+  const crop =
+    correctionDegrees !== 0 && selectedImage.width > 0 && selectedImage.height > 0
+      ? resolveCropForGeometryTransaction(
+          previous.crop,
+          selectedImage.width,
+          selectedImage.height,
+          {
+            aspectRatio: previous.aspectRatio,
+            orientationSteps: previous.orientationSteps || 0,
+            rotation: previous.rotation || 0,
+          },
+          {
+            aspectRatio: previous.aspectRatio,
+            orientationSteps: previous.orientationSteps || 0,
+            rotation,
+          },
+        )
+      : previous.crop;
 
   return {
     baseAdjustmentRevision: state.adjustmentRevision,
@@ -81,8 +73,9 @@ export const buildStraightenEditTransaction = (
     imageSessionId: identity.imageSessionId,
     operations: [
       {
-        adjustments: reconcileReferenceMatchReceiptsAfterEdit(previous, proposed),
-        type: 'replace-adjustments',
+        nodeType: 'geometry',
+        patch: { crop, rotation },
+        type: 'patch-edit-document-node',
       },
     ],
     persistence: 'commit',
