@@ -22,6 +22,7 @@ const pullRequestSchema = z.object({
 
 const pullRequestListSchema = z.array(pullRequestSchema);
 const comparisonSchema = z.object({ behind_by: z.number().int().nonnegative() });
+const gitReferenceSchema = z.object({ object: z.object({ sha: z.string().regex(/^[a-f0-9]{40}$/u) }) });
 const workflowRunsSchema = z.object({
   workflow_runs: z.array(
     z.object({
@@ -57,6 +58,7 @@ export interface ReadyPrUpdatePort {
   mergeAndPush(
     pr: PullRequestIdentity,
   ): Promise<{ disposition: 'updated'; headSha: string } | { disposition: 'changed' | 'conflict' | 'failed' }>;
+  readBaseSha(baseRef: string): Promise<string>;
   readPullRequest(number: number): Promise<PullRequestIdentity>;
 }
 
@@ -65,7 +67,6 @@ const sameIdentity = (left: PullRequestIdentity, right: PullRequestIdentity): bo
   left.headSha === right.headSha &&
   left.headRef === right.headRef &&
   left.headRepository === right.headRepository &&
-  left.baseSha === right.baseSha &&
   left.baseRef === right.baseRef &&
   !right.draft &&
   right.state === 'open';
@@ -81,7 +82,9 @@ export const updateReadyPullRequests = async (repository: string, port: ReadyPrU
       results.push({ disposition: 'fork', number: candidate.number });
       continue;
     }
-    if ((await port.behindBy(candidate)) === 0) {
+    const selectedBaseSha = await port.readBaseSha(candidate.baseRef);
+    const selected = { ...candidate, baseSha: selectedBaseSha };
+    if ((await port.behindBy(selected)) === 0) {
       results.push({ disposition: 'current', number: candidate.number });
       continue;
     }
@@ -95,12 +98,18 @@ export const updateReadyPullRequests = async (repository: string, port: ReadyPrU
       results.push({ disposition: 'changed', number: candidate.number });
       continue;
     }
+    const currentBaseSha = await port.readBaseSha(current.baseRef);
+    if (currentBaseSha !== selectedBaseSha) {
+      results.push({ disposition: 'changed', number: candidate.number });
+      continue;
+    }
     if (await port.hasActiveChecks(current.headSha)) {
       results.push({ disposition: 'active', number: candidate.number });
       continue;
     }
 
-    const merged = await port.mergeAndPush(current);
+    const currentAgainstLiveBase = { ...current, baseSha: currentBaseSha };
+    const merged = await port.mergeAndPush(currentAgainstLiveBase);
     if (merged.disposition !== 'updated') {
       results.push({ disposition: merged.disposition, number: candidate.number });
       continue;
@@ -111,15 +120,20 @@ export const updateReadyPullRequests = async (repository: string, port: ReadyPrU
       pushed.headSha !== merged.headSha ||
       pushed.headRef !== current.headRef ||
       pushed.headRepository !== repository ||
-      pushed.baseSha !== current.baseSha ||
+      pushed.baseRef !== current.baseRef ||
       pushed.draft ||
       pushed.state !== 'open'
     ) {
       results.push({ disposition: 'changed', number: candidate.number });
       continue;
     }
+    const pushedBaseSha = await port.readBaseSha(pushed.baseRef);
+    if (pushedBaseSha !== currentBaseSha) {
+      results.push({ disposition: 'changed', number: candidate.number });
+      continue;
+    }
 
-    await port.dispatchRequiredChecks(pushed, merged.headSha);
+    await port.dispatchRequiredChecks({ ...pushed, baseSha: pushedBaseSha }, merged.headSha);
     results.push({ disposition: 'updated', number: candidate.number });
   }
   return results;
@@ -173,6 +187,7 @@ export interface GitHubOperations {
   dispatchRequiredChecks(pr: PullRequestIdentity, expectedHeadSha: string): Promise<void>;
   hasActiveChecks(headSha: string): Promise<boolean>;
   listOpenPullRequests(): Promise<PullRequestIdentity[]>;
+  readBaseSha(baseRef: string): Promise<string>;
   readPullRequest(number: number): Promise<PullRequestIdentity>;
 }
 
@@ -212,6 +227,14 @@ class GitHubApi implements GitHubOperations {
 
   async readPullRequest(number: number): Promise<PullRequestIdentity> {
     return toIdentity(pullRequestSchema.parse(await this.request(`pulls/${number}`)));
+  }
+
+  async readBaseSha(baseRef: string): Promise<string> {
+    const encodedRef = baseRef
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    return gitReferenceSchema.parse(await this.request(`git/ref/heads/${encodedRef}`)).object.sha;
   }
 
   async behindBy(pr: PullRequestIdentity): Promise<number> {
@@ -256,6 +279,10 @@ export class GitBranchUpdater implements ReadyPrUpdatePort {
 
   readPullRequest(number: number): Promise<PullRequestIdentity> {
     return this.api.readPullRequest(number);
+  }
+
+  readBaseSha(baseRef: string): Promise<string> {
+    return this.api.readBaseSha(baseRef);
   }
 
   behindBy(pr: PullRequestIdentity): Promise<number> {
@@ -366,6 +393,10 @@ export class GitBranchUpdater implements ReadyPrUpdatePort {
       ).split(/\s+/u)[0];
       if (remoteHead !== pr.headSha) {
         console.log(`PR #${pr.number}: head changed before push.`);
+        return { disposition: 'changed' };
+      }
+      if ((await this.api.readBaseSha(pr.baseRef)) !== pr.baseSha) {
+        console.log(`PR #${pr.number}: base changed before push.`);
         return { disposition: 'changed' };
       }
 

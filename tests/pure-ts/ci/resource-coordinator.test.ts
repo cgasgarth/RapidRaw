@@ -272,6 +272,38 @@ await lease.release();`,
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
 
+  test('bounds queue stalls with owner diagnostics and removes the timed-out waiter', async () => {
+    const root = await temporaryRoot();
+    const holder = await acquireResourceLease({
+      label: 'long-native-owner',
+      ownerId: 'long-native-owner-id',
+      resource: 'native-heavy',
+      root,
+    });
+    const controller = new AbortController();
+    const abort = setTimeout(() => controller.abort(), 100);
+    try {
+      await expect(
+        acquireResourceLease({
+          label: 'bounded-native-waiter',
+          ownerId: 'bounded-native-waiter-id',
+          pollMs: 1_000,
+          resource: 'native-heavy',
+          root,
+          signal: controller.signal,
+          timeoutMs: 25,
+        }),
+      ).rejects.toThrow(
+        /bounded-native-waiter timed out waiting \d+ms for native-heavy: long-native-owner pid=\d+ worktree=/u,
+      );
+      expect(await queuedLabels(root)).toEqual([]);
+      expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('long-native-owner')).toBeTrue();
+    } finally {
+      clearTimeout(abort);
+      await holder.release();
+    }
+  });
+
   test('hands a released lease to the oldest waiter before an immediate reacquirer', async () => {
     const root = await temporaryRoot();
     const releaseFirst = join(root, 'release-first');

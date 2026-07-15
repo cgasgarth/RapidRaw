@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
+import { acquireResourceLease } from '../../scripts/lib/ci/resource-coordinator';
 import {
   boundedToolIdentity,
   classifyProcessTermination,
@@ -271,6 +272,16 @@ describe('affected validation DAG', () => {
     for (const id of excluded) expect(selected.has(id)).toBeFalse();
   });
 
+  test('manifest compile gates share the cross-worktree native lease', () => {
+    const manifestById = new Map(validationManifest.map((node) => [node.id, node]));
+    for (const id of ['rust-clippy', 'browser-harness', 'tauri-contracts', 'native-boundaries']) {
+      expect(manifestById.get(id)?.queueResources).toEqual(['native-heavy']);
+    }
+    for (const id of ['rust-clippy', 'tauri-contracts', 'native-boundaries']) {
+      expect(manifestById.get(id)?.resourceClass).toBe('native-heavy');
+    }
+  });
+
   test('dependency closure selects the shared producer once', () => {
     const plan = planValidation(validationManifest, 'push', ['src/App.tsx']);
     expect(plan.filter((entry) => entry.node.id === 'bundle-build' && entry.selected)).toHaveLength(1);
@@ -444,6 +455,107 @@ describe('affected validation DAG', () => {
         options,
       ),
     ).toBe(0);
+  });
+
+  test('native queue time does not consume the post-acquisition execution timeout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-native-queue-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    const queuePath = join(coordinator, 'native-heavy.queue');
+    const wrapperPath = join(import.meta.dir, '../../scripts/ci/run-resource-coordinated.ts');
+    await mkdir(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
+    await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
+    const holder = await acquireResourceLease({
+      label: 'blocking-native-build',
+      ownerId: 'blocking-native-owner',
+      resource: 'native-heavy',
+      root: coordinator,
+    });
+    const queuedNode: ValidationNode = {
+      id: 'queued-native-command',
+      command: [
+        'bun',
+        wrapperPath,
+        '--resource',
+        'native-heavy',
+        '--label',
+        'nested-native-command',
+        '--',
+        '/usr/bin/true',
+      ],
+      dependencies: [],
+      inputs: ['rust'],
+      resourceClass: 'native-heavy',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      queueTimeoutMs: 2_000,
+      queueResources: ['native-heavy'],
+      timeoutMs: 400,
+    };
+    const options = {
+      mode: 'commit' as const,
+      changedPaths: ['input.rs'],
+      noCache: true,
+      verifyCache: false,
+      explainCache: false,
+      root,
+      resourceCoordinatorRoot: coordinator,
+    };
+    let settled = false;
+    const validation = runValidation([queuedNode], options).finally(() => {
+      settled = true;
+    });
+    let result: number | undefined;
+    try {
+      const queueDeadline = Date.now() + 2_000;
+      while ((await readdir(queuePath).catch(() => [])).length === 0 && Date.now() < queueDeadline) await Bun.sleep(5);
+      expect((await readdir(queuePath)).length).toBeGreaterThan(0);
+      await Bun.sleep(500);
+      expect(settled).toBeFalse();
+    } finally {
+      await holder.release();
+      result = await validation;
+    }
+    expect(result).toBe(0);
+    expect(await Bun.file(join(coordinator, 'native-heavy.lock')).exists()).toBeFalse();
+
+    expect(
+      await runValidation(
+        [
+          {
+            ...queuedNode,
+            id: 'slow-native-command',
+            command: [...queuedNode.command.slice(0, -1), '/bin/sh', '-c', 'sleep 2'],
+            timeoutMs: 100,
+          },
+        ],
+        options,
+      ),
+    ).toBe(1);
+    expect(await Bun.file(join(coordinator, 'native-heavy.lock')).exists()).toBeFalse();
+
+    const stalledHolder = await acquireResourceLease({
+      label: 'stalled-native-owner',
+      ownerId: 'stalled-native-owner-id',
+      resource: 'native-heavy',
+      root: coordinator,
+    });
+    try {
+      expect(
+        await runValidation(
+          [{ ...queuedNode, id: 'bounded-native-queue', queueTimeoutMs: 25, timeoutMs: 2_000 }],
+          options,
+        ),
+      ).toBe(1);
+      expect(
+        (await readFile(join(coordinator, 'native-heavy.owner.json'), 'utf8')).includes('stalled-native-owner'),
+      ).toBe(true);
+    } finally {
+      await stalledHolder.release();
+    }
+    expect(await Bun.file(join(coordinator, 'native-heavy.lock')).exists()).toBeFalse();
+    await rm(directory, { force: true, recursive: true });
   });
 
   test('separate worktree processes contend on one stable native-heavy class lease', async () => {
@@ -772,6 +884,41 @@ process.exit(code);`;
     const child = Bun.spawn(['bun', '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
     expect(await child.exited).toBe(130);
     const lockRoot = join(root, 'locks');
+    expect(await readdir(lockRoot).catch(() => [])).toEqual([]);
+  }, 10_000);
+
+  test('SIGINT cancels a native queue wait without releasing its live holder', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-queued-sigint-'));
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
+    await writeFile(join(root, 'input.rs'), 'fn input() {}\n');
+    const lockRoot = join(root, 'locks');
+    const holder = await acquireResourceLease({
+      label: 'live-native-holder',
+      ownerId: 'live-native-holder-id',
+      resource: 'native-heavy',
+      root: lockRoot,
+    });
+    try {
+      const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
+      const script = `import { runValidation } from ${JSON.stringify(enginePath)};
+const node={id:'queued-signal',command:['/usr/bin/true'],dependencies:[],inputs:['rust'],resourceClass:'native-heavy',cachePolicy:'none',modes:['commit'],queueResources:['native-heavy'],timeoutMs:60000};
+setTimeout(()=>process.kill(process.pid,'SIGINT'),100);
+const code=await runValidation([node],{mode:'commit',changedPaths:['input.rs'],noCache:true,verifyCache:false,explainCache:false,root:process.cwd(),resourceCoordinatorRoot:process.cwd()+'/locks'});
+process.exit(code);`;
+      const child = Bun.spawn(['bun', '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+      expect(await child.exited).toBe(130);
+      expect(await Bun.file(join(lockRoot, 'native-heavy.queue')).exists()).toBeFalse();
+      expect((await readFile(join(lockRoot, 'native-heavy.owner.json'), 'utf8')).includes('live-native-holder')).toBe(
+        true,
+      );
+      expect(
+        (await readdir(lockRoot)).filter(
+          (entry) => entry !== 'native-heavy.lock' && entry !== 'native-heavy.owner.json',
+        ),
+      ).toEqual([]);
+    } finally {
+      await holder.release();
+    }
     expect(await readdir(lockRoot).catch(() => [])).toEqual([]);
   }, 10_000);
 });

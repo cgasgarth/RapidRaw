@@ -39,6 +39,7 @@ const git = (cwd: string, args: readonly string[], environment = isolatedGitEnvi
 
 class FakePort implements ReadyPrUpdatePort {
   active = false;
+  baseSha = BASE_SHA;
   behind = 1;
   current = candidate();
   dispatches: Array<{ expectedHeadSha: string; pr: PullRequestIdentity }> = [];
@@ -66,6 +67,10 @@ class FakePort implements ReadyPrUpdatePort {
       : this.current;
   }
 
+  async readBaseSha(): Promise<string> {
+    return this.baseSha;
+  }
+
   async mergeAndPush(pr: PullRequestIdentity) {
     this.merges.push(pr);
     return this.mergeDisposition === 'updated'
@@ -85,6 +90,49 @@ describe('ready PR branch freshness', () => {
     expect(await updateReadyPullRequests(REPOSITORY, port)).toEqual([{ disposition: 'updated', number: 17 }]);
     expect(port.merges).toEqual([candidate()]);
     expect(port.dispatches).toEqual([{ expectedHeadSha: MERGED_SHA, pr: { ...candidate(), headSha: MERGED_SHA } }]);
+  });
+
+  test('replaces the stale pull snapshot base with the live base for compare, merge, and dispatch', async () => {
+    const port = new FakePort();
+    const staleBaseSha = 'd'.repeat(40);
+    port.open = [candidate({ baseSha: staleBaseSha })];
+    port.current = candidate({ baseSha: staleBaseSha });
+    const compared: PullRequestIdentity[] = [];
+    port.behindBy = async (pr) => {
+      compared.push(pr);
+      return 1;
+    };
+
+    expect(await updateReadyPullRequests(REPOSITORY, port)).toEqual([{ disposition: 'updated', number: 17 }]);
+    expect(compared).toEqual([candidate({ baseSha: BASE_SHA })]);
+    expect(port.merges).toEqual([candidate({ baseSha: BASE_SHA })]);
+    expect(port.dispatches).toEqual([{ expectedHeadSha: MERGED_SHA, pr: { ...candidate(), headSha: MERGED_SHA } }]);
+  });
+
+  test('fails closed when the live base advances during selection', async () => {
+    const port = new FakePort();
+    let baseReads = 0;
+    port.readBaseSha = async () => {
+      baseReads += 1;
+      return baseReads === 1 ? BASE_SHA : 'd'.repeat(40);
+    };
+
+    expect(await updateReadyPullRequests(REPOSITORY, port)).toEqual([{ disposition: 'changed', number: 17 }]);
+    expect(port.merges).toHaveLength(0);
+    expect(port.dispatches).toHaveLength(0);
+  });
+
+  test('does not dispatch stale checks when the live base advances after push', async () => {
+    const port = new FakePort();
+    let baseReads = 0;
+    port.readBaseSha = async () => {
+      baseReads += 1;
+      return baseReads < 3 ? BASE_SHA : 'd'.repeat(40);
+    };
+
+    expect(await updateReadyPullRequests(REPOSITORY, port)).toEqual([{ disposition: 'changed', number: 17 }]);
+    expect(port.merges).toEqual([candidate()]);
+    expect(port.dispatches).toHaveLength(0);
   });
 
   test.each([
@@ -238,6 +286,7 @@ describe('ready PR branch freshness', () => {
         dispatchRequiredChecks: unused,
         hasActiveChecks: unused,
         listOpenPullRequests: unused,
+        readBaseSha: async () => baseSha,
         readPullRequest: unused,
       };
       const result = await new GitBranchUpdater(api, repository, fixtureEnvironment).mergeAndPush(pr);

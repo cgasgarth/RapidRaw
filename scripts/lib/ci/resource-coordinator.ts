@@ -331,7 +331,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
           console.log(`${options.label} waiting for ${options.resource}: ${compactOwner(owner)}`);
           lastDiagnosticAt = waitedMs;
         }
-        await Bun.sleep(pollMs);
+        await Bun.sleep(Math.min(pollMs, Math.max(1, timeoutMs - waitedMs)));
         if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
       }
     }
