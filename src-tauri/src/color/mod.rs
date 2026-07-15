@@ -26,6 +26,7 @@ pub(crate) mod lens_database_service;
 pub(crate) mod lut_processing;
 pub(crate) mod mixer_render;
 pub(crate) mod monochrome;
+pub(crate) mod payload_residency_service;
 pub(crate) mod perceptual_grading;
 pub(crate) mod point_color;
 #[cfg_attr(not(any(test, feature = "validation-harness")), allow(dead_code))]
