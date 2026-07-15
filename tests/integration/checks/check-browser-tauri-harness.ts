@@ -1376,6 +1376,26 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
     undefined,
     { timeout: 10_000 },
   );
+  await page.waitForFunction(
+    ({ saves }) => {
+      const candidates = (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .slice(saves);
+      return candidates.some((call) => {
+        const mixer = call.args?.['adjustments']?.['blackWhiteMixer'];
+        const transaction = call.args?.['transaction'];
+        return (
+          typeof call.endedAtMs === 'number' &&
+          mixer?.['enabled'] === true &&
+          mixer?.['weights']?.['reds'] === 0 &&
+          typeof transaction?.['baseAdjustmentRevision'] === 'number' &&
+          transaction?.['nextAdjustmentRevision'] === transaction['baseAdjustmentRevision'] + 1
+        );
+      });
+    },
+    baseline,
+    { timeout: 10_000 },
+  );
   await page.getByTestId('black-white-mixer-contribution-value').click();
   const responseInput = page.getByTestId('black-white-mixer-contribution-input');
   await responseInput.fill('32');
@@ -1398,7 +1418,27 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
       const weights = typeof mixer === 'object' && mixer !== null ? mixer['weights'] : null;
       return (
         previewCalls.length > previews &&
-        calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').length >= saves + 1 &&
+        (() => {
+          const persistenceCalls = calls
+            .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+            .slice(saves);
+          const enable = persistenceCalls.find(
+            (call) =>
+              call.args?.['adjustments']?.['blackWhiteMixer']?.['enabled'] === true &&
+              call.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 0,
+          );
+          const response = persistenceCalls.find(
+            (call) =>
+              call.args?.['adjustments']?.['blackWhiteMixer']?.['enabled'] === true &&
+              call.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 32,
+          );
+          return (
+            typeof enable?.endedAtMs === 'number' &&
+            typeof response?.endedAtMs === 'number' &&
+            response.args?.['transaction']?.['baseAdjustmentRevision'] ===
+              enable.args?.['transaction']?.['nextAdjustmentRevision']
+          );
+        })() &&
         typeof request === 'object' &&
         request !== null &&
         !('jsAdjustments' in request) &&
@@ -1417,7 +1457,7 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   const persistence = await page.evaluate(() => {
     const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
       .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
-      .at(-1);
+      .findLast((candidate) => candidate.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 32);
     return call?.args ?? null;
   });
   const persistedMixer = persistence?.['adjustments']?.['blackWhiteMixer'];
@@ -1436,16 +1476,17 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   if (!(await undo.isEnabled())) throw new Error('Black & White Mixer edits did not create Undo boundaries.');
   await undo.click();
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
+    () =>
+      document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0' &&
+      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
     undefined,
     { timeout: 10_000 },
   );
-  if ((await page.getByTestId('black-white-mixer-toggle').getAttribute('aria-checked')) !== 'true') {
-    throw new Error('Black & White response Undo crossed the prior enable history boundary.');
-  }
   await undo.click();
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false',
+    () =>
+      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false' &&
+      document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
     undefined,
     { timeout: 10_000 },
   );
