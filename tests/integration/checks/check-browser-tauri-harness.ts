@@ -49,6 +49,73 @@ interface BoundsReport {
 
 const boundsSamples: BoundsSample[] = [];
 
+async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
+  await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
+  const recover = page.locator('[data-testid$="-analytics-header-recover-scopes"]').first();
+  if ((await recover.count()) > 0 && (await recover.isEnabled())) await recover.click();
+  await page.waitForFunction(() => {
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return calls.some(({ args, command }) => {
+      const request = command === 'apply_adjustments' ? args?.['request'] : null;
+      return (
+        typeof request === 'object' &&
+        request !== null &&
+        Reflect.get(request, 'computeWaveform') === true &&
+        typeof Reflect.get(request, 'previewOperationIdentity') === 'object'
+      );
+    });
+  });
+
+  const status = page.getByTestId('preview-scope-status');
+  await status.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="preview-scope-status"]')?.getAttribute('data-preview-scope-ready') ===
+      'true',
+  );
+  await page.waitForTimeout(250);
+  const acceptedAt = await status.getAttribute('data-preview-scope-updated-at');
+  if (!acceptedAt) throw new Error('Exact presented preview analytics did not publish scope status.');
+
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    const request = harness?.calls
+      .filter(
+        ({ args, command }) =>
+          command === 'apply_adjustments' && Reflect.get(args?.['request'] ?? {}, 'computeWaveform') === true,
+      )
+      .at(-1)?.args?.['request'];
+    if (!harness || typeof request !== 'object' || request === null)
+      throw new Error('Missing preview request authority.');
+    const current = structuredClone(Reflect.get(request, 'previewOperationIdentity')) as {
+      generation: number;
+      operationId: number;
+      session: { imageSessionId: number; sourceImagePath: string };
+    };
+    current.generation += 1000;
+    current.operationId += 1000;
+    harness.emitEvent('analytics-result', {
+      frameId: {
+        graphRevision: current.operationId,
+        imageSession: current.session.imageSessionId,
+        previewGeneration: current.generation,
+      },
+      gamut: null,
+      histogram: { blue: [9], green: [9], luma: [9], red: [9] },
+      path: current.session.sourceImagePath,
+      previewOperationIdentity: current,
+      requestedProducts: 1,
+      scopes: null,
+      spatial: null,
+      timing: { finishingMs: 0, fullImageConversions: 0, samplingMs: 0, sourcePixelsRead: 1 },
+    });
+  });
+  await page.waitForTimeout(150);
+  if ((await status.getAttribute('data-preview-scope-updated-at')) !== acceptedAt) {
+    throw new Error('A non-presented preview operation replaced exact-current scope output.');
+  }
+}
+
 async function verifyCompareDividerController(page: Page): Promise<void> {
   const divider = page.getByTestId('editor-compare-split-divider');
   const box = await divider.boundingBox();
@@ -1574,6 +1641,17 @@ try {
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
+  if (browserScenario === 'analytics-artifact-authority') {
+    await verifyPreviewAnalyticsArtifactAuthority(page);
+    if (consoleErrors.length > 0) {
+      throw new Error(`Unexpected analytics-authority browser errors: ${consoleErrors.join('\n')}`);
+    }
+    await browser.close();
+    browser = undefined;
+    await stopServer(server);
+    console.log('preview analytics artifact authority browser proof passed');
+    process.exit(0);
+  }
   if (browserScenario === 'initial-mask-draw-controller') {
     await verifyInitialMaskDrawController(page);
     if (consoleErrors.length > 0) {

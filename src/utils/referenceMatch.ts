@@ -6,6 +6,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from './adjustments';
+import type { PreviewOperationIdentity } from './previewCoordinator';
 
 export type ReferenceMatchMode = 'match-look' | 'normalize';
 export type ReferenceMatchGroup = 'color' | 'presence' | 'tone';
@@ -40,6 +41,7 @@ export interface ReferenceSpatialAnalysis {
   gridHeight: number;
   gridWidth: number;
   path: string;
+  previewOperationIdentity: PreviewOperationIdentity;
   tiles: ReferenceSpatialTileSummary[];
 }
 

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use tauri::ipc::Response;
 
-use crate::app_state::{AppState, PreviewJob};
+use crate::app_state::{AppState, FrontendPreviewOperationIdentity, PreviewJob};
 use crate::preview_scheduler::PreviewCompletion;
 
 #[derive(Deserialize)]
@@ -17,6 +17,7 @@ pub(crate) struct ApplyAdjustmentsRequest {
     edit_document_v2: crate::adjustments::edit_document_v2::EditDocumentV2,
     expected_image_path: String,
     is_interactive: bool,
+    preview_operation_identity: FrontendPreviewOperationIdentity,
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
     compute_waveform: bool,
@@ -38,6 +39,14 @@ pub(crate) async fn apply_adjustments(
     request: ApplyAdjustmentsRequest,
     state: tauri::State<'_, AppState>,
 ) -> Result<Response, String> {
+    request
+        .preview_operation_identity
+        .validate_for_render(
+            &request.expected_image_path,
+            request.viewer_sample_graph_revision.as_deref(),
+            request.is_interactive,
+        )
+        .map_err(str::to_string)?;
     state
         .services
         .preview_session
@@ -49,6 +58,7 @@ pub(crate) async fn apply_adjustments(
         adjustments: Arc::new(render_adjustments),
         expected_image_path: request.expected_image_path,
         is_interactive: request.is_interactive,
+        preview_operation_identity: Box::new(request.preview_operation_identity),
         target_resolution: request.target_resolution,
         roi: request.roi,
         compute_waveform: request.compute_waveform,

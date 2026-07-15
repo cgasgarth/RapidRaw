@@ -135,7 +135,7 @@ impl PreviewScheduler {
         })
     }
 
-    pub fn submit(&self, job: PreviewJob) -> Result<PreviewRequestId, PreviewJob> {
+    pub fn submit(&self, job: PreviewJob) -> Result<PreviewRequestId, Box<PreviewJob>> {
         let now = Instant::now();
         let quality = if job.is_interactive {
             PreviewQuality::Interactive
@@ -144,7 +144,7 @@ impl PreviewScheduler {
         };
         let mut slots = self.pending.lock().unwrap();
         if slots.shutdown {
-            return Err(job);
+            return Err(Box::new(job));
         }
 
         let mut path = self.current_path.lock().unwrap();
@@ -364,6 +364,9 @@ mod tests {
                 adjustments: Arc::new(json!({"large": "payload"})),
                 expected_image_path: "a.raw".into(),
                 is_interactive: interactive,
+                preview_operation_identity: Box::new(
+                    crate::app_state::FrontendPreviewOperationIdentity::compatibility_identity(),
+                ),
                 target_resolution: None,
                 roi: None,
                 compute_waveform: false,
@@ -414,6 +417,24 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn scheduler_preserves_frontend_operation_identity_in_the_claimed_job() {
+        let scheduler = PreviewScheduler::new(PreviewSchedulingPolicy::default());
+        let (mut preview, _) = job(true);
+        preview.preview_operation_identity.operation_id = 73;
+        assert!(scheduler.submit(preview).is_ok());
+
+        assert_eq!(
+            scheduler
+                .next()
+                .unwrap()
+                .job
+                .preview_operation_identity
+                .operation_id,
+            73
+        );
     }
 
     #[test]

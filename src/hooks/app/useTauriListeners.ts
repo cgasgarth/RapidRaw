@@ -1,8 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import type { ChannelConfig } from '../../components/adjustments/Curves';
-import type { AnalyticsResourceDescriptor, WaveformData } from '../../components/ui/AppProperties';
 import { Status } from '../../components/ui/ExportImportProperties';
 import {
   catalogIndexingErrorSchema,
@@ -12,6 +10,8 @@ import {
 } from '../../schemas/catalogIndexingSchemas';
 import { isCurrentDenoiseEvent } from '../../schemas/denoiseWorkflowSchemas';
 import {
+  type AnalyticsResultPayload,
+  analyticsResultPayloadSchema,
   denoiseErrorPayloadSchema,
   gamutWarningOverlayPayloadSchema,
   nativeQaOpenFixturePayloadSchema,
@@ -63,6 +63,7 @@ import {
 } from '../../utils/export/exportTerminalReceipt';
 import { isCurrentImportAuthority, shouldAcceptImportStart } from '../../utils/importEventAuthority';
 import { applyNativeQaOpenFixture, applyNativeQaReset } from '../../utils/nativeQaControlEvents';
+import { PreviewAnalyticsAuthority } from '../../utils/previewAnalyticsAuthority';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
@@ -82,7 +83,6 @@ import {
   HDR_COMPLETE_EVENT,
   HDR_ERROR_EVENT,
   HDR_PROGRESS_EVENT,
-  HISTOGRAM_UPDATE_EVENT,
   IMPORT_CANCELLED_EVENT,
   IMPORT_COMPLETE_EVENT,
   IMPORT_ERROR_EVENT,
@@ -106,7 +106,6 @@ import {
   THUMBNAIL_GENERATION_ERROR_EVENT,
   THUMBNAIL_INVALIDATED_EVENT,
   THUMBNAIL_PROGRESS_EVENT,
-  WAVEFORM_UPDATE_EVENT,
   WGPU_FRAME_READY_EVENT,
 } from '../../utils/tauriEventNames';
 import { thumbnailResourceCache } from '../../utils/thumbnailResources';
@@ -125,38 +124,6 @@ interface ImageAnalyticsPayload<TData> {
   data: TData;
   path: string;
 }
-
-interface AnalyticsResultPayload {
-  frameId: { graphRevision: number; imageSession: number; previewGeneration: number };
-  histogram: { blue: number[]; green: number[]; luma: number[]; red: number[] } | null;
-  path: string;
-  requestedProducts: number;
-  scopes: {
-    height: number;
-    luma: AnalyticsResourceDescriptor | null;
-    parade: AnalyticsResourceDescriptor | null;
-    rgb: AnalyticsResourceDescriptor | null;
-    vectorscope: AnalyticsResourceDescriptor | null;
-    width: number;
-  } | null;
-  spatial: {
-    gridHeight: number;
-    gridWidth: number;
-    tiles: Array<{
-      blueMean: number;
-      clippedFraction: number;
-      greenMean: number;
-      lumaMean: number;
-      lumaSpread: number;
-      redMean: number;
-      sampleCount: number;
-      x: number;
-      y: number;
-    }>;
-  } | null;
-}
-
-const analyticsFrameByPath = new Map<string, { imageSession: number; previewGeneration: number }>();
 
 const PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL = 'Display preview transform';
 const PREVIEW_SCOPE_SOURCE_LABEL = 'Edited preview';
@@ -195,6 +162,51 @@ const buildPreviewScopeStatus = ({
       : [],
     workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
   };
+};
+
+const publishExactPreviewAnalytics = (result: AnalyticsResultPayload): void => {
+  const editor = useEditorStore.getState();
+  if (editor.selectedImage?.path !== result.path) return;
+  const histogram = result.histogram
+    ? {
+        blue: { color: '#3b82f6', data: result.histogram.blue },
+        green: { color: '#22c55e', data: result.histogram.green },
+        luma: { color: '#ffffff', data: result.histogram.luma },
+        red: { color: '#ef4444', data: result.histogram.red },
+      }
+    : null;
+  const scopes = result.scopes;
+  const waveform = scopes
+    ? {
+        blue: '',
+        green: '',
+        height: scopes.height,
+        luma: scopes.luma?.url ?? '',
+        parade: scopes.parade?.url ?? '',
+        red: '',
+        rgb: scopes.rgb?.url ?? '',
+        vectorscope: scopes.vectorscope?.url ?? '',
+        width: scopes.width,
+      }
+    : null;
+  editor.setEditor({
+    histogram,
+    referenceMatchSpatialAnalysis: result.spatial
+      ? {
+          ...result.spatial,
+          frameId: result.frameId,
+          path: result.path,
+          previewOperationIdentity: result.previewOperationIdentity,
+        }
+      : null,
+    previewScopeRecoveryState: 'idle',
+    previewScopeStatus: buildPreviewScopeStatus({
+      histogramReady: histogram !== null,
+      path: result.path,
+      waveformReady: waveform !== null,
+    }),
+    waveform,
+  });
 };
 
 export function useTauriListeners({
@@ -288,6 +300,23 @@ export function useTauriListeners({
       flushHandle.current = requestAnimationFrame(flushThumbnailBatch);
     };
 
+    const analyticsAuthority = new PreviewAnalyticsAuthority<AnalyticsResultPayload>();
+    analyticsAuthority.setPresented(useEditorStore.getState().presentedPreviewArtifact);
+    const unsubscribeAnalyticsAuthority = useEditorStore.subscribe((state, previous) => {
+      if (state.presentedPreviewArtifact === previous.presentedPreviewArtifact) return;
+      const accepted = analyticsAuthority.setPresented(state.presentedPreviewArtifact);
+      if (accepted !== null) {
+        publishExactPreviewAnalytics(accepted);
+        return;
+      }
+      state.setEditor({
+        histogram: null,
+        previewScopeStatus: null,
+        referenceMatchSpatialAnalysis: null,
+        waveform: null,
+      });
+    });
+
     const listeners = [
       listen<unknown>(PERSISTED_RENDER_STATE_RECOVERED_EVENT, (event) => {
         const parsed = persistedRenderStateRecoveryPayloadSchema.safeParse(event.payload);
@@ -297,76 +326,16 @@ export function useTauriListeners({
           toastId: `persisted-render-state-recovered:${parsed.data.path}`,
         });
       }),
-      listen<AnalyticsResultPayload>(ANALYTICS_RESULT_EVENT, (event) => {
-        const result = event.payload;
-        const selectedPath = useEditorStore.getState().selectedImage?.path;
-        if (!isEffectActive || result.path !== selectedPath) return;
-        const previous = analyticsFrameByPath.get(result.path);
-        if (
-          previous &&
-          (result.frameId.imageSession < previous.imageSession ||
-            (result.frameId.imageSession === previous.imageSession &&
-              result.frameId.previewGeneration < previous.previewGeneration))
-        )
-          return;
-        analyticsFrameByPath.set(result.path, result.frameId);
-        const histogram = result.histogram
-          ? {
-              blue: { color: '#3b82f6', data: result.histogram.blue },
-              green: { color: '#22c55e', data: result.histogram.green },
-              luma: { color: '#ffffff', data: result.histogram.luma },
-              red: { color: '#ef4444', data: result.histogram.red },
-            }
-          : null;
-        const scopes = result.scopes;
-        const waveform = scopes
-          ? {
-              blue: '',
-              green: '',
-              height: scopes.height,
-              luma: scopes.luma?.url ?? '',
-              parade: scopes.parade?.url ?? '',
-              red: '',
-              rgb: scopes.rgb?.url ?? '',
-              vectorscope: scopes.vectorscope?.url ?? '',
-              width: scopes.width,
-            }
-          : null;
-        useEditorStore.getState().setEditor({
-          histogram,
-          referenceMatchSpatialAnalysis: result.spatial
-            ? { ...result.spatial, frameId: result.frameId, path: result.path }
-            : null,
-          previewScopeRecoveryState: 'idle',
-          previewScopeStatus: buildPreviewScopeStatus({
-            histogramReady: histogram !== null,
-            path: result.path,
-            waveformReady: waveform !== null,
-          }),
-          waveform,
-        });
+      listen<unknown>(ANALYTICS_RESULT_EVENT, (event) => {
+        if (!isEffectActive) return;
+        const parsed = analyticsResultPayloadSchema.safeParse(event.payload);
+        if (!parsed.success) return;
+        const accepted = analyticsAuthority.receive(parsed.data);
+        if (accepted !== null) publishExactPreviewAnalytics(accepted);
       }),
       listen<unknown>(PREVIEW_UPDATE_UNCROPPED_EVENT, (event) => {
         if (isEffectActive)
           useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: parseStringPayload(event.payload) });
-      }),
-      listen<ImageAnalyticsPayload<ChannelConfig>>(HISTOGRAM_UPDATE_EVENT, (event) => {
-        if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor((state) => ({
-            histogram: event.payload.data,
-            referenceMatchSpatialAnalysis: null,
-            previewScopeStatus: buildPreviewScopeStatus({
-              histogramReady: true,
-              path: event.payload.path,
-              waveformReady:
-                state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.waveformReady : false,
-            }),
-            previewScopeRecoveryState:
-              state.previewScopeStatus?.path === event.payload.path && state.previewScopeStatus.waveformReady
-                ? 'idle'
-                : state.previewScopeRecoveryState,
-          }));
-        }
       }),
       listen<ImageAnalyticsPayload<unknown>>(GAMUT_WARNING_UPDATE_EVENT, (event) => {
         const editor = useEditorStore.getState();
@@ -387,23 +356,6 @@ export function useTauriListeners({
         if (!isEffectActive) return;
         const payload = nativeQaOpenFixturePayloadSchema.parse(event.payload);
         applyNativeQaOpenFixture(payload, { openImagePath, resetToEmpty, resetToLibrary });
-      }),
-      listen<ImageAnalyticsPayload<WaveformData>>(WAVEFORM_UPDATE_EVENT, (event) => {
-        if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor((state) => ({
-            previewScopeStatus: buildPreviewScopeStatus({
-              histogramReady:
-                state.previewScopeStatus?.path === event.payload.path ? state.previewScopeStatus.histogramReady : false,
-              path: event.payload.path,
-              waveformReady: true,
-            }),
-            previewScopeRecoveryState:
-              state.previewScopeStatus?.path === event.payload.path && state.previewScopeStatus.histogramReady
-                ? 'idle'
-                : state.previewScopeRecoveryState,
-            waveform: event.payload.data,
-          }));
-        }
       }),
       listen<unknown>(THUMBNAIL_PROGRESS_EVENT, (event) => {
         const payload = parseThumbnailProgressPayload(event.payload);
@@ -915,6 +867,7 @@ export function useTauriListeners({
 
     return () => {
       isEffectActive = false;
+      unsubscribeAnalyticsAuthority();
       if (flushHandle.current !== null) {
         cancelAnimationFrame(flushHandle.current);
         flushHandle.current = null;
