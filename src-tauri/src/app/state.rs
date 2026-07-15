@@ -75,14 +75,9 @@ pub struct AppState {
     export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
-    image_open_coordinator: crate::image_open_session::ImageOpenCoordinator,
 }
 
 impl AppState {
-    pub(crate) fn image_open(&self) -> &crate::image_open_session::ImageOpenCoordinator {
-        &self.image_open_coordinator
-    }
-
     pub(crate) fn export_jobs(&self) -> &crate::export::job_registry::ExportJobRegistry {
         &self.export_jobs
     }
@@ -117,7 +112,6 @@ impl AppState {
             ),
             export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             interactive_gpu_pressure: Arc::default(),
-            image_open_coordinator: crate::image_open_session::ImageOpenCoordinator::default(),
         }
     }
 }
