@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { filmEmulationOperationV1Schema } from '../../packages/rawengine-schema/src/film/filmEmulationOperationSchemas';
 import { jsonValueSchema } from './masks/aiMaskingSchemas';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -7,6 +8,13 @@ const privatePathSchema = z
   .string()
   .trim()
   .regex(/^(private-fixtures|private-artifacts)\//u);
+const privateSourceRelativePathSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => !value.startsWith('/') && !value.split('/').includes('..'), {
+    message: 'Private source path must be relative and cannot traverse its source root.',
+  });
 
 const hashedPathSchema = z
   .object({
@@ -327,11 +335,41 @@ const rawOpenEditExportSkinToneUniformityCommandSchema = z
   })
   .strict();
 
+export const rawOpenEditExportFilmEmulationCommandSchema = z
+  .object({
+    actor: jsonObjectSchema,
+    approval: z
+      .object({
+        approvalClass: z.literal('edit_apply'),
+        reason: z.string().trim().min(1),
+        state: z.literal('approved'),
+      })
+      .strict(),
+    colorPipeline: colorPipelineSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('edit.apply_film_emulation_operation'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    expectedGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
+        operation: filmEmulationOperationV1Schema,
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: targetJsonObjectSchema,
+  })
+  .strict();
+
 const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
   rawOpenEditExportBasicToneCommandSchema,
   rawOpenEditExportWhiteBalanceCommandSchema,
   rawOpenEditExportAdjustHslCommandSchema,
   rawOpenEditExportSkinToneUniformityCommandSchema,
+  rawOpenEditExportFilmEmulationCommandSchema,
 ]);
 
 export const rawOpenEditExportProofRequestSchema = z
@@ -341,6 +379,7 @@ export const rawOpenEditExportProofRequestSchema = z
     editCommand: rawOpenEditExportCommandSchema,
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     privateRootPath: z.string().trim().min(1),
+    sourceRootPath: z.string().trim().min(1).optional(),
     sourceMetadata: z
       .object({
         cameraMake: z.string().trim().min(1),
@@ -349,7 +388,7 @@ export const rawOpenEditExportProofRequestSchema = z
         rawFormat: z.string().trim().min(1),
       })
       .strict(),
-    sourceRelativePath: privatePathSchema,
+    sourceRelativePath: privateSourceRelativePathSchema,
   })
   .strict();
 
