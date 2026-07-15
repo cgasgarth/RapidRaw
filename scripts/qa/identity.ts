@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 import type { QaDaemonIdentity } from './daemon-model';
 
 const hashFiles = async (worktree: string, paths: readonly string[]): Promise<string> => {
@@ -19,16 +20,9 @@ const hashFiles = async (worktree: string, paths: readonly string[]): Promise<st
   return hash.digest('hex');
 };
 
-function gitEnvironment(): Record<string, string> {
-  const environment: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith('GIT_') && value !== undefined) environment[key] = value;
-  }
-  return environment;
-}
-
 export async function createQaDaemonIdentity(worktree: string, headed: boolean): Promise<QaDaemonIdentity> {
-  const git = (args: readonly string[]) => Bun.spawnSync(['git', '-C', worktree, ...args], { env: gitEnvironment() });
+  const git = (args: readonly string[]) =>
+    Bun.spawnSync(['git', '-C', worktree, ...args], { env: isolatedGitEnvironment() });
   const configuration = await hashFiles(worktree, [
     'bun.lock',
     'package.json',
@@ -62,10 +56,19 @@ export async function processStartToken(pid: number): Promise<string | undefined
       return undefined;
     }
   }
-  const result = Bun.spawnSync(['ps', '-o', 'lstart=', '-p', String(pid)]);
-  if (result.exitCode !== 0) return undefined;
-  const token = result.stdout.toString().trim();
-  return token || undefined;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const result = Bun.spawnSync(['ps', '-o', 'lstart=', '-p', String(pid)]);
+      if (result.exitCode === 0) {
+        const token = result.stdout.toString().trim();
+        if (token !== '') return token;
+      }
+    } catch {
+      // Process creation can fail transiently when concurrent validation saturates the host process budget.
+    }
+    if (attempt < 2) await Bun.sleep(10 * (attempt + 1));
+  }
+  return undefined;
 }
 
 export async function pathModifiedAt(path: string): Promise<number | undefined> {

@@ -3,9 +3,15 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { isolatedGitEnvironment } from '../../scripts/lib/ci/git-environment';
 import { qaDaemonLeaseForState } from '../../scripts/qa/daemon-client';
 import { QaDaemonEngine, type QaLifecycleAdapter } from '../../scripts/qa/daemon-engine';
-import type { QaDaemonIdentity, QaDaemonMetrics, QaDaemonResponse } from '../../scripts/qa/daemon-model';
+import type {
+  QaDaemonIdentity,
+  QaDaemonMetrics,
+  QaDaemonResponse,
+  QaDaemonStateRecord,
+} from '../../scripts/qa/daemon-model';
 import { qaDaemonPaths, readLiveDaemonState } from '../../scripts/qa/daemon-state';
 import { createQaDaemonIdentity } from '../../scripts/qa/identity';
 
@@ -14,7 +20,17 @@ interface FakeSession {
 }
 
 const directories: string[] = [];
+const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
+
+const stopChild = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
+  if (child.exitCode === null) child.kill('SIGTERM');
+  const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(1_000).then(() => false)]);
+  if (!exited) child.kill('SIGKILL');
+  await child.exited;
+};
+
 afterEach(async () => {
+  await Promise.all(spawnedChildren.splice(0).map(stopChild));
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -54,16 +70,8 @@ async function temporaryDirectory(): Promise<string> {
   return directory;
 }
 
-function withoutGitEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
-  const isolated: Record<string, string> = {};
-  for (const [key, value] of Object.entries(environment)) {
-    if (!key.startsWith('GIT_') && value !== undefined) isolated[key] = value;
-  }
-  return isolated;
-}
-
 function fixtureGit(worktree: string, args: readonly string[], environment: NodeJS.ProcessEnv = process.env) {
-  return Bun.spawnSync(['git', ...args], { cwd: worktree, env: withoutGitEnvironment(environment) });
+  return Bun.spawnSync(['git', ...args], { cwd: worktree, env: isolatedGitEnvironment(environment) });
 }
 
 async function socketRequest(socketPath: string, value: unknown): Promise<QaDaemonResponse> {
@@ -71,6 +79,7 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
     const socket = connect(socketPath);
     let response = '';
     socket.setEncoding('utf8');
+    socket.setTimeout(1_000, () => socket.destroy(new Error('QA daemon test socket response timed out.')));
     socket.once('connect', () => socket.write(`${JSON.stringify(value)}\n`));
     socket.on('data', (chunk) => (response += chunk));
     socket.once('end', () => {
@@ -83,6 +92,38 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
     socket.once('error', reject);
   });
 }
+
+const spawnQaDaemon = (repository: string, worktree: string) => {
+  const child = Bun.spawn(['bun', 'scripts/qa/daemon.ts', '--worktree', worktree], {
+    cwd: repository,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  spawnedChildren.push(child);
+  return child;
+};
+
+const waitForDaemonState = async (
+  child: ReturnType<typeof Bun.spawn>,
+  worktree: string,
+): Promise<QaDaemonStateRecord> => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const state = await readLiveDaemonState(worktree);
+    if (state !== undefined) {
+      try {
+        const health = await socketRequest(state.socketPath, { id: `startup-${String(attempt)}`, method: 'health' });
+        if (health.ok) return state;
+      } catch {
+        // State publication precedes socket readiness; keep polling the bounded startup contract.
+      }
+    }
+    if (child.exitCode !== null) break;
+    await Bun.sleep(25);
+  }
+  await stopChild(child);
+  const stderr = await new Response(child.stderr).text();
+  throw new Error(`Daemon failed to publish state.${stderr.trim() === '' ? '' : `\n${stderr.slice(-2_000)}`}`);
+};
 
 describe('QA daemon lifecycle', () => {
   test('only grants shutdown ownership to the process that won daemon publication', () => {
@@ -305,18 +346,8 @@ describe('QA daemon lifecycle', () => {
   test('serves JSON health and removes state/socket on authenticated shutdown', async () => {
     const worktree = await temporaryDirectory();
     const repository = resolve(import.meta.dir, '../..');
-    const child = Bun.spawn(['bun', 'scripts/qa/daemon.ts', '--worktree', worktree], {
-      cwd: repository,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    let state = await readLiveDaemonState(worktree);
-    for (let attempt = 0; attempt < 100 && state === undefined; attempt += 1) {
-      await Bun.sleep(25);
-      state = await readLiveDaemonState(worktree);
-    }
-    if (state === undefined)
-      throw new Error(`Daemon failed to publish state: ${await new Response(child.stderr).text()}`);
+    const child = spawnQaDaemon(repository, worktree);
+    const state = await waitForDaemonState(child, worktree);
     const health = await socketRequest(state.socketPath, { id: 'health', method: 'health' });
     expect(health).toMatchObject({ id: 'health', ok: true });
     const shutdown = await socketRequest(state.socketPath, { id: 'shutdown', method: 'shutdown' });
@@ -328,18 +359,8 @@ describe('QA daemon lifecycle', () => {
   test('removes ownership state and socket on SIGTERM', async () => {
     const worktree = await temporaryDirectory();
     const repository = resolve(import.meta.dir, '../..');
-    const child = Bun.spawn(['bun', 'scripts/qa/daemon.ts', '--worktree', worktree], {
-      cwd: repository,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    let state = await readLiveDaemonState(worktree);
-    for (let attempt = 0; attempt < 100 && state === undefined; attempt += 1) {
-      await Bun.sleep(25);
-      state = await readLiveDaemonState(worktree);
-    }
-    if (state === undefined)
-      throw new Error(`Daemon failed to publish state: ${await new Response(child.stderr).text()}`);
+    const child = spawnQaDaemon(repository, worktree);
+    const state = await waitForDaemonState(child, worktree);
     child.kill('SIGTERM');
     await Promise.race([
       child.exited,

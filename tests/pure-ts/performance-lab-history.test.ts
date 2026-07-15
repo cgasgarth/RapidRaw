@@ -296,6 +296,7 @@ exit 1
         good,
         bad,
         evaluator: { command: './evaluate.sh', args: [] },
+        coordination: { root: coordinationRoot },
       });
       expect(report).toMatchObject({ good, bad, firstBadCommit: firstBad, candidateCommits: [firstBad] });
       const skipped = await executeOwnedPerformanceBisect({
@@ -303,6 +304,7 @@ exit 1
         good,
         bad,
         evaluator: { command: './evaluate.sh', args: ['2'] },
+        coordination: { root: coordinationRoot },
       });
       expect(skipped).toMatchObject({ good, bad, candidateCommits: [commits[2], firstBad] });
       expect(skipped.firstBadCommit).toBeUndefined();
@@ -380,6 +382,7 @@ exit 1
 
   test('forced bisect cancellation terminates and reaps the evaluator process group', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-cancel-'));
+    const coordinationRoot = await mkdtemp(resolve(tmpdir(), 'rapidraw-perf-bisect-cancel-coordinator-'));
     const evaluatorPidPath = resolve(tmpdir(), `rapidraw-perf-bisect-evaluator-${randomUUID()}.pid`);
     const environment = isolatedGitEnvironment();
     const git = (...args: string[]) => {
@@ -424,6 +427,7 @@ exit 1
         good,
         bad,
         evaluator: { command: './evaluate-blocking.sh', args: [] },
+        coordination: { root: coordinationRoot },
       });
       for (let attempt = 0; attempt < 200 && !(await Bun.file(evaluatorPidPath).exists()); attempt += 1)
         await Bun.sleep(10);
@@ -439,6 +443,7 @@ exit 1
       execution?.abort();
       await Promise.allSettled(execution === undefined ? [] : [execution.result]);
       await rm(evaluatorPidPath, { force: true });
+      await rm(coordinationRoot, { force: true, recursive: true });
       await rm(directory, { force: true, recursive: true });
     }
   }, 0);
