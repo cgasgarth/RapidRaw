@@ -1,21 +1,15 @@
 import { FolderSearch, GitCompareArrows, Plus, RefreshCw, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import {
-  matchLookApplicationReceiptV1Schema,
-  referencePhysicalSourceIdentityV1Schema,
-} from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
+import { referencePhysicalSourceIdentityV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 
-import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import {
   applyReferenceMatchProposal,
-  createReferenceMatchAdjustmentLayer,
-  createReferenceMatchAppliedDiffs,
   createReferenceMatchProposal,
   describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
@@ -28,6 +22,11 @@ import {
   summarizeReferenceHistogram,
   validateReferenceMatchApplicationIdentities,
 } from '../../utils/referenceMatch';
+import {
+  buildReferenceMatchGlobalEditTransaction,
+  buildReferenceMatchLayerEditTransaction,
+  captureReferenceMatchCommitIdentity,
+} from '../../utils/referenceMatchEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 const GROUPS: ReferenceMatchGroup[] = ['tone', 'color', 'presence'];
@@ -52,7 +51,6 @@ const resolveSourceIdentity = async (path: string): Promise<ReferencePhysicalSou
 
 export default function ReferenceMatchPanel() {
   const { t } = useTranslation();
-  const { setAdjustments } = useEditorActions();
   const {
     adjustmentSnapshot,
     adjustments,
@@ -81,6 +79,8 @@ export default function ReferenceMatchPanel() {
     })),
   );
   const [proposal, setProposal] = useState<ReferenceMatchProposal | null>(null);
+  const proposalRef = useRef(proposal);
+  proposalRef.current = proposal;
   const [impact, setImpact] = useState(100);
   const [enabledGroups, setEnabledGroups] = useState<Set<ReferenceMatchGroup>>(() => new Set(GROUPS));
   const [applyAbstention, setApplyAbstention] = useState<string | null>(null);
@@ -217,10 +217,19 @@ export default function ReferenceMatchPanel() {
     setApplyAbstention(null);
   };
 
-  const revalidateBeforeApply = async (): Promise<boolean> => {
-    if (!proposal) return false;
+  const reportStaleApply = () => {
+    setApplyAbstention(
+      t('editor.adjustments.referenceMatch.applyIdentityChanged', {
+        defaultValue: 'A reference changed after analysis. Re-analyze before applying.',
+      }),
+    );
+  };
+
+  const revalidateBeforeApply = async (candidate: ReferenceMatchProposal): Promise<boolean> => {
     const snapshot = useEditorStore.getState().referenceMatchReferences;
-    const effectiveFingerprints = new Set(proposal.effectiveReferences.map((reference) => reference.sourceFingerprint));
+    const effectiveFingerprints = new Set(
+      candidate.effectiveReferences.map((reference) => reference.sourceFingerprint),
+    );
     const effectiveSources = snapshot.filter((reference) => effectiveFingerprints.has(reference.sourceFingerprint));
     const resolved = await Promise.all(
       effectiveSources.map(
@@ -230,13 +239,13 @@ export default function ReferenceMatchPanel() {
         ],
       ),
     );
-    const validation = validateReferenceMatchApplicationIdentities(proposal, snapshot, new Map(resolved));
+    const validation = validateReferenceMatchApplicationIdentities(
+      candidate,
+      useEditorStore.getState().referenceMatchReferences,
+      new Map(resolved),
+    );
     if (!validation.valid) {
-      setApplyAbstention(
-        t('editor.adjustments.referenceMatch.applyIdentityChanged', {
-          defaultValue: 'A reference changed after analysis. Re-analyze before applying.',
-        }),
-      );
+      reportStaleApply();
       return false;
     }
     setApplyAbstention(null);
@@ -581,52 +590,38 @@ export default function ReferenceMatchPanel() {
               }
               onClick={() =>
                 void (async () => {
-                  if (!(await revalidateBeforeApply())) return;
-                  const current = useEditorStore.getState().adjustments;
+                  const identity = captureReferenceMatchCommitIdentity(useEditorStore.getState(), proposal);
+                  if (identity === null || !(await revalidateBeforeApply(proposal))) return;
+                  if (proposalRef.current?.proposalFingerprint !== identity.proposalFingerprint) {
+                    reportStaleApply();
+                    return;
+                  }
                   const layerId = crypto.randomUUID();
-                  const layerWithoutReceipt = createReferenceMatchAdjustmentLayer({
-                    enabledGroups,
-                    id: layerId,
-                    impact,
-                    name: proposal.mode === 'normalize' ? 'Reference Normalize' : 'Reference Match',
-                    proposal,
-                  });
-                  const receipt = matchLookApplicationReceiptV1Schema.parse({
-                    appliedDiffs: createReferenceMatchAppliedDiffs({
-                      adjustments: current,
+                  try {
+                    const state = useEditorStore.getState();
+                    const commit = buildReferenceMatchLayerEditTransaction({
                       enabledGroups,
+                      identity,
                       impact,
+                      layerId,
+                      layerName: proposal.mode === 'normalize' ? 'Reference Normalize' : 'Reference Match',
                       proposal,
-                    }),
-                    appliedAt: new Date().toISOString(),
-                    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(current)),
-                    destination: 'adjustment-layer',
-                    effectiveReferences: proposal.effectiveReferences,
-                    enabledGroups: [...enabledGroups].sort(),
-                    historyEntriesAdded: 1,
-                    impact,
-                    layerId,
-                    proposalFingerprint: proposal.proposalFingerprint,
-                    resultingGraphFingerprint: fingerprintReferenceMatchValue(
-                      JSON.stringify({
-                        adjustments: layerWithoutReceipt.adjustments,
-                        opacity: layerWithoutReceipt.opacity,
-                      }),
-                    ),
-                    schemaVersion: 1,
-                    targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
-                  });
-                  const layer = createReferenceMatchAdjustmentLayer({
-                    enabledGroups,
-                    id: layerId,
-                    impact,
-                    name: layerWithoutReceipt.name,
-                    proposal,
-                    receipt,
-                  });
-                  setAdjustments({ masks: [layer, ...current.masks] });
-                  setEditor({ activeMaskContainerId: layerId, lastReferenceMatchApplicationReceipt: receipt });
-                  setProposal(null);
+                      state,
+                      transactionId: crypto.randomUUID(),
+                    });
+                    if (commit === null) {
+                      setProposal(null);
+                      return;
+                    }
+                    state.applyEditTransaction(commit.request);
+                    setEditor({
+                      activeMaskContainerId: layerId,
+                      lastReferenceMatchApplicationReceipt: commit.receipt,
+                    });
+                    setProposal(null);
+                  } catch {
+                    reportStaleApply();
+                  }
                 })()
               }
               type="button"
@@ -639,40 +634,32 @@ export default function ReferenceMatchPanel() {
               disabled={enabledGroups.size === 0 || proposal.diffs.length === 0}
               onClick={() =>
                 void (async () => {
-                  if (!(await revalidateBeforeApply())) return;
-                  const current = useEditorStore.getState().adjustments;
-                  const applied = applyReferenceMatchProposal({
-                    adjustments: current,
-                    enabledGroups,
-                    impact,
-                    proposal,
-                  });
-                  const receipt = matchLookApplicationReceiptV1Schema.parse({
-                    appliedDiffs: createReferenceMatchAppliedDiffs({
-                      adjustments: current,
+                  const identity = captureReferenceMatchCommitIdentity(useEditorStore.getState(), proposal);
+                  if (identity === null || !(await revalidateBeforeApply(proposal))) return;
+                  if (proposalRef.current?.proposalFingerprint !== identity.proposalFingerprint) {
+                    reportStaleApply();
+                    return;
+                  }
+                  try {
+                    const state = useEditorStore.getState();
+                    const commit = buildReferenceMatchGlobalEditTransaction({
                       enabledGroups,
+                      identity,
                       impact,
                       proposal,
-                    }),
-                    appliedAt: new Date().toISOString(),
-                    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(current)),
-                    destination: 'global-adjustments',
-                    effectiveReferences: proposal.effectiveReferences,
-                    enabledGroups: [...enabledGroups].sort(),
-                    historyEntriesAdded: 1,
-                    impact,
-                    proposalFingerprint: proposal.proposalFingerprint,
-                    resultingGraphFingerprint: fingerprintReferenceMatchValue(
-                      JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
-                    ),
-                    schemaVersion: 1,
-                    targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
-                  });
-                  setAdjustments({ ...applied, referenceMatchApplicationReceipt: receipt });
-                  setEditor({
-                    lastReferenceMatchApplicationReceipt: receipt,
-                  });
-                  setProposal(null);
+                      state,
+                      transactionId: crypto.randomUUID(),
+                    });
+                    if (commit === null) {
+                      setProposal(null);
+                      return;
+                    }
+                    state.applyEditTransaction(commit.request);
+                    setEditor({ lastReferenceMatchApplicationReceipt: commit.receipt });
+                    setProposal(null);
+                  } catch {
+                    reportStaleApply();
+                  }
                 })()
               }
               type="button"

@@ -209,6 +209,11 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt,
   );
+  expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+    adjustmentRevision: 1,
+    persistence: 'commit',
+    source: 'reference-match',
+  });
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt?.baseGraphFingerprint).not.toBe(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt?.resultingGraphFingerprint,
   );
@@ -251,6 +256,10 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   });
   expect(layerState.adjustments.masks[0]?.adjustments.exposure).not.toBe(0);
   expect(layerState.activeMaskContainerId).toBe(layerState.adjustments.masks[0]?.id);
+  expect(layerState.lastEditApplicationReceipt).toMatchObject({
+    persistence: 'commit',
+    source: 'reference-match',
+  });
 
   await act(async () => {
     useEditorStore
