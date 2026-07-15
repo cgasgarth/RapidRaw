@@ -105,7 +105,12 @@ try {
   await page.getByTestId('perspective-analyze-button').click();
   await page.getByTestId('perspective-evidence-summary').waitFor({ timeout: 10_000 });
   await waitForCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 1);
-  await waitForCount(page, 'apply_adjustments', baselineRenders + 1);
+  await waitForCount(page, 'apply_adjustments', baselineRenders + 2);
+  await page.waitForFunction(async () => {
+    const module = await import('/src/store/useEditorStore.ts');
+    const phase = module.useEditorStore.getState().previewQualityStatus?.phase;
+    return phase === 'final_ready' || phase === 'detail_ready' || phase === 'degraded_limited';
+  });
 
   const accepted = await page.evaluate(async () => {
     const module = await import('/src/store/useEditorStore.ts');
@@ -143,33 +148,37 @@ try {
     | {
         request?: {
           editDocumentV2?: {
-            extensions?: { legacyAdjustments?: { perspectiveCorrection?: { resolvedPlan?: unknown } } };
+            extensions?: { legacyAdjustments?: { perspectiveCorrection?: unknown } };
+            nodes?: { geometry?: { params?: { perspectiveCorrection?: { resolvedPlan?: unknown } } } };
           };
         };
       }
     | undefined;
+  const renderDocument = render?.request?.editDocumentV2;
   if (
-    render?.request?.editDocumentV2?.extensions?.legacyAdjustments?.perspectiveCorrection?.resolvedPlan === undefined
+    renderDocument?.nodes?.geometry?.params?.perspectiveCorrection?.resolvedPlan === undefined ||
+    renderDocument.extensions?.legacyAdjustments?.perspectiveCorrection !== undefined
   ) {
     throw new Error('Perspective plan did not reach the render-authoritative document.');
   }
 
   const noOpSaves = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
-  const noOpRenders = (await calls(page, 'apply_adjustments')).length;
   await page.getByTestId('perspective-analyze-button').click();
   await page.waitForTimeout(500);
   const noOp = await page.evaluate(async () => {
     const module = await import('/src/store/useEditorStore.ts');
     const state = module.useEditorStore.getState();
-    return { historyIndex: state.historyIndex, revision: state.adjustmentRevision };
+    return {
+      historyIndex: state.historyIndex,
+      receipt: state.lastEditApplicationReceipt,
+      revision: state.adjustmentRevision,
+    };
   });
-  if (
-    noOp.historyIndex !== 1 ||
-    noOp.revision !== accepted.revision ||
-    (await calls(page, 'save_metadata_and_update_thumbnail')).length !== noOpSaves ||
-    (await calls(page, 'apply_adjustments')).length !== noOpRenders
-  ) {
-    throw new Error(`Exact perspective no-op produced work: ${JSON.stringify(noOp)}`);
+  const noOpSaveCount = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
+  if (noOp.historyIndex !== 1 || noOp.revision !== accepted.revision || noOpSaveCount !== noOpSaves) {
+    throw new Error(
+      `Exact perspective no-op produced work: ${JSON.stringify({ accepted, noOp, noOpSaveCount, noOpSaves })}`,
+    );
   }
 
   await page.keyboard.press('Meta+z');

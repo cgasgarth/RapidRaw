@@ -23,6 +23,7 @@ import {
   editDocumentManualChromaticAberrationV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentPerceptualGradingV2Schema,
+  editDocumentPerspectiveCorrectionV2Schema,
   editDocumentPointColorV2Schema,
   editDocumentSceneCurveV2Schema,
   editDocumentSelectiveColorMixerV2Schema,
@@ -54,6 +55,9 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (key === 'hsl') return editDocumentSelectiveColorMixerV2Schema.shape.hsl;
   if (key === 'selectiveColorRangeControls') {
     return editDocumentSelectiveColorMixerV2Schema.shape.selectiveColorRangeControls;
+  }
+  if (key === 'perspectiveCorrection') {
+    return editDocumentPerspectiveCorrectionV2Schema.shape.perspectiveCorrection;
   }
   return undefined;
 };
@@ -563,6 +567,7 @@ export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: Edit
   });
   return editDocumentV2Schema.parse({
     ...parsed,
+    geometry: nodeType === 'geometry' ? editDocumentGeometryV2Schema.parse(nextNode.params) : parsed.geometry,
     nodes: { ...parsed.nodes, [nodeType]: nextNode },
   });
 };

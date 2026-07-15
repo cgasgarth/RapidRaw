@@ -194,7 +194,7 @@ struct RawGeometryAdjustments {
     #[serde(default = "default_lens_enabled")]
     lens_vignette_enabled: bool,
     #[serde(default)]
-    lens_distortion_params: RawLensDistortionParams,
+    lens_distortion_params: Option<RawLensDistortionParams>,
     #[serde(default)]
     perspective_correction: perspective::PerspectiveCorrectionSettingsV1,
 }
@@ -216,7 +216,7 @@ impl Default for RawGeometryAdjustments {
             lens_distortion_enabled: default_lens_enabled(),
             lens_tca_enabled: default_lens_enabled(),
             lens_vignette_enabled: default_lens_enabled(),
-            lens_distortion_params: RawLensDistortionParams::default(),
+            lens_distortion_params: None,
             perspective_correction: perspective::PerspectiveCorrectionSettingsV1::default(),
         }
     }
@@ -234,6 +234,7 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
                 })
             })
             .unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+    let lens_distortion_params = raw.lens_distortion_params.unwrap_or_default();
 
     GeometryParams {
         distortion: raw.transform_distortion,
@@ -250,15 +251,15 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         lens_distortion_enabled: raw.lens_distortion_enabled,
         lens_tca_enabled: raw.lens_tca_enabled,
         lens_vignette_enabled: raw.lens_vignette_enabled,
-        lens_dist_k1: raw.lens_distortion_params.k1,
-        lens_dist_k2: raw.lens_distortion_params.k2,
-        lens_dist_k3: raw.lens_distortion_params.k3,
-        lens_model: raw.lens_distortion_params.model,
-        tca_vr: raw.lens_distortion_params.tca_vr,
-        tca_vb: raw.lens_distortion_params.tca_vb,
-        vig_k1: raw.lens_distortion_params.vig_k1,
-        vig_k2: raw.lens_distortion_params.vig_k2,
-        vig_k3: raw.lens_distortion_params.vig_k3,
+        lens_dist_k1: lens_distortion_params.k1,
+        lens_dist_k2: lens_distortion_params.k2,
+        lens_dist_k3: lens_distortion_params.k3,
+        lens_model: lens_distortion_params.model,
+        tca_vr: lens_distortion_params.tca_vr,
+        tca_vb: lens_distortion_params.tca_vb,
+        vig_k1: lens_distortion_params.vig_k1,
+        vig_k2: lens_distortion_params.vig_k2,
+        vig_k3: lens_distortion_params.vig_k3,
         perspective_source_to_corrected,
     }
 }
