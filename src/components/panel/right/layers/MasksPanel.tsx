@@ -1531,7 +1531,7 @@ export function MasksPanel() {
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'layer-command',
-        operations: [{ type: 'replace-adjustments', adjustments: { ...state.adjustments, masks: committed.masks } }],
+        operations: [{ type: 'patch-edit-document-node', nodeType: 'layers', patch: { masks: committed.masks } }],
         history: 'single-entry',
         persistence: 'commit',
       });
@@ -1836,7 +1836,13 @@ export function MasksPanel() {
       const next = applyMaskContainerAdjustmentCandidate(current, id, data.adjustments);
       if (next === current) return;
       markMaskPanelProvenanceStale('source_state_changed', [id]);
-      setAdjustments(() => next);
+      commitMaskGraphCommand(() => ({
+        masks: next.masks,
+        selection: {
+          containerId: useEditorStore.getState().activeMaskContainerId,
+          subMaskId: useEditorStore.getState().activeMaskId,
+        },
+      }));
       return;
     }
     if (
@@ -1847,10 +1853,14 @@ export function MasksPanel() {
     ) {
       markMaskPanelProvenanceStale(data.blendMode === undefined ? 'mask_alpha_changed' : 'source_state_changed', [id]);
     }
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((mask) => (mask.id === id ? { ...mask, ...data } : mask)),
-    }));
+    commitMaskGraphCommand((masks) => {
+      if (!masks.some((mask) => mask.id === id)) return null;
+      const state = useEditorStore.getState();
+      return {
+        masks: masks.map((mask) => (mask.id === id ? { ...mask, ...data } : mask)),
+        selection: { containerId: state.activeMaskContainerId, subMaskId: state.activeMaskId },
+      };
+    });
   };
   const updateSubMask = (id: string, data: SubMaskPatch) => {
     if (
@@ -1864,13 +1874,17 @@ export function MasksPanel() {
       const parentLayerId = adjustments.masks.find((mask) => mask.subMasks.some((subMask) => subMask.id === id))?.id;
       markMaskPanelProvenanceStale('mask_alpha_changed', parentLayerId === undefined ? undefined : [parentLayerId]);
     }
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      masks: prev.masks.map((m) => ({
-        ...m,
-        subMasks: m.subMasks.map((sm) => (sm.id === id ? { ...sm, ...data } : sm)),
-      })),
-    }));
+    commitMaskGraphCommand((masks) => {
+      if (!masks.some((mask) => mask.subMasks.some((subMask) => subMask.id === id))) return null;
+      const state = useEditorStore.getState();
+      return {
+        masks: masks.map((mask) => ({
+          ...mask,
+          subMasks: mask.subMasks.map((subMask) => (subMask.id === id ? { ...subMask, ...data } : subMask)),
+        })),
+        selection: { containerId: state.activeMaskContainerId, subMaskId: state.activeMaskId },
+      };
+    });
   };
 
   const handleDeleteContainer = (id: string) => {
