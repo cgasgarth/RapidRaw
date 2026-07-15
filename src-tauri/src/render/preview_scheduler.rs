@@ -3,6 +3,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::app_state::PreviewJob;
+use crate::render::interactive_gpu_pressure::InteractiveGpuPressure;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PreviewQuality {
@@ -94,7 +95,7 @@ pub struct PreviewScheduler {
     current_generation: AtomicU64,
     current_session: AtomicU64,
     current_path: Mutex<Option<String>>,
-    export_interactive_gpu_waiters: Option<Arc<AtomicUsize>>,
+    interactive_gpu_pressure: Option<Arc<InteractiveGpuPressure>>,
     policy: PreviewSchedulingPolicy,
     pub metrics: PreviewSchedulerMetrics,
 }
@@ -106,11 +107,8 @@ impl PreviewScheduler {
         let mut slots = self.pending.lock().unwrap();
         supersede_slot(slots.interactive.take(), generation);
         supersede_slot(slots.settled.take(), generation);
-        if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
-            waiters.store(
-                usize::from(slots.active_quality == Some(PreviewQuality::Interactive)),
-                Ordering::Release,
-            );
+        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
+            pressure.set_preview_pending(slots.active_quality == Some(PreviewQuality::Interactive));
         }
         generation
     }
@@ -122,7 +120,7 @@ impl PreviewScheduler {
 
     pub fn new_with_export_gpu_pressure(
         policy: PreviewSchedulingPolicy,
-        export_interactive_gpu_waiters: Option<Arc<AtomicUsize>>,
+        interactive_gpu_pressure: Option<Arc<InteractiveGpuPressure>>,
     ) -> Arc<Self> {
         Arc::new(Self {
             pending: Mutex::new(PendingPreviewSlots::default()),
@@ -130,7 +128,7 @@ impl PreviewScheduler {
             current_generation: AtomicU64::new(0),
             current_session: AtomicU64::new(0),
             current_path: Mutex::new(None),
-            export_interactive_gpu_waiters,
+            interactive_gpu_pressure,
             policy,
             metrics: PreviewSchedulerMetrics::default(),
         })
@@ -173,9 +171,6 @@ impl PreviewScheduler {
         };
         let displaced = match quality {
             PreviewQuality::Interactive => {
-                if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
-                    waiters.store(1, Ordering::Release);
-                }
                 self.metrics
                     .interactive_submissions
                     .fetch_add(1, Ordering::Relaxed);
@@ -189,6 +184,12 @@ impl PreviewScheduler {
                 slots.settled.replace(request)
             }
         };
+        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
+            pressure.set_preview_pending(
+                slots.active_quality == Some(PreviewQuality::Interactive)
+                    || slots.interactive.is_some(),
+            );
+        }
         if displaced.is_some() {
             self.metrics
                 .pending_replacements
@@ -243,9 +244,9 @@ impl PreviewScheduler {
         let mut slots = self.pending.lock().unwrap();
         slots.active_quality = None;
         if quality == PreviewQuality::Interactive
-            && let Some(waiters) = self.export_interactive_gpu_waiters.as_ref()
+            && let Some(pressure) = self.interactive_gpu_pressure.as_ref()
         {
-            waiters.store(usize::from(slots.interactive.is_some()), Ordering::Release);
+            pressure.set_preview_pending(slots.interactive.is_some());
         }
         drop(slots);
         if !rendered {
@@ -275,8 +276,8 @@ impl PreviewScheduler {
         slots.shutdown = true;
         stop_slot(slots.interactive.take());
         stop_slot(slots.settled.take());
-        if let Some(waiters) = self.export_interactive_gpu_waiters.as_ref() {
-            waiters.store(0, Ordering::Release);
+        if let Some(pressure) = self.interactive_gpu_pressure.as_ref() {
+            pressure.set_preview_pending(false);
         }
         self.wake.notify_all();
     }
@@ -424,25 +425,42 @@ mod tests {
 
     #[test]
     fn interactive_lifecycle_drives_shared_export_gpu_pressure() {
-        let pressure = Arc::new(AtomicUsize::new(0));
+        let pressure = Arc::new(InteractiveGpuPressure::default());
         let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
             PreviewSchedulingPolicy::default(),
             Some(Arc::clone(&pressure)),
         );
         assert!(scheduler.submit(job(true).0).is_ok());
-        assert_eq!(pressure.load(Ordering::Acquire), 1);
+        assert!(pressure.has_pending_preview());
         let active = scheduler.next().expect("interactive request");
         assert!(scheduler.submit(job(true).0).is_ok());
         scheduler.finish(active.quality, true);
-        assert_eq!(pressure.load(Ordering::Acquire), 1);
+        assert!(pressure.has_pending_preview());
         let replacement = scheduler.next().expect("replacement request");
         scheduler.finish(replacement.quality, true);
-        assert_eq!(pressure.load(Ordering::Acquire), 0);
+        assert!(!pressure.has_pending_preview());
 
         assert!(scheduler.submit(job(false).0).is_ok());
-        assert_eq!(pressure.load(Ordering::Acquire), 0);
+        assert!(!pressure.has_pending_preview());
         scheduler.shutdown();
-        assert_eq!(pressure.load(Ordering::Acquire), 0);
+        assert!(!pressure.has_pending_preview());
+    }
+
+    #[test]
+    fn source_switch_clears_displaced_interactive_gpu_pressure() {
+        let pressure = Arc::new(InteractiveGpuPressure::default());
+        let scheduler = PreviewScheduler::new_with_export_gpu_pressure(
+            PreviewSchedulingPolicy::default(),
+            Some(Arc::clone(&pressure)),
+        );
+        assert!(scheduler.submit(job(true).0).is_ok());
+        assert!(pressure.has_pending_preview());
+
+        let mut next_source = job(false).0;
+        next_source.expected_image_path = "b.raw".to_string();
+        assert!(scheduler.submit(next_source).is_ok());
+
+        assert!(!pressure.has_pending_preview());
     }
 
     #[test]

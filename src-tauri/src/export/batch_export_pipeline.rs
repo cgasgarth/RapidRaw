@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore};
 
+use crate::render::interactive_gpu_pressure::InteractiveGpuPressure;
+
 const CREDIT_QUANTUM_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -384,7 +386,7 @@ impl PipelineResources {
 #[derive(Clone)]
 pub struct CooperativeGpuLane {
     export_slots: Arc<Semaphore>,
-    interactive_waiters: Arc<AtomicUsize>,
+    interactive_gpu_pressure: Arc<InteractiveGpuPressure>,
     diagnostics: PipelineDiagnostics,
 }
 
@@ -396,24 +398,28 @@ impl Default for CooperativeGpuLane {
 
 impl CooperativeGpuLane {
     pub fn new(slots: usize, diagnostics: PipelineDiagnostics) -> Self {
-        Self::with_interactive_waiters(slots, diagnostics, Arc::new(AtomicUsize::new(0)))
+        Self::with_interactive_gpu_pressure(
+            slots,
+            diagnostics,
+            Arc::new(InteractiveGpuPressure::default()),
+        )
     }
 
-    pub fn with_interactive_waiters(
+    pub fn with_interactive_gpu_pressure(
         slots: usize,
         diagnostics: PipelineDiagnostics,
-        interactive_waiters: Arc<AtomicUsize>,
+        interactive_gpu_pressure: Arc<InteractiveGpuPressure>,
     ) -> Self {
         Self {
             export_slots: Arc::new(Semaphore::new(slots.max(1))),
-            interactive_waiters,
+            interactive_gpu_pressure,
             diagnostics,
         }
     }
 
     #[allow(dead_code)]
-    pub fn set_interactive_waiters(&self, waiters: usize) {
-        self.interactive_waiters.store(waiters, Ordering::SeqCst);
+    pub fn set_interactive_preview_pending(&self, pending: bool) {
+        self.interactive_gpu_pressure.set_preview_pending(pending);
     }
 
     pub async fn acquire_export(
@@ -421,7 +427,7 @@ impl CooperativeGpuLane {
         cancellation: &PipelineCancellation,
     ) -> Result<OwnedSemaphorePermit, String> {
         let started = Instant::now();
-        while self.interactive_waiters.load(Ordering::SeqCst) > 0 {
+        while self.interactive_gpu_pressure.has_pending_preview() {
             self.diagnostics
                 .update(|report| report.interactive_preemptions += 1);
             tokio::select! {
@@ -504,11 +510,11 @@ mod tests {
         let rss_start = rss_peak.load(Ordering::SeqCst);
         let started = Instant::now();
 
-        gpu_lane.set_interactive_waiters(1);
+        gpu_lane.set_interactive_preview_pending(true);
         let resumed_lane = gpu_lane.clone();
         let interactive_release = tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(8)).await;
-            resumed_lane.set_interactive_waiters(0);
+            resumed_lane.set_interactive_preview_pending(false);
         });
 
         let mut workers = Vec::with_capacity(SYNTHETIC_WORKER_COUNT);
@@ -827,7 +833,7 @@ mod tests {
     async fn interactive_gpu_preemption_is_observable_and_cancellation_wakes_waiter() {
         let diagnostics = PipelineDiagnostics::default();
         let lane = CooperativeGpuLane::new(1, diagnostics.clone());
-        lane.set_interactive_waiters(1);
+        lane.set_interactive_preview_pending(true);
         let cancellation = PipelineCancellation::default();
         let waiting_lane = lane.clone();
         let waiting_cancellation = cancellation.clone();
@@ -853,7 +859,7 @@ mod tests {
     async fn interactive_gpu_preemption_resumes_when_interactive_waiter_clears() {
         let diagnostics = PipelineDiagnostics::default();
         let lane = CooperativeGpuLane::new(1, diagnostics.clone());
-        lane.set_interactive_waiters(1);
+        lane.set_interactive_preview_pending(true);
         let cancellation = PipelineCancellation::default();
         let waiting_lane = lane.clone();
         let waiting_cancellation = cancellation.clone();
@@ -864,7 +870,7 @@ mod tests {
                 .expect("GPU lane should resume")
         });
         tokio::time::sleep(Duration::from_millis(12)).await;
-        lane.set_interactive_waiters(0);
+        lane.set_interactive_preview_pending(false);
         let permit = tokio::time::timeout(Duration::from_secs(1), waiter)
             .await
             .expect("GPU waiter should resume")

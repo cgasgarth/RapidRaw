@@ -140,7 +140,8 @@ pub struct AppState {
     pub cache_budget: Arc<CacheBudgetCoordinator>,
     pub lut_cache: MemoryLruCache<String, CachedLutPath>,
     pub lut_content_cache: MemoryLruCache<[u8; 32], Lut>,
-    pub export_interactive_gpu_waiters: Arc<AtomicUsize>,
+    pub(crate) interactive_gpu_pressure:
+        Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
     pub mask_cache: MemoryLruCache<u64, GrayImage>,
     pub geometry_cache: MemoryLruCache<u64, DynamicImage>,
     pub thumbnail_geometry_cache: MemoryLruCache<String, (u64, Arc<DynamicImage>, f32)>,
@@ -208,7 +209,7 @@ impl AppState {
                 policy("lut_cpu", 64, 96, Some(32)),
                 Arc::clone(&cache_budget),
             ),
-            export_interactive_gpu_waiters: Arc::new(AtomicUsize::new(0)),
+            interactive_gpu_pressure: Arc::default(),
             mask_cache: MemoryLruCache::new(
                 policy("masks", 96, 128, Some(64)),
                 Arc::clone(&cache_budget),
