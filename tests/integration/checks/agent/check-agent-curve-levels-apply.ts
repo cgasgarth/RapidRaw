@@ -75,6 +75,7 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: 'blob:rawengine-agent-curve-levels-stale',
 });
+const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 
 if (
   agentCurveLevelsApplyRequestSchema.safeParse({
@@ -154,7 +155,7 @@ const result = await applyAgentCurveLevels({
     levels: { enabled: true, gamma: 0.94, inputBlack: 0.02, inputWhite: 0.98, outputBlack: 0.01, outputWhite: 0.99 },
     parametricCurve: {
       luma: {
-        blackLevel: -2,
+        blackLevel: 2,
         darks: -4,
         highlights: 6,
         lights: 5,
@@ -162,7 +163,7 @@ const result = await applyAgentCurveLevels({
         split1: 20,
         split2: 52,
         split3: 82,
-        whiteLevel: 2,
+        whiteLevel: -2,
       },
     },
     pointCurves: {
@@ -195,6 +196,21 @@ if (
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.curve_levels.apply must create undo history and invalidate stale preview output.');
 }
+if (
+  state.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
+  state.lastEditApplicationReceipt?.source !== 'agent-command' ||
+  state.lastEditApplicationReceipt.transactionId !== 'agent_curve_levels_3166_apply' ||
+  state.lastEditApplicationReceipt.baseAdjustmentRevision !== baselineAdjustmentRevision ||
+  state.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1
+) {
+  throw new Error('agent.curve_levels.apply did not publish one source-bound EditTransaction receipt.');
+}
+if (
+  state.editDocumentV2.nodes.scene_curve?.params.curveMode !== 'parametric' ||
+  state.editDocumentV2.nodes.scene_curve.params.toneCurve !== 'soft_contrast'
+) {
+  throw new Error('agent.curve_levels.apply did not update the canonical scene curve node.');
+}
 if (parsedResult.beforePreviewHash === parsedResult.afterPreviewHash) {
   throw new Error('agent.curve_levels.apply did not update preview render identity.');
 }
@@ -225,6 +241,29 @@ const dispatched = dispatchResponseSchema.parse(
 );
 if (dispatched.dispatchStatus !== 'completed') {
   throw new Error('agent.curve_levels.apply did not dispatch via app-server.');
+}
+
+const beforeNoOp = useEditorStore.getState();
+const beforeNoOpSnapshot = buildAgentImageContextSnapshot();
+const noOp = await applyAgentCurveLevels({
+  curveLevels: {
+    levels: { enabled: false, gamma: 1, inputBlack: 0, inputWhite: 1, outputBlack: 0, outputWhite: 1 },
+  },
+  expectedRecipeHash: beforeNoOpSnapshot.initialPreview.recipeHash,
+  operationId: 'agent_curve_levels_no_op_3166',
+  requestId: 'agent-curve-levels-no-op-3166',
+  sessionId: 'agent-curve-levels-3166',
+});
+const afterNoOp = useEditorStore.getState();
+if (
+  noOp.changedPixelCount !== 0 ||
+  noOp.adjustedFields.length !== 0 ||
+  noOp.beforePreviewHash !== noOp.afterPreviewHash ||
+  afterNoOp.adjustmentRevision !== beforeNoOp.adjustmentRevision ||
+  afterNoOp.historyIndex !== beforeNoOp.historyIndex ||
+  afterNoOp.lastEditApplicationReceipt !== beforeNoOp.lastEditApplicationReceipt
+) {
+  throw new Error('Exact-repeat agent.curve_levels.apply created edit, history, persistence, or pixel work.');
 }
 
 const route = buildRawEngineAppServerRouteCatalog().find(
