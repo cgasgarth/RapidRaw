@@ -28,6 +28,7 @@ import {
   type PreviewOperationIdentity,
   type PreviewSessionIdentity,
 } from './previewCoordinator';
+import type { PreviewViewportAuthoritySnapshot } from './previewViewportSnapshot';
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
 const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
@@ -92,6 +93,7 @@ export interface EditedPreviewRequest {
   snapshot: AdjustmentSnapshot;
   targetResolution: number;
   viewerScope: InteractivePreviewScope;
+  viewportAuthority: PreviewViewportAuthoritySnapshot;
 }
 
 export interface ScheduledEditedPreviewRequest extends EditedPreviewRequest {
@@ -152,7 +154,7 @@ interface ScheduledEditedPreview {
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 const validateRequestIdentity = (request: EditedPreviewRequest): void => {
-  const { session, snapshot, targetResolution, viewerScope } = request;
+  const { session, snapshot, targetResolution, viewerScope, viewportAuthority } = request;
   const mismatched =
     session.sourceImagePath !== viewerScope.sourceImagePath ||
     session.graphRevision !== viewerScope.graphIdentity ||
@@ -168,7 +170,15 @@ const validateRequestIdentity = (request: EditedPreviewRequest): void => {
     session.roiFingerprint !== fingerprintPreviewRoi(request.roi) ||
     session.targetWidth !== targetResolution ||
     session.targetHeight !== targetResolution ||
-    session.viewportRevision !== viewerScope.viewportIdentity;
+    session.viewportRevision !== viewerScope.viewportIdentity ||
+    session.viewportRevision !== viewportAuthority.coordinator.revision ||
+    session.roiFingerprint !== viewportAuthority.coordinator.roiFingerprint ||
+    session.sourceImagePath !== viewportAuthority.input.sourceImagePath ||
+    session.sourceRevision !== viewportAuthority.input.sourceRevision ||
+    session.geometryRevision !== viewportAuthority.input.geometryRevision ||
+    session.targetHeight !== viewportAuthority.coordinator.targetHeight ||
+    session.targetWidth !== viewportAuthority.coordinator.targetWidth ||
+    viewerScope.devicePixelRatio !== viewportAuthority.input.devicePixelRatio;
   if (mismatched) throw new Error('Edited preview request does not match its typed session identity.');
 };
 
@@ -335,12 +345,7 @@ export class EditedPreviewEffectRunner<T> {
     };
     const viewportTransition = this.dispatch({
       type: 'viewport-changed',
-      viewport: {
-        revision: request.session.viewportRevision,
-        roiFingerprint: request.session.roiFingerprint,
-        targetHeight: request.session.targetHeight,
-        targetWidth: request.session.targetWidth,
-      },
+      viewport: request.viewportAuthority.coordinator,
     });
     this.consume(viewportTransition.effects);
     const transition = this.dispatch({
