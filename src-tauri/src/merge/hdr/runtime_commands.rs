@@ -6,7 +6,7 @@ use image::DynamicImage;
 use serde::Serialize;
 use tauri::Emitter;
 
-use crate::ImageDimensions;
+use crate::app::commands::source::ImageDimensions;
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::exif_processing::{read_exposure_time_secs, read_iso};

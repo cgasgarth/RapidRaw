@@ -216,7 +216,7 @@ pub async fn acquire_ort_model(
                     .await
                     .map_err(|error| error.to_string())?
                     .map_err(|error| error.to_string())?;
-                    crate::register_exit_handler();
+                    crate::app::runtime::register_exit_handler();
                     Ok(AiSessionHandle::Ort(Arc::new(Mutex::new(session))))
                 }
                 .await;
@@ -341,7 +341,7 @@ pub async fn acquire_clip_model(
                     .map_err(|error| error.to_string())?;
                     let tokenizer =
                         Tokenizer::from_file(tokenizer_path).map_err(|error| error.to_string())?;
-                    crate::register_exit_handler();
+                    crate::app::runtime::register_exit_handler();
                     Ok(AiSessionHandle::Clip(Arc::new(ClipModels {
                         model: Mutex::new(model),
                         tokenizer,

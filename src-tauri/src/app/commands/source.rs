@@ -8,15 +8,21 @@ use std::path::PathBuf;
 
 use crate::file_management::parse_virtual_path;
 
+#[derive(serde::Serialize)]
+pub(crate) struct ImageDimensions {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+}
+
 fn source_path(path: &str) -> PathBuf {
     let (source_path, _) = parse_virtual_path(path);
     source_path
 }
 
 #[tauri::command]
-pub(crate) fn get_image_dimensions(path: String) -> Result<crate::ImageDimensions, String> {
+pub(crate) fn get_image_dimensions(path: String) -> Result<ImageDimensions, String> {
     image::image_dimensions(source_path(&path))
-        .map(|(width, height)| crate::ImageDimensions { width, height })
+        .map(|(width, height)| ImageDimensions { width, height })
         .map_err(|error| error.to_string())
 }
 

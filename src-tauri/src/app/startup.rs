@@ -112,7 +112,8 @@ pub fn request_gpu_initialization(app: tauri::AppHandle, priority: Initializatio
             if std::env::var("RAWENGINE_STARTUP_INJECT_GPU_FAILURE").as_deref() == Ok("1") {
                 return Err("injected gpu startup failure".to_string());
             }
-            crate::get_or_init_gpu_context(&app.state::<crate::AppState>(), &app).map(|_| ())
+            crate::gpu::gpu_context::get_or_init_gpu_context(&app.state::<crate::AppState>(), &app)
+                .map(|_| ())
         })
         .await
         .unwrap_or_else(|error| Err(error.to_string()));

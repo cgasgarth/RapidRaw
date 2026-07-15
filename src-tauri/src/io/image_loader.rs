@@ -1,4 +1,3 @@
-use crate::Cursor;
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::color::white_balance::{
@@ -29,6 +28,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Cursor;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::{

@@ -1245,7 +1245,7 @@ fn generate_thumbnail_data_with_target(
             .masks
             .iter()
             .filter_map(|def| {
-                crate::get_cached_or_generate_mask(
+                crate::mask_generation::get_cached_or_generate_mask(
                     &state,
                     def,
                     preview_w,
