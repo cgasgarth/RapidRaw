@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 
+import { editDocumentV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
 
 const host = '127.0.0.1';
@@ -14,7 +15,15 @@ const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
     adjustments: z
-      .object({ crop: z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() }) })
+      .object({
+        crop: z.object({
+          height: z.number(),
+          unit: z.enum(['%', 'normalized', 'px']),
+          width: z.number(),
+          x: z.number(),
+          y: z.number(),
+        }),
+      })
       .passthrough(),
     path: z.literal(sourcePath),
     transaction: z
@@ -27,6 +36,26 @@ const persistenceSchema = z
       .strict(),
   })
   .passthrough();
+const previewRequestSchema = z.object({ editDocumentV2: editDocumentV2Schema }).passthrough();
+
+const sameJsonValue = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => sameJsonValue(value, right[index]))
+    );
+  }
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftEntries = Object.entries(left);
+  const rightRecord = right as Record<string, unknown>;
+  return (
+    leftEntries.length === Object.keys(rightRecord).length &&
+    leftEntries.every(([key, value]) => Object.hasOwn(rightRecord, key) && sameJsonValue(value, rightRecord[key]))
+  );
+};
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: {
@@ -133,6 +162,11 @@ try {
         ({ command }) => command === 'save_metadata_and_update_thumbnail',
       ).length ?? 0,
   );
+  const baselinePreviewCalls = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
 
   const start = { x: rootBounds.x + 50, y: rootBounds.y + 40 };
   const end = { x: rootBounds.x + rootBounds.width - 90, y: rootBounds.y + rootBounds.height - 70 };
@@ -186,6 +220,38 @@ try {
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
     throw new Error(`Crop did not persist one source-bound geometry revision: ${JSON.stringify(persisted)}`);
+  }
+
+  const previewDeadline = Date.now() + 10_000;
+  let observedPreviewCalls = baselinePreviewCalls;
+  while (Date.now() < previewDeadline) {
+    observedPreviewCalls = await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+          .length ?? 0,
+    );
+    if (observedPreviewCalls > baselinePreviewCalls) break;
+    await page.waitForTimeout(50);
+  }
+  if (observedPreviewCalls <= baselinePreviewCalls) {
+    throw new Error('Crop commit did not publish a new EditDocumentV2 preview request.');
+  }
+  const previewRequest = previewRequestSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'apply_adjustments')
+          .at(-1)?.args?.request ?? null,
+    ),
+  );
+  const previewDocument = previewRequest.editDocumentV2;
+  if (
+    !sameJsonValue(previewDocument.geometry, previewDocument.nodes.geometry?.params) ||
+    !sameJsonValue(previewDocument.geometry.crop, persisted.adjustments.crop)
+  ) {
+    throw new Error(
+      `Crop preview did not carry atomic geometry authority: ${JSON.stringify(previewDocument.geometry)}`,
+    );
   }
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();

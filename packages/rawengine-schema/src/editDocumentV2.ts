@@ -16,6 +16,49 @@ export const sceneGlobalColorToneParamsV2Schema = z
   })
   .strict();
 
+const editDocumentGeometryCropCoordinatesV2Schema = z.object({
+  height: z.number().finite().positive(),
+  width: z.number().finite().positive(),
+  x: z.number().finite().nonnegative(),
+  y: z.number().finite().nonnegative(),
+});
+
+export const editDocumentGeometryCropV2Schema = z
+  .discriminatedUnion('unit', [
+    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('px') }).strict(),
+    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('%') }).strict(),
+    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('normalized') }).strict(),
+  ])
+  .superRefine((crop, context) => {
+    const maximum = crop.unit === '%' ? 100 : crop.unit === 'normalized' ? 1 : null;
+    if (maximum === null) return;
+    if (crop.x + crop.width > maximum) {
+      context.addIssue({
+        code: 'custom',
+        message: `Crop x + width must not exceed ${String(maximum)}.`,
+        path: ['width'],
+      });
+    }
+    if (crop.y + crop.height > maximum) {
+      context.addIssue({
+        code: 'custom',
+        message: `Crop y + height must not exceed ${String(maximum)}.`,
+        path: ['height'],
+      });
+    }
+  });
+
+export const editDocumentGeometryV2Schema = z
+  .object({
+    aspectRatio: z.number().finite().positive().nullable(),
+    crop: editDocumentGeometryCropV2Schema.nullable(),
+    flipHorizontal: z.boolean(),
+    flipVertical: z.boolean(),
+    orientationSteps: z.number().int().min(0).max(3),
+    rotation: z.number().finite().min(-45).max(45),
+  })
+  .strict();
+
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
@@ -276,6 +319,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'geometry') {
+        const geometry = editDocumentGeometryV2Schema.safeParse(node.params);
+        if (!geometry.success) {
+          for (const issue of geometry.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'source_artifacts') {
         const sourceArtifacts = editDocumentSourceArtifactsV2Schema.safeParse(node.params);
         if (!sourceArtifacts.success) {
@@ -298,7 +349,7 @@ const editDocumentMigrationReceiptV2Schema = z
 export const editDocumentV2Schema = z
   .object({
     extensions: z.record(z.string(), z.unknown()),
-    geometry: z.record(z.string(), z.unknown()),
+    geometry: editDocumentGeometryV2Schema,
     graphProcess: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
     layers: z.record(z.string(), z.unknown()),
     migration: editDocumentMigrationReceiptV2Schema.optional(),
@@ -314,12 +365,18 @@ export const editDocumentV2Schema = z
     if (sourceNode !== undefined && !sameJsonValue(sourceNode.params, document.sourceArtifacts)) {
       context.addIssue({ code: 'custom', message: 'Source-artifact domain disagrees with its node params.' });
     }
+    // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
+    const geometryNode = document.nodes['geometry'];
+    if (geometryNode !== undefined && !sameJsonValue(geometryNode.params, document.geometry)) {
+      context.addIssue({ code: 'custom', message: 'Geometry domain disagrees with its node params.' });
+    }
   });
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
+export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 
 export interface CompiledEditDocumentNodeV2 {
@@ -341,6 +398,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
+  if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
   return {
     enabled: envelope.enabled,
@@ -366,7 +424,7 @@ export const parseEditDocumentV2 = (value: unknown): EditDocumentV2 => editDocum
 const editDocumentV2QuarantineInputSchema = z
   .object({
     extensions: z.record(z.string(), z.unknown()),
-    geometry: z.record(z.string(), z.unknown()),
+    geometry: editDocumentGeometryV2Schema,
     graphProcess: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
     layers: z.record(z.string(), z.unknown()),
     migration: editDocumentMigrationReceiptV2Schema.optional(),

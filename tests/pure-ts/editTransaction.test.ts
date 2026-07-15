@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused scene-tone UI changes to a node operation and mixed changes to legacy replacement', () => {
+  test('routes focused scene-tone and geometry UI changes to node operations and mixed changes to legacy replacement', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -48,6 +48,19 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'scene_global_color_tone',
         patch: { exposure: 0.5 },
+      },
+    ]);
+
+    const geometry = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      aspectRatio: 4 / 3,
+      orientationSteps: 1,
+    });
+    expect(geometry).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'geometry',
+        patch: { aspectRatio: 4 / 3, orientationSteps: 1 },
       },
     ]);
 
@@ -112,6 +125,28 @@ describe('reduceEditTransaction', () => {
     expect(result.afterEditDocumentV2.nodes.geometry).toBe(document.nodes.geometry);
     expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(document.nodes.scene_curve);
     expect(result.changedKeys).toEqual(['exposure', 'highlights']);
+  });
+
+  test('patches strict geometry and its explicit domain without recreating unrelated nodes', () => {
+    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const crop = { height: 1800, unit: 'px' as const, width: 2400, x: 400, y: 300 };
+    const result = reduceEditTransaction(
+      INITIAL_ADJUSTMENTS,
+      4,
+      request({
+        operations: [{ nodeType: 'geometry', patch: { crop, rotation: 2.5 }, type: 'patch-edit-document-node' }],
+        source: 'geometry-tool',
+      }),
+      undefined,
+      document,
+    );
+
+    expect(result.after).toMatchObject({ crop, rotation: 2.5 });
+    expect(result.afterEditDocumentV2.geometry).toEqual(result.afterEditDocumentV2.nodes.geometry?.params);
+    expect(result.afterEditDocumentV2.geometry).toMatchObject({ crop, rotation: 2.5 });
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(document.nodes.scene_global_color_tone);
+    expect(result.afterEditDocumentV2.nodes.layers).toBe(document.nodes.layers);
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail', 'geometry']);
   });
 
   test('focused Light reset preserves newer unmigrated Detail and Effects state', () => {

@@ -3,6 +3,7 @@ import {
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  editDocumentGeometryV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentSourceArtifactsV2Schema,
   editDocumentV2Schema,
@@ -12,6 +13,25 @@ import type { Adjustments } from './adjustments';
 
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
+
+const hasRecordShape = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeLegacyGeometryCrop = (crop: unknown): unknown => {
+  if (!hasRecordShape(crop) || Object.hasOwn(crop, 'unit')) return crop;
+  const coordinates = ['x', 'y', 'width', 'height'].map((field) => crop[field]);
+  const isNormalized = coordinates.every(
+    (coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate) && coordinate <= 1,
+  );
+  return { ...crop, unit: isNormalized ? 'normalized' : 'px' };
+};
+
+const normalizeGeometryParams = (params: Readonly<Record<string, unknown>>) =>
+  editDocumentGeometryV2Schema.parse({
+    ...params,
+    // biome-ignore lint/complexity/useLiteralKeys: geometry candidates intentionally use an index signature.
+    crop: normalizeLegacyGeometryCrop(params['crop']),
+  });
 
 const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
   const descriptor = EDIT_DOCUMENT_NODE_DESCRIPTORS.find((candidate) =>
@@ -28,9 +48,13 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   const nodes = Object.fromEntries(
     EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
       const descriptor = descriptorFor(nodeType);
-      const params = Object.fromEntries(
+      const mappedParams = Object.fromEntries(
         mapped.filter((entry) => entry.nodeType === nodeType).map(({ key }) => [key, adjustments[key]]),
       );
+      const params =
+        nodeType === 'geometry'
+          ? normalizeGeometryParams({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
+          : mappedParams;
       return [
         nodeType,
         {
@@ -48,6 +72,13 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   );
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
+  const geometryDescriptor = descriptorFor('geometry');
+  const geometryDefaulted = (geometryDescriptor?.legacyFields ?? [])
+    .filter((field) => !Object.hasOwn(adjustments, field))
+    .map((field) => `geometry.${field}`);
+  // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
+  const legacyCrop = adjustments['crop'];
+  const defaultedCropUnit = hasRecordShape(legacyCrop) && !Object.hasOwn(legacyCrop, 'unit');
   return editDocumentV2Schema.parse({
     extensions: { legacyAdjustments },
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
@@ -56,7 +87,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     layers: nodes['layers']?.params ?? {},
     migration: {
-      defaulted: [],
+      defaulted: [...geometryDefaulted, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
       disabled: [],
       mapped: [
         ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
@@ -95,7 +126,19 @@ export const updateEditDocumentV2Node = (
 ): EditDocumentV2 => {
   const node = document.nodes[nodeType];
   if (node === undefined) return document;
-  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: update(node.params) });
+  const updatedParams = update(node.params);
+  if (nodeType === 'geometry') {
+    const geometry = normalizeGeometryParams(updatedParams);
+    const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: geometry });
+    const next: EditDocumentV2 = {
+      ...document,
+      geometry,
+      nodes: { ...document.nodes, geometry: nextNode },
+    };
+    editDocumentV2Schema.parse(next);
+    return next;
+  }
+  const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: updatedParams });
   const next = { ...document, nodes: { ...document.nodes, [nodeType]: nextNode } };
   editDocumentV2Schema.parse(next);
   return next;
@@ -112,11 +155,14 @@ export const prepareEditDocumentV2ForRender = (
 ): EditDocumentV2 => {
   const prepared = legacyAdjustmentsToEditDocumentV2(preparedAdjustments);
   const nodes = { ...prepared.nodes };
+  let geometry = prepared.geometry;
   for (const nodeType of authoritativeNodeTypes) {
     const authoritativeNode = authoritativeDocument.nodes[nodeType];
-    if (authoritativeNode !== undefined) nodes[nodeType] = authoritativeNode;
+    if (authoritativeNode === undefined) continue;
+    nodes[nodeType] = authoritativeNode;
+    if (nodeType === 'geometry') geometry = editDocumentGeometryV2Schema.parse(authoritativeNode.params);
   }
-  const next = { ...prepared, nodes };
+  const next = { ...prepared, geometry, nodes };
   editDocumentV2Schema.parse(next);
   return next;
 };
