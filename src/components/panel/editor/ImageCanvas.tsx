@@ -57,11 +57,7 @@ import {
   type ViewerSampleTarget,
 } from '../../../utils/viewerSampler';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
-import {
-  analyzeWhiteBalancePickerRgbaSample,
-  buildWhiteBalancePickerAdjustmentCommand,
-  type WhiteBalancePickerRuntimeReceipt,
-} from '../../../utils/whiteBalancePicker';
+import type { WhiteBalancePickerRuntimeReceipt } from '../../../utils/whiteBalancePicker';
 import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/color/CropPanel';
 import { Mask, type SubMask, ToolType } from '../right/layers/Masks';
@@ -82,6 +78,7 @@ import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import { useViewerFocusRetouchController } from './useViewerFocusRetouchController';
 import { useViewerPickerControllers } from './useViewerPickerControllers';
 import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
+import { useViewerWhiteBalanceController } from './useViewerWhiteBalanceController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
 import { ViewerPickerOverlay } from './ViewerPickerOverlay';
 import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
@@ -130,10 +127,6 @@ import {
 import type { ViewerRetouchCommand } from './viewerRetouchHandlesController';
 import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import { resolveViewerSamplerInteraction } from './viewerSamplerInteractionController';
-import {
-  isViewerWhiteBalanceSampleCurrent,
-  resolveViewerWhiteBalanceInteraction,
-} from './viewerWhiteBalanceInteractionController';
 
 declare global {
   interface Window {
@@ -534,6 +527,18 @@ export const ImageCanvas = memo(
       geometry: overlayGeometry,
       imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
       presentation: presentationDescriptor,
+    });
+    const whiteBalanceController = useViewerWhiteBalanceController({
+      active: isWbPickerActive,
+      baseAdjustments: wbPickerBaseAdjustments,
+      geometry: overlayGeometry,
+      imageSessionId: imageSessionId ?? `viewer-source:${selectedImage.path}`,
+      ...(onWbPicked === undefined ? {} : { onCommit: onWbPicked }),
+      ...(onWbPreview === undefined ? {} : { onPreview: onWbPreview }),
+      ...(onWbPreviewCancel === undefined ? {} : { onPreviewCancel: onWbPreviewCancel }),
+      presentation: presentationDescriptor,
+      previewUrl: finalPreviewUrl,
+      selectedImagePath: selectedImage.path,
     });
 
     const [interactivePreviewUrlRegistry] = useState(() => new InteractivePreviewUrlRegistry());
@@ -1065,16 +1070,6 @@ export const ImageCanvas = memo(
     };
     const [viewerSampler, setViewerSampler] = useState(initialViewerSamplerState);
     const viewerSamplerRef = useRef(viewerSampler);
-    const whiteBalancePreviewIdentityRef = useRef(finalPreviewUrl);
-    const whiteBalancePickerActiveRef = useRef(isWbPickerActive);
-    const whiteBalanceSampleSequenceRef = useRef(0);
-    const whiteBalanceSourceIdentityRef = useRef(selectedImage.path);
-    const whiteBalanceGeometryEpochRef = useRef(overlayGeometry.geometryEpoch);
-    const lastWhiteBalanceHoverSampleAtRef = useRef(0);
-    whiteBalancePreviewIdentityRef.current = finalPreviewUrl;
-    whiteBalancePickerActiveRef.current = isWbPickerActive;
-    whiteBalanceSourceIdentityRef.current = selectedImage.path;
-    whiteBalanceGeometryEpochRef.current = overlayGeometry.geometryEpoch;
     viewerSamplerRef.current = viewerSampler;
     const transitionViewerSamplerRef = useRef<
       (transition: (current: LocalViewerSamplerState) => LocalViewerSamplerState) => void
@@ -1277,122 +1272,6 @@ export const ImageCanvas = memo(
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
     }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking]);
 
-    const handleWbSample = useCallback(
-      (e: CanvasKonvaEvent, commit: boolean) => {
-        if (!isWbPickerActive || !finalPreviewUrl || (commit ? !onWbPicked : !onWbPreview)) return;
-
-        const stage = e.target.getStage();
-        const pointerPos = getCanvasPointer(stage);
-        if (!pointerPos) return;
-
-        const cropPoint = overlayGeometry.viewToCrop(overlayPoint<'view-css-pixels'>(pointerPos.x, pointerPos.y));
-        const imgLogicalWidth = overlayGeometry.cropRectInOrientedPixels.width;
-        const imgLogicalHeight = overlayGeometry.cropRectInOrientedPixels.height;
-        const sampleGeometryEpoch = captureGeometryEpoch(overlayGeometry);
-        const sampleSequence = ++whiteBalanceSampleSequenceRef.current;
-        const interaction = resolveViewerWhiteBalanceInteraction(
-          {
-            cropSize: { height: imgLogicalHeight, width: imgLogicalWidth },
-            geometryEpoch: sampleGeometryEpoch.geometryEpoch,
-            previewIdentity: finalPreviewUrl,
-            sourceIdentity: selectedImage.path,
-          },
-          { x: cropPoint.x, y: cropPoint.y },
-          sampleSequence,
-        );
-        if (interaction === null) return;
-        const { x, y } = interaction.imagePoint;
-
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = finalPreviewUrl;
-
-        img.onload = () => {
-          if (
-            !isViewerWhiteBalanceSampleCurrent(
-              interaction.identity,
-              {
-                geometryEpoch: whiteBalanceGeometryEpochRef.current,
-                previewIdentity: whiteBalancePreviewIdentityRef.current ?? '',
-                sequence: whiteBalanceSampleSequenceRef.current,
-                sourceIdentity: whiteBalanceSourceIdentityRef.current,
-              },
-              whiteBalancePickerActiveRef.current,
-            ) ||
-            !isGeometryEpochCurrent(sampleGeometryEpoch, overlayGeometry)
-          )
-            return;
-          const radius = 5;
-          const side = radius * 2 + 1;
-
-          const canvas = document.createElement('canvas');
-          canvas.width = side;
-          canvas.height = side;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) return;
-
-          const scaleX = img.width / imgLogicalWidth;
-          const scaleY = img.height / imgLogicalHeight;
-          const srcX = Math.floor(x * scaleX);
-          const srcY = Math.floor(y * scaleY);
-
-          const startX = Math.max(0, srcX - radius);
-          const startY = Math.max(0, srcY - radius);
-          const endX = Math.min(img.width, srcX + radius + 1);
-          const endY = Math.min(img.height, srcY + radius + 1);
-          const sw = endX - startX;
-          const sh = endY - startY;
-
-          if (sw <= 0 || sh <= 0) return;
-
-          ctx.drawImage(img, startX, startY, sw, sh, 0, 0, sw, sh);
-
-          const patch = analyzeWhiteBalancePickerRgbaSample(ctx.getImageData(0, 0, sw, sh).data);
-          if (!patch || whiteBalancePreviewIdentityRef.current !== finalPreviewUrl) return;
-          if (patch.rejectedClippedPixels / patch.patchPixelCount > 0.1 || patch.spatialVariance > 0.025) return;
-
-          const command = buildWhiteBalancePickerAdjustmentCommand({
-            ...patch,
-            coordinates: {
-              imageX: x,
-              imageY: y,
-              previewPixelX: srcX,
-              previewPixelY: srcY,
-            },
-            currentAdjustments: wbPickerBaseAdjustments,
-            currentPreviewIdentity: whiteBalancePreviewIdentityRef.current,
-            previewIdentity: finalPreviewUrl,
-            selectedImagePath: selectedImage.path,
-          });
-
-          if (commit) onWbPicked?.(command.receipt, command.nextAdjustments);
-          else onWbPreview?.(command.receipt, command.nextAdjustments);
-        };
-      },
-      [
-        finalPreviewUrl,
-        isWbPickerActive,
-        onWbPicked,
-        onWbPreview,
-        overlayGeometry,
-        selectedImage.path,
-        wbPickerBaseAdjustments,
-        getCanvasPointer,
-      ],
-    );
-
-    const handleWbClick = useCallback((event: CanvasKonvaEvent) => handleWbSample(event, true), [handleWbSample]);
-
-    const handleWbHover = useCallback(
-      (event: CanvasKonvaEvent) => {
-        const now = performance.now();
-        if (now - lastWhiteBalanceHoverSampleAtRef.current < 150) return;
-        lastWhiteBalanceHoverSampleAtRef.current = now;
-        handleWbSample(event, false);
-      },
-      [handleWbSample],
-    );
-
     const handleStart = useCallback(
       (e: CanvasKonvaEvent) => {
         if (isNonPrimaryButton(e)) {
@@ -1401,11 +1280,6 @@ export const ImageCanvas = memo(
 
         if (e.evt.cancelable) e.evt.preventDefault();
         pointerGeometryEpochRef.current = captureGeometryEpoch(overlayGeometry);
-
-        if (isWbPickerActive) {
-          handleWbClick(e);
-          return;
-        }
 
         if (isParametricActive) {
           if (!activeSubMaskParameters) return;
@@ -1494,8 +1368,6 @@ export const ImageCanvas = memo(
         }
       },
       [
-        isWbPickerActive,
-        handleWbClick,
         isInitialDrawing,
         isBrushActive,
         activeLineFlow,
@@ -1538,11 +1410,6 @@ export const ImageCanvas = memo(
 
     const handleMove = useCallback(
       (e: CanvasMoveEvent) => {
-        if (isWbPickerActive) {
-          if (isKonvaEvent(e)) handleWbHover(e);
-          return;
-        }
-
         let pos: Coord | null | undefined;
         if (isKonvaEvent(e)) {
           const stage = e.target.getStage();
@@ -1611,8 +1478,6 @@ export const ImageCanvas = memo(
       },
       [
         isToolActive,
-        isWbPickerActive,
-        handleWbHover,
         isInitialDrawing,
         activeMaskId,
         activeAiSubMaskId,
@@ -1736,11 +1601,7 @@ export const ImageCanvas = memo(
 
     const handleMouseLeave = useCallback(() => {
       setCursorPreview((p: CursorPreview) => ({ ...p, visible: false }));
-      if (isWbPickerActive) {
-        whiteBalanceSampleSequenceRef.current += 1;
-        onWbPreviewCancel?.();
-      }
-    }, [isWbPickerActive, onWbPreviewCancel]);
+    }, []);
 
     useEffect(() => {
       if (!isToolActive) return;
@@ -1860,7 +1721,7 @@ export const ImageCanvas = memo(
       visible: showRetouchRemoveHandles && imageRenderSize.width > 0 && imageRenderSize.height > 0,
     });
     const showInteractiveToolOverlayStage =
-      (isMasking || isAiEditing || Boolean(isWbPickerActive)) &&
+      (isMasking || isAiEditing) &&
       retouchHandlesController.activeMode === null &&
       !isCompareModeActive &&
       !showGamutWarningOverlay;
@@ -2037,6 +1898,7 @@ export const ImageCanvas = memo(
     const viewerInteractionContext: ViewerInteractionContext = {
       activeTool:
         pickerControllers.activeTool ??
+        (whiteBalanceController.active ? 'white-balance' : null) ??
         (focusRetouchController.active ? 'focus-retouch' : null) ??
         (retouchHandlesController.activeMode === null ? null : 'retouch') ??
         viewerInputState?.activeTool ??
@@ -2124,6 +1986,10 @@ export const ImageCanvas = memo(
         }
         data-viewer-temporary-hand={String(viewerInputState?.isTemporaryHand ?? false)}
         data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
+        data-wb-picker-gesture-pointer-id={whiteBalanceController.gesturePointerId ?? ''}
+        data-wb-picker-last-status={whiteBalanceController.lastStatus}
+        data-wb-picker-pending-intent={whiteBalanceController.pendingIntent ?? ''}
+        data-wb-picker-pending-pointer-id={whiteBalanceController.pendingPointerId ?? ''}
         data-wb-picker-preview-identity={lastWhiteBalancePickerReceipt?.previewIdentity ?? undefined}
         data-wb-picker-result-temperature={
           lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingTemperature) : undefined
@@ -2182,13 +2048,19 @@ export const ImageCanvas = memo(
             pickerControllers.handleInputEvent(event);
             focusRetouchController.handleInputEvent(event);
             retouchHandlesController.handleInputEvent(event);
+            whiteBalanceController.handleInputEvent(event);
+          } else if (event.type === 'pointermove' && whiteBalanceController.active) {
+            whiteBalanceController.handleInputEvent(event);
           }
         }}
-        onPointerLeave={handleViewerSamplerPointerLeave}
+        onPointerLeave={() => {
+          handleViewerSamplerPointerLeave();
+          whiteBalanceController.cancelPreview();
+        }}
         onPointerDown={(event) => {
           const transition = viewerInteractionTransitionRef.current;
           if (transition?.shouldCapturePointer) event.currentTarget.setPointerCapture(event.pointerId);
-          if (pickerControllers.activeTool !== null) {
+          if (pickerControllers.activeTool !== null || whiteBalanceController.active) {
             event.preventDefault();
             return;
           }
