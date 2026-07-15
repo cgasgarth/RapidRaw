@@ -67,7 +67,6 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use base64::{Engine as _, engine::general_purpose};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage, Rgba};
 use imageproc::drawing::draw_line_segment_mut;
@@ -83,7 +82,6 @@ use tauri::{Emitter, Manager, ipc::Response};
 use crate::ai::ai_commands as build_ai_commands;
 #[cfg(not(feature = "ai"))]
 use crate::app::disabled_commands as build_ai_commands;
-use crate::formats::PNG_DATA_URL_PREFIX;
 use crate::hdr_artifact_sidecar::write_hdr_output_sidecar;
 use crate::image_codecs::{encode_jpeg_data_url, encode_jpeg_response, encode_png_data_url};
 use crate::merge::atomic_derived_output::{AtomicDerivedOutputTransaction, DerivedOutputManifest};
@@ -1918,35 +1916,6 @@ async fn save_hdr(
     Ok(output_path.to_string_lossy().to_string())
 }
 
-#[tauri::command]
-async fn save_collage(base64_data: String, first_path_str: String) -> Result<String, String> {
-    if !base64_data.starts_with(PNG_DATA_URL_PREFIX) {
-        return Err("Invalid base64 data format".to_string());
-    }
-    let encoded_data = &base64_data[PNG_DATA_URL_PREFIX.len()..];
-
-    let decoded_bytes = general_purpose::STANDARD
-        .decode(encoded_data)
-        .map_err(|e| format!("Failed to decode base64: {}", e))?;
-
-    let (first_path, _) = parse_virtual_path(&first_path_str);
-    let parent_dir = first_path
-        .parent()
-        .ok_or_else(|| "Could not determine parent directory of the first image.".to_string())?;
-    let stem = first_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("collage");
-
-    let output_filename = format!("{}_Collage.png", stem);
-    let output_path = parent_dir.join(output_filename);
-
-    fs::write(&output_path, &decoded_bytes)
-        .map_err(|e| format!("Failed to save collage image: {}", e))?;
-
-    Ok(output_path.to_string_lossy().to_string())
-}
-
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -2452,7 +2421,7 @@ pub fn run() {
             preview_geometry_transform,
             app::commands::logging::get_log_file_path,
             app::commands::logging::frontend_log,
-            save_collage,
+            app::commands::collage::save_collage,
             merge_hdr,
             merge::hdr::commands::cancel_hdr_plan,
             merge::focus_stack::commands::plan_focus_stack,
