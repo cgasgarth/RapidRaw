@@ -8,9 +8,7 @@ use tauri::{Emitter, Manager};
 use crate::adjustment_utils::hydrate_adjustments;
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_settings::load_preview_runtime_settings_or_default;
-use crate::app_state::{
-    AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState, CachedPreview,
-};
+use crate::app_state::{AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState};
 use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
@@ -24,6 +22,7 @@ use crate::preview_scheduler::{
     PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
     PreviewSchedulingPolicy, PreviewStage,
 };
+use crate::render::preview_frame_cache_service::CachedPreview;
 use crate::render_plan::{
     CompileRenderPlanContext, RenderPlanRevision, compile_render_plan_cached, content_revision,
 };
@@ -155,6 +154,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         preview_id,
     } = config;
 
+    let preview_frame_request = state.services.preview_frames.begin_request();
     let fn_start = std::time::Instant::now();
     cancellation_checkpoint(cancellation, PreviewStage::Source)?;
     let context = get_or_init_gpu_context(&state, app_handle)?;
@@ -261,7 +261,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     preview_identity.retouch_stage = render_plan.fingerprints.retouch;
     preview_identity.completed_stage = "geometry-retouch-base";
 
-    let cached_preview = state.cached_preview.lock().unwrap().clone();
+    let cached_preview = state.services.preview_frames.snapshot();
 
     let base_valid = cached_preview
         .as_ref()
@@ -561,21 +561,26 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         fn_start,
     )?;
     cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
-    *state.cached_preview.lock().unwrap() = Some(CachedPreview {
-        image: crate::gpu_processing::RevisionedImage::new(
-            Arc::clone(&final_preview_base),
-            final_preview_revision,
-        ),
-        small_image: crate::gpu_processing::RevisionedImage::new(
-            Arc::clone(&small_preview_base),
-            small_preview_revision,
-        ),
-        identity: preview_identity.clone(),
-        scale: scale_for_gpu,
-        unscaled_crop_offset,
-        preview_dim,
-        interactive_divisor,
-    });
+    if !state.services.preview_frames.publish_if_current(
+        preview_frame_request,
+        CachedPreview {
+            image: crate::gpu_processing::RevisionedImage::new(
+                Arc::clone(&final_preview_base),
+                final_preview_revision,
+            ),
+            small_image: crate::gpu_processing::RevisionedImage::new(
+                Arc::clone(&small_preview_base),
+                small_preview_revision,
+            ),
+            identity: preview_identity.clone(),
+            scale: scale_for_gpu,
+            unscaled_crop_offset,
+            preview_dim,
+            interactive_divisor,
+        },
+    ) {
+        return Err("preview_cancelled:Publish".to_string());
+    }
     if !is_interactive
         && pixel_roi.is_none()
         && let Some(graph_revision) = viewer_sample_graph_revision
