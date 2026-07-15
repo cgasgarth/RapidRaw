@@ -104,9 +104,7 @@ use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::parse_virtual_path;
 use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
-use crate::image_loader::{
-    composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
-};
+use crate::image_loader::{composite_patches_on_image, load_base_image_from_bytes};
 use crate::image_processing::{
     Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
     apply_flip, apply_geometry_warp, apply_srgb_to_linear, downscale_f32_image,
@@ -1949,31 +1947,6 @@ async fn save_collage(base64_data: String, first_path_str: String) -> Result<Str
     Ok(output_path.to_string_lossy().to_string())
 }
 
-#[tauri::command]
-fn analyze_negative_lab_dust_spots(
-    path: String,
-    state: tauri::State<AppState>,
-    app_handle: tauri::AppHandle,
-) -> Result<Vec<raw::negative_lab_retouch::NegativeLabDustSpotCandidate>, String> {
-    let _ = get_or_init_gpu_context(&state, &app_handle)?;
-    let (source_path, _) = parse_virtual_path(&path);
-    let source_path_str = source_path.to_string_lossy().to_string();
-    let settings = load_settings_or_default(&app_handle);
-    let bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
-    let image = load_and_composite(
-        &bytes,
-        &source_path_str,
-        &serde_json::json!({}),
-        false,
-        &settings,
-        None,
-    )
-    .map_err(|error| error.to_string())?;
-    Ok(raw::negative_lab_retouch::detect_negative_lab_dust_spots(
-        &image.to_rgb32f(),
-    ))
-}
-
 fn setup_logging(app_handle: &tauri::AppHandle) {
     let log_dir = match app_handle.path().app_log_dir() {
         Ok(dir) => dir,
@@ -2471,7 +2444,7 @@ pub fn run() {
             generate_export_soft_proof_preview,
             resolve_export_soft_proof_transform_metadata,
             app::commands::path_preview::generate_preview_for_path,
-            analyze_negative_lab_dust_spots,
+            app::commands::negative_lab_dust::analyze_negative_lab_dust_spots,
             generate_original_transformed_preview,
             app::commands::viewer_sampling::sample_viewer_pixel,
             generate_preset_preview,
