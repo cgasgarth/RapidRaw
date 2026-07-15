@@ -17,6 +17,7 @@ import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../..
 import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
 import type { ChannelMixerCommitIdentity } from '../../../utils/channelMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
+import type { SelectiveColorMixerSettings } from '../../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
@@ -34,6 +35,7 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   isForMask: boolean;
   commitBlackWhiteMixer: (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => void;
   commitChannelMixer: (update: (current: ChannelMixerSettings) => ChannelMixerSettings) => void;
+  commitSelectiveColorMixer: (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => void;
   onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
@@ -231,6 +233,7 @@ export const ColorMixerControls = ({
   canCreateLocalAdjustmentFromActiveRange = false,
   commitBlackWhiteMixer,
   commitChannelMixer,
+  commitSelectiveColorMixer,
   isForMask,
   onCreateLocalAdjustmentFromActiveRange,
   onDragStateChange,
@@ -288,7 +291,7 @@ export const ColorMixerControls = ({
   const hueBandSegments = getHueBandSegments(activeRangeControls.centerHueDegrees, activeRangeControls.widthDegrees);
 
   const handleHslChange = (key: ColorAdjustment, value: number) => {
-    setAdjustments((previous) => ({
+    commitSelectiveColorMixer((previous) => ({
       ...previous,
       hsl: { ...previous.hsl, [activeColor]: { ...previous.hsl[activeColor], [key]: value } },
     }));
@@ -298,7 +301,7 @@ export const ColorMixerControls = ({
     key: keyof Adjustments['selectiveColorRangeControls'][BlackWhiteMixerChannel],
     value: number,
   ) => {
-    setAdjustments((previous) => ({
+    commitSelectiveColorMixer((previous) => ({
       ...previous,
       selectiveColorRangeControls: {
         ...previous.selectiveColorRangeControls,
@@ -308,14 +311,14 @@ export const ColorMixerControls = ({
   };
 
   const resetActiveHsl = () => {
-    setAdjustments((previous) => ({
+    commitSelectiveColorMixer((previous) => ({
       ...previous,
       hsl: { ...previous.hsl, [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] } },
     }));
   };
 
   const resetActiveLocalRange = () => {
-    setAdjustments((previous) => ({
+    commitSelectiveColorMixer((previous) => ({
       ...previous,
       selectiveColorRangeControls: {
         ...previous.selectiveColorRangeControls,
@@ -325,7 +328,7 @@ export const ColorMixerControls = ({
   };
 
   const resetMixer = () => {
-    setAdjustments((previous) => ({
+    commitSelectiveColorMixer((previous) => ({
       ...previous,
       hsl: structuredClone(INITIAL_ADJUSTMENTS.hsl),
       selectiveColorRangeControls: structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls),

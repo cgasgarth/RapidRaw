@@ -5,17 +5,19 @@ import { readFileSync } from 'node:fs';
 
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
+import { act, createElement, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { readLayerStackSidecarsFromSidecar } from '../../../../packages/rawengine-schema/src';
 import { type AppSettings, Theme } from '../../../../src/components/ui/AppProperties';
 import { createEditorImageSession, useEditorStore } from '../../../../src/store/useEditorStore';
+import { publishAdjustmentSnapshot } from '../../../../src/utils/adjustmentSnapshots';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
 import {
   COLOR_OUTPUT_FOCUS_EVENT,
   COLOR_WORKSPACE_TAB_SESSION_KEY,
 } from '../../../../src/utils/colorWorkspaceNavigation';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2';
 
 type RenderedPanel = {
   container: HTMLDivElement;
@@ -106,6 +108,7 @@ try {
       restoredRendered.unmount();
     }
     await validateOutputFocusEvent(localRendered.container, false);
+    await validateMaskHslAuthority(localRendered.container);
     await validateMaskPointColorAuthority(localRendered.container);
     await validateMaskPerceptualGradingAuthority(localRendered.container);
   } finally {
@@ -135,6 +138,21 @@ console.log('color inspector compact workflow coverage ok');
 
 async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
   await act(async () => {
+    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    useEditorStore.setState({
+      adjustmentRevision: 0,
+      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+      adjustments,
+      editDocumentV2,
+      finalPreviewUrl: 'blob:color-foundation-preview',
+      history: [adjustments],
+      historyCheckpoints: [],
+      historyIndex: 0,
+      lastEditApplicationReceipt: null,
+      navigatorPreviewArtifact: null,
+      transformedOriginalUrl: 'blob:color-foundation-transformed',
+    });
     useEditorStore.getState().setEditor({
       exportSoftProofRecipeId: null,
       exportSoftProofTransform: null,
@@ -205,6 +223,10 @@ function TestColorHarness({
 }) {
   const [adjustments, setAdjustmentState] = useState(initialAdjustments);
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
+  useEffect(() => {
+    if (isForMask) return;
+    return useEditorStore.subscribe((state) => setAdjustmentState(state.adjustments));
+  }, [isForMask]);
   const setAdjustments = (update: AdjustmentUpdate) => {
     setAdjustmentState((previous) => (typeof update === 'function' ? update(previous) : { ...previous, ...update }));
   };
@@ -332,6 +354,25 @@ async function validateMaskPointColorAuthority(container: Element) {
   );
 }
 
+async function validateMaskHslAuthority(container: Element) {
+  await selectMixerWorkspace(container);
+  const before = useEditorStore.getState();
+  const hue = getRangeByLabel(getByTestId(container, 'selective-color-range-controls'), 'Hue');
+  assert.ok(hue, 'Mask Hue slider was not rendered.');
+  await changeRange(hue, 11);
+  assert.equal(hue.value, '11', 'Mask HSL must update its local adjustment state.');
+  assert.equal(
+    useEditorStore.getState().adjustmentRevision,
+    before.adjustmentRevision,
+    'Mask HSL must not redirect its local edit into the global transaction authority.',
+  );
+  assert.deepEqual(
+    useEditorStore.getState().adjustments.hsl,
+    before.adjustments.hsl,
+    'Mask HSL must not replace the global HSL document.',
+  );
+}
+
 async function validateMaskPerceptualGradingAuthority(container: Element) {
   await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-grading'));
   const adjustmentRevision = useEditorStore.getState().adjustmentRevision;
@@ -402,7 +443,8 @@ async function validateDirectProfileToneSelection(container: Element) {
 }
 
 async function validateHslSurfaceInteraction(container: Element) {
-  const hue = getRangeByLabel(container, 'Hue');
+  const hslControls = getByTestId(container, 'selective-color-range-controls');
+  const hue = getRangeByLabel(hslControls, 'Hue');
   assert.ok(hue, 'Hue slider was not rendered.');
   const hueValue = container.querySelector<HTMLButtonElement>('[aria-label="Hue value"]');
   assert.equal(normalizeText(hueValue?.textContent), '0', 'Hue should expose its direct numeric value.');
@@ -423,14 +465,58 @@ async function validateHslSurfaceInteraction(container: Element) {
   await click(localRangeSummary);
   const rangeCenter = getRangeByLabel(localRangeDisclosure, 'Range center');
   assert.ok(rangeCenter, 'Local range center slider was not rendered.');
+  const beforeRange = useEditorStore.getState();
   await changeRange(rangeCenter, 42);
+  const rangeCommitted = useEditorStore.getState();
+  assert.equal(rangeCommitted.adjustmentRevision, beforeRange.adjustmentRevision + 1);
+  assert.equal(rangeCommitted.history.length, beforeRange.history.length + 1);
+  assert.equal(rangeCommitted.adjustments.selectiveColorRangeControls.oranges.centerHueDegrees, 42);
+  assert.equal(rangeCommitted.lastEditApplicationReceipt?.source, 'manual-control');
+  assert.equal(rangeCommitted.finalPreviewUrl, null, 'Global range commit must invalidate rendered output.');
+  assert.equal(rangeCommitted.transformedOriginalUrl, null, 'Global range commit must invalidate transformed output.');
   assert.equal(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range').disabled, true);
   assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
 
-  await changeRange(hue, 8);
+  const beforeHue = useEditorStore.getState();
+  const activeHue = getRangeByLabel(getByTestId(container, 'selective-color-range-controls'), 'Hue');
+  assert.ok(activeHue, 'Active Hue slider was not rendered after the range commit.');
+  await changeRange(activeHue, 8);
+  assert.equal(useEditorStore.getState().adjustmentRevision, beforeHue.adjustmentRevision + 1);
+  assert.equal(useEditorStore.getState().adjustments.hsl.oranges.hue, 8);
   await click(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range'));
-  assert.equal(rangeCenter.value, '42', 'Resetting HSL must not reset the local mask range.');
+  assert.equal(useEditorStore.getState().adjustments.hsl.oranges.hue, 0);
+  assert.equal(
+    getRangeByLabel(localRangeDisclosure, 'Range center')?.value,
+    '42',
+    'Resetting HSL must not reset the local mask range.',
+  );
   assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
+
+  const beforeMixerReset = useEditorStore.getState();
+  await click(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-mixer'));
+  const reset = useEditorStore.getState();
+  assert.equal(reset.adjustmentRevision, beforeMixerReset.adjustmentRevision + 1);
+  assert.equal(reset.history.length, beforeMixerReset.history.length + 1);
+  assert.deepEqual(reset.adjustments.hsl, INITIAL_ADJUSTMENTS.hsl);
+  assert.deepEqual(reset.adjustments.selectiveColorRangeControls, INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+  assert.equal(
+    getRangeByLabel(localRangeDisclosure, 'Range center')?.value,
+    String(INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges.centerHueDegrees),
+  );
+
+  await act(async () => {
+    useEditorStore.getState().undo();
+    await flushPromises();
+  });
+  assert.equal(
+    getRangeByLabel(localRangeDisclosure, 'Range center')?.value,
+    '42',
+    'Undo must restore the complete pre-reset mixer state.',
+  );
+  await act(async () => {
+    useEditorStore.getState().redo();
+    await flushPromises();
+  });
 }
 
 async function validateColorRangeLocalAdjustmentTransaction(container: Element) {
