@@ -39,6 +39,7 @@ import EditorToolbar from '../../components/panel/editor/EditorToolbar';
 import ImageCanvas from '../../components/panel/editor/ImageCanvas';
 import ViewerFooter from '../../components/panel/editor/ViewerFooter';
 import type { ViewerInitialMaskDrawCommand } from '../../components/panel/editor/viewerInitialMaskDrawInteractionController';
+import type { ViewerMaskOverlayDescriptor } from '../../components/panel/editor/viewerMaskOverlayController';
 import type { ViewerParametricMaskTargetCommand } from '../../components/panel/editor/viewerParametricMaskTargetInteractionController';
 import type { ViewerRetouchCommand } from '../../components/panel/editor/viewerRetouchHandlesController';
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
@@ -136,6 +137,13 @@ import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmok
 const ignoreInitialMaskDrawCommit = (_command: ViewerInitialMaskDrawCommand): void => {};
 const ignoreParametricMaskTargetCommit = (_command: ViewerParametricMaskTargetCommand): void => {};
 const ignoreRetouchCommand = (_command: ViewerRetouchCommand): void => {};
+const visualMaskOverlay = (url: string | null): ViewerMaskOverlayDescriptor => ({
+  identity: JSON.stringify({ imageSessionId: 'visual-smoke', status: url === null ? 'none' : 'current' }),
+  imageSessionId: 'visual-smoke',
+  key: null,
+  status: url === null ? 'none' : 'current',
+  url,
+});
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -2495,7 +2503,7 @@ function BrushMaskCanvasVisualSmoke() {
                 isGamutWarningOverlayVisible={false}
                 isSliderDragging={false}
                 isStraightenActive={false}
-                maskOverlayUrl={buildBrushMaskCanvasOverlayUrl(activeSubMask)}
+                maskOverlay={visualMaskOverlay(buildBrushMaskCanvasOverlayUrl(activeSubMask))}
                 onAiMaskBoxCommit={() => {}}
                 onBrushCommit={(command) => {
                   if (
@@ -2709,7 +2717,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
                 isSliderDragging={false}
                 isStraightenActive={isStraightenActive}
                 liveRotation={liveRotation}
-                maskOverlayUrl={null}
+                maskOverlay={visualMaskOverlay(null)}
                 onAiMaskBoxCommit={() => {}}
                 onBrushCommit={() => {}}
                 onInitialMaskDrawCommit={ignoreInitialMaskDrawCommit}
@@ -2971,7 +2979,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isAiEditing={false}
                 isCropping
                 isMasking={false}
-                maskOverlayUrl={null}
+                maskOverlay={visualMaskOverlay(null)}
                 overlayMode="phiGrid"
                 overlayRotation={1}
                 setCrop={(nextCrop: Crop) => {
@@ -2992,7 +3000,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isAiEditing={false}
                 isCropping={false}
                 isMasking
-                maskOverlayUrl={brushOverlayUrl}
+                maskOverlay={visualMaskOverlay(brushOverlayUrl)}
               />
             </div>
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-retouch-remove">
@@ -3025,7 +3033,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isAiEditing={false}
                 isCropping={false}
                 isMasking
-                maskOverlayUrl={null}
+                maskOverlay={visualMaskOverlay(null)}
               />
             </div>
             <div
@@ -3103,7 +3111,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
                 isExportSoftProofEnabled
                 isGamutWarningOverlayVisible
                 isMasking={false}
-                maskOverlayUrl={null}
+                maskOverlay={visualMaskOverlay(null)}
                 transformState={{ positionX: -42, positionY: 18, scale: 1.6 }}
               />
             </div>

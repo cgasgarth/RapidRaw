@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
@@ -29,7 +28,6 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
-import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
@@ -66,13 +64,7 @@ import {
   resolveEditorZoom,
 } from '../../utils/editorZoom';
 import { buildInitialMaskDrawEditTransaction } from '../../utils/initialMaskDrawEditTransaction';
-import {
-  buildMaskOverlayInvokePayload,
-  buildMaskOverlayRequestIdentity,
-  buildMaskOverlayTriggerHash,
-  isMaskOverlayResponseCurrent,
-  type MaskPreviewDefinition,
-} from '../../utils/mask/maskOverlayRequest';
+import { buildMaskOverlayTriggerHash, type MaskPreviewDefinition } from '../../utils/mask/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
 import { imagePointFromCanvasClick, readObjectPromptCanvasState } from '../../utils/mask/objectMaskPromptCanvas';
 import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
@@ -96,14 +88,15 @@ import {
   buildWhiteBalancePickerEditTransaction,
   cancelWhiteBalancePickerPreview,
   createWhiteBalancePickerPreviewSession,
+  type WhiteBalancePickerAdjustmentCommand,
   type WhiteBalancePickerPreviewSession,
-  type WhiteBalancePickerRuntimeReceipt,
 } from '../../utils/whiteBalancePicker';
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import { useViewerMaskOverlayController } from './editor/useViewerMaskOverlayController';
 import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type {
@@ -154,20 +147,6 @@ interface TransformController {
 
 interface DisplaySizeUpdate extends BaseRenderSize {
   scale: number;
-}
-
-interface MaskOverlayRequest {
-  identity: string;
-  imageSessionId: string;
-  jsAdjustments: Adjustments;
-  maskDef: MaskPreviewDefinition;
-  renderSize: RenderSize;
-}
-
-interface MaskOverlayRuntimeState {
-  identity: string | null;
-  imageSessionId: string | null;
-  status: 'current' | 'none' | 'stale-ignored';
 }
 
 const isAiMaskBoxKeyCurrent = (key: ViewerAiMaskBoxSessionKey, context: ViewerAiMaskBoxCurrentContext): boolean =>
@@ -327,12 +306,6 @@ export default function Editor({
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
-  const [maskOverlayUrl, setMaskOverlayUrl] = useState<string | null>(null);
-  const [maskOverlayRuntimeState, setMaskOverlayRuntimeState] = useState<MaskOverlayRuntimeState>({
-    identity: null,
-    imageSessionId: null,
-    status: 'none',
-  });
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -343,29 +316,8 @@ export default function Editor({
   const pendingZoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const suppressDoubleClickUntilRef = useRef(0);
   const suppressCompatibilityClickUntilRef = useRef(0);
-  const isGeneratingOverlayRef = useRef(false);
-  const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
-  const latestOverlayRequestIdentityRef = useRef<string | null>(null);
-  const maskOverlayImageSessionRef = useRef<string | null>(null);
-  const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
   const viewportInteractionControllerRef = useRef<ViewerViewportInteractionController | null>(null);
   const [isViewportInteractionControllerReady, setIsViewportInteractionControllerReady] = useState(false);
-  useLayoutEffect(() => {
-    if (maskOverlayImageSessionRef.current === maskOverlayImageSessionId) return;
-    maskOverlayImageSessionRef.current = maskOverlayImageSessionId;
-    const invalidationIdentity = JSON.stringify({
-      imageSessionId: maskOverlayImageSessionId,
-      status: 'session-invalidated',
-    });
-    pendingOverlayRequestRef.current = null;
-    latestOverlayRequestIdentityRef.current = invalidationIdentity;
-    setMaskOverlayUrl(null);
-    setMaskOverlayRuntimeState({
-      identity: invalidationIdentity,
-      imageSessionId: maskOverlayImageSessionId,
-      status: 'none',
-    });
-  }, [maskOverlayImageSessionId]);
   useEffect(() => {
     let active = true;
     void viewerViewportInteractionControllerModule.then(({ createViewerViewportInteractionController }) => {
@@ -511,13 +463,14 @@ export default function Editor({
   );
 
   const handleWbPicked = useCallback(
-    (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+    (command: WhiteBalancePickerAdjustmentCommand) => {
+      const { receipt } = command;
       const previewSession = wbPickerPreviewSessionRef.current;
       if (previewSession?.previewActive) {
         publishWhiteBalancePickerPreview(cancelWhiteBalancePickerPreview(previewSession, receipt.selectedImagePath));
       }
       const state = useEditorStore.getState();
-      const request = buildWhiteBalancePickerEditTransaction(state, receipt, nextAdjustments, crypto.randomUUID());
+      const request = buildWhiteBalancePickerEditTransaction(state, command, crypto.randomUUID());
       const result = applyEditTransaction(request);
       wbPickerPreviewSessionRef.current = null;
       setEditor({
@@ -529,11 +482,12 @@ export default function Editor({
   );
 
   const handleWbPreview = useCallback(
-    (receipt: WhiteBalancePickerRuntimeReceipt, nextAdjustments: Adjustments) => {
+    (command: WhiteBalancePickerAdjustmentCommand) => {
+      const { receipt } = command;
       const session = wbPickerPreviewSessionRef.current;
       if (!session || !selectedImage) return;
       if (receipt.selectedImagePath !== selectedImage.path) return;
-      const preview = applyWhiteBalancePickerHoverPreview(session, nextAdjustments, receipt);
+      const preview = applyWhiteBalancePickerHoverPreview(session, command);
       wbPickerPreviewSessionRef.current = preview.session;
       publishWhiteBalancePickerPreview(preview.adjustments);
     },
@@ -739,6 +693,14 @@ export default function Editor({
       transformState,
     ],
   );
+  const maskOverlayBinding = useViewerMaskOverlayController({
+    context: {
+      geometryEpoch: overlayGeometry.geometryEpoch,
+      imageSessionId: maskOverlayImageSessionId,
+      sourceIdentity: selectedImage?.path ?? '',
+      sourceRevision: viewerSampleGraphRevision,
+    },
+  });
   const handleParametricMaskTargetCommit = useCallback(
     (command: ViewerParametricMaskTargetCommand) => {
       const state = useEditorStore.getState();
@@ -818,8 +780,8 @@ export default function Editor({
         graphRevision: viewerSampleGraphRevision,
         overlayIdentity: JSON.stringify({
           gamutWarning: isGamutWarningOverlayVisible,
-          mask: maskOverlayRuntimeState.identity,
-          maskStatus: maskOverlayRuntimeState.status,
+          mask: maskOverlayBinding.descriptor.identity,
+          maskStatus: maskOverlayBinding.descriptor.status,
           mode: overlayMode,
         }),
         proofTransformIdentity: JSON.stringify({
@@ -843,8 +805,8 @@ export default function Editor({
       isExportSoftProofEnabled,
       isGamutWarningOverlayVisible,
       isSliderDragging,
-      maskOverlayRuntimeState.identity,
-      maskOverlayRuntimeState.status,
+      maskOverlayBinding.descriptor.identity,
+      maskOverlayBinding.descriptor.status,
       overlayGeometry,
       overlayMode,
       selectedImage?.path,
@@ -1607,59 +1569,6 @@ export default function Editor({
     };
   }, [imageRenderSize, transformState.scale, handleDisplaySizeChange]);
 
-  const processOverlayQueue = useCallback(async () => {
-    if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
-
-    const { identity, imageSessionId, maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
-    pendingOverlayRequestRef.current = null;
-
-    const { maskOverlaySettings, patchResidency } = useEditorStore.getState();
-    const overlayPayload = buildMaskOverlayInvokePayload({
-      jsAdjustments,
-      maskDef,
-      maskOverlaySettings,
-      patchesSentToBackend: patchResidency.snapshot().residentIds,
-      renderSize,
-    });
-
-    if (overlayPayload === null) {
-      setMaskOverlayUrl(null);
-      setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
-      return;
-    }
-
-    isGeneratingOverlayRef.current = true;
-    try {
-      const dataUrl: string = await invoke(Invokes.GenerateMaskOverlay, { ...overlayPayload });
-      if (!isMaskOverlayResponseCurrent(latestOverlayRequestIdentityRef.current, identity)) {
-        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'stale-ignored' });
-        return;
-      }
-
-      if (dataUrl) {
-        setMaskOverlayUrl(dataUrl);
-        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'current' });
-      } else {
-        setMaskOverlayUrl(null);
-        setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
-      }
-    } catch (e) {
-      console.error('Failed to generate live mask overlay:', e);
-      setMaskOverlayUrl(null);
-      setMaskOverlayRuntimeState({ identity, imageSessionId, status: 'none' });
-    } finally {
-      isGeneratingOverlayRef.current = false;
-      requestAnimationFrame(() => {
-        if (pendingOverlayRequestRef.current) {
-          void processOverlayQueueRef.current();
-        }
-      });
-    }
-  }, []);
-  useLayoutEffect(() => {
-    processOverlayQueueRef.current = processOverlayQueue;
-  }, [processOverlayQueue]);
-
   const handleWgpuFailure = useCallback(() => {
     setEditor((state) => ({ wgpuFailureSerial: state.wgpuFailureSerial + 1 }));
   }, [setEditor]);
@@ -1669,30 +1578,16 @@ export default function Editor({
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
-      const { maskOverlaySettings: currentMaskOverlaySettings } = useEditorStore.getState();
-      const triggerHash = buildMaskOverlayTriggerHash({
-        activeMaskDef: maskDef as AiPatch | MaskContainer,
+      const { maskOverlaySettings: currentMaskOverlaySettings, patchResidency } = useEditorStore.getState();
+      maskOverlayBinding.request({
         adjustments: currentAdjustments,
-        imageRenderSize: { height: renderSize.height, width: renderSize.width },
-        maskOverlaySettings: currentMaskOverlaySettings,
-      });
-      const identity = buildMaskOverlayRequestIdentity({
-        imageSessionId: maskOverlayImageSessionId,
-        renderSize,
-        selectedImagePath: selectedImage?.path,
-        triggerHash,
-      });
-      latestOverlayRequestIdentityRef.current = identity;
-      pendingOverlayRequestRef.current = {
-        identity,
-        imageSessionId: maskOverlayImageSessionId,
-        jsAdjustments: currentAdjustments,
         maskDef,
+        maskOverlaySettings: currentMaskOverlaySettings,
+        patchesSentToBackend: patchResidency.snapshot().residentIds,
         renderSize,
-      };
-      void processOverlayQueue();
+      });
     },
-    [maskOverlayImageSessionId, processOverlayQueue, selectedImage?.path],
+    [maskOverlayBinding.request],
   );
 
   const handleLiveMaskPreview = useCallback(
@@ -2242,15 +2137,6 @@ export default function Editor({
     x: 0.5,
     y: 0.5,
   };
-  const canPublishMaskOverlay = maskOverlayRuntimeState.imageSessionId === maskOverlayImageSessionId;
-  const publishedMaskOverlayRuntimeState = canPublishMaskOverlay
-    ? maskOverlayRuntimeState
-    : {
-        identity: JSON.stringify({ imageSessionId: maskOverlayImageSessionId, status: 'render-invalidated' }),
-        imageSessionId: maskOverlayImageSessionId,
-        status: 'none' as const,
-      };
-
   const previewOnlyLabel = t('editor.previewOnly.label');
   const exitPreviewLabel = t('editor.previewOnly.exit');
   const chrome = editorChromeTokens;
@@ -2420,8 +2306,7 @@ export default function Editor({
                 isRotationActive={isRotationActive}
                 isSliderDragging={isSliderDragging}
                 isGamutWarningOverlayVisible={isGamutWarningOverlayVisible}
-                maskOverlayUrl={canPublishMaskOverlay ? maskOverlayUrl : null}
-                maskOverlayRuntimeState={publishedMaskOverlayRuntimeState}
+                maskOverlay={maskOverlayBinding.descriptor}
                 onAiMaskBoxCommit={handleAiMaskBoxCommit}
                 onBrushCommit={handleBrushCommit}
                 onInitialMaskDrawCommit={handleInitialMaskDrawCommit}
@@ -2455,15 +2340,21 @@ export default function Editor({
                 comparisonLabel={referenceCompareSource?.label ?? null}
                 uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
                 updateSubMask={updateSubMaskLocal}
-                isWbPickerActive={isWbPickerActive}
-                lastWhiteBalancePickerReceipt={lastWhiteBalancePickerReceipt}
-                onWbPicked={handleWbPicked}
-                onWbPreview={handleWbPreview}
-                onWbPreviewCancel={handleWbPreviewCancel}
-                wbPickerBaseAdjustments={wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments}
-                pickerImageSessionId={
-                  editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`
-                }
+                whiteBalanceRuntime={{
+                  active: isWbPickerActive,
+                  baseWhiteBalance: {
+                    temperature: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).temperature,
+                    tint: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).tint,
+                  },
+                  commands: {
+                    cancelPreview: handleWbPreviewCancel,
+                    commit: handleWbPicked,
+                    preview: handleWbPreview,
+                  },
+                  imageSessionId:
+                    editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
+                  lastReceipt: lastWhiteBalancePickerReceipt,
+                }}
                 overlayRotation={overlayRotation}
                 overlayMode={overlayMode}
                 cursorStyle={cursorStyle}
