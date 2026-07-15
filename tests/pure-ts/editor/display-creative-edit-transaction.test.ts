@@ -233,4 +233,50 @@ describe('display creative edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
   });
+
+  test('commits through the canonical selected-image fallback session', () => {
+    useEditorStore.setState({
+      finalPreviewUrl: 'blob:fallback-display-before',
+      imageSession: null,
+      imageSessionId: 29,
+    });
+    const state = useEditorStore.getState();
+    const fallbackIdentity: DisplayCreativeCommitIdentity = {
+      adjustmentRevision: state.adjustmentRevision,
+      imageSessionId: 'editor-image-session:29',
+      sourceIdentity: sourcePath,
+    };
+    const noOp = state.applyEditTransaction(
+      buildDisplayCreativeEditTransaction(state, fallbackIdentity, Effect.VignetteAmount, 0, 'fallback-display-no-op'),
+    );
+    expect(noOp.noOp).toBe(true);
+    expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:fallback-display-before');
+    const result = useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildDisplayCreativeEditTransaction(
+          useEditorStore.getState(),
+          fallbackIdentity,
+          Effect.VignetteAmount,
+          -18,
+          'fallback-display',
+        ),
+      );
+    expect(result).toMatchObject({ changedKeys: ['vignetteAmount'], noOp: false });
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      imageSessionId: fallbackIdentity.imageSessionId,
+      transactionId: 'fallback-display',
+    });
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
+    expect(() =>
+      buildDisplayCreativeEditTransaction(
+        { ...state, imageSessionId: 30 },
+        fallbackIdentity,
+        Effect.VignetteAmount,
+        -20,
+        'stale-fallback',
+      ),
+    ).toThrow('display_creative_transaction.stale_session');
+  });
 });
