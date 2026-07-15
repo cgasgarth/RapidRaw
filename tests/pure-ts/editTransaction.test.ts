@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, curve, tone-equalizer, point-color, perceptual-grading, and geometry changes', () => {
+  test('routes focused tone, camera, curve, tone-equalizer, point-color, lens, perceptual-grading, and geometry changes', () => {
     const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
       exposure: 0.5,
@@ -62,6 +62,19 @@ describe('reduceEditTransaction', () => {
         type: 'patch-edit-document-node',
         nodeType: 'geometry',
         patch: { aspectRatio: 4 / 3, orientationSteps: 1 },
+      },
+    ]);
+
+    const lensCorrection = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
+      ...INITIAL_ADJUSTMENTS,
+      lensDistortionAmount: 125,
+      lensVignetteEnabled: false,
+    });
+    expect(lensCorrection).toEqual([
+      {
+        type: 'patch-edit-document-node',
+        nodeType: 'lens_correction',
+        patch: { lensDistortionAmount: 125, lensVignetteEnabled: false },
       },
     ]);
 

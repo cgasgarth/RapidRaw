@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
+import { lensProfileDistortionParamsV1Schema, lensProfilePatchV1Schema } from './rawEngineSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
@@ -316,6 +317,25 @@ export const editDocumentGeometryV2Schema = z
   })
   .strict();
 
+export const editDocumentLensDistortionParamsV2Schema = lensProfileDistortionParamsV1Schema;
+export const editDocumentLensCorrectionV2Schema = z
+  .object({
+    lensCorrectionMode: lensProfilePatchV1Schema.shape.lensCorrectionMode.unwrap(),
+    lensDistortionAmount: lensProfilePatchV1Schema.shape.lensDistortionAmount.unwrap(),
+    lensDistortionEnabled: lensProfilePatchV1Schema.shape.lensDistortionEnabled.unwrap(),
+    lensDistortionParams: lensProfilePatchV1Schema.shape.lensDistortionParams.unwrap(),
+    lensMaker: lensProfilePatchV1Schema.shape.lensMaker.unwrap(),
+    lensModel: lensProfilePatchV1Schema.shape.lensModel.unwrap(),
+    lensTcaAmount: lensProfilePatchV1Schema.shape.lensTcaAmount.unwrap(),
+    lensTcaEnabled: lensProfilePatchV1Schema.shape.lensTcaEnabled.unwrap(),
+    lensVignetteAmount: lensProfilePatchV1Schema.shape.lensVignetteAmount.unwrap(),
+    lensVignetteEnabled: lensProfilePatchV1Schema.shape.lensVignetteEnabled.unwrap(),
+  })
+  .strict()
+  .refine(({ lensMaker, lensModel }) => lensModel === null || lensMaker !== null, {
+    message: 'Lens model cannot be set while lens maker is cleared.',
+  });
+
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
@@ -549,6 +569,37 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'camera_input',
     process: 'scene_referred_v2',
     renderStage: 'camera_input',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
+      lensCorrectionMode: 'manual',
+      lensDistortionAmount: 100,
+      lensDistortionEnabled: true,
+      lensDistortionParams: null,
+      lensMaker: null,
+      lensModel: null,
+      lensTcaAmount: 100,
+      lensTcaEnabled: true,
+      lensVignetteAmount: 100,
+      lensVignetteEnabled: true,
+    },
+    legacyFields: [
+      'lensCorrectionMode',
+      'lensDistortionAmount',
+      'lensDistortionEnabled',
+      'lensDistortionParams',
+      'lensMaker',
+      'lensModel',
+      'lensTcaAmount',
+      'lensTcaEnabled',
+      'lensVignetteAmount',
+      'lensVignetteEnabled',
+    ],
+    nodeType: 'lens_correction',
+    process: 'legacy_pipeline_v1',
+    renderStage: 'lens_correction',
     implementationVersion: 1,
   },
   {
@@ -897,6 +948,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'lens_correction') {
+        const lensCorrection = editDocumentLensCorrectionV2Schema.safeParse(node.params);
+        if (!lensCorrection.success) {
+          for (const issue of lensCorrection.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'source_artifacts') {
         const sourceArtifacts = editDocumentSourceArtifactsV2Schema.safeParse(node.params);
         if (!sourceArtifacts.success) {
@@ -967,6 +1026,7 @@ export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Sc
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
+export type EditDocumentLensCorrectionV2 = z.infer<typeof editDocumentLensCorrectionV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 
 export interface CompiledEditDocumentNodeV2 {
@@ -996,6 +1056,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);
   if (envelope.type === 'geometry') editDocumentGeometryV2Schema.parse(envelope.params);
+  if (envelope.type === 'lens_correction') editDocumentLensCorrectionV2Schema.parse(envelope.params);
   if (envelope.type === 'source_artifacts') editDocumentSourceArtifactsV2Schema.parse(envelope.params);
   if (envelope.type === 'layers') editDocumentLayersV2Schema.parse(envelope.params);
   return {

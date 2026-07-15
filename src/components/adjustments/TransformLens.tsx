@@ -1,16 +1,22 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { Aperture, CircleDashed, Grid3X3, Loader, Plus, SquareDashed, Trash2, Wand2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type PerspectiveCorrectionMode,
   type PerspectiveCropPolicy,
   perspectiveAnalysisResultSchema,
 } from '../../schemas/geometry/perspectiveSchemas';
+import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import type { Adjustments } from '../../utils/adjustments';
+import {
+  buildLensCorrectionEditTransaction,
+  type LensCorrectionCommitIdentity,
+  type ManualLensCorrectionAdjustment,
+} from '../../utils/lensCorrectionEditTransaction';
 import { parseExifMetadataNumber } from '../../utils/metadataPanelContracts';
 import {
   getLensCorrectionAvailability,
@@ -103,6 +109,19 @@ export default function TransformLens({
   const [detectionStatus, setDetectionStatus] = useState<DetectionStatus>('idle');
   const [perspectiveStatus, setPerspectiveStatus] = useState<PerspectiveStatus>('idle');
   const [perspectiveMessage, setPerspectiveMessage] = useState<string | null>(null);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const lensCorrectionCommitIdentity = useMemo<LensCorrectionCommitIdentity | null>(
+    () =>
+      selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImagePath],
+  );
+  const lensCorrectionCommitIdentityRef = useRef(lensCorrectionCommitIdentity);
+  lensCorrectionCommitIdentityRef.current = lensCorrectionCommitIdentity;
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(
@@ -156,6 +175,21 @@ export default function TransformLens({
 
   const updateAdjustment = <Key extends keyof Adjustments>(key: Key, value: Adjustments[Key]) => {
     setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+  };
+
+  const commitLensCorrectionAdjustment = <Key extends ManualLensCorrectionAdjustment>(
+    key: Key,
+    value: Adjustments[Key],
+  ) => {
+    const identity = lensCorrectionCommitIdentityRef.current;
+    if (identity === null) return;
+    const result = applyEditTransaction(
+      buildLensCorrectionEditTransaction(useEditorStore.getState(), identity, key, value, crypto.randomUUID()),
+    );
+    lensCorrectionCommitIdentityRef.current = {
+      ...identity,
+      adjustmentRevision: result.nextAdjustmentRevision,
+    };
   };
 
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> =>
@@ -364,7 +398,13 @@ export default function TransformLens({
             : copy.profileIdle;
 
   return (
-    <div className="space-y-2" data-testid="transform-lens-inspector">
+    <div
+      className="space-y-2"
+      data-commit-adjustment-revision={lensCorrectionCommitIdentity?.adjustmentRevision}
+      data-commit-image-session={lensCorrectionCommitIdentity?.imageSessionId}
+      data-commit-source-identity={lensCorrectionCommitIdentity?.sourceIdentity}
+      data-testid="transform-lens-inspector"
+    >
       <section className="space-y-1.5" data-testid="perspective-correction-controls">
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
@@ -697,7 +737,7 @@ export default function TransformLens({
               disabled={!availability.distortion}
               label={copy.profileDistortion}
               onChange={(checked) => {
-                updateAdjustment('lensDistortionEnabled', checked);
+                commitLensCorrectionAdjustment('lensDistortionEnabled', checked);
               }}
               {...(availability.distortion ? {} : { tooltip: unsupportedProfileFieldTooltip })}
             />
@@ -715,10 +755,11 @@ export default function TransformLens({
               min={0}
               onDragStateChange={onDragStateChange}
               onValueChange={(value) => {
-                updateAdjustment('lensDistortionAmount', Math.trunc(value));
+                commitLensCorrectionAdjustment('lensDistortionAmount', Math.trunc(value));
               }}
               step={1}
               suffix="%"
+              testId="lens-control-distortion-amount"
               value={adjustments.lensDistortionAmount}
             />
 
@@ -728,7 +769,7 @@ export default function TransformLens({
               disabled={!availability.tca}
               label={copy.profileTca}
               onChange={(checked) => {
-                updateAdjustment('lensTcaEnabled', checked);
+                commitLensCorrectionAdjustment('lensTcaEnabled', checked);
               }}
               {...(availability.tca ? {} : { tooltip: unsupportedProfileFieldTooltip })}
             />
@@ -741,10 +782,11 @@ export default function TransformLens({
               min={0}
               onDragStateChange={onDragStateChange}
               onValueChange={(value) => {
-                updateAdjustment('lensTcaAmount', Math.trunc(value));
+                commitLensCorrectionAdjustment('lensTcaAmount', Math.trunc(value));
               }}
               step={1}
               suffix="%"
+              testId="lens-control-tca-amount"
               value={adjustments.lensTcaAmount}
             />
 
@@ -754,7 +796,7 @@ export default function TransformLens({
               disabled={!availability.vignetting}
               label={copy.profileVignette}
               onChange={(checked) => {
-                updateAdjustment('lensVignetteEnabled', checked);
+                commitLensCorrectionAdjustment('lensVignetteEnabled', checked);
               }}
               {...(availability.vignetting ? {} : { tooltip: unsupportedProfileFieldTooltip })}
             />
@@ -772,10 +814,11 @@ export default function TransformLens({
               min={0}
               onDragStateChange={onDragStateChange}
               onValueChange={(value) => {
-                updateAdjustment('lensVignetteAmount', Math.trunc(value));
+                commitLensCorrectionAdjustment('lensVignetteAmount', Math.trunc(value));
               }}
               step={1}
               suffix="%"
+              testId="lens-control-vignette-amount"
               value={adjustments.lensVignetteAmount}
             />
           </div>

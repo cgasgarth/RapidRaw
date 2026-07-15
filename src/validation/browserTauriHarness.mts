@@ -70,6 +70,7 @@ declare global {
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
+      setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
       callIndex: number;
@@ -308,6 +309,9 @@ export const installBrowserTauriHarness = (): void => {
     metadataSaveResponses: [],
     originalPreviewResponses: [],
     revokedObjectUrls: [],
+    setAdjustmentsForPath: (path, adjustments) => {
+      harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
+    },
   };
   window.isTauri = true;
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
