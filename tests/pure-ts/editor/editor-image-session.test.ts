@@ -65,6 +65,33 @@ describe('editor image session ownership', () => {
     expect(isEditorImageSessionCurrent(first.id)).toBe(false);
   });
 
+  test('reopen clears cached GPU-ready state until the new session presents exact pixels', () => {
+    const first = createEditorImageSession({ generation: 10, path: '/raw/A.ARW', source: 'cold-load' });
+    useEditorStore.getState().setEditor({ imageSession: first });
+    useEditorStore.getState().setEditor({
+      hasRenderedFirstFrame: true,
+      previewQualityStatus: {
+        backend: 'wgpu',
+        effectiveRoi: null,
+        effectiveTargetResolution: 1920,
+        estimatedWorkingBytes: 1,
+        generation: 1,
+        limitedBy: null,
+        phase: 'final_ready',
+        reason: 'settled viewport',
+        requestId: 1,
+        requestedTargetResolution: 1920,
+        sufficientForSemanticZoom: true,
+        tier: 'settled_full',
+      },
+    });
+
+    const reopened = createEditorImageSession({ generation: 11, path: '/raw/A.ARW', source: 'cache' });
+    useEditorStore.getState().setEditor({ imageSession: reopened });
+    expect(useEditorStore.getState().hasRenderedFirstFrame).toBe(false);
+    expect(useEditorStore.getState().previewQualityStatus).toBeNull();
+  });
+
   test('cache snapshot is built only for a coherent ready current image', () => {
     const session = createEditorImageSession({ generation: 2, path: '/raw/A.ARW', source: 'cold-load' });
     const snapshot = {

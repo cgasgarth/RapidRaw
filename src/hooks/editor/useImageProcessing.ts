@@ -26,6 +26,7 @@ import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapt
 import { PreviewViewportQualityController } from '../../utils/previewViewportQualityController';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+import { type WgpuPreviewCommit, wgpuFramePresentationAuthority } from '../../utils/wgpuFramePresentationAuthority';
 
 const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
@@ -73,6 +74,12 @@ export function useImageProcessing() {
   const previewScopeRecoveryRequestId = useEditorStore((state) => state.previewScopeRecoveryRequestId);
   const setEditor = useEditorStore((state) => state.setEditor);
   const isCompareActive = compare.mode !== 'off' || compare.isOriginalHeld;
+
+  useEffect(() => {
+    wgpuFramePresentationAuthority.installImageSession(
+      selectedImage === null ? null : { imageSessionId, sourceImagePath: selectedImage.path },
+    );
+  }, [imageSessionId, selectedImage]);
 
   const activeRightPanel = useUIStore((state) => state.activeRightPanel);
   const appSettings = useSettingsStore((state) => state.appSettings);
@@ -128,6 +135,34 @@ export function useImageProcessing() {
   const previewPresentationAdapter = useMemo(
     () =>
       new PreviewPresentationAdapter({
+        acceptWgpuPresentation: (candidate: WgpuPreviewCommit) => {
+          wgpuFramePresentationAuthority.installImageSession({
+            imageSessionId: candidate.identity.session.imageSessionId,
+            sourceImagePath: candidate.identity.session.sourceImagePath,
+          });
+          const committed = wgpuFramePresentationAuthority.acceptPreview(candidate);
+          if (committed === null) return;
+          setEditor((state) => {
+            const currentSession = state.imageSession;
+            if (
+              currentSession === null ||
+              currentSession.generation !== committed.identity.session.imageSessionId ||
+              currentSession.path !== committed.identity.session.sourceImagePath
+            ) {
+              return {};
+            }
+            return {
+              hasRenderedFirstFrame: true,
+              interactivePatch: null,
+              presentedPreviewArtifact: null,
+              previewQualityStatus: committed.previewQualityStatus,
+              ...(committed.renderedPreviewResolution === undefined
+                ? {}
+                : { renderedPreviewResolution: committed.renderedPreviewResolution }),
+              wgpuFrameSerial: state.wgpuFrameSerial + 1,
+            };
+          });
+        },
         getCoordinatorState: () => previewRuntime.snapshot(),
         getPresentationState: () => {
           const editor = useEditorStore.getState();

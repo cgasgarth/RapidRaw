@@ -27,7 +27,6 @@ import {
   parseImportTerminalPayload,
   parsePanoramaCompletePayload,
   parseProgressPayload,
-  parseRenderPathPayload,
   parseSmartPreviewGeneratedPayload,
   parseStringPayload,
   parseThumbnailErrorPayload,
@@ -35,6 +34,7 @@ import {
   parseThumbnailInvalidatedPayload,
   parseThumbnailProgressPayload,
   parseThumbnailTerminalPayload,
+  parseWgpuFrameReadyPayload,
   persistedRenderStateRecoveryPayloadSchema,
 } from '../../schemas/tauriEventSchemas';
 import { isCurrentThumbnailAuthority, shouldAcceptThumbnailAuthority } from '../../schemas/thumbnailOperationSchemas';
@@ -105,6 +105,7 @@ import {
   WGPU_FRAME_READY_EVENT,
 } from '../../utils/tauriEventNames';
 import { thumbnailResourceCache } from '../../utils/thumbnailResources';
+import { wgpuFramePresentationAuthority } from '../../utils/wgpuFramePresentationAuthority';
 
 interface TauriListenerProps {
   invalidateThumbnailRevision: (path: string, sourceRevision: string) => void;
@@ -549,13 +550,44 @@ export function useTauriListeners({
         );
       }),
       listen<unknown>(WGPU_FRAME_READY_EVENT, (event) => {
-        const payload = parseRenderPathPayload(event.payload);
-        if (isEffectActive && payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor((state) => ({
-            hasRenderedFirstFrame: true,
-            wgpuFrameSerial: state.wgpuFrameSerial + 1,
-          }));
+        const payload = parseWgpuFrameReadyPayload(event.payload);
+        if (!isEffectActive) return;
+        const editor = useEditorStore.getState();
+        const session = editor.imageSession;
+        if (
+          session === null ||
+          payload.path !== session.path ||
+          payload.previewOperationIdentity.session.sourceImagePath !== session.path ||
+          payload.previewOperationIdentity.session.imageSessionId !== session.generation
+        ) {
+          return;
         }
+        wgpuFramePresentationAuthority.installImageSession({
+          imageSessionId: session.generation,
+          sourceImagePath: session.path,
+        });
+        const committed = wgpuFramePresentationAuthority.recordFrameReady(payload.previewOperationIdentity);
+        if (committed === null) return;
+        editor.setEditor((state) => {
+          const currentSession = state.imageSession;
+          if (
+            currentSession === null ||
+            currentSession.generation !== committed.identity.session.imageSessionId ||
+            currentSession.path !== committed.identity.session.sourceImagePath
+          ) {
+            return {};
+          }
+          return {
+            hasRenderedFirstFrame: true,
+            interactivePatch: null,
+            presentedPreviewArtifact: null,
+            previewQualityStatus: committed.previewQualityStatus,
+            ...(committed.renderedPreviewResolution === undefined
+              ? {}
+              : { renderedPreviewResolution: committed.renderedPreviewResolution }),
+            wgpuFrameSerial: state.wgpuFrameSerial + 1,
+          };
+        });
       }),
       listen<unknown>(PANORAMA_PROGRESS_EVENT, (event) => {
         const payload = parseStringPayload(event.payload);
