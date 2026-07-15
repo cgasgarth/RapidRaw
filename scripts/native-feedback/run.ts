@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { acquireResourceLease } from '../lib/ci/resource-coordinator';
+import { acquireResourceLease, resolveValidationHostBudgetCapacity } from '../lib/ci/resource-coordinator';
 import { compareNativeFeedbackReceipts, runNativeFeedbackBenchmark } from './benchmark';
 import { captureNativeFeedbackIdentity, computeNativeSourceDigest } from './identity';
 import {
@@ -183,7 +183,11 @@ if (args[0] === 'measure') {
   ]
     .map((argument) => `'${argument.replaceAll("'", "'\\''")}'`)
     .join(' ');
-  const lease = await acquireResourceLease({ label: `native-feedback-${scope}`, resource: 'native-heavy' });
+  const lease = await acquireResourceLease({
+    hostBudgetCapacity: await resolveValidationHostBudgetCapacity(),
+    label: `native-feedback-${scope}`,
+    resource: 'native-heavy',
+  });
   let runtime: Awaited<ReturnType<typeof createCargoNativeFeedbackExecutor>> | undefined;
   let complete = false;
   const cancellation = new AbortController();

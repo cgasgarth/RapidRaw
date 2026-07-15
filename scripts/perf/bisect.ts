@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { isolatedGitEnvironment } from '../lib/ci/git-environment';
-import { acquireResourceLease } from '../lib/ci/resource-coordinator';
+import { acquireResourceLease, resolveValidationHostBudgetCapacity } from '../lib/ci/resource-coordinator';
 
 const shaSchema = z.string().regex(/^[0-9a-f]{40}$/u);
 
@@ -121,6 +121,7 @@ export async function executePerformanceBisect(options: {
     .parse({ cwd: options.cwd, good: options.good, bad: options.bad });
   try {
     const lease = await acquireResourceLease({
+      hostBudgetCapacity: await resolveValidationHostBudgetCapacity(),
       label: 'performance-bisect',
       onQueued: options.coordination?.onQueued,
       resource: 'native-heavy',

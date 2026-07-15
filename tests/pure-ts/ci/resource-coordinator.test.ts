@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { acquireResourceLease } from '../../../scripts/lib/ci/resource-coordinator';
+import {
+  acquireResourceLease,
+  deriveValidationHostBudgetCapacity,
+  validationHostBudgetWeight,
+} from '../../../scripts/lib/ci/resource-coordinator';
 
 const temporaryRoots: string[] = [];
 const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
@@ -146,6 +150,175 @@ const seedStaleLock = async (root: string, label: string): Promise<void> => {
 };
 
 describe('cross-worktree resource coordinator', () => {
+  test('derives bounded host capacity and proportional class reservations', () => {
+    expect(deriveValidationHostBudgetCapacity(12, 64 * 1024 ** 3)).toBe(6);
+    expect(deriveValidationHostBudgetCapacity(4, 8 * 1024 ** 3)).toBe(2);
+    expect(deriveValidationHostBudgetCapacity(64, 2 * 1024 ** 3)).toBe(1);
+    expect(validationHostBudgetWeight('cpu-heavy', 6)).toBe(2);
+    expect(validationHostBudgetWeight('suite-exclusive', 6)).toBe(3);
+    expect(validationHostBudgetWeight('native-heavy', 6)).toBe(4);
+    expect(validationHostBudgetWeight('browser', 6)).toBe(4);
+  });
+
+  test('shares weighted host capacity across worktrees while light work stays parallel', async () => {
+    const root = await temporaryRoot();
+    const nativeWorktree = join(root, 'native-worktree');
+    const cpuWorktree = join(root, 'cpu-worktree');
+    const lightWorktree = join(root, 'light-worktree');
+    const nativeStarted = join(root, 'native-started');
+    const cpuStarted = join(root, 'cpu-started');
+    const lightStarted = join(root, 'light-started');
+    const releaseNative = join(root, 'release-native');
+    await Promise.all([mkdir(nativeWorktree), mkdir(cpuWorktree), mkdir(lightWorktree)]);
+
+    const native = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'weighted-native',hostBudgetCapacity:4,pollMs:10});
+await Bun.write(${JSON.stringify(nativeStarted)},'started');
+while(!(await Bun.file(${JSON.stringify(releaseNative)}).exists())) await Bun.sleep(10);
+await lease.release();`,
+      nativeWorktree,
+    );
+    await waitFor(async () => await Bun.file(nativeStarted).exists(), 'weighted native owner did not start');
+    const cpu = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'validation-class-cpu-heavy',capacity:2,label:'weighted-cpu',hostBudgetCapacity:4,pollMs:10});
+await Bun.write(${JSON.stringify(cpuStarted)},'started');
+await lease.release();`,
+      cpuWorktree,
+    );
+    await waitFor(
+      async () => (await queuedLabels(root, 'validation-host-heavy')).includes('host-budget:weighted-cpu'),
+      'CPU owner never queued behind the weighted native reservation',
+    );
+    expect(await Bun.file(cpuStarted).exists()).toBeFalse();
+
+    const light = trackChild(
+      Bun.spawn(['bun', '-e', `await Bun.write(${JSON.stringify(lightStarted)},'started')`], {
+        cwd: lightWorktree,
+      }),
+    );
+    expect(await light.exited).toBe(0);
+    expect(await Bun.file(lightStarted).exists()).toBeTrue();
+
+    await writeFile(releaseNative, 'release\n');
+    await Promise.all([expectSuccessfulExit(native), expectSuccessfulExit(cpu)]);
+    expect(await Bun.file(cpuStarted).exists()).toBeTrue();
+    expect((await readdir(root)).some((entry) => entry.startsWith('validation-host-heavy'))).toBeFalse();
+  });
+
+  test('cancels weighted waiters without releasing any live owner slots', async () => {
+    const root = await temporaryRoot();
+    const holder = await acquireResourceLease({
+      capacity: 4,
+      label: 'weighted-holder',
+      ownerId: 'weighted-holder-owner',
+      resource: 'validation-host-heavy',
+      root,
+      weight: 3,
+    });
+    const controller = new AbortController();
+    let queued: (() => void) | undefined;
+    const queuedPromise = new Promise<void>((resolve) => {
+      queued = resolve;
+    });
+    const waiting = acquireResourceLease({
+      capacity: 4,
+      label: 'weighted-cancelled',
+      onQueued: () => queued?.(),
+      ownerId: 'weighted-cancelled-owner',
+      pollMs: 5,
+      resource: 'validation-host-heavy',
+      root,
+      signal: controller.signal,
+      weight: 2,
+    });
+    try {
+      await queuedPromise;
+      controller.abort();
+      await expect(waiting).rejects.toThrow('resource_wait_cancelled');
+      expect(
+        (await readdir(root)).filter(
+          (entry) => entry.startsWith('validation-host-heavy.slot-') && entry.endsWith('.lock'),
+        ),
+      ).toHaveLength(3);
+      expect(await queuedLabels(root, 'validation-host-heavy')).toEqual([]);
+    } finally {
+      controller.abort();
+      await Promise.allSettled([waiting]);
+      await holder.release();
+    }
+    expect((await readdir(root)).some((entry) => entry.startsWith('validation-host-heavy'))).toBeFalse();
+  });
+
+  test('composed cross-class cancellation releases only the waiting host reservation', async () => {
+    const root = await temporaryRoot();
+    const holder = await acquireResourceLease({
+      hostBudgetCapacity: 4,
+      label: 'composed-native-holder',
+      ownerId: 'composed-native-holder-owner',
+      resource: 'native-heavy',
+      root,
+    });
+    const controller = new AbortController();
+    let queued: (() => void) | undefined;
+    const queuedPromise = new Promise<void>((resolve) => {
+      queued = resolve;
+    });
+    const waiting = acquireResourceLease({
+      capacity: 2,
+      hostBudgetCapacity: 4,
+      label: 'composed-cpu-waiter',
+      onQueued: () => queued?.(),
+      ownerId: 'composed-cpu-waiter-owner',
+      pollMs: 5,
+      resource: 'validation-class-cpu-heavy',
+      root,
+      signal: controller.signal,
+    });
+    try {
+      await queuedPromise;
+      controller.abort();
+      await expect(waiting).rejects.toThrow('resource_wait_cancelled');
+      expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('composed-native-holder')).toBe(
+        true,
+      );
+      expect(await queuedLabels(root, 'validation-host-heavy')).toEqual([]);
+    } finally {
+      controller.abort();
+      await Promise.allSettled([waiting]);
+      await holder.release();
+    }
+    expect((await readdir(root)).some((entry) => entry.startsWith('validation-host-heavy'))).toBeFalse();
+  });
+
+  test('recovers every weighted slot after an orphaned cross-worktree owner', async () => {
+    const root = await temporaryRoot();
+    const worktree = join(root, 'orphan-worktree');
+    const started = join(root, 'weighted-orphan-started');
+    await mkdir(worktree);
+    const orphan = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'validation-host-heavy',capacity:4,weight:3,label:'weighted-orphan'});
+await Bun.write(${JSON.stringify(started)},'started');
+while(true) await Bun.sleep(10);`,
+      worktree,
+    );
+    await waitFor(async () => await Bun.file(started).exists(), 'weighted orphan never acquired its slots');
+    orphan.kill('SIGKILL');
+    await orphan.exited;
+
+    const follower = directLease(
+      root,
+      `const lease=await acquireResourceLease({resource:'validation-host-heavy',capacity:4,weight:3,label:'weighted-follower'});
+console.log('weighted-follower-acquired'); await lease.release();`,
+      worktree,
+    );
+    await expectSuccessfulExit(follower);
+    expect(await new Response(follower.stdout).text()).toContain('weighted-follower-acquired');
+    expect((await readdir(root)).some((entry) => entry.startsWith('validation-host-heavy'))).toBeFalse();
+  });
+
   test('isolates root discovery from inherited Git configuration', async () => {
     const root = await temporaryRoot();
     const repository = join(root, 'repository');
@@ -535,7 +708,9 @@ await lease.release();`,
     const secondOutput = await new Response(second.stdout).text();
     const firstEnd = Number(firstOutput.match(/first-end (\d+)/)?.[1]);
     const secondStart = Number(secondOutput.match(/second-start (\d+)/)?.[1]);
-    expect(secondOutput).toContain('second-heavy waiting for native-heavy: first-heavy pid=');
+    expect(secondOutput).toContain(
+      'host-budget:second-heavy waiting for validation-host-heavy: host-budget:first-heavy pid=',
+    );
     expect(secondStart).toBeGreaterThanOrEqual(firstEnd);
   });
 

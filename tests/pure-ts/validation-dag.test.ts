@@ -558,6 +558,111 @@ describe('affected validation DAG', () => {
     await rm(directory, { force: true, recursive: true });
   });
 
+  test('shared host-budget queue time is excluded while post-acquisition timeout stays strict', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-host-budget-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    await mkdir(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
+    await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
+    const holder = await acquireResourceLease({
+      capacity: 4,
+      label: 'blocking-host-pressure',
+      ownerId: 'blocking-host-pressure-owner',
+      resource: 'validation-host-heavy',
+      root: coordinator,
+      weight: 4,
+    });
+    const unitNode: ValidationNode = {
+      id: 'weighted-unit-command',
+      command: ['/usr/bin/true'],
+      dependencies: [],
+      inputs: ['frontend'],
+      resourceClass: 'suite-exclusive',
+      cachePolicy: 'none',
+      modes: ['commit'],
+      queueTimeoutMs: 2_000,
+      timeoutMs: 100,
+    };
+    const options = {
+      mode: 'commit' as const,
+      changedPaths: ['input.ts'],
+      noCache: true,
+      verifyCache: false,
+      explainCache: false,
+      hostBudgetCapacity: 4,
+      root,
+      resourceCoordinatorRoot: coordinator,
+    };
+
+    let settled = false;
+    const queuedValidation = runValidation([unitNode], options).finally(() => {
+      settled = true;
+    });
+    try {
+      const queuePath = join(coordinator, 'validation-host-heavy.queue');
+      const queueDeadline = Date.now() + 2_000;
+      while ((await readdir(queuePath).catch(() => [])).length === 0 && Date.now() < queueDeadline) await Bun.sleep(5);
+      expect((await readdir(queuePath)).length).toBeGreaterThan(0);
+      await Bun.sleep(250);
+      expect(settled).toBeFalse();
+    } finally {
+      await holder.release();
+    }
+    expect(await queuedValidation).toBe(0);
+
+    expect(
+      await runValidation([{ ...unitNode, id: 'slow-weighted-unit', command: ['/bin/sh', '-c', 'sleep 1'] }], options),
+    ).toBe(1);
+    expect((await readdir(coordinator)).some((entry) => entry.startsWith('validation-host-heavy'))).toBeFalse();
+    await rm(directory, { force: true, recursive: true });
+  });
+
+  test('parallel nodes in one validation run reserve independent cross-class host weight', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-node-budget-'));
+    const root = join(directory, 'worktree');
+    const coordinator = join(directory, 'locks');
+    const sentinel = join(directory, 'host-pressure-sentinel');
+    await mkdir(root);
+    expect(await initFixtureRepository(root)).toEqual({ exitCode: 0, stderr: '' });
+    await Promise.all([
+      writeFile(join(root, 'input.rs'), 'fn input() {}\n'),
+      writeFile(join(root, 'input.ts'), 'export const input = true;\n'),
+    ]);
+    const exclusivePressure = [
+      'bun',
+      '-e',
+      `import {rm} from 'node:fs/promises';const path=${JSON.stringify(sentinel)};if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.sleep(120);await rm(path,{force:true})`,
+    ];
+    const node = (id: string, input: 'frontend' | 'rust', resourceClass: 'cpu-heavy' | 'native-heavy') => ({
+      id,
+      command: exclusivePressure,
+      dependencies: [],
+      inputs: [input],
+      resourceClass,
+      cachePolicy: 'none' as const,
+      modes: ['commit' as const],
+      timeoutMs: 2_000,
+    });
+    expect(
+      await runValidation(
+        [node('same-run-native', 'rust', 'native-heavy'), node('same-run-cpu', 'frontend', 'cpu-heavy')],
+        {
+          mode: 'commit',
+          changedPaths: ['input.rs', 'input.ts'],
+          noCache: true,
+          verifyCache: false,
+          explainCache: false,
+          hostBudgetCapacity: 4,
+          root,
+          resourceCoordinatorRoot: coordinator,
+        },
+      ),
+    ).toBe(0);
+    expect(await Bun.file(sentinel).exists()).toBeFalse();
+    await rm(directory, { force: true, recursive: true });
+  });
+
   test('separate worktree processes contend on one stable native-heavy class lease', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-contention-'));
     const firstWorktree = join(root, 'one');

@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { hostname } from 'node:os';
+import { availableParallelism, hostname, totalmem } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { isolatedGitEnvironment } from './git-environment';
 
@@ -10,6 +10,7 @@ interface LeaseOwner {
   ownerId?: string;
   pid: number;
   startedAt: string;
+  weight?: number;
   worktree: string;
 }
 
@@ -24,12 +25,15 @@ interface LeaseWaiter extends LeaseOwner {
 
 export interface ResourceLeaseOptions {
   capacity?: number;
+  hostBudgetCapacity?: number;
+  hostBudgetOwnerId?: string;
   label: string;
   onQueued?: () => void;
   ownerId?: string;
   resource: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  weight?: number;
   pollMs?: number;
   root?: string;
 }
@@ -44,8 +48,72 @@ const processOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID ?? crypto.randomUUID(
 
 const compactOwner = (owner: LeaseOwner | null): string =>
   owner
-    ? `${owner.leases?.map((lease) => lease.label).join(' → ') || owner.label} pid=${owner.pid} worktree=${owner.worktree} since=${owner.startedAt}`
+    ? `${owner.leases?.map((lease) => lease.label).join(' → ') || owner.label} pid=${owner.pid} worktree=${owner.worktree} since=${owner.startedAt} units=${owner.weight ?? 1}`
     : 'owner metadata unavailable';
+
+const GIB = 1024 ** 3;
+const HOST_BUDGET_RESOURCE = 'validation-host-heavy';
+
+type HostBudgetClass = 'browser' | 'cpu-heavy' | 'native-heavy' | 'suite-exclusive';
+
+export const deriveValidationHostBudgetCapacity = (cpuCount: number, memoryBytes: number): number => {
+  const cpuUnits = Math.max(1, Math.floor(cpuCount / 2));
+  const memoryUnits = Math.max(1, Math.floor(memoryBytes / (4 * GIB)));
+  return Math.max(1, Math.min(6, cpuUnits, memoryUnits));
+};
+
+export const validationHostBudgetWeight = (resourceClass: HostBudgetClass, capacity: number): number => {
+  if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error(`invalid host budget capacity: ${capacity}`);
+  const fraction = resourceClass === 'cpu-heavy' ? 1 / 3 : resourceClass === 'suite-exclusive' ? 1 / 2 : 2 / 3;
+  return Math.max(1, Math.min(capacity, Math.ceil(capacity * fraction)));
+};
+
+const positiveNumber = (value: string | undefined): number | undefined => {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const detectedCgroupLimits = async (): Promise<{ cpuCount?: number; memoryBytes?: number }> => {
+  if (process.platform !== 'linux') return {};
+  const cpuMax = await readFile('/sys/fs/cgroup/cpu.max', 'utf8').catch(() => '');
+  const [quotaText, periodText] = cpuMax.trim().split(/\s+/u);
+  const quota = positiveNumber(quotaText === 'max' ? undefined : quotaText);
+  const period = positiveNumber(periodText);
+  const memoryText = (await readFile('/sys/fs/cgroup/memory.max', 'utf8').catch(() => '')).trim();
+  return {
+    ...(quota !== undefined && period !== undefined ? { cpuCount: Math.max(1, Math.floor(quota / period)) } : {}),
+    ...(memoryText !== 'max' && positiveNumber(memoryText) !== undefined
+      ? { memoryBytes: positiveNumber(memoryText) }
+      : {}),
+  };
+};
+
+export const resolveValidationHostBudgetCapacity = async (explicitCapacity?: number): Promise<number> => {
+  const override = explicitCapacity ?? positiveNumber(Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_CAPACITY);
+  if (override !== undefined) {
+    if (!Number.isSafeInteger(override) || override < 1) throw new Error(`invalid host budget capacity: ${override}`);
+    return override;
+  }
+  const cgroup = await detectedCgroupLimits();
+  return deriveValidationHostBudgetCapacity(
+    Math.min(availableParallelism(), cgroup.cpuCount ?? Number.POSITIVE_INFINITY),
+    Math.min(totalmem(), cgroup.memoryBytes ?? Number.POSITIVE_INFINITY),
+  );
+};
+
+const hostBudgetClass = (options: ResourceLeaseOptions): HostBudgetClass | undefined => {
+  const { resource } = options;
+  if (resource === 'native-heavy')
+    return options.hostBudgetCapacity !== undefined || Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_DIRECT === '1'
+      ? 'native-heavy'
+      : undefined;
+  if (resource === 'validation-class-native-heavy') return 'native-heavy';
+  if (resource === 'browser' || resource === 'validation-class-browser') return 'browser';
+  if (resource === 'validation-class-cpu-heavy') return 'cpu-heavy';
+  if (resource === 'validation-class-suite-exclusive') return 'suite-exclusive';
+  return undefined;
+};
 
 const processIsAlive = (pid: number): boolean => {
   try {
@@ -155,10 +223,13 @@ const liveWaiters = async (queuePath: string): Promise<Array<{ path: string; wai
   return live.sort((left, right) => left.waiter.ticket - right.waiter.ticket);
 };
 
-export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
+async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
   if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
   const capacity = options.capacity ?? 1;
   if (!Number.isSafeInteger(capacity) || capacity < 1) throw new Error(`invalid resource capacity: ${capacity}`);
+  const weight = options.weight ?? 1;
+  if (!Number.isSafeInteger(weight) || weight < 1 || weight > capacity)
+    throw new Error(`invalid resource weight: ${weight}/${capacity}`);
   const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
   const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
   const ownerId = options.ownerId ?? processOwnerId;
@@ -177,6 +248,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
   await mkdir(root, { recursive: true });
 
   const nested = await withQueueMutex(queueMutexPath, pollMs, async () => {
+    const owned: Array<{ lockPath: string; ownerPath: string; owner: LeaseOwner }> = [];
     for (let slot = 0; slot < capacity; slot += 1) {
       const lockPath = lockPaths[slot];
       const ownerPath = ownerPaths[slot];
@@ -184,12 +256,17 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
       const owner = await readOwner(ownerPath);
       const lockPid = await readLockPid(lockPath);
       if (owner?.ownerId !== ownerId || lockPid === null || !processIsAlive(lockPid)) continue;
+      owned.push({ lockPath, ownerPath, owner });
+    }
+    if (owned.length === 0) return undefined;
+    if (owned.length < weight)
+      throw new Error(`resource_weight_upgrade_requires_outer_release: ${options.resource} ${owned.length}->${weight}`);
+    for (const { ownerPath, owner } of owned) {
       const leases = [...(owner.leases ?? [{ id: `legacy-${ownerId}`, label: owner.label }]), leaseFrame];
       const updated = { ...owner, label: leaseFrame.label, leases };
       await replaceFile(ownerPath, `${JSON.stringify(updated)}\n`);
-      return { lockPath, ownerPath };
     }
-    return undefined;
+    return owned;
   });
   if (nested) {
     let released = false;
@@ -199,21 +276,32 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         if (released) return;
         released = true;
         await withQueueMutex(queueMutexPath, pollMs, async () => {
-          const owner = await readOwner(nested.ownerPath);
-          if (owner?.ownerId !== ownerId) return;
-          const leases = (owner.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
-          if (leases.length > 0) {
-            await replaceFile(
-              nested.ownerPath,
-              `${JSON.stringify({ ...owner, label: leases.at(-1)?.label ?? owner.label, leases })}\n`,
-            );
-            return;
+          for (const { lockPath, ownerPath } of nested) {
+            const owner = await readOwner(ownerPath);
+            if (owner?.ownerId !== ownerId) continue;
+            const leases = (owner.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
+            if (leases.length > 0) {
+              await replaceFile(
+                ownerPath,
+                `${JSON.stringify({ ...owner, label: leases.at(-1)?.label ?? owner.label, leases })}\n`,
+              );
+              continue;
+            }
+            await rm(ownerPath, { force: true });
+            await releasePidLock(lockPath, owner.pid);
           }
-          await rm(nested.ownerPath, { force: true });
-          await releasePidLock(nested.lockPath, owner.pid);
         });
       },
-      updateOwnerPid: async () => {},
+      updateOwnerPid: async (pid: number) => {
+        await withQueueMutex(queueMutexPath, pollMs, async () => {
+          for (const { lockPath, ownerPath } of nested) {
+            const owner = await readOwner(ownerPath);
+            if (owner?.ownerId !== ownerId || !owner.leases?.some((lease) => lease.id === leaseFrame.id)) continue;
+            await replaceFile(lockPidPath(lockPath), `${pid}\n`);
+            await replaceFile(ownerPath, `${JSON.stringify({ ...owner, pid })}\n`);
+          }
+        });
+      },
     };
   }
   await mkdir(queuePath, { recursive: true });
@@ -233,6 +321,7 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         pid: process.pid,
         startedAt: new Date().toISOString(),
         ticket,
+        weight,
         worktree: process.cwd(),
       };
       const path = join(queuePath, `${String(ticket).padStart(16, '0')}.${process.pid}.${crypto.randomUUID()}.json`);
@@ -249,18 +338,23 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         const acquired = await withQueueMutex(queueMutexPath, pollMs, async () => {
           const queue = await liveWaiters(queuePath);
           const queuePosition = queue.findIndex((entry) => entry.waiter.ticket === waiter.value.ticket);
-          if (queuePosition < 0 || queuePosition >= capacity)
-            return { acquired: false, priorOwner: queue[0]?.waiter ?? null };
+          if (queuePosition !== 0) return { acquired: false, priorOwner: queue[0]?.waiter ?? null };
+          const slots: Array<{ lockPath: string; ownerPath: string; priorOwner: LeaseOwner | null }> = [];
           for (let slot = 0; slot < capacity; slot += 1) {
             const lockPath = lockPaths[slot];
             const ownerPath = ownerPaths[slot];
             if (!lockPath || !ownerPath) throw new Error(`missing resource slot ${slot}`);
             const priorOwner = await readOwner(ownerPath);
             if (!(await acquirePidLock(lockPath, process.pid))) continue;
-            await rm(waiter.path, { force: true });
-            return { acquired: true, lockPath, ownerPath, priorOwner };
+            slots.push({ lockPath, ownerPath, priorOwner });
+            if (slots.length === weight) break;
           }
-          return { acquired: false, priorOwner: await readOwner(ownerPaths[0] ?? '') };
+          if (slots.length < weight) {
+            for (const slot of slots) await releasePidLock(slot.lockPath, process.pid);
+            return { acquired: false, priorOwner: await readOwner(ownerPaths[0] ?? '') };
+          }
+          await rm(waiter.path, { force: true });
+          return { acquired: true, slots, priorOwner: slots.find((slot) => slot.priorOwner)?.priorOwner ?? null };
         });
         if (!acquired.acquired)
           throw Object.assign(new Error('resource_busy'), { blocker: acquired.priorOwner, code: 'EEXIST' });
@@ -274,10 +368,11 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
           ownerId,
           pid: process.pid,
           startedAt: new Date().toISOString(),
+          weight,
           worktree: process.cwd(),
         };
-        const { lockPath, ownerPath } = acquired;
-        await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+        const { slots } = acquired;
+        for (const { ownerPath } of slots) await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
         const waitedMs = Date.now() - waitStartedAt;
         if (waitedMs >= pollMs) console.log(`${options.label} acquired ${options.resource} after ${waitedMs}ms`);
         let released = false;
@@ -287,29 +382,34 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
             if (released) return;
             released = true;
             await withQueueMutex(queueMutexPath, pollMs, async () => {
-              const current = await readOwner(ownerPath);
-              if (current?.ownerId !== ownerId) return;
-              const leases = (current.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
-              if (leases.length > 0) {
-                await replaceFile(
-                  ownerPath,
-                  `${JSON.stringify({ ...current, label: leases.at(-1)?.label ?? current.label, leases })}\n`,
-                );
-                return;
-              }
-              if ((await readLockPid(lockPath)) === current.pid) {
-                await rm(ownerPath, { force: true });
-                await releasePidLock(lockPath, current.pid);
+              for (const { lockPath, ownerPath } of slots) {
+                const current = await readOwner(ownerPath);
+                if (current?.ownerId !== ownerId) continue;
+                const leases = (current.leases ?? []).filter((lease) => lease.id !== leaseFrame.id);
+                if (leases.length > 0) {
+                  await replaceFile(
+                    ownerPath,
+                    `${JSON.stringify({ ...current, label: leases.at(-1)?.label ?? current.label, leases })}\n`,
+                  );
+                  continue;
+                }
+                if ((await readLockPid(lockPath)) === current.pid) {
+                  await rm(ownerPath, { force: true });
+                  await releasePidLock(lockPath, current.pid);
+                }
               }
             });
           },
           updateOwnerPid: async (pid: number) => {
             await withQueueMutex(queueMutexPath, pollMs, async () => {
-              const current = await readOwner(ownerPath);
-              if (current?.ownerId !== ownerId || !current.leases?.some((lease) => lease.id === leaseFrame.id)) return;
-              owner = { ...current, pid };
-              await replaceFile(lockPidPath(lockPath), `${pid}\n`);
-              await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+              for (const { lockPath, ownerPath } of slots) {
+                const current = await readOwner(ownerPath);
+                if (current?.ownerId !== ownerId || !current.leases?.some((lease) => lease.id === leaseFrame.id))
+                  continue;
+                owner = { ...current, pid };
+                await replaceFile(lockPidPath(lockPath), `${pid}\n`);
+                await replaceFile(ownerPath, `${JSON.stringify(owner)}\n`);
+              }
             });
           },
         };
@@ -343,5 +443,63 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         await rm(queuePath, { force: true, recursive: true });
       }
     });
+  }
+}
+
+export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
+  const resourceClass = hostBudgetClass(options);
+  if (resourceClass === undefined) return await acquireSingleResourceLease(options);
+
+  const capacity = await resolveValidationHostBudgetCapacity(options.hostBudgetCapacity);
+  const root = resolveResourceCoordinatorRoot(options.root);
+  const inheritedHostOwner = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID;
+  const inheritedHostRoot = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT;
+  const hostBudgetOwnerId =
+    options.hostBudgetOwnerId ??
+    (inheritedHostOwner !== undefined && inheritedHostRoot === root ? inheritedHostOwner : options.ownerId);
+  let queuedNotified = false;
+  const notifyQueued = (): void => {
+    if (queuedNotified) return;
+    queuedNotified = true;
+    options.onQueued?.();
+  };
+  const hostLease = await acquireSingleResourceLease({
+    capacity,
+    label: `host-budget:${options.label}`,
+    onQueued: notifyQueued,
+    ownerId: hostBudgetOwnerId,
+    pollMs: options.pollMs,
+    resource: HOST_BUDGET_RESOURCE,
+    root,
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+    weight: validationHostBudgetWeight(resourceClass, capacity),
+  });
+  try {
+    const resourceLease = await acquireSingleResourceLease({
+      ...options,
+      onQueued: notifyQueued,
+      ownerId: hostLease.ownerId,
+    });
+    let released = false;
+    return {
+      ownerId: resourceLease.ownerId,
+      release: async () => {
+        if (released) return;
+        released = true;
+        try {
+          await resourceLease.release();
+        } finally {
+          await hostLease.release();
+        }
+      },
+      updateOwnerPid: async (pid: number) => {
+        await hostLease.updateOwnerPid(pid);
+        await resourceLease.updateOwnerPid(pid);
+      },
+    };
+  } catch (error) {
+    await hostLease.release();
+    throw error;
   }
 }
