@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi } from 'zustand';
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import type { ChannelConfig } from '../components/adjustments/Curves';
@@ -276,7 +276,8 @@ interface EditorState {
 
   // Actions
   publishPreviewViewportTransform: (transform: PreviewViewportTransformSnapshot) => void;
-  setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;
+  setEditor: (updater: EditorStateUpdater) => void;
+  hydrateEditorRenderAuthority: (updater: EditorRenderAuthorityHydrationUpdater) => void;
   publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
   beginBasicToneSliderInteraction: (
@@ -306,6 +307,37 @@ interface EditorState {
   resetHistory: (initialState: Adjustments) => void;
   goToHistoryIndex: (index: number) => void;
 }
+
+const editorRenderAuthorityKeys = [
+  'adjustments',
+  'adjustmentRevision',
+  'adjustmentSnapshot',
+  'editDocumentHistory',
+  'editDocumentV2',
+  'history',
+  'historyCheckpoints',
+  'historyIndex',
+] as const;
+
+type EditorRenderAuthorityKey = (typeof editorRenderAuthorityKeys)[number];
+export type EditorStateUpdate = Omit<Partial<EditorState>, EditorRenderAuthorityKey>;
+export type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => EditorStateUpdate);
+export type EditorRenderAuthorityHydration = EditorStateUpdate &
+  Pick<EditorState, 'adjustments'> &
+  Partial<
+    Pick<
+      EditorState,
+      | 'adjustmentRevision'
+      | 'editDocumentHistory'
+      | 'editDocumentV2'
+      | 'history'
+      | 'historyCheckpoints'
+      | 'historyIndex'
+    >
+  >;
+export type EditorRenderAuthorityHydrationUpdater =
+  | EditorRenderAuthorityHydration
+  | ((state: EditorState) => EditorRenderAuthorityHydration);
 
 const shouldRevalidateGamutWarningOverlay = (update: Partial<EditorState>): boolean =>
   'selectedImage' in update ||
@@ -411,6 +443,167 @@ const viewportRevisionKeys: Array<keyof EditorState> = [
   'viewportEpoch',
   'zoomMode',
 ];
+
+const applyEditorStateUpdate = (
+  set: StoreApi<EditorState>['setState'],
+  updater: EditorStateUpdater | EditorRenderAuthorityHydrationUpdater,
+  allowRenderAuthority: boolean,
+): void => {
+  set((state) => {
+    const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
+    const forbiddenKey = allowRenderAuthority ? undefined : editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+    if (forbiddenKey !== undefined) {
+      throw new Error(`editor.setEditor.render_authority_forbidden:${forbiddenKey}`);
+    }
+    if (allowRenderAuthority && !('adjustments' in rawUpdate)) {
+      throw new Error('editor.hydration.adjustments_required');
+    }
+    const update: Partial<EditorState> = { ...rawUpdate };
+
+    if (
+      state.basicToneSliderInteraction !== null &&
+      (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
+        ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
+        ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
+        'adjustments' in update ||
+        ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
+    ) {
+      update.basicToneSliderInteraction = null;
+      update.isSliderDragging = false;
+    }
+
+    if ('adjustments' in update && update.adjustments !== undefined) {
+      if (!('adjustmentRevision' in update)) {
+        update.adjustmentRevision = allowRenderAuthority ? state.adjustmentRevision : state.adjustmentRevision + 1;
+      }
+      update.referenceMatchPreview = null;
+      update.autoEditPreviewSession = null;
+      update.editDocumentV2 = update.editDocumentV2 ?? legacyAdjustmentsToEditDocumentV2(update.adjustments);
+      if (allowRenderAuthority) {
+        const history = update.history ?? state.history;
+        const historyIndex = update.historyIndex ?? state.historyIndex;
+        if (!Number.isInteger(historyIndex) || historyIndex < 0 || historyIndex >= history.length) {
+          throw new Error('editor.hydration.invalid_history_index');
+        }
+        const editDocumentHistory =
+          update.editDocumentHistory?.map((entry) => structuredClone(entry)) ??
+          history.map((entry, index) =>
+            index === historyIndex
+              ? structuredClone(update.editDocumentV2 as EditDocumentV2)
+              : legacyAdjustmentsToEditDocumentV2(entry),
+          );
+        if (
+          editDocumentHistory.length !== history.length ||
+          !areEditDocumentsEqual(editDocumentHistory[historyIndex], update.editDocumentV2)
+        ) {
+          throw new Error('editor.hydration.inconsistent_edit_document_history');
+        }
+        update.editDocumentHistory = editDocumentHistory;
+      }
+      update.adjustmentSnapshot = publishAdjustmentSnapshot(
+        state.adjustmentSnapshot,
+        update.adjustments,
+        update.editDocumentV2,
+      );
+      update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+      update.lastEditApplicationReceipt = null;
+      Object.assign(
+        update,
+        resolveAiSelectionState(state, update.adjustments, {
+          containerId:
+            'activeAiPatchContainerId' in update
+              ? (update.activeAiPatchContainerId ?? null)
+              : state.activeAiPatchContainerId,
+          subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+        }),
+      );
+    } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
+      Object.assign(
+        update,
+        resolveAiSelectionState(state, state.adjustments, {
+          containerId:
+            'activeAiPatchContainerId' in update
+              ? (update.activeAiPatchContainerId ?? null)
+              : state.activeAiPatchContainerId,
+          subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
+        }),
+      );
+    }
+    if ('imageSession' in update) {
+      update.imageSessionId =
+        update.imageSession?.generation ??
+        (allowRenderAuthority && typeof update.imageSessionId === 'number'
+          ? update.imageSessionId
+          : state.imageSessionId + 1);
+      update.navigatorPreviewArtifact = null;
+      update.presentedPreviewArtifact = null;
+      update.provisionalPreviewFrame = null;
+      state.patchResidency.reset(update.imageSessionId);
+    } else if (
+      'selectedImage' in update &&
+      update.selectedImage?.path !== state.selectedImage?.path &&
+      state.imageSession?.path !== update.selectedImage?.path
+    ) {
+      update.imageSessionId =
+        allowRenderAuthority && 'imageSessionId' in update ? update.imageSessionId : state.imageSessionId + 1;
+      update.imageSession =
+        update.selectedImage === null
+          ? null
+          : createEditorImageSession({
+              generation: update.imageSessionId,
+              path: update.selectedImage?.path ?? '',
+              source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
+            });
+      update.navigatorPreviewArtifact = null;
+      update.presentedPreviewArtifact = null;
+      state.patchResidency.reset(update.imageSessionId);
+    }
+    if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
+      update.navigatorPreviewArtifact = null;
+    }
+    if ('finalPreviewUrl' in update && !('presentedPreviewArtifact' in update)) {
+      update.presentedPreviewArtifact = null;
+    }
+    if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+      update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
+    }
+    if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
+      update.viewportRevision = state.viewportRevision + 1;
+    }
+    if (
+      ('isExportSoftProofEnabled' in update && update.isExportSoftProofEnabled !== state.isExportSoftProofEnabled) ||
+      ('exportSoftProofRecipeId' in update && update.exportSoftProofRecipeId !== state.exportSoftProofRecipeId)
+    ) {
+      update.proofRevision = state.proofRevision + 1;
+    }
+
+    normalizeCompareStateUpdate(state, update);
+
+    if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
+      update.presetApplication = null;
+      update.autoEditPreviewSession = null;
+    }
+
+    if (!shouldRevalidateGamutWarningOverlay(update)) return update;
+
+    const nextState = { ...state, ...update };
+    const nextOverlay = 'gamutWarningOverlay' in update ? update.gamutWarningOverlay : state.gamutWarningOverlay;
+
+    if (
+      nextOverlay &&
+      isPendingExportSoftProofGamutWarningOverlay(nextOverlay, {
+        exportSoftProofRecipeId: nextState.exportSoftProofRecipeId,
+        exportSoftProofTransform: nextState.exportSoftProofTransform,
+        isExportSoftProofEnabled: nextState.isExportSoftProofEnabled,
+        selectedImagePath: nextState.selectedImage?.path ?? null,
+      })
+    ) {
+      return update;
+    }
+
+    return { ...update, gamutWarningOverlay: null };
+  });
+};
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   selectedImage: null,
@@ -521,127 +714,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     });
   },
-  setEditor: (updater) => {
-    set((state) => {
-      const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
-      const update: Partial<EditorState> = { ...rawUpdate };
-
-      if (
-        state.basicToneSliderInteraction !== null &&
-        (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
-          ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
-          ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
-          'adjustments' in update ||
-          ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
-      ) {
-        update.basicToneSliderInteraction = null;
-        update.isSliderDragging = false;
-      }
-
-      if ('adjustments' in update && update.adjustments !== undefined) {
-        if (!('adjustmentRevision' in update)) update.adjustmentRevision = state.adjustmentRevision + 1;
-        update.referenceMatchPreview = null;
-        update.autoEditPreviewSession = null;
-        update.editDocumentV2 = legacyAdjustmentsToEditDocumentV2(update.adjustments);
-        update.adjustmentSnapshot = publishAdjustmentSnapshot(
-          state.adjustmentSnapshot,
-          update.adjustments,
-          update.editDocumentV2,
-        );
-        update.adjustments = update.adjustmentSnapshot.value as Adjustments;
-        update.lastEditApplicationReceipt = null;
-        Object.assign(
-          update,
-          resolveAiSelectionState(state, update.adjustments, {
-            containerId:
-              'activeAiPatchContainerId' in update
-                ? (update.activeAiPatchContainerId ?? null)
-                : state.activeAiPatchContainerId,
-            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
-          }),
-        );
-      } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
-        Object.assign(
-          update,
-          resolveAiSelectionState(state, state.adjustments, {
-            containerId:
-              'activeAiPatchContainerId' in update
-                ? (update.activeAiPatchContainerId ?? null)
-                : state.activeAiPatchContainerId,
-            subMaskId: 'activeAiSubMaskId' in update ? (update.activeAiSubMaskId ?? null) : state.activeAiSubMaskId,
-          }),
-        );
-      }
-      if ('imageSession' in update) {
-        update.imageSessionId = update.imageSession?.generation ?? state.imageSessionId + 1;
-        update.navigatorPreviewArtifact = null;
-        update.presentedPreviewArtifact = null;
-        update.provisionalPreviewFrame = null;
-        state.patchResidency.reset(update.imageSessionId);
-      } else if (
-        'selectedImage' in update &&
-        update.selectedImage?.path !== state.selectedImage?.path &&
-        state.imageSession?.path !== update.selectedImage?.path
-      ) {
-        update.imageSessionId = state.imageSessionId + 1;
-        update.imageSession =
-          update.selectedImage === null
-            ? null
-            : createEditorImageSession({
-                generation: update.imageSessionId,
-                path: update.selectedImage?.path ?? '',
-                source: update.selectedImage?.isReady ? 'cache' : 'cold-load',
-              });
-        update.navigatorPreviewArtifact = null;
-        update.presentedPreviewArtifact = null;
-        state.patchResidency.reset(update.imageSessionId);
-      }
-      if ('finalPreviewUrl' in update && !('navigatorPreviewArtifact' in update)) {
-        update.navigatorPreviewArtifact = null;
-      }
-      if ('finalPreviewUrl' in update && !('presentedPreviewArtifact' in update)) {
-        update.presentedPreviewArtifact = null;
-      }
-      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-        update.previewViewportTransform = { positionX: 0, positionY: 0, scale: 1 };
-      }
-      if (viewportRevisionKeys.some((key) => key in update && update[key] !== state[key])) {
-        update.viewportRevision = state.viewportRevision + 1;
-      }
-      if (
-        ('isExportSoftProofEnabled' in update && update.isExportSoftProofEnabled !== state.isExportSoftProofEnabled) ||
-        ('exportSoftProofRecipeId' in update && update.exportSoftProofRecipeId !== state.exportSoftProofRecipeId)
-      ) {
-        update.proofRevision = state.proofRevision + 1;
-      }
-
-      normalizeCompareStateUpdate(state, update);
-
-      if ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) {
-        update.presetApplication = null;
-        update.autoEditPreviewSession = null;
-      }
-
-      if (!shouldRevalidateGamutWarningOverlay(update)) return update;
-
-      const nextState = { ...state, ...update };
-      const nextOverlay = 'gamutWarningOverlay' in update ? update.gamutWarningOverlay : state.gamutWarningOverlay;
-
-      if (
-        nextOverlay &&
-        isPendingExportSoftProofGamutWarningOverlay(nextOverlay, {
-          exportSoftProofRecipeId: nextState.exportSoftProofRecipeId,
-          exportSoftProofTransform: nextState.exportSoftProofTransform,
-          isExportSoftProofEnabled: nextState.isExportSoftProofEnabled,
-          selectedImagePath: nextState.selectedImage?.path ?? null,
-        })
-      ) {
-        return update;
-      }
-
-      return { ...update, gamutWarningOverlay: null };
-    });
-  },
+  setEditor: (updater) => applyEditorStateUpdate(set, updater, false),
+  hydrateEditorRenderAuthority: (updater) => applyEditorStateUpdate(set, updater, true),
 
   publishWhiteBalancePickerPreview: (adjustments) =>
     set((state) => ({
@@ -1103,6 +1177,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 }));
+
+const directEditorStoreSetState = useEditorStore.setState;
+useEditorStore.setState = (updater, replace) => {
+  if (replace === true) throw new Error('editor.setState.replace_forbidden');
+  const rawUpdate = typeof updater === 'function' ? updater(useEditorStore.getState()) : updater;
+  const forbiddenKey = editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+  if (forbiddenKey !== undefined) {
+    throw new Error(`editor.setState.render_authority_forbidden:${forbiddenKey}`);
+  }
+  directEditorStoreSetState(rawUpdate);
+};
 
 export const isEditorImageSessionCurrent = (sessionId: string): boolean =>
   useEditorStore.getState().imageSession?.id === sessionId;

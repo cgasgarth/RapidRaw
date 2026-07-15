@@ -44,7 +44,7 @@ describe('typed curve edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.35 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -93,7 +93,7 @@ describe('typed curve edit transaction', () => {
       sceneCurveV1: sceneCurve,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(withScene);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, withScene, editDocumentV2),
       adjustments: withScene,
       editDocumentV2,
@@ -165,7 +165,7 @@ describe('typed curve edit transaction', () => {
 
     const current = { ...state.adjustments, rawEngineEditGraphVersion: 2, sceneCurveV1: sceneCurve };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(current);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, current, editDocumentV2),
       adjustments: current,
       editDocumentV2,
@@ -187,7 +187,7 @@ describe('typed curve edit transaction', () => {
       sceneCurveV1: sceneCurve,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(current);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, current, editDocumentV2),
       adjustments: current,
       editDocumentV2,

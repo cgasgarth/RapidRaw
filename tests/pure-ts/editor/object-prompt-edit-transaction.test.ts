@@ -66,7 +66,7 @@ describe('Object Prompt edit transaction', () => {
       ],
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,

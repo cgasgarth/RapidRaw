@@ -26,7 +26,7 @@ const selectedPath = '/fixtures/public/agent-selected-image-preview-loop/DSC_316
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 11 : 3));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-selected-export-before',

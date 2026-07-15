@@ -17,7 +17,7 @@ const selectedPath = '/fixtures/pure-ts/agent-preview-artifacts/DSC_4844.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 7 : 3));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-medium-preview-4844',

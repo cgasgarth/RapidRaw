@@ -2,7 +2,7 @@ import { upsertLayerStackSidecarInSidecar } from '../../../packages/rawengine-sc
 import type { NegativeLabSavedPositiveHandoff } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { MaskContainer } from '../adjustments';
-import { pushEditHistoryEntry } from '../editHistory';
+import { buildAdjustmentMutationOperations } from '../editTransaction';
 import { buildLayerStackSidecarFromMasks } from '../layers/layerStackCommandBridge';
 
 export interface NegativeConversionEditorHandoff {
@@ -32,24 +32,24 @@ let pendingSavedPositiveHandoff: NegativeLabSavedPositiveHandoff | null = null;
 function appendAcceptedDustHealLayers(layers: Array<MaskContainer> | undefined): void {
   if (layers === undefined || layers.length === 0) return;
 
-  useEditorStore.getState().setEditor((state) => {
-    const existingLayerIds = new Set(state.adjustments.masks.map((layer) => layer.id));
-    const newLayers = layers.filter((layer) => !existingLayerIds.has(layer.id));
-    if (newLayers.length === 0) return {};
-
-    const adjustments = {
-      ...state.adjustments,
-      masks: [...state.adjustments.masks, ...newLayers],
-    };
-    const historyState = pushEditHistoryEntry(state.history, state.historyIndex, adjustments);
-
-    return {
-      activeMaskContainerId: newLayers[0]?.id ?? state.activeMaskContainerId,
-      adjustments,
-      history: historyState.history,
-      historyIndex: historyState.historyIndex,
-    };
+  const state = useEditorStore.getState();
+  const existingLayerIds = new Set(state.adjustments.masks.map((layer) => layer.id));
+  const newLayers = layers.filter((layer) => !existingLayerIds.has(layer.id));
+  if (newLayers.length === 0) return;
+  const adjustments = {
+    ...state.adjustments,
+    masks: [...state.adjustments.masks, ...newLayers],
+  };
+  state.applyEditTransaction({
+    baseAdjustmentRevision: state.adjustmentRevision,
+    history: 'single-entry',
+    imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+    operations: buildAdjustmentMutationOperations(state.adjustments, adjustments),
+    persistence: 'commit',
+    source: 'layer-command',
+    transactionId: `negative-lab-dust-handoff:${newLayers.map(({ id }) => id).join(',')}`,
   });
+  useEditorStore.getState().setEditor({ activeMaskContainerId: newLayers[0]?.id ?? null });
 }
 
 function persistAcceptedDustHealLayersMetadata(path: string, layers: Array<MaskContainer>): void {

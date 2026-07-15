@@ -29,7 +29,7 @@ describe('image-open hydration edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.8 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 5,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -207,7 +207,8 @@ describe('image-open hydration edit transaction', () => {
       path: imageBPath,
       width: 6000,
     };
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 6,
       finalPreviewUrl: 'blob:image-b-preview',
       history: imageBHistory,
@@ -226,7 +227,8 @@ describe('image-open hydration edit transaction', () => {
 
     publishCurrentImageOpenHydration(useEditorStore.getState(), imageAIdentity, () => {
       refs.callbackCount += 1;
-      useEditorStore.setState({
+      useEditorStore.getState().hydrateEditorRenderAuthority({
+        adjustments: useEditorStore.getState().adjustments,
         finalPreviewUrl: null,
         history: [structuredClone(INITIAL_ADJUSTMENTS)],
         originalSize: { height: 3000, width: 4000 },

@@ -79,7 +79,7 @@ console.log('editor auto-adjust history state ok');
 
 async function renderHarness(): Promise<RenderedHarness> {
   useEditorStore.getState().resetHistory(structuredClone(INITIAL_ADJUSTMENTS));
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: structuredClone(INITIAL_ADJUSTMENTS),
     selectedImage: createSelectedImage(),
   });

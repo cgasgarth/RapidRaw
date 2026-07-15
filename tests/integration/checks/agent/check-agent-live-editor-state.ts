@@ -56,7 +56,7 @@ useLibraryStore.getState().setLibrary({
   sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
 });
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.35 },
   finalPreviewUrl: 'blob:rawengine-live-preview-3154',
   hasRenderedFirstFrame: true,

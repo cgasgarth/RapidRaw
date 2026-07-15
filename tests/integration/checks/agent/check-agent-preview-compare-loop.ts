@@ -29,7 +29,7 @@ const dispatchResultSchema = z
   })
   .passthrough();
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: { ...INITIAL_ADJUSTMENTS, contrast: 8, exposure: 0.25, highlights: -10 },
   brushSettings: { feather: 44, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-preview-compare-current',

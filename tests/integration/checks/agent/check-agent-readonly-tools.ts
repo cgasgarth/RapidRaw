@@ -73,7 +73,7 @@ const snapshotSubsetSchema = z
   })
   .passthrough();
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.4, highlights: -12 },
   brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-readonly-preview',

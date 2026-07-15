@@ -17,7 +17,7 @@ const image = (path: string): SelectedImage => ({
 
 describe('editor before-after compare state', () => {
   beforeEach(() => {
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       compare: DEFAULT_EDITOR_COMPARE_STATE,
       selectedImage: null,

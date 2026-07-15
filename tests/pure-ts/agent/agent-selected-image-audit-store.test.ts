@@ -19,7 +19,7 @@ const selectedPath = '/fixtures/public/agent-audit-store/DSC_4846.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 8 : 4));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-audit-store-before',

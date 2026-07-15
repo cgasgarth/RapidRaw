@@ -25,7 +25,7 @@ describe('history navigation edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -108,7 +108,8 @@ describe('history navigation edit transaction', () => {
 
   test('moves across duplicate history entries as an exact no-op without persistence authority or pixel invalidation', () => {
     const adjustments = useEditorStore.getState().adjustments;
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 7,
       finalPreviewUrl: 'blob:current-preview',
       history: [adjustments, structuredClone(adjustments)],

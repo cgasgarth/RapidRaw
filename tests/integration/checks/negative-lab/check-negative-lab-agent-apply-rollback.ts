@@ -30,7 +30,7 @@ const selectedPath = '/fixtures/negative-lab/synthetic-roll/frame_0001.tif';
 const sessionId = sampleNegativeLabCommandEnvelopeV1.parameters.sessionId;
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 14 : 3));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:negative-lab-agent-before',
@@ -128,7 +128,7 @@ if (!rejectedMissingAcceptedPlan.message.includes('unaccepted Negative Lab dry-r
   throw new Error('Negative Lab apply without an accepted dry-run did not reject.');
 }
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.28 },
   brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:negative-lab-agent-after-apply',

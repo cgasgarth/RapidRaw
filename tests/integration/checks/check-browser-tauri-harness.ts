@@ -177,6 +177,38 @@ async function verifySchemaOwnedTauriTransport(page: Page): Promise<void> {
   }
 }
 
+async function verifyEditorRenderAuthorityBoundary(page: Page): Promise<void> {
+  const proof = await page.evaluate(async () => {
+    const module = await import(/* @vite-ignore */ `/src/${'store/useEditorStore.ts'}`);
+    const state = module.useEditorStore.getState();
+    const capture = (operation: () => void): string => {
+      try {
+        operation();
+        return 'accepted';
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    };
+    const setEditorError = capture(() =>
+      Reflect.apply(state.setEditor, undefined, [{ adjustments: structuredClone(state.adjustments) }]),
+    );
+    const setStateError = capture(() =>
+      Reflect.apply(module.useEditorStore.setState, module.useEditorStore, [{ history: [...state.history] }]),
+    );
+    state.setEditor({ isWaveformVisible: true });
+    const uiUpdateAccepted = module.useEditorStore.getState().isWaveformVisible;
+    module.useEditorStore.getState().setEditor({ isWaveformVisible: false });
+    return { setEditorError, setStateError, uiUpdateAccepted };
+  });
+  if (
+    proof.setEditorError !== 'editor.setEditor.render_authority_forbidden:adjustments' ||
+    proof.setStateError !== 'editor.setState.render_authority_forbidden:history' ||
+    !proof.uiUpdateAccepted
+  ) {
+    throw new Error(`Editor render-authority browser boundary failed: ${JSON.stringify(proof)}`);
+  }
+}
+
 async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
   await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
   const recover = page.locator('[data-testid$="-analytics-header-recover-scopes"]').first();
@@ -2537,6 +2569,7 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
   await verifySchemaOwnedTauriTransport(page);
+  await verifyEditorRenderAuthorityBoundary(page);
   await page.getByRole('button', { name: /Open Folder/u }).click();
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })

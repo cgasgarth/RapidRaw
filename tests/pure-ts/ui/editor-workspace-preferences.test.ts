@@ -231,7 +231,7 @@ describe('editor workspace preferences', () => {
     installStorage(storage);
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, grainAmount: 42 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 7,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,

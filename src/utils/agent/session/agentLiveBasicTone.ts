@@ -379,9 +379,11 @@ export const applyBasicToneToLiveEditor = async ({
       ...baseTransaction,
       operations: buildAdjustmentMutationOperations(currentState.adjustments, nextAdjustments),
     });
-    useEditorStore.setState((state) =>
-      state.adjustmentRevision === result.nextAdjustmentRevision ? { lastBasicToneCommand: applyCommand } : {},
-    );
+    useEditorStore
+      .getState()
+      .setEditor((state) =>
+        state.adjustmentRevision === result.nextAdjustmentRevision ? { lastBasicToneCommand: applyCommand } : {},
+      );
   }
 
   return {

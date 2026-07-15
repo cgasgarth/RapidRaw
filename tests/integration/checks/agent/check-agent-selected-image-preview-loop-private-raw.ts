@@ -580,7 +580,7 @@ function seedStores(selectedPath: string): void {
     rootPaths: [privateSource],
     sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
   });
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-private-preview-before',

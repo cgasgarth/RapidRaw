@@ -40,7 +40,7 @@ describe('LUT edit transaction', () => {
       effectsEnabled: false,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -106,7 +106,7 @@ describe('LUT edit transaction', () => {
       lutSize: 17,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(loaded);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, loaded, editDocumentV2),
       adjustments: loaded,
       editDocumentV2,

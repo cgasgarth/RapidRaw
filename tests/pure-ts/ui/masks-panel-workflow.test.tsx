@@ -60,7 +60,7 @@ afterEach(() => {
     renderedRoot.container.remove();
     renderedRoot = null;
   }
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeMaskContainerId: null,
     activeMaskId: null,
     adjustments: INITIAL_ADJUSTMENTS,
@@ -72,7 +72,7 @@ afterEach(() => {
 
 describe('compact masks panel workflow', () => {
   test('commits first creation selection and reset without a repair pass', async () => {
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       history: [INITIAL_ADJUSTMENTS],
       historyIndex: 0,
@@ -98,7 +98,7 @@ describe('compact masks panel workflow', () => {
 
   test('keeps create, select, visibility, keyboard, and context-menu commands bound to the mask state', async () => {
     const adjustments = { ...INITIAL_ADJUSTMENTS, masks: [firstMask, secondMask] };
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       activeMaskContainerId: secondMask.id,
       activeMaskId: null,
       adjustments,

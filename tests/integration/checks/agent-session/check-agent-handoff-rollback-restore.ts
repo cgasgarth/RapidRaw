@@ -49,7 +49,7 @@ useLibraryStore.getState().setLibrary({
   sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
 });
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   finalPreviewUrl: 'blob:rawengine-handoff-rollback-before',
   hasRenderedFirstFrame: true,

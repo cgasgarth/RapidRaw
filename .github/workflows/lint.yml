@@ -154,6 +154,7 @@ jobs:
         run: |
           bun tests/integration/checks/check-script-extension-policy.ts
           bun tests/integration/checks/check-unsafe-casts.ts
+          bun tests/integration/checks/editor/check-editor-render-authority-boundary.ts
           bunx knip --config knip.jsonc --dependencies --reporter compact
 
   fast-visual:

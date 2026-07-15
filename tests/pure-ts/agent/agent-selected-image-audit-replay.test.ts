@@ -16,7 +16,7 @@ const selectedPath = '/fixtures/public/agent-audit-replay/DSC_4703.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 8 : 4));
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-audit-replay-before',
@@ -271,7 +271,8 @@ describe('agent selected-image audit replay', () => {
 
   test('blocks replay for stale graph revision before preview reproduction', () => {
     const record = buildAuditRecord();
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
       history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.3 }],
       historyIndex: 1,
     });

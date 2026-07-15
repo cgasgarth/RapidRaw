@@ -430,7 +430,7 @@ function CurveHarness({
       setAdjustments: (updater) => {
         const next = updater(useEditorStore.getState().adjustments);
         changes.push(next);
-        useEditorStore.setState({ adjustments: next });
+        useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: next });
       },
       theme: Theme.Dark,
       onDragStateChange: (dragging) => dragStates.push(dragging),
@@ -441,7 +441,7 @@ function CurveHarness({
         'data-testid': 'parent-curve-update',
         onClick: () => {
           const previous = useEditorStore.getState().adjustments;
-          useEditorStore.setState({
+          useEditorStore.getState().hydrateEditorRenderAuthority({
             adjustments: {
               ...previous,
               curves: {
@@ -476,7 +476,7 @@ async function renderCurveEditor(
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   const sourcePath = '/fixture/curves-editor.ARW';
   const imageSession = createEditorImageSession({ generation: 29, path: sourcePath, source: 'cache' });
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
     adjustments,

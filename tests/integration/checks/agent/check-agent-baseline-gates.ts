@@ -112,7 +112,7 @@ const assertRejected = (response: z.infer<typeof dispatchResponseSchema>, label:
   }
 };
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: null,
@@ -129,7 +129,7 @@ assertRejected(
   'selected image',
 );
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.2, highlights: -10 },
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-baseline-before',

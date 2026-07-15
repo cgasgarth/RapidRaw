@@ -23,7 +23,7 @@ const selectedPath = '/fixtures/pure-ts/agent-typed-dispatch/DSC_5027.ARW';
 const sessionId = 'agent-typed-dispatch-test';
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-typed-dispatch-before',
     history: [INITIAL_ADJUSTMENTS],

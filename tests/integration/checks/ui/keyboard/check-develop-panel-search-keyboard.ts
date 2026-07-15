@@ -79,7 +79,7 @@ async function validateDevelopPanelSearchKeyboard() {
       transformLens: false,
     },
   });
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: { ...INITIAL_ADJUSTMENTS },
     copiedSectionAdjustments: null,
     histogram: null,

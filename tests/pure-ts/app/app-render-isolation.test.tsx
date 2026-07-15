@@ -85,7 +85,7 @@ beforeEach(async () => {
     window,
   });
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
-  useEditorStore.getState().setEditor((state) => ({
+  useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
     adjustments: { ...state.adjustments, exposure: -1 },
     selectedImage: null,
   }));
@@ -116,7 +116,7 @@ describe('application render islands', () => {
     const baseline = { ...counts };
     for (let index = 0; index < 100; index += 1) {
       await act(async () => {
-        useEditorStore.getState().setEditor((state) => ({
+        useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
           adjustments: { ...state.adjustments, exposure: index / 100 },
         }));
       });

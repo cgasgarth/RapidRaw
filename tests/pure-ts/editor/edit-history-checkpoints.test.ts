@@ -91,7 +91,7 @@ describe('edit history checkpoints', () => {
     const exposureEdit = { ...initial, exposure: 0.35 };
     const contrastEdit = { ...exposureEdit, contrast: 18 };
 
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: contrastEdit,
       finalPreviewUrl: 'blob:stale-history-preview',
       history: [initial, exposureEdit, contrastEdit],

@@ -46,7 +46,7 @@ describe('Reset edit transaction', () => {
       sectionVisibility: { basic: true, color: true, curves: true, details: false },
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 4,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -141,7 +141,7 @@ describe('Reset edit transaction', () => {
     expect(() => assertResetAdjustmentsResultCoverage([receipt], [sourcePath, '/fixture/B.ARW'])).toThrow(
       'reset_edit_transaction.receipt_coverage',
     );
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustments: structuredClone(INITIAL_ADJUSTMENTS),
       editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),

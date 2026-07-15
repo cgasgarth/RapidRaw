@@ -34,7 +34,7 @@ describe('copy/paste edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), brightness: 0.2, exposure: 0.1 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -148,14 +148,16 @@ describe('copy/paste edit transaction', () => {
   test('compensates an exact native failure without overwriting a newer edit', () => {
     const enabledState = useEditorStore.getState();
     const disabledDocument = setEditDocumentV2NodeEnabled(enabledState.editDocumentV2, 'scene_curve', false);
-    useEditorStore.setState({
-      adjustmentSnapshot: publishAdjustmentSnapshot(
-        enabledState.adjustmentSnapshot,
-        enabledState.adjustments,
-        disabledDocument,
+    enabledState.hydrateEditorRenderAuthority({
+      adjustmentRevision: enabledState.adjustmentRevision,
+      adjustments: enabledState.adjustments,
+      editDocumentHistory: enabledState.editDocumentHistory.map((entry, index) =>
+        index === enabledState.historyIndex ? disabledDocument : entry,
       ),
-      editDocumentHistory: [disabledDocument],
       editDocumentV2: disabledDocument,
+      history: enabledState.history,
+      historyCheckpoints: enabledState.historyCheckpoints,
+      historyIndex: enabledState.historyIndex,
     });
     const before = useEditorStore.getState();
     before.createHistoryCheckpoint('Before paste');

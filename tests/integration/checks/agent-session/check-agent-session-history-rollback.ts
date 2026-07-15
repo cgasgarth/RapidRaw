@@ -7,6 +7,7 @@ import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjust
 import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/context/agentImageContextSnapshot.ts';
 import {
   AGENT_HISTORY_ROLLBACK_TOOL_NAME,
+  areEditDocumentHistoriesEqual,
   createAgentSessionCheckpoint,
   rollbackAgentSessionHistory,
 } from '../../../../src/utils/agent/session/agentSessionHistory.ts';
@@ -15,13 +16,30 @@ import {
   buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
+import {
+  legacyAdjustmentsToEditDocumentV2,
+  setEditDocumentV2NodeEnabled,
+} from '../../../../src/utils/editDocumentV2.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 18 : 2));
+const initialDocument = setEditDocumentV2NodeEnabled(
+  legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+  'tone_equalizer',
+  false,
+);
+const futureAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 4 };
+const futureDocument = setEditDocumentV2NodeEnabled(
+  legacyAdjustmentsToEditDocumentV2(futureAdjustments),
+  'tone_equalizer',
+  false,
+);
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
+  editDocumentHistory: [initialDocument, futureDocument],
+  editDocumentV2: initialDocument,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-history-before',
   hasRenderedFirstFrame: true,
@@ -31,7 +49,7 @@ useEditorStore.getState().setEditor({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  history: [INITIAL_ADJUSTMENTS, futureAdjustments],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '640', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -45,8 +63,15 @@ useEditorStore.getState().setEditor({
   },
   uncroppedAdjustedPreviewUrl: null,
 });
+useEditorStore.getState().createHistoryCheckpoint('Agent baseline');
 
 const checkpoint = createAgentSessionCheckpoint('agent-history-3163');
+if (
+  checkpoint.editDocumentHistory[0]?.nodes.tone_equalizer?.enabled !== false ||
+  checkpoint.historyCheckpoints[0]?.label !== 'Agent baseline'
+) {
+  throw new Error('Agent history rollback proof did not capture typed document and named checkpoint authority.');
+}
 const beforeRecipeHash = checkpoint.previewRecipeHash;
 const beforePreviewRef = checkpoint.previewRef;
 const dryRun = await dryRunAgentGlobalAdjustments({
@@ -159,7 +184,7 @@ if (
 ) {
   throw new Error('Agent history rollback did not report the applied-to-restored graph revisions.');
 }
-if (restoredState.historyIndex !== 0 || restoredState.history.length !== 1) {
+if (restoredState.historyIndex !== 0 || restoredState.history.length !== checkpoint.history.length) {
   throw new Error('Agent history rollback did not restore session-start history.');
 }
 if (
@@ -181,6 +206,29 @@ if (restoredState.lastBasicToneCommand !== null) {
 }
 if (rollback.previewRecipeHash !== beforeRecipeHash) {
   throw new Error('Agent history rollback did not restore the original recipe hash.');
+}
+if (
+  !areEditDocumentHistoriesEqual(restoredState.editDocumentHistory, checkpoint.editDocumentHistory) ||
+  JSON.stringify(restoredState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints) ||
+  restoredState.editDocumentV2.nodes.tone_equalizer?.enabled !== false
+) {
+  throw new Error('Agent history rollback did not restore exact typed history and named checkpoint metadata.');
+}
+restoredState.redo();
+const redoneTypedState = useEditorStore.getState();
+if (
+  redoneTypedState.editDocumentV2.nodes.tone_equalizer?.enabled !== false ||
+  redoneTypedState.historyCheckpoints[0]?.label !== 'Agent baseline'
+) {
+  throw new Error('Redo lost typed document or named checkpoint metadata after agent rollback.');
+}
+redoneTypedState.undo();
+const undoneTypedState = useEditorStore.getState();
+if (
+  undoneTypedState.editDocumentV2.nodes.tone_equalizer?.enabled !== false ||
+  undoneTypedState.historyCheckpoints[0]?.label !== 'Agent baseline'
+) {
+  throw new Error('Undo lost typed document or named checkpoint metadata after agent rollback.');
 }
 
 const firstCheckpointEditState = useEditorStore.getState();
@@ -239,6 +287,12 @@ const restoredFullHistoryState = useEditorStore.getState();
 if (
   restoredFullHistoryState.historyIndex !== fullHistoryCheckpoint.historyIndex ||
   restoredFullHistoryState.history.length !== fullHistoryCheckpoint.history.length ||
+  !areEditDocumentHistoriesEqual(
+    restoredFullHistoryState.editDocumentHistory,
+    fullHistoryCheckpoint.editDocumentHistory,
+  ) ||
+  JSON.stringify(restoredFullHistoryState.historyCheckpoints) !==
+    JSON.stringify(fullHistoryCheckpoint.historyCheckpoints) ||
   restoredFullHistoryState.adjustments.exposure !== 0.6 ||
   restoredFullHistoryState.adjustments.contrast !== 18
 ) {
