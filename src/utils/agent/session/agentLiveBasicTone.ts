@@ -20,6 +20,7 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
+import { captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorCoreState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
@@ -272,6 +273,8 @@ export const dryRunBasicToneCommandInLiveEditor = async (
 export const applyBasicToneCommandToLiveEditor = async (
   commandInput: ToneColorCommandEnvelopeV1,
 ): Promise<ToneColorMutationResultV1> => {
+  const commitIdentity = captureBasicToneCommitIdentity(useEditorStore.getState());
+  if (commitIdentity === null) throw new Error('Cannot apply typed basic tone without a selected image session.');
   const command = parseLiveBasicToneCommand(commandInput);
   if (command.dryRun) throw new Error('Live editor typed basic-tone apply requires dryRun=false.');
   if (command.approval.approvalClass !== ApprovalClass.EditApply || command.approval.state !== 'approved') {
@@ -303,7 +306,7 @@ export const applyBasicToneCommandToLiveEditor = async (
   const mutation = toneColorMutationResultV1Schema.parse(apply.result);
   const basicToneCommand = buildLegacyBasicToneCommandEnvelope(command);
 
-  useEditorStore.getState().applyBasicToneCommand(basicToneCommand);
+  useEditorStore.getState().applyBasicToneCommand(basicToneCommand, commitIdentity);
 
   return mutation;
 };
@@ -319,6 +322,8 @@ export const applyBasicToneToLiveEditor = async ({
   const initialState = useEditorStore.getState();
   const imagePath = initialState.selectedImage?.path;
   if (imagePath === undefined) throw new Error('Cannot apply agent basic tone without a selected image.');
+  const commitIdentity = captureBasicToneCommitIdentity(initialState);
+  if (commitIdentity === null) throw new Error('Cannot apply agent basic tone without a selected image session.');
 
   const expectedGraphRevision = requestedExpectedGraphRevision ?? `history_${initialState.historyIndex}`;
   const context = buildBasicToneImageCommandContext({ expectedGraphRevision, imagePath, operationId, sessionId });
@@ -358,7 +363,7 @@ export const applyBasicToneToLiveEditor = async ({
     throw new Error('Agent basic-tone apply did not change rendered preview pixels.');
   }
 
-  useEditorStore.getState().applyBasicToneCommand(applyCommand);
+  useEditorStore.getState().applyBasicToneCommand(applyCommand, commitIdentity);
 
   return {
     afterPreviewHash,

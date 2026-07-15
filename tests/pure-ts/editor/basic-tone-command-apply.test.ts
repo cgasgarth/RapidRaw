@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
-import { useEditorStore } from '../../../src/store/useEditorStore';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   applyBasicToneCommandToLiveEditor,
@@ -12,6 +13,8 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../../src/utils/basicToneCommandBridge';
+import { captureBasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const imagePath = '/fixtures/basic-tone-command-apply/DSC_4792.ARW';
 const requestedAdjustments: LegacyBasicToneAdjustmentPayload = {
@@ -27,8 +30,13 @@ const requestedAdjustments: LegacyBasicToneAdjustmentPayload = {
 };
 
 const seedEditor = () => {
+  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.setState({
-    adjustments: INITIAL_ADJUSTMENTS,
+    adjustmentRevision: 0,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+    adjustments,
+    editDocumentV2,
     exportSoftProofTransform: {
       blackPointCompensation: 'enabled',
       colorManagedTransform: 'display-p3-preview',
@@ -53,9 +61,11 @@ const seedEditor = () => {
       transformFingerprint: 'fingerprint-before-basic-tone',
       warningCodes: [],
     },
-    history: [INITIAL_ADJUSTMENTS],
+    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
+    imageSession: createEditorImageSession({ generation: 23, path: imagePath, source: 'cache' }),
+    imageSessionId: 23,
     interactivePatch: {
       basePreviewUrl: 'blob:basic-tone-before',
       fullHeight: 400,
@@ -71,6 +81,7 @@ const seedEditor = () => {
       url: 'blob:basic-tone-before-patch',
     },
     lastBasicToneCommand: null,
+    lastEditApplicationReceipt: null,
     previewScopeStatus: {
       displayTransformLabel: 'Display P3',
       exportProfileLabel: null,
@@ -161,6 +172,20 @@ describe('basic tone command apply path', () => {
     expect(applied.historyIndex).toBe(1);
     expect(applied.history[1]).toEqual(applied.adjustments);
     expect(applied.lastBasicToneCommand?.commandId).toBe(applyCommand.commandId);
+    expect(applied.adjustmentRevision).toBe(1);
+    expect(applied.lastEditApplicationReceipt).toMatchObject({
+      adjustmentRevision: 1,
+      baseAdjustmentRevision: 0,
+      changedKeys: expect.arrayContaining(['exposure', 'highlights', 'whites']),
+      persistence: 'commit',
+      source: 'agent-command',
+      transactionId: applyCommand.commandId,
+    });
+    expect(applied.editDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+      exposure: 0.65,
+      highlights: -31,
+      whites: 27,
+    });
     expect(applied.finalPreviewUrl).toBeNull();
     expect(applied.uncroppedAdjustedPreviewUrl).toBeNull();
     expect(applied.interactivePatch).toBeNull();
@@ -187,7 +212,11 @@ describe('basic tone command apply path', () => {
       dryRun: false,
       expectedGraphRevision: 'history_99',
     });
-    expect(() => useEditorStore.getState().applyBasicToneCommand(staleCommand)).toThrow('stale graph revision');
+    const identity = captureBasicToneCommitIdentity(useEditorStore.getState());
+    if (identity === null) throw new Error('Expected seeded basic-tone identity.');
+    expect(() => useEditorStore.getState().applyBasicToneCommand(staleCommand, identity)).toThrow(
+      'stale graph revision',
+    );
 
     const unapprovedCommand: BasicToneCommandEnvelope = {
       ...buildCommand('unapproved_apply', {
@@ -201,7 +230,7 @@ describe('basic tone command apply path', () => {
         state: 'not_required',
       },
     };
-    expect(() => useEditorStore.getState().applyBasicToneCommand(unapprovedCommand)).toThrow(
+    expect(() => useEditorStore.getState().applyBasicToneCommand(unapprovedCommand, identity)).toThrow(
       'approved edit-apply approval',
     );
 
@@ -210,4 +239,91 @@ describe('basic tone command apply path', () => {
     expect(state.history).toEqual([INITIAL_ADJUSTMENTS]);
     expect(state.lastBasicToneCommand).toBeNull();
   });
+
+  test('preserves exact command no-ops without history, persistence, or derived-pixel invalidation', () => {
+    const state = useEditorStore.getState();
+    const identity = captureBasicToneCommitIdentity(state);
+    if (identity === null) throw new Error('Expected seeded basic-tone identity.');
+    const command = buildBasicToneCommandEnvelope(
+      INITIAL_ADJUSTMENTS,
+      buildBasicToneImageCommandContext({
+        expectedGraphRevision: 'history_0',
+        imagePath,
+        operationId: 'exact_no_op',
+        sessionId: 'basic-tone-command-apply-test',
+      }),
+      {
+        acceptedDryRunPlanHash: 'sha256:basic-tone:no-op',
+        acceptedDryRunPlanId: 'dryrun_basic_tone_no_op',
+        dryRun: false,
+      },
+    );
+
+    const result = state.applyBasicToneCommand(command, identity);
+    const after = useEditorStore.getState();
+    expect(result.noOp).toBe(true);
+    expect(after.adjustmentRevision).toBe(0);
+    expect(after.history).toHaveLength(1);
+    expect(after.lastEditApplicationReceipt).toBeNull();
+    expect(after.lastBasicToneCommand?.commandId).toBe(command.commandId);
+    expect(after.finalPreviewUrl).toBe('blob:basic-tone-before-final');
+    expect(after.uncroppedAdjustedPreviewUrl).toBe('blob:basic-tone-before-uncropped');
+  });
+
+  test('rejects a delayed command after source, session, or revision authority changes', () => {
+    commitInterveningExposure(0.1);
+    const identity = captureBasicToneCommitIdentity(useEditorStore.getState());
+    if (identity === null) throw new Error('Expected seeded basic-tone identity.');
+    const command = buildCommand('delayed_apply', {
+      acceptedDryRunPlanHash: 'sha256:basic-tone:delayed',
+      acceptedDryRunPlanId: 'dryrun_basic_tone_delayed',
+      dryRun: false,
+    });
+
+    commitInterveningExposure(0.2);
+    expect(() => useEditorStore.getState().applyBasicToneCommand(command, identity)).toThrow(
+      'basic_tone_transaction.stale_revision:1:2',
+    );
+
+    seedEditor();
+    const sourceIdentity = captureBasicToneCommitIdentity(useEditorStore.getState());
+    if (sourceIdentity === null) throw new Error('Expected seeded basic-tone identity.');
+    const sourceCommand = buildCommand('source_changed_apply', {
+      acceptedDryRunPlanHash: 'sha256:basic-tone:source',
+      acceptedDryRunPlanId: 'dryrun_basic_tone_source',
+      dryRun: false,
+    });
+    const selectedImage = useEditorStore.getState().selectedImage;
+    if (selectedImage === null) throw new Error('Expected seeded selected image.');
+    useEditorStore.setState({
+      imageSession: createEditorImageSession({ generation: 24, path: '/fixtures/other.ARW', source: 'cache' }),
+      selectedImage: { ...selectedImage, path: '/fixtures/other.ARW' },
+    });
+    expect(() => useEditorStore.getState().applyBasicToneCommand(sourceCommand, sourceIdentity)).toThrow(
+      `basic_tone_transaction.stale_source:${imagePath}:/fixtures/other.ARW`,
+    );
+
+    seedEditor();
+    const sessionIdentity = captureBasicToneCommitIdentity(useEditorStore.getState());
+    if (sessionIdentity === null) throw new Error('Expected seeded basic-tone identity.');
+    useEditorStore.setState({
+      imageSession: createEditorImageSession({ generation: 25, path: imagePath, source: 'cache' }),
+    });
+    expect(() => useEditorStore.getState().applyBasicToneCommand(sourceCommand, sessionIdentity)).toThrow(
+      `basic_tone_transaction.stale_session:${sessionIdentity.imageSessionId}:editor-image-session:25:${String(imagePath.length)}:${imagePath}`,
+    );
+  });
 });
+
+const commitInterveningExposure = (exposure: number) => {
+  const state = useEditorStore.getState();
+  state.applyEditTransaction({
+    baseAdjustmentRevision: state.adjustmentRevision,
+    history: 'coalesced-interaction',
+    imageSessionId: state.imageSession?.id ?? '',
+    operations: [{ patch: { exposure }, type: 'patch-adjustments' }],
+    persistence: 'commit',
+    source: 'manual-control',
+    transactionId: 'intervening-coalesced-edit',
+  });
+};
