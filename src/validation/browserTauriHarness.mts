@@ -83,6 +83,7 @@ declare global {
       imageOpenDelayMs: number;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
+      perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -109,6 +110,7 @@ const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === 
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 const commandNames: Record<
   | 'analyzeAutoEdit'
+  | 'analyzePerspectiveCorrection'
   | 'calculateAutoAdjustments'
   | 'applyAutoAdjustmentsToPaths'
   | 'commitBatchAutoAdjustment'
@@ -173,6 +175,7 @@ const commandNames: Record<
   string
 > = {
   analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
+  analyzePerspectiveCorrection: Invokes.AnalyzePerspectiveCorrection,
   calculateAutoAdjustments: Invokes.CalculateAutoAdjustments,
   applyAutoAdjustmentsToPaths: Invokes.ApplyAutoAdjustmentsToPaths,
   commitBatchAutoAdjustment: Invokes.CommitBatchAutoAdjustment,
@@ -362,6 +365,7 @@ export const installBrowserTauriHarness = (): void => {
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
+    perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
     setAdjustmentsForPath: (path, adjustments) => {
       harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
@@ -425,6 +429,56 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         available: path.length > 0,
         sourceRevision: path.length > 0 ? `source-revision-v1:${hash.toString(16).padStart(16, '0').repeat(4)}` : null,
       });
+    }
+    case commandNames.analyzePerspectiveCorrection: {
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.perspectiveAnalysisResponses.shift();
+      const matrix = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ];
+      const analysisIdentity = {
+        analysisDimensions: [1024, 768],
+        implementationVersion: 1,
+        lensGeometryFingerprint: 2,
+        orientationFingerprint: 3,
+        sourceRevision: 4,
+      };
+      const value = response?.value ?? {
+        analysis: {
+          confidence: 0.92,
+          horizonAngleDegrees: 1.5,
+          identity: analysisIdentity,
+          lines: [],
+          warningCodes: [],
+        },
+        receipt: {
+          abstentionReason: null,
+          conditionEstimate: 1,
+          guideCount: 0,
+          horizontalGuideCount: 0,
+          plan: {
+            analysisIdentity,
+            confidence: 0.92,
+            correctedToSource: matrix,
+            fingerprint: 42,
+            implementationVersion: 1,
+            retainedArea: 0.81,
+            sourceToCorrected: matrix,
+            suggestedCrop: { height: 0.8, width: 0.8, x: 0.1, y: 0.1 },
+            validPolygon: [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 1],
+            ],
+            warningCodes: [],
+          },
+          residualDegreesP95: 0.25,
+          verticalGuideCount: 0,
+        },
+      };
+      return new Promise((resolve) => window.setTimeout(() => resolve(value), response?.delayMs ?? 0));
     }
     case commandNames.analyzeAutoEdit: {
       const request = args?.['request'] as { graphRevision?: string; imageSessionId?: string } | undefined;

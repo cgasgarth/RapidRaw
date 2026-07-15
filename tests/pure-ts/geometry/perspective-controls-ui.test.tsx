@@ -1,12 +1,15 @@
 import { afterEach, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import TransformLens from '../../../src/components/adjustments/TransformLens.tsx';
 import en from '../../../src/i18n/locales/en.json';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
+import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let rendered: { container: HTMLDivElement; root: Root } | null = null;
@@ -21,6 +24,30 @@ afterEach(() => {
 
 test('guided perspective controls create source-normalized horizontal and vertical evidence', async () => {
   installDom();
+  const adjustments = {
+    ...structuredClone(INITIAL_ADJUSTMENTS),
+    perspectiveCorrection: { ...INITIAL_ADJUSTMENTS.perspectiveCorrection, mode: 'guided' as const },
+  };
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  useEditorStore.setState({
+    adjustmentRevision: 0,
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
+    adjustments,
+    editDocumentV2,
+    history: [adjustments],
+    historyCheckpoints: [],
+    historyIndex: 0,
+    imageSession: createEditorImageSession({ generation: 1, path: '/fixture/guided.ARW', source: 'cache' }),
+    selectedImage: {
+      height: 3000,
+      isRaw: true,
+      isReady: true,
+      originalUrl: null,
+      path: '/fixture/guided.ARW',
+      thumbnailUrl: '',
+      width: 4000,
+    },
+  });
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -52,19 +79,15 @@ test('guided perspective controls create source-normalized horizontal and vertic
 });
 
 function PerspectiveHarness() {
-  const [adjustments, setAdjustments] = useState<Adjustments>({
-    ...INITIAL_ADJUSTMENTS,
-    perspectiveCorrection: { ...INITIAL_ADJUSTMENTS.perspectiveCorrection, mode: 'guided' },
-  });
+  const adjustments = useEditorStore((state) => state.adjustments);
+  const selectedImage = useEditorStore((state) => state.selectedImage);
   return createElement(
     'div',
     null,
     createElement(TransformLens, {
       adjustments,
-      selectedImage: null,
-      setAdjustments: (update) => {
-        setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
-      },
+      selectedImage,
+      setAdjustments: () => {},
     }),
     createElement(
       'output',
