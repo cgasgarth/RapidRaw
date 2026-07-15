@@ -55,8 +55,7 @@ pub(crate) fn generate_original_transformed_preview(
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
     let loaded_image = state
-        .services
-        .editor
+        .editor()
         .image_snapshot()
         .ok_or("No original image loaded")?;
     validate_source_identity(&expected_image_path, &loaded_image.path)?;
@@ -95,8 +94,7 @@ pub(crate) fn generate_original_transformed_preview(
         .with_active_image_session(session.generation, &session.source_identity, || {
             let current_generation = state.render().preview_session().current_generation();
             let (current_source_identity, current_source_fingerprint) = state
-                .services
-                .editor
+                .editor()
                 .image_snapshot()
                 .map(|image| {
                     (
@@ -135,9 +133,8 @@ pub(crate) fn generate_original_transformed_preview(
                     space_label: "Original · Display encoded sRGB".to_string(),
                 };
                 state
-                    .services
-                    .viewer_sampling
-                    .publish(ViewerSampleCacheSlot::Original, frame);
+                    .editor()
+                    .publish_viewer_sample(ViewerSampleCacheSlot::Original, frame);
             }
             Ok(encoded)
         })

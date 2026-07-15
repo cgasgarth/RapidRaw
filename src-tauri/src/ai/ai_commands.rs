@@ -647,7 +647,7 @@ pub async fn invoke_generative_replace_with_mask_def(
         patches.retain(|p| p.get("id").and_then(|id| id.as_str()) != Some(&patch_definition.id));
     }
 
-    let (base_image, _) = state.services.editor.clone_image_pixels()?;
+    let (base_image, _) = state.editor().clone_image_pixels()?;
     let source_image = composite_patches_on_image(&base_image, &source_image_adjustments)
         .map_err(|e| format!("Failed to prepare source image: {}", e))?;
 
