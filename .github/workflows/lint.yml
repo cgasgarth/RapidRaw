@@ -187,11 +187,12 @@ jobs:
     needs: plan
     if: needs.plan.outputs.rust == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
+          cache-save-if: 'false'
           components: rustfmt
           rustflags: ''
           rust-src-dir: src-tauri
