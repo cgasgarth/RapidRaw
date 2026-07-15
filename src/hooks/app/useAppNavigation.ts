@@ -16,6 +16,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../utils/adjustments';
+import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
   cancelBackgroundIndexingWithSchema,
   startBackgroundIndexingWithSchema,
@@ -24,6 +25,10 @@ import { formatUnknownError } from '../../utils/errorFormatting';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
 import { buildImageCacheEntry, globalImageCache } from '../../utils/ImageLRUCache';
+import {
+  buildImageOpenHydrationEditTransaction,
+  publishCurrentImageOpenHydration,
+} from '../../utils/imageOpenHydrationEditTransaction';
 import { beginImageOpenWithSchema, scheduleImagePrefetchWithSchema } from '../../utils/imageOpenInvokes';
 import { acceptImageOpenMetadataRevision } from '../../utils/imageOpenRevisionCache';
 import { imagePrefetchScheduler } from '../../utils/imagePrefetchScheduler';
@@ -218,7 +223,7 @@ export function useAppNavigation({
   const handleImageSelect = useCallback(
     async (path: string) => {
       const editorAtNavigation = useEditorStore.getState();
-      const { selectedImage, isSliderDragging, resetHistory, setEditor } = editorAtNavigation;
+      const { selectedImage, setEditor } = editorAtNavigation;
       const { setLibrary } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
 
@@ -301,8 +306,8 @@ export function useAppNavigation({
           previewSize: cachedReadyEntry.previewSize,
           histogram: cachedReadyEntry.histogram,
           waveform: cachedReadyEntry.waveform,
-          finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
-          uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
+          finalPreviewUrl: null,
+          uncroppedAdjustedPreviewUrl: null,
         });
         const savedPositiveHandoff = consumePendingNegativeConversionSavedPositiveHandoff(path);
         if (savedPositiveHandoff !== null) {
@@ -324,8 +329,24 @@ export function useAppNavigation({
           }));
         }
 
-        setEditor({ adjustments: cachedReadyEntry.adjustments });
-        resetHistory(cachedReadyEntry.adjustments);
+        const cacheState = useEditorStore.getState();
+        cacheState.applyEditTransaction(
+          buildImageOpenHydrationEditTransaction(
+            cacheState,
+            { adjustmentRevision: cacheState.adjustmentRevision, imageSessionId: session.id, path },
+            cachedReadyEntry.adjustments,
+            `cache-open:${session.id}`,
+          ),
+        );
+        setEditor({
+          finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
+          uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
+        });
+        const backgroundHydrationIdentity = {
+          adjustmentRevision: useEditorStore.getState().adjustmentRevision,
+          imageSessionId: session.id,
+          path,
+        };
         prevAdjustmentsRef.current = { path, adjustments: cachedReadyEntry.adjustments };
 
         setLibrary({ isViewLoading: false });
@@ -345,51 +366,64 @@ export function useAppNavigation({
           sessionId: { imageSession: session.generation, selectionGeneration: session.generation },
         })
           .then((openResult) => {
-            if (!isEditorImageSessionCurrent(session.id)) return;
-            const result = openResult.decoded;
-            const loadedMetadata = parseLoadedMetadata(
-              metadataWithNegativeLabReopenedSavedPositiveHandoff({
+            publishCurrentImageOpenHydration(useEditorStore.getState(), backgroundHydrationIdentity, (current) => {
+              const result = openResult.decoded;
+              const selectedImage = current.selectedImage;
+              const loadedMetadata = parseLoadedMetadata(
+                metadataWithNegativeLabReopenedSavedPositiveHandoff({
+                  imagePath: path,
+                  metadata: result.metadata,
+                }),
+              );
+              upsertReopenedDerivedOutputReceipt({
                 imagePath: path,
-                metadata: result.metadata,
-              }),
-            );
-            upsertReopenedDerivedOutputReceipt({
-              imagePath: path,
-              metadata: loadedMetadata,
-              upsert: useUIStore.getState().upsertDerivedOutputReceipt,
-            });
-            isBackendReadyRef.current = true;
-            currentResRef.current = 0;
-            setEditor((state) => ({
-              adjustments:
-                !isSliderDragging &&
+                metadata: loadedMetadata,
+                upsert: useUIStore.getState().upsertDerivedOutputReceipt,
+              });
+              const metadataAdjustments = loadedMetadata.adjustments;
+              const authoritativeAdjustments =
+                !current.isSliderDragging &&
                 !isNativeCommittedHydrationSession(session.id) &&
                 acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
-                loadedMetadata.adjustments &&
-                !loadedMetadata.adjustments['is_null']
-                  ? normalizeLoadedAdjustments(loadedMetadata.adjustments)
-                  : state.adjustments,
-              originalSize: { width: result.width, height: result.height },
-              selectedImage:
-                state.selectedImage?.path === path
-                  ? {
-                      ...state.selectedImage,
-                      exif: result.exif ?? state.selectedImage.exif,
-                      height: result.height,
-                      isOfflineSmartPreview: result.is_offline_smart_preview === true,
-                      isRaw: result.is_raw,
-                      metadata: loadedMetadata ?? state.selectedImage.metadata,
-                      rawDevelopmentReport: result.raw_development_report ?? null,
-                      width: result.width,
-                    }
-                  : state.selectedImage,
-            }));
-            const currentAdjustments = useEditorStore.getState().adjustments;
-            resetHistory(currentAdjustments);
-            prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
-            globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
-            consumePendingNegativeConversionDustHealLayers(path);
-            consumePendingNegativeConversionSavedPositiveHandoff(path);
+                metadataAdjustments !== null &&
+                metadataAdjustments !== undefined &&
+                !metadataAdjustments.is_null
+                  ? normalizeLoadedAdjustments(metadataAdjustments)
+                  : null;
+              if (
+                authoritativeAdjustments !== null &&
+                !areAdjustmentsEqual(current.adjustments, authoritativeAdjustments)
+              ) {
+                current.applyEditTransaction(
+                  buildImageOpenHydrationEditTransaction(
+                    current,
+                    backgroundHydrationIdentity,
+                    authoritativeAdjustments,
+                    `cache-meta:${session.id}:${openResult.metadataFingerprint}`,
+                  ),
+                );
+              }
+              setEditor({
+                originalSize: { width: result.width, height: result.height },
+                selectedImage: {
+                  ...selectedImage,
+                  exif: result.exif ?? selectedImage.exif,
+                  height: result.height,
+                  isOfflineSmartPreview: result.is_offline_smart_preview === true,
+                  isRaw: result.is_raw,
+                  metadata: loadedMetadata ?? selectedImage.metadata,
+                  rawDevelopmentReport: result.raw_development_report ?? null,
+                  width: result.width,
+                },
+              });
+              isBackendReadyRef.current = true;
+              currentResRef.current = 0;
+              const currentAdjustments = useEditorStore.getState().adjustments;
+              prevAdjustmentsRef.current = { path, adjustments: currentAdjustments };
+              globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
+              consumePendingNegativeConversionDustHealLayers(path);
+              consumePendingNegativeConversionSavedPositiveHandoff(path);
+            });
           })
           .catch((err: unknown) => {
             if (!isEditorImageSessionCurrent(session.id)) return;
