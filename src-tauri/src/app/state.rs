@@ -72,16 +72,11 @@ pub struct AppState {
     pub ai_embeddings: MemoryLruCache<String, ImageEmbeddings>,
     #[cfg(feature = "ai")]
     pub ai_depth_maps: MemoryLruCache<String, CachedDepthMap>,
-    export_jobs: crate::export::job_registry::ExportJobRegistry,
     pub(crate) interactive_gpu_pressure:
         Arc<crate::render::interactive_gpu_pressure::InteractiveGpuPressure>,
 }
 
 impl AppState {
-    pub(crate) fn export_jobs(&self) -> &crate::export::job_registry::ExportJobRegistry {
-        &self.export_jobs
-    }
-
     pub fn new() -> Self {
         #[cfg(feature = "ai")]
         let mib = 1024_u64 * 1024;
@@ -110,7 +105,6 @@ impl AppState {
                 policy("ai_depth_maps", 128, 192, Some(4)),
                 Arc::clone(&cache_budget),
             ),
-            export_jobs: crate::export::job_registry::ExportJobRegistry::default(),
             interactive_gpu_pressure: Arc::default(),
         }
     }

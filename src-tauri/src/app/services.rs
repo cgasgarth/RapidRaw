@@ -135,6 +135,7 @@ pub struct AppServices {
     pub(crate) focus_stack_results: Arc<crate::merge::focus_stack::job::FocusStackResultService>,
     pub(crate) computational_jobs:
         Arc<crate::merge::computational_job::ComputationalMergeJobRegistry>,
+    pub(crate) export_jobs: Arc<crate::export::job_registry::ExportJobRegistry>,
     pub(crate) hdr: Arc<crate::merge::hdr::planning_service::HdrPlanningService>,
     pub(crate) burst_sr:
         Arc<crate::merge::super_resolution::planning_service::BurstSrPlanningService>,
@@ -178,6 +179,7 @@ impl AppServices {
             focus_stack: Arc::default(),
             focus_stack_results: Arc::default(),
             computational_jobs: Arc::default(),
+            export_jobs: Arc::default(),
             hdr: Arc::default(),
             burst_sr: Arc::default(),
             panorama: Arc::default(),
