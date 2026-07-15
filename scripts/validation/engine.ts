@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, stat, statfs, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
+import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 import { acquireResourceLease, type ResourceLease } from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
 import { classesForPath } from './ownership';
@@ -242,7 +243,11 @@ const parseTimeMetrics = (stderr: string): NodeMetrics => {
 
 const cacheRoot = async (root: string): Promise<string> => {
   if (process.env.RAWENGINE_VALIDATION_CACHE_ROOT) return resolve(root, process.env.RAWENGINE_VALIDATION_CACHE_ROOT);
-  const command = Bun.spawnSync(['git', 'rev-parse', '--git-common-dir'], { cwd: root, stdout: 'pipe' });
+  const command = Bun.spawnSync(['git', 'rev-parse', '--git-common-dir'], {
+    cwd: root,
+    env: isolatedGitEnvironment(),
+    stdout: 'pipe',
+  });
   const common = command.exitCode === 0 ? command.stdout.toString().trim() : '.git';
   // git-common-dir is shared by all linked worktrees. Keep records isolated by
   // worktree identity so a producer can never reuse another worktree's output.
@@ -455,6 +460,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       await clearValidationOutputs(options.root, node);
       const before = Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
         cwd: options.root,
+        env: isolatedGitEnvironment(),
         stdout: 'pipe',
       }).stdout.toString();
       const started = performance.now();
@@ -499,6 +505,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       const termination = classifyProcessTermination(exitCode, { interrupted, timedOut });
       const after = Bun.spawnSync(['git', 'status', '--porcelain=v1', '--untracked-files=no'], {
         cwd: options.root,
+        env: isolatedGitEnvironment(),
         stdout: 'pipe',
       }).stdout.toString();
       const ok = exitCode === 0 && before === after;

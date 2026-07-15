@@ -55,19 +55,19 @@ test('keyboard focus does not scroll-close the root menu or its submenu', async 
     const launcher = required<HTMLButtonElement>(container, '[data-testid="menu-launcher"]');
     await act(async () => {
       launcher.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 20, clientY: 20 }));
-      await flush();
+      await waitForActiveMenuText('First');
     });
     expect(activeMenuText()).toBe('First');
 
     await act(async () => {
       document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
-      await flush();
+      await waitForActiveMenuText('Productivity');
     });
     expect(activeMenuText()).toBe('Productivity');
 
     await act(async () => {
       document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
-      await flush();
+      await waitForActiveMenuText('Auto Adjust Image');
     });
     expect(activeMenuText()).toBe('Auto Adjust Image');
     expect([...document.querySelectorAll('[role="menu"]')]).toHaveLength(2);
@@ -113,4 +113,14 @@ function required<T extends Element>(container: ParentNode, selector: string): T
 
 async function flush(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
+async function waitForActiveMenuText(expected: string): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (activeMenuText() === expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(
+    `Expected active menu item ${JSON.stringify(expected)}, received ${JSON.stringify(activeMenuText())}`,
+  );
 }

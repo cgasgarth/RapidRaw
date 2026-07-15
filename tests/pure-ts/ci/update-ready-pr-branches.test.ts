@@ -195,7 +195,11 @@ describe('ready PR branch freshness', () => {
         GIT_WORK_TREE: parent,
       };
       const fixtureEnvironment = isolatedGitEnvironment(hookEnvironment);
-      expect(Object.keys(fixtureEnvironment).filter((key) => key.startsWith('GIT_'))).toEqual([]);
+      expect(fixtureEnvironment).toMatchObject({ GIT_CONFIG_NOSYSTEM: '1' });
+      expect(fixtureEnvironment.GIT_CONFIG_GLOBAL).toBeDefined();
+      expect(fixtureEnvironment.GIT_DIR).toBeUndefined();
+      expect(fixtureEnvironment.GIT_INDEX_FILE).toBeUndefined();
+      expect(fixtureEnvironment.GIT_WORK_TREE).toBeUndefined();
 
       git(root, ['init', '--bare', remote], fixtureEnvironment);
       git(repository, ['init'], fixtureEnvironment);
