@@ -10,8 +10,20 @@ export interface PerceptualGradingCommitIdentity {
 export interface PerceptualGradingEditTransactionState {
   adjustmentRevision: number;
   imageSession: { id: string } | null;
+  imageSessionId: number;
   selectedImage: { path: string } | null;
 }
+
+const currentImageSessionId = (state: PerceptualGradingEditTransactionState): string =>
+  state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+
+export const isCurrentPerceptualGradingIdentity = (
+  state: PerceptualGradingEditTransactionState,
+  identity: PerceptualGradingCommitIdentity,
+): boolean =>
+  state.adjustmentRevision === identity.adjustmentRevision &&
+  currentImageSessionId(state) === identity.imageSessionId &&
+  state.selectedImage?.path === identity.sourceIdentity;
 
 export const buildPerceptualGradingEditTransaction = (
   state: PerceptualGradingEditTransactionState,
@@ -25,9 +37,9 @@ export const buildPerceptualGradingEditTransaction = (
       `perceptual_grading_transaction.stale_source:${identity.sourceIdentity}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  if (state.imageSession?.id !== identity.imageSessionId) {
+  if (currentImageSessionId(state) !== identity.imageSessionId) {
     throw new Error(
-      `perceptual_grading_transaction.stale_session:${identity.imageSessionId}:${state.imageSession?.id ?? 'none'}`,
+      `perceptual_grading_transaction.stale_session:${identity.imageSessionId}:${currentImageSessionId(state)}`,
     );
   }
   if (state.adjustmentRevision !== identity.adjustmentRevision) {
