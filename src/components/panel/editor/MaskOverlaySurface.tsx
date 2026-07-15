@@ -655,6 +655,7 @@ export const MaskOverlay = memo(
 
     if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
       const { startX, startY, endX, endY } = p;
+      if (![startX, startY, endX, endY].every(Number.isFinite)) return null;
       const start = orientedToView(startX, startY);
       const end = orientedToView(endX, endY);
       const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;

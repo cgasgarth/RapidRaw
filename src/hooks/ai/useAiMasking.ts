@@ -10,16 +10,15 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
-import {
-  type AiSubjectMaskToolAppliedResult,
-  prepareAiSubjectMaskAppServerTool,
-} from '../../utils/ai/aiSubjectMaskAppServerTool';
+import type { AiMaskBoxAsyncRequest } from '../../utils/ai/aiMaskBoxAsyncOperations';
 import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
 
 type SubMaskParameters = Record<string, unknown>;
+
+const aiMaskBoxAsyncOperationsModule = import('../../utils/ai/aiMaskBoxAsyncOperations.js');
 
 interface AiDepthMaskParameters {
   feather?: number;
@@ -136,97 +135,11 @@ export function useAiMasking() {
   );
 
   const handleQuickErase = useCallback(
-    async (subMaskId: string | null, startPoint: Coord, endPoint: Coord) => {
-      const { selectedImage, adjustments, isGeneratingAi, patchResidency } = useEditorStore.getState();
-      if (!selectedImage?.path || isGeneratingAi) return;
-      const token = await getToken();
-
-      const patchId = adjustments.aiPatches.find((p: AiPatch) =>
-        p.subMasks.some((sm: SubMask) => sm.id === subMaskId),
-      )?.id;
-      if (!patchId) return;
-
-      setEditor({ isGeneratingAi: true });
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
-      }));
-
-      try {
-        const transformAdjustments = getTransformAdjustments(adjustments);
-        const newMaskParams = await invoke<SubMaskParameters>(Invokes.GenerateAiSubjectMask, {
-          jsAdjustments: transformAdjustments,
-          endPoint: [endPoint.x, endPoint.y],
-          flipHorizontal: adjustments.flipHorizontal,
-          flipVertical: adjustments.flipVertical,
-          orientationSteps: adjustments.orientationSteps,
-          path: selectedImage.path,
-          rotation: adjustments.rotation,
-          startPoint: [startPoint.x, startPoint.y],
-        });
-
-        const subMaskToUpdate = adjustments.aiPatches
-          .find((p: AiPatch) => p.id === patchId)
-          ?.subMasks.find((sm: SubMask) => sm.id === subMaskId);
-        const finalSubMaskParams: SubMaskParameters = {
-          ...((subMaskToUpdate?.parameters as SubMaskParameters | undefined) ?? {}),
-          ...newMaskParams,
-        };
-        const updatedAdjustmentsForBackend = {
-          ...adjustments,
-          aiPatches: adjustments.aiPatches.map((p: AiPatch) =>
-            p.id === patchId
-              ? {
-                  ...p,
-                  subMasks: p.subMasks.map((sm: SubMask) =>
-                    sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
-                  ),
-                }
-              : p,
-          ),
-        };
-
-        const patchDefinitionForBackend = updatedAdjustmentsForBackend.aiPatches.find((p: AiPatch) => p.id === patchId);
-        const newPatchDataJson = await invoke<string>(Invokes.InvokeGenerativeReplaceWithMaskDef, {
-          currentAdjustments: updatedAdjustmentsForBackend,
-          patchDefinition: { ...patchDefinitionForBackend, prompt: '' },
-          path: selectedImage.path,
-          useFastInpaint: true,
-          token: token || null,
-        });
-
-        const newPatchData = parseAiPatchDataJson(newPatchDataJson);
-        patchResidency.remove(patchId);
-
-        applyAiEditCommand(({ aiPatches }) => {
-          if (!aiPatches.some((candidate) => candidate.id === patchId)) return null;
-          return {
-            aiPatches: aiPatches.map((p: AiPatch) =>
-              p.id === patchId
-                ? {
-                    ...p,
-                    patchData: newPatchData,
-                    isLoading: false,
-                    subMasks: p.subMasks.map((sm: SubMask) =>
-                      sm.id === subMaskId ? { ...sm, parameters: finalSubMaskParams } : sm,
-                    ),
-                  }
-                : p,
-            ),
-            selection: { containerId: null, subMaskId: null },
-          };
-        });
-      } catch (err) {
-        toast.error(`Quick Erase Failed: ${err instanceof Error ? err.message : String(err)}`);
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
-        }));
-      } finally {
-        setEditor({ isGeneratingAi: false });
-      }
+    async (request: AiMaskBoxAsyncRequest) => {
+      const { runQuickEraseBoxOperation } = await aiMaskBoxAsyncOperationsModule;
+      if (request.isCurrent()) await runQuickEraseBoxOperation(request, getToken);
     },
-    [applyAiEditCommand, getToken, setAdjustments, setEditor],
+    [getToken],
   );
 
   const handleDeleteMaskContainer = useCallback(
@@ -269,83 +182,9 @@ export function useAiMasking() {
     [applyAiEditCommand],
   );
 
-  const handleGenerateAiMask = async (subMaskId: string, startPoint: Coord, endPoint: Coord) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
-    if (!selectedImage?.path) return;
-    setEditor({ isGeneratingAiMask: true });
-
-    try {
-      const subjectMaskToolSession = await prepareAiSubjectMaskAppServerTool({
-        maskName: 'Subject mask',
-        operationId: `ai-subject-mask-${subMaskId}`,
-        providerClass:
-          aiProvider === AiProviderId.Local
-            ? 'local_model'
-            : aiProvider === AiProviderId.Connector
-              ? 'self_hosted_connector'
-              : 'cloud_service',
-        providerId: aiProvider === AiProviderId.Local ? 'rawengine-local-ai' : aiProvider,
-        requestId: `ai-subject-mask-${subMaskId}-request`,
-        selectedImagePath: selectedImage.path,
-      });
-
-      if (subjectMaskToolSession.status === 'blocked') {
-        toast.error(`AI Subject Mask unavailable: ${subjectMaskToolSession.userVisibleMessage}`);
-        return;
-      }
-
-      const transformAdjustments = getTransformAdjustments(adjustments);
-      const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiSubjectMask, {
-        jsAdjustments: transformAdjustments,
-        endPoint: [endPoint.x, endPoint.y],
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        path: selectedImage.path,
-        rotation: adjustments.rotation,
-        startPoint: [startPoint.x, startPoint.y],
-      });
-
-      const subjectMaskToolResult = await subjectMaskToolSession.apply();
-      if (subjectMaskToolResult.status === 'blocked') {
-        toast.error(`AI Mask Failed: ${subjectMaskToolResult.userVisibleMessage}`);
-        return;
-      }
-
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
-      const applyResult: AiSubjectMaskToolAppliedResult = subjectMaskToolResult;
-      const mergedParameters = mergeMaskParameters(subMask?.parameters, {
-        ...newParameters,
-        rawEngine: {
-          acceptedDryRunPlanHash: applyResult.applyResult.dryRunPlanHash,
-          acceptedDryRunPlanId: applyResult.applyResult.dryRunPlanId,
-          appliedGraphRevision: applyResult.applyResult.appliedGraphRevision,
-          auditEventId: applyResult.auditEvents.at(-1)?.eventId ?? null,
-          commandId: applyResult.applyResult.commandId,
-          dryRunPlanHash: applyResult.applyResult.dryRunPlanHash,
-          dryRunPlanId: applyResult.applyResult.dryRunPlanId,
-          maskArtifactId: applyResult.dryRunResult.maskArtifacts[0]?.artifactId ?? null,
-          maskContentHash: applyResult.dryRunResult.maskArtifacts[0]?.contentHash ?? null,
-          maskCoverageRatio: applyResult.dryRunResult.maskCoverageRatio,
-          outputArtifactId: applyResult.applyResult.outputArtifacts[0]?.artifactId ?? null,
-          outputContentHash: applyResult.applyResult.outputArtifacts[0]?.contentHash ?? null,
-          previewArtifactId: applyResult.dryRunResult.previewArtifacts[0]?.artifactId ?? null,
-          providerFallback: applyResult.auditEvents.at(-1)?.providerFallback ?? null,
-          provenanceEntryIds: applyResult.applyResult.provenanceEntryIds,
-          sourceGraphRevision: applyResult.applyResult.sourceGraphRevision,
-          toolName: 'ai.mask.apply_subject',
-          warnings: applyResult.applyResult.warnings,
-        },
-      });
-      patchResidency.remove(subMaskId);
-      updateSubMask(subMaskId, { parameters: mergedParameters });
-    } catch (error) {
-      toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
-    } finally {
-      setEditor({ isGeneratingAiMask: false });
-    }
+  const handleGenerateAiMask = async (request: AiMaskBoxAsyncRequest) => {
+    const { runAiSubjectBoxOperation } = await aiMaskBoxAsyncOperationsModule;
+    if (request.isCurrent()) await runAiSubjectBoxOperation(request, aiProvider);
   };
 
   const handleGenerateAiDepthMask = async (subMaskId: string, parameters: AiDepthMaskParameters) => {
