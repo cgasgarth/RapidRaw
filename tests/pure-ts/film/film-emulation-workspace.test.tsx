@@ -44,6 +44,8 @@ test('Film workspace edits publish one current transaction and reset only Film-o
     source: 'film-workspace',
   });
   expect(enabled.adjustmentSnapshot.value.filmEmulation).toEqual(enabled.adjustments.filmEmulation);
+  expect(enabled.editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(enabled.adjustments.filmEmulation);
+  expect(enabled.editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
   expect(enabled.finalPreviewUrl).toBeNull();
   expect(enabled.exportSoftProofTransform).toBeNull();
 

@@ -80,6 +80,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'scene_curve',
       'tone_equalizer',
       'display_creative',
+      'film_emulation',
       'detail_denoise_dehaze',
       'point_color',
       'color_balance_rgb',
@@ -100,6 +101,53 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
     expect(document.migration?.quarantined).not.toContain('sectionVisibility');
     expect(document.extensions.legacyAdjustments).not.toHaveProperty('sectionVisibility');
+  });
+
+  test('owns strict Film Emulation state and migrates old V2 authority idempotently', () => {
+    const filmEmulation = {
+      contractVersion: 1 as const,
+      enabled: true,
+      mix: 0.65,
+      nodeType: 'film_emulation' as const,
+      profileRef: {
+        contentSha256: `sha256:${'a'.repeat(64)}` as const,
+        id: 'rapidraw.reference_film.v1',
+        version: '1',
+      },
+      seedPolicy: 'source_stable_v1' as const,
+      workingSpace: 'acescg_linear_v1' as const,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmEmulation,
+    });
+    expect(document.nodes.film_emulation.params.filmEmulation).toEqual(filmEmulation);
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
+    expect(document.migration?.mapped).toContain('film_emulation.filmEmulation');
+
+    const oldV2 = structuredClone(document);
+    delete (oldV2.nodes as Partial<typeof oldV2.nodes>).film_emulation;
+    (oldV2.extensions.legacyAdjustments as Record<string, unknown>).filmEmulation = filmEmulation;
+    if (oldV2.migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.migration.mapped = oldV2.migration.mapped.filter((path) => path !== 'film_emulation.filmEmulation');
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.film_emulation.params.filmEmulation).toEqual(filmEmulation);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptOldV2 = structuredClone(oldV2);
+    (corruptOldV2.extensions.legacyAdjustments as Record<string, unknown>).filmEmulation = { mix: 1 };
+    const quarantined = editDocumentV2Schema.parse(corruptOldV2);
+    expect(quarantined.nodes.film_emulation.params.filmEmulation).toBeNull();
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toEqual({ filmEmulation: { mix: 1 } });
+    expect(quarantined.migration?.quarantined).toContain('filmEmulation');
+
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmEmulation: { mix: 1 },
+    });
+    expect(corruptFlat.nodes.film_emulation.params.filmEmulation).toBeNull();
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ filmEmulation: { mix: 1 } });
   });
 
   test('owns strict Color Presence state and migrates old scene-node fields idempotently', () => {

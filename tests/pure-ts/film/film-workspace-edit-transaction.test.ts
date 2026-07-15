@@ -4,12 +4,18 @@ import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  EditorPersistenceEffectRunner,
+  type EditorPersistenceExecution,
+} from '../../../src/utils/editorPersistenceEffectRunner';
 import { buildEditTransactionPersistenceContext } from '../../../src/utils/editTransaction';
 import {
   hydrateFilmEmulationTargetState,
   REFERENCE_FILM_PROFILE_REF,
 } from '../../../src/utils/film-look/filmEmulationOperation';
 import { buildFilmWorkspaceEditTransactionRequest } from '../../../src/utils/film-look/filmWorkspaceEditTransaction';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const fingerprint = (digit: string): `fnv1a64:${string}` => `fnv1a64:${digit.repeat(16)}`;
 const receipt = matchLookApplicationReceiptV1Schema.parse({
@@ -88,6 +94,83 @@ describe('Film workspace EditTransaction boundary', () => {
       baseAdjustmentRevision: 0,
       nextAdjustmentRevision: 1,
     });
+  });
+
+  test('commits Film node authority through Undo, Redo, persistence, reopen, and Reset defaults', async () => {
+    seedStore();
+    const node = {
+      contractVersion: 1 as const,
+      enabled: true,
+      mix: 0.7,
+      nodeType: 'film_emulation' as const,
+      profileRef: REFERENCE_FILM_PROFILE_REF,
+      seedPolicy: 'source_stable_v1' as const,
+      workingSpace: 'acescg_linear_v1' as const,
+    };
+    const state = useEditorStore.getState();
+    const request = buildFilmWorkspaceEditTransactionRequest(state, { filmEmulation: node }, 'film-node');
+    expect(request.operations).toEqual([
+      { nodeType: 'film_emulation', patch: { filmEmulation: node }, type: 'patch-edit-document-node' },
+    ]);
+    const result = state.applyEditTransaction(request);
+    expect(result.changedKeys).toEqual(['filmEmulation']);
+    expect(result.afterEditDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(node);
+    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
+    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(
+      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    );
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params.filmEmulation).toBeNull();
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(node);
+
+    const committed = useEditorStore.getState();
+    const executions: EditorPersistenceExecution[] = [];
+    const runner = new EditorPersistenceEffectRunner({
+      clearTimer: () => {},
+      execute: async (execution) => {
+        executions.push(execution);
+        return { path: execution.path, sidecarRevision: `sha256:${'b'.repeat(64)}` };
+      },
+      onAccepted: () => {},
+      setTimer: (callback) => {
+        callback();
+        return 0;
+      },
+    });
+    runner.installSession({
+      adjustmentRevision: 0,
+      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS)),
+      imageSessionId: 'editor-image-session:9',
+      path: '/fixture/film-node.ARW',
+      sessionGeneration: 1,
+    });
+    if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed Film receipt');
+    runner.submitCommitted({
+      adjustmentRevision: committed.adjustmentRevision,
+      adjustments: committed.adjustments,
+      editDocumentV2: committed.editDocumentV2,
+      imageSessionId: 'editor-image-session:9',
+      interactionActive: false,
+      multiSelection: null,
+      path: '/fixture/film-node.ARW',
+      receipt: committed.lastEditApplicationReceipt,
+      sessionGeneration: 1,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(executions).toHaveLength(1);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
+      executions[0]?.adjustments ?? committed.adjustments,
+    );
+    expect(reopened.nodes.film_emulation.params.filmEmulation).toEqual(node);
+    expect(reopened).toEqual(committed.editDocumentV2);
+
+    const resetDocument = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
+    expect(resetDocument.nodes.film_emulation.params.filmEmulation).toBeNull();
   });
 
   test('exact no-ops preserve revision, history, previews, and persistence authority', () => {

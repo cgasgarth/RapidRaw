@@ -21,6 +21,7 @@ enum EditNodeTypeV2 {
     SceneCurve,
     ToneEqualizer,
     DisplayCreative,
+    FilmEmulation,
     DetailDenoiseDehaze,
     PointColor,
     ColorBalanceRgb,
@@ -46,6 +47,7 @@ impl EditNodeTypeV2 {
             Self::SceneCurve => ("scene_curve", "scene_referred_v2", 1),
             Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
+            Self::FilmEmulation => ("film_emulation", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
@@ -78,7 +80,11 @@ impl EditNodeTypeV2 {
             | Self::PerceptualGrading
             | Self::CameraInput
             | Self::ColorCalibration => Some("color"),
-            Self::LensCorrection | Self::Geometry | Self::Layers | Self::SourceArtifacts => None,
+            Self::FilmEmulation
+            | Self::LensCorrection
+            | Self::Geometry
+            | Self::Layers
+            | Self::SourceArtifacts => None,
         }
     }
 }
@@ -559,6 +565,22 @@ struct DetailDenoiseDehazeV2 {
     // Optional only for v2 documents persisted before Sharpness Threshold ownership.
     sharpness_threshold: Option<f64>,
     structure: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct FilmEmulationV2 {
+    film_emulation: Value,
+}
+
+impl FilmEmulationV2 {
+    fn validate(&self) -> Result<(), String> {
+        crate::render::film_emulation::parse_node(&serde_json::json!({
+            "filmEmulation": self.film_emulation
+        }))
+        .map(|_| ())
+        .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -2337,6 +2359,12 @@ fn compile_node_params(
             parse_display_creative(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::FilmEmulation => {
+            let film: FilmEmulationV2 = serde_json::from_value(Value::Object(node.params.clone()))
+                .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))?;
+            film.validate()?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::Geometry => {
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
@@ -2697,6 +2725,9 @@ mod tests {
         apply_creative_color, apply_hsl_panel, apply_hue_shift, apply_local_contrast,
         apply_luma_levels,
     };
+    use crate::render::film_emulation::{
+        apply_pixel as apply_film_pixel, parse_node as parse_film_node,
+    };
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -2899,6 +2930,24 @@ mod tests {
                     "target": null
                 },
                 "visualizeMode": "range"
+            }
+        })
+    }
+
+    fn film_emulation_params() -> Value {
+        json!({
+            "filmEmulation": {
+                "contractVersion": 1,
+                "enabled": true,
+                "mix": 0.65,
+                "nodeType": "film_emulation",
+                "profileRef": {
+                    "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef",
+                    "id": "rapidraw.reference_film.v1",
+                    "version": "1"
+                },
+                "seedPolicy": "source_stable_v1",
+                "workingSpace": "acescg_linear_v1"
             }
         })
     }
@@ -3669,6 +3718,74 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range vibrance must fail");
         assert!(error.contains("field 'vibrance'"));
+    }
+
+    #[test]
+    fn film_emulation_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
+        let mut value = document_with_legacy(json!({}));
+        value["nodes"]["film_emulation"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": film_emulation_params(),
+            "process": "scene_referred_v2",
+            "type": "film_emulation"
+        });
+        let compiled = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("valid Film Emulation document")
+            .into_render_adjustments()
+            .expect("Film Emulation node compiles");
+        assert_eq!(compiled["filmEmulation"]["mix"], json!(0.65));
+        let params = parse_film_node(&compiled)
+            .expect("compiled Film node parses")
+            .expect("compiled Film node is active");
+        let input = Vec3::new(0.18, 0.42, 0.73);
+        let output = apply_film_pixel(input, params);
+        assert!(
+            output.distance(input) > 1.0e-4,
+            "Film node must alter a representative scene-linear pixel: {output:?}"
+        );
+
+        let legacy_compiled =
+            serde_json::from_value::<EditDocumentV2>(document_with_legacy(film_emulation_params()))
+                .expect("pre-Film-node V2 document remains parseable")
+                .into_render_adjustments()
+                .expect("legacy Film field compiles");
+        let legacy_params = parse_film_node(&legacy_compiled)
+            .expect("legacy Film node parses")
+            .expect("legacy Film node is active");
+        let legacy_output = apply_film_pixel(input, legacy_params);
+        assert!(
+            output.distance(legacy_output) <= f32::EPSILON,
+            "node and legacy Film authority must remain pixel-identical"
+        );
+
+        let mut mixed = document_with_legacy(film_emulation_params());
+        mixed["nodes"]["film_emulation"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": film_emulation_params(),
+            "process": "scene_referred_v2",
+            "type": "film_emulation"
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(mixed)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("mixed Film authority must fail");
+        assert!(error.contains("conflicts with quarantined legacy field 'filmEmulation'"));
+
+        let mut invalid = document_with_legacy(json!({}));
+        invalid["nodes"]["film_emulation"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "filmEmulation": { "mix": 2 } },
+            "process": "scene_referred_v2",
+            "type": "film_emulation"
+        });
+        let error = serde_json::from_value::<EditDocumentV2>(invalid)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("invalid Film node must fail");
+        assert!(error.contains("film_emulation_invalid_node"));
     }
 
     #[test]

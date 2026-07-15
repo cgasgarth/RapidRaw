@@ -28,13 +28,29 @@ export const buildFilmWorkspaceEditTransactionRequest = (
     next.referenceMatchApplicationReceipt === state.adjustments.referenceMatchApplicationReceipt
       ? {}
       : { referenceMatchApplicationReceipt: next.referenceMatchApplicationReceipt };
+  const ownsFilmEmulation = Object.hasOwn(patch, 'filmEmulation');
+  const { filmEmulation: _filmEmulation, ...legacyPatch } = structuredClone(patch);
+  const compatibilityPatch = { ...legacyPatch, ...provenancePatch };
 
   return {
     transactionId,
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
     baseAdjustmentRevision: state.adjustmentRevision,
     source: 'film-workspace',
-    operations: [{ type: 'patch-adjustments', patch: { ...structuredClone(patch), ...provenancePatch } }],
+    operations: [
+      ...(ownsFilmEmulation
+        ? [
+            {
+              nodeType: 'film_emulation' as const,
+              patch: { filmEmulation: patch.filmEmulation ?? null },
+              type: 'patch-edit-document-node' as const,
+            },
+          ]
+        : []),
+      ...(Object.keys(compatibilityPatch).length > 0
+        ? [{ patch: compatibilityPatch, type: 'patch-adjustments' as const }]
+        : []),
+    ],
     history,
     persistence: 'commit',
   };
