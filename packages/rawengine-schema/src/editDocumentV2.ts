@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { blackWhiteMixerSettingsSchema } from './color/blackWhiteMixerSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import {
@@ -64,6 +65,10 @@ export const editDocumentDisplayCreativeV2Schema = z
 
 export const editDocumentToneEqualizerV2Schema = z.object({ toneEqualizer: toneEqualizerSettingsV1Schema }).strict();
 export const editDocumentPointColorV2Schema = z.object({ pointColor: pointColorPlanV1Schema }).strict();
+
+export const editDocumentBlackWhiteMixerV2Schema = z
+  .object({ blackWhiteMixer: blackWhiteMixerSettingsSchema })
+  .strict();
 
 const legacyColorGradingRangeV2Schema = z
   .object({
@@ -530,6 +535,32 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   {
     capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
     defaultParams: {
+      blackWhiteMixer: {
+        enabled: false,
+        presetId: 'manual',
+        process: 'legacy_fixed_band_v1',
+        sourceClass: 'color_source',
+        weights: {
+          aquas: 0,
+          blues: 0,
+          greens: 0,
+          magentas: 0,
+          oranges: 0,
+          purples: 0,
+          reds: 0,
+          yellows: 0,
+        },
+      },
+    },
+    legacyFields: ['blackWhiteMixer'],
+    nodeType: 'black_white_mixer',
+    process: 'scene_referred_v2',
+    renderStage: 'black_white_mixer',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, provenance: 'strip', reset: true },
+    defaultParams: {
       colorGrading: {
         balance: 0,
         blending: 50,
@@ -973,6 +1004,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'black_white_mixer') {
+        const blackWhiteMixer = editDocumentBlackWhiteMixerV2Schema.safeParse(node.params);
+        if (!blackWhiteMixer.success) {
+          for (const issue of blackWhiteMixer.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'perceptual_grading') {
         const perceptualGrading = editDocumentPerceptualGradingV2Schema.safeParse(node.params);
         if (!perceptualGrading.success) {
@@ -1080,6 +1119,7 @@ export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetai
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
+export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhiteMixerV2Schema>;
 export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPerceptualGradingV2Schema>;
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
@@ -1111,6 +1151,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
+  if (envelope.type === 'black_white_mixer') editDocumentBlackWhiteMixerV2Schema.parse(envelope.params);
   if (envelope.type === 'perceptual_grading') editDocumentPerceptualGradingV2Schema.parse(envelope.params);
   if (envelope.type === 'color_calibration') editDocumentColorCalibrationV2Schema.parse(envelope.params);
   if (envelope.type === 'camera_input') editDocumentCameraInputV2Schema.parse(envelope.params);

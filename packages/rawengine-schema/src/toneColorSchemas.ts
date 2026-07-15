@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 import { artifactHandleV1Schema } from './artifactSchemas.js';
+import {
+  blackWhiteMixerSettingsSchema as toneColorBlackWhiteMixerSettingsV1Schema,
+  blackWhiteMixerWeightsSchema as toneColorBlackWhiteMixerWeightsV1Schema,
+  monochromePresetIdSchema as toneColorMonochromePresetIdV1Schema,
+  monochromeProcessSchema as toneColorMonochromeProcessV1Schema,
+  monochromeSourceClassSchema as toneColorMonochromeSourceClassV1Schema,
+} from './color/blackWhiteMixerSchemas.js';
 
 export type ToneColorSchemaDependenciesV1 = {
   approvalClass: {
@@ -71,37 +78,6 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
       red: z.number().min(-100).max(100),
     })
     .strict();
-
-  const toneColorBlackWhiteMixerWeightsV1Schema = z
-    .object({
-      aquas: z.number().min(-100).max(100),
-      blues: z.number().min(-100).max(100),
-      greens: z.number().min(-100).max(100),
-      magentas: z.number().min(-100).max(100),
-      oranges: z.number().min(-100).max(100),
-      purples: z.number().min(-100).max(100),
-      reds: z.number().min(-100).max(100),
-      yellows: z.number().min(-100).max(100),
-    })
-    .strict();
-
-  const toneColorMonochromeProcessV1Schema = z
-    .enum(['legacy_fixed_band_v1', 'neutral_panchromatic_v1', 'continuous_sensitivity_v1'])
-    .default('legacy_fixed_band_v1');
-  const toneColorMonochromeSourceClassV1Schema = z
-    .enum(['color_source', 'monochrome_sensor', 'encoded_grayscale', 'already_monochrome_working'])
-    .default('color_source');
-  const toneColorMonochromePresetIdV1Schema = z
-    .enum([
-      'manual',
-      'neutral_panchromatic',
-      'yellow_filter',
-      'orange_filter',
-      'red_filter',
-      'green_filter',
-      'blue_filter',
-    ])
-    .default('manual');
 
   const toneColorCommandBaseV1Schema = z.object({
     actor: dependencies.rawEngineActorSchema,
@@ -333,25 +309,7 @@ export function createToneColorSchemasV1(dependencies: ToneColorSchemaDependenci
       toneColorCommandBaseV1Schema
         .extend({
           commandType: z.literal('toneColor.setBlackWhiteMixer'),
-          parameters: z
-            .object({
-              enabled: z.boolean(),
-              presetId: toneColorMonochromePresetIdV1Schema,
-              process: toneColorMonochromeProcessV1Schema,
-              sourceClass: toneColorMonochromeSourceClassV1Schema,
-              weights: toneColorBlackWhiteMixerWeightsV1Schema,
-            })
-            .strict()
-            .superRefine((parameters, context) => {
-              const hasAdjustment = Object.values(parameters.weights).some((value) => value !== 0);
-              if (parameters.enabled && !hasAdjustment) {
-                context.addIssue({
-                  code: 'custom',
-                  message: 'Enabled black and white mixer requires at least one non-zero channel weight.',
-                  path: ['weights'],
-                });
-              }
-            }),
+          parameters: toneColorBlackWhiteMixerSettingsV1Schema,
         })
         .strict(),
     ])

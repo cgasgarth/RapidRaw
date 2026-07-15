@@ -76,6 +76,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'display_creative',
       'detail_denoise_dehaze',
       'point_color',
+      'black_white_mixer',
       'perceptual_grading',
       'camera_input',
       'lens_correction',
@@ -88,6 +89,39 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
     expect(document.migration?.quarantined).toContain('sectionVisibility');
+  });
+
+  test('owns strict black-and-white mixer state and excludes it from quarantined legacy fields', () => {
+    const blackWhiteMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
+      enabled: true,
+      process: 'continuous_sensitivity_v1' as const,
+      weights: { ...INITIAL_ADJUSTMENTS.blackWhiteMixer.weights, oranges: 36 },
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      blackWhiteMixer,
+    });
+
+    expect(document.nodes.black_white_mixer?.params).toEqual({ blackWhiteMixer });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('blackWhiteMixer');
+    expect(document.migration?.mapped).toContain('black_white_mixer.blackWhiteMixer');
+    expect(compileEditDocumentNodeV2(document.nodes.black_white_mixer).params).toEqual({ blackWhiteMixer });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.black_white_mixer) {
+      unknown.nodes.black_white_mixer.params.blackWhiteMixer = { ...blackWhiteMixer, futureResponse: true };
+    }
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.black_white_mixer) {
+      outOfRange.nodes.black_white_mixer.params.blackWhiteMixer = {
+        ...blackWhiteMixer,
+        weights: { ...blackWhiteMixer.weights, reds: 101 },
+      };
+    }
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
   });
 
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
@@ -1002,6 +1036,26 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(renderDocument.nodes.display_creative).toEqual(preparedDocument.nodes.display_creative);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays the authoritative black-and-white mixer envelope', () => {
+    const blackWhiteMixer = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
+      enabled: true,
+      process: 'continuous_sensitivity_v1' as const,
+      weights: { ...INITIAL_ADJUSTMENTS.blackWhiteMixer.weights, reds: 32 },
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      blackWhiteMixer,
+    });
+    const prepared = structuredClone(INITIAL_ADJUSTMENTS);
+    const preparedDocument = legacyAdjustmentsToEditDocumentV2(prepared);
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['black_white_mixer']);
+
+    expect(renderDocument.nodes.black_white_mixer).toBe(authoritative.nodes.black_white_mixer);
+    expect(renderDocument.nodes.black_white_mixer?.params).toEqual({ blackWhiteMixer });
+    expect(renderDocument.nodes.point_color).toEqual(preparedDocument.nodes.point_color);
   });
 
   test('render preparation overlays the authoritative perceptual-grading envelope', () => {

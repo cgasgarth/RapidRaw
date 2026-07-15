@@ -1,14 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import type { BlackWhiteMixerChannel } from '../../schemas/color/blackWhiteMixerSchemas';
+import type { BlackWhiteMixerChannel, BlackWhiteMixerSettings } from '../../schemas/color/blackWhiteMixerSchemas';
 import type { ChannelMixerOutput } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
 import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
+import {
+  type BlackWhiteMixerCommitIdentity,
+  buildBlackWhiteMixerEditTransaction,
+} from '../../utils/blackWhiteMixerEditTransaction';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -120,6 +124,8 @@ export default function ColorPanel({
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const gamutWarningOverlay = useEditorStore((state) => state.gamutWarningOverlay);
+  const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
+  const imageSessionId = useEditorStore((state) => state.imageSession?.id ?? null);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
   const exportSoftProofRecipeId = useEditorStore((state) => state.exportSoftProofRecipeId);
@@ -132,6 +138,37 @@ export default function ColorPanel({
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
   const isLevelsVisible = adjustmentVisibility[ColorAdjustment.Levels] !== false;
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
+  const blackWhiteMixerCommitIdentity = useMemo<BlackWhiteMixerCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null && imageSessionId !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const blackWhiteMixerCommitIdentityRef = useRef(blackWhiteMixerCommitIdentity);
+  blackWhiteMixerCommitIdentityRef.current = blackWhiteMixerCommitIdentity;
+  const blackWhiteMixerRef = useRef(adjustments.blackWhiteMixer);
+  blackWhiteMixerRef.current = adjustments.blackWhiteMixer;
+  const commitBlackWhiteMixer = useCallback(
+    (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => {
+      const next = update(blackWhiteMixerRef.current);
+      const identity = blackWhiteMixerCommitIdentityRef.current;
+      if (isForMask || identity === null) {
+        blackWhiteMixerRef.current = next;
+        setAdjustments((previous) => ({ ...previous, blackWhiteMixer: next }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildBlackWhiteMixerEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+      );
+      blackWhiteMixerRef.current = next;
+      blackWhiteMixerCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
   const resolveAutoWhiteBalance = useCallback(async () => {
     if (!selectedImage?.isReady) return;
     try {
@@ -309,9 +346,11 @@ export default function ColorPanel({
               activeColorBalanceRange={activeColorBalanceRange}
               adjustmentVisibility={adjustmentVisibility}
               adjustments={adjustments}
+              blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
               canCreateLocalAdjustmentFromActiveRange={!isForMask && selectedImage !== null}
               appSettings={appSettings}
               isForMask={isForMask}
+              commitBlackWhiteMixer={commitBlackWhiteMixer}
               onCreateLocalAdjustmentFromActiveRange={createLocalAdjustmentFromActiveColorRange}
               onDragStateChange={onDragStateChange}
               setActiveChannelMixerOutput={setActiveChannelMixerOutput}
@@ -377,6 +416,8 @@ export default function ColorPanel({
     adjustmentVisibility,
     adjustments,
     appSettings,
+    blackWhiteMixerCommitIdentity,
+    commitBlackWhiteMixer,
     currentGamutWarningOverlay,
     isColorCalibrationVisible,
     isForMask,

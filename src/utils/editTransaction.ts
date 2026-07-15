@@ -47,6 +47,12 @@ export interface EditTransactionRequest {
   operations: readonly EditNodeOperation[];
   history: EditTransactionHistory;
   persistence: EditTransactionPersistence;
+  /**
+   * Native commits can win a same-path reopen race before the editor installs
+   * their history boundary. Preserve the pre-commit document so that the
+   * already-hydrated result still becomes one atomic, undoable transaction.
+   */
+  nativeCommittedHistoryBaseline?: Adjustments;
 }
 
 export interface EditTransactionResult {
@@ -171,6 +177,7 @@ export const buildAdjustmentMutationOperations = (
   const keys = changedKeys(before, after);
   const focusedNodeType = (
     [
+      'black_white_mixer',
       'scene_global_color_tone',
       'camera_input',
       'color_calibration',
