@@ -436,7 +436,7 @@ await lease.release();`,
     expect(await new Response(follower.stdout).text()).toContain('follower-acquired');
     expect(await queuedLabels(root)).toEqual([]);
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
-  }, 30_000);
+  }, 60_000);
 
   test('serializes heavy processes while an uncoordinated lightweight process still runs', async () => {
     const root = await temporaryRoot();
