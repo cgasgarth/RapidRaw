@@ -103,6 +103,7 @@ pub struct AppServices {
     pub editor: Arc<EditorRuntimeService>,
     pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
     pub(crate) denoise: Arc<crate::computational::denoise_service::EnhancedDenoiseService>,
+    pub(crate) gpu_crash_marker: Arc<crate::gpu::crash_marker_service::GpuCrashMarkerService>,
     pub(crate) lens_database: Arc<crate::color::lens_database_service::LensDatabaseService>,
     pub(crate) focus_stack:
         Arc<crate::merge::focus_stack::planning_service::FocusStackPlanningService>,
@@ -128,6 +129,7 @@ impl AppServices {
             editor: Arc::default(),
             startup_files: Arc::default(),
             denoise: Arc::default(),
+            gpu_crash_marker: Arc::default(),
             lens_database: Arc::default(),
             focus_stack: Arc::default(),
             hdr: Arc::default(),
