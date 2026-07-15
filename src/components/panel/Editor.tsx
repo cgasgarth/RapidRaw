@@ -71,12 +71,8 @@ import {
   type MaskPreviewDefinition,
 } from '../../utils/mask/maskOverlayRequest';
 import { toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
-import {
-  applyObjectPromptClick,
-  imagePointFromCanvasClick,
-  readObjectPromptCanvasState,
-  writeObjectPromptCanvasState,
-} from '../../utils/mask/objectMaskPromptCanvas';
+import { imagePointFromCanvasClick, readObjectPromptCanvasState } from '../../utils/mask/objectMaskPromptCanvas';
+import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { openNegativeLabModalSession } from '../../utils/negative-lab/negativeLabModalSession';
 import {
   getNegativeLabDisabledReasonKey,
@@ -103,6 +99,10 @@ import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts
 import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
 import type { ViewerInitialMaskDrawCommand } from './editor/viewerInitialMaskDrawInteractionController';
+import {
+  createViewerObjectPromptInteractionController,
+  type ViewerObjectPromptCommand,
+} from './editor/viewerObjectPromptInteractionController';
 import {
   resolveViewerInput,
   shouldActivateTemporaryHand,
@@ -296,6 +296,7 @@ export default function Editor({
   );
   const { handleGenerateAiMask, handleQuickErase } = useAiMasking();
   const [cropInteraction, setCropInteraction] = useState<CropInteraction>({ kind: 'idle' });
+  const [objectPromptController] = useState(createViewerObjectPromptInteractionController);
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
@@ -923,6 +924,50 @@ export default function Editor({
     () => (isObjectPromptActive ? readObjectPromptCanvasState(activeSubMask.parameters) : null),
     [activeSubMask, isObjectPromptActive],
   );
+  const objectPromptContext = useMemo(
+    () => ({
+      active:
+        isObjectPromptActive &&
+        activeMaskId !== null &&
+        activeObjectPromptState !== null &&
+        editorImageSession !== null &&
+        selectedImage !== null,
+      geometryEpoch: overlayGeometry.geometryEpoch,
+      imageSessionId: editorImageSession?.id ?? '',
+      maskId: activeMaskId ?? '',
+      mode: activeObjectPromptState?.mode ?? ('foreground_point' as const),
+      sourceIdentity: selectedImage?.path ?? '',
+      sourceRevision: viewerSampleGraphRevision,
+      tool: 'object-prompt' as const,
+    }),
+    [
+      activeMaskId,
+      activeObjectPromptState,
+      editorImageSession,
+      isObjectPromptActive,
+      overlayGeometry.geometryEpoch,
+      selectedImage,
+      viewerSampleGraphRevision,
+    ],
+  );
+  const handleObjectPromptCommit = useCallback(
+    (command: ViewerObjectPromptCommand) => {
+      const state = useEditorStore.getState();
+      applyEditTransaction(
+        buildObjectPromptEditTransaction(
+          {
+            ...state,
+            geometryEpoch: overlayGeometry.geometryEpoch,
+            sourceRevision: viewerSampleGraphRevision,
+          },
+          command.key,
+          command.parameters,
+          `object-prompt:${crypto.randomUUID()}`,
+        ),
+      );
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
   const hasActiveRetouchTool = useMemo(
     () =>
       isMasking &&
@@ -1128,6 +1173,34 @@ export default function Editor({
     };
   }, [applyViewportTransition, dispatchViewportInteraction]);
 
+  const commitObjectPromptAt = useCallback(
+    (clientX: number, clientY: number, pointerId: number, pointerType: ViewerPointerType) => {
+      const container = imageContainerRef.current;
+      if (performance.now() < suppressDoubleClickUntilRef.current) return;
+      if (!isObjectPromptActive || activeObjectPromptState === null || activeMaskId === null || container === null)
+        return;
+      const rect = container.getBoundingClientRect();
+      const point = imagePointFromCanvasClick({ x: clientX - rect.left, y: clientY - rect.top }, overlayGeometry);
+      if (point === null) return;
+      const command = objectPromptController.activate(
+        objectPromptContext,
+        { imagePoint: point, pointerId, pointerType },
+        activeSubMask?.parameters ?? {},
+      );
+      if (command !== null) handleObjectPromptCommit(command);
+    },
+    [
+      activeMaskId,
+      activeObjectPromptState,
+      activeSubMask,
+      handleObjectPromptCommit,
+      isObjectPromptActive,
+      objectPromptContext,
+      objectPromptController,
+      overlayGeometry,
+    ],
+  );
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const declaredPointerOwner =
@@ -1182,11 +1255,14 @@ export default function Editor({
         type: 'pointerup',
       });
       applyViewportTransition(transition);
+      if (e.pointerType !== 'mouse' && transition?.dragged !== true) {
+        void commitObjectPromptAt(e.clientX, e.clientY, e.pointerId, viewerPointerType(e.pointerType));
+      }
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
     },
-    [applyViewportTransition, dispatchViewportInteraction],
+    [applyViewportTransition, commitObjectPromptAt, dispatchViewportInteraction],
   );
 
   const handlePointerCancel = useCallback(
@@ -1218,29 +1294,12 @@ export default function Editor({
       if (e.detail > 1) return;
       if (e.button !== 0) return;
       if (performance.now() < suppressDoubleClickUntilRef.current) return;
-      const container = imageContainerRef.current;
-
-      if (isObjectPromptActive && activeObjectPromptState !== null && activeMaskId !== null && container !== null) {
-        const rect = container.getBoundingClientRect();
-        const point = imagePointFromCanvasClick({ x: e.clientX - rect.left, y: e.clientY - rect.top }, overlayGeometry);
-        if (point !== null) {
-          const nextState = applyObjectPromptClick(activeObjectPromptState, point);
-          updateSubMaskLocal(activeMaskId, {
-            parameters: writeObjectPromptCanvasState(activeSubMask.parameters, nextState),
-          });
-        }
-        return;
-      }
+      const nativePointer =
+        typeof PointerEvent !== 'undefined' && e.nativeEvent instanceof PointerEvent ? e.nativeEvent : null;
+      if (nativePointer !== null && viewerPointerType(nativePointer.pointerType) !== 'mouse') return;
+      void commitObjectPromptAt(e.clientX, e.clientY, nativePointer?.pointerId ?? 1, 'mouse');
     },
-    [
-      activeMaskId,
-      activeObjectPromptState,
-      activeSubMask,
-      isObjectPromptActive,
-      overlayGeometry,
-      transformStateRef,
-      updateSubMaskLocal,
-    ],
+    [commitObjectPromptAt],
   );
 
   useEffect(() => {
@@ -2128,6 +2187,10 @@ export default function Editor({
           data-editor-focal-point-x={String(currentFocalPoint.x)}
           data-editor-focal-point-y={String(currentFocalPoint.y)}
           data-editor-layout-epoch={String(viewportLayoutEpoch)}
+          data-editor-image-rect-height={String(overlayGeometry.displayedImageRectInViewportCssPixels.height)}
+          data-editor-image-rect-left={String(overlayGeometry.displayedImageRectInViewportCssPixels.x)}
+          data-editor-image-rect-top={String(overlayGeometry.displayedImageRectInViewportCssPixels.y)}
+          data-editor-image-rect-width={String(overlayGeometry.displayedImageRectInViewportCssPixels.width)}
           data-editor-resolved-transform-scale={String(resolvedZoom.transformScale)}
           data-editor-transform-position-x={String(transformState.positionX)}
           data-editor-transform-position-y={String(transformState.positionY)}
