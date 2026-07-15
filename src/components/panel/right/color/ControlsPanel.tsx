@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import type { TFunction } from 'i18next';
 import {
@@ -37,6 +36,7 @@ import {
   autoEditPreviewV1Schema,
   autoEditProposalV1Schema,
 } from '../../../../schemas/autoEditSchemas';
+import { emptyTauriResponseSchema } from '../../../../schemas/tauriResponseSchemas';
 import { type CopiedSectionAdjustments, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../../store/useUIStore';
@@ -77,6 +77,7 @@ import {
 import { getEditorClippingStatusChips } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
+import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
@@ -280,19 +281,22 @@ export default function Controls() {
       if (!base) return;
       const serial = ++autoEditRequestSerial.current;
       try {
-        const rawPreview = await invoke<unknown>(Invokes.PreviewAutoEditProposal, {
-          request: {
-            expectedImagePath: base.path,
-            expectedImageSessionId: base.imageSessionId,
-            expectedGraphRevision: base.graphRevision,
-            resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
-            currentAdjustments: base.adjustments,
-            proposal,
-            selectedGroups: [...groups],
-            impact,
+        const preview: AutoEditPreviewV1 = await invokeWithSchema(
+          Invokes.PreviewAutoEditProposal,
+          {
+            request: {
+              expectedImagePath: base.path,
+              expectedImageSessionId: base.imageSessionId,
+              expectedGraphRevision: base.graphRevision,
+              resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
+              currentAdjustments: base.adjustments,
+              proposal,
+              selectedGroups: [...groups],
+              impact,
+            },
           },
-        });
-        const preview: AutoEditPreviewV1 = autoEditPreviewV1Schema.parse(rawPreview);
+          autoEditPreviewV1Schema,
+        );
         const state = useEditorStore.getState();
         if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
@@ -328,16 +332,19 @@ export default function Controls() {
     setAutoEditProposal(null);
     const serial = ++autoEditRequestSerial.current;
     try {
-      const rawProposal = await invoke<unknown>(Invokes.AnalyzeAutoEdit, {
-        request: {
-          expectedImagePath: image.path,
-          imageSessionId: base.imageSessionId,
-          graphRevision: base.graphRevision,
-          currentAdjustments: base.adjustments,
-          cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
+      const proposal = await invokeWithSchema(
+        Invokes.AnalyzeAutoEdit,
+        {
+          request: {
+            expectedImagePath: image.path,
+            imageSessionId: base.imageSessionId,
+            graphRevision: base.graphRevision,
+            currentAdjustments: base.adjustments,
+            cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
+          },
         },
-      });
-      const proposal = autoEditProposalV1Schema.parse(rawProposal);
+        autoEditProposalV1Schema,
+      );
       const current = useEditorStore.getState();
       if (!isCurrentAutoEditProposalRequest(current, base, serial, autoEditRequestSerial.current)) {
         return;
@@ -356,7 +363,7 @@ export default function Controls() {
 
   const cancelAutoEdit = useCallback(() => {
     autoEditRequestSerial.current += 1;
-    void invoke(Invokes.CancelAutoEditAnalysis);
+    void invokeWithSchema(Invokes.CancelAutoEditAnalysis, {}, emptyTauriResponseSchema);
     clearCurrentAutoEditPreview();
     autoEditBaseRef.current = null;
     setAutoEditProposal(null);
@@ -377,19 +384,22 @@ export default function Controls() {
       const serial = ++autoEditRequestSerial.current;
       try {
         const resultingGraphRevision = `history_${String(useEditorStore.getState().historyIndex + 1)}`;
-        const rawApplied = await invoke<unknown>(Invokes.ApplyAutoEditProposal, {
-          request: {
-            expectedImagePath: base.path,
-            expectedImageSessionId: base.imageSessionId,
-            expectedGraphRevision: base.graphRevision,
-            resultingGraphRevision,
-            currentAdjustments: base.adjustments,
-            proposal,
-            selectedGroups: [...groups],
-            impact: autoEditImpact,
+        const applied: AppliedAutoEditV1 = await invokeWithSchema(
+          Invokes.ApplyAutoEditProposal,
+          {
+            request: {
+              expectedImagePath: base.path,
+              expectedImageSessionId: base.imageSessionId,
+              expectedGraphRevision: base.graphRevision,
+              resultingGraphRevision,
+              currentAdjustments: base.adjustments,
+              proposal,
+              selectedGroups: [...groups],
+              impact: autoEditImpact,
+            },
           },
-        });
-        const applied: AppliedAutoEditV1 = appliedAutoEditV1Schema.parse(rawApplied);
+          appliedAutoEditV1Schema,
+        );
         const state = useEditorStore.getState();
         if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
@@ -440,7 +450,8 @@ export default function Controls() {
   useEffect(
     () => () => {
       autoEditRequestSerial.current += 1;
-      if (autoEditBaseRef.current !== null) void invoke(Invokes.CancelAutoEditAnalysis);
+      if (autoEditBaseRef.current !== null)
+        void invokeWithSchema(Invokes.CancelAutoEditAnalysis, {}, emptyTauriResponseSchema);
       clearCurrentAutoEditPreview();
       autoEditBaseRef.current = null;
     },

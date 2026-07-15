@@ -126,13 +126,9 @@ describe('editor persistence effect runner', () => {
       transactionId: 'transaction-a-1',
     };
 
-    expect(editorPersistenceReceiptSchema.parse(nativeReceipt)).toEqual({
-      path: nativeReceipt.path,
-      sidecarRevision: nativeReceipt.sidecarRevision,
-    });
-    expect(editorPersistenceReceiptArraySchema.parse([nativeReceipt])).toEqual([
-      { path: nativeReceipt.path, sidecarRevision: nativeReceipt.sidecarRevision },
-    ]);
+    expect(editorPersistenceReceiptSchema.parse(nativeReceipt)).toEqual(nativeReceipt);
+    expect(editorPersistenceReceiptArraySchema.parse([nativeReceipt])).toEqual([nativeReceipt]);
+    expect(editorPersistenceReceiptSchema.safeParse({ ...nativeReceipt, unexpected: true }).success).toBe(false);
   });
 
   test('primes a session without writing and skips an unchanged snapshot', () => {

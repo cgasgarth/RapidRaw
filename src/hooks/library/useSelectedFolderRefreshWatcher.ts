@@ -1,12 +1,13 @@
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import type { ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { parseVirtualImagePath } from '../../utils/virtualImagePath';
 
 export const LIBRARY_CHANGE_BATCH_EVENT = 'library-filesystem-change-batch';
@@ -32,11 +33,31 @@ export const libraryChangeBatchSchema = z
   })
   .strict();
 
-interface CatalogChangeApplied {
-  catalogRevision: number;
-  upserted: ImageFile[];
-  removedImageIds: string[];
-}
+const imageFileSchema = z
+  .object({
+    is_edited: z.boolean(),
+    modified: z.number().finite(),
+    path: z.string().min(1),
+    rating: z.number().finite(),
+    tags: z.array(z.string()).nullable(),
+    exif: z.record(z.string(), z.string()).nullable(),
+    is_virtual_copy: z.boolean(),
+  })
+  .strict();
+
+const catalogChangeAppliedSchema = z
+  .object({
+    catalogRevision: z.number().int().nonnegative(),
+    upserted: z.array(imageFileSchema),
+    removedImageIds: z.array(z.string().min(1)),
+  })
+  .strict();
+
+const libraryFolderAggregateListSchema = z.array(
+  z.object({ path: z.string().min(1), recursiveImageCount: z.number().int().nonnegative() }).strict(),
+);
+
+const libraryChangefeedGenerationSchema = z.number().int().nonnegative();
 
 export const applyLibraryChangeRows = (
   current: readonly ImageFile[],
@@ -111,9 +132,11 @@ export function useSelectedFolderRefreshWatcher({
   useEffect(() => {
     const roots = rootPaths.length > 0 ? rootPaths : currentFolderPath ? [currentFolderPath] : [];
     if (roots.length === 0 || roots.every((path) => path.startsWith('Album: '))) return;
-    void invoke<number>(Invokes.ConfigureLibraryChangefeed, {
-      roots: roots.filter((path) => !path.startsWith('Album: ')),
-    })
+    void invokeWithSchema(
+      Invokes.ConfigureLibraryChangefeed,
+      { roots: roots.filter((path) => !path.startsWith('Album: ')) },
+      libraryChangefeedGenerationSchema,
+    )
       .then((generation) => {
         generationRef.current = generation;
         revisionRef.current = 0;
@@ -140,14 +163,15 @@ export function useSelectedFolderRefreshWatcher({
       if (!folder || folder.startsWith('Album: ')) return;
       const root = rootPaths.find((candidate) => folder === candidate || folder.startsWith(`${candidate}/`)) ?? folder;
       if (batch.requiresReconcile || batch.overflowed) {
-        await invoke(Invokes.ReconcileLibraryCatalog, { path: root });
+        await invokeWithSchema(Invokes.ReconcileLibraryCatalog, { path: root }, emptyTauriResponseSchema);
         if (!active || batch.watchGeneration !== generationRef.current) return;
         await reconcileRef.current();
       } else {
-        const applied = await invoke<CatalogChangeApplied>(Invokes.ApplyLibraryCatalogChanges, {
-          root,
-          changes: batch.changes,
-        });
+        const applied = await invokeWithSchema(
+          Invokes.ApplyLibraryCatalogChanges,
+          { root, changes: batch.changes },
+          catalogChangeAppliedSchema,
+        );
         if (!active || batch.watchGeneration !== generationRef.current) return;
         useLibraryStore
           .getState()
@@ -155,9 +179,10 @@ export function useSelectedFolderRefreshWatcher({
         const changedPaths = batch.changes.flatMap((change) =>
           change.kind === 'renamed' ? [change.oldPath, change.newPath] : [change.path],
         );
-        const aggregates = await invoke<Array<{ path: string; recursiveImageCount: number }>>(
+        const aggregates = await invokeWithSchema(
           Invokes.GetLibraryFolderAggregates,
           { paths: affectedFolderPaths(changedPaths, root) },
+          libraryFolderAggregateListSchema,
         );
         const counts = new Map(aggregates.map((aggregate) => [aggregate.path, aggregate.recursiveImageCount]));
         useLibraryStore.getState().setLibrary((current) => ({

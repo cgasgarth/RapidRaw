@@ -6,10 +6,20 @@ import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
-export const editorPersistenceReceiptSchema = z.object({
-  path: z.string().trim().min(1),
-  sidecarRevision: z.string().trim().startsWith('sha256:'),
-});
+export const editorPersistenceReceiptSchema = z
+  .object({
+    adjustments: z.record(z.string(), z.json()).nullable().optional(),
+    adjustmentRevision: z.number().int().nonnegative().nullish(),
+    catalogRevision: z.number().int().nonnegative().nullish(),
+    imageId: z.string().min(1),
+    imageSessionId: z.string().min(1).nullish(),
+    path: z.string().trim().min(1),
+    renderFingerprint: z.number().int().nonnegative(),
+    sidecarRevision: z.string().trim().startsWith('sha256:'),
+    thumbnailRevision: z.string().trim().startsWith('sha256:'),
+    transactionId: z.string().min(1).nullish(),
+  })
+  .strict();
 
 export const editorPersistenceReceiptArraySchema = z.array(editorPersistenceReceiptSchema);
 

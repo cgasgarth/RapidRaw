@@ -1,10 +1,11 @@
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
+import { z } from 'zod';
 import { useOsPlatform } from '../../hooks/ui/useOsPlatform';
 import { Invokes } from '../../tauri/commands';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Slider from '../ui/primitives/Slider';
 
@@ -53,9 +54,11 @@ export default function LUTControl({
         let fileName = selected;
         if (isAndroid) {
           try {
-            fileName = await invoke<string>(Invokes.ResolveAndroidContentUriName, {
-              uriStr: selected,
-            });
+            fileName = await invokeWithSchema(
+              Invokes.ResolveAndroidContentUriName,
+              { uriStr: selected },
+              z.string().min(1),
+            );
           } catch (e) {
             console.error('Failed to resolve Android URI:', e);
           }

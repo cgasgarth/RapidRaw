@@ -1,11 +1,12 @@
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useState } from 'react';
 import {
   type CameraProfileBrowserEntry,
   cameraProfileRegistryReportSchema,
 } from '../../schemas/color/cameraProfileBrowserSchemas';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { Invokes } from '../../tauri/commands';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 export const useCameraProfileRegistry = (cameraModel: string | null) => {
   const [entries, setEntries] = useState<Array<CameraProfileBrowserEntry>>([]);
@@ -14,7 +15,11 @@ export const useCameraProfileRegistry = (cameraModel: string | null) => {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const report = cameraProfileRegistryReportSchema.parse(await invoke(Invokes.ListCameraProfiles, { cameraModel }));
+      const report = await invokeWithSchema(
+        Invokes.ListCameraProfiles,
+        { cameraModel },
+        cameraProfileRegistryReportSchema,
+      );
       setEntries(report.entries);
       setErrorCode(null);
     } catch (error) {
@@ -33,8 +38,10 @@ export const useCameraProfileRegistry = (cameraModel: string | null) => {
     if (sourcePath === null) return;
     setLoading(true);
     try {
-      const report = cameraProfileRegistryReportSchema.parse(
-        await invoke(Invokes.ImportCameraProfile, { cameraModel, sourcePath }),
+      const report = await invokeWithSchema(
+        Invokes.ImportCameraProfile,
+        { cameraModel, sourcePath },
+        cameraProfileRegistryReportSchema,
       );
       setEntries(report.entries);
       setErrorCode(null);
@@ -46,13 +53,13 @@ export const useCameraProfileRegistry = (cameraModel: string | null) => {
   }, [cameraModel]);
   const removeProfile = useCallback(
     async (id: string) => {
-      await invoke(Invokes.RemoveCameraProfile, { id });
+      await invokeWithSchema(Invokes.RemoveCameraProfile, { id }, emptyTauriResponseSchema);
       await refresh();
     },
     [refresh],
   );
   const revealProfile = useCallback(async (id: string) => {
-    await invoke(Invokes.RevealCameraProfile, { id });
+    await invokeWithSchema(Invokes.RevealCameraProfile, { id }, emptyTauriResponseSchema);
   }, []);
   return { entries, errorCode, importProfile, loading, refresh, removeProfile, revealProfile };
 };

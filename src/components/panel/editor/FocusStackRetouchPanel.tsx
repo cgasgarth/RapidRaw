@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { Eraser, Redo2, RotateCcw, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -7,6 +6,7 @@ import {
 } from '../../../schemas/focus-stack/focusStackRetouchSchemas';
 import { useUIStore } from '../../../store/useUIStore';
 import { Invokes } from '../../../tauri/commands';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 
 interface Props {
   packagePath: string;
@@ -25,8 +25,12 @@ export function FocusStackRetouchPanel({ packagePath }: Props) {
   const runHistory = useCallback(
     async (direction: 'undo' | 'redo' | 'reset') => {
       try {
-        const value = await invoke(Invokes.NavigateFocusStackRetouch, { request: { packagePath, direction } });
-        setSession(focusRetouchSessionSchema.parse(value));
+        const value = await invokeWithSchema(
+          Invokes.NavigateFocusStackRetouch,
+          { request: { packagePath, direction } },
+          focusRetouchSessionSchema,
+        );
+        setSession(value);
         setError(null);
       } catch (cause) {
         setError(String(cause));
@@ -42,9 +46,9 @@ export function FocusStackRetouchPanel({ packagePath }: Props) {
 
   useEffect(() => {
     if (!isFocusStack) return;
-    void invoke(Invokes.OpenFocusStackRetouch, { request: { packagePath } })
+    void invokeWithSchema(Invokes.OpenFocusStackRetouch, { request: { packagePath } }, focusRetouchSessionSchema)
       .then((value) => {
-        setSession(focusRetouchSessionSchema.parse(value));
+        setSession(value);
         setError(null);
       })
       .catch((cause) => setError(String(cause)));

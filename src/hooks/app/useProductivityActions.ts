@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useRef } from 'react';
+import { z } from 'zod';
 
 import { hdrRuntimePlanSchema } from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import { panoramaRuntimePlanSchema } from '../../schemas/computational-merge/panoramaUiSchemas';
@@ -8,6 +8,7 @@ import {
   denoiseCancelReceiptSchema,
   denoiseOperationHandleSchema,
 } from '../../schemas/denoiseWorkflowSchemas';
+import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
 import { useOperationLaunchStore } from '../../store/useOperationLaunchStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -16,11 +17,15 @@ import {
   buildHdrDryRunActionState,
   buildPanoramaDryRunCommandState,
 } from '../../utils/computational-merge/computationalMergeModalState';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import type { OperationEvent } from '../../workflows/operationLifecycle';
 
 type HdrLifecycleInput = {
   [Type in OperationEvent['type']]: Omit<Extract<OperationEvent, { type: Type }>, 'launchId'>;
 }[OperationEvent['type']];
+
+const savedOutputPathSchema = z.string().min(1);
+const savedOutputPathListSchema = z.array(savedOutputPathSchema);
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
@@ -49,12 +54,14 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         },
       }));
       try {
-        const runtimePlan = panoramaRuntimePlanSchema.parse(
-          await invoke(Invokes.PlanPanorama, {
+        const runtimePlan = await invokeWithSchema(
+          Invokes.PlanPanorama,
+          {
             cancellationId,
             maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
             paths,
-          }),
+          },
+          panoramaRuntimePlanSchema,
         );
         setUI((state) =>
           state.panoramaModalState.alignmentCancellationId !== cancellationId ||
@@ -116,10 +123,14 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       throw new Error(err);
     }
     try {
-      const savedPath: string = await invoke(Invokes.SavePanorama, {
-        firstPathStr: panoramaModalState.stitchingSourcePaths[0],
-        sourcePaths: panoramaModalState.stitchingSourcePaths,
-      });
+      const savedPath = await invokeWithSchema(
+        Invokes.SavePanorama,
+        {
+          firstPathStr: panoramaModalState.stitchingSourcePaths[0],
+          sourcePaths: panoramaModalState.stitchingSourcePaths,
+        },
+        savedOutputPathSchema,
+      );
       await refreshImageList();
       return savedPath;
     } catch (err) {
@@ -153,11 +164,15 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
             progressMessage: 'Applying calibrated HDR artifacts...',
           },
         }));
-        void invoke(Invokes.MergeHdr, {
-          acceptedDryRunPlanHash: hdrModalState.runtimePlan.acceptedDryRunPlanHash,
-          acceptedDryRunPlanId: hdrModalState.runtimePlan.acceptedDryRunPlanId,
-          paths: selectedPaths,
-        }).catch((err: unknown) => {
+        void invokeWithSchema(
+          Invokes.MergeHdr,
+          {
+            acceptedDryRunPlanHash: hdrModalState.runtimePlan.acceptedDryRunPlanHash,
+            acceptedDryRunPlanId: hdrModalState.runtimePlan.acceptedDryRunPlanId,
+            paths: selectedPaths,
+          },
+          emptyTauriResponseSchema,
+        ).catch((err: unknown) => {
           dispatchHdrLifecycle({ type: 'fail', error: String(err) });
           setUI((state) =>
             state.hdrModalState.activeOperationId !== operationId
@@ -185,7 +200,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       dispatchHdrLifecycle({ type: 'prepare' });
       void (async () => {
         try {
-          const runtimePlan = hdrRuntimePlanSchema.parse(await invoke(Invokes.PlanHdr, { paths: selectedPaths }));
+          const runtimePlan = await invokeWithSchema(Invokes.PlanHdr, { paths: selectedPaths }, hdrRuntimePlanSchema);
           dispatchHdrLifecycle({ type: 'ready' });
           setUI((state) =>
             state.hdrModalState.activeOperationId !== operationId
@@ -238,7 +253,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       throw new Error(err);
     }
     try {
-      const savedPath: string = await invoke(Invokes.SaveHdr, { firstPathStr: hdrModalState.stitchingSourcePaths[0] });
+      const savedPath = await invokeWithSchema(
+        Invokes.SaveHdr,
+        { firstPathStr: hdrModalState.stitchingSourcePaths[0] },
+        savedOutputPathSchema,
+      );
       await refreshImageList();
       return savedPath;
     } catch (err) {
@@ -264,11 +283,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
         },
       }));
 
-      const launch = invoke(Invokes.ApplyDenoising, {
-        path: denoiseModalState.targetPaths[0],
-        intensity,
-        method,
-      }).then((value) => denoiseOperationHandleSchema.parse(value));
+      const launch = invokeWithSchema(
+        Invokes.ApplyDenoising,
+        { path: denoiseModalState.targetPaths[0], intensity, method },
+        denoiseOperationHandleSchema,
+      );
       denoiseLaunchRef.current = launch;
       try {
         const operation = await launch;
@@ -277,14 +296,13 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           setUI((state) => ({
             denoiseModalState: { ...state.denoiseModalState, activeOperation: operation },
           }));
-          await invoke(Invokes.ExecuteDenoising, {
-            operation,
-            path: denoiseModalState.targetPaths[0],
-            intensity,
-            method,
-          });
+          await invokeWithSchema(
+            Invokes.ExecuteDenoising,
+            { operation, path: denoiseModalState.targetPaths[0], intensity, method },
+            emptyTauriResponseSchema,
+          );
         } else {
-          await invoke(Invokes.CancelDenoising, { operation });
+          await invokeWithSchema(Invokes.CancelDenoising, { operation }, denoiseCancelReceiptSchema);
         }
       } catch (err) {
         if (denoiseLaunchRef.current === launch) {
@@ -326,7 +344,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       try {
         const operation = expectedOperation ?? stateBeforeCancel.activeOperation ?? (await pendingLaunch);
         if (!operation) return;
-        denoiseCancelReceiptSchema.parse(await invoke(Invokes.CancelDenoising, { operation }));
+        await invokeWithSchema(Invokes.CancelDenoising, { operation }, denoiseCancelReceiptSchema);
       } catch (error) {
         console.error('Failed to cancel Enhanced Denoise:', error);
       }
@@ -337,7 +355,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const handleBatchDenoise = useCallback(
     async (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => {
       try {
-        const savedPaths: string[] = await invoke(Invokes.BatchDenoiseImages, { paths, intensity, method });
+        const savedPaths = await invokeWithSchema(
+          Invokes.BatchDenoiseImages,
+          { paths, intensity, method },
+          savedOutputPathListSchema,
+        );
         await refreshImageList();
         return savedPaths;
       } catch (err) {
@@ -351,9 +373,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const handleSaveDenoisedImage = useCallback(async (): Promise<string> => {
     const { denoiseModalState } = useUIStore.getState();
     if (denoiseModalState.targetPaths.length === 0) throw new Error('No target path');
-    const savedPath = await invoke<string>(Invokes.SaveDenoisedImage, {
-      originalPathStr: denoiseModalState.targetPaths[0],
-    });
+    const savedPath = await invokeWithSchema(
+      Invokes.SaveDenoisedImage,
+      { originalPathStr: denoiseModalState.targetPaths[0] },
+      savedOutputPathSchema,
+    );
     await refreshImageList();
     return savedPath;
   }, [refreshImageList]);
@@ -361,7 +385,11 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const handleSaveCollage = useCallback(
     async (base64Data: string, firstPath: string): Promise<string> => {
       try {
-        const savedPath: string = await invoke(Invokes.SaveCollage, { base64Data, firstPathStr: firstPath });
+        const savedPath = await invokeWithSchema(
+          Invokes.SaveCollage,
+          { base64Data, firstPathStr: firstPath },
+          savedOutputPathSchema,
+        );
         await refreshImageList();
         return savedPath;
       } catch (err) {

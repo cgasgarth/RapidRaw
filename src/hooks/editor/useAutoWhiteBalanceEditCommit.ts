@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useRef } from 'react';
 
 import { useEditorStore } from '../../store/useEditorStore';
@@ -9,6 +8,11 @@ import {
   isCurrentAutoWhiteBalanceRequest,
 } from '../../utils/cameraInputEditTransaction';
 import { technicalWhiteBalanceFromAutoAdjustments } from '../../utils/color/whiteBalance';
+import {
+  type ContextAutoAdjustPatch,
+  contextAutoAdjustPatchSchema,
+} from '../../utils/contextAutoAdjustEditTransaction';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
 export type AutoWhiteBalanceCommitStatus = 'applied' | 'stale' | 'unavailable';
 
@@ -32,9 +36,9 @@ export const useAutoWhiteBalanceEditCommit = (
     if (!requestedConfiguration.enabled || !initialState.selectedImage?.isReady || identity === null)
       return 'unavailable';
 
-    let autoAdjustments: unknown;
+    let autoAdjustments: ContextAutoAdjustPatch;
     try {
-      autoAdjustments = await invoke<unknown>(Invokes.CalculateAutoAdjustments);
+      autoAdjustments = await invokeWithSchema(Invokes.CalculateAutoAdjustments, {}, contextAutoAdjustPatchSchema);
     } catch (error) {
       if (
         !isCurrentAutoWhiteBalanceRequest(

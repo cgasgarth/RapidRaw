@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
 
 import { Invokes } from '../tauri/commands';
@@ -11,6 +10,7 @@ import {
   type PreviewOperationIdentity,
   type PreviewSessionIdentity,
 } from './previewCoordinator';
+import { invokeWithSchema } from './tauriSchemaInvoke';
 
 export interface OriginalPreviewRequest {
   expectedImagePath: string;
@@ -43,13 +43,16 @@ export interface OriginalPreviewEffectRunnerOptions {
 const originalPreviewDataUrlSchema = z.string().startsWith('data:image/');
 
 export const executeOriginalPreview: OriginalPreviewExecutor = async (request) => {
-  const result = await invoke<unknown>(Invokes.GenerateOriginalTransformedPreview, {
-    expectedImagePath: request.expectedImagePath,
-    jsAdjustments: request.jsAdjustments,
-    targetResolution: request.targetResolution,
-    viewerSampleGraphRevision: request.viewerSampleGraphRevision,
-  });
-  return originalPreviewDataUrlSchema.parse(result);
+  return invokeWithSchema(
+    Invokes.GenerateOriginalTransformedPreview,
+    {
+      expectedImagePath: request.expectedImagePath,
+      jsAdjustments: request.jsAdjustments,
+      targetResolution: request.targetResolution,
+      viewerSampleGraphRevision: request.viewerSampleGraphRevision,
+    },
+    originalPreviewDataUrlSchema,
+  );
 };
 
 /**
