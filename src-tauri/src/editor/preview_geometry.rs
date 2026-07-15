@@ -18,7 +18,8 @@ use crate::image_processing::{
     apply_coarse_rotation, apply_flip, downscale_f32_image, warp_image_geometry,
 };
 use crate::render::render_caches;
-use crate::{calculate_transform_hash, calculate_visual_hash, compile_consumer_render_plan};
+use crate::render::render_plan::compile_consumer_render_plan;
+use crate::{calculate_transform_hash, calculate_visual_hash};
 use crate::{get_or_load_lut, resolve_tonemapper_override_from_handle};
 
 #[derive(Clone, Copy, Deserialize)]

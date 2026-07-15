@@ -17,10 +17,8 @@ use crate::image_processing::{
     resolve_tonemapper_override,
 };
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
-use crate::{
-    AppState, apply_all_transformations, compile_consumer_render_plan, encode_jpeg_response,
-    get_or_load_lut,
-};
+use crate::render::render_plan::compile_consumer_render_plan;
+use crate::{AppState, apply_all_transformations, encode_jpeg_response, get_or_load_lut};
 
 #[tauri::command]
 pub(crate) fn generate_preview_for_path(

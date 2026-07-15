@@ -4,13 +4,15 @@ use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage};
 use tauri::ipc::Response;
 
+use crate::render::render_plan::compile_consumer_render_plan;
+
 use crate::{
     AppState, CommunityPreset, Crop, MaskDefinition, RenderRequest, adjustment_fields,
-    calculate_transform_hash, compile_consumer_render_plan, downscale_f32_image,
-    encode_jpeg_response, generate_mask_bitmap, generate_transformed_preview,
-    get_cached_or_generate_mask, get_or_init_gpu_context, get_or_load_lut, is_raw_file,
-    load_settings_or_default, normalize_film_look_adjustments_for_render, parse_virtual_path,
-    process_and_get_dynamic_image, render_pipeline, resolve_tonemapper_override_from_handle,
+    calculate_transform_hash, downscale_f32_image, encode_jpeg_response, generate_mask_bitmap,
+    generate_transformed_preview, get_cached_or_generate_mask, get_or_init_gpu_context,
+    get_or_load_lut, is_raw_file, load_settings_or_default,
+    normalize_film_look_adjustments_for_render, parse_virtual_path, process_and_get_dynamic_image,
+    render_pipeline, resolve_tonemapper_override_from_handle,
 };
 
 fn scale_crop_adjustment(adjustments: &serde_json::Value, scale: f32) -> serde_json::Value {
