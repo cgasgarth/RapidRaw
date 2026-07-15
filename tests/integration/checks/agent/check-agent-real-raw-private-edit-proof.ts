@@ -126,7 +126,7 @@ function seedStores(selectedPath: string): void {
     sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
   });
 
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:rawengine-private-raw-before',
     hasRenderedFirstFrame: true,

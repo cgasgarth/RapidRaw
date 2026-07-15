@@ -35,6 +35,11 @@ export const validationManifest: readonly ValidationNode[] = [
   node('typecheck', ['bun', 'run', 'typecheck'], ['frontend', 'schema'], 'cpu-heavy'),
   node('unit', ['bun', 'run', 'test:unit'], ['frontend', 'schema', 'scripts'], 'suite-exclusive'),
   node('unsafe-casts', ['bun', 'tests/integration/checks/check-unsafe-casts.ts'], ['frontend']),
+  node(
+    'editor-render-authority',
+    ['bun', 'tests/integration/checks/editor/check-editor-render-authority-boundary.ts'],
+    ['frontend'],
+  ),
   node('rustfmt', ['bun', 'run', 'check:rust:fmt'], ['rust']),
   node('render-abi', ['bun', 'run', 'check:render-abi'], ['rust', 'scripts']),
   node('rust-clippy', ['bun', 'run', 'check:rust:clippy'], ['rust', 'dependencies'], 'native-heavy'),

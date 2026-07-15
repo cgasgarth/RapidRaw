@@ -31,7 +31,7 @@ describe('editor teardown transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 12, exposure: 1.4 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       activeMaskContainerId: 'mask-container-A',
       activeMaskId: 'mask-A',
       adjustmentRevision: 5,
@@ -169,7 +169,7 @@ describe('editor teardown transaction', () => {
     const pathB = '/fixtures/teardown-B.CR3';
     const sessionB = createEditorImageSession({ generation: 71, path: pathB, source: 'cold-load' });
     const adjustmentsB = { ...imageA.adjustments, exposure: 2.2 };
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 6,
       adjustments: adjustmentsB,
       finalPreviewUrl: 'blob:image-b-preview',
@@ -210,7 +210,7 @@ describe('editor teardown transaction', () => {
   test('clears an already-neutral session without inventing an adjustment revision', () => {
     const neutral = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(neutral);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 9,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, neutral, editDocumentV2),
       adjustments: neutral,

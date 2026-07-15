@@ -29,7 +29,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
     perspectiveCorrection: { ...INITIAL_ADJUSTMENTS.perspectiveCorrection, mode: 'guided' as const },
   };
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
     adjustments,

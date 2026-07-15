@@ -61,7 +61,7 @@ afterEach(() => {
     rendered.container.remove();
     rendered = null;
   }
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     compare: { dividerPosition: 0.5, isOriginalHeld: false, labelsVisible: true, mode: 'off', orientation: 'vertical' },
     previewQualityStatus: null,

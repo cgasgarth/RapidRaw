@@ -49,7 +49,7 @@ afterEach(() => {
   }
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
     adjustmentRevision: 0,
@@ -72,7 +72,7 @@ describe('AI panel command-owned selection', () => {
       aiPatches: [edit('first', ['one', 'middle', 'last']), edit('second', [])],
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: null,
       adjustmentRevision: 0,

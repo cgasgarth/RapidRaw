@@ -38,7 +38,7 @@ describe('display creative edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -178,7 +178,7 @@ describe('display creative edit transaction', () => {
       grainAmount: 12,
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(activeLook);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentSnapshot: publishAdjustmentSnapshot(null, activeLook, editDocumentV2),
       adjustments: activeLook,
       editDocumentV2,

@@ -35,7 +35,7 @@ import {
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3161.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 16 : 2));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-tone-before',
@@ -249,7 +249,7 @@ if (
   failures.push('agent tone apply is missing from the agent route catalog.');
 }
 
-useEditorStore.setState({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,

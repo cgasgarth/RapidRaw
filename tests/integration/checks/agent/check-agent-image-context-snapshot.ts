@@ -8,7 +8,7 @@ import { buildAgentImageContextSnapshot } from '../../../../src/utils/agent/cont
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3156.ARW';
 const histogramBins = Array.from({ length: 256 }, (_, index) => (index === 0 ? 24 : index === 255 ? 18 : 2));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   activeMaskContainerId: 'mask_subject_3156',
   adjustments: {
     ...INITIAL_ADJUSTMENTS,

@@ -59,7 +59,7 @@ const previewVariant = (source: Uint8Array, marker: number): Uint8Array => {
 };
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-selected-image-proposal-before',
     histogram: {

@@ -22,7 +22,7 @@ test('useEditorActions routes rotate through one geometry transaction', () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), aspectRatio: 4 / 3, exposure: 0.25 };
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   const session = createEditorImageSession({ generation: 51, path: sourcePath, source: 'cache' });
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
     adjustments,

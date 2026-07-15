@@ -39,3 +39,29 @@ export const buildHistoryNavigationEditTransaction = (
     transactionId,
   };
 };
+
+export const buildHistoryRestorationEditTransaction = (
+  state: HistoryNavigationEditTransactionState,
+  history: readonly Adjustments[],
+  historyTargetIndex: number,
+  transactionId: string,
+): EditTransactionRequest => {
+  const adjustments = history[historyTargetIndex];
+  if (!Number.isInteger(historyTargetIndex) || historyTargetIndex < 0 || adjustments === undefined) {
+    throw new Error(`edit_transaction.invalid_history_target:${String(historyTargetIndex)}`);
+  }
+  return {
+    baseAdjustmentRevision: state.adjustmentRevision,
+    compensationHistory: {
+      checkpoints: [],
+      entries: structuredClone([...history]),
+      historyIndex: historyTargetIndex,
+    },
+    history: 'compensation',
+    imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+    operations: [{ adjustments: structuredClone(adjustments), type: 'replace-adjustments' }],
+    persistence: 'commit',
+    source: 'history',
+    transactionId,
+  };
+};

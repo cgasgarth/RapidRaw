@@ -31,7 +31,7 @@ describe('basic tone slider interaction authority', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -128,11 +128,18 @@ describe('basic tone slider interaction authority', () => {
 
     useEditorStore.setState({ selectedImage });
     useEditorStore.getState().beginBasicToneSliderInteraction(identity(), BasicAdjustment.Shadows, 'stale-revision');
-    useEditorStore.setState({ adjustmentRevision: 1 });
+    useEditorStore
+      .getState()
+      .hydrateEditorRenderAuthority({ adjustments: useEditorStore.getState().adjustments, adjustmentRevision: 1 });
     expect(useEditorStore.getState().commitBasicToneSliderInteraction('stale-revision')).toBeNull();
     expect(useEditorStore.getState().adjustments.shadows).toBe(0);
 
-    useEditorStore.setState({ adjustmentRevision: 0, imageSession: null, imageSessionId: 91 });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
+      adjustmentRevision: 0,
+      imageSession: null,
+      imageSessionId: 91,
+    });
     const fallbackIdentity = identity('editor-image-session:91');
     useEditorStore
       .getState()

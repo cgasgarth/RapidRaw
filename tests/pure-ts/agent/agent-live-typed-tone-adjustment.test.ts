@@ -52,7 +52,7 @@ class DeferredToneAdjustmentBridge extends RawEngineLocalAppServerBridge {
 }
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-tone-adjustment-before',
     history: [INITIAL_ADJUSTMENTS],

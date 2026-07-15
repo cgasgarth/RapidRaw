@@ -3,8 +3,8 @@ import type { ViewerAiMaskBoxSessionKey } from '../../../src/components/panel/ed
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { buildAiMaskBoxEditTransaction } from '../../../src/utils/aiMaskBoxEditTransaction';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildAiMaskBoxEditTransaction } from '../../../src/utils/aiMaskBoxEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/ai-mask-target.ARW';
@@ -55,7 +55,7 @@ describe('AI mask box edit transaction', () => {
       ],
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -131,7 +131,7 @@ describe('AI mask box edit transaction', () => {
         },
       ],
     };
-    useEditorStore.setState({ adjustments });
+    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments });
     const parameters = { endX: 700, endY: 800, feather: 0.2, startX: 300, startY: 400 };
     const request = buildAiMaskBoxEditTransaction(
       { ...useEditorStore.getState(), geometryEpoch, sourceRevision },

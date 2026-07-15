@@ -28,7 +28,7 @@ const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransacti
 afterEach(() => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: initial,
     editDocumentV2,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, initial, editDocumentV2),
@@ -427,7 +427,7 @@ describe('reduceEditTransaction', () => {
       contrast: 12,
       glowAmount: 16,
     };
-    useEditorStore.getState().setEditor({ adjustments: hydratedAdjustments });
+    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: hydratedAdjustments });
     const hydrated = useEditorStore.getState();
 
     expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);

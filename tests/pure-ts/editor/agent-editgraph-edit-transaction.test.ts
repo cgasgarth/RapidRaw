@@ -88,7 +88,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
       adjustments,
@@ -207,7 +207,11 @@ describe('agent EditGraph EditTransaction bridge', () => {
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustments.exposure).toBe(0);
 
-    useEditorStore.setState({ adjustmentRevision: 0, imageSessionId: 81 });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
+      adjustmentRevision: 0,
+      imageSessionId: 81,
+    });
     const fallbackState = useEditorStore.getState();
     const identity = captureAgentEditGraphCommitIdentity(fallbackState);
     if (identity === null) throw new Error('Expected fallback EditGraph identity.');

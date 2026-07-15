@@ -17,7 +17,7 @@ const imagePath = '/fixtures/color-range-transaction.ARW';
 
 const seedStore = () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeMaskContainerId: null,
     activeMaskId: null,
     adjustmentRevision: 0,

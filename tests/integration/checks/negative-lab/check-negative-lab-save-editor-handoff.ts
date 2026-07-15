@@ -73,7 +73,7 @@ const acceptedDustHealLayer = buildDustCandidateHealLayer({
   layerId: 'negative-lab-dust-heal-001',
 });
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   selectedImage: null,
 });

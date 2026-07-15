@@ -16,7 +16,7 @@ const fixturePath = new URL('../../../docs/baseline/render/rapidraw-vite-empty-r
 const selectedPath = '/fixtures/agent-medium-preview-attachment/DSC_5015.ARW';
 
 const seedEditor = () => {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-medium-preview-attachment',
     history: [INITIAL_ADJUSTMENTS],
@@ -108,7 +108,9 @@ describe('agent medium preview attachment runtime', () => {
     const initialHistory = useEditorStore.getState().history;
     const snapshot = buildAgentImageContextSnapshot();
     const stale = manager.acquire({ deadlineAt: Date.now() + 5_000, snapshot });
-    useEditorStore.setState({ historyIndex: 1 });
+    useEditorStore
+      .getState()
+      .hydrateEditorRenderAuthority({ adjustments: useEditorStore.getState().adjustments, historyIndex: 1 });
     resolveRender?.(bytes);
     await expect(stale).rejects.toMatchObject({
       outcome: 'stale',

@@ -69,7 +69,7 @@ async function validateLocaleContract() {
 }
 
 async function validateScopeDrawerControls() {
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     activeWaveformChannel: DisplayMode.Luma,
     adjustments: { ...INITIAL_ADJUSTMENTS, showClipping: false },
     histogram: {

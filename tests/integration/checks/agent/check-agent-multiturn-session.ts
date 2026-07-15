@@ -29,7 +29,7 @@ for (let index = 0; index + 8 < mediumPreviewFixture.length; index += 1) {
 
 setAgentMediumPreviewAttachmentRendererForTest(async () => new Uint8Array(mediumPreviewFixture));
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-session-before',
@@ -191,7 +191,7 @@ if (
   throw new Error('agent multi-turn session did not bind final review to previews and receipts.');
 }
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,

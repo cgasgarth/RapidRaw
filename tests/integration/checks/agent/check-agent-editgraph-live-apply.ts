@@ -84,7 +84,7 @@ const buildCommand = ({
     },
   });
 
-useEditorStore.getState().setEditor({
+useEditorStore.getState().hydrateEditorRenderAuthority({
   adjustments: INITIAL_ADJUSTMENTS,
   finalPreviewUrl: 'blob:rawengine-editgraph-before',
   hasRenderedFirstFrame: true,

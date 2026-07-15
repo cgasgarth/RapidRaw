@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
-import { buildHistoryNavigationEditTransaction } from '../../historyNavigationEditTransaction';
+import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   type AgentCoreEditCommandBundleStep,
@@ -96,15 +96,16 @@ export const rollbackApprovedAgentPlan = (rollbackTarget: AgentAtomicApplyResult
   const state = useEditorStore.getState();
   const history = state.history.slice(0, rollbackTarget.historyIndex + 1);
   history[rollbackTarget.historyIndex] = structuredClone(rollbackTarget.adjustments);
-  useEditorStore.setState({ history });
-  const navigationState = useEditorStore.getState();
-  navigationState.applyEditTransaction(
-    buildHistoryNavigationEditTransaction(
-      navigationState,
+  state.applyEditTransaction(
+    buildHistoryRestorationEditTransaction(
+      state,
+      history,
       rollbackTarget.historyIndex,
-      `agent-approval-rollback:${rollbackTarget.graphRevision}:${String(navigationState.adjustmentRevision)}`,
+      `agent-approval-rollback:${rollbackTarget.graphRevision}:${String(state.adjustmentRevision)}`,
     ),
   );
-  useEditorStore.setState({ finalPreviewUrl: rollbackTarget.previewUrl, uncroppedAdjustedPreviewUrl: null });
+  useEditorStore
+    .getState()
+    .setEditor({ finalPreviewUrl: rollbackTarget.previewUrl, uncroppedAdjustedPreviewUrl: null });
   return rollbackTarget.graphRevision;
 };

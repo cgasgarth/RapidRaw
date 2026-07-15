@@ -46,7 +46,7 @@ const applied = batchAutoAdjustPathResultV1Schema.parse({
 
 beforeEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
     adjustments,
@@ -179,7 +179,7 @@ describe('Batch Auto Adjust transaction boundary', () => {
       false,
     );
 
-    useEditorStore.setState({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: successor.adjustmentRevision,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, acceptedAdjustments, acceptedEditDocument),
       adjustments: acceptedAdjustments,
@@ -230,7 +230,7 @@ describe('Batch Auto Adjust transaction boundary', () => {
 
   test('rejects a deferred legacy history snapshot after newer mixer transactions', () => {
     const deferred = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 8 };
-    useEditorStore.getState().setEditor({ adjustments: deferred });
+    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: deferred });
     const deferredIdentity = {
       adjustmentRevision: useEditorStore.getState().adjustmentRevision,
       imageSessionId: session.id,

@@ -27,7 +27,7 @@ test('history rows use the real navigation command without duplicating entries',
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const exposure = { ...initial, exposure: 0.4 };
   const contrast = { ...exposure, contrast: 12 };
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: contrast,
     history: [initial, exposure, contrast],
     historyCheckpoints: [],
@@ -57,7 +57,7 @@ test('history rows use the real navigation command without duplicating entries',
 test('snapshots expose empty, create, rename, and apply behavior through the store', async () => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const exposure = { ...initial, exposure: 0.4 };
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: exposure,
     history: [initial, exposure],
     historyCheckpoints: [],

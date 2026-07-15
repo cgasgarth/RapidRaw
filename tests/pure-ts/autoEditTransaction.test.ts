@@ -39,7 +39,7 @@ const preview = (exposure = 0.75) =>
 
 beforeEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
     adjustments,

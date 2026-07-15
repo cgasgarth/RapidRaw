@@ -37,7 +37,7 @@ const resetStores = (fixtureId: string): void => {
     sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
   });
 
-  useEditorStore.getState().setEditor({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: `blob:rawengine-${fixtureId}-before`,
     hasRenderedFirstFrame: true,

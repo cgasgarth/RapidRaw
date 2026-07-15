@@ -29,7 +29,7 @@ const receipt = matchLookApplicationReceiptV1Schema.parse({
 
 const seedStore = () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  useEditorStore.setState({
+  useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
     adjustments,

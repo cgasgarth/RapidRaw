@@ -347,7 +347,7 @@ function useAdjustmentPanelSmokeState() {
         inputWhite: 0.92,
       },
     };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       copiedSectionAdjustments: {
         section: 'basic',
@@ -1174,7 +1174,7 @@ function useProfessionalEditorToolbarSmokeState() {
       },
       osPlatform: 'macos',
     });
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: masks,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform: {
@@ -1203,7 +1203,7 @@ function useProfessionalEditorToolbarSmokeState() {
 function useProfessionalEditorSmokeState() {
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       displaySize: { height: 540, width: 810 },
       histogram: null,
@@ -1231,7 +1231,7 @@ function useProfessionalFilmstripContextSmokeState() {
       highlights: -28,
       shadows: 18,
     };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       copiedAdjustments: { contrast: adjustments.contrast, exposure: adjustments.exposure },
       displaySize: { height: 680, width: 1020 },
@@ -1486,7 +1486,7 @@ function useProfessionalEditorStatusChipsSmokeState() {
       width: 240,
     };
 
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform,
@@ -2616,7 +2616,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
       rotation: 2.4,
     };
 
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: nextAdjustments,
       displaySize: { height: 405, width: 720 },
       finalPreviewUrl: brushMaskCanvasImageDataUrl,
@@ -3136,7 +3136,7 @@ function WorkflowRailVisualSmoke() {
 
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments,
       histogram: null,
       history: [adjustments],
@@ -3371,7 +3371,7 @@ function AgentChatVisualSmoke() {
       rootPaths: ['/Users/cgas/Pictures/Capture One'],
       sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
     });
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
       hasRenderedFirstFrame: true,
@@ -3501,7 +3501,7 @@ function ProfessionalAgentReviewVisualSmoke() {
 
 function ProfessionalAgentReviewWorkspaceVisualSmoke() {
   useEffect(() => {
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: INITIAL_ADJUSTMENTS,
       finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
       hasRenderedFirstFrame: true,
@@ -8166,7 +8166,7 @@ function FilmEmulationWorkspaceVisualSmoke() {
 
   useEffect(() => {
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
-    useEditorStore.getState().setEditor({
+    useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustments: initial,
       exportSoftProofTransform: {

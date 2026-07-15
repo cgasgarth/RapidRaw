@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import type { BasicToneCommandEnvelope } from '../../basicToneCommandBridge';
-import { buildHistoryNavigationEditTransaction } from '../../historyNavigationEditTransaction';
+import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 
 export const AGENT_HISTORY_ROLLBACK_TOOL_NAME = 'rawengine.agent.history.rollback';
@@ -132,16 +132,15 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   ) {
     throw new Error('Agent history rollback rejected inconsistent checkpoint history target.');
   }
-  useEditorStore.setState({ history });
-  const navigationState = useEditorStore.getState();
-  navigationState.applyEditTransaction(
-    buildHistoryNavigationEditTransaction(
-      navigationState,
+  state.applyEditTransaction(
+    buildHistoryRestorationEditTransaction(
+      state,
+      history,
       checkpoint.historyIndex,
       `agent-history:${parsedRequest.sessionId}:${parsedRequest.scope}:${parsedRequest.requestId}`,
     ),
   );
-  useEditorStore.setState({
+  useEditorStore.getState().setEditor({
     finalPreviewUrl: checkpoint.previewRef,
     lastBasicToneCommand: checkpoint.lastBasicToneCommand,
     uncroppedAdjustedPreviewUrl: checkpoint.uncroppedPreviewRef,
