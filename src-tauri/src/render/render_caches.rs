@@ -45,9 +45,7 @@ impl<'a> RenderCaches<'a> {
 
     pub fn clear_gpu_dependent_preview(&self) {
         self.clear_display_encoded_artifacts();
-        if let Ok(mut preview_cache) = self.state.cached_preview.lock() {
-            *preview_cache = None;
-        }
+        self.state.services.preview_frames.clear();
         self.state.services.full_warp_cache.clear_frame();
     }
 

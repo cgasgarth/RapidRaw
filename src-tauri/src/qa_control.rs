@@ -299,8 +299,11 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
         .try_image_snapshot()
         .map(|image| image.path);
     let cache_report = RenderCaches::new(app_state).native_cache_report();
-    let preview = app_state.cached_preview.lock().ok().and_then(|preview| {
-        preview.as_ref().map(|preview| {
+    let preview = app_state
+        .services
+        .preview_frames
+        .try_snapshot()
+        .map(|preview| {
             let identity = &preview.identity;
             json!({
                 "source": identity.source.canonical_identity,
@@ -312,8 +315,7 @@ fn diagnostics(state: &QaControlState, app_state: &AppState) -> Value {
                 "completedStage": identity.completed_stage,
                 "backendGeneration": identity.backend_generation,
             })
-        })
-    });
+        });
     json!({
         "ready": state.ready.load(Ordering::Acquire),
         "identity": state.identity,

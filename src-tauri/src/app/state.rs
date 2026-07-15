@@ -25,17 +25,6 @@ pub struct WindowState {
     pub fullscreen: bool,
 }
 
-#[derive(Clone)]
-pub struct CachedPreview {
-    pub image: crate::gpu_processing::RevisionedImage,
-    pub small_image: crate::gpu_processing::RevisionedImage,
-    pub identity: crate::render::artifact_identity::RenderArtifactIdentity,
-    pub scale: f32,
-    pub unscaled_crop_offset: (f32, f32),
-    pub preview_dim: u32,
-    pub interactive_divisor: f32,
-}
-
 pub struct GpuImageCache {
     pub texture: Texture,
     pub texture_view: TextureView,
@@ -113,7 +102,6 @@ pub struct AppState {
     pub gpu_initialization: InitializationService,
     pub lens_initialization: InitializationService,
     pub window_setup_complete: AtomicBool,
-    pub cached_preview: Mutex<Option<CachedPreview>>,
     pub gpu_context: Mutex<Option<GpuContext>>,
     pub display_target_coordinator:
         Mutex<Option<Arc<crate::app::display_target::DisplayTargetCoordinator>>>,
@@ -170,7 +158,6 @@ impl AppState {
             gpu_initialization: InitializationService::default(),
             lens_initialization: InitializationService::default(),
             window_setup_complete: AtomicBool::new(false),
-            cached_preview: Mutex::new(None),
             gpu_context: Mutex::new(None),
             display_target_coordinator: Mutex::new(None),
             gpu_image_cache: Mutex::new(None),
