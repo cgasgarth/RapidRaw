@@ -16,7 +16,15 @@ const persistenceSchema = z
   .object({
     adjustments: z
       .object({
-        whiteBalanceTechnical: z.object({ source: z.literal('picker') }).passthrough(),
+        whiteBalanceTechnical: z
+          .object({
+            duv: z.number(),
+            kelvin: z.number(),
+            source: z.literal('picker'),
+            x: z.number(),
+            y: z.number(),
+          })
+          .passthrough(),
       })
       .passthrough(),
     path: z.literal(sourcePath),
@@ -131,6 +139,7 @@ try {
   const bounds = await page.locator('[data-editor-image-frame="edited"]').first().boundingBox();
   if (bounds === null) throw new Error('White Balance picker could not resolve displayed image bounds.');
   const samplePoint = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  const touchSamplePoint = { x: bounds.x + bounds.width * 0.62, y: bounds.y + bounds.height * 0.58 };
   await page.mouse.move(samplePoint.x - 10, samplePoint.y - 10);
   await page.mouse.move(samplePoint.x, samplePoint.y);
   await page.waitForFunction(
@@ -206,6 +215,108 @@ try {
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
   if (!(await undo.isEnabled())) throw new Error('White Balance picker commit did not create an undo boundary.');
+  await undo.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="color-quick-white-balance"]')?.getAttribute('data-white-balance-state') ===
+      'as-shot',
+    undefined,
+    { timeout: 10_000 },
+  );
+
+  await picker.click();
+  const savesBeforeTouch = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 31, radiusX: 1, radiusY: 1, x: touchSamplePoint.x, y: touchSamplePoint.y }],
+    type: 'touchStart',
+  });
+  await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchCancel' });
+  await page.waitForTimeout(1_500);
+  const savesAfterCancel = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  if (savesAfterCancel !== savesBeforeTouch) {
+    throw new Error('A cancelled White Balance touch gesture persisted its delayed sample.');
+  }
+  if ((await picker.getAttribute('aria-pressed')) !== 'true') {
+    throw new Error('White Balance pointer cancellation unexpectedly deactivated the tool.');
+  }
+
+  const previewsBeforeDistinctPatch = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0,
+  );
+  await page.evaluate(() => {
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.push(
+      { color: [72, 140, 220], delayMs: 0 },
+      { color: [72, 140, 220], delayMs: 0 },
+      { color: [72, 140, 220], delayMs: 0 },
+    );
+  });
+  await page.mouse.move(touchSamplePoint.x, touchSamplePoint.y);
+  await page.waitForFunction(
+    (minimum) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(({ command }) => command === 'apply_adjustments')
+        .length ?? 0) > minimum,
+    previewsBeforeDistinctPatch,
+    { timeout: 10_000 },
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="image-canvas"]')?.getAttribute('data-wb-picker-last-status') ===
+      'preview-accepted',
+    undefined,
+    { timeout: 10_000 },
+  );
+
+  await cdp.send('Input.dispatchTouchEvent', {
+    touchPoints: [{ force: 1, id: 32, radiusX: 1, radiusY: 1, x: touchSamplePoint.x, y: touchSamplePoint.y }],
+    type: 'touchStart',
+  });
+  await cdp.send('Input.dispatchTouchEvent', { touchPoints: [], type: 'touchEnd' });
+  await page.waitForFunction(
+    (minimum) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) > minimum,
+    savesBeforeTouch,
+    { timeout: 10_000 },
+  );
+  if ((await picker.getAttribute('aria-pressed')) !== 'false') {
+    throw new Error('White Balance touch commit did not complete its one-shot tool session.');
+  }
+  if ((await page.getByTestId('color-quick-white-balance').getAttribute('data-white-balance-state')) !== 'custom') {
+    throw new Error('White Balance touch commit did not apply its sampled adjustment.');
+  }
+  const touchPersisted = persistenceSchema.parse(
+    await page.evaluate(
+      () =>
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+          .at(-1)?.args ?? null,
+    ),
+  );
+  const firstWhiteBalance = persisted.adjustments.whiteBalanceTechnical;
+  const touchWhiteBalance = touchPersisted.adjustments.whiteBalanceTechnical;
+  if (
+    firstWhiteBalance.x === touchWhiteBalance.x &&
+    firstWhiteBalance.y === touchWhiteBalance.y &&
+    firstWhiteBalance.kelvin === touchWhiteBalance.kelvin &&
+    firstWhiteBalance.duv === touchWhiteBalance.duv
+  ) {
+    throw new Error('White Balance touch commit did not persist a materially distinct sampled patch after Undo.');
+  }
+  if (!(await undo.isEnabled())) throw new Error('White Balance touch commit did not create an undo boundary.');
   await undo.click();
   await page.waitForFunction(
     () =>
