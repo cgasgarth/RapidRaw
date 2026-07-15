@@ -112,6 +112,31 @@ if (useEditorStore.getState().historyIndex !== 2) {
   throw new Error('Rejected stale rollback mutated the current edit graph.');
 }
 useEditorStore.getState().goToHistoryIndex(1);
+for (const [label, invalidCheckpoint] of [
+  ['index', { ...checkpoint, graphRevision: 'history_99', historyIndex: 99 }],
+  ['image', { ...checkpoint, activeImagePath: '/fixtures/other.ARW' }],
+  ['graph', { ...checkpoint, graphRevision: 'history_99' }],
+] as const) {
+  const beforeInvalid = useEditorStore.getState();
+  expectRejects(() =>
+    rollbackAgentSessionHistory({
+      checkpoint: invalidCheckpoint,
+      requestId: `agent-history-rollback-invalid-${label}`,
+      scope: 'session_start',
+      sessionId: 'agent-history-3163',
+    }),
+  );
+  const afterInvalid = useEditorStore.getState();
+  if (
+    afterInvalid.adjustmentRevision !== beforeInvalid.adjustmentRevision ||
+    afterInvalid.historyIndex !== beforeInvalid.historyIndex ||
+    JSON.stringify(afterInvalid.history) !== JSON.stringify(beforeInvalid.history) ||
+    JSON.stringify(afterInvalid.adjustments) !== JSON.stringify(beforeInvalid.adjustments) ||
+    afterInvalid.lastEditApplicationReceipt !== beforeInvalid.lastEditApplicationReceipt
+  ) {
+    throw new Error(`Invalid ${label} checkpoint mutated editor authority before rejection.`);
+  }
+}
 const beforeRollbackRevision = useEditorStore.getState().adjustmentRevision;
 
 const rollback = rollbackAgentSessionHistory({

@@ -114,12 +114,27 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   ) {
     throw new Error('Agent history rollback rejected stale preview recipe hash.');
   }
+  if (checkpoint.activeImagePath !== currentSnapshot.activeImagePath) {
+    throw new Error('Agent history rollback rejected checkpoint for a different image.');
+  }
+  if (checkpoint.graphRevision !== `history_${String(checkpoint.historyIndex)}`) {
+    throw new Error('Agent history rollback rejected inconsistent checkpoint graph revision.');
+  }
 
   const state = useEditorStore.getState();
+  if (checkpoint.historyIndex >= state.history.length) {
+    throw new Error('Agent history rollback rejected checkpoint outside current history.');
+  }
   const history =
     checkpoint.history.length === 0
       ? [...state.history.slice(0, checkpoint.historyIndex), structuredClone(checkpoint.adjustments)]
       : structuredClone(checkpoint.history);
+  if (
+    checkpoint.historyIndex >= history.length ||
+    JSON.stringify(history[checkpoint.historyIndex]) !== JSON.stringify(checkpoint.adjustments)
+  ) {
+    throw new Error('Agent history rollback rejected inconsistent checkpoint history target.');
+  }
   useEditorStore.setState({ history });
   const navigationState = useEditorStore.getState();
   navigationState.applyEditTransaction(
