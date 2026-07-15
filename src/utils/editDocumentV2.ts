@@ -9,6 +9,7 @@ import {
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentNodeEnvelopeV2Schema,
+  editDocumentPointColorV2Schema,
   editDocumentSceneCurveV2Schema,
   editDocumentSourceArtifactsV2Schema,
   editDocumentToneEqualizerV2Schema,
@@ -79,9 +80,14 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
                         ...(descriptor?.defaultParams ?? {}),
                         ...mappedParams,
                       })
-                    : nodeType === 'layers'
-                      ? { masks: [], ...mappedParams }
-                      : mappedParams;
+                    : nodeType === 'point_color'
+                      ? editDocumentPointColorV2Schema.parse({
+                          ...(descriptor?.defaultParams ?? {}),
+                          ...mappedParams,
+                        })
+                      : nodeType === 'layers'
+                        ? { masks: [], ...mappedParams }
+                        : mappedParams;
       return [
         nodeType,
         {
@@ -100,7 +106,15 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
   // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
   const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
   const defaultedNodeParams = (
-    ['camera_input', 'detail_denoise_dehaze', 'display_creative', 'geometry', 'scene_curve', 'tone_equalizer'] as const
+    [
+      'camera_input',
+      'detail_denoise_dehaze',
+      'display_creative',
+      'geometry',
+      'point_color',
+      'scene_curve',
+      'tone_equalizer',
+    ] as const
   ).flatMap((nodeType) => {
     const descriptor = descriptorFor(nodeType);
     return Object.keys(descriptor?.defaultParams ?? {})
