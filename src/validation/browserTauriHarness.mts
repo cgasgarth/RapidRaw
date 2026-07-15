@@ -57,6 +57,12 @@ interface BrowserHarnessAutoAdjustResponse {
   value?: unknown;
 }
 
+interface BrowserHarnessTonePlacementResponse {
+  delayMs: number;
+  failure?: string;
+  value: unknown;
+}
+
 declare global {
   interface ImportMetaEnv {
     VITE_RAWENGINE_AGENT_AUDIT_E2E?: string | undefined;
@@ -84,6 +90,7 @@ declare global {
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
       perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
+      tonePlacementResponses: Array<BrowserHarnessTonePlacementResponse>;
       setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
     };
     __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
@@ -111,6 +118,7 @@ const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settin
 const commandNames: Record<
   | 'analyzeAutoEdit'
   | 'analyzePerspectiveCorrection'
+  | 'analyzeToneEqualizerPlacement'
   | 'calculateAutoAdjustments'
   | 'applyAutoAdjustmentsToPaths'
   | 'commitBatchAutoAdjustment'
@@ -176,6 +184,7 @@ const commandNames: Record<
 > = {
   analyzeAutoEdit: Invokes.AnalyzeAutoEdit,
   analyzePerspectiveCorrection: Invokes.AnalyzePerspectiveCorrection,
+  analyzeToneEqualizerPlacement: Invokes.AnalyzeToneEqualizerPlacement,
   calculateAutoAdjustments: Invokes.CalculateAutoAdjustments,
   applyAutoAdjustmentsToPaths: Invokes.ApplyAutoAdjustmentsToPaths,
   commitBatchAutoAdjustment: Invokes.CommitBatchAutoAdjustment,
@@ -367,6 +376,7 @@ export const installBrowserTauriHarness = (): void => {
     originalPreviewResponses: [],
     perspectiveAnalysisResponses: [],
     revokedObjectUrls: [],
+    tonePlacementResponses: [],
     setAdjustmentsForPath: (path, adjustments) => {
       harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
     },
@@ -479,6 +489,29 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         },
       };
       return new Promise((resolve) => window.setTimeout(() => resolve(value), response?.delayMs ?? 0));
+    }
+    case commandNames.analyzeToneEqualizerPlacement: {
+      const sourceIdentity =
+        getStringArg(args, 'expectedSourceIdentity') ?? `${browserHarnessRoot}/browser-harness.ARW`;
+      const response = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.tonePlacementResponses.shift() ?? {
+        delayMs: 0,
+        value: {
+          confidence: 0.86,
+          histogram: Array.from({ length: 32 }, (_, index) => index + 1),
+          pivotEv: 0.5,
+          rangeEv: 12,
+          sceneBlackEv: -6,
+          sceneWhiteEv: 6,
+          sourceFingerprint: '0123456789abcdef',
+          sourceIdentity,
+        },
+      };
+      return new Promise((resolve, reject) => {
+        window.setTimeout(() => {
+          if (response.failure !== undefined) reject(new Error(response.failure));
+          else resolve(response.value);
+        }, response.delayMs);
+      });
     }
     case commandNames.analyzeAutoEdit: {
       const request = args?.['request'] as { graphRevision?: string; imageSessionId?: string } | undefined;

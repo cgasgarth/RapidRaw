@@ -5,7 +5,10 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { BasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
-import { buildToneEqualizerEditTransaction } from '../../../src/utils/toneEqualizerEditTransaction';
+import {
+  buildToneEqualizerEditTransaction,
+  isCurrentToneEqualizerAsyncRequest,
+} from '../../../src/utils/toneEqualizerEditTransaction';
 
 const sourcePath = '/fixture/tone-equalizer.ARW';
 const session = createEditorImageSession({ generation: 17, path: sourcePath, source: 'cache' });
@@ -96,5 +99,28 @@ describe('tone equalizer edit transaction', () => {
         'stale-revision',
       ),
     ).toThrow('tone_equalizer_transaction.stale_revision');
+  });
+
+  test('accepts only the latest placement analysis for the captured source, session, and revision', () => {
+    const state = useEditorStore.getState();
+    expect(isCurrentToneEqualizerAsyncRequest(state, identity(), 7, 7)).toBeTrue();
+    expect(isCurrentToneEqualizerAsyncRequest(state, identity(), 6, 7)).toBeFalse();
+    expect(isCurrentToneEqualizerAsyncRequest(state, identity({ adjustmentRevision: 1 }), 7, 7)).toBeFalse();
+    expect(
+      isCurrentToneEqualizerAsyncRequest(
+        { ...state, selectedImage: { path: '/fixture/successor.ARW' } },
+        identity(),
+        7,
+        7,
+      ),
+    ).toBeFalse();
+    expect(
+      isCurrentToneEqualizerAsyncRequest(
+        { ...state, imageSession: { id: 'editor-image-session:successor' } },
+        identity(),
+        7,
+        7,
+      ),
+    ).toBeFalse();
   });
 });
