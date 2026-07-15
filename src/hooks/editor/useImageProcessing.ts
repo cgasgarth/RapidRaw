@@ -13,6 +13,7 @@ import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner
 import { getEditorZoomDpr, getEditorZoomSourceSize, resolveEditorZoom } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { OriginalPreviewEffectRunner } from '../../utils/originalPreviewEffectRunner';
+import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
 import {
   createPreviewQualityPolicy,
   fingerprintPreviewRoi,
@@ -90,6 +91,7 @@ export function useImageProcessing() {
   const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
     getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
   );
+  const [analyticsListenerReady, setAnalyticsListenerReady] = useState(false);
   const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
   const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
   previewCoordinatorRef.current = previewCoordinator;
@@ -107,6 +109,7 @@ export function useImageProcessing() {
   previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
   const previewInvalidationRunnerRef = useRef<PreviewInvalidationEffectRunner | null>(null);
+  const previewAnalyticsRunnerRef = useRef<PreviewAnalyticsEffectRunner | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
   const schedulingEffectExecutorRef = useRef<((effect: PreviewCoordinatorEffect) => void) | null>(null);
 
@@ -114,6 +117,7 @@ export function useImageProcessing() {
     (event: PreviewCoordinatorEvent) => {
       const previous = previewCoordinator.snapshot();
       const transition = previewCoordinator.dispatch(event);
+      previewAnalyticsRunnerRef.current?.consume(transition.effects);
       editedPreviewRunnerRef.current?.consume(transition.effects);
       previewInvalidationRunnerRef.current?.consume(transition.effects);
       originalPreviewRunnerRef.current?.consume(transition.effects);
@@ -137,6 +141,23 @@ export function useImageProcessing() {
     },
     [previewCoordinator, previewUrlReleaseAuthority, setEditor],
   );
+  const previewAnalyticsRunner = useMemo(
+    () =>
+      new PreviewAnalyticsEffectRunner({
+        dispatch: dispatchPreviewCoordinator,
+        getPresentationState: () => {
+          const editor = useEditorStore.getState();
+          return {
+            exportSoftProofTransform: editor.exportSoftProofTransform,
+            isExportSoftProofEnabled: editor.isExportSoftProofEnabled,
+            selectedImagePath: editor.selectedImage?.path ?? null,
+          };
+        },
+        publish: setEditor,
+      }),
+    [dispatchPreviewCoordinator, setEditor],
+  );
+  previewAnalyticsRunnerRef.current = previewAnalyticsRunner;
   const previewInvalidationRunner = useMemo(
     () =>
       new PreviewInvalidationEffectRunner({
@@ -307,13 +328,26 @@ export function useImageProcessing() {
   );
 
   useEffect(() => {
-    previewInvalidationRunner.start();
+    let mounted = true;
+    void previewAnalyticsRunner
+      .start()
+      .catch((error: unknown) => {
+        console.error('Failed to subscribe to preview analytics:', error);
+      })
+      .finally(() => {
+        if (mounted) {
+          previewInvalidationRunner.start();
+          setAnalyticsListenerReady(true);
+        }
+      });
     return () => {
+      mounted = false;
       previewInvalidationRunner.stop('editor-unmounted');
+      previewAnalyticsRunner.stop();
       editedPreviewRunner.cancel();
       originalPreviewRunner.dispose();
     };
-  }, [editedPreviewRunner, originalPreviewRunner, previewInvalidationRunner]);
+  }, [editedPreviewRunner, originalPreviewRunner, previewAnalyticsRunner, previewInvalidationRunner]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -473,11 +507,12 @@ export function useImageProcessing() {
   );
 
   useEffect(() => {
+    if (!analyticsListenerReady) return;
     dispatchPreviewCoordinator({
       inputs: captureSchedulingSnapshot(),
       type: 'scheduling-inputs-changed',
     });
-  }, [captureSchedulingSnapshot, dispatchPreviewCoordinator]);
+  }, [analyticsListenerReady, captureSchedulingSnapshot, dispatchPreviewCoordinator]);
 
   useEffect(() => {
     previewInvalidationRunner.updateSource({

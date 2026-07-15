@@ -377,6 +377,82 @@ test('graph revisions canonically distinguish proposal and render-authoritative 
   );
 });
 
+test('early analytics publishes only when its exact artifact is presented and duplicates are discarded', () => {
+  let state = createPreviewCoordinatorState();
+  const queued = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  const identity = required(queued.state.settled.identity);
+  state = transition(queued.state, { identity, type: 'operation-started' }).state;
+  const early = transition(state, { identity, receiptId: 1, type: 'analytics-result-received' });
+  expect(early.effects).toEqual([]);
+  expect(early.state.pendingAnalytics).toEqual([{ identity, receiptId: 1 }]);
+
+  const presented = transition(early.state, {
+    artifact: artifact(identity, 'blob:analytics-current'),
+    identity,
+    type: 'operation-completed',
+  });
+  expect(presented.effects).toContainEqual({
+    identity,
+    reason: 'buffered-analytics-presented',
+    receiptId: 1,
+    type: 'publish-analytics',
+  });
+  expect(presented.state.analytics).toEqual({ identity, status: 'presented' });
+  expect(presented.state.pendingAnalytics).toEqual([]);
+
+  const duplicate = transition(presented.state, { identity, receiptId: 2, type: 'analytics-result-received' });
+  expect(duplicate.effects).toEqual([
+    { reason: 'duplicate-analytics-result', receiptId: 2, type: 'discard-analytics' },
+  ]);
+});
+
+test('analytics rejects A to B to successor-A reordering and keeps bounded transition receipts', () => {
+  let state = createPreviewCoordinatorState();
+  const firstA = transition(state, {
+    identity: session({ sourceImagePath: '/fixtures/a.raw' }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const firstIdentity = required(firstA.state.settled.identity);
+  state = transition(firstA.state, { identity: firstIdentity, type: 'operation-started' }).state;
+  state = transition(state, { identity: firstIdentity, receiptId: 1, type: 'analytics-result-received' }).state;
+  const b = session({ imageSessionId: 2, sourceImagePath: '/fixtures/b.raw', sourceRevision: 2 });
+  const switched = transition(state, { session: b, type: 'image-session-installed' });
+  expect(switched.effects).toContainEqual({
+    reason: 'image-session-replaced',
+    receiptId: 1,
+    type: 'discard-analytics',
+  });
+
+  const successor = transition(switched.state, {
+    identity: session({ imageSessionId: 3, sourceImagePath: '/fixtures/a.raw', sourceRevision: 3 }),
+    kind: 'settled',
+    type: 'render-inputs-changed',
+  });
+  const successorIdentity = required(successor.state.settled.identity);
+  const stale = transition(successor.state, {
+    identity: firstIdentity,
+    receiptId: 2,
+    type: 'analytics-result-received',
+  });
+  expect(stale.effects).toEqual([{ reason: 'stale-analytics-result', receiptId: 2, type: 'discard-analytics' }]);
+
+  state = stale.state;
+  for (let receiptId = 3; receiptId <= 40; receiptId += 1) {
+    state = transition(state, { identity: firstIdentity, receiptId, type: 'analytics-result-received' }).state;
+  }
+  expect(state.analyticsTransitions).toHaveLength(32);
+  expect(state.analyticsTransitions.at(-1)).toMatchObject({ action: 'discarded', receiptId: 40 });
+
+  state = transition(state, { identity: successorIdentity, type: 'operation-started' }).state;
+  const current = transition(state, {
+    identity: successorIdentity,
+    receiptId: 41,
+    type: 'analytics-result-received',
+  });
+  expect(current.state.pendingAnalytics).toEqual([{ identity: successorIdentity, receiptId: 41 }]);
+});
+
 test('new render inputs cancel the previous operation and start newest work', () => {
   let state = createPreviewCoordinatorState();
   state = transition(state, { type: 'image-session-installed', session: session() }).state;
@@ -589,6 +665,7 @@ test('original compare publishes independently without replacing the edited arti
   expect(cancelled.effects).toEqual([
     { reason: 'editor-unmounted', type: 'release-url', url: 'blob:edited' },
     { reason: 'editor-unmounted', type: 'release-url', url: 'blob:original' },
+    { reason: 'editor-unmounted', type: 'clear-analytics' },
   ]);
 });
 
@@ -763,6 +840,7 @@ test('display generation accepts only newer identities and releases reordered co
       type: 'release-url',
       url: 'blob:display-old',
     },
+    { reason: 'display-generation-changed', type: 'clear-analytics' },
   ]);
   expect(invalidated.state.visibleArtifact).toBeNull();
   expect(invalidated.state.displayGeneration).toBe(3);

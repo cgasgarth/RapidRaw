@@ -10,8 +10,6 @@ import {
 } from '../../schemas/catalogIndexingSchemas';
 import { isCurrentDenoiseEvent } from '../../schemas/denoiseWorkflowSchemas';
 import {
-  type AnalyticsResultPayload,
-  analyticsResultPayloadSchema,
   denoiseErrorPayloadSchema,
   gamutWarningOverlayPayloadSchema,
   nativeQaOpenFixturePayloadSchema,
@@ -63,11 +61,9 @@ import {
 } from '../../utils/export/exportTerminalReceipt';
 import { isCurrentImportAuthority, shouldAcceptImportStart } from '../../utils/importEventAuthority';
 import { applyNativeQaOpenFixture, applyNativeQaReset } from '../../utils/nativeQaControlEvents';
-import { PreviewAnalyticsAuthority } from '../../utils/previewAnalyticsAuthority';
 import {
   AI_MODEL_DOWNLOAD_FINISH_EVENT,
   AI_MODEL_DOWNLOAD_START_EVENT,
-  ANALYTICS_RESULT_EVENT,
   BATCH_EXPORT_PROGRESS_EVENT,
   CULLING_COMPLETE_EVENT,
   CULLING_ERROR_EVENT,
@@ -124,90 +120,6 @@ interface ImageAnalyticsPayload<TData> {
   data: TData;
   path: string;
 }
-
-const PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL = 'Display preview transform';
-const PREVIEW_SCOPE_SOURCE_LABEL = 'Edited preview';
-const PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL = 'Working RGB';
-const PREVIEW_SCOPE_EXPORT_SOURCE_LABEL = 'Export preview';
-
-const buildPreviewScopeStatus = ({
-  histogramReady,
-  path,
-  waveformReady,
-}: {
-  histogramReady: boolean;
-  path: string;
-  waveformReady: boolean;
-}) => {
-  const editor = useEditorStore.getState();
-  const transform = editor.exportSoftProofTransform;
-  const isExportPreview = editor.isExportSoftProofEnabled && transform !== null;
-
-  return {
-    displayTransformLabel: transform?.colorManagedTransform ?? PREVIEW_SCOPE_DISPLAY_TRANSFORM_LABEL,
-    exportProfileLabel: isExportPreview ? transform.effectiveColorProfile : null,
-    exportRenderingIntentLabel: isExportPreview ? transform.effectiveRenderingIntent : null,
-    histogramReady,
-    path,
-    renderBasis: isExportPreview ? ('export_preview' as const) : ('editor_preview' as const),
-    softProofTransformApplied: transform?.transformApplied ?? false,
-    sourceLabel: isExportPreview ? PREVIEW_SCOPE_EXPORT_SOURCE_LABEL : PREVIEW_SCOPE_SOURCE_LABEL,
-    updatedAt: new Date().toISOString(),
-    waveformReady,
-    warningCodes: isExportPreview
-      ? [
-          transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
-          'render_target_matches_export_recipe',
-        ]
-      : [],
-    workingTransformLabel: PREVIEW_SCOPE_WORKING_TRANSFORM_LABEL,
-  };
-};
-
-const publishExactPreviewAnalytics = (result: AnalyticsResultPayload): void => {
-  const editor = useEditorStore.getState();
-  if (editor.selectedImage?.path !== result.path) return;
-  const histogram = result.histogram
-    ? {
-        blue: { color: '#3b82f6', data: result.histogram.blue },
-        green: { color: '#22c55e', data: result.histogram.green },
-        luma: { color: '#ffffff', data: result.histogram.luma },
-        red: { color: '#ef4444', data: result.histogram.red },
-      }
-    : null;
-  const scopes = result.scopes;
-  const waveform = scopes
-    ? {
-        blue: '',
-        green: '',
-        height: scopes.height,
-        luma: scopes.luma?.url ?? '',
-        parade: scopes.parade?.url ?? '',
-        red: '',
-        rgb: scopes.rgb?.url ?? '',
-        vectorscope: scopes.vectorscope?.url ?? '',
-        width: scopes.width,
-      }
-    : null;
-  editor.setEditor({
-    histogram,
-    referenceMatchSpatialAnalysis: result.spatial
-      ? {
-          ...result.spatial,
-          frameId: result.frameId,
-          path: result.path,
-          previewOperationIdentity: result.previewOperationIdentity,
-        }
-      : null,
-    previewScopeRecoveryState: 'idle',
-    previewScopeStatus: buildPreviewScopeStatus({
-      histogramReady: histogram !== null,
-      path: result.path,
-      waveformReady: waveform !== null,
-    }),
-    waveform,
-  });
-};
 
 export function useTauriListeners({
   invalidateThumbnailRevision,
@@ -300,23 +212,6 @@ export function useTauriListeners({
       flushHandle.current = requestAnimationFrame(flushThumbnailBatch);
     };
 
-    const analyticsAuthority = new PreviewAnalyticsAuthority<AnalyticsResultPayload>();
-    analyticsAuthority.setPresented(useEditorStore.getState().presentedPreviewArtifact);
-    const unsubscribeAnalyticsAuthority = useEditorStore.subscribe((state, previous) => {
-      if (state.presentedPreviewArtifact === previous.presentedPreviewArtifact) return;
-      const accepted = analyticsAuthority.setPresented(state.presentedPreviewArtifact);
-      if (accepted !== null) {
-        publishExactPreviewAnalytics(accepted);
-        return;
-      }
-      state.setEditor({
-        histogram: null,
-        previewScopeStatus: null,
-        referenceMatchSpatialAnalysis: null,
-        waveform: null,
-      });
-    });
-
     const listeners = [
       listen<unknown>(PERSISTED_RENDER_STATE_RECOVERED_EVENT, (event) => {
         const parsed = persistedRenderStateRecoveryPayloadSchema.safeParse(event.payload);
@@ -325,13 +220,6 @@ export function useTauriListeners({
         toast.warn(`Recovered incompatible saved edits and reopened with safe render state.${backup}`, {
           toastId: `persisted-render-state-recovered:${parsed.data.path}`,
         });
-      }),
-      listen<unknown>(ANALYTICS_RESULT_EVENT, (event) => {
-        if (!isEffectActive) return;
-        const parsed = analyticsResultPayloadSchema.safeParse(event.payload);
-        if (!parsed.success) return;
-        const accepted = analyticsAuthority.receive(parsed.data);
-        if (accepted !== null) publishExactPreviewAnalytics(accepted);
       }),
       listen<unknown>(PREVIEW_UPDATE_UNCROPPED_EVENT, (event) => {
         if (isEffectActive)
@@ -867,7 +755,6 @@ export function useTauriListeners({
 
     return () => {
       isEffectActive = false;
-      unsubscribeAnalyticsAuthority();
       if (flushHandle.current !== null) {
         cancelAnimationFrame(flushHandle.current);
         flushHandle.current = null;
