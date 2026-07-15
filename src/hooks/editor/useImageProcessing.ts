@@ -17,18 +17,15 @@ import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffect
 import {
   createPreviewQualityPolicy,
   fingerprintPreviewRoi,
-  PreviewCoordinator,
-  type PreviewCoordinatorEffect,
-  type PreviewCoordinatorEvent,
   resolvePreviewViewportRoi,
 } from '../../utils/previewCoordinator';
+import { PreviewCoordinatorRuntime } from '../../utils/previewCoordinatorRuntime';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
 import { PreviewInvalidationEffectRunner } from '../../utils/previewInvalidationEffectRunner';
 import { PreviewMaterializationAdapter } from '../../utils/previewMaterializationAdapter';
 import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../../utils/previewPresentationAdapter';
 import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
-import { PreviewUrlReleaseAuthority } from '../../utils/previewUrlReleaseAuthority';
 import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
@@ -92,55 +89,24 @@ export function useImageProcessing() {
     getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
   );
   const [analyticsListenerReady, setAnalyticsListenerReady] = useState(false);
-  const previewCoordinatorRef = useRef<PreviewCoordinator | null>(null);
-  const previewCoordinator = previewCoordinatorRef.current ?? new PreviewCoordinator();
-  previewCoordinatorRef.current = previewCoordinator;
+  const previewRuntimeRef = useRef<PreviewCoordinatorRuntime | null>(null);
+  const previewRuntime =
+    previewRuntimeRef.current ??
+    new PreviewCoordinatorRuntime({
+      isUrlProtected: (url) => globalImageCache.isProtected(url),
+      publishSurface: (update) => useEditorStore.getState().setEditor(update),
+    });
+  previewRuntimeRef.current = previewRuntime;
   const previewRequestScopeAdapterRef = useRef<PreviewRequestScopeAdapter | null>(null);
   const previewRequestScopeAdapter =
     previewRequestScopeAdapterRef.current ??
     new PreviewRequestScopeAdapter({
-      getDisplayGeneration: () => previewCoordinator.snapshot().displayGeneration,
+      getDisplayGeneration: () => previewRuntime.snapshot().displayGeneration,
     });
   previewRequestScopeAdapterRef.current = previewRequestScopeAdapter;
-  const previewUrlReleaseAuthorityRef = useRef<PreviewUrlReleaseAuthority | null>(null);
-  const previewUrlReleaseAuthority =
-    previewUrlReleaseAuthorityRef.current ??
-    new PreviewUrlReleaseAuthority({ isProtected: (url) => globalImageCache.isProtected(url) });
-  previewUrlReleaseAuthorityRef.current = previewUrlReleaseAuthority;
   const editedPreviewRunnerRef = useRef<EditedPreviewEffectRunner<PreviewPresentationValue> | null>(null);
-  const previewInvalidationRunnerRef = useRef<PreviewInvalidationEffectRunner | null>(null);
-  const previewAnalyticsRunnerRef = useRef<PreviewAnalyticsEffectRunner | null>(null);
   const originalPreviewRunnerRef = useRef<OriginalPreviewEffectRunner | null>(null);
-  const schedulingEffectExecutorRef = useRef<((effect: PreviewCoordinatorEffect) => void) | null>(null);
-
-  const dispatchPreviewCoordinator = useCallback(
-    (event: PreviewCoordinatorEvent) => {
-      const previous = previewCoordinator.snapshot();
-      const transition = previewCoordinator.dispatch(event);
-      previewAnalyticsRunnerRef.current?.consume(transition.effects);
-      editedPreviewRunnerRef.current?.consume(transition.effects);
-      previewInvalidationRunnerRef.current?.consume(transition.effects);
-      originalPreviewRunnerRef.current?.consume(transition.effects);
-      for (const effect of transition.effects) {
-        schedulingEffectExecutorRef.current?.(effect);
-        if (effect.type === 'clear-original') {
-          setEditor({ transformedOriginalUrl: null });
-          continue;
-        }
-        if (effect.type !== 'publish') continue;
-        if (effect.identity.kind === 'settled') {
-          setEditor({ finalPreviewUrl: effect.artifact.url, presentedPreviewArtifact: effect.artifact });
-        } else if (effect.identity.kind === 'interactive') {
-          setEditor({ presentedPreviewArtifact: effect.artifact });
-        } else if (effect.identity.kind === 'original') {
-          setEditor({ transformedOriginalUrl: effect.artifact.url });
-        }
-      }
-      previewUrlReleaseAuthority.consume(previous, transition);
-      return transition;
-    },
-    [previewCoordinator, previewUrlReleaseAuthority, setEditor],
-  );
+  const dispatchPreviewCoordinator = previewRuntime.dispatch;
   const previewAnalyticsRunner = useMemo(
     () =>
       new PreviewAnalyticsEffectRunner({
@@ -157,20 +123,18 @@ export function useImageProcessing() {
       }),
     [dispatchPreviewCoordinator, setEditor],
   );
-  previewAnalyticsRunnerRef.current = previewAnalyticsRunner;
   const previewInvalidationRunner = useMemo(
     () =>
       new PreviewInvalidationEffectRunner({
         dispatch: dispatchPreviewCoordinator,
-        getState: () => previewCoordinator.snapshot(),
+        getState: () => previewRuntime.snapshot(),
       }),
-    [dispatchPreviewCoordinator, previewCoordinator],
+    [dispatchPreviewCoordinator, previewRuntime],
   );
-  previewInvalidationRunnerRef.current = previewInvalidationRunner;
   const previewPresentationAdapter = useMemo(
     () =>
       new PreviewPresentationAdapter({
-        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getCoordinatorState: () => previewRuntime.snapshot(),
         getPresentationState: () => {
           const editor = useEditorStore.getState();
           return {
@@ -181,22 +145,22 @@ export function useImageProcessing() {
         publish: setEditor,
         recordTiming: (sample) => previewQualityControllerRef.current.record(sample),
       }),
-    [previewCoordinator, setEditor],
+    [previewRuntime, setEditor],
   );
   const previewMaterializationAdapter = useMemo(
     () =>
       new PreviewMaterializationAdapter({
-        releaseUrl: (url) => previewUrlReleaseAuthority.release(url),
+        releaseUrl: (url) => previewRuntime.releaseUnpresentedUrl(url),
       }),
-    [previewUrlReleaseAuthority],
+    [previewRuntime],
   );
   const previewFailureAdapter = useMemo(
     () =>
       new PreviewFailureAdapter({
-        getCoordinatorState: () => previewCoordinator.snapshot(),
+        getCoordinatorState: () => previewRuntime.snapshot(),
         publish: setEditor,
       }),
-    [previewCoordinator, setEditor],
+    [previewRuntime, setEditor],
   );
 
   const originalPreviewRunner =
@@ -245,7 +209,7 @@ export function useImageProcessing() {
       },
       releaseMaterialized: (result) => {
         if (result.value.kind === 'patch' || result.value.kind === 'full') {
-          previewUrlReleaseAuthority.release(result.value.url);
+          previewRuntime.releaseUnpresentedUrl(result.value.url);
         }
       },
     });
@@ -428,14 +392,22 @@ export function useImageProcessing() {
   const calculatedTargetResolution = calculateTargetRes();
   const calculatedRoiFingerprint = fingerprintPreviewRoi(calculateROI());
 
-  schedulingEffectExecutorRef.current = (effect) => {
-    if (effect.type === 'schedule-edited') {
-      previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
-    } else if (effect.type === 'schedule-original') {
-      dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
-      originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
-    }
-  };
+  previewRuntime.installEffectConsumers([
+    (effects) => previewAnalyticsRunner.consume(effects),
+    (effects) => editedPreviewRunner.consume(effects),
+    (effects) => previewInvalidationRunner.consume(effects),
+    (effects) => originalPreviewRunner.consume(effects),
+    (effects) => {
+      for (const effect of effects) {
+        if (effect.type === 'schedule-edited') {
+          previewRequestIntentAdapter.schedulePrepared(effect.prepared, effect.delayMs);
+        } else if (effect.type === 'schedule-original') {
+          dispatchPreviewCoordinator({ type: 'viewport-changed', viewport: effect.prepared.viewport });
+          originalPreviewRunner.request(effect.prepared.session, effect.prepared.request, effect.delayMs);
+        }
+      }
+    },
+  ]);
 
   useEffect(() => {
     if (activeRightPanel === Panel.Crop && selectedImage?.isReady) {
