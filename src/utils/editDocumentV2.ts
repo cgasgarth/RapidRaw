@@ -4,6 +4,7 @@ import {
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   editDocumentGeometryV2Schema,
+  editDocumentLayersV2Schema,
   editDocumentNodeEnvelopeV2Schema,
   editDocumentSourceArtifactsV2Schema,
   editDocumentV2Schema,
@@ -54,7 +55,9 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       const params =
         nodeType === 'geometry'
           ? normalizeGeometryParams({ ...(descriptor?.defaultParams ?? {}), ...mappedParams })
-          : mappedParams;
+          : nodeType === 'layers'
+            ? { masks: [], ...mappedParams }
+            : mappedParams;
       return [
         nodeType,
         {
@@ -139,7 +142,11 @@ export const updateEditDocumentV2Node = (
     return next;
   }
   const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: updatedParams });
-  const next = { ...document, nodes: { ...document.nodes, [nodeType]: nextNode } };
+  const next: EditDocumentV2 = {
+    ...document,
+    layers: nodeType === 'layers' ? editDocumentLayersV2Schema.parse(nextNode.params) : document.layers,
+    nodes: { ...document.nodes, [nodeType]: nextNode },
+  };
   editDocumentV2Schema.parse(next);
   return next;
 };
@@ -156,13 +163,22 @@ export const prepareEditDocumentV2ForRender = (
   const prepared = legacyAdjustmentsToEditDocumentV2(preparedAdjustments);
   const nodes = { ...prepared.nodes };
   let geometry = prepared.geometry;
+  let layers = prepared.layers;
   for (const nodeType of authoritativeNodeTypes) {
     const authoritativeNode = authoritativeDocument.nodes[nodeType];
     if (authoritativeNode === undefined) continue;
     nodes[nodeType] = authoritativeNode;
     if (nodeType === 'geometry') geometry = editDocumentGeometryV2Schema.parse(authoritativeNode.params);
+    if (nodeType === 'layers') layers = editDocumentLayersV2Schema.parse(authoritativeNode.params);
   }
-  const next = { ...prepared, geometry, nodes };
+  // Explicit domains travel with their authoritative nodes; publishing only the
+  // envelope would create an ambiguous render document rejected by native code.
+  const next: EditDocumentV2 = {
+    ...prepared,
+    geometry,
+    layers,
+    nodes,
+  };
   editDocumentV2Schema.parse(next);
   return next;
 };

@@ -115,6 +115,56 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(reopened).toEqual(first);
   });
 
+  test('defaults and strictly validates the render-authoritative layers domain', () => {
+    const { masks: _legacyMasks, ...legacyWithoutMasks } = structuredClone(INITIAL_ADJUSTMENTS);
+    const defaulted = legacyAdjustmentsToEditDocumentV2(legacyWithoutMasks);
+    expect(defaulted.layers).toEqual({ masks: [] });
+    expect(defaulted.nodes.layers?.params).toEqual(defaulted.layers);
+
+    const layer = {
+      adjustments: { exposure: 0.4 },
+      blendMode: 'overlay' as const,
+      id: 'layer-1',
+      invert: false,
+      name: 'Local sky',
+      opacity: 72,
+      subMasks: [
+        {
+          id: 'sub-mask-1',
+          invert: false,
+          mode: 'additive' as const,
+          opacity: 100,
+          parameters: { feather: 0.5 },
+          type: 'brush' as const,
+          visible: true,
+        },
+      ],
+      visible: true,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      masks: [layer],
+    });
+    expect(document.layers.masks).toEqual([layer]);
+    expect(compileEditDocumentNodeV2(document.nodes.layers).params).toEqual(document.layers);
+
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        layers: { masks: [layer, layer] },
+        nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [layer, layer] } } },
+      }),
+    ).toThrow('unique');
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        layers: { masks: [{ ...layer, opacity: 101 }] },
+        nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: document.layers } },
+      }),
+    ).toThrow();
+    expect(() => editDocumentV2Schema.parse({ ...document, layers: { masks: [] } })).toThrow('disagrees');
+  });
+
   test('rejects malformed, duplicate, and ambiguous source artifacts', () => {
     const document = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
@@ -264,6 +314,28 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.scene_global_color_tone).toBe(authoritative.nodes.scene_global_color_tone);
     expect(renderDocument.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
     expect(renderDocument.nodes.source_artifacts?.params.aiPatches).toEqual([]);
+  });
+
+  test('render preparation transfers the layers envelope and explicit domain together', () => {
+    const layer = {
+      adjustments: { saturation: 12 },
+      id: 'authoritative-layer',
+      invert: false,
+      name: 'Authoritative layer',
+      opacity: 80,
+      subMasks: [],
+      visible: true,
+    };
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      masks: [layer],
+    });
+    const prepared = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] };
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['layers']);
+
+    expect(renderDocument.nodes.layers).toBe(authoritative.nodes.layers);
+    expect(renderDocument.layers).toEqual({ masks: [layer] });
+    expect(renderDocument.nodes.layers?.params).toEqual(renderDocument.layers);
   });
 
   test('future node types are quarantined and non-finite node values are rejected', () => {

@@ -209,6 +209,44 @@ enum SourceArtifactSubMaskModeV2 {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum LayerBlendModeV2 {
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    SoftLight,
+    Hue,
+    Saturation,
+    Luminosity,
+    Color,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LayerV2 {
+    adjustments: BTreeMap<String, Value>,
+    blend_mode: Option<LayerBlendModeV2>,
+    id: String,
+    invert: bool,
+    layer_group_id: Option<String>,
+    layer_group_name: Option<String>,
+    name: String,
+    opacity: f64,
+    reference_match_application_receipt: Option<Map<String, Value>>,
+    retouch_clone_source: Option<Map<String, Value>>,
+    retouch_remove_source: Option<Map<String, Value>>,
+    sub_masks: Vec<SourceArtifactSubMaskV2>,
+    visible: bool,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LayersV2 {
+    masks: Vec<LayerV2>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SourceArtifactSubMaskV2 {
     id: String,
@@ -333,7 +371,7 @@ impl EditDocumentV2 {
             );
         }
         validate_geometry_domain(&self.nodes, &self.geometry)?;
-        validate_explicit_domain(&self.nodes, EditNodeTypeV2::Layers, &self.layers)?;
+        validate_layers_domain(&self.nodes, &self.layers)?;
         validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
         if self
             .provenance
@@ -370,6 +408,10 @@ fn compile_node_params(
         }
         EditNodeTypeV2::SourceArtifacts => {
             parse_source_artifacts(&node.params)?;
+            Ok(node.params.clone())
+        }
+        EditNodeTypeV2::Layers => {
+            parse_layers(&node.params)?;
             Ok(node.params.clone())
         }
         _ => Ok(node.params.clone()),
@@ -459,21 +501,76 @@ fn validate_geometry_domain(
     Err("EditDocumentV2 geometry domain disagrees with its node params".to_string())
 }
 
-fn validate_explicit_domain(
+fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
+    let layers: LayersV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 layers are invalid: {error}"))?;
+    let mut layer_ids = std::collections::BTreeSet::new();
+    for layer in &layers.masks {
+        if layer.id.trim().is_empty() || !layer_ids.insert(&layer.id) {
+            return Err("EditDocumentV2 layer IDs must be non-empty and unique".to_string());
+        }
+        if !(0.0..=100.0).contains(&layer.opacity) {
+            return Err("EditDocumentV2 layer opacity must be within 0..=100".to_string());
+        }
+        if layer
+            .layer_group_id
+            .as_ref()
+            .is_some_and(|value| value.trim().is_empty())
+            || layer
+                .layer_group_name
+                .as_ref()
+                .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err("EditDocumentV2 layer group identity must be non-empty".to_string());
+        }
+        if layer
+            .reference_match_application_receipt
+            .as_ref()
+            .is_some_and(|receipt| receipt.get("schemaVersion") != Some(&Value::from(1)))
+        {
+            return Err(
+                "EditDocumentV2 layer reference-match provenance requires schemaVersion 1"
+                    .to_string(),
+            );
+        }
+        let mut sub_mask_ids = std::collections::BTreeSet::new();
+        for sub_mask in &layer.sub_masks {
+            if sub_mask.id.trim().is_empty() || !sub_mask_ids.insert(&sub_mask.id) {
+                return Err(
+                    "EditDocumentV2 layer sub-mask IDs must be non-empty and unique".to_string(),
+                );
+            }
+            if !(0.0..=100.0).contains(&sub_mask.opacity) {
+                return Err(
+                    "EditDocumentV2 layer sub-mask opacity must be within 0..=100".to_string(),
+                );
+            }
+        }
+        let _ = (
+            &layer.adjustments,
+            &layer.blend_mode,
+            layer.invert,
+            &layer.name,
+            &layer.retouch_clone_source,
+            &layer.retouch_remove_source,
+            layer.visible,
+        );
+    }
+    Ok(layers)
+}
+
+fn validate_layers_domain(
     nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    node_type: EditNodeTypeV2,
     domain: &Map<String, Value>,
 ) -> Result<(), String> {
-    let Some(node) = nodes.get(&node_type) else {
+    let domain = parse_layers(domain)?;
+    let Some(node) = nodes.get(&EditNodeTypeV2::Layers) else {
         return Ok(());
     };
-    if &node.params == domain {
+    if parse_layers(&node.params)? == domain {
         return Ok(());
     }
-    Err(format!(
-        "EditDocumentV2 {} domain disagrees with its node params",
-        node_type.contract().0
-    ))
+    Err("EditDocumentV2 layers domain disagrees with its node params".to_string())
 }
 
 #[cfg(test)]
@@ -597,6 +694,27 @@ mod tests {
                 "mode": "additive",
                 "opacity": 80,
                 "parameters": { "mask_data_base64": "encoded-mask" },
+                "type": "brush",
+                "visible": true
+            }],
+            "visible": true
+        })
+    }
+
+    fn layer() -> Value {
+        json!({
+            "adjustments": { "exposure": 0.4 },
+            "blendMode": "overlay",
+            "id": "layer-1",
+            "invert": false,
+            "name": "Local sky",
+            "opacity": 72,
+            "subMasks": [{
+                "id": "sub-mask-1",
+                "invert": false,
+                "mode": "additive",
+                "opacity": 100,
+                "parameters": { "feather": 0.5 },
                 "type": "brush",
                 "visible": true
             }],
@@ -864,5 +982,35 @@ mod tests {
             .into_render_adjustments()
             .expect_err("legacy-owned provenance must fail");
         assert!(error.contains("must be owned by provenance"));
+    }
+
+    #[test]
+    fn compiles_strict_layers_and_rejects_duplicate_or_ambiguous_layer_state() {
+        let layer = layer();
+        let mut value = document_with_legacy(json!({}));
+        value["nodes"]["layers"]["params"] = json!({ "masks": [layer] });
+        value["layers"] = json!({ "masks": [layer] });
+        let compiled = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("valid layers document")
+            .into_render_adjustments()
+            .expect("compiled layers document");
+        assert_eq!(compiled["masks"][0]["id"], json!("layer-1"));
+
+        let mut duplicate = document_with_legacy(json!({}));
+        duplicate["nodes"]["layers"]["params"] = json!({ "masks": [layer, layer] });
+        duplicate["layers"] = json!({ "masks": [layer, layer] });
+        let error = serde_json::from_value::<EditDocumentV2>(duplicate)
+            .expect("duplicate layers deserialize before semantic validation")
+            .into_render_adjustments()
+            .expect_err("duplicate layer IDs must fail");
+        assert!(error.contains("non-empty and unique"));
+
+        let mut ambiguous = document_with_legacy(json!({}));
+        ambiguous["nodes"]["layers"]["params"] = json!({ "masks": [layer] });
+        let error = serde_json::from_value::<EditDocumentV2>(ambiguous)
+            .expect("ambiguous layers deserialize before semantic validation")
+            .into_render_adjustments()
+            .expect_err("ambiguous layers must fail");
+        assert!(error.contains("layers domain disagrees"));
     }
 }

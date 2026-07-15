@@ -20,12 +20,14 @@ const DISPATCHES = 20_000;
 const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
 const fixture = structuredClone(INITIAL_ADJUSTMENTS);
 fixture.masks = Array.from({ length: 16 }, (_, index) => ({
-  id: `perf-mask-${index}`,
-  name: `Performance mask ${index}`,
-  enabled: true,
   adjustments: {},
+  id: `perf-mask-${index}`,
+  invert: false,
+  name: `Performance mask ${index}`,
+  opacity: 100,
   subMasks: [],
-})) as typeof fixture.masks;
+  visible: true,
+}));
 const snapshot = publishAdjustmentSnapshot(null, fixture);
 const fixtureDigest = `sha256:${createHash('sha256').update(JSON.stringify(fixture)).digest('hex')}` as const;
 
