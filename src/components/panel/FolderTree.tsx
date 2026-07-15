@@ -59,6 +59,7 @@ export interface FolderTree {
 }
 
 interface FolderTreeProps {
+  hasMacWindowOverlay?: boolean;
   isContiguousShell?: boolean;
   isResizing: boolean;
   isVisible: boolean;
@@ -682,6 +683,7 @@ function TreeNode({
 }
 
 export default function FolderTree({
+  hasMacWindowOverlay = false,
   isResizing,
   isContiguousShell = false,
   isVisible,
@@ -856,7 +858,10 @@ export default function FolderTree({
       )}
 
       {isVisible && (
-        <div className="p-2 flex flex-col h-full">
+        <div
+          className={cx('p-2 flex flex-col h-full', hasMacWindowOverlay && 'pt-9')}
+          data-tauri-drag-region={hasMacWindowOverlay ? 'true' : undefined}
+        >
           <div className="pt-1 pb-2">
             <div className="flex items-center">
               <AnimatePresence>

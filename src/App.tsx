@@ -57,6 +57,7 @@ import { globalImageCache } from './utils/ImageLRUCache';
 import { getWorkspaceLeftSurface } from './utils/workspaceLeftSurface';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
+import { resolveWindowChromeLayout } from './window/windowChrome';
 
 const LOCAL_DEV_CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA';
 const CLERK_PUBLISHABLE_KEY = getViteEnv().VITE_CLERK_PUBLISHABLE_KEY ?? LOCAL_DEV_CLERK_PUBLISHABLE_KEY;
@@ -175,6 +176,11 @@ function App() {
 
   const isAndroid = osPlatform === 'android';
   const isCompactPortrait = viewportSize.isCompactPortrait;
+  const windowChrome = resolveWindowChromeLayout({
+    decorationsEnabled: appSettings?.decorations ?? false,
+    isWindowFullScreen,
+    osPlatform,
+  });
 
   const compactEditorPanelMinHeight = 220;
   const compactEditorPreviewSafeHeight = 300;
@@ -202,7 +208,7 @@ function App() {
       effectiveRatio = adjustments.aspectRatio;
     }
     const desiredImageHeight = viewportSize.width / effectiveRatio;
-    const topUiEstimation = !appSettings?.decorations && !isWindowFullScreen ? 110 : 60;
+    const topUiEstimation = windowChrome.compactTopUiHeight;
     const totalDesiredTopHeight = desiredImageHeight + topUiEstimation;
     const calculatedBottomHeight = Math.round(viewportSize.height - totalDesiredTopHeight);
     return Math.max(halfScreenHeight, calculatedBottomHeight);
@@ -527,6 +533,7 @@ function App() {
       >
         <RenderIsland name="folder-tree">
           <FolderTreePanel
+            hasMacWindowOverlay={windowChrome.kind === 'macos-overlay'}
             isContiguousShell={false}
             isResizing={isResizing}
             isVisible={libraryWorkspacePreferences.folderTree.visible}
@@ -543,7 +550,11 @@ function App() {
             setIsVisible={(value: boolean) => {
               setLibraryFolderTreeVisibility(value);
             }}
-            style={{ width: libraryWorkspacePreferences.folderTree.visible ? `${libraryLeftPanelWidth}px` : '32px' }}
+            style={{
+              width: libraryWorkspacePreferences.folderTree.visible
+                ? `${libraryLeftPanelWidth}px`
+                : `${windowChrome.reserveCollapsedLeadingWidth}px`,
+            }}
             isInstantTransition={isInstantTransition}
           />
         </RenderIsland>
@@ -562,29 +573,29 @@ function App() {
     isCompactPortrait,
   });
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
-  const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
-
   return (
     <>
       <AppServices />
       <div
         className={cx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
-          useMacWindowShell && 'macos-window-shell',
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
         data-viewer-lights-out={selectedImage ? lightsOutLevel : 'off'}
+        data-window-chrome={windowChrome.kind}
       >
-        <div
-          className={cx(
-            'shrink-0 overflow-hidden z-50',
-            !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
-          )}
-          data-editor-surrounding-chrome="true"
-        >
-          {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
-        </div>
+        {windowChrome.kind === 'custom-titlebar' ? (
+          <div
+            className={cx(
+              'shrink-0 overflow-hidden z-50',
+              !isInstantTransition && 'transition-all duration-300 ease-in-out',
+              isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
+            )}
+            data-editor-surrounding-chrome="true"
+          >
+            <TitleBar />
+          </div>
+        ) : null}
         <div
           className={cx(
             'flex-1 flex flex-col min-h-0',
@@ -605,6 +616,7 @@ function App() {
             {leftSurface === 'editor' ? (
               <EditorLeftSidebar
                 expandedSections={editorLeftSidebarPreferences.expandedSections}
+                hasMacWindowOverlay={windowChrome.kind === 'macos-overlay'}
                 isFullScreen={isFullScreen}
                 isResizing={isResizing}
                 isVisible={editorLeftSidebarPreferences.visible}
