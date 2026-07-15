@@ -9,6 +9,10 @@ import {
   isDetailBooleanNodeAdjustment,
   isDetailNumberNodeAdjustment,
 } from '../../utils/detailEditTransaction';
+import {
+  buildLensCorrectionEditTransaction,
+  isManualLensCorrectionAdjustment,
+} from '../../utils/lensCorrectionEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Switch from '../ui/primitives/Switch';
@@ -52,6 +56,18 @@ export default function DetailsPanel({
 
   const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
     const nextValue = Math.trunc(value);
+    if (!isForMask && isManualLensCorrectionAdjustment(key)) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildLensCorrectionEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
+      );
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
     if (!isForMask && isDetailNumberNodeAdjustment(key)) {
       const identity = detailCommitIdentityRef.current;
       if (identity === null) return;

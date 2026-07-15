@@ -47,7 +47,6 @@ export const EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS = {
 export const EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS = Object.keys(
   EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
 ) as (keyof typeof EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS)[];
-const EDIT_DOCUMENT_LOCAL_CONTRAST_FIELD_NAMES = new Set<string>(EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS);
 
 export const editDocumentDetailDenoiseDehazeV2Schema = z
   .object({
@@ -381,8 +380,25 @@ export const editDocumentGeometryV2Schema = z
   .strict();
 
 export const editDocumentLensDistortionParamsV2Schema = lensProfileDistortionParamsV1Schema;
+export const editDocumentManualChromaticAberrationV2Schema = z
+  .object({
+    chromaticAberrationBlueYellow: z.number().finite().min(-100).max(100),
+    chromaticAberrationRedCyan: z.number().finite().min(-100).max(100),
+  })
+  .strict();
+
+export const EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS = {
+  chromaticAberrationBlueYellow: 0,
+  chromaticAberrationRedCyan: 0,
+} as const;
+
+export const EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS = Object.keys(
+  EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,
+) as (keyof typeof EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS)[];
+
 export const editDocumentLensCorrectionV2Schema = z
   .object({
+    ...editDocumentManualChromaticAberrationV2Schema.shape,
     lensCorrectionMode: lensProfilePatchV1Schema.shape.lensCorrectionMode.unwrap(),
     lensDistortionAmount: lensProfilePatchV1Schema.shape.lensDistortionAmount.unwrap(),
     lensDistortionEnabled: lensProfilePatchV1Schema.shape.lensDistortionEnabled.unwrap(),
@@ -705,6 +721,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       reset: true,
     },
     defaultParams: {
+      ...EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,
       lensCorrectionMode: 'manual',
       lensDistortionAmount: 100,
       lensDistortionEnabled: true,
@@ -718,6 +735,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     },
     editorSection: null,
     legacyFields: [
+      ...EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
       'lensCorrectionMode',
       'lensDistortionAmount',
       'lensDistortionEnabled',
@@ -1313,12 +1331,21 @@ const editDocumentV2ObjectSchema = z
 const isEditDocumentRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const normalizeLegacyDetailOwnership = (
+interface LegacyNodeOwnershipMigration {
+  defaults: Readonly<Record<string, unknown>>;
+  fields: readonly string[];
+  nodeType: string;
+  schemas: Readonly<Record<string, z.ZodType>>;
+}
+
+const normalizeLegacyNodeOwnership = (
   document: Readonly<Record<string, unknown>>,
-  nodes: Readonly<Record<string, unknown>>,
+  ownership: LegacyNodeOwnershipMigration,
 ): Readonly<Record<string, unknown>> => {
-  const detailNode = nodes['detail_denoise_dehaze'];
-  if (!isEditDocumentRecord(detailNode) || !isEditDocumentRecord(detailNode['params'])) return document;
+  const nodes = document['nodes'];
+  if (!isEditDocumentRecord(nodes)) return document;
+  const node = nodes[ownership.nodeType];
+  if (!isEditDocumentRecord(node) || !isEditDocumentRecord(node['params'])) return document;
   if (!isEditDocumentRecord(document['extensions'])) return document;
   const extensions = { ...document['extensions'] };
   const rawLegacy = extensions['legacyAdjustments'];
@@ -1327,29 +1354,30 @@ const normalizeLegacyDetailOwnership = (
   const rawQuarantine = extensions['quarantinedLegacyAdjustments'];
   if (rawQuarantine !== undefined && !isEditDocumentRecord(rawQuarantine)) return document;
   const quarantinedLegacyAdjustments = { ...(rawQuarantine ?? {}) };
-  const params = { ...detailNode['params'] };
+  const params = { ...node['params'] };
   const mappedPaths: string[] = [];
   const defaultedPaths: string[] = [];
   const quarantinedFields: string[] = [];
 
-  for (const field of EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS) {
+  for (const field of ownership.fields) {
     if (Object.hasOwn(params, field)) continue;
-    const path = `detail_denoise_dehaze.${field}`;
+    const path = `${ownership.nodeType}.${field}`;
     if (Object.hasOwn(legacyAdjustments, field)) {
       const candidate = legacyAdjustments[field];
       delete legacyAdjustments[field];
-      const parsed = editDocumentLocalContrastV2Schema.shape[field].safeParse(candidate);
+      const parsed = ownership.schemas[field]?.safeParse(candidate);
+      if (parsed === undefined) return document;
       if (parsed.success) {
         params[field] = parsed.data;
         mappedPaths.push(path);
       } else {
-        params[field] = EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS[field];
+        params[field] = ownership.defaults[field];
         quarantinedLegacyAdjustments[field] = candidate;
         defaultedPaths.push(path);
         quarantinedFields.push(field);
       }
     } else {
-      params[field] = EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS[field];
+      params[field] = ownership.defaults[field];
       defaultedPaths.push(path);
       if (Object.hasOwn(quarantinedLegacyAdjustments, field)) quarantinedFields.push(field);
     }
@@ -1361,6 +1389,7 @@ const normalizeLegacyDetailOwnership = (
     extensions['quarantinedLegacyAdjustments'] = quarantinedLegacyAdjustments;
   }
   const parsedMigration = editDocumentMigrationReceiptV2Schema.safeParse(document['migration']);
+  const ownedFields = new Set(ownership.fields);
   const migration = parsedMigration.success
     ? {
         ...parsedMigration.data,
@@ -1368,7 +1397,7 @@ const normalizeLegacyDetailOwnership = (
         mapped: [...new Set([...parsedMigration.data.mapped, ...mappedPaths])].sort(),
         quarantined: [
           ...new Set([
-            ...parsedMigration.data.quarantined.filter((field) => !EDIT_DOCUMENT_LOCAL_CONTRAST_FIELD_NAMES.has(field)),
+            ...parsedMigration.data.quarantined.filter((field) => !ownedFields.has(field)),
             ...quarantinedFields,
           ]),
         ].sort(),
@@ -1379,7 +1408,7 @@ const normalizeLegacyDetailOwnership = (
     ...document,
     extensions,
     migration,
-    nodes: { ...nodes, detail_denoise_dehaze: { ...detailNode, params } },
+    nodes: { ...nodes, [ownership.nodeType]: { ...node, params } },
   };
 };
 
@@ -1405,7 +1434,18 @@ export const editDocumentV2Schema = z.preprocess((value) => {
       }
     }
   }
-  return normalizeLegacyDetailOwnership(document, document['nodes'] as Readonly<Record<string, unknown>>);
+  document = normalizeLegacyNodeOwnership(document, {
+    defaults: EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
+    fields: EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
+    nodeType: 'detail_denoise_dehaze',
+    schemas: editDocumentLocalContrastV2Schema.shape,
+  });
+  return normalizeLegacyNodeOwnership(document, {
+    defaults: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,
+    fields: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
+    nodeType: 'lens_correction',
+    schemas: editDocumentManualChromaticAberrationV2Schema.shape,
+  });
 }, editDocumentV2ObjectSchema);
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;

@@ -52,6 +52,30 @@ test('Detail inspector exposes and commits independent professional denoise cont
   });
 });
 
+test('Detail inspector commits chromatic aberration through lens node authority', async () => {
+  installDom();
+  installEditorSession();
+  const container = await renderHarness(createElement(DenoiseControlsHarness));
+  const redCyan = findSliderByLabel(container, 'Red/Cyan');
+  if (redCyan === null) throw new Error('Expected Red/Cyan slider');
+  const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  valueSetter?.call(redCyan, '23');
+  await act(async () => {
+    redCyan.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await flushPromises();
+  });
+
+  expect(useEditorStore.getState().adjustments.chromaticAberrationRedCyan).toBe(23);
+  expect(useEditorStore.getState().editDocumentV2.nodes.lens_correction.params.chromaticAberrationRedCyan).toBe(23);
+  expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params).not.toHaveProperty(
+    'chromaticAberrationRedCyan',
+  );
+  expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+    adjustmentRevision: 1,
+    source: 'manual-control',
+  });
+});
+
 test('Detail mask controls keep local denoise values outside the global transaction authority', async () => {
   installDom();
   installEditorSession();
