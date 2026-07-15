@@ -67,7 +67,7 @@ const assertPreviousValueMatches = (
   }
 };
 
-export const applyEditGraphOperationsToAdjustments = (
+const applyEditGraphOperationsToAdjustments = (
   base: Adjustments,
   operations: readonly EditGraphParameterPatchOperationV1[],
 ): Adjustments => {

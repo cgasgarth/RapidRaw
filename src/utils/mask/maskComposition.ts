@@ -11,11 +11,7 @@ const clamp01 = (value: number) => {
   return Math.max(0, Math.min(1, value));
 };
 
-export function applyMaskComposeOperation(
-  baseWeight: number,
-  contributionWeight: number,
-  mode: MaskComposeMode,
-): number {
+function applyMaskComposeOperation(baseWeight: number, contributionWeight: number, mode: MaskComposeMode): number {
   const base = clamp01(baseWeight);
   const contribution = clamp01(contributionWeight);
 

@@ -106,4 +106,4 @@ export const agentExpertEditDemoWorkflowSchema = z
   })
   .strict();
 
-export type AgentExpertEditDemoWorkflow = z.infer<typeof agentExpertEditDemoWorkflowSchema>;
+type AgentExpertEditDemoWorkflow = z.infer<typeof agentExpertEditDemoWorkflowSchema>;

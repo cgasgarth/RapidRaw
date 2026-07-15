@@ -16,8 +16,8 @@ import {
 } from './agentPreviewEnvelope';
 
 export const AGENT_MEDIUM_PREVIEW_MAX_BYTES = 8 * 1024 * 1024;
-export const AGENT_MEDIUM_PREVIEW_TTL_MS = 60_000;
-export const AGENT_MEDIUM_PREVIEW_CACHE_LIMIT = 8;
+const AGENT_MEDIUM_PREVIEW_TTL_MS = 60_000;
+const AGENT_MEDIUM_PREVIEW_CACHE_LIMIT = 8;
 
 export const agentModelImageAttachmentSchema = z
   .object({
@@ -150,7 +150,7 @@ const buildCacheKey = (
   ].join(':');
 };
 
-export const renderAgentMediumPreviewNative = async ({
+const renderAgentMediumPreviewNative = async ({
   adjustments,
   signal,
   snapshot,

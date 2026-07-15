@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 const normalizedScalarSchema = z.number().min(0).max(1);
 
-export const defringeTargetSchema = z.enum(['purple', 'green']);
-export const defringeFixtureKindSchema = z.enum([
+const defringeTargetSchema = z.enum(['purple', 'green']);
+const defringeFixtureKindSchema = z.enum([
   'backlit_branch',
   'specular_edge',
   'chrome_highlight',
@@ -11,7 +11,7 @@ export const defringeFixtureKindSchema = z.enum([
   'false_positive_color_patch',
 ]);
 
-export const defringeRangeSchema = z
+const defringeRangeSchema = z
   .object({
     hueCenterDeg: z.number().min(0).max(360),
     hueWidthDeg: z.number().min(5).max(120),
@@ -40,7 +40,7 @@ export const defringeRangeSchema = z
     }
   });
 
-export const defringeSettingsSchema = z
+const defringeSettingsSchema = z
   .object({
     amount: normalizedScalarSchema,
     chromaProtection: normalizedScalarSchema,
@@ -94,11 +94,11 @@ export const defringeFixtureSchema = z
     }
   });
 
-export const defringeFixtureListSchema = z.array(defringeFixtureSchema).min(1);
+const defringeFixtureListSchema = z.array(defringeFixtureSchema).min(1);
 
 export type DefringeFixture = z.infer<typeof defringeFixtureSchema>;
-export type DefringeSettings = z.infer<typeof defringeSettingsSchema>;
+type DefringeSettings = z.infer<typeof defringeSettingsSchema>;
 
-export const parseDefringeFixture = (value: unknown): DefringeFixture => defringeFixtureSchema.parse(value);
+const parseDefringeFixture = (value: unknown): DefringeFixture => defringeFixtureSchema.parse(value);
 
 export const parseDefringeFixtures = (value: unknown): DefringeFixture[] => defringeFixtureListSchema.parse(value);

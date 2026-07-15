@@ -6,14 +6,14 @@ const axisBoundsSchema = z
   .strict()
   .refine((bounds) => bounds.min <= bounds.max, 'Bounds min must not exceed max.');
 
-export const negativeLabRollBoundsSetSchema = z
+const negativeLabRollBoundsSetSchema = z
   .object({
     axisBounds: z.object({ color: axisBoundsSchema, luma: axisBoundsSchema }).strict(),
     channelBounds: z.object({ b: axisBoundsSchema, g: axisBoundsSchema, r: axisBoundsSchema }).strict(),
   })
   .strict();
 
-export const negativeLabRollBoundsFrameSchema = z
+const negativeLabRollBoundsFrameSchema = z
   .object({
     anchor: z.boolean(),
     eligible: z.boolean(),
@@ -33,7 +33,7 @@ export const negativeLabRollBoundsRequestSchema = z
   })
   .strict();
 
-export const negativeLabRollBoundsFrameResultSchema = z
+const negativeLabRollBoundsFrameResultSchema = z
   .object({
     anchor: z.boolean(),
     eligible: z.boolean(),

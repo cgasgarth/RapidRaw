@@ -103,7 +103,7 @@ export const deriveLayerMaskExportParityReceiptState = ({
   });
 };
 
-export const buildLayerMaskExportParityReceiptId = (
+const buildLayerMaskExportParityReceiptId = (
   receipt: Pick<
     LayerMaskExportParityReceipt,
     'finalExportHash' | 'fixtureId' | 'refinedMaskContentHash' | 'refinedPreviewHash' | 'sourceGraphRevision'

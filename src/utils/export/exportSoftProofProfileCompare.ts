@@ -159,7 +159,7 @@ export const buildSoftProofProfileCompareUnavailableState = ({
   status: 'unavailable',
 });
 
-export const hashSoftProofPreviewBuffer = (buffer: ArrayBuffer): string => {
+const hashSoftProofPreviewBuffer = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
   let hash = 0x811c9dc5;
   for (const byte of bytes) {
@@ -248,7 +248,7 @@ export interface ExportSoftProofResolverStatus {
     | null;
 }
 
-export const buildExportSoftProofResolverPreset = ({
+const buildExportSoftProofResolverPreset = ({
   currentSettings,
   name,
 }: {

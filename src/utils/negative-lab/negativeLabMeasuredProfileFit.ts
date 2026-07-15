@@ -10,14 +10,14 @@ import {
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
 
-export interface NegativeLabCalibrationPatchV1 {
+interface NegativeLabCalibrationPatchV1 {
   expectedRgb: [number, number, number];
   independentColorPatch: boolean;
   observedRgb: [number, number, number];
   clipped?: boolean;
 }
 
-export const fitNegativeLabMeasuredProfile = async ({
+const fitNegativeLabMeasuredProfile = async ({
   patches,
   sourceInterpretationHash,
   targetLayoutId = 'rawengine_negative_lab_target_v1',

@@ -11,7 +11,7 @@ export interface LibraryImagePatch {
   changes: Partial<Omit<ImageFile, 'path'>>;
 }
 
-export interface LibraryEntityDelta {
+interface LibraryEntityDelta {
   collectionRevision: number;
   upserted: readonly LibraryImageEntity[];
   removedPaths: readonly string[];

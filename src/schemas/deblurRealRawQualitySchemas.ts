@@ -81,7 +81,7 @@ const qualityCaseSchema = z
     }
   });
 
-export const deblurRealRawQualityManifestSchema = z
+const deblurRealRawQualityManifestSchema = z
   .object({
     $schema: z.url(),
     issue: z.literal(1182),

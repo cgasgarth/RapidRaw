@@ -9,12 +9,12 @@ import {
   AiAppServerToolRouteStatus,
 } from '../../utils/ai/aiAppServerToolRouteIds';
 
-export const aiAppServerToolRouteStatusSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_STATUSES);
-export const aiAppServerToolRouteSourceKindSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_SOURCE_KINDS);
-export const aiAppServerToolRouteExecutionModeSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_EXECUTION_MODES);
-export const aiAppServerToolCapabilitySchema = z.enum(AI_APP_SERVER_TOOL_CAPABILITIES);
+const aiAppServerToolRouteStatusSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_STATUSES);
+const aiAppServerToolRouteSourceKindSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_SOURCE_KINDS);
+const aiAppServerToolRouteExecutionModeSchema = z.enum(AI_APP_SERVER_TOOL_ROUTE_EXECUTION_MODES);
+const aiAppServerToolCapabilitySchema = z.enum(AI_APP_SERVER_TOOL_CAPABILITIES);
 
-export const aiAppServerToolRouteSchema = z
+const aiAppServerToolRouteSchema = z
   .object({
     appServerToolName: z
       .string()
@@ -107,6 +107,6 @@ export const aiAppServerToolRouteManifestSchema = z
   .strict();
 
 export type AiAppServerToolRoute = z.infer<typeof aiAppServerToolRouteSchema>;
-export type AiAppServerToolRouteExecutionMode = z.infer<typeof aiAppServerToolRouteExecutionModeSchema>;
-export type AiAppServerToolRouteManifest = z.infer<typeof aiAppServerToolRouteManifestSchema>;
-export type AiAppServerToolRouteSourceKind = z.infer<typeof aiAppServerToolRouteSourceKindSchema>;
+type AiAppServerToolRouteExecutionMode = z.infer<typeof aiAppServerToolRouteExecutionModeSchema>;
+type AiAppServerToolRouteManifest = z.infer<typeof aiAppServerToolRouteManifestSchema>;
+type AiAppServerToolRouteSourceKind = z.infer<typeof aiAppServerToolRouteSourceKindSchema>;

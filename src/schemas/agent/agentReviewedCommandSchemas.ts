@@ -7,9 +7,9 @@ export const agentReviewedAdjustmentCommandIdSchema = z.enum([
   'shadow_lift',
 ]);
 
-export const agentReviewedAdjustmentCommandIntensitySchema = z.enum(['low', 'medium', 'high']);
+const agentReviewedAdjustmentCommandIntensitySchema = z.enum(['low', 'medium', 'high']);
 
-export const agentReviewedAdjustmentCommandDiffSchema = z
+const agentReviewedAdjustmentCommandDiffSchema = z
   .object({
     after: z.number(),
     before: z.number(),
@@ -29,6 +29,6 @@ export const agentReviewedAdjustmentCommandReceiptSchema = z
   .strict();
 
 export type AgentReviewedAdjustmentCommandId = z.infer<typeof agentReviewedAdjustmentCommandIdSchema>;
-export type AgentReviewedAdjustmentCommandIntensity = z.infer<typeof agentReviewedAdjustmentCommandIntensitySchema>;
-export type AgentReviewedAdjustmentCommandDiff = z.infer<typeof agentReviewedAdjustmentCommandDiffSchema>;
+type AgentReviewedAdjustmentCommandIntensity = z.infer<typeof agentReviewedAdjustmentCommandIntensitySchema>;
+type AgentReviewedAdjustmentCommandDiff = z.infer<typeof agentReviewedAdjustmentCommandDiffSchema>;
 export type AgentReviewedAdjustmentCommandReceipt = z.infer<typeof agentReviewedAdjustmentCommandReceiptSchema>;

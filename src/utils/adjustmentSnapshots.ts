@@ -17,7 +17,7 @@ const shouldFreezeSnapshots = (): boolean =>
   (globalThis as typeof globalThis & { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !==
   'production';
 
-export const deepFreezeAdjustmentSnapshot = <T>(value: T, seen = new WeakSet<object>()): T => {
+const deepFreezeAdjustmentSnapshot = <T>(value: T, seen = new WeakSet<object>()): T => {
   if (!shouldFreezeSnapshots() || value === null || typeof value !== 'object' || seen.has(value)) return value;
   seen.add(value);
   for (const nested of Object.values(value)) deepFreezeAdjustmentSnapshot(nested, seen);

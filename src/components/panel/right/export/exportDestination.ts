@@ -69,7 +69,7 @@ export async function chooseExportDestination(
   };
 }
 
-export function normalizeFilenameTemplate(filenameTemplate: string, imageCount: number): string {
+function normalizeFilenameTemplate(filenameTemplate: string, imageCount: number): string {
   if (imageCount > 1 && !filenameTemplate.includes('{sequence}') && !filenameTemplate.includes('{original_filename}')) {
     return `${filenameTemplate}_{sequence}`;
   }

@@ -149,7 +149,7 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA = {
   schemaVersion: 1,
 } satisfies ComputationalMergeAppServerRouteManifest;
 
-export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_DATA = COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA.routes;
+const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_DATA = COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA.routes;
 
 export interface ComputationalMergeAppServerRoutePairData {
   apply: ComputationalMergeAppServerRoute;

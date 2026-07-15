@@ -7,7 +7,7 @@ import {
 
 import type { HdrBracketDetectionResultV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
-export const hdrBracketPreflightSourceMetadataSchema = z
+const hdrBracketPreflightSourceMetadataSchema = z
   .object({
     contentHash: z.string().trim().min(1).optional(),
     exif: z.record(z.string(), z.string()).nullable().optional(),
@@ -16,7 +16,7 @@ export const hdrBracketPreflightSourceMetadataSchema = z
   })
   .strict();
 
-export const hdrBracketPreflightSourceMetadataListSchema = z.array(hdrBracketPreflightSourceMetadataSchema).min(2);
+const hdrBracketPreflightSourceMetadataListSchema = z.array(hdrBracketPreflightSourceMetadataSchema).min(2);
 
 export type HdrBracketPreflightSourceMetadata = z.infer<typeof hdrBracketPreflightSourceMetadataSchema>;
 

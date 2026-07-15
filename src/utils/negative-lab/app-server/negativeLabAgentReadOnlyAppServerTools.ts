@@ -122,7 +122,7 @@ export const negativeLabAgentInspectResponseSchema = agentReadOnlyResponseBaseSc
   })
   .strict();
 
-export const negativeLabAgentConversionPlanResponseSchema = agentReadOnlyResponseBaseSchema
+const negativeLabAgentConversionPlanResponseSchema = agentReadOnlyResponseBaseSchema
   .extend({
     affectedFrameIds: z.array(z.string().trim().min(1)),
     conversionPlan: z.unknown(),
@@ -132,7 +132,7 @@ export const negativeLabAgentConversionPlanResponseSchema = agentReadOnlyRespons
   })
   .strict();
 
-export const negativeLabAgentRollNormalizationPlanResponseSchema = agentReadOnlyResponseBaseSchema
+const negativeLabAgentRollNormalizationPlanResponseSchema = agentReadOnlyResponseBaseSchema
   .extend({
     affectedFrameIds: z.array(z.string().trim().min(1)),
     parameterDiff: z.array(parameterDiffSchema),
@@ -143,7 +143,7 @@ export const negativeLabAgentRollNormalizationPlanResponseSchema = agentReadOnly
   })
   .strict();
 
-export const negativeLabAgentQcProofResponseSchema = agentReadOnlyResponseBaseSchema
+const negativeLabAgentQcProofResponseSchema = agentReadOnlyResponseBaseSchema
   .extend({
     contactSheetArtifact: z
       .object({
@@ -159,7 +159,7 @@ export const negativeLabAgentQcProofResponseSchema = agentReadOnlyResponseBaseSc
   })
   .strict();
 
-export const negativeLabAgentStockFamilyPlanResponseSchema = agentReadOnlyResponseBaseSchema
+const negativeLabAgentStockFamilyPlanResponseSchema = agentReadOnlyResponseBaseSchema
   .extend({
     affectedFrameIds: z.array(z.string().trim().min(1)),
     parameterDiff: z.array(parameterDiffSchema),

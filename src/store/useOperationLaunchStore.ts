@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import type { OperationLaunch } from '../workflows/operationLifecycle';
 
-export const OPERATION_KINDS = [
+const OPERATION_KINDS = [
   'hdr',
   'panorama',
   'focusStack',
@@ -11,7 +11,7 @@ export const OPERATION_KINDS = [
   'negativeLab',
   'culling',
 ] as const;
-export type OperationKind = (typeof OPERATION_KINDS)[number];
+type OperationKind = (typeof OPERATION_KINDS)[number];
 
 interface OperationLaunchState {
   launches: Partial<Record<OperationKind, OperationLaunch>>;
@@ -43,5 +43,5 @@ export const useOperationLaunchStore = create<OperationLaunchState>((set) => ({
   },
 }));
 
-export const isCurrentOperationLaunch = (kind: OperationKind, launchId: string): boolean =>
+const isCurrentOperationLaunch = (kind: OperationKind, launchId: string): boolean =>
   useOperationLaunchStore.getState().launches[kind]?.launchId === launchId;

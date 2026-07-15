@@ -25,9 +25,9 @@ export const consumeStartupShellIntent = (): StartupShellIntent | null => {
   return intent;
 };
 
-export type StartupAppLoadResult<T> = { module: T; status: 'ready' } | { error: Error; status: 'failed' };
+type StartupAppLoadResult<T> = { module: T; status: 'ready' } | { error: Error; status: 'failed' };
 
-export const loadStartupApp = async <T>(loader: () => Promise<T>): Promise<StartupAppLoadResult<T>> => {
+const loadStartupApp = async <T>(loader: () => Promise<T>): Promise<StartupAppLoadResult<T>> => {
   try {
     return { module: await loader(), status: 'ready' };
   } catch (error) {
@@ -35,7 +35,7 @@ export const loadStartupApp = async <T>(loader: () => Promise<T>): Promise<Start
   }
 };
 
-export const loadStartupAppAfterShellReceipt = async <T>(
+const loadStartupAppAfterShellReceipt = async <T>(
   shellReceipt: Promise<unknown>,
   loader: () => Promise<T>,
 ): Promise<StartupAppLoadResult<T>> => {

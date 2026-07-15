@@ -7,7 +7,7 @@ import {
 } from '../../../packages/rawengine-schema/src';
 import { brushMaskParametersSchema, flowBrushMaskParametersSchema } from '../../schemas/masks/maskParameterSchemas';
 
-export const BRUSH_MASK_COMMAND_SCHEMA_VERSION = RAW_ENGINE_SCHEMA_VERSION;
+const BRUSH_MASK_COMMAND_SCHEMA_VERSION = RAW_ENGINE_SCHEMA_VERSION;
 export const BRUSH_MASK_COMMAND_COORDINATE_SPACE = 'normalized_image' as const;
 
 export type BrushMaskCommandEnvelope = Extract<

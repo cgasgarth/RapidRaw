@@ -8,7 +8,7 @@ import {
   aiDenoiseRuntimeSettingsSchema,
 } from '../schemas/ai/aiDenoiseRuntimeSchemas';
 
-export const DEFAULT_LOCAL_AI_DENOISE_SETTINGS: AiDenoiseRuntimeSettings = aiDenoiseRuntimeSettingsSchema.parse({
+const DEFAULT_LOCAL_AI_DENOISE_SETTINGS: AiDenoiseRuntimeSettings = aiDenoiseRuntimeSettingsSchema.parse({
   chromaStrength: 0.58,
   lumaStrength: 0.46,
   modelId: 'rawengine-local-denoise-adapter-v1',

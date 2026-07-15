@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const proofLevelSchema = z.enum(['runtime_quality_harness', 'synthetic_shared_preview_export_match']);
+const proofLevelSchema = z.enum(['runtime_quality_harness', 'synthetic_shared_preview_export_match']);
 
-export const proofEntrypointsSchema = z
+const proofEntrypointsSchema = z
   .object({
     export: z.string().trim().min(1).optional(),
     preview: z.string().trim().min(1).optional(),
@@ -63,7 +63,7 @@ export const proofContractSchema = z
     }
   });
 
-export type ProofContract = z.infer<typeof proofContractSchema>;
+type ProofContract = z.infer<typeof proofContractSchema>;
 
 export function collectProofContractFailures(path: string, value: unknown): string[] {
   const parsed = proofContractSchema.safeParse(value);

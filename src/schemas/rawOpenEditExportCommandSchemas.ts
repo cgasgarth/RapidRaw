@@ -230,7 +230,7 @@ export const rawOpenEditExportBasicToneCommandSchema = z
   })
   .strict();
 
-export const rawOpenEditExportAdjustHslCommandSchema = z
+const rawOpenEditExportAdjustHslCommandSchema = z
   .object({
     actor: jsonObjectSchema,
     approval: z
@@ -260,7 +260,7 @@ export const rawOpenEditExportAdjustHslCommandSchema = z
   })
   .strict();
 
-export const rawOpenEditExportWhiteBalanceCommandSchema = z
+const rawOpenEditExportWhiteBalanceCommandSchema = z
   .object({
     actor: jsonObjectSchema,
     approval: z
@@ -293,7 +293,7 @@ export const rawOpenEditExportWhiteBalanceCommandSchema = z
   })
   .strict();
 
-export const rawOpenEditExportSkinToneUniformityCommandSchema = z
+const rawOpenEditExportSkinToneUniformityCommandSchema = z
   .object({
     actor: jsonObjectSchema,
     approval: z
@@ -327,7 +327,7 @@ export const rawOpenEditExportSkinToneUniformityCommandSchema = z
   })
   .strict();
 
-export const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
+const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
   rawOpenEditExportBasicToneCommandSchema,
   rawOpenEditExportWhiteBalanceCommandSchema,
   rawOpenEditExportAdjustHslCommandSchema,

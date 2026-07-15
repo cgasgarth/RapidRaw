@@ -3,7 +3,7 @@ import { z } from 'zod';
 const nullableStringSchema = z.string().trim().min(1).nullable();
 const nullablePositiveIntSchema = z.number().int().positive().nullable();
 
-export const publicFixtureManifestEntrySchema = z
+const publicFixtureManifestEntrySchema = z
   .object({
     bitDepth: nullablePositiveIntSchema,
     cameraOrScanner: nullableStringSchema,
@@ -84,7 +84,7 @@ const retiredPublicFixtureManifestEntrySchema = publicFixtureManifestEntrySchema
   status: z.literal('retired'),
 });
 
-export const publicFixtureManifestSchema = z
+const publicFixtureManifestSchema = z
   .object({
     $schema: z.url(),
     activeEntries: z.array(activePublicFixtureManifestEntrySchema),
@@ -133,7 +133,7 @@ export type PublicFixtureManifestEntry = z.infer<typeof publicFixtureManifestEnt
 export const parsePublicFixtureManifest = (value: unknown): PublicFixtureManifest =>
   publicFixtureManifestSchema.parse(value);
 
-export const getPublicFixtureManifestEntries = (manifest: PublicFixtureManifest): PublicFixtureManifestEntry[] => [
+const getPublicFixtureManifestEntries = (manifest: PublicFixtureManifest): PublicFixtureManifestEntry[] => [
   ...manifest.activeEntries,
   ...manifest.plannedEntries,
   ...manifest.retiredEntries,

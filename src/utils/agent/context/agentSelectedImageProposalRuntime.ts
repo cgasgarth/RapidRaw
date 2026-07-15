@@ -86,7 +86,7 @@ const canonicalize = (value: unknown): unknown => {
 
 const canonicalJson = (value: unknown): string => JSON.stringify(canonicalize(value));
 
-export const calculateAgentSelectedImageProposalReceiptHash = async (receipt: ReceiptWithoutHash): Promise<string> =>
+const calculateAgentSelectedImageProposalReceiptHash = async (receipt: ReceiptWithoutHash): Promise<string> =>
   proposalHash(canonicalJson(receipt));
 
 export const verifyAgentSelectedImageProposalReceipt = async (receipt: unknown): Promise<boolean> => {

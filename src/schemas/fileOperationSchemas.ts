@@ -10,7 +10,7 @@ export const importJobAuthoritySchema = z
     jobId: importJobIdSchema,
   })
   .strict();
-export const importStageSchema = z.enum([
+const importStageSchema = z.enum([
   'preflight',
   'inspecting',
   'copying',
@@ -23,7 +23,7 @@ export const importStageSchema = z.enum([
   'cancelled',
 ]);
 
-export const importItemFailureSchema = z
+const importItemFailureSchema = z
   .object({
     itemId: z.number().int().nonnegative(),
     source: fileOperationPathSchema,
@@ -32,7 +32,7 @@ export const importItemFailureSchema = z
   })
   .strict();
 
-export const importArtifactReceiptSchema = z
+const importArtifactReceiptSchema = z
   .object({
     destination: fileOperationPathSchema,
     byteSize: z.number().int().nonnegative().safe(),
@@ -40,7 +40,7 @@ export const importArtifactReceiptSchema = z
   })
   .strict();
 
-export const importItemReceiptSchema = z
+const importItemReceiptSchema = z
   .object({
     itemId: z.number().int().nonnegative().safe(),
     source: fileOperationPathSchema,
@@ -52,7 +52,7 @@ export const importItemReceiptSchema = z
   })
   .strict();
 
-export const importDiagnosticsSchema = z
+const importDiagnosticsSchema = z
   .object({
     preflightMillis: z.number().int().nonnegative().safe(),
     timeToFirstCommitMillis: z.number().int().nonnegative().safe().nullable(),
@@ -148,7 +148,7 @@ export type CreateFolderRequest = z.infer<typeof createFolderRequestSchema>;
 export type DeleteFilesRequest = z.infer<typeof deleteFilesRequestSchema>;
 export type ImportFilesRequest = z.infer<typeof importFilesRequestSchema>;
 export type ImportJobAuthority = z.infer<typeof importJobAuthoritySchema>;
-export type ImportJobReceipt = z.infer<typeof importJobReceiptSchema>;
+type ImportJobReceipt = z.infer<typeof importJobReceiptSchema>;
 export type ImportResumeValidation = z.infer<typeof importResumeValidationSchema>;
 export type RenameFilesRequest = z.infer<typeof renameFilesRequestSchema>;
 export type RenameFolderRequest = z.infer<typeof renameFolderRequestSchema>;

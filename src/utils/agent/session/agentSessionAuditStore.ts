@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { agentModelSelectionReceiptSchema } from './agentAppServerModelSelection';
 
-export const agentArtifactLineageEntrySchema = z
+const agentArtifactLineageEntrySchema = z
   .object({
     artifactId: z.string().trim().min(1),
     contentHash: z.string().trim().min(1),
@@ -10,7 +10,7 @@ export const agentArtifactLineageEntrySchema = z
   })
   .strict();
 
-export const agentSessionTraceEventSchema = z
+const agentSessionTraceEventSchema = z
   .object({
     approvalId: z.string().trim().min(1).optional(),
     errorCode: z.string().trim().min(1).optional(),
@@ -36,7 +36,7 @@ export const agentSessionTraceEventSchema = z
   })
   .strict();
 
-export const agentSessionAuditRecordSchema = z
+const agentSessionAuditRecordSchema = z
   .object({
     approvalId: z.string().trim().min(1),
     artifactLineage: z.array(agentArtifactLineageEntrySchema).min(1),
@@ -64,7 +64,7 @@ export const agentSessionAuditRecordSchema = z
   })
   .strict();
 
-export const agentSessionAuditStoreSchema = z
+const agentSessionAuditStoreSchema = z
   .object({
     records: z.array(agentSessionAuditRecordSchema),
     schemaVersion: z.literal(1),
@@ -157,7 +157,7 @@ export const agentSelectedImageExportReceiptSchema = z
 
 export type AgentSessionAuditRecord = z.infer<typeof agentSessionAuditRecordSchema>;
 export type AgentSessionAuditStore = z.infer<typeof agentSessionAuditStoreSchema>;
-export type AgentSessionTraceEvent = z.infer<typeof agentSessionTraceEventSchema>;
+type AgentSessionTraceEvent = z.infer<typeof agentSessionTraceEventSchema>;
 export type AgentSelectedImageExportReceipt = z.infer<typeof agentSelectedImageExportReceiptSchema>;
 
 export interface AgentSessionAuditStorageAdapter {
@@ -165,7 +165,7 @@ export interface AgentSessionAuditStorageAdapter {
   writeText: (value: string) => void;
 }
 
-export const parseAgentSessionAuditStore = (value: string | null): AgentSessionAuditStore => {
+const parseAgentSessionAuditStore = (value: string | null): AgentSessionAuditStore => {
   if (value === null) return { records: [], schemaVersion: 1 };
   return agentSessionAuditStoreSchema.parse(JSON.parse(value));
 };
@@ -175,10 +175,9 @@ export const readAgentSessionAuditStore = (adapter: AgentSessionAuditStorageAdap
 
 const privatePathPattern = /(?:\/Users\/[^\s"']+|\/var\/folders\/[^\s"']+|[A-Za-z]:\\[^\s"']+)/gu;
 
-export const redactAgentTraceText = (value: string): string =>
-  value.replace(privatePathPattern, '[redacted-local-path]');
+const redactAgentTraceText = (value: string): string => value.replace(privatePathPattern, '[redacted-local-path]');
 
-export const createShareableAgentSessionAuditRecord = (record: AgentSessionAuditRecord): AgentSessionAuditRecord => {
+const createShareableAgentSessionAuditRecord = (record: AgentSessionAuditRecord): AgentSessionAuditRecord => {
   const parsedRecord = agentSessionAuditRecordSchema.parse(record);
   return agentSessionAuditRecordSchema.parse({
     ...parsedRecord,

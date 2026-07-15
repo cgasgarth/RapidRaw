@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const normalizedPercentSchema = z.number().min(0).max(100);
 
-export const brushStrokePointSchema = z
+const brushStrokePointSchema = z
   .object({
     pressure: z.number().min(0).max(1).optional(),
     x: z.number(),
@@ -10,7 +10,7 @@ export const brushStrokePointSchema = z
   })
   .strict();
 
-export const brushLineSchema = z
+const brushLineSchema = z
   .object({
     feather: normalizedPercentSchema,
     points: z.array(brushStrokePointSchema).min(1).max(4096),
@@ -129,7 +129,7 @@ export const aiDepthMaskParametersSchema = z.object({
   minFade: z.number(),
 });
 
-export type AiDepthMaskParameters = z.infer<typeof aiDepthMaskParametersSchema>;
+type AiDepthMaskParameters = z.infer<typeof aiDepthMaskParametersSchema>;
 export type BrushLine = z.infer<typeof brushLineSchema>;
 export type BrushMaskParameters = z.infer<typeof brushMaskParametersSchema>;
 export type FlowBrushMaskParameters = z.infer<typeof flowBrushMaskParametersSchema>;

@@ -3,7 +3,7 @@ import { z } from 'zod';
 const normalizedScalarSchema = z.number().min(0).max(1);
 const artifactHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
-export const waveletDetailScaleSchema = z
+const waveletDetailScaleSchema = z
   .object({
     amount: z.number().min(-100).max(100),
     enabled: z.boolean(),
@@ -54,7 +54,7 @@ export const waveletDetailRecipeSchema = z
     }
   });
 
-export const waveletDetailPreviewPassSchema = z
+const waveletDetailPreviewPassSchema = z
   .object({
     amount: z.number().min(-100).max(100),
     radiusPx: z.number().positive().max(128),
@@ -62,7 +62,7 @@ export const waveletDetailPreviewPassSchema = z
   })
   .strict();
 
-export const waveletDetailPreviewArtifactSchema = z
+const waveletDetailPreviewArtifactSchema = z
   .object({
     artifactId: z.string().regex(/^wavelet_detail\.preview\.[a-z0-9._-]+$/u),
     colorSpace: waveletDetailRecipeSchema.shape.colorSpace,
@@ -189,11 +189,11 @@ export const waveletDetailPreviewManifestSchema = z
   });
 
 export type WaveletDetailRecipe = z.infer<typeof waveletDetailRecipeSchema>;
-export type WaveletDetailPreviewArtifact = z.infer<typeof waveletDetailPreviewArtifactSchema>;
+type WaveletDetailPreviewArtifact = z.infer<typeof waveletDetailPreviewArtifactSchema>;
 export type WaveletDetailPreviewManifest = z.infer<typeof waveletDetailPreviewManifestSchema>;
-export type WaveletDetailPreviewPass = z.infer<typeof waveletDetailPreviewPassSchema>;
+type WaveletDetailPreviewPass = z.infer<typeof waveletDetailPreviewPassSchema>;
 export type WaveletDetailPreviewPlan = z.infer<typeof waveletDetailPreviewPlanSchema>;
-export type WaveletDetailScale = z.infer<typeof waveletDetailScaleSchema>;
+type WaveletDetailScale = z.infer<typeof waveletDetailScaleSchema>;
 
 export function estimateWaveletDetailPasses(recipe: WaveletDetailRecipe): number {
   const activeScaleCount = [recipe.fine, recipe.medium, recipe.coarse].filter(

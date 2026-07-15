@@ -15,7 +15,7 @@ export const negativeLabUserProfileIdSchema = z
   .string()
   .regex(/^negative_lab\.user\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
-export const negativeLabMeasuredProfileClaimPolicySchema = z.enum([
+const negativeLabMeasuredProfileClaimPolicySchema = z.enum([
   'process_family_profile_no_stock_claim',
   'named_stock_profile_requires_license_review',
 ]);
@@ -56,27 +56,24 @@ export const negativeLabProfileFitReceiptSchema = z
     warningCodes: z.array(z.string().trim().min(1)),
   })
   .strict();
-export const negativeLabMeasuredProfileCalibrationMethodSchema = z.enum([
+const negativeLabMeasuredProfileCalibrationMethodSchema = z.enum([
   'density_curve_process_family_v1',
   'density_matrix_process_family_v1',
 ]);
-export const negativeLabMeasuredProfileFixtureLegalStatusSchema = z.enum([
-  'licensed_private_ci',
-  'project_owned_private_ci',
-]);
-export const negativeLabMeasuredProfileRenderProofStatusSchema = z.enum([
+const negativeLabMeasuredProfileFixtureLegalStatusSchema = z.enum(['licensed_private_ci', 'project_owned_private_ci']);
+const negativeLabMeasuredProfileRenderProofStatusSchema = z.enum([
   'metadata_only',
   'runtime_render_verified',
   'runtime_route_verified',
 ]);
-export const negativeLabMeasuredProfileEvidenceDigestSchema = z
+const negativeLabMeasuredProfileEvidenceDigestSchema = z
   .object({
     fixtureLegalStatus: negativeLabMeasuredProfileFixtureLegalStatusSchema,
     renderProofStatus: negativeLabMeasuredProfileRenderProofStatusSchema,
     sourceFixtureContentHashes: z.array(z.string().regex(/^sha256:[a-f0-9]{64}$/u)).min(1),
   })
   .strict();
-export const negativeLabMeasurementReportPatchMetricsSchema = z
+const negativeLabMeasurementReportPatchMetricsSchema = z
   .object({
     deltaE00Max: z.number().min(0),
     deltaE00Mean: z.number().min(0),
@@ -88,7 +85,7 @@ export const negativeLabMeasurementReportPatchMetricsSchema = z
   .refine((metrics) => metrics.deltaE00Mean <= metrics.deltaE00P95 && metrics.deltaE00P95 <= metrics.deltaE00Max, {
     message: 'Negative Lab measurement Delta E metrics must be ordered mean <= p95 <= max.',
   });
-export const negativeLabMeasurementReportTargetReferenceSchema = z
+const negativeLabMeasurementReportTargetReferenceSchema = z
   .object({
     id: z.string().trim().min(1),
     patchCount: z.number().int().min(12),
@@ -293,19 +290,17 @@ export const negativeLabMeasuredProfileCatalogSchema = z
 
 export type NegativeLabMeasuredProfile = z.infer<typeof negativeLabMeasuredProfileSchema>;
 export type NegativeLabMeasuredProfileCatalog = z.infer<typeof negativeLabMeasuredProfileCatalogSchema>;
-export type NegativeLabMeasuredProfileCalibrationMethod = z.infer<
-  typeof negativeLabMeasuredProfileCalibrationMethodSchema
->;
-export type NegativeLabMeasuredProfileClaimPolicy = z.infer<typeof negativeLabMeasuredProfileClaimPolicySchema>;
-export type NegativeLabMeasuredProfileEvidenceDigest = z.infer<typeof negativeLabMeasuredProfileEvidenceDigestSchema>;
+type NegativeLabMeasuredProfileCalibrationMethod = z.infer<typeof negativeLabMeasuredProfileCalibrationMethodSchema>;
+type NegativeLabMeasuredProfileClaimPolicy = z.infer<typeof negativeLabMeasuredProfileClaimPolicySchema>;
+type NegativeLabMeasuredProfileEvidenceDigest = z.infer<typeof negativeLabMeasuredProfileEvidenceDigestSchema>;
 export type NegativeLabMeasurementReport = z.infer<typeof negativeLabMeasurementReportSchema>;
-export type NegativeLabMeasuredProfileRuntimeStatus = z.infer<typeof negativeLabMeasuredProfileRuntimeStatusSchema>;
+type NegativeLabMeasuredProfileRuntimeStatus = z.infer<typeof negativeLabMeasuredProfileRuntimeStatusSchema>;
 export type NegativeLabRuntimePresetId = z.infer<typeof negativeLabRuntimePresetIdSchema>;
 
 export const parseNegativeLabMeasuredProfileCatalog = (value: unknown): NegativeLabMeasuredProfileCatalog =>
   negativeLabMeasuredProfileCatalogSchema.parse(value);
 
-export const parseNegativeLabMeasurementReport = (value: unknown): NegativeLabMeasurementReport =>
+const parseNegativeLabMeasurementReport = (value: unknown): NegativeLabMeasurementReport =>
   negativeLabMeasurementReportSchema.parse(value);
 
 export const negativeLabRuntimeProfileBrowserRowSchema = z

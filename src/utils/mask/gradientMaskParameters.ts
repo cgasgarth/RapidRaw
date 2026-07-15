@@ -35,10 +35,10 @@ export function normalizeRadialGradientParameters(
   });
 }
 
-export function parseLinearGradientParameters(parameters: unknown): LinearGradientMaskParameters {
+function parseLinearGradientParameters(parameters: unknown): LinearGradientMaskParameters {
   return linearGradientMaskParametersSchema.parse(parameters);
 }
 
-export function parseRadialGradientParameters(parameters: unknown): RadialGradientMaskParameters {
+function parseRadialGradientParameters(parameters: unknown): RadialGradientMaskParameters {
   return radialGradientMaskParametersSchema.parse(parameters);
 }

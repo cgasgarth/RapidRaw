@@ -3,7 +3,7 @@ import { z } from 'zod';
 const positiveIntegerSchema = z.number().int().positive();
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
-export const detailStageKindSchema = z.enum([
+const detailStageKindSchema = z.enum([
   'raw_decode',
   'demosaic',
   'scene_linear_denoise',
@@ -15,7 +15,7 @@ export const detailStageKindSchema = z.enum([
   'export_encode',
 ]);
 
-export const detailRuntimeStateSchema = z.enum([
+const detailRuntimeStateSchema = z.enum([
   'contract_only',
   'validation_only',
   'cpu_reference_only',
@@ -25,7 +25,7 @@ export const detailRuntimeStateSchema = z.enum([
   'e2e_proven',
 ]);
 
-export const detailLimitationSchema = z.enum([
+const detailLimitationSchema = z.enum([
   'e2e_workflow',
   'gpu_parity',
   'preview_export_parity',
@@ -33,34 +33,34 @@ export const detailLimitationSchema = z.enum([
   'ui_api_wiring',
 ]);
 
-export const detailOutputComparisonLimitationSchema = z.enum([
+const detailOutputComparisonLimitationSchema = z.enum([
   'native_export_pipeline',
   'real_raw_quality',
   'tauri_app_e2e',
   'user_tuned_recipe_quality',
 ]);
 
-export const detailOutputComparisonWarningSchema = z.enum([
+const detailOutputComparisonWarningSchema = z.enum([
   'crop_bounds_ok',
   'fallback_render_mode_review',
   'halo_risk_review',
   'oversmoothing_review',
 ]);
 
-export const detailPreviewExportParityClaimSchema = z.enum([
+const detailPreviewExportParityClaimSchema = z.enum([
   'disabled_noop_parity',
   'enabled_synthetic_parity',
   'export_intent_separated',
 ]);
 
-export const detailPreviewExportParityLimitationSchema = z.enum([
+const detailPreviewExportParityLimitationSchema = z.enum([
   'e2e_workflow',
   'gpu_parity',
   'real_app_pipeline',
   'real_raw_quality',
 ]);
 
-export const detailPreviewExportParityCaseSchema = z
+const detailPreviewExportParityCaseSchema = z
   .object({
     caseId: z.string().regex(/^detail\.[a-z0-9.-]+\.v[0-9]+$/u),
     claim: detailPreviewExportParityClaimSchema,
@@ -189,7 +189,7 @@ const detailOutputComparisonArtifactSchema = z
   })
   .strict();
 
-export const detailOutputComparisonProofReportSchema = z
+const detailOutputComparisonProofReportSchema = z
   .object({
     $schema: z.url(),
     artifacts: z
@@ -297,7 +297,7 @@ export const detailOutputComparisonVisualProofSchema = z
   })
   .strict();
 
-export const detailStageEntrySchema = z
+const detailStageEntrySchema = z
   .object({
     order: positiveIntegerSchema,
     stage: detailStageKindSchema,
@@ -378,7 +378,7 @@ export const detailStageOrderManifestSchema = z
     }
   });
 
-export const detailArtifactKindSchema = z.enum([
+const detailArtifactKindSchema = z.enum([
   'e2e_screenshot',
   'export_artifact',
   'metric_report',
@@ -388,7 +388,7 @@ export const detailArtifactKindSchema = z.enum([
   'synthetic_before',
 ]);
 
-export const detailArtifactEntrySchema = z
+const detailArtifactEntrySchema = z
   .object({
     artifactId: z.string().regex(/^detail\.[a-z0-9.-]+\.v[0-9]+$/u),
     capabilityState: detailRuntimeStateSchema,

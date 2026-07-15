@@ -4,14 +4,14 @@ import { negativeLabBaseFogSampleRectSchema } from './negativeLabPresetCatalogSc
 
 export const NEGATIVE_LAB_PATCH_SAMPLER_CORRECTION_SCHEMA_VERSION = 1;
 
-export const negativeLabPatchSamplerCorrectionRoleSchema = z.enum([
+const negativeLabPatchSamplerCorrectionRoleSchema = z.enum([
   'base_fog',
   'highlight_exposure',
   'neutral_rgb_balance',
   'shadow_black_point',
 ]);
 
-export const negativeLabPatchSamplerCorrectionSchema = z
+const negativeLabPatchSamplerCorrectionSchema = z
   .object({
     accepted: z.literal(true),
     appliedAt: z.string().trim().min(1),

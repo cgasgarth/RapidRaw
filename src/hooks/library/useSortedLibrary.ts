@@ -14,7 +14,7 @@ import {
 import { type SearchCriteria, useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
-export { ADVANCED_QUERY_REGEX, parseAperture, parseFocalLength, parseShutter };
+export { ADVANCED_QUERY_REGEX };
 
 interface SortedLibraryState {
   filterCriteria: FilterCriteria;
@@ -28,7 +28,7 @@ interface SortedLibrarySettingsState {
   supportedTypes: SupportedTypes | null;
 }
 
-export const libraryProjectionCache = new LibraryProjectionCache();
+const libraryProjectionCache = new LibraryProjectionCache();
 const controller = new LibraryQueryController(createLibraryQueryWorker);
 
 export function computeSortedLibrary(

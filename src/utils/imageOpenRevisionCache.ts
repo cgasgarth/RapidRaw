@@ -6,6 +6,6 @@ export function acceptImageOpenMetadataRevision(path: string, fingerprint: strin
   return previous !== fingerprint;
 }
 
-export function clearImageOpenMetadataRevisions(): void {
+function clearImageOpenMetadataRevisions(): void {
   metadataFingerprints.clear();
 }

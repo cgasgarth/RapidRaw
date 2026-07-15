@@ -35,7 +35,7 @@ export interface WgpuTransformGeometry {
   windowWidth: number;
 }
 
-export const WGPU_TRANSFORM_OVERLAP_PX = 2;
+const WGPU_TRANSFORM_OVERLAP_PX = 2;
 export const WGPU_HIDDEN_COORDINATE = -999999;
 
 const MIN_WGPU_SURFACE_SIZE = 1;

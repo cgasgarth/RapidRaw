@@ -65,8 +65,7 @@ export const reduceEditorCompare = (state: EditorCompareState, command: EditorCo
   }
 };
 
-export const isEditorCompareActive = (state: EditorCompareState): boolean =>
-  state.mode !== 'off' || state.isOriginalHeld;
+const isEditorCompareActive = (state: EditorCompareState): boolean => state.mode !== 'off' || state.isOriginalHeld;
 
 export interface ComparePaneLayout {
   edited: RenderSize;

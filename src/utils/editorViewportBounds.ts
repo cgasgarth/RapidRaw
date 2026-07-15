@@ -58,7 +58,7 @@ export interface ViewportTransform {
   scale: number;
 }
 
-export const FIT_TRANSFORM: ViewportTransform = { scale: 1, positionX: 0, positionY: 0 };
+const FIT_TRANSFORM: ViewportTransform = { scale: 1, positionX: 0, positionY: 0 };
 
 const centerOfSnapshot = (snapshot: ViewportSnapshot): ViewportPoint => ({
   x: snapshot.containerWidth / 2,

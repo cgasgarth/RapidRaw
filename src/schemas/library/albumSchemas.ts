@@ -22,6 +22,6 @@ const albumGroupSchema: z.ZodType<Extract<AlbumItem, { type: 'group' }>> = z
   })
   .strict();
 
-export const albumItemSchema: z.ZodType<AlbumItem> = z.lazy(() => z.union([albumSchema, albumGroupSchema]));
+const albumItemSchema: z.ZodType<AlbumItem> = z.lazy(() => z.union([albumSchema, albumGroupSchema]));
 
 export const albumTreeSchema = z.array(albumItemSchema);

@@ -64,7 +64,7 @@ export const agentLensProfileApplyRequestSchema = z
   })
   .strict();
 
-export const agentLensProfileApplyResponseSchema = z
+const agentLensProfileApplyResponseSchema = z
   .object({
     adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),

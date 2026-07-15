@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-export const colorBalanceRgbRangeSchema = z.enum(['shadows', 'midtones', 'highlights']);
-export const colorBalanceRgbChannelSchema = z.enum(['red', 'green', 'blue']);
+const colorBalanceRgbRangeSchema = z.enum(['shadows', 'midtones', 'highlights']);
+const colorBalanceRgbChannelSchema = z.enum(['red', 'green', 'blue']);
 
 const colorBalanceRgbRangeSettingsSchema = z
   .object({

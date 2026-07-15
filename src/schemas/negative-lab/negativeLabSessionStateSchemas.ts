@@ -10,7 +10,7 @@ import { negativeLabFrameRgbBalanceOffsetSchema } from './negativeLabFrameRgbBal
 import { negativeLabPatchSamplerCorrectionPayloadSchema } from './negativeLabPatchSamplerCorrectionSchemas';
 import { negativeLabPresetIdSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 
-export const NEGATIVE_LAB_SESSION_STATE_SCHEMA_VERSION = 1;
+const NEGATIVE_LAB_SESSION_STATE_SCHEMA_VERSION = 1;
 
 export const negativeLabSessionSaveOptionsSchema = z
   .object({
@@ -20,7 +20,7 @@ export const negativeLabSessionSaveOptionsSchema = z
   })
   .strict();
 
-export const negativeLabSessionFrameStateSchema = z
+const negativeLabSessionFrameStateSchema = z
   .object({
     cropStatus: negativeLabFrameCropStatusSchema.nullable(),
     exposureOffset: z
@@ -34,7 +34,7 @@ export const negativeLabSessionFrameStateSchema = z
   })
   .strict();
 
-export const negativeLabSessionRecipeStateSchema = z
+const negativeLabSessionRecipeStateSchema = z
   .object({
     conversionScope: z.enum(['active', 'all', 'ready']),
     openSavedPositiveInEditor: z.boolean(),
@@ -46,7 +46,7 @@ export const negativeLabSessionRecipeStateSchema = z
   })
   .strict();
 
-export const negativeLabSessionPlanStateSchema = z
+const negativeLabSessionPlanStateSchema = z
   .object({
     acceptedApplyPlanFingerprint: z.string().trim().min(1).nullable(),
     acceptedSessionRevision: z.number().int().nonnegative().nullable(),
@@ -65,7 +65,7 @@ export const negativeLabSessionPlanStateSchema = z
     }
   });
 
-export const negativeLabSessionStateSchema = z
+const negativeLabSessionStateSchema = z
   .object({
     activePath: z.string().trim().min(1).nullable(),
     frameStateByPath: z.record(z.string().trim().min(1), negativeLabSessionFrameStateSchema),
@@ -109,7 +109,7 @@ export const negativeLabSessionStateSchema = z
 export type NegativeLabSessionSaveOptions = z.infer<typeof negativeLabSessionSaveOptionsSchema>;
 export type NegativeLabSessionFrameState = z.infer<typeof negativeLabSessionFrameStateSchema>;
 export type NegativeLabSessionRecipeState = z.infer<typeof negativeLabSessionRecipeStateSchema>;
-export type NegativeLabSessionPlanState = z.infer<typeof negativeLabSessionPlanStateSchema>;
+type NegativeLabSessionPlanState = z.infer<typeof negativeLabSessionPlanStateSchema>;
 export type NegativeLabSessionState = z.infer<typeof negativeLabSessionStateSchema>;
 
 export const parseNegativeLabSessionState = (value: unknown): NegativeLabSessionState =>

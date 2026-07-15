@@ -5,7 +5,7 @@ const positiveIntegerSchema = z.number().int().positive();
 const ratioSchema = z.number().min(0).max(1);
 const sharpnessScoreSchema = z.number().nonnegative();
 
-export const focusSharpnessSourceScoreSchema = z
+const focusSharpnessSourceScoreSchema = z
   .object({
     relativeConfidence: ratioSchema,
     sharpnessScore: sharpnessScoreSchema,
@@ -13,7 +13,7 @@ export const focusSharpnessSourceScoreSchema = z
   })
   .strict();
 
-export const focusSharpnessMapCellSchema = z
+const focusSharpnessMapCellSchema = z
   .object({
     confidenceMargin: ratioSchema,
     height: positiveIntegerSchema,
@@ -26,7 +26,7 @@ export const focusSharpnessMapCellSchema = z
   })
   .strict();
 
-export const focusSharpnessExpectedRegionResultSchema = z
+const focusSharpnessExpectedRegionResultSchema = z
   .object({
     aggregateConfidenceMargin: z.number(),
     cellCount: positiveIntegerSchema,
@@ -40,7 +40,7 @@ export const focusSharpnessExpectedRegionResultSchema = z
   })
   .strict();
 
-export const focusSharpnessAppliedTransformSchema = z
+const focusSharpnessAppliedTransformSchema = z
   .object({
     dx: z.number().int(),
     dy: z.number().int(),
@@ -50,7 +50,7 @@ export const focusSharpnessAppliedTransformSchema = z
   })
   .strict();
 
-export const focusSharpnessFixtureReportSchema = z
+const focusSharpnessFixtureReportSchema = z
   .object({
     appliedTransforms: z.array(focusSharpnessAppliedTransformSchema).length(3),
     expectedRegionResults: z.array(focusSharpnessExpectedRegionResultSchema).min(3),
@@ -70,7 +70,7 @@ export const focusSharpnessFixtureReportSchema = z
   })
   .strict();
 
-export const focusSharpnessMapReportSchema = z
+const focusSharpnessMapReportSchema = z
   .object({
     $schema: z.url(),
     algorithm: z

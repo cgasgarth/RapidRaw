@@ -7,8 +7,8 @@ import {
 } from '../../utils/export/exportFormatIds';
 import type { Progress } from './AppProperties';
 
-export const EXPORT_TIMEOUT = 4000;
-export const IMPORT_TIMEOUT = 5000;
+const EXPORT_TIMEOUT = 4000;
+const IMPORT_TIMEOUT = 5000;
 
 export const FileFormats = ExportFileFormatId;
 export type FileFormats = ExportFileFormatIdType;

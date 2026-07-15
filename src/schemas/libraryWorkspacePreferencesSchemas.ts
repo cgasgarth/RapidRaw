@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const LIBRARY_WORKSPACE_PREFERENCE_VERSION = 1 as const;
+const LIBRARY_WORKSPACE_PREFERENCE_VERSION = 1 as const;
 
 export const libraryWorkspacePreferencesSchema = z
   .object({

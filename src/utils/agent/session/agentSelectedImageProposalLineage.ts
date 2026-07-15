@@ -21,7 +21,7 @@ const transitions: Readonly<
   superseded: [],
 };
 
-export class AgentSelectedImageProposalLineageError extends Error {}
+class AgentSelectedImageProposalLineageError extends Error {}
 
 const fail = (message: string): never => {
   throw new AgentSelectedImageProposalLineageError(message);

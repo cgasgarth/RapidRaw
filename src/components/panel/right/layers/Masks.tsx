@@ -43,11 +43,8 @@ export enum SubMaskMode {
 }
 
 export enum ToolType {
-  AiSeletor = 'ai-selector',
   Brush = 'brush',
   Eraser = 'eraser',
-  GenerativeReplace = 'generative-replace',
-  SelectSubject = 'select-subject',
 }
 
 export interface MaskType {

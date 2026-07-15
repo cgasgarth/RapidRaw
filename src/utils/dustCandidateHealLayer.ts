@@ -211,7 +211,7 @@ export const buildDustCandidateHealLayer = ({
   };
 };
 
-export const buildNegativeLabScratchHealLayers = ({
+const buildNegativeLabScratchHealLayers = ({
   candidate,
   frameId,
   imageHeight,

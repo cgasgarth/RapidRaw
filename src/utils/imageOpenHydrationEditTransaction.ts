@@ -21,7 +21,7 @@ interface ImageOpenHydrationContinuationState extends ImageOpenHydrationState {
   > | null;
 }
 
-export const isImageOpenHydrationIdentityCurrent = <State extends ImageOpenHydrationState>(
+const isImageOpenHydrationIdentityCurrent = <State extends ImageOpenHydrationState>(
   state: State,
   identity: ImageOpenHydrationIdentity,
 ): state is State & { selectedImage: { path: string } } =>

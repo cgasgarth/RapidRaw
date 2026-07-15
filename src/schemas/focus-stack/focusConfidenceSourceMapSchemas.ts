@@ -4,14 +4,14 @@ const nonnegativeIntegerSchema = z.number().int().nonnegative();
 const positiveIntegerSchema = z.number().int().positive();
 const ratioSchema = z.number().min(0).max(1);
 
-export const focusConfidenceSourceSummarySchema = z
+const focusConfidenceSourceSummarySchema = z
   .object({
     sourceIndex: nonnegativeIntegerSchema,
     winnerCellRatio: ratioSchema,
   })
   .strict();
 
-export const focusConfidenceSourceMapFixtureSchema = z
+const focusConfidenceSourceMapFixtureSchema = z
   .object({
     fixtureId: z.string().regex(/^focus\.synthetic\.[a-z0-9.-]+\.v[0-9]+$/u),
     grid: z

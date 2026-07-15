@@ -18,7 +18,7 @@ interface ColorWheelProps {
   isExpanded?: boolean | undefined;
 }
 
-export type ColorWheelSliderSource = 'hue' | 'luminance' | 'saturation';
+type ColorWheelSliderSource = 'hue' | 'luminance' | 'saturation';
 
 export interface ColorWheelInteractionState {
   wheel: boolean;

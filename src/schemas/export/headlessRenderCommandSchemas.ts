@@ -32,6 +32,6 @@ export const headlessRenderArtifactSchema = z
     }
   });
 
-export type HeadlessRenderRequest = z.infer<typeof headlessRenderRequestSchema>;
-export type HeadlessRenderArtifact = z.infer<typeof headlessRenderArtifactSchema>;
+type HeadlessRenderRequest = z.infer<typeof headlessRenderRequestSchema>;
+type HeadlessRenderArtifact = z.infer<typeof headlessRenderArtifactSchema>;
 export type HeadlessRenderPixel = z.infer<typeof pixelSchema>;

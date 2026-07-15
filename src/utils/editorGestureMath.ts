@@ -28,7 +28,7 @@ export interface TransformBounds {
   minY: number;
 }
 
-export const getPrimaryWheelDelta = ({ deltaX, deltaY }: Pick<WheelGestureInput, 'deltaX' | 'deltaY'>): number =>
+const getPrimaryWheelDelta = ({ deltaX, deltaY }: Pick<WheelGestureInput, 'deltaX' | 'deltaY'>): number =>
   deltaY !== 0 ? deltaY : deltaX;
 
 export const getWheelZoomMultiplier = (isTrackpad: boolean, zoomSpeedMultiplier = 1): number =>
@@ -58,7 +58,7 @@ export const getWheelPanDelta = (event: WheelGestureInput, isTrackpad: boolean):
   return { dx: event.deltaX, dy: event.deltaY };
 };
 
-export const applyBoundResistance = (value: number, min: number, max: number, resistance: number): number => {
+const applyBoundResistance = (value: number, min: number, max: number, resistance: number): number => {
   if (value > max) return max + (value - max) * resistance;
   if (value < min) return min + (value - min) * resistance;
   return value;

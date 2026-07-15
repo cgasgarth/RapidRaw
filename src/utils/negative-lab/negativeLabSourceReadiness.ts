@@ -16,13 +16,13 @@ export type NegativeLabSourceReadiness =
       unsupportedPaths: string[];
     };
 
-export const negativeLabSourceReasonKeys = {
+const negativeLabSourceReasonKeys = {
   empty: 'negativeLabEntryPoints.disabled.noSelection',
   loading: 'negativeLabEntryPoints.disabled.loading',
   unsupported: 'negativeLabEntryPoints.disabled.unsupported',
 } as const satisfies Record<NegativeLabSourceReadinessReason, string>;
 
-export const negativeLabCommandPaletteReasonKeys = {
+const negativeLabCommandPaletteReasonKeys = {
   empty: 'modals.commandPalette.unavailable.selectSource',
   loading: 'modals.commandPalette.unavailable.negativeLabLoading',
   unsupported: 'modals.commandPalette.unavailable.negativeLabUnsupported',

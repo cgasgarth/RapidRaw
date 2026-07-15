@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const aiDenoisePixelSchema = z
+const aiDenoisePixelSchema = z
   .object({
     b: z.number().min(0).max(1),
     g: z.number().min(0).max(1),
@@ -38,7 +38,7 @@ export const aiDenoiseImageBufferSchema = z
     }
   });
 
-export const aiDenoiseRuntimeMetricsSchema = z
+const aiDenoiseRuntimeMetricsSchema = z
   .object({
     changedPixelCount: z.number().int().positive(),
     chromaVarianceAfter: z.number().nonnegative(),
@@ -68,7 +68,7 @@ export const aiDenoiseRuntimeMetricsSchema = z
     }
   });
 
-export const aiDenoiseRuntimeProvenanceSchema = z
+const aiDenoiseRuntimeProvenanceSchema = z
   .object({
     deterministic: z.literal(true),
     inputContentHash: z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u),

@@ -42,7 +42,7 @@ export interface OriginalPreviewEffectRunnerOptions {
 
 const originalPreviewDataUrlSchema = z.string().startsWith('data:image/');
 
-export const executeOriginalPreview: OriginalPreviewExecutor = async (request) => {
+const executeOriginalPreview: OriginalPreviewExecutor = async (request) => {
   return invokeWithSchema(
     Invokes.GenerateOriginalTransformedPreview,
     {

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
-import { beginStaticStartup } from '../../product/startupBootstrap';
+import { beginStaticStartup } from '../../product/staticStartup';
 import { Invokes } from '../../tauri/commands';
 
 const startupPhaseSchema = z.enum([

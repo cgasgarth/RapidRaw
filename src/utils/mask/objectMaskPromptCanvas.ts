@@ -3,15 +3,15 @@ import type { SubMask } from '../../components/panel/right/layers/Masks';
 import { type EditorOverlayGeometry, overlayPoint } from '../editorOverlayGeometry';
 import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 
-export const objectPromptModeSchema = z.enum(['foreground_point', 'background_point', 'box']);
-export const objectPromptPointSchema = z
+const objectPromptModeSchema = z.enum(['foreground_point', 'background_point', 'box']);
+const objectPromptPointSchema = z
   .object({
     label: z.enum(['foreground', 'background']),
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
   })
   .strict();
-export const objectPromptBoxSchema = z
+const objectPromptBoxSchema = z
   .object({
     height: z.number().positive().max(1),
     width: z.number().positive().max(1),
@@ -52,7 +52,7 @@ export const aiObjectMaskProposalSchema = z
 
 export type AiObjectMaskProposal = z.infer<typeof aiObjectMaskProposalSchema>;
 
-export const objectMaskProposalReplayReceiptSchema = z
+const objectMaskProposalReplayReceiptSchema = z
   .object({
     boxHeight: z.number().min(0).max(1).nullable(),
     boxReady: z.boolean(),

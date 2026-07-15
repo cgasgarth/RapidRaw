@@ -3,9 +3,9 @@ import { z } from 'zod';
 import type { Adjustments, HueSatLum } from './adjustments';
 import type { SelectiveColorRangeControl } from './selectiveColorRanges';
 
-export const SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION = 1;
+const SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION = 1;
 
-export const SELECTIVE_COLOR_COMMAND_RANGE_KEYS = [
+const SELECTIVE_COLOR_COMMAND_RANGE_KEYS = [
   'reds',
   'oranges',
   'yellows',
@@ -16,10 +16,10 @@ export const SELECTIVE_COLOR_COMMAND_RANGE_KEYS = [
   'magentas',
 ] as const;
 
-export const TONE_COLOR_HSL_BANDS = ['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta'] as const;
+const TONE_COLOR_HSL_BANDS = ['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta'] as const;
 
-export type SelectiveColorCommandRangeKey = (typeof SELECTIVE_COLOR_COMMAND_RANGE_KEYS)[number];
-export type ToneColorHslBand = (typeof TONE_COLOR_HSL_BANDS)[number];
+type SelectiveColorCommandRangeKey = (typeof SELECTIVE_COLOR_COMMAND_RANGE_KEYS)[number];
+type ToneColorHslBand = (typeof TONE_COLOR_HSL_BANDS)[number];
 
 const selectiveColorCommandContextActorSchema = z.looseObject({
   id: z.string().trim().min(1),
@@ -95,7 +95,7 @@ export type SelectiveColorCommandContextTarget = z.infer<typeof selectiveColorCo
 export type SelectiveColorCommandColorPipeline = z.infer<typeof selectiveColorCommandColorPipelineSchema>;
 export type SelectiveColorCommandEnvelope = z.infer<typeof selectiveColorCommandEnvelopeSchema>;
 
-export const selectiveColorAdjustmentPayloadSchema = z
+const selectiveColorAdjustmentPayloadSchema = z
   .object({
     adjustment: z
       .object({
@@ -193,7 +193,7 @@ export const buildSelectiveColorImageCommandContext = ({
   },
 });
 
-export const hasSelectiveColorAdjustmentChange = (previous: HueSatLum, next: HueSatLum): boolean =>
+const hasSelectiveColorAdjustmentChange = (previous: HueSatLum, next: HueSatLum): boolean =>
   previous.hue !== next.hue || previous.saturation !== next.saturation || previous.luminance !== next.luminance;
 
 export const buildSelectiveColorCommandEnvelope = (
@@ -245,7 +245,7 @@ export const buildSelectiveColorCommandEnvelope = (
   return parseSelectiveColorCommandEnvelope(envelope);
 };
 
-export const parseSelectiveColorCommandEnvelope = (command: unknown): SelectiveColorCommandEnvelope => {
+const parseSelectiveColorCommandEnvelope = (command: unknown): SelectiveColorCommandEnvelope => {
   return selectiveColorCommandEnvelopeSchema.parse(command);
 };
 

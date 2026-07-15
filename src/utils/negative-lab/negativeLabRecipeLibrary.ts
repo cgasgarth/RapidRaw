@@ -145,7 +145,7 @@ export const resolveNegativeLabRecipeScope = (
   });
 };
 
-export const checkNegativeLabRecipeCompatibility = (
+const checkNegativeLabRecipeCompatibility = (
   recipe: NegativeLabNamedRecipe,
   current: Pick<NegativeLabNamedRecipeInput, 'selectedAcquisitionProfileId' | 'selectedPresetId'>,
 ): NegativeLabRecipeCompatibility => {

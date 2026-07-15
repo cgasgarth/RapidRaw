@@ -4,7 +4,7 @@ import { negativeLabAcquisitionProfileIdSchema } from './negativeLabAcquisitionP
 import { negativeLabPresetIdSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 import { negativeLabSessionSaveOptionsSchema } from './negativeLabSessionStateSchemas';
 
-export const NEGATIVE_LAB_NAMED_RECIPE_SCHEMA_VERSION = 1;
+const NEGATIVE_LAB_NAMED_RECIPE_SCHEMA_VERSION = 1;
 
 const negativeLabNamedRecipeIdSchema = z
   .string()
@@ -32,7 +32,7 @@ export const negativeLabNamedRecipeSchema = z
   })
   .strict();
 
-export const negativeLabNamedRecipeLibrarySchema = z
+const negativeLabNamedRecipeLibrarySchema = z
   .object({
     recipes: z.array(negativeLabNamedRecipeSchema),
     version: z.literal(NEGATIVE_LAB_NAMED_RECIPE_SCHEMA_VERSION),

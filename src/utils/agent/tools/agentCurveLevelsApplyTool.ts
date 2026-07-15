@@ -103,7 +103,7 @@ export const agentCurveLevelsApplyRequestSchema = z
   })
   .strict();
 
-export const agentCurveLevelsApplyResponseSchema = z
+const agentCurveLevelsApplyResponseSchema = z
   .object({
     adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),

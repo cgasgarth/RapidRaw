@@ -85,10 +85,7 @@ export const formatExifFocalLength = (value: MetadataValue): string | undefined 
   return `${formatFiniteMetadataNumber(parsed.value)} mm`;
 };
 
-export const readExifMetadataValue = (
-  exif: MetadataExifData | null | undefined,
-  keys: readonly string[],
-): MetadataValue => {
+const readExifMetadataValue = (exif: MetadataExifData | null | undefined, keys: readonly string[]): MetadataValue => {
   for (const key of keys) {
     const value = exif?.[key];
     if (hasMetadataValue(value)) return value;
@@ -145,7 +142,7 @@ export const getDisplayPreviewLutLocaleStatus = (
   return 'unsupported';
 };
 
-export const getDefaultXmpConflictChoice = (field: XmpMetadataConflictDecision['field']): XmpMetadataConflictChoice =>
+const getDefaultXmpConflictChoice = (field: XmpMetadataConflictDecision['field']): XmpMetadataConflictChoice =>
   field === 'keywords' ? 'merge' : 'external';
 
 export const buildDefaultXmpConflictDecisions = (

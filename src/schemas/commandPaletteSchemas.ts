@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const commandPaletteCommandIdSchema = z.enum([
+const commandPaletteCommandIdSchema = z.enum([
   'backToLibrary',
   'collage',
   'copyPasteSettings',
@@ -28,7 +28,7 @@ export const commandPaletteCommandIdSchema = z.enum([
 
 export type CommandPaletteCommandId = z.infer<typeof commandPaletteCommandIdSchema>;
 
-export const commandPaletteCommandCategorySchema = z.enum(['merge', 'navigation', 'panels', 'workflow']);
+const commandPaletteCommandCategorySchema = z.enum(['merge', 'navigation', 'panels', 'workflow']);
 
 export type CommandPaletteCommandCategory = z.infer<typeof commandPaletteCommandCategorySchema>;
 

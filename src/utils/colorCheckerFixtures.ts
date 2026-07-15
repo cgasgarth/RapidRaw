@@ -1,15 +1,15 @@
 import { z } from 'zod';
 
-export const colorCheckerFixtureIdSchema = z.string().regex(/^colorchecker\.[a-z0-9.-]+\.v[0-9]+$/u);
+const colorCheckerFixtureIdSchema = z.string().regex(/^colorchecker\.[a-z0-9.-]+\.v[0-9]+$/u);
 
-export const colorCheckerLicenseSchema = z
+const colorCheckerLicenseSchema = z
   .object({
     evidence: z.string().trim().min(1),
     spdx: z.string().trim().min(1),
   })
   .strict();
 
-export const colorCheckerMeasurementSchema = z
+const colorCheckerMeasurementSchema = z
   .object({
     referenceIlluminant: z.enum(['D50', 'D55', 'D65', 'unknown']),
     referenceObserver: z.enum(['2deg', '10deg', 'unknown']),
@@ -18,14 +18,14 @@ export const colorCheckerMeasurementSchema = z
   })
   .strict();
 
-export const colorCheckerPatchGeometrySchema = z
+const colorCheckerPatchGeometrySchema = z
   .object({
     columns: z.number().int().positive(),
     rows: z.number().int().positive(),
   })
   .strict();
 
-export const colorCheckerFixtureSchema = z
+const colorCheckerFixtureSchema = z
   .object({
     assetSha256: z
       .string()
@@ -85,7 +85,7 @@ export const colorCheckerFixtureSchema = z
     }
   });
 
-export const colorCheckerFixtureManifestSchema = z
+const colorCheckerFixtureManifestSchema = z
   .object({
     $schema: z.url(),
     fixtures: z.array(colorCheckerFixtureSchema).min(1),
