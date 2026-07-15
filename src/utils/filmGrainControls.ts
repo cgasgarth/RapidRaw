@@ -32,7 +32,7 @@ export const FILM_GRAIN_UI_PRESETS = [
   },
 ] as const satisfies ReadonlyArray<FilmGrainUiPreset>;
 
-export type FilmGrainUiPresetId = (typeof FILM_GRAIN_UI_PRESETS)[number]['id'];
+type FilmGrainUiPresetId = (typeof FILM_GRAIN_UI_PRESETS)[number]['id'];
 
 export const buildFilmGrainPresetAdjustmentPatch = (
   preset: FilmGrainUiPreset,

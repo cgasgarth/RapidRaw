@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import { agentSelectedImageProposalLineageV1Schema } from '../../../schemas/agent/agentSelectedImageProposalIterationSchemas';
 
-export const AGENT_SELECTED_IMAGE_MODEL_TOOL_LOOP_SCHEMA_VERSION = 1 as const;
+const AGENT_SELECTED_IMAGE_MODEL_TOOL_LOOP_SCHEMA_VERSION = 1 as const;
 
-export const agentSelectedImageModelPatchSchema = z
+const agentSelectedImageModelPatchSchema = z
   .object({
     blacks: z.number().min(-100).max(100).optional(),
     clarity: z.number().min(-100).max(100).optional(),
@@ -54,7 +54,7 @@ export const agentSelectedImageModelOutputSchema = z.discriminatedUnion('decisio
     .strict(),
 ]);
 
-export const agentSelectedImageModelToolBudgetSchema = z
+const agentSelectedImageModelToolBudgetSchema = z
   .object({
     artifactTtlMs: z.number().int().min(5_000).max(300_000).default(60_000),
     maxAggregatePreviewBytes: z
@@ -96,7 +96,7 @@ export const agentSelectedImageModelToolLoopRequestSchema = z
   })
   .strict();
 
-export const agentSelectedImageModelToolLoopStateSchema = z.enum([
+const agentSelectedImageModelToolLoopStateSchema = z.enum([
   'queued',
   'acquiring_context',
   'model_running',
@@ -114,7 +114,7 @@ export const agentSelectedImageModelToolLoopStateSchema = z.enum([
 
 const digestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
-export const agentSelectedImageModelToolAuditEventSchema = z
+const agentSelectedImageModelToolAuditEventSchema = z
   .object({
     callId: z.string().trim().min(1).optional(),
     durationMs: z.number().int().nonnegative(),

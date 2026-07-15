@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from './zodUniqueHelpers';
 
-export const compareSurveyModeSchema = z.enum(['compare', 'survey']);
-export const compareSurveySortKeySchema = z.enum(['selection_order', 'rating', 'capture_time', 'file_name']);
-export const compareSurveySortOrderSchema = z.enum(['asc', 'desc']);
+const compareSurveyModeSchema = z.enum(['compare', 'survey']);
+const compareSurveySortKeySchema = z.enum(['selection_order', 'rating', 'capture_time', 'file_name']);
+const compareSurveySortOrderSchema = z.enum(['asc', 'desc']);
 
-export const compareSurveyViewportSchema = z
+const compareSurveyViewportSchema = z
   .object({
     linked: z.boolean(),
     panX: z.number().min(-100).max(100),
@@ -15,7 +15,7 @@ export const compareSurveyViewportSchema = z
   })
   .strict();
 
-export const compareSurveyCandidateSchema = z
+const compareSurveyCandidateSchema = z
   .object({
     capturedAt: z.iso.datetime().nullable(),
     colorLabel: z.string().trim().min(1).nullable(),
@@ -89,7 +89,7 @@ export const compareSurveySessionSchema = z
 
 export type CompareSurveyCandidate = z.infer<typeof compareSurveyCandidateSchema>;
 export type CompareSurveySession = z.infer<typeof compareSurveySessionSchema>;
-export type CompareSurveyViewport = z.infer<typeof compareSurveyViewportSchema>;
+type CompareSurveyViewport = z.infer<typeof compareSurveyViewportSchema>;
 
 export const compareSurveyPickExportHandoffSchema = z
   .object({

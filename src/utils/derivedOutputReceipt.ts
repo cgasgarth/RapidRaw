@@ -42,7 +42,7 @@ const STALE_REASON_ORDER: ReadonlyArray<DerivedOutputStaleReason> = [
   'output_artifact_changed',
 ];
 
-export const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutputReceipt => {
+const buildDerivedOutputReceipt = (input: BuildReceiptInput): DerivedOutputReceipt => {
   const settingsHash = hashStableJson(input.settings);
   const { settings: _settings, sourcePaths, ...receiptInput } = input;
   const receiptSourcePaths =
@@ -147,7 +147,7 @@ const toSourceState = (receipt: DerivedOutputReceipt) =>
     sourceIndex,
   }));
 
-export const buildDerivedOutputProvenanceSidecarPath = (outputPath: string): string => `${outputPath}.rrdata`;
+const buildDerivedOutputProvenanceSidecarPath = (outputPath: string): string => `${outputPath}.rrdata`;
 
 export const buildDerivedOutputProvenanceSidecar = ({
   acceptedApplyId,
@@ -488,7 +488,7 @@ const buildSuperResolutionReceiptMetadata = (
   };
 };
 
-export const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
+const hashStableJson = (value: unknown): string => `fnv1a32:${fnv1a32(stableJson(value))}`;
 
 const stableJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`;

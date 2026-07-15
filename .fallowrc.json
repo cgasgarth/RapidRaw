@@ -1,0 +1,22 @@
+{
+  "entry": [
+    "src/main.ts",
+    "packages/rawengine-schema/src/index.ts",
+    "src/validation/**/*.ts",
+    "src/validation/**/*.mts",
+    "src/validation/**/*.tsx",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "packages/*/scripts/**/*.ts"
+  ],
+  "health": {
+    "ignore": ["tests/**", "scripts/**", "src/validation/**", "packages/*/scripts/**"]
+  },
+  "duplicates": {
+    "minLines": 10,
+    "minTokens": 100,
+    "ignore": ["tests/**", "scripts/**", "src/validation/**", "packages/*/scripts/**"]
+  },
+  "publicPackages": ["@rawengine/schema"]
+}

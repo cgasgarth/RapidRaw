@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from './zodUniqueHelpers';
 
-export const metadataTemplateMergeModeSchema = z.enum(['append_tags', 'replace_fields']);
-export const metadataTemplateFieldSchema = z.enum([
+const metadataTemplateMergeModeSchema = z.enum(['append_tags', 'replace_fields']);
+const metadataTemplateFieldSchema = z.enum([
   'Artist',
   'Copyright',
   'ImageDescription',
@@ -13,7 +13,7 @@ export const metadataTemplateFieldSchema = z.enum([
   'tags',
 ]);
 
-export const metadataTemplateValuesSchema = z
+const metadataTemplateValuesSchema = z
   .object({
     Artist: z.string().trim().min(1).nullable(),
     Copyright: z.string().trim().min(1).nullable(),
@@ -25,7 +25,7 @@ export const metadataTemplateValuesSchema = z
   })
   .strict();
 
-export const metadataTemplateSchema = z
+const metadataTemplateSchema = z
   .object({
     applyFields: z.array(metadataTemplateFieldSchema).min(1),
     createdAt: z.iso.datetime(),
@@ -95,7 +95,7 @@ export const metadataTemplateCatalogSchema = z
     }
   });
 
-export const metadataTemplateTargetSchema = z
+const metadataTemplateTargetSchema = z
   .object({
     Artist: z.string().nullable(),
     Copyright: z.string().nullable(),

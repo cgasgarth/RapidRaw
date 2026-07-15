@@ -12,9 +12,9 @@ import {
   focusStackReviewOverlayModeSchema,
 } from './focusStackUiSchemas';
 
-export const focusStackOutputReviewDecisionSchema = z.enum(['editable_review_required', 'preview_only', 'blocked']);
+const focusStackOutputReviewDecisionSchema = z.enum(['editable_review_required', 'preview_only', 'blocked']);
 
-export const focusStackOutputReviewWarningSchema = z.enum([
+const focusStackOutputReviewWarningSchema = z.enum([
   'alignment_low_confidence',
   'focus_coverage_low',
   'high_memory_estimate',
@@ -29,22 +29,22 @@ export const focusStackOutputReviewWarningSchema = z.enum([
   'unsupported_blend_method_preview_only',
   'retouch_layer_deferred',
 ]);
-export const focusStackSourceContributionWarningStateSchema = z.enum(['artifact_review_required', 'clear']);
-export const focusStackEditableHandoffStatusSchema = z.enum(['blocked', 'ready', 'review_required']);
-export const focusStackHaloReviewStatusSchema = z.enum(['apply_ready', 'blocked', 'review_required']);
-export const focusStackApplyReceiptStatusSchema = z.enum(['apply_ready', 'blocked', 'preview_only', 'review_required']);
-export const focusStackAlignmentReviewStatusSchema = z.enum(['applied', 'not_requested', 'planned', 'review_required']);
-export const focusStackRetouchSeedReasonCodeSchema = z.enum([
+const focusStackSourceContributionWarningStateSchema = z.enum(['artifact_review_required', 'clear']);
+const focusStackEditableHandoffStatusSchema = z.enum(['blocked', 'ready', 'review_required']);
+const focusStackHaloReviewStatusSchema = z.enum(['apply_ready', 'blocked', 'review_required']);
+const focusStackApplyReceiptStatusSchema = z.enum(['apply_ready', 'blocked', 'preview_only', 'review_required']);
+const focusStackAlignmentReviewStatusSchema = z.enum(['applied', 'not_requested', 'planned', 'review_required']);
+const focusStackRetouchSeedReasonCodeSchema = z.enum([
   'focus_coverage_low',
   'halo_risk',
   'low_confidence',
   'retouch_layer_required',
   'retouch_recommended',
 ]);
-export const focusStackRetouchSeedAvailabilitySchema = z.enum(['available', 'unavailable']);
-export const focusStackRetouchSeedStateSchema = z.enum(['current', 'stale', 'unknown']);
+const focusStackRetouchSeedAvailabilitySchema = z.enum(['available', 'unavailable']);
+const focusStackRetouchSeedStateSchema = z.enum(['current', 'stale', 'unknown']);
 
-export const focusStackRetouchSeedMaskRegionSchema = z
+const focusStackRetouchSeedMaskRegionSchema = z
   .object({
     cellCount: z.number().int().positive(),
     regionId: z.string().trim().min(1),
@@ -53,7 +53,7 @@ export const focusStackRetouchSeedMaskRegionSchema = z
   })
   .strict();
 
-export const focusStackRetouchSeedSourceCandidateSchema = z
+const focusStackRetouchSeedSourceCandidateSchema = z
   .object({
     contentHash: z.string().trim().min(1),
     coverageCellCount: z.number().int().positive(),
@@ -270,4 +270,4 @@ export const focusStackOutputReviewWorkflowSchema = z
   });
 
 export type FocusStackOutputReviewWorkflow = z.infer<typeof focusStackOutputReviewWorkflowSchema>;
-export type FocusStackOutputReviewArtifactHandle = ArtifactHandleV1;
+type FocusStackOutputReviewArtifactHandle = ArtifactHandleV1;

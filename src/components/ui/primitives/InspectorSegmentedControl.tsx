@@ -2,7 +2,7 @@ import cx from 'clsx';
 import { useRef } from 'react';
 import { inspectorTokens } from '../inspectorTokens';
 
-export interface InspectorSegmentedControlOption<T extends string> {
+interface InspectorSegmentedControlOption<T extends string> {
   disabled?: boolean;
   label: string;
   tooltip?: string;

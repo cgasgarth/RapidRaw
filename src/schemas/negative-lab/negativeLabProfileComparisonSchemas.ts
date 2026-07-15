@@ -12,7 +12,7 @@ import {
 } from './negativeLabMeasuredProfileSchemas';
 import { negativeLabPresetIdSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 
-export const negativeLabProfileComparisonDeltaSchema = z
+const negativeLabProfileComparisonDeltaSchema = z
   .object({
     key: z.enum([
       'analysis_buffer',
@@ -33,7 +33,7 @@ export const negativeLabProfileComparisonDeltaSchema = z
   })
   .strict();
 
-export const negativeLabProfileComparisonRenderEvidenceSchema = z
+const negativeLabProfileComparisonRenderEvidenceSchema = z
   .object({
     baseSampleReference: z.string().trim().min(1),
     densityAlgorithm: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
@@ -79,7 +79,7 @@ export const negativeLabSelectedProfileSnapshotSchema = z
   })
   .strict();
 
-export const negativeLabProfileComparisonRowSchema = z
+const negativeLabProfileComparisonRowSchema = z
   .object({
     deltaSummary: z.string().trim().min(1),
     deltas: z.array(negativeLabProfileComparisonDeltaSchema).min(1),

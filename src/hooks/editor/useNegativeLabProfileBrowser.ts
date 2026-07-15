@@ -5,12 +5,12 @@ import { listNegativeLabStockMetadataReferencesForPreset } from '../../utils/neg
 
 export type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 export type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
-export type NegativeLabProfileFilterLabelKey =
+type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
   | 'modals.negativeConversion.profileFilterBlackAndWhite'
   | 'modals.negativeConversion.profileFilterColorNegative'
   | 'modals.negativeConversion.profileFilterMeasured';
-export type NegativeLabProfileSortLabelKey =
+type NegativeLabProfileSortLabelKey =
   | 'modals.negativeConversion.profileSortCatalog'
   | 'modals.negativeConversion.profileSortEvidence'
   | 'modals.negativeConversion.profileSortName'

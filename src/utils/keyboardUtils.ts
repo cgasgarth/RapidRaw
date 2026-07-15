@@ -346,7 +346,7 @@ export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): strin
   return parts;
 }
 
-export function codeToDisplayLabel(code: string): string | null {
+function codeToDisplayLabel(code: string): string | null {
   if (/^Key[A-Z]$/.test(code) || /^Digit[0-9]$/.test(code)) {
     return (code[code.length - 1] ?? '').toUpperCase();
   }
@@ -356,7 +356,7 @@ export function codeToDisplayLabel(code: string): string | null {
   return symMap[code] ?? null;
 }
 
-export function isValidShortcutKey(code: string): boolean {
+function isValidShortcutKey(code: string): boolean {
   if (code.startsWith('Key') || code.startsWith('Digit')) return true;
   if (code.startsWith('F') && /^\d+$/.test(code.slice(1))) return true;
   if (/^Numpad[0-9]$/.test(code)) return true;
@@ -389,6 +389,6 @@ export function formatShortcutLabel(combo: string[], osPlatform: string): string
   return combo.map((part) => formatKeyCode(part, osPlatform)).join('+');
 }
 
-export function arraysEqual(a: string[], b: string[]): boolean {
+function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }

@@ -89,7 +89,7 @@ export const keyboardShortcutMapSchema = z.record(z.string().min(1), keyboardSho
 export type KeyboardShortcutCombo = z.infer<typeof keyboardShortcutComboSchema>;
 export type KeyboardShortcutMap = z.infer<typeof keyboardShortcutMapSchema>;
 
-export const parseKeyboardShortcutMap = (value: unknown): KeyboardShortcutMap => keyboardShortcutMapSchema.parse(value);
+const parseKeyboardShortcutMap = (value: unknown): KeyboardShortcutMap => keyboardShortcutMapSchema.parse(value);
 
 export const parseKeyboardShortcutCombo = (value: unknown): KeyboardShortcutCombo =>
   keyboardShortcutComboSchema.parse(value);

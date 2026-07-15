@@ -644,7 +644,7 @@ function cloneSourceForOperation(
   };
 }
 
-export function toLayerScopedToneAdjustment(adjustments: MaskContainer['adjustments']): LayerScopedToneAdjustmentV1 {
+function toLayerScopedToneAdjustment(adjustments: MaskContainer['adjustments']): LayerScopedToneAdjustmentV1 {
   return {
     blackPoint: adjustments.blacks,
     clarity: adjustments.clarity,

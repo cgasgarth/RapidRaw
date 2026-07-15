@@ -181,7 +181,7 @@ interface TransformSessionProps extends Omit<TransformModalProps, 'isOpen'> {
   show: boolean;
 }
 
-export function TransformSession({
+function TransformSession({
   currentAdjustments,
   isSessionOpen,
   onApply,

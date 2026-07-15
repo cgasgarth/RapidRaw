@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const hdrReviewDecisionSchema = z.enum(['accepted', 'rejected']);
-export const hdrReviewWarningSeveritySchema = z.enum(['ok', 'review', 'blocked']);
-export const hdrReviewMetricStatusSchema = z.enum(['ready', 'review', 'pending']);
+const hdrReviewDecisionSchema = z.enum(['accepted', 'rejected']);
+const hdrReviewWarningSeveritySchema = z.enum(['ok', 'review', 'blocked']);
+const hdrReviewMetricStatusSchema = z.enum(['ready', 'review', 'pending']);
 
 export const hdrReviewDiagnosticsSchema = z
   .object({
@@ -40,6 +40,6 @@ export const hdrReviewDiagnosticsSchema = z
   .strict();
 
 export type HdrReviewDiagnostics = z.infer<typeof hdrReviewDiagnosticsSchema>;
-export type HdrReviewDecision = z.infer<typeof hdrReviewDecisionSchema>;
-export type HdrReviewWarningSeverity = z.infer<typeof hdrReviewWarningSeveritySchema>;
-export type HdrReviewMetricStatus = z.infer<typeof hdrReviewMetricStatusSchema>;
+type HdrReviewDecision = z.infer<typeof hdrReviewDecisionSchema>;
+type HdrReviewWarningSeverity = z.infer<typeof hdrReviewWarningSeveritySchema>;
+type HdrReviewMetricStatus = z.infer<typeof hdrReviewMetricStatusSchema>;

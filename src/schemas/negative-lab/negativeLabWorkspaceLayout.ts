@@ -11,7 +11,7 @@ export const negativeLabWorkspacePanelIdSchema = z.enum([
 
 export type NegativeLabWorkspacePanelId = z.infer<typeof negativeLabWorkspacePanelIdSchema>;
 
-export const negativeLabWorkspaceLayoutSchema = z
+const negativeLabWorkspaceLayoutSchema = z
   .object({
     collapsedPanelIds: z.array(negativeLabWorkspacePanelIdSchema),
     pinnedPanelId: negativeLabWorkspacePanelIdSchema.nullable(),
@@ -25,7 +25,7 @@ export const DEFAULT_NEGATIVE_LAB_WORKSPACE_LAYOUT: NegativeLabWorkspaceLayout =
   pinnedPanelId: null,
 };
 
-export const NEGATIVE_LAB_WORKSPACE_LAYOUT_STORAGE_KEY = 'rapidraw.negative-lab.workspace-layout.v1';
+const NEGATIVE_LAB_WORKSPACE_LAYOUT_STORAGE_KEY = 'rapidraw.negative-lab.workspace-layout.v1';
 
 export const parseNegativeLabWorkspaceLayout = (value: unknown): NegativeLabWorkspaceLayout => {
   const parsed = negativeLabWorkspaceLayoutSchema.safeParse(value);

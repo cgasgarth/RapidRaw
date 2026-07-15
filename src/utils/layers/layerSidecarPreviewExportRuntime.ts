@@ -9,13 +9,13 @@ import {
   renderLayerPreviewStack,
 } from './layerPreviewExportParity';
 
-export const SIDECAR_LAYER_OUTPUT_BLEND_MODES = [
+const SIDECAR_LAYER_OUTPUT_BLEND_MODES = [
   'normal',
   'multiply',
   'screen',
 ] as const satisfies ReadonlyArray<LayerBlendMode>;
 
-export type SidecarLayerOutputBlendMode = (typeof SIDECAR_LAYER_OUTPUT_BLEND_MODES)[number];
+type SidecarLayerOutputBlendMode = (typeof SIDECAR_LAYER_OUTPUT_BLEND_MODES)[number];
 
 export interface LayerSidecarPreviewExportRuntimeInput {
   basePixels: ReadonlyArray<LayerRgbPixel>;
@@ -49,7 +49,7 @@ export interface LayerSidecarPreviewExportRuntimeRender extends LayerBlendStackR
 
 const supportedBlendModes = new Set<string>(SIDECAR_LAYER_OUTPUT_BLEND_MODES);
 
-export function isSidecarLayerOutputBlendMode(value: string): value is SidecarLayerOutputBlendMode {
+function isSidecarLayerOutputBlendMode(value: string): value is SidecarLayerOutputBlendMode {
   return supportedBlendModes.has(value);
 }
 

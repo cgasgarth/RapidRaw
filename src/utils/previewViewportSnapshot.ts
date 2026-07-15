@@ -55,7 +55,7 @@ const roiSchema = z
   .readonly()
   .nullable();
 
-export const previewViewportAuthorityInputSchema = z
+const previewViewportAuthorityInputSchema = z
   .object({
     devicePixelRatio: positiveFiniteNumberSchema,
     geometryRevision: revisionSchema,

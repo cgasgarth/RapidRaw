@@ -39,7 +39,7 @@ const aiSubjectMaskToolProviderSchema = z
   })
   .strict();
 
-export const aiSubjectMaskToolBlockedResultSchema = z
+const aiSubjectMaskToolBlockedResultSchema = z
   .object({
     auditEvents: z.array(rawEngineLocalAppServerAuditEventV1Schema).min(1),
     provider: aiSubjectMaskToolProviderSchema,
@@ -48,7 +48,7 @@ export const aiSubjectMaskToolBlockedResultSchema = z
   })
   .strict();
 
-export const aiSubjectMaskToolAppliedResultSchema = z
+const aiSubjectMaskToolAppliedResultSchema = z
   .object({
     applyResult: aiToolApplyResultV1Schema,
     auditEvents: z.array(rawEngineLocalAppServerAuditEventV1Schema).min(2),
@@ -58,7 +58,7 @@ export const aiSubjectMaskToolAppliedResultSchema = z
   })
   .strict();
 
-export const aiSubjectMaskToolResultSchema = z.union([
+const aiSubjectMaskToolResultSchema = z.union([
   aiSubjectMaskToolBlockedResultSchema,
   aiSubjectMaskToolAppliedResultSchema,
 ]);

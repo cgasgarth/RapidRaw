@@ -38,7 +38,7 @@ const aiEnhancementApply = {
   outputSchemaName: AiAppServerToolSchemaName.EnhancementApplyResult,
 } as const;
 
-export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSchema.parse({
+const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSchema.parse({
   routes: [
     {
       ...aiMaskDryRun,

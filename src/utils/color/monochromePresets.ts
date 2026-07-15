@@ -78,7 +78,7 @@ export const MONOCHROME_PRESETS: readonly MonochromePreset[] = [
   }),
 ];
 
-export const findMonochromePreset = (id: MonochromePresetId): MonochromePreset | undefined =>
+const findMonochromePreset = (id: MonochromePresetId): MonochromePreset | undefined =>
   MONOCHROME_PRESETS.find((candidate) => candidate.id === id);
 
 export const applyMonochromePreset = (

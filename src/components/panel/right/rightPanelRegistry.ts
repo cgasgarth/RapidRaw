@@ -215,7 +215,7 @@ export const RIGHT_PANEL_GROUPS = [
 
 export const RIGHT_PANEL_ORDER: Panel[] = RIGHT_PANEL_GROUPS.flatMap((group) => group.map(({ id }) => id));
 export const RIGHT_PANEL_ENTRIES: RightPanelRegistryEntry[] = RIGHT_PANEL_GROUPS.flatMap((group) => [...group]);
-export const RIGHT_PANEL_ENTRY_BY_ID: ReadonlyMap<Panel, RightPanelRegistryEntry> = new Map(
+const RIGHT_PANEL_ENTRY_BY_ID: ReadonlyMap<Panel, RightPanelRegistryEntry> = new Map(
   RIGHT_PANEL_ENTRIES.map((entry) => [entry.id, entry]),
 );
 

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-export const AGENT_EDITING_MODEL_ID = 'gpt-5.6-terra' as const;
-export const AGENT_EDITING_REASONING_TIER = 'light' as const;
+const AGENT_EDITING_MODEL_ID = 'gpt-5.6-terra' as const;
+const AGENT_EDITING_REASONING_TIER = 'light' as const;
 
-export const agentReasoningTierSchema = z.enum(['none', 'minimal', 'low', 'light', 'medium', 'high', 'xhigh']);
+const agentReasoningTierSchema = z.enum(['none', 'minimal', 'low', 'light', 'medium', 'high', 'xhigh']);
 
 export const agentModelSelectionSchema = z
   .object({

@@ -317,7 +317,7 @@ export const buildReopenedDerivedOutputReceipt = ({
   buildHdrReopenedDerivedOutputReceipt({ imagePath, metadata }) ??
   buildPanoramaReopenedDerivedOutputReceipt({ imagePath, metadata });
 
-export const buildFocusStackReopenedDerivedOutputReceipt = ({
+const buildFocusStackReopenedDerivedOutputReceipt = ({
   imagePath,
   metadata,
 }: {

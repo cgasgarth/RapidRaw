@@ -28,7 +28,7 @@ const agentImageContextClippingSchema = z
   })
   .strict();
 
-export const agentImageContextSnapshotSchema = z
+const agentImageContextSnapshotSchema = z
   .object({
     activeImagePath: z.string().trim().min(1),
     adjustmentSummary: z.array(z.object({ key: z.string().trim().min(1), value: z.unknown() }).strict()),

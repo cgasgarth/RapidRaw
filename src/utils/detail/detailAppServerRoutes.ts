@@ -8,7 +8,7 @@ import {
   DetailAppServerToolName,
 } from './detailAppServerRouteIds';
 
-export const DETAIL_APP_SERVER_ROUTE_MANIFEST = detailAppServerRouteManifestSchema.parse({
+const DETAIL_APP_SERVER_ROUTE_MANIFEST = detailAppServerRouteManifestSchema.parse({
   routes: [
     {
       commandType: DetailAppServerCommandType.DryRunControls,

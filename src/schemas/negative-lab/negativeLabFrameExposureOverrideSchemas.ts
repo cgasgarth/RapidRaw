@@ -5,7 +5,7 @@ export const NEGATIVE_LAB_FRAME_EXPOSURE_MIN_EV = -2;
 export const NEGATIVE_LAB_FRAME_EXPOSURE_MAX_EV = 2;
 export const NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV = 0.05;
 
-export const negativeLabFrameExposureOverrideSchema = z
+const negativeLabFrameExposureOverrideSchema = z
   .object({
     effectiveExposure: z.number().min(-4).max(4),
     exposureOffset: z.number().min(NEGATIVE_LAB_FRAME_EXPOSURE_MIN_EV).max(NEGATIVE_LAB_FRAME_EXPOSURE_MAX_EV),

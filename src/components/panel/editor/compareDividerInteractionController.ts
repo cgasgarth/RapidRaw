@@ -79,7 +79,7 @@ const sameCurrentIdentity = (left: CompareDividerCurrentContext, right: CompareD
   left.sourceIdentity === right.sourceIdentity &&
   left.sourceRevision === right.sourceRevision;
 
-export const compareDividerSessionFingerprint = (context: CompareDividerCurrentContext): string =>
+const compareDividerSessionFingerprint = (context: CompareDividerCurrentContext): string =>
   JSON.stringify([
     context.imageSessionId,
     context.sourceIdentity,

@@ -9,7 +9,7 @@ export interface PreviewAnalyticsEnvelope {
   previewOperationIdentity: PreviewOperationIdentity;
 }
 
-export const isExactPresentedPreviewAnalytics = (
+const isExactPresentedPreviewAnalytics = (
   result: PreviewAnalyticsEnvelope,
   artifact: PreviewArtifact | null,
 ): boolean =>

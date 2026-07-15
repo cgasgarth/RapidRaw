@@ -6,11 +6,11 @@ import {
   type FilmLookBrowserItem,
 } from './filmLookBrowser';
 
-export const FILM_LOOK_COLOR_PIPELINE_COMMAND_SCHEMA_VERSION = 1;
+const FILM_LOOK_COLOR_PIPELINE_COMMAND_SCHEMA_VERSION = 1;
 
 const hashSchema = z.string().regex(/^rawengine-pixel-hash:[a-f0-9]{16}$/u);
 
-export const filmLookColorPipelinePixelSchema = z
+const filmLookColorPipelinePixelSchema = z
   .object({
     b: z.number().min(0).max(1),
     g: z.number().min(0).max(1),
@@ -20,7 +20,7 @@ export const filmLookColorPipelinePixelSchema = z
   })
   .strict();
 
-export const filmLookColorPipelineSchema = z
+const filmLookColorPipelineSchema = z
   .object({
     chromaticAdaptation: z.literal('bradford_v1'),
     inputDomain: z.literal('camera_linear_rgb'),
@@ -37,7 +37,7 @@ export const filmLookColorPipelineSchema = z
   })
   .strict();
 
-export const filmLookAbSlotSchema = z
+const filmLookAbSlotSchema = z
   .object({
     afterHash: hashSchema,
     beforeHash: hashSchema,
@@ -103,7 +103,7 @@ export const filmLookAbCommandSchema = z
   .strict();
 
 export type FilmLookColorPipelinePixel = z.infer<typeof filmLookColorPipelinePixelSchema>;
-export type FilmLookAbSlot = z.infer<typeof filmLookAbSlotSchema>;
+type FilmLookAbSlot = z.infer<typeof filmLookAbSlotSchema>;
 export type FilmLookAbCommand = z.infer<typeof filmLookAbCommandSchema>;
 
 export interface BuildFilmLookAbCommandOptions {
@@ -119,7 +119,7 @@ export interface BuildFilmLookAbCommandOptions {
   strengthB: number;
 }
 
-export const DEFAULT_FILM_LOOK_COLOR_PIPELINE = {
+const DEFAULT_FILM_LOOK_COLOR_PIPELINE = {
   chromaticAdaptation: 'bradford_v1',
   inputDomain: 'camera_linear_rgb',
   operationDomain: 'acescg_linear_v1',
@@ -218,7 +218,7 @@ function hashCoordinate(lookId: string, x: number, y: number, variant: string): 
   return normalized * 2 - 1;
 }
 
-export function buildFilmLookAbSlot(
+function buildFilmLookAbSlot(
   sourcePixels: ReadonlyArray<FilmLookColorPipelinePixel>,
   look: FilmLookBrowserItem,
   strength: number,

@@ -10,10 +10,10 @@ export const createPreviewQualityPolicy = (): AdaptivePreviewQualityController =
 const revisionSchema = z.number().int().nonnegative().safe();
 const positiveRevisionSchema = z.number().int().positive().safe();
 
-export const previewOperationKindSchema = z.enum(['interactive', 'settled', 'original', 'analytics']);
+const previewOperationKindSchema = z.enum(['interactive', 'settled', 'original', 'analytics']);
 export type PreviewOperationKind = z.infer<typeof previewOperationKindSchema>;
 
-export const previewGraphRevisionSchema = z
+const previewGraphRevisionSchema = z
   .object({
     adjustmentRevision: positiveRevisionSchema,
     geometryRevision: revisionSchema,
@@ -60,7 +60,7 @@ export const previewOperationIdentitySchema = z
 
 export type PreviewOperationIdentity = z.infer<typeof previewOperationIdentitySchema>;
 
-export const previewArtifactSchema = z
+const previewArtifactSchema = z
   .object({
     identity: previewOperationIdentitySchema,
     url: z.string().trim().min(1),

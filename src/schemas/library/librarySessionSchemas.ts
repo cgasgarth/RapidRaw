@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from '../zodUniqueHelpers';
 
-export const librarySessionKindSchema = z.enum([
+const librarySessionKindSchema = z.enum([
   'folder_browse',
   'shoot_session',
   'culling',
@@ -12,19 +12,19 @@ export const librarySessionKindSchema = z.enum([
 ]);
 
 export const librarySessionWorkflowStageSchema = z.enum(['ingest', 'cull', 'edit', 'review', 'export', 'archive']);
-export const librarySessionViewModeSchema = z.enum(['grid', 'list', 'compare', 'survey']);
-export const librarySessionSortKeySchema = z.enum(['name', 'modified_at', 'rating', 'color_label', 'file_type']);
-export const librarySessionSortOrderSchema = z.enum(['asc', 'desc']);
-export const librarySessionRawStatusSchema = z.enum(['all', 'raw_only', 'rendered_only', 'missing_sidecar']);
+const librarySessionViewModeSchema = z.enum(['grid', 'list', 'compare', 'survey']);
+const librarySessionSortKeySchema = z.enum(['name', 'modified_at', 'rating', 'color_label', 'file_type']);
+const librarySessionSortOrderSchema = z.enum(['asc', 'desc']);
+const librarySessionRawStatusSchema = z.enum(['all', 'raw_only', 'rendered_only', 'missing_sidecar']);
 
-export const librarySessionSortSchema = z
+const librarySessionSortSchema = z
   .object({
     key: librarySessionSortKeySchema,
     order: librarySessionSortOrderSchema,
   })
   .strict();
 
-export const librarySessionFilterSchema = z
+const librarySessionFilterSchema = z
   .object({
     colorLabels: uniqueStringArraySchema('colorLabels'),
     minimumRating: z.number().int().min(0).max(5),
@@ -141,5 +141,5 @@ export const librarySessionSetSchema = z
 export type LibrarySession = z.infer<typeof librarySessionSchema>;
 export type LibrarySessionSet = z.infer<typeof librarySessionSetSchema>;
 
-export const parseLibrarySession = (value: unknown): LibrarySession => librarySessionSchema.parse(value);
+const parseLibrarySession = (value: unknown): LibrarySession => librarySessionSchema.parse(value);
 export const parseLibrarySessionSet = (value: unknown): LibrarySessionSet => librarySessionSetSchema.parse(value);

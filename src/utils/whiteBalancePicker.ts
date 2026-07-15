@@ -7,7 +7,7 @@ import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransf
 const sliderMinimum = -100;
 const sliderMaximum = 100;
 
-export const whiteBalancePickerSampleSchema = z
+const whiteBalancePickerSampleSchema = z
   .object({
     red: z.number().min(0).max(255),
     green: z.number().min(0).max(255),
@@ -82,7 +82,7 @@ export interface WhiteBalancePickerPatchSample {
   spatialVariance: number;
 }
 
-export class WhiteBalancePickerSampleError extends Error {
+class WhiteBalancePickerSampleError extends Error {
   constructor(public readonly code: 'stale_preview' | 'clipped_patch' | 'non_uniform_patch') {
     super(`white_balance_picker_${code}`);
   }

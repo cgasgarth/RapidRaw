@@ -6,7 +6,7 @@ import {
 } from './negativeLabFrameRgbBalanceOverrideSchemas';
 import { negativeLabBaseFogSampleRectSchema } from './negativeLabPresetCatalogSchemas';
 
-export const negativeLabNeutralPatchRiskSchema = z.enum(['high', 'low', 'medium']);
+const negativeLabNeutralPatchRiskSchema = z.enum(['high', 'low', 'medium']);
 
 export const negativeLabNeutralPatchSuggestionSchema = z
   .object({

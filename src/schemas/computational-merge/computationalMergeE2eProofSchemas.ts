@@ -179,7 +179,7 @@ const proofCaseSchema = z
     }
   });
 
-export const computationalMergeE2eProofManifestSchema = z
+const computationalMergeE2eProofManifestSchema = z
   .object({
     $schema: z.url(),
     issue: z.literal(1809),

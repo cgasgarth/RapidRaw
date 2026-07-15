@@ -51,7 +51,7 @@ import type { SelectedImage } from '../../../ui/AppProperties';
 
 const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
 const WORKSPACE_SESSION_ID = 'agent-workspace-selected-image';
-export const AGENT_AUDIT_EXPORT_FILE_TOOL_NAME = 'rawengine.agent.audit.export';
+const AGENT_AUDIT_EXPORT_FILE_TOOL_NAME = 'rawengine.agent.audit.export';
 
 export type AgentSelectedImageWorkspaceActionStatus =
   | 'applied'

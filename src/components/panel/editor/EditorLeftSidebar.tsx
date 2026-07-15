@@ -9,7 +9,7 @@ import Resizer from '../../ui/Resizer';
 
 export const EDITOR_LEFT_SECTION_IDS = ['navigator', 'focusSources', 'presets', 'snapshots', 'history'] as const;
 export type EditorLeftSectionId = (typeof EDITOR_LEFT_SECTION_IDS)[number];
-export type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
+type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
 const EDITOR_LEFT_RESIZER_WIDTH = 8;
 
 interface EditorLeftSidebarProps {

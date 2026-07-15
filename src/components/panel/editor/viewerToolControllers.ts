@@ -50,7 +50,7 @@ export type ViewerToolCommand =
   | { readonly kind: 'update'; readonly pointerId: number; readonly session: ViewerToolSession }
   | { readonly kind: 'end' | 'cancel'; readonly pointerId: number; readonly session: ViewerToolSession };
 
-export interface ViewerToolController {
+interface ViewerToolController {
   readonly id: ViewerToolId;
   begin(
     key: ViewerToolSessionKey,
@@ -96,7 +96,7 @@ const createController = (id: ViewerToolId): ViewerToolController => ({
   },
 });
 
-export const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
+const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
   brush: createController('brush'),
   crop: createController('crop'),
   'focus-retouch': createController('focus-retouch'),

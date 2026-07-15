@@ -7,7 +7,7 @@ export type CreateResizeHandler = (
   startSize: number,
 ) => (event: ReactPointerEvent<HTMLDivElement>) => void;
 
-export const PANEL_RESIZE_LIMITS = {
+const PANEL_RESIZE_LIMITS = {
   bottom: { max: 400, min: 100 },
   left: { max: 500, min: 200 },
   right: { max: 600, min: 320 },

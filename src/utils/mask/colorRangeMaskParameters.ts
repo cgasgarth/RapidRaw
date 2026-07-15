@@ -23,7 +23,7 @@ export function createColorRangeMaskParameters(
   return colorRangeMaskParametersSchema.parse(createSelectiveColorMaskSelection(rangeKey, options));
 }
 
-export function parseColorRangeMaskParameters(parameters: unknown): ColorRangeMaskParameters {
+function parseColorRangeMaskParameters(parameters: unknown): ColorRangeMaskParameters {
   return colorRangeMaskParametersSchema.parse(parameters);
 }
 

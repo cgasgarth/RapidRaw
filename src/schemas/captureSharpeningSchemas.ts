@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const normalizedScalarSchema = z.number().min(0).max(1);
 
-export const captureSharpeningStageSchema = z.literal('post_demosaic_pre_global');
+const captureSharpeningStageSchema = z.literal('post_demosaic_pre_global');
 
 export const captureSharpeningPresetSchema = z
   .object({

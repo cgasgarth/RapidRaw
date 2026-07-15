@@ -25,7 +25,7 @@ const oddKernelSizeSchema = z
     message: 'PSF kernel size must be odd.',
   });
 
-export const deblurFixtureLimitationSchema = z.enum([
+const deblurFixtureLimitationSchema = z.enum([
   'cpu_reference_deblur',
   'e2e_workflow',
   'preview_export_parity',
@@ -34,7 +34,7 @@ export const deblurFixtureLimitationSchema = z.enum([
   'ui_api',
 ]);
 
-export const deblurFixtureKindSchema = z.enum([
+const deblurFixtureKindSchema = z.enum([
   'failure_high_noise',
   'failure_motion_unknown',
   'failure_saturated_edge',
@@ -43,14 +43,14 @@ export const deblurFixtureKindSchema = z.enum([
   'gaussian_low_contrast_text',
 ]);
 
-export const deblurArtifactKindSchema = z.enum([
+const deblurArtifactKindSchema = z.enum([
   'expected_deblurred_reference',
   'ringing_metric_probe',
   'synthetic_blurred_input',
   'synthetic_clean_reference',
 ]);
 
-export const deblurBasePatternSchema = z.enum([
+const deblurBasePatternSchema = z.enum([
   'fine_texture_patch',
   'high_noise_edge',
   'low_contrast_text',
@@ -59,7 +59,7 @@ export const deblurBasePatternSchema = z.enum([
   'slanted_edge',
 ]);
 
-export const deblurRejectionReasonSchema = z.enum([
+const deblurRejectionReasonSchema = z.enum([
   'halo_risk',
   'motion_psf_unknown',
   'noise_amplification_risk',
@@ -67,7 +67,7 @@ export const deblurRejectionReasonSchema = z.enum([
   'saturated_edge_risk',
 ]);
 
-export const deblurArtifactSchema = z
+const deblurArtifactSchema = z
   .object({
     hash: sha256Schema.nullable(),
     kind: deblurArtifactKindSchema,
@@ -76,7 +76,7 @@ export const deblurArtifactSchema = z
   })
   .strict();
 
-export const deblurExpectedMetricSchema = z
+const deblurExpectedMetricSchema = z
   .object({
     deltaEMax: metricRangeSchema,
     edgeAcutanceRatio: metricRangeSchema,
@@ -88,7 +88,7 @@ export const deblurExpectedMetricSchema = z
   })
   .strict();
 
-export const deblurSyntheticGeneratorSchema = z
+const deblurSyntheticGeneratorSchema = z
   .object({
     basePattern: deblurBasePatternSchema,
     blur: z
@@ -113,7 +113,7 @@ export const deblurSyntheticGeneratorSchema = z
   })
   .strict();
 
-export const deblurAcceptancePolicySchema = z.discriminatedUnion('action', [
+const deblurAcceptancePolicySchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('accept'),
@@ -140,13 +140,13 @@ const deblurBaseFixtureSchema = z
   })
   .strict();
 
-export const deblurSyntheticFixtureSchema = deblurBaseFixtureSchema.extend({
+const deblurSyntheticFixtureSchema = deblurBaseFixtureSchema.extend({
   generator: deblurSyntheticGeneratorSchema,
   privateRawEvidence: z.null(),
   sourceKind: z.literal('synthetic_public'),
 });
 
-export const deblurFixtureSchema = deblurSyntheticFixtureSchema;
+const deblurFixtureSchema = deblurSyntheticFixtureSchema;
 
 export const deblurFixtureManifestSchema = z
   .object({
@@ -244,7 +244,7 @@ export const deblurFixtureManifestSchema = z
     }
   });
 
-export type DeblurFixture = z.infer<typeof deblurFixtureSchema>;
+type DeblurFixture = z.infer<typeof deblurFixtureSchema>;
 export type DeblurFixtureManifest = z.infer<typeof deblurFixtureManifestSchema>;
 
 export function parseDeblurFixtureManifest(value: unknown): DeblurFixtureManifest {

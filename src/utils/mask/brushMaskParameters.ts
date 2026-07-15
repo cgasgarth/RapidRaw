@@ -20,7 +20,7 @@ function clamp(value: number, min: number, max: number, fallback: number): numbe
   return Math.max(min, Math.min(max, value));
 }
 
-export function normalizeBrushStroke(input: BrushStrokeInput): BrushLine {
+function normalizeBrushStroke(input: BrushStrokeInput): BrushLine {
   return {
     feather: clamp(input.feather, 0, 100, 50),
     points: input.points.map((point) => ({
@@ -33,11 +33,11 @@ export function normalizeBrushStroke(input: BrushStrokeInput): BrushLine {
   };
 }
 
-export function parseBrushMaskParameters(parameters: unknown): BrushMaskParameters {
+function parseBrushMaskParameters(parameters: unknown): BrushMaskParameters {
   return brushMaskParametersSchema.parse(parameters);
 }
 
-export function parseFlowBrushMaskParameters(parameters: unknown): FlowBrushMaskParameters {
+function parseFlowBrushMaskParameters(parameters: unknown): FlowBrushMaskParameters {
   return flowBrushMaskParametersSchema.parse(parameters);
 }
 

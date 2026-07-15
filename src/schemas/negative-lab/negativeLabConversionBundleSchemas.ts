@@ -20,7 +20,7 @@ const negativeLabFlatLogMasterSchema = z
   .object({ algorithmVersion: z.literal(1), gain: z.number().min(0.1).max(2), lift: z.number().min(0).max(0.25) })
   .strict();
 
-export const negativeLabConversionBundleOutputSchema = z
+const negativeLabConversionBundleOutputSchema = z
   .object({
     contentHash: fnv64HashSchema,
     dimensions: z.object({ height: z.number().int().positive(), width: z.number().int().positive() }).strict(),
@@ -132,5 +132,5 @@ export const negativeLabConversionBundleSchema = z
 
 export type NegativeLabConversionBundle = z.infer<typeof negativeLabConversionBundleSchema>;
 
-export const parseNegativeLabConversionBundle = (value: unknown): NegativeLabConversionBundle =>
+const parseNegativeLabConversionBundle = (value: unknown): NegativeLabConversionBundle =>
   negativeLabConversionBundleSchema.parse(value);

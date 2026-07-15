@@ -1,6 +1,6 @@
 import type { PreviewCoordinatorState, PreviewCoordinatorTransition } from './previewCoordinator';
 
-export type PreviewUrlRelease = (url: string) => void;
+type PreviewUrlRelease = (url: string) => void;
 
 interface PreviewUrlReleaseAuthorityOptions {
   isProtected?: (url: string) => boolean;

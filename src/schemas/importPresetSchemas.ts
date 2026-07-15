@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from './zodUniqueHelpers';
 
-export const importPresetSourcePolicySchema = z.enum(['copy', 'move', 'reference']);
-export const importPresetDuplicatePolicySchema = z.enum(['skip', 'rename', 'overwrite_after_approval']);
-export const importPresetSidecarPolicySchema = z.enum(['copy_existing', 'create_empty', 'ignore']);
+const importPresetSourcePolicySchema = z.enum(['copy', 'move', 'reference']);
+const importPresetDuplicatePolicySchema = z.enum(['skip', 'rename', 'overwrite_after_approval']);
+const importPresetSidecarPolicySchema = z.enum(['copy_existing', 'create_empty', 'ignore']);
 
-export const importPresetBackupPolicySchema = z
+const importPresetBackupPolicySchema = z
   .object({
     backupRootPath: z.string().trim().min(1).nullable(),
     enabled: z.boolean(),
@@ -22,7 +22,7 @@ export const importPresetBackupPolicySchema = z
     }
   });
 
-export const importPresetSchema = z
+const importPresetSchema = z
   .object({
     addTags: uniqueStringArraySchema('addTags'),
     applyPresetIds: uniqueStringArraySchema('applyPresetIds'),

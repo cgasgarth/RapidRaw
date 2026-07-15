@@ -4,7 +4,7 @@ import {
   filmStageControlDescriptorListV1Schema,
 } from '../../../packages/rawengine-schema/src/index.js';
 
-export const FILM_REFERENCE_STAGE_ID: FilmStageIdV1 = 'reference_luminance_shaper_v1';
+const FILM_REFERENCE_STAGE_ID: FilmStageIdV1 = 'reference_luminance_shaper_v1';
 export const FILM_REFERENCE_STAGE_DEFAULT_P = 0.35;
 
 /** Renderer-owned controls for the currently supported reference response stage. */

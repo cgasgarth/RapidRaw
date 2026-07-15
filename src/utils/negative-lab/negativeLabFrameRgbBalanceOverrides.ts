@@ -26,13 +26,13 @@ const snapWeight = (value: number): number =>
 const clampWeight = (value: number): number =>
   Math.min(Math.max(value, NEGATIVE_LAB_FRAME_RGB_BALANCE_MIN_WEIGHT), NEGATIVE_LAB_FRAME_RGB_BALANCE_MAX_WEIGHT);
 
-export const negativeLabFrameRgbBalanceFromParams = (params: NegativeLabPresetParams): NegativeLabFrameRgbBalance => ({
+const negativeLabFrameRgbBalanceFromParams = (params: NegativeLabPresetParams): NegativeLabFrameRgbBalance => ({
   blueWeight: snapWeight(clampWeight(params.blue_weight)),
   greenWeight: snapWeight(clampWeight(params.green_weight)),
   redWeight: snapWeight(clampWeight(params.red_weight)),
 });
 
-export const snapNegativeLabFrameRgbBalanceOffset = ({
+const snapNegativeLabFrameRgbBalanceOffset = ({
   baselineWeight,
   offset,
 }: {

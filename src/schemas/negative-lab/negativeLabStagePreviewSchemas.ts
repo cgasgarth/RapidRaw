@@ -1,11 +1,8 @@
 import { z } from 'zod';
 
-export const negativeLabStageIdSchema = z.enum(['normalized_density', 'scene_linear_print']);
-export const negativeLabStageColorDomainSchema = negativeLabStageIdSchema;
-export const negativeLabStageDisplayTransformSchema = z.enum([
-  'normalized_density_clamp_v1',
-  'scene_linear_to_srgb_gamma_v1',
-]);
+const negativeLabStageIdSchema = z.enum(['normalized_density', 'scene_linear_print']);
+const negativeLabStageColorDomainSchema = negativeLabStageIdSchema;
+const negativeLabStageDisplayTransformSchema = z.enum(['normalized_density_clamp_v1', 'scene_linear_to_srgb_gamma_v1']);
 
 /** Native intermediate-stage identity fields; the adapter adds the strict bounds receipt shape. */
 export const negativeLabStagePreviewArtifactFieldsSchema = z
@@ -21,4 +18,4 @@ export const negativeLabStagePreviewArtifactFieldsSchema = z
   })
   .strict();
 
-export type NegativeLabStagePreviewArtifactFields = z.infer<typeof negativeLabStagePreviewArtifactFieldsSchema>;
+type NegativeLabStagePreviewArtifactFields = z.infer<typeof negativeLabStagePreviewArtifactFieldsSchema>;

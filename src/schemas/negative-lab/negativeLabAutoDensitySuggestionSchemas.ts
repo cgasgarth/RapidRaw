@@ -6,9 +6,9 @@ export const NEGATIVE_LAB_AUTO_DENSITY_SUGGESTION_SCHEMA_VERSION = 1;
 
 const finiteNumberSchema = z.number().refine(Number.isFinite, { message: 'Expected a finite number.' });
 
-export const negativeLabAutoDensitySuggestionStateSchema = z.enum(['suggested_only', 'accepted_into_plan']);
-export const negativeLabAutoDensityContrastGradeSchema = z.enum(['hold', 'lift_contrast', 'soften_contrast']);
-export const negativeLabAutoDensityWarningCodeSchema = z.enum([
+const negativeLabAutoDensitySuggestionStateSchema = z.enum(['suggested_only', 'accepted_into_plan']);
+const negativeLabAutoDensityContrastGradeSchema = z.enum(['hold', 'lift_contrast', 'soften_contrast']);
+const negativeLabAutoDensityWarningCodeSchema = z.enum([
   'border_density_contamination',
   'cast_balance_low_confidence',
   'clipped_transmittance_samples',
@@ -22,7 +22,7 @@ export const negativeLabAutoDensityWarningCodeSchema = z.enum([
   'thin_frame',
 ]);
 
-export const negativeLabAutoDensityPrintCurveParametersSchema = z
+const negativeLabAutoDensityPrintCurveParametersSchema = z
   .object({
     blackPoint: finiteNumberSchema,
     contrast: finiteNumberSchema,
@@ -33,7 +33,7 @@ export const negativeLabAutoDensityPrintCurveParametersSchema = z
   })
   .strict();
 
-export const negativeLabAutoDensityFrameSuggestionSchema = z
+const negativeLabAutoDensityFrameSuggestionSchema = z
   .object({
     castBalanceSuggestion: negativeLabFrameRgbBalanceOffsetSchema.nullable(),
     confidence: z.number().min(0).max(1),

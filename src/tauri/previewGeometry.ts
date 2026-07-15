@@ -7,7 +7,7 @@ import { Invokes } from './commands';
 const finite = z.number().finite();
 const previewGeometryDataUrlSchema = z.string().regex(/^data:image\/(?:jpeg|png|webp);base64,/u);
 
-export const previewGeometryParamsSchema = z.object({
+const previewGeometryParamsSchema = z.object({
   distortion: finite,
   vertical: finite,
   horizontal: finite,

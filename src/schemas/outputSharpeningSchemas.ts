@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { OUTPUT_SHARPENING_FILE_FORMAT_IDS } from '../utils/export/exportFormatIds';
 
-export const outputSharpeningTargetSchema = z.enum(['screen', 'print', 'custom']);
+const outputSharpeningTargetSchema = z.enum(['screen', 'print', 'custom']);
 
 export const outputSharpeningSettingsSchema = z
   .object({

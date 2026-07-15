@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { type MaskParameterRecord, toMaskParameterRecord } from './maskParameterAccess';
 
-export const maskRefinementParametersCommandSchema = z
+const maskRefinementParametersCommandSchema = z
   .object({
     density: z.number().min(0).max(1),
     edgeContrast: z.number().min(0).max(1),
@@ -30,7 +30,7 @@ export type MaskRefinementUiCommand = z.infer<typeof maskRefinementUiCommandSche
 
 export const MASK_REFINEMENT_REPLAY_PARAMETER_KEY = 'refinementReplayCommand';
 
-export const maskRefinementReplayReceiptSchema = z
+const maskRefinementReplayReceiptSchema = z
   .object({
     density: maskRefinementParametersCommandSchema.shape.density,
     edgeContrast: maskRefinementParametersCommandSchema.shape.edgeContrast,

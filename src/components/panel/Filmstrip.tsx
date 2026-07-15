@@ -624,7 +624,7 @@ const FilmstripCell = ({
   );
 };
 
-export const FilmstripList = memo(function FilmstripList({
+const FilmstripList = memo(function FilmstripList({
   height,
   width,
   data,

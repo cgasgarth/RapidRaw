@@ -1,10 +1,6 @@
 import type { EditorWorkspaceLightsOutLevel } from '../../../schemas/editorWorkspacePreferencesSchemas';
 
-export const VIEWER_LIGHTS_OUT_LEVELS = [
-  'off',
-  'dim',
-  'black',
-] as const satisfies readonly EditorWorkspaceLightsOutLevel[];
+const VIEWER_LIGHTS_OUT_LEVELS = ['off', 'dim', 'black'] as const satisfies readonly EditorWorkspaceLightsOutLevel[];
 
 export type ViewerEscapeAction = 'exit-fullscreen' | 'exit-lights-out' | 'none';
 

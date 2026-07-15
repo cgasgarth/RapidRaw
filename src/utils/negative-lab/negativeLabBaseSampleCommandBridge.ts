@@ -209,7 +209,7 @@ const sampleEditModeForStatus = (status: NegativeLabBaseSampleStatus): 'accept' 
   return 'replace';
 };
 
-export const buildNegativeLabUpdateBaseSamplesCommand = (
+const buildNegativeLabUpdateBaseSamplesCommand = (
   context: NegativeLabBaseSampleCommandContext,
   warningCodes: NegativeLabBaseSampleWarningCode[],
   measuredAt: string,

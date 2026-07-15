@@ -14,7 +14,7 @@ export const libraryRelinkIdentitySchema = z
   })
   .strict();
 
-export const libraryRelinkEvidenceKindSchema = z.enum([
+const libraryRelinkEvidenceKindSchema = z.enum([
   'content_hash',
   'byte_length',
   'capture_timestamp',
@@ -24,7 +24,7 @@ export const libraryRelinkEvidenceKindSchema = z.enum([
   'filename',
 ]);
 
-export const libraryRelinkEvidenceSchema = z
+const libraryRelinkEvidenceSchema = z
   .object({
     kind: libraryRelinkEvidenceKindSchema,
     status: z.enum(['match', 'mismatch', 'missing']),
@@ -32,9 +32,9 @@ export const libraryRelinkEvidenceSchema = z
   })
   .strict();
 
-export const libraryRelinkCandidateDecisionSchema = z.enum(['verified', 'possible', 'rejected']);
+const libraryRelinkCandidateDecisionSchema = z.enum(['verified', 'possible', 'rejected']);
 
-export const libraryRelinkCandidateResultSchema = z
+const libraryRelinkCandidateResultSchema = z
   .object({
     candidatePath: z.string().trim().min(1),
     decision: libraryRelinkCandidateDecisionSchema,

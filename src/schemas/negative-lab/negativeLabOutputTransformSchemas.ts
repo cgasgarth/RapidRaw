@@ -21,5 +21,5 @@ export const negativeLabSceneLinearStatsSchema = z
   })
   .strict();
 
-export type NegativeLabOutputTransform = z.infer<typeof negativeLabOutputTransformSchema>;
-export type NegativeLabSceneLinearStats = z.infer<typeof negativeLabSceneLinearStatsSchema>;
+type NegativeLabOutputTransform = z.infer<typeof negativeLabOutputTransformSchema>;
+type NegativeLabSceneLinearStats = z.infer<typeof negativeLabSceneLinearStatsSchema>;

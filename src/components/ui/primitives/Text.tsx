@@ -10,7 +10,7 @@ import {
   type VariantConfig,
 } from '../../../types/typography';
 
-export interface TextProps extends HTMLAttributes<HTMLElement> {
+interface TextProps extends HTMLAttributes<HTMLElement> {
   variant?: VariantConfig;
   weight?: TextWeight;
   color?: TextColor;
@@ -18,7 +18,7 @@ export interface TextProps extends HTMLAttributes<HTMLElement> {
   children: ReactNode;
 }
 
-export const Text = forwardRef<HTMLElement, TextProps>(
+const Text = forwardRef<HTMLElement, TextProps>(
   ({ variant = TextVariants.body, weight, color, as, className, children, ...props }, ref) => {
     const Component = as || variant.defaultElement;
 

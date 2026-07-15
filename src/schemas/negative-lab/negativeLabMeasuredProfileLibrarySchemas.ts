@@ -5,9 +5,9 @@ import {
   negativeLabMeasurementReportSchema,
 } from './negativeLabMeasuredProfileSchemas';
 
-export const negativeLabMeasuredProfileLibraryHashSchema = z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u);
+const negativeLabMeasuredProfileLibraryHashSchema = z.string().regex(/^fnv1a32:[0-9a-f]{8}$/u);
 
-export const negativeLabMeasuredProfileLibraryEntrySchema = z
+const negativeLabMeasuredProfileLibraryEntrySchema = z
   .object({
     contentHash: negativeLabMeasuredProfileLibraryHashSchema,
     createdAt: z.string().datetime({ offset: true }),

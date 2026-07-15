@@ -119,7 +119,7 @@ export const agentIterativeEditLoopRequestSchema = z
   })
   .strict();
 
-export const agentIterativeEditLoopResultSchema = z
+const agentIterativeEditLoopResultSchema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
     compareReview: z

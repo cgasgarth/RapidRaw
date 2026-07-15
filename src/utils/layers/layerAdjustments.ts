@@ -33,7 +33,7 @@ interface LayerAdjustmentLimit {
   min: number;
 }
 
-export const LAYER_ADJUSTMENT_LIMITS: Record<LayerAdjustmentKey, LayerAdjustmentLimit> = {
+const LAYER_ADJUSTMENT_LIMITS: Record<LayerAdjustmentKey, LayerAdjustmentLimit> = {
   blacks: { min: -100, max: 100 },
   brightness: { min: -100, max: 100 },
   clarity: { min: -100, max: 100 },
@@ -57,7 +57,7 @@ export const LAYER_ADJUSTMENT_LIMITS: Record<LayerAdjustmentKey, LayerAdjustment
   whites: { min: -100, max: 100 },
 };
 
-export function clampLayerAdjustmentValue(key: LayerAdjustmentKey, value: number): number {
+function clampLayerAdjustmentValue(key: LayerAdjustmentKey, value: number): number {
   const limits = LAYER_ADJUSTMENT_LIMITS[key];
   if (!Number.isFinite(value)) return 0;
   return Math.max(limits.min, Math.min(limits.max, value));

@@ -72,12 +72,9 @@ export interface FolderTreeSort {
 
 export enum Theme {
   Arctic = 'arctic',
-  Blue = 'blue',
   Dark = 'dark',
   Grey = 'grey',
   Light = 'light',
-  MutedGreen = 'muted-green',
-  Sepia = 'sepia',
   Snow = 'snow',
 }
 
@@ -321,7 +318,7 @@ export interface WaveformData {
   width: number;
 }
 
-export interface AnalyticsResourceDescriptor {
+interface AnalyticsResourceDescriptor {
   byteLen: number;
   mimeType: string;
   resourceId: string;
@@ -377,7 +374,7 @@ export interface CullingLatencyReport {
   totalElapsedMs: number;
 }
 
-export interface KeybindHandler {
+interface KeybindHandler {
   shouldFire?: () => boolean;
   execute: (event: KeyboardEvent) => void;
 }

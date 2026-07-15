@@ -53,7 +53,7 @@ const rightsSchema = z
     }
   });
 
-export const privateRawEvidenceArtifactClassSchema = z.enum([
+const privateRawEvidenceArtifactClassSchema = z.enum([
   'bracket_alignment',
   'focus_plane_transition',
   'high_iso_chroma_noise',
@@ -81,7 +81,7 @@ const privateRawEvidenceFeatureFamilySchema = z.enum([
   'super_resolution',
 ]);
 
-export const privateRawEvidenceEntrySchema = z
+const privateRawEvidenceEntrySchema = z
   .object({
     artifactClass: privateRawEvidenceArtifactClassSchema,
     camera: cameraMetadataSchema,
@@ -156,7 +156,7 @@ export const privateRawEvidenceEntrySchema = z
     }
   });
 
-export const privateRawEvidenceLedgerSchema = z
+const privateRawEvidenceLedgerSchema = z
   .object({
     $schema: z.url(),
     entries: z.array(privateRawEvidenceEntrySchema).min(1),
@@ -197,7 +197,7 @@ export const privateRawEvidenceLedgerSchema = z
     }
   });
 
-export type PrivateRawEvidenceEntry = z.infer<typeof privateRawEvidenceEntrySchema>;
+type PrivateRawEvidenceEntry = z.infer<typeof privateRawEvidenceEntrySchema>;
 export type PrivateRawEvidenceLedger = z.infer<typeof privateRawEvidenceLedgerSchema>;
 
 export function parsePrivateRawEvidenceLedger(value: unknown): PrivateRawEvidenceLedger {

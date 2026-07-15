@@ -396,7 +396,7 @@ const privateRunReportSchema = z
     }
   });
 
-export const computationalMergePrivateRunReportCollectionSchema = z
+const computationalMergePrivateRunReportCollectionSchema = z
   .object({
     $schema: z.url(),
     issue: z.literal(1817),

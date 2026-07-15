@@ -4,19 +4,13 @@ import {
   hdrRuntimeSidecarReceiptV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 
-export const hdrMergeAlignmentModeSchema = z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']);
-export const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disabled']);
-export const hdrMergeDeghostingSchema = z.enum(['off', 'low', 'medium', 'high']);
-export const hdrMergeExposureWeightingModeSchema = z.enum(['balanced', 'protect_highlights', 'lift_shadows']);
-export const hdrMergeStrategySchema = z.enum(['scene_linear_radiance', 'exposure_fusion_preview']);
-export const hdrMergeQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
-export const hdrToneMappingPresetSchema = z.enum([
-  'custom',
-  'natural',
-  'highlight_detail',
-  'interior_lift',
-  'fast_preview',
-]);
+const hdrMergeAlignmentModeSchema = z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']);
+const hdrMergeBracketValidationSchema = z.enum(['required', 'warn', 'disabled']);
+const hdrMergeDeghostingSchema = z.enum(['off', 'low', 'medium', 'high']);
+const hdrMergeExposureWeightingModeSchema = z.enum(['balanced', 'protect_highlights', 'lift_shadows']);
+const hdrMergeStrategySchema = z.enum(['scene_linear_radiance', 'exposure_fusion_preview']);
+const hdrMergeQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
+const hdrToneMappingPresetSchema = z.enum(['custom', 'natural', 'highlight_detail', 'interior_lift', 'fast_preview']);
 
 export const hdrMergeUiSettingsSchema = z
   .object({
@@ -224,7 +218,7 @@ export const hdrRuntimePlanSchema = z
   })
   .strict();
 
-export const hdrEditableSourceRefSchema = z
+const hdrEditableSourceRefSchema = z
   .object({
     contentHash: z.string().min(1),
     contentState: z.string().min(1),
@@ -234,7 +228,7 @@ export const hdrEditableSourceRefSchema = z
   })
   .strict();
 
-export const hdrBracketCompareSourceSchema = z
+const hdrBracketCompareSourceSchema = z
   .object({
     contentHash: z.string().min(1),
     displayName: z.string().min(1),
@@ -247,7 +241,7 @@ export const hdrBracketCompareSourceSchema = z
   })
   .strict();
 
-export const hdrBracketCompareReviewSummarySchema = z
+const hdrBracketCompareReviewSummarySchema = z
   .object({
     accepted: z.boolean().nullable(),
     detectionConfidence: z.number().min(0).max(1).nullable(),
@@ -263,7 +257,7 @@ export const hdrBracketCompareReviewSummarySchema = z
 
 const hdrParityHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
-export const hdrPreviewExportParitySummarySchema = z
+const hdrPreviewExportParitySummarySchema = z
   .object({
     comparedFields: z.array(
       z.enum([
@@ -314,7 +308,7 @@ export const hdrEditableHandoffSummarySchema = z
 export type HdrMergeUiSettings = z.infer<typeof hdrMergeUiSettingsSchema>;
 export type HdrRuntimePlan = z.infer<typeof hdrRuntimePlanSchema>;
 export type HdrMergeAlignmentMode = z.infer<typeof hdrMergeAlignmentModeSchema>;
-export type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidationSchema>;
+type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidationSchema>;
 export type HdrMergeDeghosting = z.infer<typeof hdrMergeDeghostingSchema>;
 export type HdrMergeExposureWeightingMode = z.infer<typeof hdrMergeExposureWeightingModeSchema>;
 export type HdrMergeStrategy = z.infer<typeof hdrMergeStrategySchema>;
@@ -419,7 +413,7 @@ export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   toneMappingPreset: 'natural',
 });
 
-export const normalizeHdrMergeUiSettings = (value: unknown): HdrMergeUiSettings => {
+const normalizeHdrMergeUiSettings = (value: unknown): HdrMergeUiSettings => {
   const parsed = hdrMergeUiSettingsSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_HDR_MERGE_UI_SETTINGS;
 };

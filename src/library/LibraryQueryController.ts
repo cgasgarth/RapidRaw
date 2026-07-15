@@ -2,7 +2,7 @@ import type { LibrarySearchProjection } from './LibrarySearchProjection';
 import { queryLibraryProjections, type SerializedCompiledLibraryQuery } from './libraryQuery';
 import type { LibraryQueryWorkerCommand, LibraryQueryWorkerResult } from './libraryQueryWorkerProtocol';
 
-export interface LibraryQueryState {
+interface LibraryQueryState {
   committedQueryRevision: number;
   matchedCount: number;
   orderedPaths: readonly string[];

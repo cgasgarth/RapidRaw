@@ -113,7 +113,7 @@ export const initialCropStraightenControllerState = (): CropStraightenController
   session: null,
 });
 
-export const isCropStraightenSessionCurrent = (
+const isCropStraightenSessionCurrent = (
   expected: CropStraightenSessionIdentity,
   actual: CropStraightenSessionIdentity,
 ): boolean =>
@@ -152,7 +152,7 @@ export const resolveStraightenCorrection = (
   return correction;
 };
 
-export const cropStraightenOverlay = (state: CropStraightenControllerState): StraightenOverlayDescriptor | null => {
+const cropStraightenOverlay = (state: CropStraightenControllerState): StraightenOverlayDescriptor | null => {
   if (state.session === null || state.gesture === null) return null;
   return {
     ariaLabel: 'Straighten guide',

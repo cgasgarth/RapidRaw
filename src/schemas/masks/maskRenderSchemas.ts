@@ -7,7 +7,7 @@ const normalizedScalarSchema = z.number().min(0).max(1);
 
 export const maskComposeModeSchema = z.enum(['add', 'subtract', 'intersect']);
 
-export const maskRenderBrushPointSchema = z
+const maskRenderBrushPointSchema = z
   .object({
     pressure: normalizedScalarSchema,
     x: z.number(),
@@ -15,7 +15,7 @@ export const maskRenderBrushPointSchema = z
   })
   .strict();
 
-export const maskRenderOperationSchema = z
+const maskRenderOperationSchema = z
   .discriminatedUnion('type', [
     z
       .object({
@@ -105,7 +105,7 @@ export const maskRenderOperationSchema = z
     }
   });
 
-export const maskRenderLayerSchema = z
+const maskRenderLayerSchema = z
   .object({
     blendMode: z.enum([
       'normal',
@@ -155,8 +155,8 @@ export const maskRenderSceneSchema = z
     }
   });
 
-export type MaskRenderLayer = z.infer<typeof maskRenderLayerSchema>;
-export type MaskRenderOperation = z.infer<typeof maskRenderOperationSchema>;
+type MaskRenderLayer = z.infer<typeof maskRenderLayerSchema>;
+type MaskRenderOperation = z.infer<typeof maskRenderOperationSchema>;
 export type MaskRenderScene = z.infer<typeof maskRenderSceneSchema>;
 export type MaskComposeMode = z.infer<typeof maskComposeModeSchema>;
 

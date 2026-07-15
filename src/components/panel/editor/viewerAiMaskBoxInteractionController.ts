@@ -71,10 +71,8 @@ const sameContext = (key: ViewerAiMaskBoxSessionKey, context: ViewerAiMaskBoxCur
   key.sourceRevision === context.sourceRevision &&
   key.tool === context.tool;
 
-export const isViewerAiMaskBoxKeyCurrent = (
-  key: ViewerAiMaskBoxSessionKey,
-  context: ViewerAiMaskBoxCurrentContext,
-): boolean => sameContext(key, context);
+const isViewerAiMaskBoxKeyCurrent = (key: ViewerAiMaskBoxSessionKey, context: ViewerAiMaskBoxCurrentContext): boolean =>
+  sameContext(key, context);
 
 const finitePoint = (point: ViewerAiMaskBoxPoint): boolean =>
   Number.isFinite(point.imagePoint.x) &&

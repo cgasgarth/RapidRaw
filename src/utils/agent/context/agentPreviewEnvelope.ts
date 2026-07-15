@@ -4,8 +4,8 @@ export const AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX = 1536;
 export const AGENT_MEDIUM_PREVIEW_QUALITY = 0.86;
 export const AGENT_PREVIEW_MAX_PIXEL_COUNT = 4_194_304;
 
-export const agentPreviewPurposeSchema = z.enum(['detail_review', 'initial_context', 'refresh']);
-export const agentPreviewCompareRoleSchema = z.enum(['before', 'current']);
+const agentPreviewPurposeSchema = z.enum(['detail_review', 'initial_context', 'refresh']);
+const agentPreviewCompareRoleSchema = z.enum(['before', 'current']);
 
 export const agentPreviewEnvelopeSchema = z
   .object({
@@ -188,7 +188,7 @@ export const isAgentPreviewEnvelopeCurrent = ({
   recipeHash: string;
 }): boolean => preview.recipeHash === recipeHash && !preview.lifecycle.persisted;
 
-export const agentPreviewCompareArtifactSchema = z
+const agentPreviewCompareArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
     contentHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
@@ -208,7 +208,7 @@ export const agentPreviewCompareArtifactSchema = z
     path: ['recipeHash'],
   });
 
-export const agentPreviewCompareScopeSummarySchema = z
+const agentPreviewCompareScopeSummarySchema = z
   .object({
     clipping: z
       .object({
@@ -221,7 +221,7 @@ export const agentPreviewCompareScopeSummarySchema = z
   })
   .strict();
 
-export const agentPreviewCompareLineageSchema = z
+const agentPreviewCompareLineageSchema = z
   .object({
     beforeGraphRevision: z.string().trim().min(1),
     beforeRecipeHash: z.string().trim().min(1),

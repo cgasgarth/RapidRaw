@@ -1,25 +1,25 @@
 import { z } from 'zod';
 
-export const negativeLabCrosstalkProfileIdSchema = z
+const negativeLabCrosstalkProfileIdSchema = z
   .string()
   .regex(/^negative_lab\.crosstalk\.(?:generic|identity|user|imported)\.[a-z0-9_]+\.v[0-9]+$/u);
-export const negativeLabCrosstalkProfileProvenanceSchema = z.enum([
+const negativeLabCrosstalkProfileProvenanceSchema = z.enum([
   'rawengine_identity_default',
   'rawengine_generic',
   'user_owned',
   'user_imported',
 ]);
-export const negativeLabCrosstalkProfileMatrixValueSchema = z
+const negativeLabCrosstalkProfileMatrixValueSchema = z
   .number()
   .min(-2)
   .max(2)
   .refine(Number.isFinite, { message: 'Negative Lab crosstalk matrix values must be finite.' });
-export const negativeLabCrosstalkProfileMatrixRowSchema = z.tuple([
+const negativeLabCrosstalkProfileMatrixRowSchema = z.tuple([
   negativeLabCrosstalkProfileMatrixValueSchema,
   negativeLabCrosstalkProfileMatrixValueSchema,
   negativeLabCrosstalkProfileMatrixValueSchema,
 ]);
-export const negativeLabCrosstalkProfileMatrixSchema = z.tuple([
+const negativeLabCrosstalkProfileMatrixSchema = z.tuple([
   negativeLabCrosstalkProfileMatrixRowSchema,
   negativeLabCrosstalkProfileMatrixRowSchema,
   negativeLabCrosstalkProfileMatrixRowSchema,

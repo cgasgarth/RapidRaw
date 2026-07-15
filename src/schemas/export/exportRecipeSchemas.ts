@@ -2,16 +2,16 @@ import { z } from 'zod';
 import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../../utils/export/exportFormatIds';
 import { outputSharpeningSettingsSchema } from '../outputSharpeningSchemas';
 
-export const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);
-export const exportColorProfileSchema = z.enum(['srgb', 'displayP3', 'adobeRgb1998', 'proPhotoRgb', 'sourceEmbedded']);
-export const exportRenderingIntentSchema = z.enum([
+const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);
+const exportColorProfileSchema = z.enum(['srgb', 'displayP3', 'adobeRgb1998', 'proPhotoRgb', 'sourceEmbedded']);
+const exportRenderingIntentSchema = z.enum([
   'absoluteColorimetric',
   'perceptual',
   'relativeColorimetric',
   'saturation',
 ]);
-export const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
-export const watermarkAnchorSchema = z.enum([
+const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
+const watermarkAnchorSchema = z.enum([
   'topLeft',
   'topCenter',
   'topRight',
@@ -98,7 +98,7 @@ export const exportRecipeSchema = z
     }
   });
 
-export const exportRecipeListSchema = z.array(exportRecipeSchema);
+const exportRecipeListSchema = z.array(exportRecipeSchema);
 
 export type ExportRecipe = z.infer<typeof exportRecipeSchema>;
 export type ExportRecipeList = z.infer<typeof exportRecipeListSchema>;

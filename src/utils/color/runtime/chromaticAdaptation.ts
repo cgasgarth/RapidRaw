@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const xyWhitePointSchema = z
+const xyWhitePointSchema = z
   .object({
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
@@ -62,7 +62,7 @@ const multiplyMatrixVector = (matrix: Matrix3, vector: XyzColor): XyzColor => [
   matrix[2][0] * vector[0] + matrix[2][1] * vector[1] + matrix[2][2] * vector[2],
 ];
 
-export const xyToNormalizedXyz = (whitePoint: XyWhitePoint): XyzColor => {
+const xyToNormalizedXyz = (whitePoint: XyWhitePoint): XyzColor => {
   const parsed = xyWhitePointSchema.parse(whitePoint);
   return [parsed.x / parsed.y, 1, (1 - parsed.x - parsed.y) / parsed.y];
 };
@@ -90,7 +90,7 @@ export const adaptXyzBradford = (input: ChromaticAdaptationInput): XyzColor => {
 export const linearSrgbToXyzD65 = (rgb: LinearRgbColor): XyzColor =>
   multiplyMatrixVector(srgbToXyzD65Matrix, [rgb.red, rgb.green, rgb.blue]);
 
-export const xyzD65ToLinearSrgb = (xyz: XyzColor): LinearRgbColor => {
+const xyzD65ToLinearSrgb = (xyz: XyzColor): LinearRgbColor => {
   const [red, green, blue] = multiplyMatrixVector(xyzD65ToSrgbMatrix, xyz);
   return { blue, green, red };
 };

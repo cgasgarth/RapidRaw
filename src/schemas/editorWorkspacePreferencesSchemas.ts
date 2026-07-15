@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 import { Panel } from '../components/ui/AppProperties';
 
-export const EDITOR_WORKSPACE_PREFERENCE_VERSION = 1 as const;
+const EDITOR_WORKSPACE_PREFERENCE_VERSION = 1 as const;
 
-export const editorWorkspaceZoomModeSchema = z.enum(['fit', 'fill', 'oneToOne']);
-export const editorWorkspaceLightsOutLevelSchema = z.enum(['off', 'dim', 'black']);
-export const editorWorkspaceCompareModeSchema = z.enum(['off', 'hold-original', 'split-wipe', 'side-by-side']);
-export const compactEditorDrawerStateSchema = z.enum(['collapsed', 'peek', 'expanded']);
-export const editorWorkspacePanelSchema = z.nativeEnum(Panel);
+const editorWorkspaceZoomModeSchema = z.enum(['fit', 'fill', 'oneToOne']);
+const editorWorkspaceLightsOutLevelSchema = z.enum(['off', 'dim', 'black']);
+const editorWorkspaceCompareModeSchema = z.enum(['off', 'hold-original', 'split-wipe', 'side-by-side']);
+const compactEditorDrawerStateSchema = z.enum(['collapsed', 'peek', 'expanded']);
+const editorWorkspacePanelSchema = z.nativeEnum(Panel);
 
 const sectionIdsSchema = z.array(z.string().trim().min(1)).max(32);
 
