@@ -227,6 +227,57 @@ impl DetailDenoiseDehazeV2 {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DisplayCreativeV2 {
+    flare_amount: f64,
+    glow_amount: f64,
+    grain_amount: f64,
+    grain_roughness: f64,
+    grain_size: f64,
+    halation_amount: f64,
+    lut_data: Option<String>,
+    lut_intensity: f64,
+    lut_name: Option<String>,
+    lut_path: Option<String>,
+    lut_size: u32,
+    vignette_amount: f64,
+    vignette_feather: f64,
+    vignette_midpoint: f64,
+    vignette_roundness: f64,
+}
+
+impl DisplayCreativeV2 {
+    fn validate(&self) -> Result<(), String> {
+        for (field, value, minimum, maximum) in [
+            ("flareAmount", self.flare_amount, 0.0, 100.0),
+            ("glowAmount", self.glow_amount, 0.0, 100.0),
+            ("grainAmount", self.grain_amount, 0.0, 100.0),
+            ("grainRoughness", self.grain_roughness, 0.0, 100.0),
+            ("grainSize", self.grain_size, 0.0, 100.0),
+            ("halationAmount", self.halation_amount, 0.0, 100.0),
+            ("lutIntensity", self.lut_intensity, 0.0, 100.0),
+            ("vignetteAmount", self.vignette_amount, -100.0, 100.0),
+            ("vignetteFeather", self.vignette_feather, 0.0, 100.0),
+            ("vignetteMidpoint", self.vignette_midpoint, 0.0, 100.0),
+            ("vignetteRoundness", self.vignette_roundness, -100.0, 100.0),
+        ] {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 display_creative field '{field}' must be finite and within [{minimum}, {maximum}]"
+                ));
+            }
+        }
+        let _ = (
+            &self.lut_data,
+            &self.lut_name,
+            &self.lut_path,
+            self.lut_size,
+        );
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum SceneCurveModeV2 {
     Point,
@@ -922,6 +973,10 @@ fn compile_node_params(
             parse_detail_denoise_dehaze(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::DisplayCreative => {
+            parse_display_creative(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::Geometry => {
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
@@ -934,7 +989,6 @@ fn compile_node_params(
             parse_layers(&node.params)?;
             Ok(node.params.clone())
         }
-        _ => Ok(node.params.clone()),
     }
 }
 
@@ -959,6 +1013,13 @@ fn parse_detail_denoise_dehaze(
         .map_err(|error| format!("EditDocumentV2 detail_denoise_dehaze is invalid: {error}"))?;
     detail.validate()?;
     Ok(detail)
+}
+
+fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreativeV2, String> {
+    let display: DisplayCreativeV2 = serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 display_creative is invalid: {error}"))?;
+    display.validate()?;
+    Ok(display)
 }
 
 fn validate_node_contract(
@@ -1181,6 +1242,26 @@ mod tests {
         })
     }
 
+    fn display_creative_params() -> Value {
+        json!({
+            "flareAmount": 0,
+            "glowAmount": 0,
+            "grainAmount": 12,
+            "grainRoughness": 50,
+            "grainSize": 25,
+            "halationAmount": 3,
+            "lutData": null,
+            "lutIntensity": 80,
+            "lutName": null,
+            "lutPath": null,
+            "lutSize": 0,
+            "vignetteAmount": 0,
+            "vignetteFeather": 50,
+            "vignetteMidpoint": 50,
+            "vignetteRoundness": 0
+        })
+    }
+
     fn document_with_legacy(legacy: Value) -> Value {
         json!({
             "extensions": { "legacyAdjustments": legacy },
@@ -1228,7 +1309,7 @@ mod tests {
                 "display_creative": {
                     "enabled": true,
                     "implementationVersion": 1,
-                    "params": { "grainAmount": 12, "halationAmount": 3, "lutIntensity": 80 },
+                    "params": display_creative_params(),
                     "process": "scene_referred_v2",
                     "type": "display_creative"
                 },
@@ -1380,11 +1461,8 @@ mod tests {
             "flipHorizontal": false,
             "flipVertical": true,
             "futureField": { "enabled": true },
-            "grainAmount": 12,
-            "halationAmount": 3,
             "highlights": -22,
             "lumaNoiseReduction": 5,
-            "lutIntensity": 80,
             "masks": [],
             "orientationSteps": 1,
             "rawEngineEditGraphVersion": 2,
@@ -1421,6 +1499,12 @@ mod tests {
         for (key, value) in scene_curve_params()
             .as_object()
             .expect("scene-curve params object")
+        {
+            expected[key] = value.clone();
+        }
+        for (key, value) in display_creative_params()
+            .as_object()
+            .expect("display-creative params object")
         {
             expected[key] = value.clone();
         }
@@ -1648,6 +1732,36 @@ mod tests {
             .into_render_adjustments()
             .expect_err("out-of-range detail field must fail");
         assert!(error.contains("lumaNoiseReduction"));
+    }
+
+    #[test]
+    fn display_creative_compiler_rejects_stale_missing_and_out_of_range_params() {
+        let mut stale = document_with_legacy(json!({}));
+        stale["nodes"]["display_creative"]["params"]["filmCurve"] = json!({ "legacy": true });
+        let error = serde_json::from_value::<EditDocumentV2>(stale)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("stale display field must fail");
+        assert!(error.contains("unknown field `filmCurve`"));
+
+        let mut missing = document_with_legacy(json!({}));
+        missing["nodes"]["display_creative"]["params"]
+            .as_object_mut()
+            .expect("display params object")
+            .remove("lutIntensity");
+        let error = serde_json::from_value::<EditDocumentV2>(missing)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("missing display field must fail");
+        assert!(error.contains("missing field `lutIntensity`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["display_creative"]["params"]["vignetteAmount"] = json!(101);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range display field must fail");
+        assert!(error.contains("vignetteAmount"));
     }
 
     #[test]
