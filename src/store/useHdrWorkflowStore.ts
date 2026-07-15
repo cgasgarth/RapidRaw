@@ -27,5 +27,4 @@ export const useHdrWorkflowStore = create<HdrWorkflowStore>((set, get) => ({
   isCurrent: (launchId) => isCurrentHdrWorkflow(get(), launchId),
 }));
 
-export const resetHdrWorkflowStore = () =>
-  useHdrWorkflowStore.setState(createHdrWorkflowState(DEFAULT_HDR_MERGE_UI_SETTINGS));
+const resetHdrWorkflowStore = () => useHdrWorkflowStore.setState(createHdrWorkflowState(DEFAULT_HDR_MERGE_UI_SETTINGS));

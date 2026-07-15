@@ -12,5 +12,5 @@ export const NegativeLabAppServerCommandName = {
   StockRegistry: 'negative.lab.list_stock_registry',
 } as const;
 
-export type NegativeLabAppServerCommandName =
+type NegativeLabAppServerCommandName =
   (typeof NegativeLabAppServerCommandName)[keyof typeof NegativeLabAppServerCommandName];

@@ -69,7 +69,7 @@ export const agentGeometryApplyRequestSchema = z
   })
   .strict();
 
-export const agentGeometryApplyResponseSchema = z
+const agentGeometryApplyResponseSchema = z
   .object({
     adjustedFields: z.array(z.string().trim().min(1)),
     afterPreviewHash: z.string().trim().min(1),

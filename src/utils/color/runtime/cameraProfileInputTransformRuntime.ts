@@ -8,7 +8,7 @@ export const cameraProfileRgbPixelSchema = z
   })
   .strict();
 
-export const cameraProfileMatrixRowSchema = z.tuple([z.number(), z.number(), z.number()]);
+const cameraProfileMatrixRowSchema = z.tuple([z.number(), z.number(), z.number()]);
 export const cameraProfileMatrix3x3Schema = z.tuple([
   cameraProfileMatrixRowSchema,
   cameraProfileMatrixRowSchema,

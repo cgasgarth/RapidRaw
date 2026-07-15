@@ -10,7 +10,7 @@ import { waveletDetailRecipeSchema } from '../../schemas/waveletDetailSchemas';
 
 const normalizedCropPixelSchema = z.number().min(0).max(1);
 
-export const detailOutputComparisonRecipeV1Schema = z
+const detailOutputComparisonRecipeV1Schema = z
   .object({
     denoise: detailDenoiseControlsV1Schema,
     deblur: detailDeblurUiControlsV1Schema,
@@ -66,7 +66,7 @@ export const detailOutputComparisonCommandV1Schema = z
   })
   .strict();
 
-export const detailOutputComparisonCommandApplyInputV1Schema = z
+const detailOutputComparisonCommandApplyInputV1Schema = z
   .object({
     command: detailOutputComparisonCommandV1Schema,
     currentBaselineCrop: z.array(normalizedCropPixelSchema).min(1),
@@ -91,7 +91,7 @@ export const detailOutputComparisonCommandApplyInputV1Schema = z
     }
   });
 
-export const detailOutputComparisonCommandApplyResultV1Schema = z
+const detailOutputComparisonCommandApplyResultV1Schema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
     changedPixelRatio: z.number().min(0).max(1),
@@ -122,7 +122,7 @@ export const detailOutputComparisonCommandApplyResultV1Schema = z
     }
   });
 
-export type DetailOutputComparisonCommandV1 = z.infer<typeof detailOutputComparisonCommandV1Schema>;
+type DetailOutputComparisonCommandV1 = z.infer<typeof detailOutputComparisonCommandV1Schema>;
 export type DetailOutputComparisonCommandApplyResultV1 = z.infer<
   typeof detailOutputComparisonCommandApplyResultV1Schema
 >;

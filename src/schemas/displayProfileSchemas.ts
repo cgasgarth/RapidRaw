@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const activeDisplayProfileStatusSchema = z.enum([
+const activeDisplayProfileStatusSchema = z.enum([
   'active_profile_loaded',
   'fallback_no_active_profile',
   'unsupported_platform',
@@ -24,7 +24,7 @@ export const activeDisplayProfileSchema = z
 
 export type ActiveDisplayProfile = z.infer<typeof activeDisplayProfileSchema>;
 
-export const displayPreviewLutTransformStatusSchema = z.enum([
+const displayPreviewLutTransformStatusSchema = z.enum([
   'active_display_transform',
   'srgb_fallback_transform',
   'unsupported_platform',

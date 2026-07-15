@@ -87,7 +87,7 @@ const sameContext = (
   left.sourceIdentity === right.sourceIdentity &&
   left.sourceRevision === right.sourceRevision;
 
-export const isViewerWhiteBalanceSampleCurrent = (
+const isViewerWhiteBalanceSampleCurrent = (
   expected: ViewerWhiteBalanceSampleIdentity,
   actual: ViewerWhiteBalanceInteractionContext,
   pending: ViewerWhiteBalanceSampleIdentity | null,

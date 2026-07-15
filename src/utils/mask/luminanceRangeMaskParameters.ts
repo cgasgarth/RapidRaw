@@ -27,7 +27,7 @@ export function normalizeLuminanceRangeParameters(
   });
 }
 
-export function parseLuminanceRangeParameters(parameters: unknown): LuminanceRangeMaskParameters {
+function parseLuminanceRangeParameters(parameters: unknown): LuminanceRangeMaskParameters {
   return luminanceRangeMaskParametersSchema.parse(parameters);
 }
 

@@ -10,7 +10,7 @@ import { Invokes } from '../../tauri/commands';
 import { AI_CONNECTOR_STATUS_UPDATE_EVENT } from '../../utils/tauriEventNames';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
-export const AI_CONNECTOR_STATUS_POLL_INTERVAL_MS = 10_000;
+const AI_CONNECTOR_STATUS_POLL_INTERVAL_MS = 10_000;
 
 const checkAiConnectorStatus = async (): Promise<void> => {
   await invokeWithSchema(Invokes.CheckAIConnectorStatus, {}, emptyTauriResponseSchema);

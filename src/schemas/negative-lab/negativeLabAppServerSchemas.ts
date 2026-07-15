@@ -39,24 +39,22 @@ import {
 } from './negativeLabStockRegistrySchemas';
 import { negativeLabQcProofReportSchema } from './negativeLabWorkspaceSchemas';
 
-export const negativeLabConversionPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.ConversionPlan);
-export const negativeLabAcceptedBatchApplyCommandNameSchema = z.literal(
-  NegativeLabAppServerCommandName.AcceptedBatchApply,
-);
-export const negativeLabAcceptBatchPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.AcceptBatchPlan);
-export const negativeLabBatchSummaryCommandNameSchema = z.literal(NegativeLabAppServerCommandName.BatchSummary);
-export const negativeLabDensitometerCommandNameSchema = z.literal(NegativeLabAppServerCommandName.Densitometer);
-export const negativeLabFrameHealthCommandNameSchema = z.literal(NegativeLabAppServerCommandName.FrameHealth);
-export const negativeLabPlanRollNormalizationCommandNameSchema = z.literal(
+const negativeLabConversionPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.ConversionPlan);
+const negativeLabAcceptedBatchApplyCommandNameSchema = z.literal(NegativeLabAppServerCommandName.AcceptedBatchApply);
+const negativeLabAcceptBatchPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.AcceptBatchPlan);
+const negativeLabBatchSummaryCommandNameSchema = z.literal(NegativeLabAppServerCommandName.BatchSummary);
+const negativeLabDensitometerCommandNameSchema = z.literal(NegativeLabAppServerCommandName.Densitometer);
+const negativeLabFrameHealthCommandNameSchema = z.literal(NegativeLabAppServerCommandName.FrameHealth);
+const negativeLabPlanRollNormalizationCommandNameSchema = z.literal(
   NegativeLabAppServerCommandName.PlanRollNormalization,
 );
-export const negativeLabQcProofCommandNameSchema = z.literal(NegativeLabAppServerCommandName.QcProof);
-export const negativeLabStockMetadataCommandNameSchema = z.literal(NegativeLabAppServerCommandName.StockMetadata);
-export const negativeLabStockRegistryCommandNameSchema = z.literal(NegativeLabAppServerCommandName.StockRegistry);
-export const negativeLabStockFamilyConversionCommandNameSchema = z.literal(
+const negativeLabQcProofCommandNameSchema = z.literal(NegativeLabAppServerCommandName.QcProof);
+const negativeLabStockMetadataCommandNameSchema = z.literal(NegativeLabAppServerCommandName.StockMetadata);
+const negativeLabStockRegistryCommandNameSchema = z.literal(NegativeLabAppServerCommandName.StockRegistry);
+const negativeLabStockFamilyConversionCommandNameSchema = z.literal(
   NegativeLabAppServerCommandName.StockFamilyConversion,
 );
-export const negativeLabAppServerCommandNameSchema = z.union([
+const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabAcceptBatchPlanCommandNameSchema,
   negativeLabAcceptedBatchApplyCommandNameSchema,
   negativeLabBatchSummaryCommandNameSchema,
@@ -69,7 +67,7 @@ export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabStockFamilyConversionCommandNameSchema,
   negativeLabStockRegistryCommandNameSchema,
 ]);
-export const negativeLabAppServerOutputFormatSchema = z.enum(NEGATIVE_LAB_OUTPUT_FORMAT_IDS);
+const negativeLabAppServerOutputFormatSchema = z.enum(NEGATIVE_LAB_OUTPUT_FORMAT_IDS);
 export const negativeLabAppServerScopeSchema = z.enum(['active', 'all']);
 export const negativeLabProfileProvenanceHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
@@ -213,7 +211,7 @@ export const negativeLabAcceptBatchPlanAppServerCommandSchema = negativeLabFrame
     presetId: negativeLabRuntimePresetIdSchema,
   })
   .strict();
-export const negativeLabQcOverlayVisibilityAppServerSchema = z
+const negativeLabQcOverlayVisibilityAppServerSchema = z
   .object({
     densityWarnings: z.boolean(),
     frameBounds: z.boolean(),
@@ -278,68 +276,68 @@ interface NegativeLabRouteDescriptor {
   reason: string;
 }
 
-export const negativeLabAcceptedBatchApplyRouteDescriptor = {
+const negativeLabAcceptedBatchApplyRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.AcceptedBatchApply,
   inputSchemaName: 'NegativeLabAcceptedBatchApplyAppServerCommandV1',
   outputSchemaName: 'NegativeLabAcceptedBatchApplyResultV1',
   reason: 'Negative Lab app-server apply calls must replay an accepted dry-run plan identity.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabAcceptBatchPlanRouteDescriptor = {
+const negativeLabAcceptBatchPlanRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.AcceptBatchPlan,
   inputSchemaName: 'NegativeLabAcceptBatchPlanAppServerCommandV1',
   outputSchemaName: 'NegativeLabAcceptedBatchPlanV1',
   reason: 'Negative Lab app-server calls require an accepted non-destructive batch plan before apply.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabBatchSummaryRouteDescriptor = {
+const negativeLabBatchSummaryRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.BatchSummary,
   inputSchemaName: 'NegativeLabBatchSummaryAppServerCommandV1',
   outputSchemaName: 'NegativeLabBatchDryRunSummaryV1',
   reason: 'Negative Lab app-server calls expose the same non-destructive batch apply/skip plan used by UI.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabConversionPlanRouteDescriptor = {
+const negativeLabConversionPlanRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.ConversionPlan,
   inputSchemaName: 'NegativeLabAppServerCommandV1',
   outputSchemaName: 'NegativeLabConversionPlanResultV1',
   reason: 'Negative Lab app-server calls share the UI built-in preset catalog and deterministic conversion plan shape.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabDensitometerRouteDescriptor = {
+const negativeLabDensitometerRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.Densitometer,
   inputSchemaName: 'NegativeLabDensitometerAppServerCommandV1',
   outputSchemaName: 'NegativeBaseFogDensitometerReadoutV1',
   reason: 'Negative Lab app-server calls expose the same base/fog densitometer math used by UI.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabFrameHealthRouteDescriptor = {
+const negativeLabFrameHealthRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.FrameHealth,
   inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
   outputSchemaName: 'NegativeLabFrameHealthReportV1',
   reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabQcProofRouteDescriptor = {
+const negativeLabQcProofRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.QcProof,
   inputSchemaName: 'NegativeLabQcProofAppServerCommandV1',
   outputSchemaName: 'NegativeLabQcProofBundleV1',
   reason:
     'Negative Lab app-server calls expose the same contact-sheet QC proof report and artifact used by the workspace UI.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabPlanRollNormalizationRouteDescriptor = {
+const negativeLabPlanRollNormalizationRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.PlanRollNormalization,
   inputSchemaName: 'NegativeLabPlanRollNormalizationAppServerCommandV1',
   outputSchemaName: 'NegativeLabRollNormalizationPlanV1',
   reason: 'Negative Lab app-server calls expose deterministic selected-frame roll normalization review before apply.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabStockFamilyConversionRouteDescriptor = {
+const negativeLabStockFamilyConversionRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.StockFamilyConversion,
   inputSchemaName: 'NegativeLabStockFamilyConversionAppServerCommandV1',
   outputSchemaName: 'NegativeLabStockFamilyConversionResultV1',
   reason: 'Negative Lab app-server calls can build conversion plans from governed stock-family registry ids.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabStockMetadataRouteDescriptor = {
+const negativeLabStockMetadataRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.StockMetadata,
   inputSchemaName: 'NegativeLabStockMetadataAppServerCommandV1',
   outputSchemaName: 'NegativeLabStockMetadataAppServerResultV1',
   reason: 'Negative Lab app-server calls expose named stock metadata without routing it through apply/export.',
 } as const satisfies NegativeLabRouteDescriptor;
-export const negativeLabStockRegistryRouteDescriptor = {
+const negativeLabStockRegistryRouteDescriptor = {
   commandName: NegativeLabAppServerCommandName.StockRegistry,
   inputSchemaName: 'NegativeLabStockRegistryAppServerCommandV1',
   outputSchemaName: 'NegativeLabStockRegistryAppServerResultV1',
@@ -371,29 +369,25 @@ const buildNegativeLabRouteSchema = (descriptor: (typeof negativeLabRouteDescrip
     })
     .strict();
 
-export const negativeLabBatchSummaryRouteSchema = buildNegativeLabRouteSchema(negativeLabBatchSummaryRouteDescriptor);
-export const negativeLabAcceptBatchPlanRouteSchema = buildNegativeLabRouteSchema(
-  negativeLabAcceptBatchPlanRouteDescriptor,
-);
-export const negativeLabAcceptedBatchApplyRouteSchema = buildNegativeLabRouteSchema(
+const negativeLabBatchSummaryRouteSchema = buildNegativeLabRouteSchema(negativeLabBatchSummaryRouteDescriptor);
+const negativeLabAcceptBatchPlanRouteSchema = buildNegativeLabRouteSchema(negativeLabAcceptBatchPlanRouteDescriptor);
+const negativeLabAcceptedBatchApplyRouteSchema = buildNegativeLabRouteSchema(
   negativeLabAcceptedBatchApplyRouteDescriptor,
 );
-export const negativeLabConversionPlanRouteSchema = buildNegativeLabRouteSchema(
-  negativeLabConversionPlanRouteDescriptor,
-);
-export const negativeLabDensitometerRouteSchema = buildNegativeLabRouteSchema(negativeLabDensitometerRouteDescriptor);
-export const negativeLabFrameHealthRouteSchema = buildNegativeLabRouteSchema(negativeLabFrameHealthRouteDescriptor);
-export const negativeLabPlanRollNormalizationRouteSchema = buildNegativeLabRouteSchema(
+const negativeLabConversionPlanRouteSchema = buildNegativeLabRouteSchema(negativeLabConversionPlanRouteDescriptor);
+const negativeLabDensitometerRouteSchema = buildNegativeLabRouteSchema(negativeLabDensitometerRouteDescriptor);
+const negativeLabFrameHealthRouteSchema = buildNegativeLabRouteSchema(negativeLabFrameHealthRouteDescriptor);
+const negativeLabPlanRollNormalizationRouteSchema = buildNegativeLabRouteSchema(
   negativeLabPlanRollNormalizationRouteDescriptor,
 );
-export const negativeLabQcProofRouteSchema = buildNegativeLabRouteSchema(negativeLabQcProofRouteDescriptor);
-export const negativeLabStockRegistryRouteSchema = buildNegativeLabRouteSchema(negativeLabStockRegistryRouteDescriptor);
-export const negativeLabStockMetadataRouteSchema = buildNegativeLabRouteSchema(negativeLabStockMetadataRouteDescriptor);
-export const negativeLabStockFamilyConversionRouteSchema = buildNegativeLabRouteSchema(
+const negativeLabQcProofRouteSchema = buildNegativeLabRouteSchema(negativeLabQcProofRouteDescriptor);
+const negativeLabStockRegistryRouteSchema = buildNegativeLabRouteSchema(negativeLabStockRegistryRouteDescriptor);
+const negativeLabStockMetadataRouteSchema = buildNegativeLabRouteSchema(negativeLabStockMetadataRouteDescriptor);
+const negativeLabStockFamilyConversionRouteSchema = buildNegativeLabRouteSchema(
   negativeLabStockFamilyConversionRouteDescriptor,
 );
 
-export const negativeLabAppServerRouteSchema = z.union([
+const negativeLabAppServerRouteSchema = z.union([
   negativeLabAcceptBatchPlanRouteSchema,
   negativeLabAcceptedBatchApplyRouteSchema,
   negativeLabBatchSummaryRouteSchema,
@@ -462,7 +456,7 @@ export const negativeLabConversionPlanResultSchema = z
     }
   });
 
-export const negativeLabAcceptedBatchPlanSchema = z
+const negativeLabAcceptedBatchPlanSchema = z
   .object({
     acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
     acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
@@ -533,7 +527,7 @@ export const negativeLabPositiveOutputReceiptSchema = z
     }
   });
 
-export const negativeLabPositiveOutputRejectedFrameSchema = z
+const negativeLabPositiveOutputRejectedFrameSchema = z
   .object({
     frameId: z.string().trim().min(1),
     reason: z.enum(['missing_positive_variant', 'source_overwrite_guard', 'unsupported_output_format']),
@@ -541,7 +535,7 @@ export const negativeLabPositiveOutputRejectedFrameSchema = z
   })
   .strict();
 
-export const negativeLabAcceptedBatchApplyPlanSchema = z
+const negativeLabAcceptedBatchApplyPlanSchema = z
   .object({
     acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
     acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),

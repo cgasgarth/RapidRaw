@@ -169,7 +169,7 @@ export function cloneSubMaskForPaste(
   return clonedSubMask;
 }
 
-export function createInvertedSubMaskContainer<TContainer extends MaskLikeContainer>({
+function createInvertedSubMaskContainer<TContainer extends MaskLikeContainer>({
   cloneContainer,
   cloneSubMask,
   invertedName,
@@ -222,10 +222,7 @@ export function insertSubMaskAt<TSubMask extends SubMask>(
   return nextSubMasks;
 }
 
-export function getMaskLikeInsertAfterIndex(
-  containers: Array<MaskListContainer>,
-  containerId: string,
-): number | undefined {
+function getMaskLikeInsertAfterIndex(containers: Array<MaskListContainer>, containerId: string): number | undefined {
   const containerIndex = containers.findIndex((container) => container.id === containerId);
   return containerIndex >= 0 ? containerIndex + 1 : undefined;
 }

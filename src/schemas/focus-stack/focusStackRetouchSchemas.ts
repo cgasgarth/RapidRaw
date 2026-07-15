@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const focusRetouchRevisionSchema = z.object({
+const focusRetouchRevisionSchema = z.object({
   schemaVersion: z.literal(1),
   revisionId: z.string().min(1),
   parentRevisionId: z.string().min(1).nullable(),

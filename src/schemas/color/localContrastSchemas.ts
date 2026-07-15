@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const localContrastModeSchema = z.enum(['classic', 'edge_protected', 'midtone_masked']);
+const localContrastModeSchema = z.enum(['classic', 'edge_protected', 'midtone_masked']);
 
 export const localContrastSettingsSchema = z
   .object({
@@ -36,4 +36,4 @@ export const localContrastFixtureSchema = z
   })
   .strict();
 
-export type LocalContrastSettings = z.infer<typeof localContrastSettingsSchema>;
+type LocalContrastSettings = z.infer<typeof localContrastSettingsSchema>;

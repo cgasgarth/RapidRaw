@@ -46,7 +46,7 @@ export const captureCameraInputCommitIdentity = (
       }
     : null;
 
-export const isCurrentCameraInputCommitIdentity = (
+const isCurrentCameraInputCommitIdentity = (
   state: CameraInputEditTransactionState,
   identity: CameraInputCommitIdentity,
 ): boolean =>

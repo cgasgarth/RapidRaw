@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const negativeLabSourcePositiveComparisonModeSchema = z.enum(['final', 'side_by_side', 'split', 'hold_source']);
+const negativeLabSourcePositiveComparisonModeSchema = z.enum(['final', 'side_by_side', 'split', 'hold_source']);
 
-export const negativeLabComparisonDimensionsSchema = z.object({
+const negativeLabComparisonDimensionsSchema = z.object({
   height: z.number().int().positive(),
   width: z.number().int().positive(),
 });

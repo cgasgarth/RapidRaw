@@ -1,4 +1,4 @@
-export type FolderTreeSection = 'albums' | 'current' | 'pinned';
+type FolderTreeSection = 'albums' | 'current' | 'pinned';
 
 interface FolderTreeSearchMatches {
   albums: boolean;

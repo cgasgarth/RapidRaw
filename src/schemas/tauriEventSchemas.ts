@@ -16,8 +16,8 @@ const nonnegativeIntegerSchema = z.number().int().nonnegative().safe();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;
 type CullingProgressPayload = Progress & { stage: string };
 
-export const stringPayloadSchema = z.string();
-export const countPayloadSchema = nonnegativeNumberSchema;
+const stringPayloadSchema = z.string();
+const countPayloadSchema = nonnegativeNumberSchema;
 
 const analyticsResourceDescriptorSchema = z
   .object({
@@ -123,7 +123,7 @@ export const displayTargetChangePayloadSchema = z
   })
   .strict();
 
-export const progressPayloadSchema = z
+const progressPayloadSchema = z
   .object({
     completed: nonnegativeNumberSchema.optional(),
     current: nonnegativeNumberSchema,
@@ -132,7 +132,7 @@ export const progressPayloadSchema = z
   })
   .loose();
 
-export const thumbnailSmartPreviewPayloadSchema = z
+const thumbnailSmartPreviewPayloadSchema = z
   .object({
     colorProfile: z.string(),
     height: nonnegativeNumberSchema,
@@ -144,7 +144,7 @@ export const thumbnailSmartPreviewPayloadSchema = z
   })
   .strict();
 
-export const thumbnailResourceDescriptorSchema = z
+const thumbnailResourceDescriptorSchema = z
   .object({
     byteLen: nonnegativeNumberSchema,
     generation: nonnegativeNumberSchema,
@@ -157,7 +157,7 @@ export const thumbnailResourceDescriptorSchema = z
   })
   .strict();
 
-export const thumbnailGeneratedPayloadSchema = z
+const thumbnailGeneratedPayloadSchema = z
   .object({
     cacheRevision: z.string().optional(),
     fromCache: z.boolean().optional(),
@@ -173,7 +173,7 @@ export const thumbnailGeneratedPayloadSchema = z
   })
   .loose();
 
-export const thumbnailInvalidatedPayloadSchema = z
+const thumbnailInvalidatedPayloadSchema = z
   .object({
     outcome: z.enum(['deferred', 'duplicate', 'scheduled']),
     path: z.string().min(1),
@@ -182,7 +182,7 @@ export const thumbnailInvalidatedPayloadSchema = z
   })
   .strict();
 
-export const smartPreviewGeneratedPayloadSchema = z
+const smartPreviewGeneratedPayloadSchema = z
   .object({
     generation: nonnegativeNumberSchema,
     path: z.string(),
@@ -201,7 +201,7 @@ export const importStartPayloadSchema = z
   })
   .loose();
 
-export const pathProgressPayloadSchema = progressPayloadSchema
+const pathProgressPayloadSchema = progressPayloadSchema
   .extend({
     path: z.string(),
   })
@@ -223,9 +223,9 @@ export const importTerminalPayloadSchema = importJobAuthoritySchema
   .extend({ receipt: importJobReceiptSchema })
   .strict();
 
-export const importErrorPayloadSchema = importJobAuthoritySchema.extend({ message: z.string() }).strict();
+const importErrorPayloadSchema = importJobAuthoritySchema.extend({ message: z.string() }).strict();
 
-export const denoiseCompletePayloadSchema = z
+const denoiseCompletePayloadSchema = z
   .object({
     denoised: z.string(),
     operation: denoiseOperationHandleSchema,
@@ -240,26 +240,26 @@ export const denoiseErrorPayloadSchema = z
   })
   .strict();
 
-export const denoiseProgressPayloadSchema = z
+const denoiseProgressPayloadSchema = z
   .object({
     message: z.string(),
     operation: denoiseOperationHandleSchema,
   })
   .strict();
 
-export const renderPathPayloadSchema = z
+const renderPathPayloadSchema = z
   .object({
     path: z.string().optional(),
   })
   .loose();
 
-export const base64PayloadSchema = z
+const base64PayloadSchema = z
   .object({
     base64: z.string(),
   })
   .loose();
 
-export const hdrCompletePayloadSchema = z
+const hdrCompletePayloadSchema = z
   .object({
     base64: z.string(),
     receipt: z
@@ -340,14 +340,14 @@ export const gamutWarningOverlayPayloadSchema = z
 
 export type GamutWarningOverlayPayload = z.infer<typeof gamutWarningOverlayPayloadSchema>;
 
-export const panoramaCompletePayloadSchema = z
+const panoramaCompletePayloadSchema = z
   .object({
     base64: z.string(),
     review: panoramaRenderedReviewSchema,
   })
   .strict();
 
-export const aiConnectorStatusPayloadSchema = z
+const aiConnectorStatusPayloadSchema = z
   .object({
     connected: z.boolean(),
   })
@@ -421,7 +421,7 @@ export const exportReceiptPayloadSchema = z
   })
   .strict();
 
-export const cullingProgressPayloadSchema = progressPayloadSchema
+const cullingProgressPayloadSchema = progressPayloadSchema
   .extend({
     stage: z.string(),
   })
@@ -466,7 +466,7 @@ const cullingLatencyReportSchema = z
   })
   .loose();
 
-export const cullingSuggestionsPayloadSchema = z
+const cullingSuggestionsPayloadSchema = z
   .object({
     blurryImages: z.array(imageAnalysisResultSchema),
     failedPaths: z.array(z.string()),
@@ -507,12 +507,12 @@ export const parseImportTerminalPayload = (value: unknown) => importTerminalPayl
 export const parseImportErrorPayload = (value: unknown) => importErrorPayloadSchema.parse(value);
 export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadSchema.parse(value);
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
-export const parseDenoiseErrorPayload = (value: unknown) => denoiseErrorPayloadSchema.parse(value);
+const parseDenoiseErrorPayload = (value: unknown) => denoiseErrorPayloadSchema.parse(value);
 export const parseDenoiseProgressPayload = (value: unknown) => denoiseProgressPayloadSchema.parse(value);
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
-export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
+const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
 export const parseHdrCompletePayload = (value: unknown) => hdrCompletePayloadSchema.parse(value);
-export const parseGamutWarningOverlayPayload = (value: unknown) => gamutWarningOverlayPayloadSchema.parse(value);
+const parseGamutWarningOverlayPayload = (value: unknown) => gamutWarningOverlayPayloadSchema.parse(value);
 export const parsePanoramaCompletePayload = (value: unknown) => panoramaCompletePayloadSchema.parse(value);
 export const parseAiConnectorStatusPayload = (value: unknown) => aiConnectorStatusPayloadSchema.parse(value);
 export const parseExportReceiptPayload = (value: unknown) => exportReceiptPayloadSchema.parse(value);

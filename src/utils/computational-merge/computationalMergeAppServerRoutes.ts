@@ -8,18 +8,18 @@ import {
   getComputationalMergeAppServerRoutePairData,
 } from './computationalMergeAppServerRouteManifestData';
 
-export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST = computationalMergeAppServerRouteManifestSchema.parse(
+const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST = computationalMergeAppServerRouteManifestSchema.parse(
   COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST_DATA,
 );
 
 export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTES = COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST.routes;
 
-export interface ComputationalMergeAppServerRoutePair {
+interface ComputationalMergeAppServerRoutePair {
   apply: ComputationalMergeAppServerRoute;
   dryRun: ComputationalMergeAppServerRoute;
 }
 
-export function getComputationalMergeAppServerRoutePair(
+function getComputationalMergeAppServerRoutePair(
   family: ComputationalMergeAppServerRouteFamily,
 ): ComputationalMergeAppServerRoutePair {
   return getComputationalMergeAppServerRoutePairData(family);

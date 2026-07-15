@@ -11,7 +11,7 @@ export const focusStackReviewOverlayModeSchema = z.enum([
   'halo_risk',
 ]);
 
-export const focusStackUiSettingsSchema = z
+const focusStackUiSettingsSchema = z
   .object({
     alignmentMode: focusStackAlignmentModeSchema,
     blendMethod: focusStackBlendMethodSchema,
@@ -27,10 +27,10 @@ export const focusStackUiSettingsSchema = z
 
 export type FocusStackUiSettings = z.infer<typeof focusStackUiSettingsSchema>;
 export type FocusStackAlignmentMode = z.infer<typeof focusStackAlignmentModeSchema>;
-export type FocusStackBlendMethod = z.infer<typeof focusStackBlendMethodSchema>;
+type FocusStackBlendMethod = z.infer<typeof focusStackBlendMethodSchema>;
 export type FocusStackQualityPreference = z.infer<typeof focusStackQualityPreferenceSchema>;
 export type FocusStackReviewOverlayMode = z.infer<typeof focusStackReviewOverlayModeSchema>;
-export type FocusStackRetouchLayerPolicy = z.infer<typeof focusStackRetouchLayerPolicySchema>;
+type FocusStackRetouchLayerPolicy = z.infer<typeof focusStackRetouchLayerPolicySchema>;
 
 export const DEFAULT_FOCUS_STACK_UI_SETTINGS = focusStackUiSettingsSchema.parse({
   alignmentMode: 'auto',
@@ -44,7 +44,7 @@ export const DEFAULT_FOCUS_STACK_UI_SETTINGS = focusStackUiSettingsSchema.parse(
   sourceMode: 'focus_bracket',
 });
 
-export const normalizeFocusStackUiSettings = (value: unknown): FocusStackUiSettings => {
+const normalizeFocusStackUiSettings = (value: unknown): FocusStackUiSettings => {
   const parsed = focusStackUiSettingsSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_FOCUS_STACK_UI_SETTINGS;
 };

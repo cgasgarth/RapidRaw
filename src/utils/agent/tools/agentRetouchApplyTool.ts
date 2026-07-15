@@ -132,8 +132,8 @@ export const agentRetouchApplyResponseSchema = z
 
 export type AgentRetouchApplyRequest = z.infer<typeof agentRetouchApplyRequestSchema>;
 export type AgentRetouchApplyResponse = z.infer<typeof agentRetouchApplyResponseSchema>;
-export type AgentRetouchOverlayPreview = z.infer<typeof agentRetouchOverlayPreviewSchema>;
-export type AgentRetouchOutputProof = z.infer<typeof agentRetouchOutputProofSchema>;
+type AgentRetouchOverlayPreview = z.infer<typeof agentRetouchOverlayPreviewSchema>;
+type AgentRetouchOutputProof = z.infer<typeof agentRetouchOutputProofSchema>;
 
 const toIdSegment = (value: string): string =>
   value

@@ -45,7 +45,7 @@ export type CollageLoadAction =
 export const createCollageSessionIdentity = (orderedPaths: readonly string[], openEpoch: number): string =>
   `${openEpoch}:${orderedPaths.map((path) => `${path.length}:${path}`).join('')}`;
 
-export const chooseDefaultLayout = (availableLayouts: readonly CollageLayoutOption[]): CollageLayoutOption | null =>
+const chooseDefaultLayout = (availableLayouts: readonly CollageLayoutOption[]): CollageLayoutOption | null =>
   availableLayouts[0] ?? null;
 
 export const resolveCollageLayout = (

@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-export const negativeLabPaperProfileIdSchema = z
-  .string()
-  .regex(/^negative_lab\.paper\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
+const negativeLabPaperProfileIdSchema = z.string().regex(/^negative_lab\.paper\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
 export const negativeLabPaperProfileSchema = z
   .object({

@@ -101,7 +101,7 @@ export const buildLayerMaskSourceGraphRevision = ({
     '_',
   )}`;
 
-export const buildLayerMaskProvenanceReceipt = ({
+const buildLayerMaskProvenanceReceipt = ({
   appliedCommandId,
   layerId,
   masks,

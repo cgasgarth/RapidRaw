@@ -129,7 +129,7 @@ const nativeDensityScopesSchema = z
   })
   .strict();
 
-export const negativeLabDryRunPreviewArtifactSchema = z
+const negativeLabDryRunPreviewArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
     baseFogSampleSummary: z

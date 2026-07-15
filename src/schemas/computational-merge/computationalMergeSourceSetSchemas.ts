@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { privateRawFormatSchema } from '../privateRawFormatSchemas';
 
-export const computationalMergeSourceSetFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
+const computationalMergeSourceSetFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
 
 const sourceItemSchema = z
   .object({
@@ -13,7 +13,7 @@ const sourceItemSchema = z
   })
   .strict();
 
-export const computationalMergePrivateSourceSetSchema = z
+const computationalMergePrivateSourceSetSchema = z
   .object({
     evidenceId: z.string().regex(/^raw-evidence\.[a-z0-9.-]+\.v[0-9]+$/u),
     featureFamily: computationalMergeSourceSetFamilySchema,

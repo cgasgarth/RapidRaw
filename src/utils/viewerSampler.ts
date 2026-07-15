@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const viewerSampleTargets = ['edited', 'original', 'softProof'] as const;
-export const viewerSampleSpaces = ['displayEncoded', 'workingLinear'] as const;
-export const viewerSampleRadii = [0, 1, 2, 4] as const;
+const viewerSampleTargets = ['edited', 'original', 'softProof'] as const;
+const viewerSampleSpaces = ['displayEncoded', 'workingLinear'] as const;
+const viewerSampleRadii = [0, 1, 2, 4] as const;
 
 export type ViewerSampleTarget = (typeof viewerSampleTargets)[number];
 export type ViewerSampleSpace = (typeof viewerSampleSpaces)[number];
@@ -73,7 +73,7 @@ export const buildViewerSamplerIdentity = (input: ViewerSamplerIdentityInput): s
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
-export const buildViewerSampleRequestIdentity = (request: Omit<ViewerSampleRequest, 'requestIdentity'>): string =>
+const buildViewerSampleRequestIdentity = (request: Omit<ViewerSampleRequest, 'requestIdentity'>): string =>
   JSON.stringify([
     request.imageIdentity,
     request.graphRevision,

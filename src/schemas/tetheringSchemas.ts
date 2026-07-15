@@ -12,16 +12,16 @@ export const tetherMetadataTemplateIdSchema = z.enum([
   'reviewSelect',
   'copyright-client-delivery',
 ]);
-export const tetherCameraControlIdSchema = z.enum(['iso', 'shutterSpeed', 'aperture']);
-export const tetherCameraControlStatusSchema = z.enum(['ready', 'read_only', 'unsupported']);
+const tetherCameraControlIdSchema = z.enum(['iso', 'shutterSpeed', 'aperture']);
+const tetherCameraControlStatusSchema = z.enum(['ready', 'read_only', 'unsupported']);
 
-export const tetherCapabilitySchema = z.object({
+const tetherCapabilitySchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
   status: z.enum(['ready', 'not_checked', 'unavailable']),
 });
 
-export const tetherCameraControlSchema = z.object({
+const tetherCameraControlSchema = z.object({
   currentValue: z.string().trim().min(1),
   id: tetherCameraControlIdSchema,
   label: z.string().trim().min(1),
@@ -31,7 +31,7 @@ export const tetherCameraControlSchema = z.object({
   writable: z.boolean(),
 });
 
-export const tetheredCameraSchema = z.object({
+const tetheredCameraSchema = z.object({
   batteryPercent: z.number().int().min(0).max(100).nullable(),
   capabilities: z.array(tetherCapabilitySchema),
   connection: z.object({
@@ -65,14 +65,14 @@ export const tetherDiscoveryResponseSchema = z.object({
   }),
 });
 
-export const tetherRecoverySummarySchema = z.object({
+const tetherRecoverySummarySchema = z.object({
   message: z.string().trim().min(1),
   partialFilesFound: z.number().int().nonnegative(),
   quarantinedFiles: z.array(z.string().trim().min(1)),
   status: z.enum(['clean', 'failed', 'not_checked', 'quarantined', 'reconnect_required']),
 });
 
-export const tetherSessionSnapshotSchema = z.object({
+const tetherSessionSnapshotSchema = z.object({
   cameraDisplayName: z.string().trim().min(1),
   cameraId: z.string().trim().min(1),
   captureCounter: z.number().int().nonnegative(),
@@ -120,7 +120,7 @@ export const tetherCaptureRequestSchema = z.object({
   metadataTemplateId: tetherMetadataTemplateIdSchema.default('none'),
 });
 
-export const tetherCaptureBackupSchema = z.object({
+const tetherCaptureBackupSchema = z.object({
   bytes: z.number().int().nonnegative().nullable(),
   checksum: z
     .string()
@@ -133,7 +133,7 @@ export const tetherCaptureBackupSchema = z.object({
   status: z.enum(['disabled', 'failed', 'verified']),
 });
 
-export const tetherCaptureIngestSchema = z.object({
+const tetherCaptureIngestSchema = z.object({
   addTags: z.array(z.string().trim().min(1)).default([]),
   applyPresetIds: z.array(z.string().trim().min(1)).default([]),
   collisionIndex: z.number().int().min(1),
@@ -142,7 +142,7 @@ export const tetherCaptureIngestSchema = z.object({
   presetId: tetherIngestPresetIdSchema,
 });
 
-export const tetherCaptureMetadataSchema = z.object({
+const tetherCaptureMetadataSchema = z.object({
   applied: z.boolean(),
   appliedFields: z.array(z.string().trim().min(1)),
   sidecarPath: z.string().trim().min(1).nullable(),
@@ -214,8 +214,8 @@ export type TetherCaptureResponse = z.infer<typeof tetherCaptureResponseSchema>;
 export type TetherDiscoveryResponse = z.infer<typeof tetherDiscoveryResponseSchema>;
 export type TetherIngestProofReceipt = z.infer<typeof tetherIngestProofReceiptSchema>;
 export type TetherRecoveryProofReceipt = z.infer<typeof tetherRecoveryProofReceiptSchema>;
-export type TetherRecoverySummary = z.infer<typeof tetherRecoverySummarySchema>;
+type TetherRecoverySummary = z.infer<typeof tetherRecoverySummarySchema>;
 export type TetherSessionOpenRequest = z.infer<typeof tetherSessionOpenRequestSchema>;
 export type TetherSessionResponse = z.infer<typeof tetherSessionResponseSchema>;
 export type TetherSessionSnapshot = z.infer<typeof tetherSessionSnapshotSchema>;
-export type TetheredCamera = z.infer<typeof tetheredCameraSchema>;
+type TetheredCamera = z.infer<typeof tetheredCameraSchema>;

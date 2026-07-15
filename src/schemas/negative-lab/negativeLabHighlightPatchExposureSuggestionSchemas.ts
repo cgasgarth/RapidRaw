@@ -4,8 +4,8 @@ import { negativeLabBaseFogSampleRectSchema } from './negativeLabPresetCatalogSc
 
 const renderedRgbTupleSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 
-export const negativeLabHighlightPatchExposureStatusSchema = z.enum(['already_safe', 'blocked', 'suggested']);
-export const negativeLabHighlightPatchExposureRiskSchema = z.enum(['high', 'low', 'medium']);
+const negativeLabHighlightPatchExposureStatusSchema = z.enum(['already_safe', 'blocked', 'suggested']);
+const negativeLabHighlightPatchExposureRiskSchema = z.enum(['high', 'low', 'medium']);
 
 export const negativeLabHighlightPatchExposureSuggestionSchema = z
   .object({

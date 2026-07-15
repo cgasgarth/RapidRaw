@@ -30,7 +30,7 @@ export const SETTINGS_OWNERSHIP = {
   restartProcessing: RESTART_REQUIRED_SETTING_KEYS,
 } as const;
 
-export const PROCESSING_BACKENDS = ['auto', 'vulkan', 'dx12', 'metal', 'gl'] as const;
+const PROCESSING_BACKENDS = ['auto', 'vulkan', 'dx12', 'metal', 'gl'] as const;
 export type ProcessingBackend = (typeof PROCESSING_BACKENDS)[number];
 
 export function selectProcessingBackends(osPlatform: string): readonly ProcessingBackend[] {
@@ -65,7 +65,7 @@ export interface SettingsEditSession {
 
 const defaultWgpuRenderer = (_osPlatform: string): boolean => false;
 
-export function selectRestartRequiredSettings(settings: AppSettings, osPlatform: string): RestartRequiredSettingsDraft {
+function selectRestartRequiredSettings(settings: AppSettings, osPlatform: string): RestartRequiredSettingsDraft {
   return {
     linuxGpuOptimization: settings.linuxGpuOptimization ?? false,
     processingBackend: settings.processingBackend || 'auto',

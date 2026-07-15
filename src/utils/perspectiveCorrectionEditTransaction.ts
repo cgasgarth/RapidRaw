@@ -30,7 +30,7 @@ export const capturePerspectiveCorrectionCommitIdentity = (
       }
     : null;
 
-export const isCurrentPerspectiveCorrectionIdentity = (
+const isCurrentPerspectiveCorrectionIdentity = (
   state: PerspectiveCorrectionEditTransactionState,
   identity: PerspectiveCorrectionCommitIdentity,
 ): boolean =>

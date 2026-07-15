@@ -132,7 +132,7 @@ const sessionMessageSchema = z
   })
   .strict();
 
-export const agentMultiTurnAppServerSessionResultSchema = z
+const agentMultiTurnAppServerSessionResultSchema = z
   .object({
     changedPixelCount: z.number().int().positive(),
     changedPixelPercent: z.number().min(0).max(100),

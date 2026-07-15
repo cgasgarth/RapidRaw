@@ -81,7 +81,7 @@ export type AgentSelectedImageLiveSessionState =
   | 'rolled_back'
   | 'failed';
 
-export type AgentSelectedImageLiveSessionApprovalDecision = 'approved' | 'cancelled' | 'pending' | 'rejected';
+type AgentSelectedImageLiveSessionApprovalDecision = 'approved' | 'cancelled' | 'pending' | 'rejected';
 export type AgentSelectedImageLiveSessionStaleReason = AgentSelectedImageRecoveryStaleReason;
 export type AgentSelectedImageLiveSessionEnvelopeBlockedReason =
   | AgentSelectedImageLiveSessionStaleReason
@@ -90,7 +90,7 @@ export type AgentSelectedImageLiveSessionEnvelopeBlockedReason =
   | 'missing_approval'
   | 'request_id_mismatch'
   | 'runtime_tool_mismatch';
-export type AgentSelectedImageLiveSessionCancellationOutcome =
+type AgentSelectedImageLiveSessionCancellationOutcome =
   | 'cancelled_before_apply'
   | 'late_result_blocked'
   | 'not_cancelled';
@@ -234,7 +234,7 @@ const selectedImageLiveSessionRollbackCheckpointSchema = z
   })
   .strict();
 
-export const agentSelectedImageLiveSessionReceiptSchema = z
+const agentSelectedImageLiveSessionReceiptSchema = z
   .object({
     acceptedPreviewArtifactId: z.string().trim().min(1),
     afterPreviewHash: z.string().trim().min(1).optional(),
@@ -293,7 +293,7 @@ export const agentSelectedImageLiveSessionReceiptSchema = z
   })
   .strict();
 
-export const agentSelectedImageLiveSessionAuditRecordSchema = z
+const agentSelectedImageLiveSessionAuditRecordSchema = z
   .object({
     auditEvents: z.array(selectedImageLiveSessionAuditEventSchema).min(1),
     lifecycleReceipt: agentSelectedImageLifecycleReceiptV2Schema.optional(),
@@ -304,7 +304,7 @@ export const agentSelectedImageLiveSessionAuditRecordSchema = z
   })
   .strict();
 
-export const agentSelectedImageLiveSessionAuditStoreSchema = z
+const agentSelectedImageLiveSessionAuditStoreSchema = z
   .object({
     records: z.array(agentSelectedImageLiveSessionAuditRecordSchema),
     schemaVersion: z.literal(1),
@@ -422,9 +422,7 @@ export type AgentSelectedImageLiveSessionReplayPreflight = z.infer<
   typeof agentSelectedImageLiveSessionReplayPreflightSchema
 >;
 export type AgentSelectedImageLiveSessionReceipt = z.infer<typeof agentSelectedImageLiveSessionReceiptSchema>;
-export type AgentSelectedImageLiveSessionTranscriptEntry = z.infer<
-  typeof selectedImageLiveSessionTranscriptEntrySchema
->;
+type AgentSelectedImageLiveSessionTranscriptEntry = z.infer<typeof selectedImageLiveSessionTranscriptEntrySchema>;
 
 export interface AgentSelectedImageLiveSessionAuditSummary {
   finalGraphRevision?: string;
@@ -1915,7 +1913,7 @@ export const rollbackAgentSelectedImageLiveSession = async ({
   });
 };
 
-export const buildAgentSelectedImageLiveSessionAuditRecord = (
+const buildAgentSelectedImageLiveSessionAuditRecord = (
   draft: AgentSelectedImageLiveSessionDraft,
   receiptPatch: {
     afterPreviewArtifactId?: string;

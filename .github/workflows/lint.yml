@@ -92,6 +92,17 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
       - run: bun run typecheck
 
+  fast-fallow-health:
+    name: 'pr fast: Fallow health'
+    needs: plan
+    if: needs.plan.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bun run check:fallow-health
+
   fast-schema:
     name: 'pr fast: schema contracts'
     needs: plan
@@ -244,6 +255,7 @@ jobs:
       - plan
       - fast-lint
       - fast-typecheck
+      - fast-fallow-health
       - fast-schema
       - fast-contract-tests
       - fast-format

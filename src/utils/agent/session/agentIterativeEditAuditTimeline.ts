@@ -14,8 +14,8 @@ import {
   agentToneAdjustmentDryRunResponseSchema,
 } from '../tools/agentToneAdjustmentTool';
 
-export const agentIterativeEditTimelinePhaseSchema = z.enum(['preview', 'dry_run', 'apply', 'preview_after']);
-export const agentIterativeEditTimelineStatusSchema = z.enum(['succeeded', 'failed', 'cancelled', 'skipped']);
+const agentIterativeEditTimelinePhaseSchema = z.enum(['preview', 'dry_run', 'apply', 'preview_after']);
+const agentIterativeEditTimelineStatusSchema = z.enum(['succeeded', 'failed', 'cancelled', 'skipped']);
 
 const linkedAuditIdsSchema = z
   .object({
@@ -30,7 +30,7 @@ const linkedAuditIdsSchema = z
   })
   .strict();
 
-export const agentIterativeEditTimelineEventSchema = z
+const agentIterativeEditTimelineEventSchema = z
   .object({
     acceptedPlanHash: z.string().trim().min(1).optional(),
     acceptedPlanId: z.string().trim().min(1).optional(),
@@ -116,7 +116,7 @@ export const agentIterativeEditAuditTimelineSchema = z
   });
 
 export type AgentIterativeEditAuditTimeline = z.infer<typeof agentIterativeEditAuditTimelineSchema>;
-export type AgentIterativeEditTimelineEvent = z.infer<typeof agentIterativeEditTimelineEventSchema>;
+type AgentIterativeEditTimelineEvent = z.infer<typeof agentIterativeEditTimelineEventSchema>;
 
 export interface BuildAgentToneAdjustmentTimelineInput {
   apply: AgentToneAdjustmentApplyResponse;

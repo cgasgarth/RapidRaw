@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const agentApprovalStatusSchema = z.enum(['approved', 'cancelled', 'pending']);
+const agentApprovalStatusSchema = z.enum(['approved', 'cancelled', 'pending']);
 
 export const agentApprovalStateSchema = z
   .object({

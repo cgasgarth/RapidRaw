@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path';
 
 import {
   formatPureTsShardFailure,
+  planPureTsUnitConcurrency,
+  resolvePureTsHostCapacity,
   runPureTsUnitShards,
   selectPureTsFailureContext,
 } from '../../../scripts/ci/run-pure-ts-unit';
@@ -92,11 +94,14 @@ describe('pure TypeScript unit runner', () => {
         command: ['bun', 'test', '--shard=4/8', 'tests/pure-ts'],
         durationMs: 125,
         exitCode: 1,
+        lane: 'parallel',
+        parallelWidth: 8,
         pid: process.pid,
         shard: 4,
         stderr: error,
         stdout: '',
         timedOut: false,
+        workersPerShard: 1,
       },
       8,
     );
@@ -147,6 +152,127 @@ describe('pure TypeScript unit runner', () => {
     expect(results.map(({ exitCode }) => exitCode)).toEqual([0, 0]);
     expect(results.every(({ timedOut }) => !timedOut)).toBeTrue();
     expect(await readdir(countRoot)).toHaveLength(2);
+  }, 10_000);
+
+  test('bounds 1/2/4-core plans by effective CPU and memory capacity', () => {
+    const gibibytes = (value: number) => value * 1024 * 1024 * 1024;
+    expect(
+      [1, 2, 4].map((cpuCores) =>
+        planPureTsUnitConcurrency({
+          capacity: { cpuCores, memoryBytes: gibibytes(16) },
+          fileCount: 200,
+        }),
+      ),
+    ).toEqual([
+      {
+        effectiveCpuCores: 1,
+        effectiveMemoryBytes: gibibytes(16),
+        maxConcurrentWorkers: 1,
+        parallelShardCount: 1,
+        workersPerShard: 1,
+      },
+      {
+        effectiveCpuCores: 2,
+        effectiveMemoryBytes: gibibytes(16),
+        maxConcurrentWorkers: 2,
+        parallelShardCount: 2,
+        workersPerShard: 1,
+      },
+      {
+        effectiveCpuCores: 4,
+        effectiveMemoryBytes: gibibytes(16),
+        maxConcurrentWorkers: 4,
+        parallelShardCount: 4,
+        workersPerShard: 1,
+      },
+    ]);
+    expect(
+      planPureTsUnitConcurrency({
+        capacity: { cpuCores: 16, memoryBytes: gibibytes(4) },
+        fileCount: 200,
+      }),
+    ).toMatchObject({ maxConcurrentWorkers: 2, parallelShardCount: 2, workersPerShard: 1 });
+  });
+
+  test('honors cgroup v2 and v1 quotas without exceeding host capacity', () => {
+    const gibibytes = (value: number) => value * 1024 * 1024 * 1024;
+    expect(
+      resolvePureTsHostCapacity({
+        cgroupCpuMax: '200000 100000',
+        cgroupMemoryMax: String(gibibytes(6)),
+        hostCpuCores: 16,
+        hostMemoryBytes: gibibytes(32),
+      }),
+    ).toEqual({ cpuCores: 2, memoryBytes: gibibytes(6) });
+    expect(
+      resolvePureTsHostCapacity({
+        cgroupCpuPeriodMicros: '100000',
+        cgroupCpuQuotaMicros: '400000',
+        cgroupMemoryLimitBytes: String(gibibytes(8)),
+        hostCpuCores: 2,
+        hostMemoryBytes: gibibytes(4),
+      }),
+    ).toEqual({ cpuCores: 2, memoryBytes: gibibytes(4) });
+    expect(
+      resolvePureTsHostCapacity({
+        cgroupCpuMax: 'max 100000',
+        cgroupCpuPeriodMicros: '100000',
+        cgroupCpuQuotaMicros: '100000',
+        cgroupMemoryLimitBytes: String(gibibytes(1)),
+        cgroupMemoryMax: 'max',
+        hostCpuCores: 8,
+        hostMemoryBytes: gibibytes(16),
+      }),
+    ).toEqual({ cpuCores: 8, memoryBytes: gibibytes(16) });
+  });
+
+  test('runs process-owning and calibrated files after parallel shards and never overlaps them', async () => {
+    const root = await temporaryRoot('unit-exclusive-lanes');
+    const tests = join(root, 'tests');
+    const events = join(root, 'events');
+    await mkdir(tests);
+    await mkdir(events);
+    const writeTimedFixture = async (name: string, durationMs: number) => {
+      await writeFile(
+        join(tests, `${name}.test.ts`),
+        `import { expect, test } from 'bun:test';
+test(${JSON.stringify(name)},async()=>{
+  const root=Bun.env.RAWENGINE_TEST_EVENT_ROOT;
+  if(root===undefined)throw new Error('missing event root');
+  await Bun.write(root+'/${name}-start',String(Date.now()));
+  await Bun.sleep(${String(durationMs)});
+  await Bun.write(root+'/${name}-end',String(Date.now()));
+  expect(true).toBeTrue();
+});
+`,
+      );
+    };
+    await Promise.all([
+      writeTimedFixture('parallel-a', 180),
+      writeTimedFixture('parallel-b', 180),
+      writeTimedFixture('exclusive-a', 80),
+      writeTimedFixture('exclusive-b', 80),
+    ]);
+    const exclusiveFiles = [join(tests, 'exclusive-a.test.ts'), join(tests, 'exclusive-b.test.ts')];
+    const results = await runPureTsUnitShards({
+      capacity: { cpuCores: 4, memoryBytes: 16 * 1024 * 1024 * 1024 },
+      env: { RAWENGINE_TEST_EVENT_ROOT: events },
+      exclusiveFiles,
+      shardCount: 2,
+      target: tests,
+      workersPerShard: 1,
+    });
+    expect(results.map(({ exitCode }) => exitCode)).toEqual([0, 0, 0, 0]);
+    expect(results.map(({ lane }) => lane)).toEqual(['parallel', 'parallel', 'exclusive', 'exclusive']);
+    const timestamp = async (name: string) => Number(await Bun.file(join(events, name)).text());
+    const parallelStarts = await Promise.all(['parallel-a-start', 'parallel-b-start'].map(timestamp));
+    const parallelEnds = await Promise.all(['parallel-a-end', 'parallel-b-end'].map(timestamp));
+    const exclusiveAStart = await timestamp('exclusive-a-start');
+    const exclusiveAEnd = await timestamp('exclusive-a-end');
+    const exclusiveBStart = await timestamp('exclusive-b-start');
+    expect(Math.max(...parallelStarts)).toBeLessThan(Math.min(...parallelEnds));
+    expect(exclusiveAStart).toBeGreaterThanOrEqual(Math.max(...parallelEnds));
+    expect(exclusiveBStart).toBeGreaterThanOrEqual(exclusiveAEnd);
   }, 10_000);
 
   test('terminates a CPU-runaway shard on its independent bound with failure diagnostics intact', async () => {

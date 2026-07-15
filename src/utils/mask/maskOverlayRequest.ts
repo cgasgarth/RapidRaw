@@ -87,7 +87,7 @@ const stripBackendMaskDataFromSubMasks = (
   });
 };
 
-export const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustments>(
+const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustments>(
   value: T,
   patchesSentToBackend: ReadonlySet<string>,
 ): T => {

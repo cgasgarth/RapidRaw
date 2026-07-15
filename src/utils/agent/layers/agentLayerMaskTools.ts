@@ -202,7 +202,7 @@ export const agentObjectSelectionApplyRequestSchema = z
     }
   });
 
-export const agentLayerCreateResponseSchema = z
+const agentLayerCreateResponseSchema = z
   .object({
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
@@ -220,7 +220,7 @@ export const agentLayerCreateResponseSchema = z
   })
   .strict();
 
-export const agentMaskCreateOrUpdateResponseSchema = z
+const agentMaskCreateOrUpdateResponseSchema = z
   .object({
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
@@ -239,7 +239,7 @@ export const agentMaskCreateOrUpdateResponseSchema = z
   })
   .strict();
 
-export const agentLayerScopedAdjustResponseSchema = z
+const agentLayerScopedAdjustResponseSchema = z
   .object({
     adjustedFields: z.array(z.string().trim().min(1)).min(1),
     afterPreviewHash: z.string().trim().min(1),
@@ -257,7 +257,7 @@ export const agentLayerScopedAdjustResponseSchema = z
   })
   .strict();
 
-export const agentObjectSelectionApplyResponseSchema = z
+const agentObjectSelectionApplyResponseSchema = z
   .object({
     afterPreviewHash: z.string().trim().min(1),
     appliedGraphRevision: z.string().trim().min(1),
@@ -285,7 +285,7 @@ export type AgentLayerScopedAdjustRequest = z.infer<typeof agentLayerScopedAdjus
 export type AgentLayerScopedAdjustResponse = z.infer<typeof agentLayerScopedAdjustResponseSchema>;
 export type AgentObjectSelectionApplyRequest = z.infer<typeof agentObjectSelectionApplyRequestSchema>;
 export type AgentObjectSelectionApplyResponse = z.infer<typeof agentObjectSelectionApplyResponseSchema>;
-export type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
+type AgentLayerMaskOverlayPreview = z.infer<typeof agentLayerMaskOverlayPreviewSchema>;
 type ObjectSelectionProviderStatus = z.infer<typeof agentObjectSelectionApplyResponseSchema>['providerStatus'];
 
 const toIdSegment = (value: string): string =>

@@ -84,7 +84,6 @@ export enum ColorAdjustment {
   Levels = 'levels',
   Luminance = 'luminance',
   Saturation = 'saturation',
-  SkinToneUniformity = 'skinToneUniformity',
   Temperature = 'temperature',
   Tint = 'tint',
   ToneCurve = 'toneCurve',
@@ -171,7 +170,7 @@ export enum LensAdjustment {
   LensVignetteEnabled = 'lensVignetteEnabled',
 }
 
-export const ADJUSTMENT_FIELDS = {
+const ADJUSTMENT_FIELDS = {
   aiPatches: 'aiPatches',
   crop: 'crop',
   flipHorizontal: 'flipHorizontal',
@@ -430,7 +429,7 @@ export interface SkinToneUniformitySettings {
   targetSaturation: number;
 }
 
-export const INITIAL_POINT_COLOR: PointColorPlanV1 = {
+const INITIAL_POINT_COLOR: PointColorPlanV1 = {
   enabled: false,
   points: [],
   process: POINT_COLOR_PROCESS_V1,
@@ -616,7 +615,7 @@ export const LAYER_BLEND_MODES = [
 export type LayerBlendMode = (typeof LAYER_BLEND_MODES)[number];
 export const DEFAULT_LAYER_BLEND_MODE: LayerBlendMode = 'normal';
 
-export const MASK_EDIT_NODE_TYPES = ['basic', 'color', 'curves', 'details'] as const;
+const MASK_EDIT_NODE_TYPES = ['basic', 'color', 'curves', 'details'] as const;
 export type MaskEditNodeType = (typeof MASK_EDIT_NODE_TYPES)[number];
 export interface MaskEditNodeEnvelope {
   enabled: boolean;
@@ -764,7 +763,7 @@ const INITIAL_COLOR_GRADING: ColorGradingProps = {
   shadows: { hue: 0, saturation: 0, luminance: 0 },
 };
 
-export const INITIAL_PERCEPTUAL_GRADING: PerceptualGradingSettingsV1 = {
+const INITIAL_PERCEPTUAL_GRADING: PerceptualGradingSettingsV1 = {
   balance: 0,
   blending: 0.5,
   falloff: 1,
@@ -831,7 +830,7 @@ const INITIAL_LEVELS: LevelsSettings = {
   outputWhite: 1,
 };
 
-export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
+const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   darks: 0,
   shadows: 0,
   highlights: 0,
@@ -850,7 +849,7 @@ export const getDefaultParametricCurve = (): ParametricCurve => ({
   blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
 });
 
-export const getDefaultCurves = (): Curves => ({
+const getDefaultCurves = (): Curves => ({
   blue: [
     { x: 0, y: 0 },
     { x: 255, y: 255 },
@@ -1519,14 +1518,14 @@ export interface PickAdjustmentValuesOptions {
   skipDefaultValues?: boolean;
 }
 
-export const cloneAdjustmentValue = <Value>(value: Value): Value => structuredClone(value);
+const cloneAdjustmentValue = <Value>(value: Value): Value => structuredClone(value);
 
 export const bindTypedCurveGraphVersion = (adjustments: Partial<Adjustments>): Partial<Adjustments> =>
   adjustments.sceneCurveV1 !== undefined || adjustments.outputCurveV1 !== undefined
     ? { ...adjustments, rawEngineEditGraphVersion: 2 }
     : adjustments;
 
-export const hasAdjustmentKey = (source: Partial<Adjustments>, key: string): boolean => Object.hasOwn(source, key);
+const hasAdjustmentKey = (source: Partial<Adjustments>, key: string): boolean => Object.hasOwn(source, key);
 
 export const pickAdjustmentValues = (
   keys: readonly string[],

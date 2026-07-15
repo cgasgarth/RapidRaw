@@ -6,7 +6,7 @@ import {
   FilmLookAppServerSchemaName,
 } from '../utils/film-look/filmLookAppServerRouteIds';
 
-export const filmLookAppServerCommandNameSchema = z.union([
+const filmLookAppServerCommandNameSchema = z.union([
   z.literal(FilmLookAppServerCommandName.ApplyFilmEmulationOperation),
   z.literal(FilmLookAppServerCommandName.BuildAdjustmentPatch),
 ]);
@@ -18,7 +18,7 @@ export const filmLookAppServerCommandSchema = z
   })
   .strict();
 
-export const filmLookAppServerRouteSchema = z
+const filmLookAppServerRouteSchema = z
   .object({
     commandName: filmLookAppServerCommandNameSchema,
     inputSchemaName: z.union([

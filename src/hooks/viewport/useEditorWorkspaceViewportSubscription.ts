@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import type { EditorWorkspaceViewport } from '../../utils/editorWorkspacePreferences';
 
-export const COMPACT_EDITOR_MAX_WIDTH = 900;
+const COMPACT_EDITOR_MAX_WIDTH = 900;
 
 export const classifyEditorWorkspaceViewport = (width: number, height: number): EditorWorkspaceViewport => {
   const normalizedWidth = Math.max(0, Math.round(width));

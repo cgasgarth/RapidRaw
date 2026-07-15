@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { uniqueStringArraySchema } from '../zodUniqueHelpers';
 
-export const libraryBackupFileRoleSchema = z.enum([
+const libraryBackupFileRoleSchema = z.enum([
   'library_session',
   'sidecar_rrdata',
   'sidecar_rrexif',
@@ -11,9 +11,9 @@ export const libraryBackupFileRoleSchema = z.enum([
   'source_reference',
 ]);
 
-export const libraryBackupHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+const libraryBackupHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
-export const libraryBackupFileEntrySchema = z
+const libraryBackupFileEntrySchema = z
   .object({
     byteLength: z.number().int().min(0),
     contentHash: libraryBackupHashSchema,
@@ -23,7 +23,7 @@ export const libraryBackupFileEntrySchema = z
   })
   .strict();
 
-export const libraryBackupManifestSchema = z
+const libraryBackupManifestSchema = z
   .object({
     backupId: z.string().trim().min(1),
     createdAt: z.iso.datetime(),
@@ -67,7 +67,7 @@ export const libraryBackupManifestSchema = z
 
 export type LibraryBackupFileEntry = z.infer<typeof libraryBackupFileEntrySchema>;
 export type LibraryBackupManifest = z.infer<typeof libraryBackupManifestSchema>;
-export type LibraryBackupFileRole = z.infer<typeof libraryBackupFileRoleSchema>;
+type LibraryBackupFileRole = z.infer<typeof libraryBackupFileRoleSchema>;
 
 export const parseLibraryBackupManifest = (value: unknown): LibraryBackupManifest =>
   libraryBackupManifestSchema.parse(value);

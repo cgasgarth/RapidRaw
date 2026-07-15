@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { Adjustments } from './adjustments';
 
-export const BASIC_TONE_COMMAND_SCHEMA_VERSION = 1;
+const BASIC_TONE_COMMAND_SCHEMA_VERSION = 1;
 
 export const BasicToneApprovalClass = {
   EditApply: 'edit_apply',

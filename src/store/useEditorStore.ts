@@ -92,7 +92,7 @@ export interface CopiedSectionAdjustments {
   values: Partial<Adjustments>;
 }
 
-export interface PresetApplication {
+interface PresetApplication {
   before: Adjustments;
   beforeEditDocumentV2: EditDocumentV2;
   expected: Adjustments;
@@ -161,12 +161,12 @@ export interface NavigatorPreviewArtifact {
   url: string;
 }
 
-export interface ProvisionalPreviewFrame {
+interface ProvisionalPreviewFrame {
   receipt: ProgressiveImageFrameReceipt;
   url: string;
 }
 
-export interface ReferenceMatchPreview {
+interface ReferenceMatchPreview {
   adjustments: Adjustments;
   baseAdjustmentRevision: number;
   enabledGroups: ReferenceMatchGroup[];
@@ -323,7 +323,7 @@ const editorRenderAuthorityKeys = [
 
 type EditorRenderAuthorityKey = (typeof editorRenderAuthorityKeys)[number];
 export type EditorStateUpdate = Omit<Partial<EditorState>, EditorRenderAuthorityKey>;
-export type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => EditorStateUpdate);
+type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => EditorStateUpdate);
 export type EditorRenderAuthorityHydration = EditorStateUpdate &
   Pick<EditorState, 'adjustments'> &
   Partial<
@@ -337,7 +337,7 @@ export type EditorRenderAuthorityHydration = EditorStateUpdate &
       | 'historyIndex'
     >
   >;
-export type EditorRenderAuthorityHydrationUpdater =
+type EditorRenderAuthorityHydrationUpdater =
   | EditorRenderAuthorityHydration
   | ((state: EditorState) => EditorRenderAuthorityHydration);
 

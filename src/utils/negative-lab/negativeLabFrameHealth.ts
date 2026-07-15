@@ -40,7 +40,7 @@ const classifyAcquisitionSourceFamily = (path: string) => {
   return 'unknown';
 };
 
-export const buildNegativeLabFrameAcquisitionHealth = (path: string): NegativeLabFrameAcquisitionHealth => {
+const buildNegativeLabFrameAcquisitionHealth = (path: string): NegativeLabFrameAcquisitionHealth => {
   const sourceFamily = classifyAcquisitionSourceFamily(path);
   const warningCodes: NegativeLabFrameAcquisitionHealth['warningCodes'] = [];
 
@@ -109,7 +109,7 @@ const buildNegativeLabFrameBatchDisposition = ({
   return { batchDisposition: 'apply', batchDispositionReason: 'ready_to_apply' };
 };
 
-export const buildNegativeLabAcquisitionHealthReport = (
+const buildNegativeLabAcquisitionHealthReport = (
   targetPaths: readonly string[],
 ): NegativeLabAcquisitionHealthReport => {
   const sourceFamilies = targetPaths.map((path) => buildNegativeLabFrameAcquisitionHealth(path).sourceFamily);

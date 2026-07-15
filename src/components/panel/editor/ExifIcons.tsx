@@ -52,7 +52,7 @@ export const IconFocalLength = (props: ExifIconProps) => (
   </svg>
 );
 
-export const IconCalendar = (props: ExifIconProps) => (
+const IconCalendar = (props: ExifIconProps) => (
   <svg {...iconProps} {...props}>
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
     <line x1="16" y1="2" x2="16" y2="6" />
@@ -61,7 +61,7 @@ export const IconCalendar = (props: ExifIconProps) => (
   </svg>
 );
 
-export const IconClock = (props: ExifIconProps) => (
+const IconClock = (props: ExifIconProps) => (
   <svg {...iconProps} {...props}>
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { cameraProfileIdSchema } from './profileToneSchemas';
 
-export const cameraProfileSourceSchema = z.enum(['embedded', 'open', 'user', 'generated', 'matrix_fallback']);
-export const cameraProfileBrowserEntrySchema = z
+const cameraProfileSourceSchema = z.enum(['embedded', 'open', 'user', 'generated', 'matrix_fallback']);
+const cameraProfileBrowserEntrySchema = z
   .object({
     cameraModel: z.string().min(1).nullable(),
     compatible: z.boolean(),
@@ -15,7 +15,7 @@ export const cameraProfileBrowserEntrySchema = z
     source: cameraProfileSourceSchema,
   })
   .strict();
-export const cameraProfileBrowserCatalogSchema = z.array(cameraProfileBrowserEntrySchema);
+const cameraProfileBrowserCatalogSchema = z.array(cameraProfileBrowserEntrySchema);
 export const cameraProfileRegistryReportSchema = z
   .object({
     entries: cameraProfileBrowserCatalogSchema,

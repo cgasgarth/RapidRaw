@@ -3,7 +3,7 @@ import { z } from 'zod';
 const percentAdjustmentSchema = z.number().min(0).max(100);
 const normalizedScalarSchema = z.number().min(0).max(1);
 
-export const noiseFixtureKindSchema = z.enum([
+const noiseFixtureKindSchema = z.enum([
   'flat_shadow',
   'color_checker_shadow',
   'fine_texture_high_iso',
@@ -11,7 +11,7 @@ export const noiseFixtureKindSchema = z.enum([
   'edge_with_chroma_noise',
 ]);
 
-export const noiseSeparationSettingsSchema = z
+const noiseSeparationSettingsSchema = z
   .object({
     colorNoiseReduction: percentAdjustmentSchema,
     detailPreservation: normalizedScalarSchema,
@@ -76,12 +76,12 @@ export const noiseSeparationFixtureSchema = z
     }
   });
 
-export const noiseSeparationFixtureListSchema = z.array(noiseSeparationFixtureSchema).min(1);
+const noiseSeparationFixtureListSchema = z.array(noiseSeparationFixtureSchema).min(1);
 
 export type NoiseSeparationFixture = z.infer<typeof noiseSeparationFixtureSchema>;
-export type NoiseSeparationSettings = z.infer<typeof noiseSeparationSettingsSchema>;
+type NoiseSeparationSettings = z.infer<typeof noiseSeparationSettingsSchema>;
 
-export const parseNoiseSeparationFixture = (value: unknown): NoiseSeparationFixture =>
+const parseNoiseSeparationFixture = (value: unknown): NoiseSeparationFixture =>
   noiseSeparationFixtureSchema.parse(value);
 
 export const parseNoiseSeparationFixtures = (value: unknown): NoiseSeparationFixture[] =>

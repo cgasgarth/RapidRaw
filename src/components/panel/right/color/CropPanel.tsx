@@ -143,7 +143,7 @@ export default function CropPanel() {
   return <CropEditSession key={`${selectedImagePath}:${sessionEpoch}`} />;
 }
 
-export function CropEditSession() {
+function CropEditSession() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);

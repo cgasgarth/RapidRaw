@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { AgentPreviewEnvelope } from '../context/agentPreviewEnvelope';
 
-export const agentEditReviewRubricAreaSchema = z.enum([
+const agentEditReviewRubricAreaSchema = z.enum([
   'color_white_balance',
   'crop_detail',
   'exposure_tone',
@@ -11,7 +11,7 @@ export const agentEditReviewRubricAreaSchema = z.enum([
   'user_confirmation',
 ]);
 
-export const agentEditReviewRubricEntrySchema = z
+const agentEditReviewRubricEntrySchema = z
   .object({
     area: agentEditReviewRubricAreaSchema,
     note: z.string().trim().min(1),

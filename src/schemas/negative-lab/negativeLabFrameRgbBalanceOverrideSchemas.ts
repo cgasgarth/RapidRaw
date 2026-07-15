@@ -59,7 +59,7 @@ export const negativeLabFrameRgbBalanceOffsetSchema = z
     }
   });
 
-export const negativeLabFrameRgbBalanceOverrideSchema = z
+const negativeLabFrameRgbBalanceOverrideSchema = z
   .object({
     frameId: z.string().trim().min(1),
     rgbBalanceOffset: negativeLabFrameRgbBalanceOffsetSchema,

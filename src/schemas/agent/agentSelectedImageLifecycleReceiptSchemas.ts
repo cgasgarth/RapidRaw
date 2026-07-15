@@ -97,7 +97,7 @@ export const agentSelectedImageLifecycleRevertSchema = phaseBaseSchema
   })
   .strict();
 
-export const agentSelectedImageLifecycleFailureSchema = phaseBaseSchema
+const agentSelectedImageLifecycleFailureSchema = phaseBaseSchema
   .extend({
     cleanupResult: z.enum(['complete', 'failed', 'not_required']),
     compensationResult: z.enum(['passed', 'failed', 'not_attempted']),

@@ -116,12 +116,12 @@ const buildManifest = (definition: BaselineDefinition): FilmProfileManifestV1 =>
   });
 };
 
-export const FILM_BASELINE_PROFILES: readonly FilmProfileManifestV1[] = [
+const FILM_BASELINE_PROFILES: readonly FilmProfileManifestV1[] = [
   REFERENCE_FILM_PROFILE_MANIFEST,
   ...baselineDefinitions.map(buildManifest),
 ];
 
 export const getFilmBaselineProfileCatalog = (): readonly FilmProfileManifestV1[] => FILM_BASELINE_PROFILES;
 
-export const getFilmBaselineProfile = (id: string): FilmProfileManifestV1 | undefined =>
+const getFilmBaselineProfile = (id: string): FilmProfileManifestV1 | undefined =>
   FILM_BASELINE_PROFILES.find((profile) => profile.profile.id === id);

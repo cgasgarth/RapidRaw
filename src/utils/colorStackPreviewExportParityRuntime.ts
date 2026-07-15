@@ -71,7 +71,7 @@ const DEFAULT_WIDTH = 18;
 const DEFAULT_HEIGHT = 10;
 const CHANNEL_KEYS = ['red', 'green', 'blue'] as const;
 
-export function buildColorStackParitySyntheticImage(): Array<ColorStackParityPixel> {
+function buildColorStackParitySyntheticImage(): Array<ColorStackParityPixel> {
   const pixels: Array<ColorStackParityPixel> = [];
 
   for (let y = 0; y < DEFAULT_HEIGHT; y += 1) {

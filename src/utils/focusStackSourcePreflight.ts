@@ -6,7 +6,7 @@ import {
 } from '../../packages/rawengine-schema/src/focus-stack/focusStackSourceValidation.ts';
 import { parseExifDistanceMm, parseExifInteger, parseExposureEv, readExifString } from './exifPreflightMetadata';
 
-export const focusStackSourcePreflightMetadataSchema = z
+const focusStackSourcePreflightMetadataSchema = z
   .object({
     exif: z.record(z.string(), z.string()).nullable().optional(),
     graphRevision: z.string().min(1).optional(),
@@ -17,7 +17,7 @@ export const focusStackSourcePreflightMetadataSchema = z
   })
   .strict();
 
-export const focusStackSourcePreflightRequestSchema = z
+const focusStackSourcePreflightRequestSchema = z
   .object({
     sources: z.array(focusStackSourcePreflightMetadataSchema).min(1),
   })

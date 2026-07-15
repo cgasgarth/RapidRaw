@@ -69,7 +69,7 @@ interface AutoEditPreviewInput {
   proposalId: string;
 }
 
-export const autoEditPreviewSessionKey = (
+const autoEditPreviewSessionKey = (
   identity: Pick<AutoEditPreviewSession, 'baseAdjustmentRevision' | 'imageSessionId' | 'proposalId' | 'targetPath'>,
 ): string =>
   JSON.stringify([identity.imageSessionId, identity.targetPath, identity.baseAdjustmentRevision, identity.proposalId]);
@@ -104,7 +104,7 @@ export const createAutoEditPreviewSession = ({
   };
 };
 
-export const isCurrentAutoEditPreviewSession = (
+const isCurrentAutoEditPreviewSession = (
   session: AutoEditPreviewSession,
   current: { imageSessionId: string | null; path: string | null; snapshotAdjustmentRevision: number },
 ): boolean =>

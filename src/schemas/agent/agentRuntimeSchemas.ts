@@ -4,22 +4,22 @@ export const AgentRuntimeId = {
   AppServer: 'app-server',
 } as const;
 
-export const agentRuntimeIdSchema = z.enum([AgentRuntimeId.AppServer]);
+const agentRuntimeIdSchema = z.enum([AgentRuntimeId.AppServer]);
 
-export type AgentRuntimeId = z.infer<typeof agentRuntimeIdSchema>;
+type AgentRuntimeId = z.infer<typeof agentRuntimeIdSchema>;
 
-export const DEFAULT_AGENT_RUNTIME_ID: AgentRuntimeId = AgentRuntimeId.AppServer;
+const DEFAULT_AGENT_RUNTIME_ID: AgentRuntimeId = AgentRuntimeId.AppServer;
 
-export const agentRuntimeSettingsSchema = z
+const agentRuntimeSettingsSchema = z
   .object({
     agentRuntime: agentRuntimeIdSchema.default(DEFAULT_AGENT_RUNTIME_ID),
     enabled: z.boolean().default(false),
   })
   .strict();
 
-export type AgentRuntimeSettings = z.infer<typeof agentRuntimeSettingsSchema>;
+type AgentRuntimeSettings = z.infer<typeof agentRuntimeSettingsSchema>;
 
-export const normalizeAgentRuntimeId = (value: unknown): AgentRuntimeId => {
+const normalizeAgentRuntimeId = (value: unknown): AgentRuntimeId => {
   const parsed = agentRuntimeIdSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_AGENT_RUNTIME_ID;
 };
@@ -32,24 +32,21 @@ export const RawEngineAppServerTransport = {
   StdioJsonl: 'stdio_jsonl',
 } as const;
 
-export const rawEngineAppServerTransportSchema = z.enum([RawEngineAppServerTransport.StdioJsonl]);
+const rawEngineAppServerTransportSchema = z.enum([RawEngineAppServerTransport.StdioJsonl]);
 
 export const RawEngineAppServerToolKind = {
   Command: 'command',
   Read: 'read',
 } as const;
 
-export const rawEngineAppServerToolKindSchema = z.enum([
-  RawEngineAppServerToolKind.Command,
-  RawEngineAppServerToolKind.Read,
-]);
+const rawEngineAppServerToolKindSchema = z.enum([RawEngineAppServerToolKind.Command, RawEngineAppServerToolKind.Read]);
 
 export const RawEngineAppServerAuditOutcome = {
   Rejected: 'rejected',
   Success: 'success',
 } as const;
 
-export const rawEngineAppServerAuditOutcomeSchema = z.enum([
+const rawEngineAppServerAuditOutcomeSchema = z.enum([
   RawEngineAppServerAuditOutcome.Success,
   RawEngineAppServerAuditOutcome.Rejected,
 ]);
@@ -60,7 +57,7 @@ export const RawEngineAppServerLifecyclePhase = {
   Stopped: 'stopped',
 } as const;
 
-export const rawEngineAppServerLifecyclePhaseSchema = z.enum([
+const rawEngineAppServerLifecyclePhaseSchema = z.enum([
   RawEngineAppServerLifecyclePhase.Created,
   RawEngineAppServerLifecyclePhase.Initialized,
   RawEngineAppServerLifecyclePhase.Stopped,
@@ -74,7 +71,7 @@ export const RawEngineAppServerSupervisorPhase = {
   Stopping: 'stopping',
 } as const;
 
-export const rawEngineAppServerSupervisorPhaseSchema = z.enum([
+const rawEngineAppServerSupervisorPhaseSchema = z.enum([
   RawEngineAppServerSupervisorPhase.Idle,
   RawEngineAppServerSupervisorPhase.Starting,
   RawEngineAppServerSupervisorPhase.Running,
@@ -91,7 +88,7 @@ export const RawEngineAppServerSupervisorEventKind = {
   Stop: 'stop',
 } as const;
 
-export const rawEngineAppServerSupervisorEventKindSchema = z.enum([
+const rawEngineAppServerSupervisorEventKindSchema = z.enum([
   RawEngineAppServerSupervisorEventKind.Created,
   RawEngineAppServerSupervisorEventKind.Start,
   RawEngineAppServerSupervisorEventKind.Ready,
@@ -118,14 +115,14 @@ export const RawEngineAppServerHostToolName = {
   RouteCatalog: 'rawengine.host.route_catalog',
 } as const;
 
-export const rawEngineAppServerHostToolNameSchema = z.enum([
+const rawEngineAppServerHostToolNameSchema = z.enum([
   RawEngineAppServerHostToolName.Capabilities,
   RawEngineAppServerHostToolName.DispatchTool,
   RawEngineAppServerHostToolName.Health,
   RawEngineAppServerHostToolName.RouteCatalog,
 ]);
 
-export const rawEngineAppServerClientInfoSchema = z
+const rawEngineAppServerClientInfoSchema = z
   .object({
     name: z.string().trim().min(1),
     title: z.string().trim().min(1),
@@ -193,7 +190,7 @@ export const rawEngineAppServerStructuredErrorSchema = z
   })
   .strict();
 
-export const rawEngineAppServerSupervisorEventSchema = z
+const rawEngineAppServerSupervisorEventSchema = z
   .object({
     kind: rawEngineAppServerSupervisorEventKindSchema,
     phase: rawEngineAppServerSupervisorPhaseSchema,
@@ -244,7 +241,7 @@ export const rawEngineAppServerSupervisorStateSchema = z
     }
   });
 
-export const rawEngineAppServerToolDefinitionSchema = z
+const rawEngineAppServerToolDefinitionSchema = z
   .object({
     inputSchemaName: z.string().trim().min(1),
     mutates: z.boolean(),
@@ -266,28 +263,28 @@ export const rawEngineAppServerHostManifestSchema = z
   })
   .strict();
 
-export const rawEngineAppServerHealthRequestSchema = z
+const rawEngineAppServerHealthRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
     toolName: z.literal(RawEngineAppServerHostToolName.Health),
   })
   .strict();
 
-export const rawEngineAppServerCapabilitiesRequestSchema = z
+const rawEngineAppServerCapabilitiesRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
     toolName: z.literal(RawEngineAppServerHostToolName.Capabilities),
   })
   .strict();
 
-export const rawEngineAppServerRouteCatalogRequestSchema = z
+const rawEngineAppServerRouteCatalogRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
     toolName: z.literal(RawEngineAppServerHostToolName.RouteCatalog),
   })
   .strict();
 
-export const rawEngineAppServerToolDispatchRequestSchema = z
+const rawEngineAppServerToolDispatchRequestSchema = z
   .object({
     arguments: z.unknown(),
     draftSession: z
@@ -397,7 +394,7 @@ export const RawEngineAppServerRouteMode = {
   Read: 'read',
 } as const;
 
-export const rawEngineAppServerRouteModeSchema = z.enum([
+const rawEngineAppServerRouteModeSchema = z.enum([
   RawEngineAppServerRouteMode.ApplyDryRunPlan,
   RawEngineAppServerRouteMode.DryRunCommand,
   RawEngineAppServerRouteMode.HostCommand,
@@ -553,7 +550,7 @@ export type RawEngineAppServerHostManifest = z.infer<typeof rawEngineAppServerHo
 export type RawEngineAppServerHostRequest = z.infer<typeof rawEngineAppServerHostRequestSchema>;
 export type RawEngineAppServerHostResponse = z.infer<typeof rawEngineAppServerHostResponseSchema>;
 export type RawEngineAppServerHostResponseEnvelope = z.infer<typeof rawEngineAppServerHostResponseEnvelopeSchema>;
-export type RawEngineAppServerHostToolName = z.infer<typeof rawEngineAppServerHostToolNameSchema>;
+type RawEngineAppServerHostToolName = z.infer<typeof rawEngineAppServerHostToolNameSchema>;
 export type RawEngineAppServerLifecycleReplay = z.infer<typeof rawEngineAppServerLifecycleReplaySchema>;
 export type RawEngineAppServerLifecycleState = z.infer<typeof rawEngineAppServerLifecycleStateSchema>;
 export type RawEngineAppServerStructuredError = z.infer<typeof rawEngineAppServerStructuredErrorSchema>;

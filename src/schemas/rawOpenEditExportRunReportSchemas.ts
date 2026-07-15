@@ -299,9 +299,9 @@ const privateRunReportSchema = z
 
 /** Strict parser for the single workflow report emitted by the native RAW smoke harness. */
 export const rawOpenEditExportRunReportSchema = privateRunReportSchema;
-export type RawOpenEditExportRunReport = z.infer<typeof rawOpenEditExportRunReportSchema>;
+type RawOpenEditExportRunReport = z.infer<typeof rawOpenEditExportRunReportSchema>;
 
-export const rawOpenEditExportRunReportCollectionSchema = z
+const rawOpenEditExportRunReportCollectionSchema = z
   .object({
     $schema: z.url(),
     issue: z.literal(1829),

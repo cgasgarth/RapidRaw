@@ -7,7 +7,7 @@ import { classifyAgentEditIntent } from './agentEditIntentClassifier';
 
 export const agentEditRecipeKindSchema = z.enum(['brighten_flat_raw', 'warm_portrait_pop', 'cool_landscape_detail']);
 
-export const agentEditRecipePlanSchema = z
+const agentEditRecipePlanSchema = z
   .object({
     recipeKind: agentEditRecipeKindSchema,
     recipeName: z.string().trim().min(1),

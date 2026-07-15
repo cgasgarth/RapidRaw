@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 import { panoramaTilePerformanceV1Schema } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 
-export const panoramaUiProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical']);
-export const panoramaUiBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop']);
-export const panoramaUiBlendModeSchema = z.enum(['feather', 'multi_band']);
-export const panoramaUiExposureModeSchema = z.enum(['gain_compensation', 'none']);
-export const panoramaUiQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
-export const panoramaRuntimePlanStatusSchema = z.enum(['accepted', 'warning', 'blocked_plan_only']);
+const panoramaUiProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical']);
+const panoramaUiBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop']);
+const panoramaUiBlendModeSchema = z.enum(['feather', 'multi_band']);
+const panoramaUiExposureModeSchema = z.enum(['gain_compensation', 'none']);
+const panoramaUiQualityPreferenceSchema = z.enum(['preview', 'balanced', 'best']);
+const panoramaRuntimePlanStatusSchema = z.enum(['accepted', 'warning', 'blocked_plan_only']);
 
 const panoramaSourceGeometryConnectivitySchema = z
   .object({
@@ -163,7 +163,7 @@ const panoramaAlignmentEdgeSchema = z
   })
   .strict();
 
-export const panoramaCalibratedAlignmentPlanSchema = z
+const panoramaCalibratedAlignmentPlanSchema = z
   .object({
     algorithmId: z.literal('rapidraw_oriented_brief_calibrated_global_pose_v1'),
     blockedReasons: z.array(z.string()),
@@ -506,7 +506,7 @@ export const DEFAULT_PANORAMA_UI_SETTINGS = panoramaUiSettingsSchema.parse({
   sourceMode: 'overlap_sequence',
 });
 
-export const normalizePanoramaUiSettings = (value: unknown): PanoramaUiSettings => {
+const normalizePanoramaUiSettings = (value: unknown): PanoramaUiSettings => {
   const parsed = panoramaUiSettingsSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_PANORAMA_UI_SETTINGS;
 };

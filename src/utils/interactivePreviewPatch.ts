@@ -7,7 +7,7 @@ export type CreateDecodableImage = () => DecodableImage;
 const positiveSafeIntegerSchema = z.number().int().positive().safe();
 const finitePositiveNumberSchema = z.number().finite().positive();
 
-export const interactivePreviewScopeSchema = z.object({
+const interactivePreviewScopeSchema = z.object({
   backend: z.enum(['cpu', 'wgpu']),
   basePreviewUrl: z.string().nullable(),
   devicePixelRatio: finitePositiveNumberSchema,
@@ -29,7 +29,7 @@ export const interactivePreviewScopeSchema = z.object({
 
 export type InteractivePreviewScope = z.infer<typeof interactivePreviewScopeSchema>;
 
-export const interactivePreviewIdentitySchema = interactivePreviewScopeSchema.extend({
+const interactivePreviewIdentitySchema = interactivePreviewScopeSchema.extend({
   backendEpoch: positiveSafeIntegerSchema,
   devicePixelRatioEpoch: positiveSafeIntegerSchema,
   generation: positiveSafeIntegerSchema,

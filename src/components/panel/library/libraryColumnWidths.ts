@@ -21,7 +21,7 @@ export const LIBRARY_COLUMN_KEYS: readonly ColumnWidthKey[] = [
 ];
 
 export const CORE_LIBRARY_COLUMN_KEYS = LIBRARY_COLUMN_KEYS.slice(0, 5);
-export const LIBRARY_COLUMN_RESIZE_EPSILON = 0.001;
+const LIBRARY_COLUMN_RESIZE_EPSILON = 0.001;
 
 const finiteOr = (value: number, fallback: number) => (Number.isFinite(value) ? value : fallback);
 
@@ -61,7 +61,7 @@ export function resizeAdjacentColumns(
   return { ...safeInitial, [left]: nextLeft, [right]: nextRight };
 }
 
-export const columnWidthVariable = (key: ColumnWidthKey) => `--library-col-${key}`;
+const columnWidthVariable = (key: ColumnWidthKey) => `--library-col-${key}`;
 
 export function normalizedColumnPercentages(
   widths: ColumnWidths,

@@ -11,7 +11,7 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   ]),
 );
 
-export const colorStylePresetCategorySchema = z.enum([
+const colorStylePresetCategorySchema = z.enum([
   'black_and_white',
   'cinematic',
   'landscape',
@@ -21,7 +21,7 @@ export const colorStylePresetCategorySchema = z.enum([
   'wedding',
 ]);
 
-export const colorStylePresetAdjustmentKeySchema = z.enum([
+const colorStylePresetAdjustmentKeySchema = z.enum([
   'colorCalibration',
   'colorGrading',
   'creativeTemperature',
@@ -50,24 +50,22 @@ export type ColorStylePresetAdjustmentKey = z.infer<typeof colorStylePresetAdjus
 
 const colorStylePresetAdjustmentKeys = new Set<string>(colorStylePresetAdjustmentKeySchema.options);
 
-export const colorStylePresetAdjustmentPatchSchema = z
-  .record(z.string(), jsonValueSchema)
-  .superRefine((patch, context) => {
-    const entries = Object.entries(patch);
-    if (entries.length === 0) {
-      context.addIssue({ code: 'custom', message: 'Color style presets require at least one adjustment.' });
-    }
+const colorStylePresetAdjustmentPatchSchema = z.record(z.string(), jsonValueSchema).superRefine((patch, context) => {
+  const entries = Object.entries(patch);
+  if (entries.length === 0) {
+    context.addIssue({ code: 'custom', message: 'Color style presets require at least one adjustment.' });
+  }
 
-    for (const [key] of entries) {
-      if (!colorStylePresetAdjustmentKeys.has(key)) {
-        context.addIssue({
-          code: 'custom',
-          message: `Unsupported color style adjustment key: ${key}`,
-          path: [key],
-        });
-      }
+  for (const [key] of entries) {
+    if (!colorStylePresetAdjustmentKeys.has(key)) {
+      context.addIssue({
+        code: 'custom',
+        message: `Unsupported color style adjustment key: ${key}`,
+        path: [key],
+      });
     }
-  });
+  }
+});
 
 export const colorStylePresetSchema = z
   .object({
@@ -97,7 +95,7 @@ export const colorStylePresetSchema = z
     }
   });
 
-export const colorStylePresetCatalogSchema = z
+const colorStylePresetCatalogSchema = z
   .object({
     defaultPresetId: z.string().trim().min(1).nullable(),
     presets: z.array(colorStylePresetSchema).min(1),

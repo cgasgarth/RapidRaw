@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const colorParityOperationSchema = z.enum([
+const colorParityOperationSchema = z.enum([
   'channel_mixer',
   'color_balance_rgb',
   'luma_levels',
@@ -9,7 +9,7 @@ export const colorParityOperationSchema = z.enum([
   'legacy_tonemap',
 ]);
 
-export const colorParityVec3Schema = z.tuple([z.number(), z.number(), z.number()]);
+const colorParityVec3Schema = z.tuple([z.number(), z.number(), z.number()]);
 
 export const colorParityCaseSchema = z
   .object({
@@ -37,7 +37,7 @@ export const colorParityShaderFunctionSchema = z
   })
   .strict();
 
-export const colorParityManifestSchema = z
+const colorParityManifestSchema = z
   .object({
     $schema: z.url(),
     cases: z.array(colorParityCaseSchema).min(1),
@@ -97,7 +97,7 @@ export const applyColorParityLinearExposure = (
   return makeVec3(input[0] * multiplier, input[1] * multiplier, input[2] * multiplier);
 };
 
-export const applyColorParityWhiteBalance = (
+const applyColorParityWhiteBalance = (
   inputValue: ColorParityVec3,
   parameters: Record<string, number>,
 ): ColorParityVec3 => {
@@ -141,7 +141,7 @@ export const applyColorParityLegacyTonemap = (inputValue: ColorParityVec3): Colo
   return makeVec3(tonemap(input[0]), tonemap(input[1]), tonemap(input[2]));
 };
 
-export const applyColorParityChannelMixer = (
+const applyColorParityChannelMixer = (
   inputValue: ColorParityVec3,
   parameters: Record<string, number>,
 ): ColorParityVec3 => {
@@ -168,7 +168,7 @@ export const applyColorParityChannelMixer = (
   return makeVec3(clamp(mixed[0] * scale, 0, 1), clamp(mixed[1] * scale, 0, 1), clamp(mixed[2] * scale, 0, 1));
 };
 
-export const applyColorParityColorBalanceRgb = (
+const applyColorParityColorBalanceRgb = (
   inputValue: ColorParityVec3,
   parameters: Record<string, number>,
 ): ColorParityVec3 => {

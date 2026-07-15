@@ -7,7 +7,7 @@ import {
 import { Invokes } from '../../tauri/commands';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
 
-export const lockNegativeLabRollBounds = async (
+const lockNegativeLabRollBounds = async (
   request: NegativeLabRollBoundsRequest,
 ): Promise<NegativeLabRollBoundsReceipt> => {
   const parsedRequest = negativeLabRollBoundsRequestSchema.parse(request);

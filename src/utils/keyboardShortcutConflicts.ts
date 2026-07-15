@@ -37,7 +37,7 @@ export function findKeyboardShortcutConflicts(value: unknown): Array<KeyboardSho
     .sort((left, right) => left.comboKey.localeCompare(right.comboKey));
 }
 
-export function assertKeyboardShortcutMapHasNoConflicts(shortcuts: KeyboardShortcutMap): void {
+function assertKeyboardShortcutMapHasNoConflicts(shortcuts: KeyboardShortcutMap): void {
   const conflicts = findKeyboardShortcutConflicts(shortcuts);
   if (conflicts.length === 0) return;
 

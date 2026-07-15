@@ -12,7 +12,7 @@ export interface MaskGraphCommandResult {
   selectBrushTool?: boolean;
 }
 
-export const EMPTY_MASK_SELECTION: MaskSelection = { containerId: null, subMaskId: null };
+const EMPTY_MASK_SELECTION: MaskSelection = { containerId: null, subMaskId: null };
 
 /** Resolve both selection ids against the same mask graph snapshot. */
 export function resolveMaskSelection(masks: ReadonlyArray<MaskContainer>, requested: MaskSelection): MaskSelection {

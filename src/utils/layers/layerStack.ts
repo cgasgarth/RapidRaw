@@ -53,14 +53,14 @@ export interface CopyLayerMasksInput {
   targetLayerId: string;
 }
 
-export class LayerStackOperationError extends Error {
+class LayerStackOperationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'LayerStackOperationError';
   }
 }
 
-export function clampLayerOpacity(opacity: number): number {
+function clampLayerOpacity(opacity: number): number {
   if (!Number.isFinite(opacity)) return 100;
   return Math.max(0, Math.min(100, Math.round(opacity)));
 }

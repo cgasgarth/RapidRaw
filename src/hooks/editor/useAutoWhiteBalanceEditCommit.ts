@@ -14,7 +14,7 @@ import {
 } from '../../utils/contextAutoAdjustEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
-export type AutoWhiteBalanceCommitStatus = 'applied' | 'stale' | 'unavailable';
+type AutoWhiteBalanceCommitStatus = 'applied' | 'stale' | 'unavailable';
 
 export const useAutoWhiteBalanceEditCommit = (
   enabled: boolean,

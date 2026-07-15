@@ -1,6 +1,6 @@
 export type EditorChromeStatus = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
 
-export type EditorInteractionState =
+type EditorInteractionState =
   | 'idle'
   | 'hover'
   | 'pressed'

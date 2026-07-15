@@ -20,7 +20,7 @@ import {
 
 export type AgentLocalLayerCoverageStatus = 'covered' | 'partial';
 
-export interface AgentLocalLayerCoverageEntry {
+interface AgentLocalLayerCoverageEntry {
   applyPath: string;
   commandTypes: readonly string[];
   inputSchemaName: string;

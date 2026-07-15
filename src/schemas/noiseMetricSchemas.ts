@@ -3,13 +3,9 @@ import { z } from 'zod';
 const positiveIntegerSchema = z.number().int().positive();
 const nonNegativeNumberSchema = z.number().min(0);
 
-export const noiseMetricLimitationSchema = z.enum([
-  'real_raw_quality',
-  'preview_export_parity',
-  'runtime_denoise_quality',
-]);
+const noiseMetricLimitationSchema = z.enum(['real_raw_quality', 'preview_export_parity', 'runtime_denoise_quality']);
 
-export const noiseMetricRegionSchema = z
+const noiseMetricRegionSchema = z
   .object({
     height: positiveIntegerSchema,
     id: z.string().regex(/^[a-z0-9.-]+$/u),
@@ -19,7 +15,7 @@ export const noiseMetricRegionSchema = z
   })
   .strict();
 
-export const noiseMetricExpectedRangeSchema = z
+const noiseMetricExpectedRangeSchema = z
   .object({
     max: nonNegativeNumberSchema,
     min: nonNegativeNumberSchema,
@@ -29,7 +25,7 @@ export const noiseMetricExpectedRangeSchema = z
     message: 'Expected metric range min must be less than or equal to max.',
   });
 
-export const noiseMetricCaseSchema = z
+const noiseMetricCaseSchema = z
   .object({
     description: z.string().trim().min(1),
     expectedMetrics: z
@@ -133,7 +129,7 @@ export const noiseMetricFixtureManifestSchema = z
     }
   });
 
-export type NoiseMetricCase = z.infer<typeof noiseMetricCaseSchema>;
+type NoiseMetricCase = z.infer<typeof noiseMetricCaseSchema>;
 export type NoiseMetricFixtureManifest = z.infer<typeof noiseMetricFixtureManifestSchema>;
 
 export function parseNoiseMetricFixtureManifest(value: unknown): NoiseMetricFixtureManifest {

@@ -28,7 +28,7 @@ export const parseAiPatchDataJson = (value: string): JsonValue => {
 
 export const aiMaskCapabilitySchema = z.enum(['background', 'depth', 'foreground', 'person', 'sky', 'subject']);
 
-export const aiMaskCapabilityAuditEntrySchema = z
+const aiMaskCapabilityAuditEntrySchema = z
   .object({
     capability: aiMaskCapabilitySchema,
     derivedFrom: aiMaskCapabilitySchema.optional(),
@@ -94,7 +94,7 @@ export const aiPeopleMaskPartSchema = z.enum([
   'teeth',
 ]);
 
-export const aiPeopleMaskProviderTierSchema = z.enum([
+const aiPeopleMaskProviderTierSchema = z.enum([
   'contract',
   'fake_provider',
   'macos_face',
@@ -103,9 +103,9 @@ export const aiPeopleMaskProviderTierSchema = z.enum([
   'face_detail',
 ]);
 
-export const aiPeopleMaskRuntimeStatusSchema = z.enum(['schema_only', 'dry_run', 'runtime_apply']);
+const aiPeopleMaskRuntimeStatusSchema = z.enum(['schema_only', 'dry_run', 'runtime_apply']);
 
-export const aiPeopleMaskSupportStatusSchema = z.enum(['supported', 'derived', 'planned', 'unsupported']);
+const aiPeopleMaskSupportStatusSchema = z.enum(['supported', 'derived', 'planned', 'unsupported']);
 
 export const aiPeopleMaskProviderCapabilitySchema = z
   .object({
@@ -134,7 +134,7 @@ export const aiPeopleMaskProviderCapabilitySchema = z
     }
   });
 
-export const normalizedAiPeopleRectSchema = z
+const normalizedAiPeopleRectSchema = z
   .object({
     height: z.number().positive().max(1),
     width: z.number().positive().max(1),
@@ -167,7 +167,7 @@ export const aiPeopleMaskTargetSchema = z
   })
   .strict();
 
-export const aiPeopleMaskAnalysisPersonSchema = z
+const aiPeopleMaskAnalysisPersonSchema = z
   .object({
     availableParts: z.array(aiPeopleMaskPartSchema).min(1),
     bounds: normalizedAiPeopleRectSchema,
@@ -185,7 +185,7 @@ export const aiPeopleMaskAnalysisPersonSchema = z
     }
   });
 
-export const aiPeopleMaskAnalysisSchema = z
+const aiPeopleMaskAnalysisSchema = z
   .object({
     generatedAt: z.iso.datetime(),
     imageHash: z.string().trim().min(1),
@@ -196,7 +196,7 @@ export const aiPeopleMaskAnalysisSchema = z
   })
   .strict();
 
-export const aiPeopleMaskArtifactSchema = z
+const aiPeopleMaskArtifactSchema = z
   .object({
     artifactId: z.string().trim().min(1),
     confidence: z.number().min(0).max(1),
@@ -232,7 +232,7 @@ export const aiPeopleMaskContractFixtureSchema = z
     }
   });
 
-export const aiPeopleMaskPickerOptionSchema = z
+const aiPeopleMaskPickerOptionSchema = z
   .object({
     disabledReason: z.string().trim().min(1).nullable(),
     label: z.string().trim().min(1),
@@ -330,7 +330,7 @@ export const aiPeopleMaskFakeProviderFixtureSchema = z
   })
   .strict();
 
-export const aiPeopleMaskLayerPlanEntrySchema = z
+const aiPeopleMaskLayerPlanEntrySchema = z
   .object({
     artifactId: z.string().trim().min(1),
     layerId: z.string().trim().min(1),

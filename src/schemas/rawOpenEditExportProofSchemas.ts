@@ -97,7 +97,7 @@ const proofCaseSchema = z
     }
   });
 
-export const rawOpenEditExportProofManifestSchema = z
+const rawOpenEditExportProofManifestSchema = z
   .object({
     $schema: z.url(),
     issue: z.literal(1376),

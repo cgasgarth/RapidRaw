@@ -22,7 +22,7 @@ export const getLibraryRowHeight = (layout: LibraryLayoutSnapshot, index: number
   return layout.layoutIndex.getRowHeight(index);
 };
 
-export const getLibraryRowTop = (layout: LibraryLayoutSnapshot, rowIndex: number): number => {
+const getLibraryRowTop = (layout: LibraryLayoutSnapshot, rowIndex: number): number => {
   return layout.layoutIndex.getRowOffset(rowIndex);
 };
 
