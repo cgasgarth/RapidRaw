@@ -545,6 +545,7 @@ export function useImageProcessing() {
       const scopeSnapshot = interactiveScopeRef.current(normalizedTargetRes, quality.effectiveRoi);
       if (scopeSnapshot === null) return;
       const session = previewSessionIdentity(scopeSnapshot.scope, normalizedTargetRes, scopeSnapshot.roi);
+      dispatchPreviewCoordinator({ session, type: 'image-session-installed' });
       const identity = editedPreviewRunner.request(
         {
           activeWaveformChannel,

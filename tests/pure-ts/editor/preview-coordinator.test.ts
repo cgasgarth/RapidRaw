@@ -68,6 +68,27 @@ test('fingerprints are canonical and distinguish typed source identity changes',
   );
 });
 
+test('synchronous current-session installation makes a later passive reinstall idempotent', () => {
+  const previous = session({ imageSessionId: 4, sourceRevision: 4 });
+  const current = session({ adjustmentRevision: 8, imageSessionId: 8, sourceRevision: 8 });
+  let state = transition(createPreviewCoordinatorState(), {
+    session: previous,
+    type: 'image-session-installed',
+  }).state;
+  state = transition(state, { session: current, type: 'image-session-installed' }).state;
+  state = transition(state, {
+    identity: current,
+    kind: 'settled',
+    reason: 'settled-inputs-changed',
+    type: 'render-inputs-changed',
+  }).state;
+
+  const passiveReinstall = transition(state, { session: current, type: 'image-session-installed' });
+  expect(passiveReinstall.effects).toEqual([]);
+  expect(passiveReinstall.state.settled.status).toBe('queued');
+  expect(passiveReinstall.state.lastTransition?.reason).toBe('session-installed');
+});
+
 test('graph revisions canonically distinguish proposal and render-authoritative revisions', () => {
   const committed = {
     adjustmentRevision: 7,
