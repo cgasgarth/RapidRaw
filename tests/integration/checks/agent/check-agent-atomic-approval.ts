@@ -154,6 +154,7 @@ if (appliedState.adjustments.exposure !== 0.25 || appliedState.historyIndex !== 
   throw new Error('Atomic approval did not apply the approved plan.');
 }
 
+const beforeRollbackRevision = appliedState.adjustmentRevision;
 const rollbackRevision = rollbackApprovedAgentPlan(applied.rollbackTarget);
 const rolledBackState = useEditorStore.getState();
 if (rollbackRevision !== 'history_0') {
@@ -164,6 +165,14 @@ if (rolledBackState.adjustments.exposure !== INITIAL_ADJUSTMENTS.exposure || rol
 }
 if (rolledBackState.finalPreviewUrl !== 'blob:rawengine-atomic-before') {
   throw new Error('Rollback did not restore original preview identity.');
+}
+if (
+  rolledBackState.adjustmentRevision !== beforeRollbackRevision + 1 ||
+  rolledBackState.lastEditApplicationReceipt?.source !== 'history' ||
+  rolledBackState.lastEditApplicationReceipt.transactionId !==
+    `agent-approval-rollback:history_0:${String(beforeRollbackRevision)}`
+) {
+  throw new Error('Rollback did not publish one history-navigation transaction receipt.');
 }
 
 console.log('agent atomic approval ok');
