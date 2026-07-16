@@ -3326,7 +3326,7 @@ mod tests {
             Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
         }));
         let adjustments = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 2,
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             "exposure": 18,
             "contrast": 12,
             "showClipping": false
@@ -3377,7 +3377,7 @@ mod tests {
             preview_plan.adjustments,
             Arc::clone(&preview_plan.edit_graph),
         );
-        let exported = render(export_plan.adjustments, export_plan.edit_graph);
+        let exported = render(export_plan.adjustments, Arc::clone(&export_plan.edit_graph));
         assert_eq!(
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
@@ -3386,11 +3386,15 @@ mod tests {
             preview_plan.edit_graph.pipeline_version,
             crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
         );
+        assert_eq!(
+            export_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
     }
 
     #[test]
     #[cfg(feature = "tauri-test")]
-    fn private_real_raw_current_preview_export_and_removed_graph_rejection_when_enabled() {
+    fn private_real_raw_current_graph_preview_export_and_rejection_proof_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
             return;
         }
@@ -3421,22 +3425,54 @@ mod tests {
         let state = app.state::<crate::AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("real Metal compute context initializes");
-        let recipe = |version| {
-            json!({
-                "rawEngineEditGraphVersion": version,
-                "exposure": 16,
-                "contrast": 10,
-                "highlights": -14,
-                "vibrance": 9,
-                "channelMixer": {
-                    "enabled": true,
-                    "preserveLuminance": false,
-                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 18 },
-                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
-                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -12 }
+        let current_recipe = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+            "exposure": 16,
+            "contrast": 10,
+            "highlights": -14,
+            "vibrance": 9,
+            "channelMixer": {
+                "enabled": true,
+                "preserveLuminance": false,
+                "red": { "red": 100, "green": 0, "blue": 0, "constant": 18 },
+                "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                "blue": { "red": 0, "green": 0, "blue": 100, "constant": -12 }
+            }
+        }));
+
+        for (invalid_version, expected_error) in [
+            (Some(json!(1)), "render_plan.unsupported_edit_graph_version"),
+            (
+                Some(json!(
+                    crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION + 1
+                )),
+                "render_plan.unsupported_edit_graph_version",
+            ),
+            (Some(json!("2")), "render_plan.invalid_edit_graph_version"),
+            (None, "render_plan.missing_edit_graph_version"),
+        ] {
+            let mut invalid = current_recipe.clone();
+            let object = invalid
+                .as_object_mut()
+                .expect("current recipe is an object");
+            match invalid_version {
+                Some(version) => {
+                    object.insert("rawEngineEditGraphVersion".into(), version);
                 }
-            })
-        };
+                None => {
+                    object.remove("rawEngineEditGraphVersion");
+                }
+            }
+            let error =
+                prepare_export_render_inputs(&source_path, &invalid, &state, true, Some(0), 0)
+                    .err()
+                    .expect("invalid graph version is rejected before export execution");
+            assert!(
+                error.starts_with(expected_error),
+                "unexpected graph-version rejection: {error}"
+            );
+        }
+
         let render = |adjustments: &serde_json::Value, caller: &str| {
             super::process_image_for_export_pipeline_with_tonemapper_override(
                 &source_path,
@@ -3452,44 +3488,25 @@ mod tests {
             )
             .expect("graph-authoritative real RAW render succeeds")
         };
-        let current_recipe = recipe(crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION);
-        let preview = render(&current_recipe, "current_edit_graph_private_raw_preview");
-        let export = render(&current_recipe, "current_edit_graph_private_raw_export");
+        let preview = render(&current_recipe, "edit_graph_current_private_raw_preview");
+        let export = render(&current_recipe, "edit_graph_current_private_raw_export");
         let current_receipt = state
             .gpu()
             .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
-            .expect("real RAW current render publishes a GPU execution receipt");
-        let removed_graph_error =
-            super::process_image_for_export_pipeline_with_tonemapper_override(
-                &source_path,
-                &base,
-                &recipe(1),
-                &context,
-                &state,
-                true,
-                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
-                "removed_edit_graph_private_raw_rejection",
-                Some(0),
-                &[],
-            )
-            .expect_err("removed graph v1 must be rejected before renderer dispatch");
-        assert!(
-            removed_graph_error.contains("unsupported edit graph version 1"),
-            "unexpected removed graph rejection: {removed_graph_error}"
-        );
+            .expect("real RAW current-graph render publishes a GPU execution receipt");
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
         assert_eq!(preview.dimensions(), base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "current_edit_graph_private_raw_proof dimensions={}x{} preview_export_sha256={} removed_graph_rejection={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "edit_graph_current_private_raw_proof dimensions={}x{} pipeline_version={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             hex::encode(digest),
-            removed_graph_error,
             current_receipt.phase_dispatch_count,
             current_receipt.command_buffer_count,
             current_receipt.queue_submit_count,
