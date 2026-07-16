@@ -3,7 +3,7 @@ import type { ViewerAiMaskBoxSessionKey } from '../../../src/components/panel/ed
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAiMaskBoxEditTransaction } from '../../../src/utils/aiMaskBoxEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -35,6 +35,8 @@ describe('AI mask box edit transaction', () => {
         {
           adjustments: {},
           blendMode: 'normal' as const,
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer:1',
           invert: false,
           name: 'Subject layer',

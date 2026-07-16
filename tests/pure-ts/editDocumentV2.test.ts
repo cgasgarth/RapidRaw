@@ -595,6 +595,8 @@ describe('EditDocumentV2 legacy adapter', () => {
     const layer = {
       adjustments: { exposure: 0.4 },
       blendMode: 'overlay' as const,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1 as const,
       id: 'layer-1',
       invert: false,
       name: 'Local sky',
@@ -616,8 +618,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       masks: [layer],
     });
-    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
-    expect(document.layers.masks).toEqual([migratedLayer]);
+    expect(document.layers.masks).toEqual([layer]);
     expect(compileEditDocumentNodeV2(document.nodes.layers).params).toEqual(document.layers);
 
     expect(() =>
@@ -637,12 +638,14 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(() => editDocumentV2Schema.parse({ ...document, layers: { masks: [] } })).toThrow('disagrees');
   });
 
-  test('reopens pre-envelope V2 layers losslessly and quarantines corrupt edit nodes idempotently', () => {
+  test('rejects pre-envelope, legacy-visibility, malformed, and split layer authority', () => {
     const document = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
       masks: [
         {
           adjustments: { exposure: 0.4 },
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1,
           id: 'legacy-v2-layer',
           invert: false,
           name: 'Legacy V2 layer',
@@ -652,49 +655,43 @@ describe('EditDocumentV2 legacy adapter', () => {
         },
       ],
     });
-    const {
-      editNodes: _editNodes,
-      editNodeSchemaVersion: _editNodeSchemaVersion,
-      ...legacyLayerEnvelope
-    } = document.layers.masks[0] ?? {};
-    const legacyLayer = {
-      ...legacyLayerEnvelope,
-      adjustments: { exposure: 0.4, sectionVisibility: { basic: false, color: true, curves: false, details: true } },
-    };
-    const reopened = editDocumentV2Schema.parse({
-      ...document,
-      layers: { masks: [legacyLayer] },
-      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [legacyLayer] } } },
-    });
-    expect(reopened.layers.masks[0]).toMatchObject({
-      adjustments: { exposure: 0.4 },
-      editNodeSchemaVersion: 1,
-      editNodes: {
-        basic: { enabled: false },
-        color: { enabled: true },
-        curves: { enabled: false },
-        details: { enabled: true },
-      },
-    });
-    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+    const currentLayer = document.layers.masks[0];
+    expect(currentLayer).toBeDefined();
+    if (currentLayer === undefined) throw new Error('expected current layer fixture');
 
-    const corruptLayer = { ...legacyLayer, editNodes: { basic: { enabled: 'not-boolean' } } };
-    const quarantined = editDocumentV2Schema.parse({
-      ...document,
-      layers: { masks: [corruptLayer] },
-      nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [corruptLayer] } } },
-    });
-    expect(quarantined.layers.masks[0]).toMatchObject({
-      adjustments: { exposure: 0.4 },
-      editNodeQuarantine: { invalidEditNodes: corruptLayer.editNodes },
-      editNodes: {
-        basic: { enabled: false },
-        color: { enabled: true },
-        curves: { enabled: false },
-        details: { enabled: true },
-      },
-    });
-    expect(editDocumentV2Schema.parse(quarantined)).toEqual(quarantined);
+    const rejectBothDomains = (layer: Record<string, unknown>) =>
+      editDocumentV2Schema.parse({
+        ...document,
+        layers: { masks: [layer] },
+        nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [layer] } } },
+      });
+
+    const { editNodes: _editNodes, ...missingNodes } = currentLayer;
+    expect(() => rejectBothDomains(missingNodes)).toThrow();
+    const { editNodeSchemaVersion: _schemaVersion, ...missingSchemaVersion } = currentLayer;
+    expect(() => rejectBothDomains(missingSchemaVersion)).toThrow();
+    expect(() => rejectBothDomains({ ...currentLayer, editNodeSchemaVersion: 0 })).toThrow();
+    expect(() => rejectBothDomains({ ...currentLayer, editNodes: { basic: { enabled: true } } })).toThrow();
+    expect(() =>
+      rejectBothDomains({
+        ...currentLayer,
+        adjustments: {
+          ...currentLayer.adjustments,
+          sectionVisibility: { basic: false, color: true, curves: false, details: true },
+        },
+      }),
+    ).toThrow('sectionVisibility');
+
+    const splitLayer = {
+      ...currentLayer,
+      editNodes: { ...currentLayer.editNodes, basic: { enabled: false } },
+    };
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: { ...document.nodes, layers: { ...document.nodes.layers, params: { masks: [splitLayer] } } },
+      }),
+    ).toThrow('disagrees');
   });
 
   test('rejects malformed, duplicate, and ambiguous source artifacts', () => {
@@ -2024,6 +2021,8 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('render preparation transfers the layers envelope and explicit domain together', () => {
     const layer = {
       adjustments: { saturation: 12 },
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1 as const,
       id: 'authoritative-layer',
       invert: false,
       name: 'Authoritative layer',
@@ -2037,10 +2036,8 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     const prepared = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [] };
     const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['layers']);
-    const migratedLayer = { ...layer, editNodes: createDefaultMaskEditNodes(), editNodeSchemaVersion: 1 as const };
-
     expect(renderDocument.nodes.layers).toBe(authoritative.nodes.layers);
-    expect(renderDocument.layers).toEqual({ masks: [migratedLayer] });
+    expect(renderDocument.layers).toEqual({ masks: [layer] });
     expect(renderDocument.nodes.layers?.params).toEqual(renderDocument.layers);
   });
 

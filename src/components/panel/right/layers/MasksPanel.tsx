@@ -67,7 +67,6 @@ import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../..
 import {
   ADJUSTMENT_SECTIONS,
   type Adjustments,
-  createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
   hasAdjustmentValueChanges,
   INITIAL_ADJUSTMENTS,
@@ -3594,7 +3593,7 @@ function SettingsPanel({
     adjustments: INITIAL_MASK_ADJUSTMENTS,
   };
   const displayContainer = container || placeholderContainer;
-  const displayEditNodes = displayContainer.editNodes ?? createDefaultMaskEditNodes();
+  const displayEditNodes = displayContainer.editNodes;
   const displayAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...displayContainer.adjustments };
 
   const handleApplyPresetToMask = (presetAdjustments: Partial<Adjustments>) => {
@@ -3825,7 +3824,7 @@ function SettingsPanel({
     }
     if (!(['basic', 'color', 'curves', 'details'] as const).some((nodeType) => nodeType === sectionName)) return;
     const nodeType = sectionName as 'basic' | 'color' | 'curves' | 'details';
-    const editNodes = container.editNodes ?? createDefaultMaskEditNodes();
+    const editNodes = container.editNodes;
     updateContainer(container.id, {
       editNodes: {
         ...editNodes,

@@ -35,8 +35,6 @@ import {
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
 
-const cloneJsonValue = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
-
 export enum ActiveChannel {
   Blue = 'blue',
   Green = 'green',
@@ -625,7 +623,6 @@ export interface MaskContainer {
   adjustments: MaskAdjustments;
   blendMode?: LayerBlendMode;
   editNodes: MaskEditNodeMap;
-  editNodeQuarantine?: Record<string, JsonValue>;
   editNodeSchemaVersion: 1;
   id: string;
   invert: boolean;
@@ -1136,14 +1133,14 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
     const containerAdjustments = maskContainer.adjustments;
-    const legacyMaskVisibility =
-      typeof containerAdjustments['sectionVisibility'] === 'object' &&
-      containerAdjustments['sectionVisibility'] !== null
-        ? (containerAdjustments['sectionVisibility'] as Readonly<Record<string, unknown>>)
-        : null;
-    const { sectionVisibility: _legacyMaskVisibility, ...maskPixelAdjustments } = containerAdjustments;
+    if (Object.hasOwn(containerAdjustments, 'sectionVisibility')) {
+      throw new Error('Layer adjustments must not contain legacy sectionVisibility.');
+    }
     const normalizedSubMasks = normalizeSubMasks(maskContainer.subMasks);
-    const parsedMaskEditNodes = editDocumentMaskNodesV2Schema.safeParse(maskContainer.editNodes);
+    const parsedMaskEditNodes = editDocumentMaskNodesV2Schema.parse(maskContainer.editNodes);
+    if (maskContainer.editNodeSchemaVersion !== 1) {
+      throw new Error('Layer editNodeSchemaVersion must be 1.');
+    }
 
     const parsedLayerReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
       maskContainer.referenceMatchApplicationReceipt,
@@ -1151,24 +1148,12 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     const normalizedMask: MaskContainer = {
       ...INITIAL_MASK_CONTAINER,
       ...maskContainer,
-      editNodes: parsedMaskEditNodes.success
-        ? parsedMaskEditNodes.data
-        : (Object.fromEntries(
-            MASK_EDIT_NODE_TYPES.map((nodeType) => [
-              nodeType,
-              {
-                enabled: typeof legacyMaskVisibility?.[nodeType] === 'boolean' ? legacyMaskVisibility[nodeType] : true,
-              },
-            ]),
-          ) as MaskEditNodeMap),
-      ...(maskContainer.editNodes !== undefined && !parsedMaskEditNodes.success
-        ? { editNodeQuarantine: { invalidEditNodes: cloneJsonValue(maskContainer.editNodes) } }
-        : {}),
+      editNodes: parsedMaskEditNodes,
       editNodeSchemaVersion: 1,
       id: maskContainer.id || crypto.randomUUID(),
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
-        ...maskPixelAdjustments,
+        ...containerAdjustments,
         flareAmount: containerAdjustments.flareAmount,
         glowAmount: containerAdjustments.glowAmount,
         halationAmount: containerAdjustments.halationAmount,
@@ -1185,9 +1170,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
           ? deepCloneParametric(containerAdjustments.parametricCurve)
           : getDefaultParametricCurve(),
         curveMode: containerAdjustments.curveMode ?? 'point',
-        effectsEnabled:
-          containerAdjustments.effectsEnabled ??
-          (typeof legacyMaskVisibility?.['effects'] === 'boolean' ? legacyMaskVisibility['effects'] : true),
+        effectsEnabled: containerAdjustments.effectsEnabled ?? true,
         sharpnessThreshold: containerAdjustments.sharpnessThreshold,
         toneEqualizer: normalizeToneEqualizer(containerAdjustments.toneEqualizer),
       },
