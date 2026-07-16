@@ -88,9 +88,11 @@ const createAgentRollbackSnapshot = () => {
   return {
     adjustments: state.adjustments,
     activeImagePath: context.activeImagePath,
+    editDocumentHistory: structuredClone(state.editDocumentHistory),
     finalPreviewUrl: state.finalPreviewUrl,
     graphRevision: context.graphRevision,
-    history: state.history,
+    history: structuredClone(state.history),
+    historyCheckpoints: structuredClone(state.historyCheckpoints),
     historyIndex: state.historyIndex,
     lastBasicToneCommand: state.lastBasicToneCommand,
     recipeHash: context.initialPreview.recipeHash,
@@ -550,20 +552,24 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
     }
 
     const rollbackRequestId = `agent-live-rollback-${Date.now()}`;
+    const checkpoint = {
+      adjustments: rollbackSnapshot.adjustments,
+      activeImagePath: rollbackSnapshot.activeImagePath,
+      editDocumentHistory: rollbackSnapshot.editDocumentHistory,
+      graphRevision: rollbackSnapshot.graphRevision,
+      history: rollbackSnapshot.history,
+      historyCheckpoints: rollbackSnapshot.historyCheckpoints,
+      historyIndex: rollbackSnapshot.historyIndex,
+      lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
+      previewRecipeHash: rollbackSnapshot.recipeHash,
+      previewRef: rollbackSnapshot.finalPreviewUrl,
+      sessionId: 'agent-chat-shell',
+      uncroppedPreviewRef: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
+    };
     agentHistoryRollbackResponseSchema.parse(
       await dispatchAgentTypedEditorTool({
         args: {
-          checkpoint: {
-            adjustments: rollbackSnapshot.adjustments,
-            activeImagePath: rollbackSnapshot.activeImagePath,
-            graphRevision: rollbackSnapshot.graphRevision,
-            historyIndex: rollbackSnapshot.historyIndex,
-            lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
-            previewRecipeHash: rollbackSnapshot.recipeHash,
-            previewRef: rollbackSnapshot.finalPreviewUrl,
-            sessionId: 'agent-chat-shell',
-            uncroppedPreviewRef: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
-          },
+          checkpoint,
           expectedCurrentGraphRevision: validation.currentGraphRevision,
           expectedCurrentPreviewRecipeHash: validation.currentRecipeHash,
           expectedSelectedImagePath: validation.currentImagePath,
@@ -573,17 +579,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         },
         context: createAgentTypedToolExecutionContext({
           arguments: {
-            checkpoint: {
-              adjustments: rollbackSnapshot.adjustments,
-              activeImagePath: rollbackSnapshot.activeImagePath,
-              graphRevision: rollbackSnapshot.graphRevision,
-              historyIndex: rollbackSnapshot.historyIndex,
-              lastBasicToneCommand: rollbackSnapshot.lastBasicToneCommand,
-              previewRecipeHash: rollbackSnapshot.recipeHash,
-              previewRef: rollbackSnapshot.finalPreviewUrl,
-              sessionId: 'agent-chat-shell',
-              uncroppedPreviewRef: rollbackSnapshot.uncroppedAdjustedPreviewUrl,
-            },
+            checkpoint,
             expectedCurrentGraphRevision: validation.currentGraphRevision,
             expectedCurrentPreviewRecipeHash: validation.currentRecipeHash,
             expectedSelectedImagePath: validation.currentImagePath,

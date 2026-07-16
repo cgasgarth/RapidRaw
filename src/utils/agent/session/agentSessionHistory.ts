@@ -3,7 +3,6 @@ import { type EditDocumentV2, editDocumentV2Schema } from '../../../../packages/
 import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import type { BasicToneCommandEnvelope } from '../../basicToneCommandBridge';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../editDocumentV2';
 import type { EditHistoryCheckpoint } from '../../editHistory';
 import { areEditDocumentsEqual } from '../../editTransaction';
 import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
@@ -35,21 +34,19 @@ const agentSessionCheckpointSchema: z.ZodType<AgentSessionCheckpoint> = z
     adjustments: z.custom<Adjustments>((value) => typeof value === 'object' && value !== null),
     activeImagePath: z.string().trim().min(1),
     graphRevision: z.string().trim().min(1),
-    editDocumentHistory: z.array(editDocumentV2Schema).default([]),
+    editDocumentHistory: z.array(editDocumentV2Schema).min(1),
     historyIndex: z.number().int().nonnegative(),
-    history: z.array(z.custom<Adjustments>((value) => typeof value === 'object' && value !== null)).default([]),
-    historyCheckpoints: z
-      .array(
-        z
-          .object({
-            createdAt: z.string().trim().min(1),
-            historyIndex: z.number().int().nonnegative(),
-            id: z.string().trim().min(1),
-            label: z.string().trim().min(1),
-          })
-          .strict(),
-      )
-      .default([]),
+    history: z.array(z.custom<Adjustments>((value) => typeof value === 'object' && value !== null)).min(1),
+    historyCheckpoints: z.array(
+      z
+        .object({
+          createdAt: z.string().trim().min(1),
+          historyIndex: z.number().int().nonnegative(),
+          id: z.string().trim().min(1),
+          label: z.string().trim().min(1),
+        })
+        .strict(),
+    ),
     lastBasicToneCommand: z.custom<BasicToneCommandEnvelope | null>(),
     previewRecipeHash: z.string().trim().min(1),
     previewRef: z.string().trim().min(1).nullable(),
@@ -149,14 +146,8 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
   }
 
   const state = useEditorStore.getState();
-  const history =
-    checkpoint.history.length === 0
-      ? [...state.history.slice(0, checkpoint.historyIndex), structuredClone(checkpoint.adjustments)]
-      : structuredClone(checkpoint.history);
-  const editDocumentHistory =
-    checkpoint.editDocumentHistory.length === 0
-      ? history.map((entry) => legacyAdjustmentsToEditDocumentV2(entry))
-      : structuredClone(checkpoint.editDocumentHistory);
+  const history = structuredClone(checkpoint.history);
+  const editDocumentHistory = structuredClone(checkpoint.editDocumentHistory);
   if (
     checkpoint.historyIndex >= history.length ||
     editDocumentHistory.length !== history.length ||

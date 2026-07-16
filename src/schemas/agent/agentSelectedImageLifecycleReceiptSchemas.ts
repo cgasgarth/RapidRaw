@@ -166,9 +166,3 @@ export const verifyAgentSelectedImageLifecycleReceipt = async (
   }
   return receipt.hash === (await hashAgentSelectedImageLifecycleValue('receipt', { ...receipt, hash: undefined }));
 };
-
-export const upgradeAgentSelectedImageLiveSessionReceiptV1 = (legacyReceipt: unknown) => ({
-  legacyReceipt,
-  proof: 'legacy_unverified' as const,
-  schemaVersion: 1 as const,
-});
