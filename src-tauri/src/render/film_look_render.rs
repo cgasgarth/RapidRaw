@@ -66,6 +66,16 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
         ],
     },
     FilmLookPatch {
+        id: "film_look.measured.monochrome_d65.v1",
+        patch: &[
+            ("contrast", 12),
+            ("grainAmount", 20),
+            ("grainRoughness", 60),
+            ("grainSize", 40),
+            ("saturation", -100),
+        ],
+    },
+    FilmLookPatch {
         id: "film_look.generic.punch_color.v1",
         patch: &[
             ("blacks", -3),
@@ -114,6 +124,23 @@ const FILM_LOOK_PATCHES: &[FilmLookPatch] = &[
         ],
     },
 ];
+
+pub(crate) fn validate_film_look_selection(
+    look_id: Option<&str>,
+    strength: f64,
+) -> Result<(), String> {
+    if !strength.is_finite() || !(0.0..=100.0).contains(&strength) {
+        return Err("film_look_invalid_strength".to_string());
+    }
+    if let Some(look_id) = look_id
+        && !FILM_LOOK_PATCHES
+            .iter()
+            .any(|candidate| candidate.id == look_id)
+    {
+        return Err(format!("film_look_unsupported_id:{look_id}"));
+    }
+    Ok(())
+}
 
 pub(crate) fn normalize_film_look_adjustments_for_render(adjustments: &Value) -> Cow<'_, Value> {
     // A canonical renderer-owned Film node supersedes the legacy adjustment
@@ -251,6 +278,25 @@ mod tests {
         assert_eq!(normalized["grainRoughness"], 58);
         assert_eq!(normalized["grainSize"], 32);
         assert_eq!(normalized["grainAmount"], 10);
+    }
+
+    #[test]
+    fn measured_monochrome_profile_has_native_preview_and_export_authority() {
+        let adjustments = json!({
+            "filmLookId": "film_look.measured.monochrome_d65.v1",
+            "filmLookStrength": 75
+        });
+        validate_film_look_selection(
+            adjustments["filmLookId"].as_str(),
+            adjustments["filmLookStrength"].as_f64().unwrap_or_default(),
+        )
+        .expect("UI-exposed measured profile must be renderer-supported");
+        let normalized = normalize_film_look_adjustments_for_render(&adjustments).into_owned();
+        assert_eq!(normalized["contrast"], 9);
+        assert_eq!(normalized["saturation"], -75);
+        assert_eq!(normalized["grainAmount"], 15);
+        assert_eq!(normalized["grainRoughness"], 58);
+        assert_eq!(normalized["grainSize"], 36);
     }
 
     #[test]
