@@ -14,6 +14,9 @@ const manifestPath = resolve(
   '../../../fixtures/film/validation/reference-film-validation-manifest-v1.json',
 );
 const fixture = await Bun.file(manifestPath).json();
+const vectors = await Bun.file(
+  resolve(import.meta.dir, '../../../fixtures/film/validation/reference-film-analytic-v1.json'),
+).json();
 const approval = await Bun.file(
   resolve(import.meta.dir, '../../../fixtures/film/validation/reference-film-release-approval-v1.json'),
 ).json();
@@ -43,6 +46,10 @@ const report = {
   },
   modelReferenceMaxAbs: 0,
   modelReferenceRmse: 0,
+  previewExportMaxAbs: 0,
+  previewExportRmse: 0,
+  previewPostFilmHash: 'fnv1a32:1234abcd',
+  exportPostFilmHash: 'fnv1a32:1234abcd',
   samples: [
     {
       id: 'neutral',
@@ -99,42 +106,51 @@ const stochasticOpticalReport = {
 
 describe('Film native analytic release gate', () => {
   test('accepts identity-safe native output and reuses gamut classification', () => {
-    expect(evaluateFilmNativeReleaseGate(fixture, report)).toEqual({
-      colorimetricPatches: [
-        {
-          comparisonDomain: 'lab_d50_deltae00',
-          deltaC: 0,
-          deltaE00: 0,
-          deltaL: 0,
-          hueAngleDeltaDeg: 0,
-          id: 'neutral',
-        },
-        {
-          comparisonDomain: 'extended_ap1_range_only',
-          deltaC: null,
-          deltaE00: null,
-          deltaL: null,
-          hueAngleDeltaDeg: null,
-          id: 'extended',
-        },
-      ],
-      failures: [],
-      gamutClassifications: {
-        high_component: 0,
-        in_gamut: 1,
-        mixed_out_of_gamut: 1,
-        negative_component: 0,
-      },
-      maxIdentityDeltaE00: 0,
-      maxReferenceDeltaE00: 0,
-      meanReferenceDeltaE00: 0,
-      neutralChromaMax: 0,
-      passed: true,
+    const completeReport = {
+      ...report,
+      samples: vectors.samples.map((sample: { id: string; input: [number, number, number] }, index: number) => {
+        const fallback = report.samples[index] ?? report.samples[0];
+        if (fallback === undefined) throw new Error('Expected a native report fixture sample.');
+        return {
+          ...fallback,
+          disabledOutput: sample.input,
+          fullMixOutput: sample.input,
+          id: sample.id,
+          input: sample.input,
+          mixZeroOutput: sample.input,
+          modelReferenceOutput: sample.input,
+        };
+      }),
+      negativeComponentCount: vectors.samples
+        .flatMap(({ input }: { input: number[] }) => input)
+        .filter((value: number) => value < 0).length,
+      highComponentCount: vectors.samples
+        .flatMap(({ input }: { input: number[] }) => input)
+        .filter((value: number) => value > 1).length,
+    };
+    const result = evaluateFilmNativeReleaseGate(fixture, vectors, completeReport);
+    expect(result.failures).toEqual([]);
+    expect(result.passed).toBeTrue();
+    expect(result.colorimetricPatches).toHaveLength(vectors.samples.length);
+    expect(result.maxIdentityDeltaE00).toBe(0);
+  });
+
+  test('fails closed on incomplete governed vectors and preview/export divergence', () => {
+    const result = evaluateFilmNativeReleaseGate(fixture, vectors, {
+      ...report,
+      previewExportMaxAbs: fixture.thresholds.previewExportMaxAbs + 1,
+      previewExportRmse: fixture.thresholds.previewExportRmse + 1,
+      exportPostFilmHash: 'fnv1a32:deadbeef',
     });
+    expect(result.passed).toBeFalse();
+    expect(result.failures).toContain('film_release_vector_set_mismatch');
+    expect(result.failures).toContain('preview_export_max_abs_failed');
+    expect(result.failures).toContain('preview_export_rmse_failed');
+    expect(result.failures).toContain('preview_export_post_film_hash_mismatch');
   });
 
   test('fails closed on perceptual identity drift and dishonest range counts', () => {
-    const result = evaluateFilmNativeReleaseGate(fixture, {
+    const result = evaluateFilmNativeReleaseGate(fixture, vectors, {
       ...report,
       negativeComponentCount: 0,
       samples: [{ ...report.samples[0], disabledOutput: [0.25, 0.18, 0.18] }, report.samples[1]],
@@ -146,7 +162,7 @@ describe('Film native analytic release gate', () => {
   });
 
   test('records every color patch and fails model-reference perceptual drift', () => {
-    const result = evaluateFilmNativeReleaseGate(fixture, {
+    const result = evaluateFilmNativeReleaseGate(fixture, vectors, {
       ...report,
       samples: [{ ...report.samples[0], fullMixOutput: [0.35, 0.2, 0.2] }, report.samples[1]],
     });
@@ -215,12 +231,29 @@ describe('Film output gamut and baseline approval gates', () => {
     expect(result.failures).toContain('film_output_gamut_targets_not_distinct');
   });
 
-  test('rejects unapproved baselines and production pixel changes without #5030 proof', () => {
+  test('rejects unapproved baselines, policy drift, and production pixel changes without #5030 proof', async () => {
     const approvedAnalytic = {
       ...report,
       deterministicHash: approval.approvedBaselines.postFilmHash,
+      executionPlan: {
+        ...report.executionPlan,
+        planSha256: approval.executionIdentity.planSha256,
+      },
     };
-    expect(evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, approval)).toEqual({
+    const output = await buildFilmOutputGamutReport(fixture, approvedAnalytic);
+    const approvedOutput = {
+      ...output,
+      targets: output.targets.map((target) => ({
+        ...target,
+        outputHash:
+          target.target === 'srgb'
+            ? approval.approvedBaselines.outputGamutHashes.srgb
+            : approval.approvedBaselines.outputGamutHashes.displayP3,
+      })),
+    };
+    expect(
+      evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, approvedOutput, approval),
+    ).toEqual({
       failures: [],
       passed: true,
     });
@@ -229,12 +262,22 @@ describe('Film output gamut and baseline approval gates', () => {
         fixture,
         { ...approvedAnalytic, deterministicHash: `sha256:${'f'.repeat(64)}` },
         stochasticOpticalReport,
+        approvedOutput,
         approval,
       ).failures,
     ).toContain('film_post_film_baseline_unapproved');
+    expect(
+      evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, output, approval).failures,
+    ).toContain('film_output_gamut_baseline_unapproved');
+    expect(
+      evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, approvedOutput, {
+        ...approval,
+        validationIdentity: { ...approval.validationIdentity, bitDepths: [8] },
+      }).failures,
+    ).toContain('film_baseline_validation_identity_mismatch');
 
     expect(() =>
-      evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, {
+      evaluateFilmBaselineApprovalGate(fixture, approvedAnalytic, stochasticOpticalReport, approvedOutput, {
         ...approval,
         releasePolicy: { ...approval.releasePolicy, productionFilmPixelsChanged: true },
       }),
