@@ -6,6 +6,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
+import { installBrowserProofNetworkBoundary } from '../../../scripts/qa/browser-network-boundary';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 import { Invokes } from '../../../src/tauri/commands';
 import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
@@ -2752,6 +2753,7 @@ try {
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
   });
+  await installBrowserProofNetworkBoundary(page);
   if (browserScenario === 'preview-url-lifetime') {
     await page.addInitScript(() => {
       const created: string[] = [];
