@@ -1532,6 +1532,96 @@ mod tests {
     }
 
     #[test]
+    fn legacy_film_effect_models_never_reach_the_render_plan() {
+        for algorithm in [
+            "legacy_rapidraw_red_fringe_v0",
+            "legacy_rapidraw_glow_bloom_v0",
+            "legacy_rapidraw_desaturate_v0",
+            "legacy_rapidraw_luma_noise_v0",
+        ] {
+            let adjustments = json!({
+                "rawEngineEditGraphVersion": 2,
+                "filmEmulation": {
+                    "nodeType": "film_emulation",
+                    "contractVersion": 1,
+                    "enabled": true,
+                    "profileRef": {
+                        "id": "rapidraw.reference_film.v1",
+                        "version": "1",
+                        "contentSha256": crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256
+                    },
+                    "mix": 1,
+                    "workingSpace": "acescg_linear_v1",
+                    "seedPolicy": "source_stable_v1",
+                    "algorithm": algorithm
+                }
+            });
+            let error = compile_render_plan(&adjustments, context(903), None)
+                .err()
+                .expect("removed Film algorithm must fail before render");
+            assert_eq!(error.code, "render_plan.invalid_film_emulation");
+            assert_eq!(error.message, "film_emulation_invalid_node");
+        }
+    }
+
+    #[test]
+    fn every_current_profile_has_identical_preview_export_plan_output() {
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            3,
+            2,
+            Rgba([0.18, 0.36, 0.08, 1.0]),
+        ));
+        let mut profile_pixels = Vec::new();
+        for (index, profile) in crate::render::film_emulation::FilmProfileKindV1::ALL
+            .into_iter()
+            .enumerate()
+        {
+            let adjustments = json!({
+                "rawEngineEditGraphVersion": 2,
+                "filmEmulation": {
+                    "nodeType": "film_emulation",
+                    "contractVersion": 1,
+                    "enabled": true,
+                    "profileRef": {
+                        "id": profile.id(),
+                        "version": "1",
+                        "contentSha256": profile.content_sha256()
+                    },
+                    "mix": 1,
+                    "workingSpace": "acescg_linear_v1",
+                    "seedPolicy": "source_stable_v1"
+                }
+            });
+            let preview =
+                compile_render_plan(&adjustments, context(920 + index as u64), None).unwrap();
+            let export =
+                compile_render_plan(&adjustments, context(930 + index as u64), None).unwrap();
+            let execute = |plan: &CompiledRenderPlan| {
+                crate::cpu_edit_graph::execute_cpu_edit_graph(
+                    &source,
+                    &plan.adjustments,
+                    &[],
+                    None,
+                    &plan.edit_graph,
+                )
+                .unwrap()
+                .to_rgba32f()
+            };
+            let preview_pixels = execute(&preview);
+            let export_pixels = execute(&export);
+            assert_eq!(
+                preview.edit_graph.fingerprint,
+                export.edit_graph.fingerprint
+            );
+            assert_eq!(preview_pixels, export_pixels);
+            profile_pixels.push(preview_pixels.get_pixel(0, 0).0);
+        }
+        assert_ne!(profile_pixels[0], profile_pixels[1]);
+        assert_ne!(profile_pixels[0], profile_pixels[2]);
+        assert_ne!(profile_pixels[0], profile_pixels[3]);
+    }
+
+    #[test]
     fn persisted_edit_graph_version_defaults_to_legacy_and_requires_explicit_v2() {
         let implicit = compile_render_plan(&json!({"exposure": 10}), context(72), None).unwrap();
         let explicit = compile_render_plan(

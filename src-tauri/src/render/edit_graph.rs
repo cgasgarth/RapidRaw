@@ -574,7 +574,7 @@ impl CompiledNodePayload {
                 "enabled": params.enabled,
                 "mix": params.mix,
                 "shaperP": params.shaper_p,
-                "profile": crate::render::film_emulation::REFERENCE_PROFILE_ID,
+                "profile": params.profile.id(),
                 "receipt": crate::render::film_emulation::runtime_receipt(*params, "uncomputed"),
             }),
             Self::LocalScene(local) => serde_json::json!({
@@ -1691,6 +1691,7 @@ fn film_fingerprint(params: FilmEmulationParams) -> u64 {
     hasher.update(&[u8::from(params.enabled)]);
     hasher.update(&params.mix.to_le_bytes());
     hasher.update(&params.shaper_p.to_le_bytes());
+    hasher.update(params.profile.content_sha256().as_bytes());
     u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 

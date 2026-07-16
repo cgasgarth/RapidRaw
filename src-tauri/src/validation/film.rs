@@ -1,8 +1,9 @@
 //! Native trust-boundary and production-render checks for governed Film validation.
 
 use crate::render::film_emulation::{
-    AP1_LUMINANCE, FilmEmulationParams, FilmEmulationProfileRef, REFERENCE_PROFILE_CONTENT_SHA256,
-    REFERENCE_PROFILE_ID, REFERENCE_PROFILE_VERSION, REFERENCE_SHAPER_P, apply_pixel,
+    AP1_LUMINANCE, FilmEmulationParams, FilmEmulationProfileRef, FilmProfileKindV1,
+    REFERENCE_PROFILE_CONTENT_SHA256, REFERENCE_PROFILE_ID, REFERENCE_PROFILE_VERSION,
+    REFERENCE_SHAPER_P, apply_pixel,
 };
 use crate::render::film_execution_plan::{
     FilmExecutionPlanV1, FilmExecutionReceiptV1, FilmFrameContextV1, execute_cpu,
@@ -480,6 +481,7 @@ fn run_reference_analytic_gate(
         enabled: false,
         mix: 1.0,
         shaper_p: REFERENCE_SHAPER_P,
+        profile: FilmProfileKindV1::Reference,
         grain_amount: 0.0,
     };
     let mix_zero = FilmEmulationParams {
@@ -745,6 +747,7 @@ fn render_grain_frame(
             enabled: true,
             mix: 1.0,
             shaper_p: REFERENCE_SHAPER_P,
+            profile: FilmProfileKindV1::Reference,
             grain_amount,
         },
         &plan,
