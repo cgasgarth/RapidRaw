@@ -26,7 +26,7 @@ export function resolveRandomizedTestSeed(value: string | undefined): number {
 
 export function buildRandomizedTestArgs(seed: number, target = DEFAULT_RANDOMIZED_TEST_TARGET): string[] {
   explicitSeedSchema.parse(seed);
-  return ['test', '--no-orphans', '--reporter=dot', '--parallel', '--randomize', `--seed=${seed}`, target];
+  return ['test', '--no-orphans', '--dots', '--parallel', '--randomize', `--seed=${seed}`, target];
 }
 
 export function randomizedTestReproduction(seed: number): string {
