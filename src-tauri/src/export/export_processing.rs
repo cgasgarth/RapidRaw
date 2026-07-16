@@ -1098,11 +1098,10 @@ pub(crate) fn render_current_export_preview(
         resolve_tonemapper_override_from_handle(app_handle, is_raw),
         1,
     )?;
-    let mut adjustments = render_inputs.adjustments;
-    crate::render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
-    crate::render_pipeline::suppress_legacy_global_detail(
-        &mut adjustments,
+    let (adjustments, execution_graph) = crate::render_pipeline::bind_pre_gpu_execution(
+        &render_inputs.edit_graph,
         detail_stage.owns_legacy_global_detail,
+        render_inputs.lut.is_some(),
     );
     process_and_get_dynamic_image(
         &context,
@@ -1120,7 +1119,7 @@ pub(crate) fn render_current_export_preview(
             lut: render_inputs.lut,
             roi: None,
             edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                render_inputs.edit_graph,
+                execution_graph,
             ),
         },
         debug_tag,
@@ -3330,7 +3329,9 @@ mod tests {
         let source_id = "edit-graph-preview-export-parity.synthetic";
         let revision = RenderPlanRevision {
             image_session: 0,
-            source_revision: 17,
+            source_revision: crate::render::artifact_identity::source_fingerprint_for_path(
+                source_id,
+            ),
             adjustment_revision: document.content_fingerprint(),
             schema_version: 2,
             settings_revision: 0,

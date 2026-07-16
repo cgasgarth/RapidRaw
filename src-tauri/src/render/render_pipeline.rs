@@ -127,6 +127,113 @@ mod tests {
         DynamicImage::ImageRgb32F(image)
     }
 
+    fn current_detail_document(
+        has_mask: bool,
+    ) -> crate::adjustments::edit_document_v2::CompiledCurrentEditDocument {
+        let mut document = crate::exif_processing::neutral_current_edit_document();
+        let detail = &mut document["nodes"]["detail_denoise_dehaze"]["params"];
+        detail["sharpness"] = 70.into();
+        detail["clarity"] = 45.into();
+        detail["structure"] = 30.into();
+        detail["lumaNoiseReduction"] = 60.into();
+        detail["colorNoiseReduction"] = 50.into();
+        let mask_adjustments = has_mask.then(|| {
+            let scene = &document["nodes"]["scene_global_color_tone"]["params"];
+            let presence = &document["nodes"]["color_presence"]["params"];
+            let curves = &document["nodes"]["scene_curve"]["params"];
+            let detail = &document["nodes"]["detail_denoise_dehaze"]["params"];
+            let creative = &document["nodes"]["display_creative"]["params"];
+            let selective = &document["nodes"]["selective_color_mixer"]["params"];
+            let grading = &document["nodes"]["perceptual_grading"]["params"];
+            let tone_equalizer = &document["nodes"]["tone_equalizer"]["params"];
+            json!({
+                "blacks": scene["blacks"],
+                "brightness": scene["brightness"],
+                "clarity": 20,
+                "colorGrading": grading["colorGrading"],
+                "perceptualGradingV1": grading["perceptualGradingV1"],
+                "colorNoiseReduction": 25,
+                "contrast": scene["contrast"],
+                "curves": curves["curves"],
+                "pointCurves": curves["pointCurves"],
+                "parametricCurve": curves["parametricCurve"],
+                "curveMode": curves["curveMode"],
+                "dehaze": detail["dehaze"],
+                "effectsEnabled": true,
+                "exposure": scene["exposure"],
+                "flareAmount": creative["flareAmount"],
+                "glowAmount": creative["glowAmount"],
+                "halationAmount": creative["halationAmount"],
+                "highlights": scene["highlights"],
+                "hue": presence["hue"],
+                "hsl": selective["hsl"],
+                "selectiveColorRangeControls": selective["selectiveColorRangeControls"],
+                "lumaNoiseReduction": 40,
+                "saturation": presence["saturation"],
+                "shadows": scene["shadows"],
+                "sharpness": 30,
+                "sharpnessThreshold": detail["sharpnessThreshold"],
+                "structure": detail["structure"],
+                "temperature": 0,
+                "tint": 0,
+                "toneEqualizer": tone_equalizer["toneEqualizer"],
+                "vibrance": presence["vibrance"],
+                "whites": scene["whites"]
+            })
+        });
+        let layers = if let Some(mask_adjustments) = mask_adjustments {
+            json!([{
+                "adjustments": mask_adjustments,
+                "blendMode": "normal",
+                "editNodes": {
+                    "basic": { "enabled": true },
+                    "color": { "enabled": true },
+                    "curves": { "enabled": true },
+                    "details": { "enabled": true }
+                },
+                "editNodeSchemaVersion": 1,
+                "id": "local-detail",
+                "invert": false,
+                "name": "Local detail",
+                "opacity": 100,
+                "subMasks": [],
+                "visible": true
+            }])
+        } else {
+            json!([])
+        };
+        document["layers"]["masks"] = layers.clone();
+        document["nodes"]["layers"]["params"]["masks"] = layers;
+        serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(document)
+            .expect("typed current detail document deserializes")
+            .compile()
+            .expect("typed current detail document compiles")
+    }
+
+    fn compile_current_detail_plan(
+        document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+        is_raw: bool,
+        revision_seed: u64,
+        lut: Option<Arc<crate::lut_processing::Lut>>,
+    ) -> Arc<crate::render_plan::CompiledRenderPlan> {
+        crate::render_plan::compile_current_edit_document_render_plan_cached(
+            document,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::RenderPlanRevision {
+                    image_session: revision_seed,
+                    source_revision: revision_seed,
+                    adjustment_revision: document.content_fingerprint(),
+                    schema_version: 2,
+                    settings_revision: u64::from(is_raw),
+                },
+                is_raw,
+                tonemapper_override: Some(0),
+            },
+            lut,
+        )
+        .expect("typed current detail plan compiles")
+    }
+
     #[test]
     fn disabled_detail_stages_borrow_input() {
         let image = test_image();
@@ -231,47 +338,8 @@ mod tests {
 
     #[test]
     fn pre_gpu_execution_binding_suppresses_only_owned_global_shader_controls() {
-        let raw = crate::render_plan::current_render_adjustments(json!({
-            "sharpness": 70,
-            "clarity": 45,
-            "structure": 30,
-            "lumaNoiseReduction": 60,
-            "colorNoiseReduction": 50,
-            "sceneCurveV1": {
-                "middleGrey": 0.18,
-                "channelMode": "luminance_preserving",
-                "points": [
-                    {"xEv": -16.0, "yEv": -16.0},
-                    {"xEv": 0.0, "yEv": 0.5},
-                    {"xEv": 16.0, "yEv": 16.0}
-                ]
-            },
-            "masks": [{
-                "id": "local-detail",
-                "name": "Local detail",
-                "visible": true,
-                "invert": false,
-                "opacity": 100,
-                "blendMode": "normal",
-                "adjustments": {
-                    "sharpness": 30,
-                    "clarity": 20,
-                    "lumaNoiseReduction": 40,
-                    "colorNoiseReduction": 25
-                },
-                "subMasks": []
-            }]
-        }));
-        let plan = crate::render_plan::compile_render_plan(
-            &raw,
-            crate::render_plan::CompileRenderPlanContext {
-                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
-                is_raw: true,
-                tonemapper_override: None,
-            },
-            None,
-        )
-        .unwrap();
+        let document = current_detail_document(true);
+        let plan = compile_current_detail_plan(&document, true, 1, None);
         let local_detail_before = (
             plan.adjustments.mask_adjustments[0].sharpness,
             plan.adjustments.mask_adjustments[0].clarity,
@@ -403,48 +471,16 @@ mod tests {
                 has_lut: true,
             },
         ] {
-            let masks = case.has_mask.then(|| {
-                json!([{
-                    "id": "local-detail",
-                    "name": "Local detail",
-                    "visible": true,
-                    "invert": false,
-                    "opacity": 100,
-                    "blendMode": "normal",
-                    "adjustments": {
-                        "sharpness": 30,
-                        "clarity": 20,
-                        "lumaNoiseReduction": 40,
-                        "colorNoiseReduction": 25
-                    },
-                    "subMasks": []
-                }])
-            });
-            let raw = crate::render_plan::current_render_adjustments(json!({
-                "sharpness": 70,
-                "clarity": 45,
-                "structure": 30,
-                "lumaNoiseReduction": 60,
-                "colorNoiseReduction": 50,
-                "masks": masks.unwrap_or_else(|| json!([]))
-            }));
+            let document = current_detail_document(case.has_mask);
             let lut = case.has_lut.then(|| Arc::clone(&identity_lut));
-            let plan = crate::render_plan::compile_render_plan(
-                &raw,
-                crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(
-                        &raw,
-                        u64::from(case.is_raw),
-                        u64::from(case.has_mask),
-                        u64::from(case.has_lut),
-                    ),
-                    is_raw: case.is_raw,
-                    tonemapper_override: Some(0),
-                },
+            let plan = compile_current_detail_plan(
+                &document,
+                case.is_raw,
+                10 + u64::from(case.has_mask) * 2 + u64::from(case.has_lut),
                 lut.clone(),
-            )
-            .expect("current plan compiles");
-            let detail_stage = apply_pre_gpu_detail_stages(&source, 41, &raw, case.is_raw);
+            );
+            let detail_stage =
+                apply_current_pre_gpu_detail_stages(&source, 41, &document, case.is_raw);
             let (adjustments, graph) = bind_pre_gpu_execution(
                 &plan.edit_graph,
                 detail_stage.owns_legacy_global_detail,
