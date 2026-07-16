@@ -15,6 +15,7 @@ const legacyReport = {
   },
   demosaicPath: 'bayer_hq',
   processingProfile: 'balanced',
+  stageSamples: [],
 } satisfies RawDevelopmentReport;
 
 describe('RAW warning receipts', () => {

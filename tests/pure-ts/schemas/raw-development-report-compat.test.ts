@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
-import { beginImageOpenResultSchema, rawDevelopmentReportSchema } from '../../../src/schemas/imageLoaderSchemas.ts';
+import {
+  beginImageOpenResultSchema,
+  type RawDevelopmentReport,
+  rawDevelopmentReportSchema,
+} from '../../../src/schemas/imageLoaderSchemas.ts';
 
 const hash = `blake3:${'a'.repeat(64)}`;
 
@@ -69,9 +73,10 @@ const currentReport = {
     xyzToAp1MatrixVersion: 'aces_ap1_xyz_d60_v1',
   },
   processingProfile: 'balanced',
+  stageSamples: [],
   runtime: { cacheHit: false, decodeElapsedMs: 42, outputDimensions: [9504, 6336] },
   xtransHq: null,
-} as const;
+} satisfies RawDevelopmentReport;
 
 const legacyReport = {
   ...currentReport,
@@ -88,7 +93,7 @@ const legacyReport = {
     resolverAlgorithmId: 'dual_illuminant_mired_v1',
   },
   highlightReconstruction: undefined,
-} as const;
+} satisfies RawDevelopmentReport;
 
 describe('RAW development report compatibility boundary', () => {
   test('accepts the current native camera-profile and input-transform contract', () => {
