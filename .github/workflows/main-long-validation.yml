@@ -148,11 +148,22 @@ jobs:
           key: v1-${{ runner.os }}-${{ runner.arch }}-main-native-capabilities
           cache-on-failure: true
       - name: Validate all maintained native profiles and leaf features
-        run: |
-          bun tests/integration/checks/check-native-feature-leaves.ts
-          bun run check:native-profiles
-          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
-          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+        env:
+          RAWENGINE_MAIN_COMMAND_RECEIPT: artifacts/ci/main-native-supersession.json
+        run: >-
+          bun scripts/ci/run-latest-main-command.ts -- bash -euo pipefail -c
+          'bun tests/integration/checks/check-native-feature-leaves.ts;
+          bun run check:native-profiles;
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational;
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features'
+      - name: Upload native supersession receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-native-supersession-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/main-native-supersession.json
+          retention-days: 14
+          if-no-files-found: error
 
   dependency-security-license:
     name: 'dependencies: exhaustive security and licenses'
