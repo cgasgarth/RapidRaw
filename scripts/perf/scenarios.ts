@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
-import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter';
 import { acquireQaDaemon, type QaDaemonLease, requestQaDaemon, shutdownQaDaemonLease } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
@@ -20,7 +20,7 @@ const DISPATCHES = 20_000;
 const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
 const fixture = structuredClone(INITIAL_ADJUSTMENTS);
 fixture.masks = Array.from({ length: 16 }, (_, index) => ({
-  adjustments: {},
+  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
   editNodes: createDefaultMaskEditNodes(),
   editNodeSchemaVersion: 1,
   id: `perf-mask-${index}`,
@@ -321,7 +321,7 @@ const browserQaScenario = (
   };
 };
 
-const startupBinary = process.env.RAWENGINE_PERF_STARTUP_BINARY;
+const startupBinary = process.env['RAWENGINE_PERF_STARTUP_BINARY'];
 const startupFixtureDigest = `sha256:${createHash('sha256')
   .update(`native-startup-v2:${startupBinary ?? 'unconfigured'}`)
   .digest('hex')}` as const;
@@ -578,7 +578,7 @@ const subtractNativeScheduler = (
   };
 };
 
-const nativeFixture = process.env.RAWENGINE_PERF_NATIVE_FIXTURE;
+const nativeFixture = process.env['RAWENGINE_PERF_NATIVE_FIXTURE'];
 const nativeFixtureDigest = `sha256:${createHash('sha256')
   .update(
     nativeFixture !== undefined && isAbsolute(nativeFixture)
@@ -628,7 +628,7 @@ const nativeRawOpenScenario = (cacheMode: 'cold' | 'warm'): PerformanceScenario 
         throw new Error('RAWENGINE_PERF_NATIVE_FIXTURE must be an absolute private RAW path.');
       await stat(nativeFixture);
       const launcherArgs = ['scripts/dev/start-native-qa-app.ts', '--validation-harness'];
-      if (process.env.RAWENGINE_PERF_NATIVE_NO_BUILD === '1') launcherArgs.push('--no-build');
+      if (process.env['RAWENGINE_PERF_NATIVE_NO_BUILD'] === '1') launcherArgs.push('--no-build');
       const launcher = Bun.spawn(['bun', ...launcherArgs], {
         cwd: worktree,
         stderr: 'pipe',
