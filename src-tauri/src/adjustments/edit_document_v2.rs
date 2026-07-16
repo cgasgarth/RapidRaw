@@ -1305,7 +1305,6 @@ impl LumaLevelsV2 {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum BlackWhiteMixerProcessV2 {
-    LegacyFixedBandV1,
     NeutralPanchromaticV1,
     ContinuousSensitivityV1,
 }
@@ -1375,16 +1374,12 @@ impl BlackWhiteMixerSettingsV2 {
                     .to_string(),
             );
         }
-        if self.enabled
-            && self.process == BlackWhiteMixerProcessV2::LegacyFixedBandV1
-            && weights.iter().all(|value| *value == 0.0)
-        {
-            return Err(
-                "EditDocumentV2 enabled legacy black_white_mixer requires a non-zero channel response"
-                    .to_string(),
-            );
-        }
-        let _ = (&self.preset_id, &self.source_class);
+        let _ = (
+            &self.enabled,
+            &self.preset_id,
+            &self.process,
+            &self.source_class,
+        );
         Ok(())
     }
 }
@@ -4537,8 +4532,8 @@ mod tests {
             .expect_err("out-of-range monochrome response must fail");
         assert!(error.contains("weights must be finite"));
 
-        let mut legacy_zero = document_with_legacy(json!({}));
-        legacy_zero["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
+        let mut legacy_process = document_with_legacy(json!({}));
+        legacy_process["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
             "enabled": true,
             "presetId": "manual",
             "process": "legacy_fixed_band_v1",
@@ -4548,11 +4543,11 @@ mod tests {
                 "oranges": 0, "purples": 0, "reds": 0, "yellows": 0
             }
         });
-        let error = serde_json::from_value::<EditDocumentV2>(legacy_zero)
+        let error = serde_json::from_value::<EditDocumentV2>(legacy_process)
             .expect("document envelope remains parseable")
             .into_render_adjustments()
-            .expect_err("enabled legacy zero response must fail");
-        assert!(error.contains("requires a non-zero channel response"));
+            .expect_err("legacy monochrome process must fail typed node compilation");
+        assert!(error.contains("unknown variant `legacy_fixed_band_v1`"));
     }
 
     #[test]

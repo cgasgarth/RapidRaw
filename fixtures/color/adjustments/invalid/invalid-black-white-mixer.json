@@ -1,6 +1,6 @@
 [
   {
-    "case": "enabled with zero weights",
+    "case": "missing process",
     "input": {
       "enabled": true,
       "weights": {
@@ -16,9 +16,27 @@
     }
   },
   {
+    "case": "legacy process",
+    "input": {
+      "enabled": true,
+      "process": "legacy_fixed_band_v1",
+      "weights": {
+        "reds": 20,
+        "oranges": 0,
+        "yellows": 0,
+        "greens": 0,
+        "aquas": 0,
+        "blues": 0,
+        "purples": 0,
+        "magentas": 0
+      }
+    }
+  },
+  {
     "case": "out of range",
     "input": {
       "enabled": true,
+      "process": "continuous_sensitivity_v1",
       "weights": {
         "reds": 101,
         "oranges": 0,

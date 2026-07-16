@@ -820,7 +820,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       blackWhiteMixer: {
         enabled: false,
         presetId: 'manual',
-        process: 'legacy_fixed_band_v1',
+        process: 'continuous_sensitivity_v1',
         sourceClass: 'color_source',
         weights: {
           aquas: 0,

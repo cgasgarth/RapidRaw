@@ -24,11 +24,7 @@ export const blackWhiteMixerWeightsSchema = z
   })
   .strict();
 
-export const monochromeProcessSchema = z.enum([
-  'legacy_fixed_band_v1',
-  'neutral_panchromatic_v1',
-  'continuous_sensitivity_v1',
-]);
+export const monochromeProcessSchema = z.enum(['neutral_panchromatic_v1', 'continuous_sensitivity_v1']);
 
 export const monochromeSourceClassSchema = z.enum([
   'color_source',
@@ -51,21 +47,11 @@ export const blackWhiteMixerSettingsSchema = z
   .object({
     enabled: z.boolean(),
     presetId: monochromePresetIdSchema.default('manual'),
-    process: monochromeProcessSchema.default('legacy_fixed_band_v1'),
+    process: monochromeProcessSchema,
     sourceClass: monochromeSourceClassSchema.default('color_source'),
     weights: blackWhiteMixerWeightsSchema,
   })
-  .strict()
-  .superRefine((settings, context) => {
-    const hasAdjustment = Object.values(settings.weights).some((value) => value !== 0);
-    if (settings.enabled && settings.process === 'legacy_fixed_band_v1' && !hasAdjustment) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Enabled legacy black and white mixer requires at least one non-zero channel weight.',
-        path: ['weights'],
-      });
-    }
-  });
+  .strict();
 
 export type BlackWhiteMixerChannel = z.infer<typeof blackWhiteMixerChannelSchema>;
 export type BlackWhiteMixerSettings = z.infer<typeof blackWhiteMixerSettingsSchema>;

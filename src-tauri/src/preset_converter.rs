@@ -34,6 +34,19 @@ fn get_attr_as_f64(attrs: &HashMap<String, String>, key: &str) -> Option<f64> {
         .and_then(|s| s.trim_start_matches('+').parse::<f64>().ok())
 }
 
+fn imports_black_white(attrs: &HashMap<String, String>) -> bool {
+    attrs
+        .get("ConvertToGrayscale")
+        .is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "true" | "1"))
+        || attrs.get("Treatment").is_some_and(|value| {
+            let value = value.replace("&amp;", "&").to_ascii_lowercase();
+            matches!(
+                value.as_str(),
+                "black & white" | "black and white" | "monochrome"
+            )
+        })
+}
+
 fn extract_xmp_name(xmp_content: &str) -> Option<String> {
     let re =
         Regex::new(r#"(?s)<crs:Name>.*?<rdf:Alt>.*?<rdf:li[^>]*>([^<]+)</rdf:li>.*?</crs:Name>"#)
@@ -224,6 +237,28 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         adjustments.insert("hsl".to_string(), Value::Object(hsl_map));
     }
 
+    if imports_black_white(&attrs) {
+        let weights = colors
+            .into_iter()
+            .map(|(src, dst)| {
+                let value = get_attr_as_f64(&attrs, &format!("GrayMixer{src}"))
+                    .unwrap_or(0.0)
+                    .clamp(-100.0, 100.0);
+                (dst.to_string(), json!(value))
+            })
+            .collect::<Map<String, Value>>();
+        adjustments.insert(
+            "blackWhiteMixer".to_string(),
+            json!({
+                "enabled": true,
+                "presetId": "manual",
+                "process": "continuous_sensitivity_v1",
+                "sourceClass": "color_source",
+                "weights": weights,
+            }),
+        );
+    }
+
     let mut shadows_map = Map::new();
     let mut midtones_map = Map::new();
     let mut highlights_map = Map::new();
@@ -350,4 +385,48 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         include_crop_transform: Some(false),
         preset_type: Some("style".to_string()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convert_xmp_to_preset;
+
+    #[test]
+    fn xmp_black_white_import_targets_current_continuous_process() {
+        let preset = convert_xmp_to_preset(
+            r#"<rdf:Description crs:ConvertToGrayscale="True" crs:GrayMixerRed="35" crs:GrayMixerBlue="-42" />"#,
+        )
+        .expect("XMP preset converts");
+        let mixer = &preset.adjustments["blackWhiteMixer"];
+
+        assert_eq!(mixer["enabled"], true);
+        assert_eq!(mixer["process"], "continuous_sensitivity_v1");
+        assert_eq!(mixer["sourceClass"], "color_source");
+        assert_eq!(mixer["weights"]["reds"], 35.0);
+        assert_eq!(mixer["weights"]["blues"], -42.0);
+        assert_eq!(mixer["weights"]["greens"], 0.0);
+
+        let treatment = convert_xmp_to_preset(
+            r#"<rdf:Description crs:Treatment="Black &amp; White" crs:GrayMixerGreen="18" />"#,
+        )
+        .expect("monochrome Treatment preset converts");
+        assert_eq!(
+            treatment.adjustments["blackWhiteMixer"]["process"],
+            "continuous_sensitivity_v1"
+        );
+        assert_eq!(
+            treatment.adjustments["blackWhiteMixer"]["weights"]["greens"],
+            18.0
+        );
+    }
+
+    #[test]
+    fn color_xmp_import_does_not_invent_monochrome_state() {
+        let preset = convert_xmp_to_preset(
+            r#"<rdf:Description crs:ConvertToGrayscale="False" crs:GrayMixerRed="35" />"#,
+        )
+        .expect("XMP preset converts");
+
+        assert!(preset.adjustments.get("blackWhiteMixer").is_none());
+    }
 }

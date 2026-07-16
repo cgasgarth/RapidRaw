@@ -3,7 +3,7 @@ import {
   type BlackWhiteMixerSettings,
   parseBlackWhiteMixerSettings,
 } from '../../../schemas/color/blackWhiteMixerSchemas';
-import { SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
+import type { SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 
 export interface RgbPixel {
   blue: number;
@@ -31,24 +31,6 @@ export interface MonochromeRuntimeReceiptV1 {
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-const circularHueDistance = (left: number, right: number) => {
-  const delta = Math.abs(left - right) % 360;
-  return Math.min(delta, 360 - delta);
-};
-
-const rgbToHueDegrees = ({ blue, green, red }: RgbPixel) => {
-  const max = Math.max(red, green, blue);
-  const min = Math.min(red, green, blue);
-  const chroma = max - min;
-
-  if (chroma === 0) return undefined;
-
-  if (max === red) return ((green - blue) / chroma) * 60 + (green < blue ? 360 : 0);
-  if (max === green) return ((blue - red) / chroma) * 60 + 120;
-  return ((red - green) / chroma) * 60 + 240;
-};
-
-const rec709Luminance = ({ blue, green, red }: RgbPixel) => 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 const acesCgLuminance = ({ blue, green, red }: RgbPixel) => 0.27222872 * red + 0.67408174 * green + 0.05368952 * blue;
 const CONTINUOUS_ANCHORS: ReadonlyArray<{ hue: number; key: BlackWhiteMixerChannel }> = [
   { hue: 0, key: 'reds' },
@@ -123,13 +105,12 @@ export const applyTargetedMonochromeMix = (
 
 export function applyBlackWhiteMixerToRgbPixel(pixel: RgbPixel, value: unknown): BlackWhiteMixerRuntimeResult {
   const settings = parseBlackWhiteMixerSettings(value);
-  const sceneProcess = settings.process !== 'legacy_fixed_band_v1';
   const sanitized = {
     blue: sanitizeSceneChannel(pixel.blue),
     green: sanitizeSceneChannel(pixel.green),
     red: sanitizeSceneChannel(pixel.red),
   };
-  const luminance = sceneProcess ? acesCgLuminance(sanitized) : rec709Luminance(pixel);
+  const luminance = acesCgLuminance(sanitized);
 
   const responseValues = Object.values(settings.weights).map((weight) => weight / 100);
   const responseMin = Math.max(-2, Math.min(2, Math.min(...responseValues)));
@@ -169,54 +150,16 @@ export function applyBlackWhiteMixerToRgbPixel(pixel: RgbPixel, value: unknown):
     };
   }
 
-  if (settings.process === 'continuous_sensitivity_v1') {
-    const [, a, b] = ap1ToOklab(sanitized);
-    const chroma = Math.hypot(a, b);
-    const hue = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
-    const influence = continuousMonochromeTarget(hue);
-    const responseEv = (Object.entries(influence) as Array<[BlackWhiteMixerChannel, number]>).reduce(
-      (sum, [key, weight]) => sum + (settings.weights[key] / 100) * weight,
-      0,
-    );
-    const weightedAdjustment = responseEv * smoothstep(0.005, 0.08, chroma);
-    const mixed = luminance * 2 ** Math.min(2, Math.max(-2, weightedAdjustment));
-    const outputRgb = { blue: mixed, green: mixed, red: mixed };
-    return {
-      influence,
-      luminance,
-      outputRgb,
-      receipt: receipt(outputRgb),
-      weightedAdjustment,
-    };
-  }
-
-  const hue = rgbToHueDegrees(pixel);
-  if (hue === undefined) {
-    const outputRgb = { blue: luminance, green: luminance, red: luminance };
-    return {
-      influence: {},
-      luminance,
-      outputRgb,
-      receipt: receipt(outputRgb),
-      weightedAdjustment: 0,
-    };
-  }
-
-  const influenceEntries = SELECTIVE_COLOR_RANGES.map((range) => {
-    const distance = circularHueDistance(hue, range.centerHueDegrees);
-    const influence = clamp01(1 - distance / (range.widthDegrees / 2));
-    return { influence, key: range.key };
-  }).filter((entry) => entry.influence > 0);
-
-  const influenceTotal = influenceEntries.reduce((total, entry) => total + entry.influence, 0);
-  const weightedAdjustment =
-    influenceTotal === 0
-      ? 0
-      : influenceEntries.reduce((total, entry) => total + entry.influence * settings.weights[entry.key], 0) /
-        influenceTotal /
-        100;
-  const mixed = clamp01(luminance * (1 + weightedAdjustment * 0.5));
-  const influence = Object.fromEntries(influenceEntries.map((entry) => [entry.key, entry.influence]));
+  const [, a, b] = ap1ToOklab(sanitized);
+  const chroma = Math.hypot(a, b);
+  const hue = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+  const influence = continuousMonochromeTarget(hue);
+  const responseEv = (Object.entries(influence) as Array<[BlackWhiteMixerChannel, number]>).reduce(
+    (sum, [key, weight]) => sum + (settings.weights[key] / 100) * weight,
+    0,
+  );
+  const weightedAdjustment = responseEv * smoothstep(0.005, 0.08, chroma);
+  const mixed = luminance * 2 ** Math.min(2, Math.max(-2, weightedAdjustment));
   const outputRgb = { blue: mixed, green: mixed, red: mixed };
 
   return {

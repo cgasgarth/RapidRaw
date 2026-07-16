@@ -29,7 +29,8 @@
         "magentas"
       ],
       "influence": {
-        "oranges": 0.6507936507936505
+        "oranges": 0.8265949093983365,
+        "yellows": 0.1734050906016636
       },
       "inputRgb": {
         "blue": 0.34,
@@ -37,16 +38,16 @@
         "red": 0.62
       },
       "maxExpectedDelta": 0,
-      "maxOutputDelta": 0.14871608,
+      "maxOutputDelta": 0.170615839235,
       "outputRgb": {
-        "blue": 0.48871608000000005,
-        "green": 0.48871608000000005,
-        "red": 0.48871608000000005
+        "blue": 0.5106158392353066,
+        "green": 0.5106158392353066,
+        "red": 0.5106158392353066
       },
       "runtimeStatus": "apply_runtime_proof",
       "schemaStatus": "validated_by_zod",
       "uiStatus": "existing_control_surface_not_retested",
-      "weightedAdjustment": 0.14
+      "weightedAdjustment": 0.119115411361
     },
     {
       "case": "landscape sky control",
@@ -56,7 +57,8 @@
         "greens"
       ],
       "influence": {
-        "blues": 0.8333333333333334
+        "blues": 0.8155487408286668,
+        "purples": 0.18445125917133326
       },
       "inputRgb": {
         "blue": 0.66,
@@ -64,16 +66,16 @@
         "red": 0.24
       },
       "maxExpectedDelta": 0,
-      "maxOutputDelta": 0.34141128,
+      "maxOutputDelta": 0.359967842168,
       "outputRgb": {
-        "blue": 0.31858872,
-        "green": 0.31858872,
-        "red": 0.31858872
+        "blue": 0.30003215783161774,
+        "green": 0.30003215783161774,
+        "red": 0.30003215783161774
       },
       "runtimeStatus": "apply_runtime_proof",
       "schemaStatus": "validated_by_zod",
       "uiStatus": "existing_control_surface_not_retested",
-      "weightedAdjustment": -0.28
+      "weightedAdjustment": -0.250487798533
     }
   ],
   "fixturePath": "fixtures/color/adjustments/black-white-mixer.json",
