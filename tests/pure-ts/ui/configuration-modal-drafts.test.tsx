@@ -11,7 +11,13 @@ import CopyPasteSettingsModal, {
 } from '../../../src/components/modals/navigation/CopyPasteSettingsModal';
 import type { Preset } from '../../../src/components/ui/AppProperties';
 import type { CopyPasteSettings } from '../../../src/schemas/copyPasteSettingsSchemas';
-import { PasteMode } from '../../../src/utils/adjustments';
+import { INITIAL_ADJUSTMENTS, PasteMode } from '../../../src/utils/adjustments';
+import {
+  createEditDocumentPresetPayload,
+  RAPIDRAW_PRESET_FORMAT,
+  RAPIDRAW_PRESET_SCHEMA_VERSION,
+} from '../../../src/utils/editDocumentPreset';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 let unmount: (() => Promise<void>) | null = null;
 
@@ -154,7 +160,20 @@ test('same-source close and reopen replaces each shell draft before it becomes v
 });
 
 function preset(id: string, name: string, presetType: 'style' | 'tool'): Preset {
-  return { adjustments: {}, id, name, presetType };
+  return {
+    editDocumentV2: createEditDocumentPresetPayload(
+      legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+      false,
+      presetType,
+    ),
+    format: RAPIDRAW_PRESET_FORMAT,
+    id,
+    includeCropTransform: false,
+    includeMasks: false,
+    name,
+    presetType,
+    schemaVersion: RAPIDRAW_PRESET_SCHEMA_VERSION,
+  };
 }
 
 function settings(pasteMode: PasteMode): CopyPasteSettings {

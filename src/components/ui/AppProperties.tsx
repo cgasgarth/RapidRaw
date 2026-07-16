@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react';
 import type { EditDocumentV2CopyPayload } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
-import type { Adjustments } from '../../utils/adjustments';
 import type { ToolType } from '../panel/right/layers/Masks';
 
 export const GLOBAL_KEYS = [
@@ -238,8 +237,9 @@ export enum Orientation {
 }
 
 export interface Preset {
-  adjustments: Partial<Adjustments>;
-  editDocumentV2?: EditDocumentV2CopyPayload | undefined;
+  format: 'rapidraw.preset';
+  schemaVersion: 1;
+  editDocumentV2: EditDocumentV2CopyPayload;
   colorStyleProvenance?:
     | {
         createdAt: string;
@@ -252,9 +252,9 @@ export interface Preset {
   folder?: Folder;
   id: string;
   name: string;
-  includeMasks?: boolean | undefined;
-  includeCropTransform?: boolean | undefined;
-  presetType?: 'tool' | 'style' | undefined;
+  includeMasks: false;
+  includeCropTransform: boolean;
+  presetType: 'tool' | 'style';
 }
 
 export interface Progress {

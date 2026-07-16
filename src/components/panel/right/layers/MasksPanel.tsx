@@ -75,6 +75,7 @@ import {
   type LayerBlendMode,
   type MaskContainer,
 } from '../../../../utils/adjustments';
+import { lowerEditDocumentV2CopyPayloadToLegacyAdjustments } from '../../../../utils/editDocumentV2';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
 import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
@@ -266,11 +267,10 @@ type MaskAdjustmentUpdater = MaskAdjustmentPatch | ((adjustments: Adjustments) =
 type AdjustmentsUpdater = (updater: (adjustments: Adjustments) => Adjustments) => void;
 type MaskContainerWithId = MaskContainer;
 type SetState<T> = (value: T | ((previous: T) => T)) => void;
-type PresetMenuItem = UserPreset & {
-  adjustments?: Partial<Adjustments> | undefined;
-  folder?: { children?: Array<PresetMenuItem> | undefined; name?: string | undefined } | undefined;
-  preset?: { adjustments: Partial<Adjustments>; name?: string | undefined } | undefined;
-};
+type PresetMenuItem = UserPreset;
+
+const presetMaskAdjustments = (item: PresetMenuItem): Partial<Adjustments> | null =>
+  item.preset === undefined ? null : lowerEditDocumentV2CopyPayloadToLegacyAdjustments(item.preset.editDocumentV2);
 
 const getPanelMaskParameterNumber = (parameters: unknown, key: PanelMaskParameterKey, fallback = 0): number =>
   getMaskParameterNumber(parameters, key, fallback);
@@ -2970,9 +2970,9 @@ function ContainerRow({
             return {
               label: item.folder.name ?? '',
               icon: FolderIcon,
-              submenu: generatePresetSubmenu(item.folder.children),
+              submenu: generatePresetSubmenu(item.folder.children.map((preset) => ({ preset }))),
             };
-          const presetAdjustments = item.adjustments ?? item.preset?.adjustments;
+          const presetAdjustments = presetMaskAdjustments(item);
           if (presetAdjustments)
             return {
               label: item.name || item.preset?.name || '',
@@ -3614,10 +3614,10 @@ function SettingsPanel({
           return {
             label: item.folder.name ?? '',
             icon: FolderIcon,
-            submenu: generatePresetSubmenu(item.folder.children),
+            submenu: generatePresetSubmenu(item.folder.children.map((preset) => ({ preset }))),
           };
         }
-        const presetAdjustments = item.adjustments ?? item.preset?.adjustments;
+        const presetAdjustments = presetMaskAdjustments(item);
         if (presetAdjustments) {
           return {
             label: item.name || item.preset?.name || '',

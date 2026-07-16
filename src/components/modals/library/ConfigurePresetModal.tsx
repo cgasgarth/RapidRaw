@@ -31,15 +31,13 @@ const getConfigurePresetState = (initialPreset: Preset | null | undefined) => {
     ({ capabilities }) => capabilities.preset === 'optional_geometry',
   );
   const hasGeometry = optionalGeometry.some(
-    ({ legacyFields, nodeType }) =>
-      initialPreset?.editDocumentV2?.nodes[nodeType] !== undefined ||
-      legacyFields.some((field) => Object.hasOwn(initialPreset?.adjustments ?? {}, field)),
+    ({ nodeType }) => initialPreset?.editDocumentV2.nodes[nodeType] !== undefined,
   );
 
   return {
     name: initialPreset?.name || '',
     includeCropTransform: initialPreset?.includeCropTransform ?? hasGeometry ?? false,
-    presetType: initialPreset?.presetType || 'style',
+    presetType: initialPreset?.presetType ?? 'style',
   };
 };
 

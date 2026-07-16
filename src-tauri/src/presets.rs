@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 use regex::Regex;
@@ -8,29 +9,62 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
+use crate::adjustments::edit_document_v2::validate_edit_document_v2_copy_payload;
 use crate::preset_converter::{self, ExternalPresetImportDiagnostic};
 
+const RAPIDRAW_PRESET_FORMAT: &str = "rapidraw.preset";
+const RAPIDRAW_PRESET_SCHEMA_VERSION: u8 = 1;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Preset {
+    pub format: String,
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: u8,
     pub id: String,
     pub name: String,
-    pub adjustments: Value,
-    #[serde(rename = "editDocumentV2", skip_serializing_if = "Option::is_none")]
-    pub edit_document_v2: Option<Value>,
-    #[serde(rename = "includeMasks", skip_serializing_if = "Option::is_none")]
-    pub include_masks: Option<bool>,
-    #[serde(
-        rename = "includeCropTransform",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub include_crop_transform: Option<bool>,
-    #[serde(rename = "presetType", skip_serializing_if = "Option::is_none")]
-    pub preset_type: Option<String>,
+    #[serde(rename = "editDocumentV2")]
+    pub edit_document_v2: Value,
+    #[serde(rename = "includeMasks")]
+    pub include_masks: bool,
+    #[serde(rename = "includeCropTransform")]
+    pub include_crop_transform: bool,
+    #[serde(rename = "presetType")]
+    pub preset_type: PresetType,
     #[serde(
         rename = "colorStyleProvenance",
         skip_serializing_if = "Option::is_none"
     )]
-    pub color_style_provenance: Option<Value>,
+    pub color_style_provenance: Option<ColorStyleProvenance>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ColorStyleProvenance {
+    pub created_at: String,
+    pub legal_naming_status: UserColorStyleLegalNamingStatus,
+    pub legal_warning: String,
+    pub source: UserColorStyleSource,
+    pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum UserColorStyleLegalNamingStatus {
+    UserNamed,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum UserColorStyleSource {
+    UserCreated,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PresetType {
+    Style,
+    Tool,
 }
 
 #[derive(Serialize)]
@@ -40,6 +74,7 @@ struct ExportPresetFile<'a> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct PresetFolder {
     pub id: String,
     pub name: String,
@@ -47,13 +82,14 @@ pub struct PresetFolder {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum PresetItem {
     Preset(Preset),
     Folder(PresetFolder),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct PresetFile {
     pub presets: Vec<PresetItem>,
 }
@@ -153,11 +189,81 @@ fn find_or_create_community_folder(items: &mut Vec<PresetItem>) -> String {
     new_folder_id
 }
 
+fn validate_preset(preset: &Preset) -> Result<(), String> {
+    if preset.format != RAPIDRAW_PRESET_FORMAT {
+        return Err(format!(
+            "Unsupported RapidRaw preset format: {}",
+            preset.format
+        ));
+    }
+    if preset.schema_version != RAPIDRAW_PRESET_SCHEMA_VERSION {
+        return Err(format!(
+            "Unsupported RapidRaw preset schemaVersion: {}",
+            preset.schema_version
+        ));
+    }
+    if preset.id.trim().is_empty() || preset.name.trim().is_empty() {
+        return Err("RapidRaw preset id and name must be non-empty".to_string());
+    }
+    if preset.include_masks {
+        return Err("RapidRaw presets cannot persist masks".to_string());
+    }
+    validate_edit_document_v2_copy_payload(&preset.edit_document_v2)?;
+    let nodes = preset
+        .edit_document_v2
+        .get("nodes")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "RapidRaw preset editDocumentV2.nodes must be an object".to_string())?;
+    if !preset.include_crop_transform
+        && (nodes.contains_key("geometry") || nodes.contains_key("lens_correction"))
+    {
+        return Err(
+            "RapidRaw preset excludes crop/transform but contains geometry authority".to_string(),
+        );
+    }
+    if preset.color_style_provenance.is_some() && preset.preset_type != PresetType::Style {
+        return Err("Only style presets can contain color-style provenance".to_string());
+    }
+    if preset
+        .color_style_provenance
+        .as_ref()
+        .is_some_and(|provenance| {
+            provenance.created_at.trim().is_empty()
+                || provenance.updated_at.trim().is_empty()
+                || provenance.legal_warning.trim().is_empty()
+        })
+    {
+        return Err("RapidRaw color-style provenance fields must be non-empty".to_string());
+    }
+    Ok(())
+}
+
+fn validate_preset_items(presets: &[PresetItem]) -> Result<(), String> {
+    for item in presets {
+        match item {
+            PresetItem::Preset(preset) => validate_preset(preset)?,
+            PresetItem::Folder(folder) => {
+                if folder.id.trim().is_empty() || folder.name.trim().is_empty() {
+                    return Err("RapidRaw preset folder id and name must be non-empty".to_string());
+                }
+                for preset in &folder.children {
+                    validate_preset(preset)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn decode_presets(content: &str) -> Result<Vec<PresetItem>, String> {
-    serde_json::from_str(content).map_err(|error| error.to_string())
+    let presets: Vec<PresetItem> =
+        serde_json::from_str(content).map_err(|error| error.to_string())?;
+    validate_preset_items(&presets)?;
+    Ok(presets)
 }
 
 fn encode_presets(presets: &[PresetItem]) -> Result<String, String> {
+    validate_preset_items(presets)?;
     serde_json::to_string_pretty(presets).map_err(|error| error.to_string())
 }
 
@@ -166,9 +272,24 @@ fn read_presets_from_path(path: &Path) -> Result<Vec<PresetItem>, String> {
     decode_presets(&content)
 }
 
+fn write_content_atomically(path: &Path, content: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "RapidRaw preset path has no parent directory".to_string())?;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
+    temporary
+        .write_all(content)
+        .and_then(|()| temporary.as_file().sync_all())
+        .map_err(|error| error.to_string())?;
+    temporary
+        .persist(path)
+        .map_err(|error| error.error.to_string())?;
+    Ok(())
+}
+
 fn write_presets_to_path(path: &Path, presets: &[PresetItem]) -> Result<(), String> {
-    let content = encode_presets(presets)?;
-    fs::write(path, content).map_err(|error| error.to_string())
+    write_content_atomically(path, encode_presets(presets)?.as_bytes())
 }
 
 #[tauri::command]
@@ -258,6 +379,7 @@ pub fn handle_export_presets_to_file(
     presets_to_export: Vec<PresetItem>,
     file_path: String,
 ) -> Result<(), String> {
+    validate_preset_items(&presets_to_export)?;
     let preset_file = ExportPresetFile {
         creator: "Anonymous",
         presets: &presets_to_export,
@@ -265,31 +387,17 @@ pub fn handle_export_presets_to_file(
 
     let json_string = serde_json::to_string_pretty(&preset_file)
         .map_err(|e| format!("Failed to serialize presets: {}", e))?;
-    fs::write(file_path, json_string).map_err(|e| format!("Failed to write preset file: {}", e))
+    write_content_atomically(Path::new(&file_path), json_string.as_bytes())
+        .map_err(|error| format!("Failed to write preset file: {error}"))
 }
 
 #[tauri::command]
-pub fn save_community_preset(
-    name: String,
-    adjustments: Value,
-    app_handle: AppHandle,
-    include_masks: Option<bool>,
-    include_crop_transform: Option<bool>,
-    preset_type: Option<String>,
-) -> Result<(), String> {
+pub fn save_community_preset(mut preset: Preset, app_handle: AppHandle) -> Result<(), String> {
+    validate_preset(&preset)?;
     let mut current_presets = load_presets(app_handle.clone())?;
     let community_folder_id = find_or_create_community_folder(&mut current_presets);
-
-    let new_preset = Preset {
-        adjustments,
-        edit_document_v2: None,
-        id: Uuid::new_v4().to_string(),
-        include_crop_transform,
-        include_masks,
-        name,
-        color_style_provenance: None,
-        preset_type: preset_type.or(Some("style".to_string())),
-    };
+    preset.id = Uuid::new_v4().to_string();
+    preset.color_style_provenance = None;
 
     if let Some(PresetItem::Folder(folder)) = current_presets.iter_mut().find(|item| {
         if let PresetItem::Folder(folder) = item {
@@ -298,10 +406,8 @@ pub fn save_community_preset(
             false
         }
     }) {
-        folder
-            .children
-            .retain(|preset| preset.name != new_preset.name);
-        folder.children.push(new_preset);
+        folder.children.retain(|saved| saved.name != preset.name);
+        folder.children.push(preset);
     }
 
     save_presets(current_presets, app_handle)
@@ -309,42 +415,23 @@ pub fn save_community_preset(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Preset, PresetItem, extract_external_xmp, read_presets_from_path, write_presets_to_path,
-    };
+    use super::{PresetItem, extract_external_xmp, read_presets_from_path, write_presets_to_path};
     use serde_json::json;
     use std::fs;
 
     #[test]
     fn preset_edit_document_v2_survives_native_save_and_reload() {
-        let edit_document_v2 = json!({
-            "nodes": {
-                "scene_global_color_tone": {
-                    "enabled": false,
-                    "implementationVersion": 1,
-                    "params": { "exposure": 1.25 },
-                    "process": "scene_referred_v2",
-                    "type": "scene_global_color_tone",
-                }
-            },
-            "schemaVersion": 2
-        });
+        let mut preset = crate::preset_converter::convert_xmp_to_preset(
+            r#"<rdf:Description crs:Name="V2 roundtrip" crs:Exposure2012="1.25" />"#,
+        )
+        .expect("current external compiler")
+        .preset;
+        preset.id = "preset-v2".to_string();
+        let edit_document_v2 = preset.edit_document_v2.clone();
         let directory = tempfile::tempdir().expect("temporary preset directory");
         let path = directory.path().join("presets.json");
-        write_presets_to_path(
-            &path,
-            &[PresetItem::Preset(Preset {
-                adjustments: json!({}),
-                color_style_provenance: None,
-                edit_document_v2: Some(edit_document_v2.clone()),
-                id: "preset-v2".to_string(),
-                include_crop_transform: Some(false),
-                include_masks: Some(false),
-                name: "V2 roundtrip".to_string(),
-                preset_type: Some("style".to_string()),
-            })],
-        )
-        .expect("production preset writer must persist V2 authority");
+        write_presets_to_path(&path, &[PresetItem::Preset(preset)])
+            .expect("production preset writer must persist V2 authority");
         let persisted_bytes = fs::read(&path).expect("persisted preset bytes");
         assert!(String::from_utf8_lossy(&persisted_bytes).contains("editDocumentV2"));
         let decoded = read_presets_from_path(&path)
@@ -352,20 +439,48 @@ mod tests {
         let PresetItem::Preset(reopened) = &decoded[0] else {
             panic!("expected preset item");
         };
-        assert_eq!(reopened.edit_document_v2.as_ref(), Some(&edit_document_v2));
-        assert_eq!(reopened.adjustments, json!({}));
+        assert_eq!(reopened.edit_document_v2, edit_document_v2);
+        assert_eq!(reopened.format, "rapidraw.preset");
+        assert_eq!(reopened.schema_version, 1);
 
         fs::write(
             &path,
             r#"[{"preset":{"id":"legacy","name":"Legacy","adjustments":{"exposure":0.5}}}]"#,
         )
-        .expect("legacy fixture must write");
-        let legacy = read_presets_from_path(&path)
-            .expect("legacy file must remain readable through production helper");
-        let PresetItem::Preset(legacy_preset) = &legacy[0] else {
-            panic!("expected legacy preset item");
-        };
-        assert!(legacy_preset.edit_document_v2.is_none());
+        .expect("flat-only fixture must write");
+        assert!(read_presets_from_path(&path).is_err());
+
+        let mut provenance_leak =
+            serde_json::to_value(reopened).expect("serialized current preset");
+        provenance_leak
+            .as_object_mut()
+            .expect("preset object")
+            .insert(
+                "colorStyleProvenance".to_string(),
+                json!({ "source": "imported_external" }),
+            );
+        fs::write(&path, json!([{ "preset": provenance_leak }]).to_string())
+            .expect("provenance leak fixture must write");
+        assert!(read_presets_from_path(&path).is_err());
+
+        let mut future = reopened.clone();
+        future.schema_version = 2;
+        assert!(write_presets_to_path(&path, &[PresetItem::Preset(future)]).is_err());
+
+        let mut disallowed = reopened.clone();
+        disallowed.edit_document_v2 = json!({
+            "nodes": {
+                "source_artifacts": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": { "aiPatches": [] },
+                    "process": "scene_referred_v2",
+                    "type": "source_artifacts"
+                }
+            },
+            "schemaVersion": 2
+        });
+        assert!(write_presets_to_path(&path, &[PresetItem::Preset(disallowed)]).is_err());
     }
 
     #[test]
@@ -378,7 +493,7 @@ mod tests {
         let converted = crate::preset_converter::convert_xmp_to_preset(&embedded)
             .expect("embedded lrtemplate XMP converts");
         let preset = converted.preset;
-        let current = preset.edit_document_v2.expect("current preset authority");
+        let current = preset.edit_document_v2;
 
         assert_eq!(
             current["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["process"],
