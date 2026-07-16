@@ -3,9 +3,8 @@
 
 import { readFileSync } from 'node:fs';
 
-import ts from '@typescript/typescript6';
-
 import { getExtension, toRepoPath, walkRepoFiles } from '../../../../scripts/lib/ci/repo-files.ts';
+import { lineAtOffset, parseSource, visitSource } from '../../../../scripts/lib/ci/source-ast.ts';
 
 const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const SCHEMA_WRAPPER_PATH = 'src/utils/tauriSchemaInvoke.ts';
@@ -36,70 +35,53 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/hooks/editor/useImageLoader.ts': { raw: 3, typed: 2 },
   'src/hooks/editor/useImageProcessing.ts': { raw: 5, typed: 0 },
   'src/hooks/library/useLibraryActions.ts': { raw: 8, typed: 3 },
-  'src/hooks/editor/usePresets.ts': { raw: 5, typed: 2 },
+  'src/hooks/editor/usePresets.ts': { raw: 5, typed: 3 },
   'src/hooks/app/useProductivityActions.ts': { raw: 9, typed: 1 },
   'src/hooks/library/useThumbnails.ts': { raw: 2, typed: 0 },
   'src/utils/frontendLogBridge.ts': { raw: 1, typed: 0 },
 };
 
-const getScriptKind = (path) => (getExtension(path) === '.tsx' ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-
-const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-
-export const inspectTauriInvokeSource = (filePath, contents) => {
+export const inspectTauriInvokeSource = (filePath: string, contents: string) => {
   if (filePath === SCHEMA_WRAPPER_PATH) {
     return { importedNames: [], namespaceNames: [], rawCalls: [], typedRawCalls: [] };
   }
 
-  const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
-  const importedNames = new Set();
-  const namespaceNames = new Set();
-  const rawCalls = [];
-  const typedRawCalls = [];
+  const importedNames = new Set<string>();
+  const namespaceNames = new Set<string>();
+  const rawCalls: number[] = [];
+  const typedRawCalls: number[] = [];
 
-  const visit = (node) => {
-    if (
-      ts.isImportDeclaration(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
-      node.moduleSpecifier.text === '@tauri-apps/api/core'
-    ) {
-      const namedBindings = node.importClause?.namedBindings;
-      if (namedBindings && ts.isNamedImports(namedBindings)) {
-        for (const element of namedBindings.elements) {
-          const importedName = element.propertyName?.text ?? element.name.text;
-          if (importedName === 'invoke') {
-            importedNames.add(element.name.text);
-          }
+  visitSource(parseSource(filePath, contents), (node) => {
+    if (node.type === 'ImportDeclaration' && node.source.value === '@tauri-apps/api/core') {
+      for (const specifier of node.specifiers) {
+        if (specifier.type === 'ImportNamespaceSpecifier') {
+          namespaceNames.add(specifier.local.name);
+          continue;
         }
-      } else if (namedBindings && ts.isNamespaceImport(namedBindings)) {
-        namespaceNames.add(namedBindings.name.text);
+        if (specifier.type !== 'ImportSpecifier') continue;
+        const importedName =
+          specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value;
+        if (importedName === 'invoke') importedNames.add(specifier.local.name);
       }
     }
 
-    if (!ts.isCallExpression(node)) {
-      ts.forEachChild(node, visit);
-      return;
-    }
+    if (node.type !== 'CallExpression') return;
 
-    const isNamedInvokeCall = ts.isIdentifier(node.expression) && importedNames.has(node.expression.text);
+    const isNamedInvokeCall = node.callee.type === 'Identifier' && importedNames.has(node.callee.name);
     const isNamespaceInvokeCall =
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'invoke' &&
-      ts.isIdentifier(node.expression.expression) &&
-      namespaceNames.has(node.expression.expression.text);
+      node.callee.type === 'MemberExpression' &&
+      !node.callee.computed &&
+      node.callee.property.type === 'Identifier' &&
+      node.callee.property.name === 'invoke' &&
+      node.callee.object.type === 'Identifier' &&
+      namespaceNames.has(node.callee.object.name);
 
     if (isNamedInvokeCall || isNamespaceInvokeCall) {
-      const line = getLine(sourceFile, node.getStart(sourceFile));
+      const line = lineAtOffset(contents, node.start);
       rawCalls.push(line);
-      if ((node.typeArguments?.length ?? 0) > 0) {
-        typedRawCalls.push(line);
-      }
+      if ((node.typeArguments?.params.length ?? 0) > 0) typedRawCalls.push(line);
     }
-
-    ts.forEachChild(node, visit);
-  };
-
-  visit(sourceFile);
+  });
   return { importedNames: [...importedNames], namespaceNames: [...namespaceNames], rawCalls, typedRawCalls };
 };
 

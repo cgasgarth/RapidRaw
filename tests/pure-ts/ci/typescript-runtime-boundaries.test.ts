@@ -1,33 +1,37 @@
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import { relative, resolve } from 'node:path';
 
-import ts from '@typescript/typescript6';
+import { API } from 'typescript/unstable/async';
+import { z } from 'zod';
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
+const api = new API({ cwd: repositoryRoot });
 
-const parseProject = (relativePath: string): ts.ParsedCommandLine => {
-  const configPath = resolve(repositoryRoot, relativePath);
-  const config = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (config.error !== undefined) {
-    throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-  }
+const baseConfigSchema = z.object({
+  compilerOptions: z.object({
+    module: z.literal('preserve'),
+    moduleDetection: z.literal('force'),
+    moduleResolution: z.literal('bundler'),
+    noEmit: z.literal(true),
+    strict: z.literal(true),
+    target: z.literal('esnext'),
+    verbatimModuleSyntax: z.literal(true),
+  }),
+});
 
-  return ts.parseJsonConfigFileContent(config.config, ts.sys, repositoryRoot, undefined, configPath);
-};
+const packageSchema = z.object({
+  devDependencies: z.record(z.string(), z.string()),
+  scripts: z.record(z.string(), z.string()),
+});
 
-const relativeFiles = (project: ts.ParsedCommandLine): Set<string> =>
-  new Set(project.fileNames.map((fileName) => relative(repositoryRoot, fileName)));
+afterAll(async () => {
+  await api.close();
+});
 
-const expectBundlerProject = (project: ts.ParsedCommandLine): void => {
-  expect(project.options.allowImportingTsExtensions).toBe(true);
-  expect(project.options.module).toBe(ts.ModuleKind.Preserve);
-  expect(project.options.moduleDetection).toBe(ts.ModuleDetectionKind.Force);
-  expect(project.options.moduleResolution).toBe(ts.ModuleResolutionKind.Bundler);
-  expect(project.options.noEmit).toBe(true);
-  expect(project.options.strict).toBe(true);
-  expect(project.options.target).toBe(ts.ScriptTarget.ESNext);
-  expect(project.options.verbatimModuleSyntax).toBe(true);
-};
+const parseProject = async (relativePath: string) => api.parseConfigFile(resolve(repositoryRoot, relativePath));
+
+const relativeFiles = (fileNames: readonly string[]): Set<string> =>
+  new Set(fileNames.map((fileName) => relative(repositoryRoot, fileName)));
 
 const compilerVersion = (entrypoint: string): string => {
   const result = Bun.spawnSync(['bun', resolve(repositoryRoot, entrypoint), '--version'], {
@@ -41,39 +45,52 @@ const compilerVersion = (entrypoint: string): string => {
   return new TextDecoder().decode(result.stdout).trim();
 };
 
-describe('TypeScript 6/7 runtime project boundaries', () => {
-  test('keeps browser production source free of Bun ambient types', () => {
-    const project = parseProject('tsconfig.json');
-    const files = relativeFiles(project);
+describe('TypeScript 7 runtime project boundaries', () => {
+  test('uses strict Bun-recommended compiler semantics', async () => {
+    const config = baseConfigSchema.parse(await Bun.file(resolve(repositoryRoot, 'tsconfig.base.json')).json());
+    expect(config.compilerOptions).toEqual({
+      module: 'preserve',
+      moduleDetection: 'force',
+      moduleResolution: 'bundler',
+      noEmit: true,
+      strict: true,
+      target: 'esnext',
+      verbatimModuleSyntax: true,
+    });
+  });
 
-    expectBundlerProject(project);
-    expect(project.options.types).toEqual([]);
+  test('keeps browser production source free of Bun ambient types', async () => {
+    const project = await parseProject('tsconfig.json');
+    const files = relativeFiles(project.fileNames);
+
+    expect(project.options['types']).toEqual([]);
     expect(files.has('src/main.ts')).toBe(true);
     expect([...files].some((path) => path.startsWith('scripts/'))).toBe(false);
     expect([...files].some((path) => path.startsWith('tests/'))).toBe(false);
   });
 
-  test('loads Bun ambient types only for Bun-executed scripts', () => {
-    const project = parseProject('scripts/tsconfig.json');
-    const files = relativeFiles(project);
+  test('loads Bun ambient types only for Bun-executed scripts', async () => {
+    const project = await parseProject('scripts/tsconfig.json');
+    const files = relativeFiles(project.fileNames);
 
-    expectBundlerProject(project);
-    expect(project.options.types).toEqual(['bun']);
+    expect(project.options['types']).toEqual(['bun']);
     expect(files.has('scripts/validation/run.ts')).toBe(true);
   });
 
-  test('keeps the portable schema source runtime-neutral', () => {
-    const project = parseProject('packages/rawengine-schema/tsconfig.json');
-    const files = relativeFiles(project);
+  test('keeps the portable schema source runtime-neutral', async () => {
+    const project = await parseProject('packages/rawengine-schema/tsconfig.json');
+    const files = relativeFiles(project.fileNames);
 
-    expectBundlerProject(project);
-    expect(project.options.types).toEqual([]);
+    expect(project.options['types']).toEqual([]);
     expect(files.has('packages/rawengine-schema/src/index.ts')).toBe(true);
     expect([...files].some((path) => path.startsWith('packages/rawengine-schema/scripts/'))).toBe(false);
   });
 
-  test('resolves the maintained TypeScript 7 and TypeScript 6 compiler entrypoints', () => {
+  test('declares one current compiler and no compatibility lane', async () => {
+    const packageJson = packageSchema.parse(await Bun.file(resolve(repositoryRoot, 'package.json')).json());
+    expect(packageJson.devDependencies['typescript']).toMatch(/^\^7\./u);
+    expect(Object.keys(packageJson.devDependencies).filter((name) => name.startsWith('@typescript/'))).toEqual([]);
+    expect(Object.keys(packageJson.scripts).filter((name) => name.includes('compat'))).toEqual([]);
     expect(compilerVersion('node_modules/typescript/bin/tsc')).toMatch(/^Version 7\./u);
-    expect(compilerVersion('node_modules/@typescript/typescript6/bin/tsc6')).toMatch(/^Version 6\./u);
   });
 });

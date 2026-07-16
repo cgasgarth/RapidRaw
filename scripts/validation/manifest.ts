@@ -36,13 +36,6 @@ export const validationManifest: readonly ValidationNode[] = [
   node('format', ['bun', 'run', 'format:check'], ['docs', 'frontend', 'schema', 'scripts', 'workflows', 'rust']),
   node('typecheck', ['bun', 'run', 'typecheck'], ['frontend', 'schema'], 'cpu-heavy'),
   node(
-    'typecheck-compat',
-    ['bun', 'run', 'typecheck:compat'],
-    ['frontend', 'schema', 'dependencies'],
-    'cpu-heavy',
-    broad,
-  ),
-  node(
     'fallow-health',
     ['bun', 'run', 'check:fallow-health'],
     ['frontend', 'schema', 'scripts', 'dependencies'],
