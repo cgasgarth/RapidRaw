@@ -1,4 +1,3 @@
-pub(crate) const LEGACY_FIXED_BAND_V1: u32 = 0;
 pub(crate) const NEUTRAL_PANCHROMATIC_V1: u32 = 1;
 pub(crate) const CONTINUOUS_SENSITIVITY_V1: u32 = 2;
 pub(crate) const MONOCHROME_IMPLEMENTATION_VERSION: u32 = 2;

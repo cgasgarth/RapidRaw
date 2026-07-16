@@ -3852,7 +3852,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn scene_referred_v2_uses_ap1_luminance_while_legacy_keeps_view_luma() {
+    fn current_monochrome_uses_ap1_luminance_across_graph_versions() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -3872,6 +3872,7 @@ mod blur_pass_tests {
                 "rawEngineEditGraphVersion": version,
                 "blackWhiteMixer": {
                     "enabled": true,
+                    "process": "neutral_panchromatic_v1",
                     "weights": {
                         "reds": 0, "oranges": 0, "yellows": 0, "greens": 0,
                         "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
@@ -3921,16 +3922,19 @@ mod blur_pass_tests {
             gpu
         };
 
-        let legacy = render(1);
+        let graph_v1 = render(1);
         let scene_referred = render(2);
         let scene_referred_warm = render(2);
         let encode = |linear: f32| 1.055 * linear.powf(1.0 / 2.4) - 0.055;
-        assert!((legacy - encode(0.2126)).abs() <= 0.01, "legacy={legacy}");
+        assert!(
+            (graph_v1 - encode(0.272_228_72)).abs() <= 0.01,
+            "graph_v1={graph_v1}"
+        );
         assert!(
             (scene_referred - encode(0.272_228_72)).abs() <= 0.01,
             "scene_referred={scene_referred}"
         );
-        assert!(scene_referred > legacy + 0.05);
+        assert_eq!(scene_referred, graph_v1);
         assert_eq!(scene_referred, scene_referred_warm);
         let processor = state
             .gpu()

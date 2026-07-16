@@ -247,6 +247,7 @@ const parsedBlackWhiteMixerCommand = toneColorCommandEnvelopeV1Schema.safeParse(
   idempotencyKey: 'idem_tone_color_black_white_mixer_preview_sample',
   parameters: {
     enabled: true,
+    process: 'continuous_sensitivity_v1',
     weights: {
       aquas: -4,
       blues: -10,
