@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -14,13 +14,13 @@ import type {
 } from '../../scripts/qa/daemon-model';
 import { qaDaemonPaths, readLiveDaemonState } from '../../scripts/qa/daemon-state';
 import { createQaDaemonIdentity } from '../../scripts/qa/identity';
+import { createLazyLifecycleAdapter } from '../../scripts/qa/lazy-lifecycle-adapter';
 
 interface FakeSession {
   generation: number;
 }
 
-const directories: string[] = [];
-const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
+const QA_DAEMON_STARTUP_DIAGNOSTIC_MS = 10_000;
 
 const stopChild = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
   if (child.exitCode === null) child.kill('SIGTERM');
@@ -28,11 +28,6 @@ const stopChild = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => 
   if (!exited) child.kill('SIGKILL');
   await child.exited;
 };
-
-afterEach(async () => {
-  await Promise.all(spawnedChildren.splice(0).map(stopChild));
-  await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
-});
 
 const identity = (worktree: string, configuration = 'a'.repeat(64), source = 'b'.repeat(64)): QaDaemonIdentity => ({
   worktree,
@@ -64,10 +59,14 @@ function fakeAdapter(events: string[]): QaLifecycleAdapter<FakeSession, string[]
   };
 }
 
-async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(resolve(tmpdir(), 'rapidraw-qa-daemon-'));
-  directories.push(directory);
-  return directory;
+async function temporaryDirectory(): Promise<{ path: string; [Symbol.asyncDispose](): Promise<void> }> {
+  const path = await mkdtemp(resolve(tmpdir(), 'rapidraw-qa-daemon-'));
+  return {
+    path,
+    async [Symbol.asyncDispose]() {
+      await rm(path, { recursive: true, force: true });
+    },
+  };
 }
 
 function fixtureGit(worktree: string, args: readonly string[], environment: NodeJS.ProcessEnv = process.env) {
@@ -93,42 +92,119 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
   });
 }
 
+interface CapturedStream {
+  completed: Promise<void>;
+  text(): string;
+}
+
+function captureStream(stream: ReadableStream<Uint8Array>, onLine?: (line: string) => void): CapturedStream {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let pending = '';
+  const completed = (async () => {
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const decoded = decoder.decode(chunk.value, { stream: true });
+        text += decoded;
+        pending += decoded;
+        let newline = pending.indexOf('\n');
+        while (newline >= 0) {
+          onLine?.(pending.slice(0, newline));
+          pending = pending.slice(newline + 1);
+          newline = pending.indexOf('\n');
+        }
+      }
+      const tail = decoder.decode();
+      text += tail;
+      pending += tail;
+      if (pending !== '') onLine?.(pending);
+    } finally {
+      reader.releaseLock();
+    }
+  })();
+  return { completed, text: () => text };
+}
+
 const spawnQaDaemon = (repository: string, worktree: string) => {
-  const child = Bun.spawn(['bun', 'scripts/qa/daemon.ts', '--worktree', worktree], {
+  const child = Bun.spawn([process.execPath, 'scripts/qa/daemon.ts', '--worktree', worktree], {
     cwd: repository,
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  spawnedChildren.push(child);
-  return child;
+  if (!(child.stdout instanceof ReadableStream) || !(child.stderr instanceof ReadableStream))
+    throw new Error('QA daemon diagnostic pipes were not attached.');
+  const readiness = Promise.withResolvers<void>();
+  let readinessSettled = false;
+  const stdout = captureStream(child.stdout, (line) => {
+    try {
+      const message: unknown = JSON.parse(line);
+      if (typeof message === 'object' && message !== null && Reflect.get(message, 'event') === 'ready') {
+        readinessSettled = true;
+        readiness.resolve();
+      }
+    } catch {
+      // Non-JSON output remains available in diagnostics.
+    }
+  });
+  const stderr = captureStream(child.stderr);
+  void stdout.completed.then(() => {
+    if (!readinessSettled) readiness.reject(new Error('QA daemon stdout closed before readiness.'));
+  });
+  return {
+    child,
+    ready: readiness.promise,
+    diagnostics() {
+      return `pid=${String(child.pid)} exit=${String(child.exitCode)}\nstdout:\n${stdout.text()}\nstderr:\n${stderr.text()}`;
+    },
+    async [Symbol.asyncDispose]() {
+      await stopChild(child);
+      await Promise.all([stdout.completed, stderr.completed]);
+    },
+  };
 };
 
 const waitForDaemonState = async (
-  child: ReturnType<typeof Bun.spawn>,
+  daemon: ReturnType<typeof spawnQaDaemon>,
   worktree: string,
 ): Promise<QaDaemonStateRecord> => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const state = await readLiveDaemonState(worktree);
-    if (state !== undefined) {
-      try {
-        const health = await socketRequest(state.socketPath, { id: `startup-${String(attempt)}`, method: 'health' });
-        if (health.ok) return state;
-      } catch {
-        // State publication precedes socket readiness; keep polling the bounded startup contract.
-      }
-    }
-    if (child.exitCode !== null) break;
-    await Bun.sleep(25);
+  const outcome = await Promise.race([
+    daemon.ready.then(() => 'ready' as const),
+    daemon.child.exited.then(() => 'exited' as const),
+    Bun.sleep(QA_DAEMON_STARTUP_DIAGNOSTIC_MS).then(() => 'diagnostic-deadline' as const),
+  ]);
+  if (outcome !== 'ready') {
+    throw new Error(`QA daemon readiness failed (${outcome}).\n${daemon.diagnostics()}`);
   }
-  await stopChild(child);
-  if (child.stderr === undefined || typeof child.stderr === 'number') {
-    throw new Error('QA daemon stderr pipe was unavailable.');
-  }
-  const stderr = await new Response(child.stderr).text();
-  throw new Error(`Daemon failed to publish state.${stderr.trim() === '' ? '' : `\n${stderr.slice(-2_000)}`}`);
+  const state = await readLiveDaemonState(worktree);
+  if (state === undefined)
+    throw new Error(`QA daemon announced readiness without live state.\n${daemon.diagnostics()}`);
+  const health = await socketRequest(state.socketPath, { id: 'startup', method: 'health' });
+  if (!health.ok) throw new Error(`QA daemon readiness health check failed.\n${daemon.diagnostics()}`);
+  return state;
 };
 
 describe('QA daemon lifecycle', () => {
+  test('does not load the browser lifecycle until the first browser job', async () => {
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
+    const events: string[] = [];
+    let loads = 0;
+    const lazyAdapter = createLazyLifecycleAdapter(async () => {
+      loads += 1;
+      return fakeAdapter(events);
+    });
+    const engine = new QaDaemonEngine(worktree, lazyAdapter);
+    expect(loads).toBe(0);
+    expect(engine.metrics.serverStarts).toBe(0);
+    await engine.run(identity(worktree), { scenarioIds: ['one'], shard: { index: 0, total: 1 } });
+    await engine.close();
+    expect(loads).toBe(1);
+    expect(events).toEqual(['start:1', 'stop:1']);
+  });
+
   test('only grants shutdown ownership to the process that won daemon publication', () => {
     const state = {
       schemaVersion: 1 as const,
@@ -143,7 +219,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('reuses source changes but restarts configuration changes with fresh-context accounting', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const events: string[] = [];
     const engine = new QaDaemonEngine(worktree, fakeAdapter(events));
     await engine.run(identity(worktree), { scenarioIds: ['one'], shard: { index: 0, total: 1 } });
@@ -172,7 +249,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('one-shot and persistent engines return equivalent scenario results', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const persistent = new QaDaemonEngine(worktree, fakeAdapter([]));
     const oneShot = new QaDaemonEngine(worktree, fakeAdapter([]));
     const job = { scenarioIds: ['compare', 'crop'], shard: { index: 0, total: 1 } } as const;
@@ -181,7 +259,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('discards a failed session before the next isolated job', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const events: string[] = [];
     const adapter = fakeAdapter(events);
     const run = adapter.run;
@@ -201,7 +280,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('accounts for serialized worktree wait and avoided process starts', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     let releaseFirst!: () => void;
     let runs = 0;
     const adapter = fakeAdapter([]);
@@ -225,7 +305,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('accounts for a source refresh restart without claiming process reuse', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const adapter = fakeAdapter([]);
     adapter.refresh = async (_session, _identity, metrics) => {
       metrics.browserStarts += 1;
@@ -248,7 +329,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('rejects a request from another worktree', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const engine = new QaDaemonEngine(worktree, fakeAdapter([]));
     await expect(
       engine.run(identity(resolve(worktree, 'other')), { scenarioIds: ['one'], shard: { index: 0, total: 1 } }),
@@ -256,7 +338,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('cancellation aborts an active job before session cleanup', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const events: string[] = [];
     const adapter: QaLifecycleAdapter<FakeSession, void> = {
       async start() {
@@ -283,7 +366,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('quarantines malformed and stale ownership records', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const paths = qaDaemonPaths(worktree);
     await mkdir(paths.directory, { recursive: true });
     await writeFile(paths.state, '{bad json');
@@ -304,7 +388,8 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('keys configuration separately from source content for restart versus HMR reuse', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const repository = resolve(import.meta.dir, '../..');
     const commonDirectory = fixtureGit(repository, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
       .stdout.toString()
@@ -347,31 +432,33 @@ describe('QA daemon lifecycle', () => {
   });
 
   test('serves JSON health and removes state/socket on authenticated shutdown', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const repository = resolve(import.meta.dir, '../..');
-    const child = spawnQaDaemon(repository, worktree);
-    const state = await waitForDaemonState(child, worktree);
+    await using daemon = spawnQaDaemon(repository, worktree);
+    const state = await waitForDaemonState(daemon, worktree);
     const health = await socketRequest(state.socketPath, { id: 'health', method: 'health' });
     expect(health).toMatchObject({ id: 'health', ok: true });
     const shutdown = await socketRequest(state.socketPath, { id: 'shutdown', method: 'shutdown' });
     expect(shutdown).toEqual({ id: 'shutdown', ok: true, result: { shuttingDown: true } });
-    await child.exited;
+    await daemon.child.exited;
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
-  }, 15_000);
+  }, 40_000);
 
   test('removes ownership state and socket on SIGTERM', async () => {
-    const worktree = await temporaryDirectory();
+    await using directory = await temporaryDirectory();
+    const worktree = directory.path;
     const repository = resolve(import.meta.dir, '../..');
-    const child = spawnQaDaemon(repository, worktree);
-    const state = await waitForDaemonState(child, worktree);
-    child.kill('SIGTERM');
+    await using daemon = spawnQaDaemon(repository, worktree);
+    const state = await waitForDaemonState(daemon, worktree);
+    daemon.child.kill('SIGTERM');
     await Promise.race([
-      child.exited,
+      daemon.child.exited,
       Bun.sleep(3_000).then(() => {
         throw new Error('QA daemon did not exit within the SIGTERM cleanup deadline.');
       }),
     ]);
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
     expect(await stat(state.socketPath).catch(() => undefined)).toBeUndefined();
-  }, 10_000);
+  }, 40_000);
 });

@@ -195,7 +195,7 @@ async function setInputValue(container: Element, testId: string, value: string) 
 
 async function setElementValue(input: HTMLInputElement, value: string) {
   await act(async () => {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await Bun.sleep(50);
   });
   const user = userEvent.setup({ delay: 1 });
   await user.click(input);
