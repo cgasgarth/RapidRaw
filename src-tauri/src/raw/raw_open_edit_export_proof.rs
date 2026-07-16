@@ -401,6 +401,7 @@ fn run_raw_open_edit_export_proof_with_context(
         .ok_or_else(|| "RAW graph trace requires a RawDevelopmentReport".to_string())?;
 
     let empty_adjustments = json!({
+        "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
         "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
     });
     let is_raw = is_raw_file(&source_path_string);
@@ -666,7 +667,13 @@ fn run_raw_open_edit_export_proof_with_context(
     let sidecar_reload_revision_match = reloaded_sidecar_json
         .pointer("/rawOpenEditExportProof/editGraphRevision")
         .and_then(Value::as_str)
-        == Some(request.edit_command.expected_graph_revision.as_str());
+        == Some(request.edit_command.expected_graph_revision.as_str())
+        && reloaded_sidecar_json
+            .pointer("/adjustments/rawEngineEditGraphVersion")
+            .and_then(Value::as_u64)
+            == Some(u64::from(
+                crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+            ));
     let save_reopen_film_node_hash_equal = if let Some(node) = adjustments.get("filmEmulation") {
         reloaded_sidecar_json
             .pointer("/adjustments/filmEmulation")
@@ -1150,7 +1157,7 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
         return Err("editCommand requires approved edit_apply approval.".to_string());
     }
 
-    match command.command_type.as_str() {
+    let mut adjustments = match command.command_type.as_str() {
         "toneColor.setBasicTone" => basic_tone_adjustments(&command.parameters),
         "toneColor.setWhiteBalance" => white_balance_adjustments(&command.parameters),
         "toneColor.adjustHsl" => selective_color_adjustments(&command.parameters),
@@ -1162,7 +1169,15 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
             "editCommand.commandType is not supported by the RAW open/edit/export proof command."
                 .to_string(),
         ),
-    }
+    }?;
+    adjustments
+        .as_object_mut()
+        .ok_or_else(|| "proof command adjustments must be an object".to_string())?
+        .insert(
+            "rawEngineEditGraphVersion".to_string(),
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION.into(),
+        );
+    Ok(adjustments)
 }
 
 fn film_emulation_adjustments(parameters: &Value) -> Result<Value, String> {
