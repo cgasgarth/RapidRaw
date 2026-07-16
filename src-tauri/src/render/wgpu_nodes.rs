@@ -652,6 +652,14 @@ mod tests {
                 WgpuDispatchPhase::DisplayTransport,
             ]
         );
+        assert_eq!(
+            runtime
+                .dispatch_groups()
+                .iter()
+                .map(|group| group.phase.shader_execution_phase())
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
         assert!(
             runtime
                 .dispatch_groups()

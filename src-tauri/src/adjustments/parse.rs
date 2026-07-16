@@ -994,7 +994,7 @@ pub fn get_all_adjustments_from_json_with_masks(
         tile_offset_y: 0,
         mask_atlas_cols: 1,
         blur_pass_flags: 0,
-        execution_phase: 0,
+        execution_phase: 1,
         source_width: 0,
         source_height: 0,
     }
@@ -1004,6 +1004,12 @@ pub fn get_all_adjustments_from_json_with_masks(
 mod tests {
     use super::get_all_adjustments_from_json;
     use serde_json::json;
+
+    #[test]
+    fn parsed_adjustments_start_at_the_current_scene_phase() {
+        let adjustments = get_all_adjustments_from_json(&json!({}), true, None);
+        assert_eq!(adjustments.execution_phase, 1);
+    }
 
     #[test]
     fn effects_enablement_controls_render_values_and_preserves_legacy_migration() {

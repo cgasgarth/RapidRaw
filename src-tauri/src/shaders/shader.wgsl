@@ -536,15 +536,6 @@ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     return select(higher, lower, c <= cutoff);
 }
 
-fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
-    let c_clamped = clamp(c, vec3<f32>(0.0), vec3<f32>(1.0));
-    let cutoff = vec3<f32>(0.0031308);
-    let a = vec3<f32>(0.055);
-    let higher = (1.0 + a) * pow(c_clamped, vec3<f32>(1.0 / 2.4)) - a;
-    let lower = c_clamped * 12.92;
-    return select(higher, lower, c_clamped <= cutoff);
-}
-
 fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
     let magnitude = abs(c);
     let cutoff = vec3<f32>(0.0031308);
@@ -2211,10 +2202,6 @@ fn rapid_view_encode_signed(color: vec3<f32>) -> vec3<f32> {
     return sign(color) * select(higher, lower, magnitude <= vec3<f32>(0.0031308));
 }
 
-fn no_tonemap(c: vec3<f32>) -> vec3<f32> {
-    return c;
-}
-
 fn is_default_curve(points: array<Point, 16>, count: u32) -> bool {
     if (count < 2u) {
         return false;
@@ -2464,11 +2451,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let out_dims = vec2<u32>(textureDimensions(output_texture));
     if (id.x >= out_dims.x || id.y >= out_dims.y) { return; }
 
+    let execution_phase = adjustments.execution_phase;
+    if (execution_phase < 1u || execution_phase > 3u) { return; }
+
     const REFERENCE_DIMENSION: f32 = 1080.0;
     let source_dims = select(
         textureDimensions(input_texture),
         vec2<u32>(adjustments.source_width, adjustments.source_height),
-        adjustments.execution_phase >= 2u,
+        execution_phase >= 2u,
     );
     let full_dims = vec2<f32>(source_dims);
     let current_ref_dim = min(full_dims.x, full_dims.y);
@@ -2476,10 +2466,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     let absolute_coord = id.xy + vec2<u32>(adjustments.tile_offset_x, adjustments.tile_offset_y);
     let absolute_coord_i = vec2<i32>(absolute_coord);
-    let scene_input_phase = adjustments.execution_phase <= 1u;
-    let view_input_phase = adjustments.execution_phase == 2u;
-    let view_execution_phase = adjustments.execution_phase == 0u || view_input_phase;
-    let display_phase = adjustments.execution_phase == 3u;
+    let scene_input_phase = execution_phase == 1u;
+    let view_input_phase = execution_phase == 2u;
     let input_coord = select(id.xy, absolute_coord, scene_input_phase);
 
     let ca_rc = adjustments.global.chromatic_aberration_red_cyan;
@@ -2878,24 +2866,24 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         composite_rgb_linear = apply_film_emulation(composite_rgb_linear, absolute_coord);
     }
 
-    if (adjustments.execution_phase == 1u) {
+    if (scene_input_phase) {
         textureStore(output_texture, id.xy, vec4<f32>(composite_rgb_linear, original_alpha));
         return;
     }
 
     var base_srgb = color_from_texture;
-    if (view_execution_phase && adjustments.global.tonemapper_mode == 2u) {
+    if (view_input_phase && adjustments.global.tonemapper_mode == 2u) {
         base_srgb = rapid_view_encode_signed(rapid_view_transform(composite_rgb_linear));
-    } else if (view_execution_phase && adjustments.global.tonemapper_mode == 1u) {
+    } else if (view_input_phase && adjustments.global.tonemapper_mode == 1u) {
         base_srgb = agx_full_transform(composite_rgb_linear);
-    } else if (view_execution_phase && is_raw == 1u) {
+    } else if (view_input_phase && is_raw == 1u) {
         var srgb_emulated = linear_to_srgb_extended(composite_rgb_linear);
         const BRIGHTNESS_GAMMA: f32 = 1.1;
         srgb_emulated = pow(srgb_emulated, vec3<f32>(1.0 / BRIGHTNESS_GAMMA));
         const CONTRAST_MIX: f32 = 0.75;
         let contrast_curve = srgb_emulated * srgb_emulated * (3.0 - 2.0 * srgb_emulated);
         base_srgb = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
-    } else if (view_execution_phase) {
+    } else if (view_input_phase) {
         base_srgb = linear_to_srgb_extended(composite_rgb_linear);
     }
 
