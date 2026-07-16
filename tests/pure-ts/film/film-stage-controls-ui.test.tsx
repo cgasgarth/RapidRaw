@@ -39,10 +39,8 @@ describe('Film stage controls UI', () => {
         }),
       ),
     );
-    const slider = view.container.querySelector<HTMLInputElement>('input[type="range"]');
-    expect(slider?.getAttribute('aria-label')).toBe(`${responseLabelKey} slider`);
-    expect(view.container.querySelector('[data-stage-modified="false"]')).not.toBeNull();
-    if (slider === null) throw new Error('Expected descriptor slider');
+    const slider = view.getByRole('slider', { name: `${responseLabelKey} slider` });
+    expect(view.getByLabelText('Profile default')).toHaveAttribute('data-stage-modified', 'false');
     await act(async () => {
       slider.value = '1.25';
       const reactPropsKey = Object.keys(slider).find((key) => key.startsWith('__reactProps$'));
@@ -64,9 +62,7 @@ describe('Film stage controls UI', () => {
         }),
       ),
     );
-    const reset = view.container.querySelector<HTMLButtonElement>('button[aria-label*="Reset"]');
-    expect(reset).not.toBeNull();
-    if (reset === null) throw new Error('Expected reset control');
+    const reset = view.getByRole('button', { name: /Reset/ });
     fireEvent.click(reset);
     expect(resets).toEqual(['reference_luminance_shaper_p']);
   });

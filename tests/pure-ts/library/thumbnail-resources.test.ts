@@ -1,11 +1,14 @@
-import { beforeEach, expect, mock, test } from 'bun:test';
+import { afterAll, beforeEach, expect, mock, test } from 'bun:test';
 
 const invoke = mock(async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
 const created: string[] = [];
 const revoked: string[] = [];
-Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Macintosh' } });
+const originalUserAgent = Object.getOwnPropertyDescriptor(navigator, 'userAgent');
+const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Macintosh' });
 Object.defineProperty(URL, 'createObjectURL', {
   configurable: true,
   value: mock(() => {
@@ -30,6 +33,12 @@ const descriptor = (revision: string, generation: number) => ({
   revision: revision.repeat(64),
   source: 'generated' as const,
   width: 40,
+});
+
+afterAll(() => {
+  restoreProperty(navigator, 'userAgent', originalUserAgent);
+  restoreProperty(URL, 'createObjectURL', originalCreateObjectUrl);
+  restoreProperty(URL, 'revokeObjectURL', originalRevokeObjectUrl);
 });
 
 beforeEach(() => {
@@ -57,3 +66,8 @@ test('binary fallback revokes each replaced object URL exactly once', async () =
   expect(invoke).toHaveBeenCalledTimes(2);
   expect(revoked).toEqual(['blob:test-0', 'blob:test-1']);
 });
+
+function restoreProperty(target: object, property: PropertyKey, descriptor: PropertyDescriptor | undefined) {
+  if (descriptor === undefined) Reflect.deleteProperty(target, property);
+  else Object.defineProperty(target, property, descriptor);
+}

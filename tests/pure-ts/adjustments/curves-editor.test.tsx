@@ -225,7 +225,7 @@ test('numeric point editing commits valid changes and Escape does not add histor
   const changes: Adjustments[] = [];
   const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
   initialAdjustments.curves.luma[0] = { x: 0, y: 0.4 };
-  const { container } = await renderCurveEditor(changes, initialAdjustments);
+  const { container, getByRole } = await renderCurveEditor(changes, initialAdjustments);
   const point = container.querySelector<SVGCircleElement>('circle[role="button"]');
   if (!point) throw new Error('Expected an accessible curve point.');
 
@@ -235,8 +235,8 @@ test('numeric point editing commits valid changes and Escape does not add histor
     await flushPromises();
   });
 
-  const yInput = container.querySelector<HTMLInputElement>('input[aria-label="Y Axis"]');
-  if (!yInput) throw new Error('Expected the selected point Y input.');
+  const yInput = getByRole('spinbutton', { name: 'Y Axis' });
+  if (!(yInput instanceof window.HTMLInputElement)) throw new Error('Expected the selected point Y input.');
   fireEvent.change(yInput, { target: { value: '42' } });
   const cancelPropsKey = Object.keys(yInput).find((key) => key.startsWith('__reactProps$'));
   const cancelProps = cancelPropsKey === undefined ? null : Reflect.get(yInput, cancelPropsKey);
@@ -247,8 +247,10 @@ test('numeric point editing commits valid changes and Escape does not add histor
   await act(flushPromises);
   expect(changes).toHaveLength(0);
 
-  const committedYInput = container.querySelector<HTMLInputElement>('input[aria-label="Y Axis"]');
-  if (!committedYInput) throw new Error('Expected the selected point Y input after cancelling the draft.');
+  const committedYInput = getByRole('spinbutton', { name: 'Y Axis' });
+  if (!(committedYInput instanceof window.HTMLInputElement)) {
+    throw new Error('Expected the selected point Y input after cancelling the draft.');
+  }
   fireEvent.change(committedYInput, { target: { value: '42' } });
   const reactPropsKey = Object.keys(committedYInput).find((key) => key.startsWith('__reactProps$'));
   const reactProps = reactPropsKey === undefined ? null : Reflect.get(committedYInput, reactPropsKey);

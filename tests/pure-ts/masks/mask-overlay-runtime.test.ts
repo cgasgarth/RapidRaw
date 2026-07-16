@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
@@ -14,56 +14,14 @@ import {
   type MaskPreviewDefinition,
 } from '../../../src/utils/mask/maskOverlayRequest';
 
-const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-
-class MemoryStorage implements Storage {
-  private readonly values = new Map<string, string>();
-
-  get length() {
-    return this.values.size;
-  }
-
-  clear() {
-    this.values.clear();
-  }
-
-  getItem(key: string) {
-    return this.values.get(key) ?? null;
-  }
-
-  key(index: number) {
-    return Array.from(this.values.keys())[index] ?? null;
-  }
-
-  removeItem(key: string) {
-    this.values.delete(key);
-  }
-
-  setItem(key: string, value: string) {
-    this.values.set(key, value);
-  }
-}
-
-function installMemoryStorage() {
-  const storage = new MemoryStorage();
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: storage,
-  });
-  return storage;
-}
+beforeEach(() => localStorage.clear());
 
 afterEach(() => {
-  if (originalLocalStorageDescriptor) {
-    Object.defineProperty(globalThis, 'localStorage', originalLocalStorageDescriptor);
-  } else {
-    delete (globalThis as { localStorage?: Storage }).localStorage;
-  }
+  localStorage.clear();
 });
 
 test('mask overlay preferences normalize persisted mode and opacity', () => {
-  const storage = installMemoryStorage();
-  storage.setItem(
+  localStorage.setItem(
     'rawengine.maskOverlaySettings.v1',
     JSON.stringify({ edgeThreshold: 1.5, mode: 'edges', opacity: -0.25 }),
   );
