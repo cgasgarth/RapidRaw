@@ -62,6 +62,7 @@ export const runScopedAutofix = (
 ): number => {
   if (paths.length === 0) return 0;
   const [executable, ...command] = biomeCommand;
+  if (executable === undefined) throw new Error('Scoped autofix requires a formatter executable.');
   const formatted: Array<{
     blob: string;
     formattedContent: Buffer;
@@ -80,6 +81,8 @@ export const runScopedAutofix = (
     const metadata = indexEntry.stdout.toString().split('\0')[0] ?? '';
     const match = /^(\d+)\s+([0-9a-f]+)\s+\d+\t/u.exec(metadata);
     if (match === null) return 1;
+    const mode = match[1];
+    if (mode === undefined) return 1;
     const staged = spawnSync('git', ['show', `:${path}`], {
       cwd: root,
       encoding: 'buffer',
@@ -108,7 +111,7 @@ export const runScopedAutofix = (
     formatted.push({
       blob: nextBlob.stdout.trim(),
       formattedContent: fix.stdout,
-      mode: match[1],
+      mode,
       path,
       stagedContent: staged.stdout,
       synchronizeWorkingCopy: workingContent?.equals(staged.stdout) ?? false,
