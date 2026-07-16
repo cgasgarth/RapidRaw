@@ -150,6 +150,10 @@ describe('editor persistence effect runner', () => {
   test('seals migration-shaped editor state into the exact strict current native request', () => {
     const migrationShaped = legacyAdjustmentsToEditDocumentV2(adjustments(0.75));
     migrationShaped.extensions['quarantinedNodes'] = { future_curve_v3: { schemaVersion: 3 } };
+    const sceneCurve = migrationShaped.nodes['scene_curve'];
+    if (sceneCurve === undefined) throw new Error('Expected current scene-curve node.');
+    sceneCurve.params['sceneCurveV1'] = undefined;
+    sceneCurve.params['outputCurveV1'] = undefined;
 
     const request = buildEditorPersistenceRequest({
       editDocumentV2: migrationShaped,
@@ -166,7 +170,11 @@ describe('editor persistence effect runner', () => {
       quarantinedNodes: { future_curve_v3: { schemaVersion: 3 } },
     });
     expect(request.editDocumentV2).not.toHaveProperty('migration');
-    expect(JSON.stringify(request)).not.toContain('legacyAdjustments');
+    expect(request.editDocumentV2.nodes['scene_curve']?.params).not.toHaveProperty('sceneCurveV1');
+    expect(request.editDocumentV2.nodes['scene_curve']?.params).not.toHaveProperty('outputCurveV1');
+    const serializedCommand: unknown = JSON.parse(JSON.stringify(request));
+    expect(JSON.stringify(serializedCommand)).not.toContain('legacyAdjustments');
+    expect(editorPersistenceRequestSchema.parse(serializedCommand)).toEqual(request);
     expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
   });
 
@@ -203,7 +211,7 @@ describe('editor persistence effect runner', () => {
     expect(persisted).toEqual({ catalogRevision: 7, request: valid, sidecarRevision: 'sha256:last-valid' });
   });
 
-  test('persists a committed edit through autosave and exact restart/reopen hydration', async () => {
+  test('feeds the exact current native envelope through loaded-metadata restart/reopen hydration', async () => {
     let persisted: ReturnType<typeof buildEditorPersistenceRequest> | null = null;
     const { accepted, clock, failures, runner } = harness(async (execution) => {
       persisted = buildEditorPersistenceRequest({
@@ -215,8 +223,8 @@ describe('editor persistence effect runner', () => {
     });
     const initial = currentDocument(0);
     runner.installSession(input({ adjustmentRevision: 0, adjustments: adjustments(0), editDocumentV2: initial }));
-    const edited = currentDocument(1.25);
-    runner.submitCommitted(input({ adjustments: adjustments(1.25), editDocumentV2: edited }), 0);
+    const edited = currentDocument(0.65);
+    runner.submitCommitted(input({ adjustments: adjustments(0.65), editDocumentV2: edited }), 0);
     clock.advance(0);
     await flush();
 
@@ -224,8 +232,20 @@ describe('editor persistence effect runner', () => {
     expect(accepted).toHaveLength(1);
     if (persisted === null) throw new Error('Expected autosave persistence request.');
     const restarted = JSON.parse(JSON.stringify(persisted)) as { editDocumentV2: unknown };
-    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: restarted.editDocumentV2 }, adjustments(1.25));
+    const nativeEnvelope = {
+      adjustments: null,
+      editDocumentV2: restarted.editDocumentV2,
+      rating: 0,
+      tags: null,
+    };
+    const nativeDocument = nativeEnvelope.editDocumentV2 as ReturnType<typeof currentDocument>;
+    expect(nativeDocument.nodes['scene_curve']?.params).not.toHaveProperty('sceneCurveV1');
+    expect(nativeDocument.nodes['scene_curve']?.params).not.toHaveProperty('outputCurveV1');
+    expect(nativeDocument.extensions).toEqual({});
+
+    const reopened = hydrateImageOpenEditDocumentV2(nativeEnvelope, adjustments(0.65));
     expect(reopened).toEqual(edited);
+    expect(reopened.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.65);
   });
 
   test('accepts native receipt envelopes for primary and multi-selection saves', () => {

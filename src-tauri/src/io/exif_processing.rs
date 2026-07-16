@@ -1814,6 +1814,27 @@ mod tests {
         let sidecar = get_primary_sidecar_path(&source);
         let mut metadata = metadata_for(&source);
 
+        // Exercise the exact typed command boundary before the sidecar writer. Absent
+        // optional current fields must stay omitted when the native document is
+        // serialized, or the strict TypeScript load boundary cannot reopen it.
+        let typed_document = serde_json::from_value::<
+            crate::adjustments::edit_document_v2::EditDocumentV2,
+        >(metadata.edit_document_v2.take().unwrap())
+        .unwrap();
+        metadata.edit_document_v2 = Some(serde_json::to_value(typed_document).unwrap());
+        let typed_json = metadata.edit_document_v2.as_ref().unwrap();
+        assert!(
+            typed_json["nodes"]["scene_curve"]["params"]
+                .get("sceneCurveV1")
+                .is_none()
+        );
+        assert!(
+            typed_json["nodes"]["scene_curve"]["params"]
+                .get("outputCurveV1")
+                .is_none()
+        );
+        assert_eq!(typed_json["extensions"], serde_json::json!({}));
+
         metadata.edit_document_v2.as_mut().unwrap()["nodes"]["scene_global_color_tone"]["params"]
             ["exposure"] = serde_json::json!(0.4);
         save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
@@ -1867,8 +1888,23 @@ mod tests {
                 ["exposure"],
             serde_json::json!(1.6)
         );
-        serde_json::from_slice::<CurrentSidecarEnvelope>(&fs::read(&sidecar).unwrap())
-            .expect("atomic sidecar must always be a complete current envelope");
+        let persisted =
+            serde_json::from_slice::<CurrentSidecarEnvelope>(&fs::read(&sidecar).unwrap())
+                .expect("atomic sidecar must always be a complete current envelope");
+        assert!(
+            persisted.edit_document_v2["nodes"]["scene_curve"]["params"]
+                .get("sceneCurveV1")
+                .is_none()
+        );
+        assert!(
+            persisted.edit_document_v2["nodes"]["scene_curve"]["params"]
+                .get("outputCurveV1")
+                .is_none()
+        );
+        assert_eq!(
+            persisted.edit_document_v2["extensions"],
+            serde_json::json!({})
+        );
     }
 
     #[test]

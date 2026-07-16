@@ -455,7 +455,7 @@ export const prepareEditDocumentV2ForRender = (
  */
 export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
   const quarantinedNodes = document.extensions['quarantinedNodes'];
-  return currentRenderEditDocumentV2Schema.parse({
+  const current = currentRenderEditDocumentV2Schema.parse({
     extensions: quarantinedNodes === undefined ? {} : { quarantinedNodes },
     geometry: document.geometry,
     graphProcess: document.graphProcess,
@@ -466,6 +466,8 @@ export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): E
     sourceDecode: document.sourceDecode,
     sourceArtifacts: document.sourceArtifacts,
   });
+  const jsonSafe: unknown = JSON.parse(JSON.stringify(current));
+  return currentRenderEditDocumentV2Schema.parse(jsonSafe);
 };
 
 export interface PreparedCurrentEditDocumentPayload {
