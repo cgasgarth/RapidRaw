@@ -38,7 +38,7 @@ describe('viewer brush interaction controller', () => {
     const [overlay] = controller.overlays();
     const [commit] = controller.end(context());
     expect(commit).toMatchObject({ kind: 'commit', line: { brushSize: 24, feather: 0.5, tool: 'brush' } });
-    expect(overlay?.imageLine).toEqual(commit?.kind === 'commit' ? commit.line : null);
+    expect(overlay?.imageLine).toEqual(commit?.kind === 'commit' ? commit.line : undefined);
   });
 
   test('preserves touch and pressure-bearing pen samples and latest Alt state', () => {

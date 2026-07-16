@@ -30,6 +30,12 @@ const selectedImage = {
   width: 4000,
 };
 
+const requireStoredBrushLines = (parameters: Record<string, unknown> | undefined): readonly unknown[] => {
+  const lines = parameters?.['lines'];
+  if (!Array.isArray(lines)) throw new Error('Expected stored brush lines.');
+  return lines;
+};
+
 const installState = (explicitSession: boolean): string => {
   const imageSession = explicitSession
     ? createEditorImageSession({ generation: 51, path: sourcePath, source: 'cache' })
@@ -132,7 +138,7 @@ const captureCommit = (imageSessionId: string, overrides: Partial<ViewerBrushCur
     current,
     imagePath: sourcePath,
     imageSize: { height: selectedImage.height, width: selectedImage.width },
-    parameters: subMask.parameters,
+    parameters: subMask.parameters ?? {},
     subMask,
   });
   if (result === null) throw new Error('expected semantic brush commit');
@@ -158,11 +164,12 @@ describe('viewer brush edit transaction', () => {
     const state = useEditorStore.getState();
 
     expect(result).toMatchObject({ changedKeys: ['masks'], nextAdjustmentRevision: 1, noOp: false });
-    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines).toHaveLength(1);
-    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines?.[0]?.points).toMatchObject([
-      { pressure: 0.25 },
-      { pressure: 0.8 },
-    ]);
+    const storedLines = requireStoredBrushLines(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters);
+    expect(storedLines).toHaveLength(1);
+    const firstLine = storedLines[0];
+    const storedPoints =
+      typeof firstLine === 'object' && firstLine !== null && 'points' in firstLine ? firstLine.points : undefined;
+    expect(storedPoints).toMatchObject([{ pressure: 0.25 }, { pressure: 0.8 }]);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
     expect(state.lastEditApplicationReceipt).toMatchObject({
@@ -174,7 +181,9 @@ describe('viewer brush edit transaction', () => {
     expect(state.navigatorPreviewArtifact).toBeNull();
 
     state.undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines).toEqual([]);
+    expect(
+      requireStoredBrushLines(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters),
+    ).toEqual([]);
   });
 
   test('treats an exact current-state replay as a no-op without history or output invalidation', () => {
@@ -258,9 +267,9 @@ describe('viewer brush edit transaction', () => {
     );
 
     expect(result).toMatchObject({ changedKeys: ['aiPatches'], nextAdjustmentRevision: 1, noOp: false });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.subMasks[0]?.parameters.lines).toHaveLength(
-      1,
-    );
+    expect(
+      requireStoredBrushLines(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.subMasks[0]?.parameters),
+    ).toHaveLength(1);
     expect(useEditorStore.getState().history).toHaveLength(2);
   });
 

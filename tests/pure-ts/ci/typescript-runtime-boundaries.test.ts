@@ -20,8 +20,15 @@ const baseConfigSchema = z.object({
 });
 
 const packageSchema = z.object({
+  dependencies: z.record(z.string(), z.string()),
   devDependencies: z.record(z.string(), z.string()),
   scripts: z.record(z.string(), z.string()),
+});
+
+const installedPackageSchema = z.object({
+  name: z.string(),
+  peerDependencies: z.record(z.string(), z.string()).optional(),
+  version: z.string(),
 });
 
 afterAll(async () => {
@@ -92,5 +99,31 @@ describe('TypeScript 7 runtime project boundaries', () => {
     expect(Object.keys(packageJson.devDependencies).filter((name) => name.startsWith('@typescript/'))).toEqual([]);
     expect(Object.keys(packageJson.scripts).filter((name) => name.includes('compat'))).toEqual([]);
     expect(compilerVersion('node_modules/typescript/bin/tsc')).toMatch(/^Version 7\./u);
+  });
+
+  test('requires direct dependency TypeScript peers to accept the installed compiler', async () => {
+    const packageJson = packageSchema.parse(await Bun.file(resolve(repositoryRoot, 'package.json')).json());
+    const compiler = installedPackageSchema.parse(
+      await Bun.file(resolve(repositoryRoot, 'node_modules/typescript/package.json')).json(),
+    );
+    const directDependencyNames = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
+    const typedPeers: Array<{ name: string; range: string; version: string }> = [];
+
+    for (const dependencyName of directDependencyNames) {
+      const dependency = installedPackageSchema.parse(
+        await Bun.file(resolve(repositoryRoot, 'node_modules', dependencyName, 'package.json')).json(),
+      );
+      const range = dependency.peerDependencies?.['typescript'];
+      if (range !== undefined) typedPeers.push({ name: dependency.name, range, version: dependency.version });
+    }
+
+    expect(compiler.version).toMatch(/^7\./u);
+    expect(typedPeers.map(({ name }) => name).sort()).toEqual(['i18next', 'react-i18next']);
+    for (const dependency of typedPeers) {
+      expect({
+        acceptsInstalledCompiler: Bun.semver.satisfies(compiler.version, dependency.range),
+        dependency: `${dependency.name}@${dependency.version}`,
+      }).toEqual({ acceptsInstalledCompiler: true, dependency: `${dependency.name}@${dependency.version}` });
+    }
   });
 });

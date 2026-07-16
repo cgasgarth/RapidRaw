@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   createViewerObjectPromptInteractionController,
   type ViewerObjectPromptCurrentContext,
+  type ViewerObjectPromptKey,
   type ViewerObjectPromptSample,
 } from '../../../src/components/panel/editor/viewerObjectPromptInteractionController';
 import { readObjectPromptCanvasState } from '../../../src/utils/mask/objectMaskPromptCanvas';
@@ -24,12 +25,17 @@ const sample = (
   pointerType: ViewerObjectPromptSample['pointerType'] = 'mouse',
 ): ViewerObjectPromptSample => ({ imagePoint: { x, y }, pointerId: 4, pointerType });
 
+const expectedKey = (current: ViewerObjectPromptCurrentContext, operationGeneration: number): ViewerObjectPromptKey => {
+  if (!current.active) throw new Error('Expected active Object Prompt context.');
+  return { ...current, active: true, operationGeneration };
+};
+
 describe('viewer Object Prompt interaction controller', () => {
   test('emits keyed foreground and background point commands for mouse and touch', () => {
     const controller = createViewerObjectPromptInteractionController();
     const foreground = controller.activate(context(), sample(0.25, 0.4), { promptMode: 'foreground_point' });
     expect(foreground).toMatchObject({
-      key: { ...context(), operationGeneration: 1 },
+      key: expectedKey(context(), 1),
       kind: 'commit-object-prompt',
     });
     expect(readObjectPromptCanvasState(foreground?.parameters).pointPrompts).toEqual([
@@ -41,7 +47,7 @@ describe('viewer Object Prompt interaction controller', () => {
       ...foreground?.parameters,
       promptMode: 'background_point',
     });
-    expect(background?.key).toEqual({ ...backgroundContext, operationGeneration: 2 });
+    expect(background?.key).toEqual(expectedKey(backgroundContext, 2));
     expect(readObjectPromptCanvasState(background?.parameters).pointPrompts.at(-1)).toEqual({
       label: 'background',
       x: 0.7,
@@ -90,11 +96,10 @@ describe('viewer Object Prompt interaction controller', () => {
       sourceIdentity: '/private/image-b.arw',
       sourceRevision: 'graph:10',
     });
-    expect(controller.activate(sourceA, sample(0.1, 0.2), {})?.key).toEqual({ ...sourceA, operationGeneration: 1 });
+    expect(controller.activate(sourceA, sample(0.1, 0.2), {})?.key).toEqual(expectedKey(sourceA, 1));
     expect(controller.activate(sourceB, sample(0.2, 0.3), { promptMode: 'background_point' })?.key).toEqual({
-      ...sourceB,
-      operationGeneration: 2,
+      ...expectedKey(sourceB, 2),
     });
-    expect(controller.activate(sourceA, sample(0.3, 0.4), {})?.key).toEqual({ ...sourceA, operationGeneration: 3 });
+    expect(controller.activate(sourceA, sample(0.3, 0.4), {})?.key).toEqual(expectedKey(sourceA, 3));
   });
 });
