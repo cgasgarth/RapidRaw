@@ -1,4 +1,11 @@
-const readPositiveInt = (name, fallback) => {
+interface BoundedOutputOptions {
+  headLines?: number;
+  maxChars?: number;
+  maxLines?: number;
+  tailLines?: number;
+}
+
+const readPositiveInt = (name: string, fallback: number): number => {
   const value = process.env[name];
   if (!value) return fallback;
 
@@ -11,7 +18,11 @@ const DEFAULT_MAX_FAILURE_LINES = readPositiveInt('RAWENGINE_COMPACT_MAX_LINES',
 const DEFAULT_HEAD_LINES = readPositiveInt('RAWENGINE_COMPACT_HEAD_LINES', 8);
 const DEFAULT_TAIL_LINES = readPositiveInt('RAWENGINE_COMPACT_TAIL_LINES', 12);
 
-export const formatCommandForLog = (command, args = [], { maxArgs = 10, maxChars = 240 } = {}) => {
+export const formatCommandForLog = (
+  command: string,
+  args: readonly string[] = [],
+  { maxArgs = 10, maxChars = 240 }: { maxArgs?: number; maxChars?: number } = {},
+): string => {
   const parts = [command, ...args].filter(Boolean);
   const visibleParts = parts.length > maxArgs ? [...parts.slice(0, maxArgs), `...(+${parts.length - maxArgs})`] : parts;
   const rendered = visibleParts.join(' ');
@@ -23,7 +34,10 @@ export const formatCommandForLog = (command, args = [], { maxArgs = 10, maxChars
   return `${rendered.slice(0, maxChars)}...`;
 };
 
-export const readBoundedStream = async (stream, { maxChars = DEFAULT_MAX_FAILURE_CHARS * 2 } = {}) => {
+export const readBoundedStream = async (
+  stream: ReadableStream<Uint8Array> | null | undefined,
+  { maxChars = DEFAULT_MAX_FAILURE_CHARS * 2 }: { maxChars?: number } = {},
+): Promise<string> => {
   if (!stream) return '';
 
   const reader = stream.getReader();
@@ -36,7 +50,7 @@ export const readBoundedStream = async (stream, { maxChars = DEFAULT_MAX_FAILURE
   let totalChars = 0;
   let truncated = false;
 
-  const append = (chunk) => {
+  const append = (chunk: string): void => {
     if (!chunk) return;
 
     totalChars += chunk.length;
@@ -70,15 +84,15 @@ export const readBoundedStream = async (stream, { maxChars = DEFAULT_MAX_FAILURE
 };
 
 export const writeBoundedOutput = (
-  name,
-  value,
+  name: string,
+  value: string,
   {
     maxChars = DEFAULT_MAX_FAILURE_CHARS,
     maxLines = DEFAULT_MAX_FAILURE_LINES,
     headLines = DEFAULT_HEAD_LINES,
     tailLines = DEFAULT_TAIL_LINES,
-  } = {},
-) => {
+  }: BoundedOutputOptions = {},
+): void => {
   if (!value) return;
 
   const normalized = value.endsWith('\n') ? value : `${value}\n`;

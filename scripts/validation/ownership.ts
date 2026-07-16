@@ -26,7 +26,9 @@ export const classesForPath = (path: string): InputClass[] => {
     for (const fallback of ['frontend', 'schema', 'rust', 'scripts'] as const) direct.add(fallback);
   const queue = [...direct];
   for (let index = 0; index < queue.length; index += 1) {
-    for (const dependency of classDependencies[queue[index]] ?? []) {
+    const input = queue[index];
+    if (input === undefined) continue;
+    for (const dependency of classDependencies[input] ?? []) {
       if (!direct.has(dependency)) {
         direct.add(dependency);
         queue.push(dependency);

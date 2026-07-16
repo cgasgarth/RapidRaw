@@ -52,7 +52,7 @@ class FakePort implements ReadyPrUpdatePort {
     return this.open;
   }
 
-  async behindBy(): Promise<number> {
+  async behindBy(_pr: PullRequestIdentity): Promise<number> {
     return this.behind;
   }
 
@@ -112,7 +112,7 @@ describe('ready PR branch freshness', () => {
   test('fails closed when the live base advances during selection', async () => {
     const port = new FakePort();
     let baseReads = 0;
-    port.readBaseSha = async () => {
+    port.readBaseSha = async (): Promise<string> => {
       baseReads += 1;
       return baseReads === 1 ? BASE_SHA : 'd'.repeat(40);
     };
@@ -125,7 +125,7 @@ describe('ready PR branch freshness', () => {
   test('does not dispatch stale checks when the live base advances after push', async () => {
     const port = new FakePort();
     let baseReads = 0;
-    port.readBaseSha = async () => {
+    port.readBaseSha = async (): Promise<string> => {
       baseReads += 1;
       return baseReads < 3 ? BASE_SHA : 'd'.repeat(40);
     };
@@ -136,10 +136,30 @@ describe('ready PR branch freshness', () => {
   });
 
   test.each([
-    ['current', (port: FakePort) => (port.behind = 0)],
-    ['draft', (port: FakePort) => (port.open = [candidate({ draft: true })])],
-    ['fork', (port: FakePort) => (port.open = [candidate({ headRepository: 'other/fork' })])],
-    ['active', (port: FakePort) => (port.active = true)],
+    [
+      'current',
+      (port: FakePort): void => {
+        port.behind = 0;
+      },
+    ],
+    [
+      'draft',
+      (port: FakePort): void => {
+        port.open = [candidate({ draft: true })];
+      },
+    ],
+    [
+      'fork',
+      (port: FakePort): void => {
+        port.open = [candidate({ headRepository: 'other/fork' })];
+      },
+    ],
+    [
+      'active',
+      (port: FakePort): void => {
+        port.active = true;
+      },
+    ],
   ] as const)('skips a %s head without merging or dispatching', async (disposition, arrange) => {
     const port = new FakePort();
     arrange(port);
@@ -244,10 +264,10 @@ describe('ready PR branch freshness', () => {
       };
       const fixtureEnvironment = isolatedGitEnvironment(hookEnvironment);
       expect(fixtureEnvironment).toMatchObject({ GIT_CONFIG_NOSYSTEM: '1' });
-      expect(fixtureEnvironment.GIT_CONFIG_GLOBAL).toBeDefined();
-      expect(fixtureEnvironment.GIT_DIR).toBeUndefined();
-      expect(fixtureEnvironment.GIT_INDEX_FILE).toBeUndefined();
-      expect(fixtureEnvironment.GIT_WORK_TREE).toBeUndefined();
+      expect(fixtureEnvironment['GIT_CONFIG_GLOBAL']).toBeDefined();
+      expect(fixtureEnvironment['GIT_DIR']).toBeUndefined();
+      expect(fixtureEnvironment['GIT_INDEX_FILE']).toBeUndefined();
+      expect(fixtureEnvironment['GIT_WORK_TREE']).toBeUndefined();
 
       git(root, ['init', '--bare', remote], fixtureEnvironment);
       git(repository, ['init'], fixtureEnvironment);
@@ -296,6 +316,7 @@ describe('ready PR branch freshness', () => {
       const remoteHead = git(repository, ['ls-remote', 'origin', 'refs/heads/codex/feature'], fixtureEnvironment).split(
         /\s+/u,
       )[0];
+      if (remoteHead === undefined) throw new Error('missing remote feature head');
       expect(remoteHead).toBe(result.headSha);
       git(repository, ['fetch', 'origin', 'codex/feature'], fixtureEnvironment);
       expect(git(repository, ['merge-base', '--is-ancestor', featureSha, remoteHead], fixtureEnvironment)).toBe('');

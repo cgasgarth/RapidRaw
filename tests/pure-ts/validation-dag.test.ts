@@ -903,9 +903,9 @@ await lease.release();`;
     expect(
       await Promise.all(parallelWorktrees.map((worktree) => runValidation([parallelProducer], options(worktree)))),
     ).toEqual([0, 0, 0]);
-    expect(validationOutputResource(parallelWorktrees[0], 'dist')).not.toBe(
-      validationOutputResource(parallelWorktrees[1], 'dist'),
-    );
+    const [firstWorktree, secondWorktree] = parallelWorktrees;
+    if (firstWorktree === undefined || secondWorktree === undefined) throw new Error('missing parallel worktrees');
+    expect(validationOutputResource(firstWorktree, 'dist')).not.toBe(validationOutputResource(secondWorktree, 'dist'));
     expect(await readdir(join(root, 'parallel-rendezvous'))).toHaveLength(3);
   });
 
@@ -940,7 +940,7 @@ await lease.release();`;
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-output-stress-'));
     const root = join(directory, 'worktree');
     const coordinator = join(directory, 'locks');
-    const children: Array<ReturnType<typeof Bun.spawn>> = [];
+    const children: Array<ReturnType<typeof spawnNestedOutputValidation>> = [];
     try {
       await mkdir(root);
       await writeFile(join(root, 'input.ts'), 'export const input = true;\n');
