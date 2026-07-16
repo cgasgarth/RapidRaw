@@ -2022,6 +2022,17 @@
     "provisionalCameraPreview": "Kameravorschau — RAW wird entwickelt",
     "provisionalCameraPreviewFailed": "Kameravorschau — RAW-Entwicklung fehlgeschlagen",
     "provisionalLibraryPreview": "Bibliotheksvorschau — RAW wird entwickelt",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2157,6 +2168,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "Blende",
         "backToLibrary": "Zurück zur Bibliothek",

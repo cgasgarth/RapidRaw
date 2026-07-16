@@ -32,6 +32,7 @@ import {
   createRendererHandoffState,
   type EditorPresentationDescriptor,
 } from '../../../utils/editorPresentationDescriptor';
+import type { EditorReferenceViewState } from '../../../utils/editorReferenceView';
 import { globalImageCache } from '../../../utils/ImageLRUCache';
 import {
   InteractivePreviewUrlRegistry,
@@ -60,6 +61,7 @@ import {
 import { getEdgeFadeStyle, MaskOverlay, OptimizedBrushLine } from './MaskOverlaySurface';
 import { type CanvasOverlayStatus, canvasOverlayTokens } from './overlays/canvasOverlayTokens';
 import { PreviewSurface } from './PreviewSurface';
+import { ReferenceViewOverlay } from './ReferenceViewOverlay';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
 import { useViewerToolRuntimeController } from './useViewerToolRuntimeController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
@@ -226,6 +228,8 @@ interface ImageCanvasProps {
   wgpuFrameSerial?: number;
   wgpuFailureSerial?: number;
   viewerSampleGraphRevision?: string;
+  referenceView?: EditorReferenceViewState;
+  onReferenceViewCommand?: (command: 'choose' | 'clear' | 'focus-active' | 'focus-reference' | 'toggle-sync') => void;
 }
 
 const ignoreViewerPickerCommit = (): void => undefined;
@@ -265,6 +269,8 @@ export const ImageCanvas = memo(
     wgpuFrameSerial = 0,
     wgpuFailureSerial = 0,
     viewerSampleGraphRevision = 'viewer-sample-unbound',
+    referenceView,
+    onReferenceViewCommand,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
     const {
@@ -1342,7 +1348,7 @@ export const ImageCanvas = memo(
         data-viewer-sampler-suppressed={String(viewerSamplerController.state.suppressed)}
         data-viewer-sampler-target={viewerSamplerController.state.target}
         data-testid="image-canvas"
-        onInputEvent={viewerInteraction.handleInputEvent}
+        onInputEvent={referenceView?.activePane === 'reference' ? () => undefined : viewerInteraction.handleInputEvent}
         onPointerLeave={() => {
           viewerSamplerController.handlePointerLeave();
           whiteBalanceController.cancelPreview();
@@ -1414,6 +1420,16 @@ export const ImageCanvas = memo(
               showSideBySideCompare={showSideBySideCompare}
               showSplitCompare={showSplitCompare}
             />
+            {referenceView && referenceView.mode !== 'off' && onReferenceViewCommand && (
+              <ReferenceViewOverlay
+                activePath={selectedImage.path}
+                onChoose={() => onReferenceViewCommand('choose')}
+                onClear={() => onReferenceViewCommand('clear')}
+                onFocus={(pane) => onReferenceViewCommand(pane === 'active' ? 'focus-active' : 'focus-reference')}
+                onToggleSync={() => onReferenceViewCommand('toggle-sync')}
+                state={referenceView}
+              />
+            )}
             <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
             <ViewerSamplerOverlay descriptor={viewerSamplerController.overlay} />
             <ViewerFocusRetouchOverlay descriptors={focusRetouchController.overlays} geometry={overlayGeometry} />

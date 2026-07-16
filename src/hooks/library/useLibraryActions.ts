@@ -10,6 +10,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -204,8 +205,22 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleImageClick = useCallback(
     (path: string, event: LibraryClickEvent) => {
       const { selectionAnchorPath, libraryActivePath, setLibrary } = useLibraryStore.getState();
-      const { selectedImage } = useEditorStore.getState();
+      const { selectedImage, referenceView, dispatchReferenceView } = useEditorStore.getState();
       const inEditor = !!selectedImage;
+
+      if (inEditor && referenceView.isChooserOpen && path !== selectedImage.path) {
+        dispatchReferenceView({
+          image: {
+            id: path,
+            label: path.split(/[\\/]/).pop() ?? path,
+            path,
+            renderUrl: thumbnailCache.get(path)?.url ?? null,
+          },
+          type: 'set-reference',
+        });
+        setLibrary({ selectionAnchorPath: selectedImage.path });
+        return;
+      }
 
       handleMultiSelectClick(path, event, {
         shiftAnchor: selectionAnchorPath ?? (inEditor ? selectedImage.path : libraryActivePath),

@@ -1933,6 +1933,17 @@
     "provisionalCameraPreview": "カメラプレビュー — RAWを現像中",
     "provisionalCameraPreviewFailed": "カメラプレビュー — RAW現像に失敗しました",
     "provisionalLibraryPreview": "ライブラリプレビュー — RAWを現像中",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2066,6 +2077,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "絞り値",
         "backToLibrary": "ライブラリに戻る",

@@ -2009,6 +2009,17 @@
     "provisionalCameraPreview": "Anteprima fotocamera — sviluppo RAW",
     "provisionalCameraPreviewFailed": "Anteprima fotocamera — sviluppo RAW non riuscito",
     "provisionalLibraryPreview": "Anteprima libreria — sviluppo RAW",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2146,6 +2157,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "Apertura",
         "backToLibrary": "Torna alla Libreria",

@@ -2009,6 +2009,17 @@
     "provisionalCameraPreview": "Vista previa de cámara — revelando RAW",
     "provisionalCameraPreviewFailed": "Vista previa de cámara — falló el revelado RAW",
     "provisionalLibraryPreview": "Vista previa de biblioteca — revelando RAW",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2146,6 +2157,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "Apertura",
         "backToLibrary": "Volver a la Biblioteca",

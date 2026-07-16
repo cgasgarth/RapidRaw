@@ -2069,6 +2069,17 @@
     "provisionalCameraPreview": "Camera preview — developing RAW",
     "provisionalCameraPreviewFailed": "Camera preview — RAW development failed",
     "provisionalLibraryPreview": "Library preview — developing RAW",
+    "referenceView": {
+      "active": "Active",
+      "ariaLabel": "Reference View",
+      "chooseHint": "Select an image in the filmstrip",
+      "chooseReference": "Choose reference…",
+      "clear": "Clear",
+      "independent": "Independent",
+      "readOnly": "Read-only reference",
+      "replace": "Replace",
+      "sync": "Sync"
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2210,6 +2221,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "{{current}}/{{total}}",
+      "referenceView": "Reference View",
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",

@@ -5,6 +5,7 @@ export type EditorToolbarCommandId =
   | 'show-original'
   | 'compare-split-wipe'
   | 'compare-side-by-side'
+  | 'reference-view'
   | 'compare-orientation'
   | 'negative-lab'
   | 'soft-proof'
@@ -31,6 +32,7 @@ export interface EditorToolbarCommandState {
   canSoftProof: boolean;
   canUndo: boolean;
   compareMode: 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
+  referenceViewActive?: boolean;
   compareOrientation: 'vertical' | 'horizontal';
   isFullScreen: boolean;
   isSoftProofEnabled: boolean;
@@ -44,6 +46,7 @@ export interface EditorToolbarCommandLabels {
   compareOrientation: string;
   compareSideBySide: string;
   compareSplitWipe: string;
+  referenceView?: string;
   fullscreen: string;
   lightsOut: string;
   negativeLab: string;
@@ -62,6 +65,7 @@ export interface EditorToolbarCommandActions {
   redo: () => void;
   toggleCompareSideBySide: () => void;
   toggleCompareSplitWipe: () => void;
+  toggleReferenceView?: () => void;
   toggleFullScreen: () => void;
   toggleLightsOut: () => void;
   toggleShowOriginal: () => void;
@@ -125,6 +129,16 @@ export function buildEditorToolbarCommands(
     command('compare-side-by-side', labels.compareSideBySide, 'overflow', 110, actions.toggleCompareSideBySide, {
       pressed: state.compareMode === 'side-by-side',
     }),
+    command(
+      'reference-view',
+      labels.referenceView ?? 'Reference View',
+      'overflow',
+      115,
+      actions.toggleReferenceView ?? (() => undefined),
+      {
+        pressed: state.referenceViewActive ?? false,
+      },
+    ),
     command('compare-orientation', labels.compareOrientation, 'overflow', 120, actions.changeCompareOrientation, {
       enabled: state.compareMode === 'split-wipe' || state.compareMode === 'side-by-side',
     }),
