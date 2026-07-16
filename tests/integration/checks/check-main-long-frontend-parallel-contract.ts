@@ -23,7 +23,14 @@ type Job = {
   steps?: Step[];
   'timeout-minutes'?: number;
 };
-type Workflow = { jobs?: Record<string, Job> };
+type Workflow = {
+  jobs?: Record<string, Job>;
+  on?: {
+    workflow_dispatch?: {
+      inputs?: Record<string, { description?: string; required?: boolean; type?: string }>;
+    };
+  };
+};
 
 const workflow = Bun.YAML.parse(readFileSync('.github/workflows/main-long-validation.yml', 'utf8')) as Workflow;
 const jobs = workflow.jobs ?? {};
@@ -154,8 +161,13 @@ if (
 const randomizedStep = jobs['frontend-randomized']?.steps?.find(
   (step) => step.name === 'Repeat the Bun suite in a reproducible random order',
 );
-if (randomizedStep?.env?.RAWENGINE_BUN_TEST_SEED !== '${{ github.run_id }}')
-  throw new Error('Randomized Bun tests must derive a reproducible seed from the main workflow run.');
+const randomizedSeedInput = workflow.on?.workflow_dispatch?.inputs?.randomized_seed;
+if (
+  randomizedSeedInput?.required !== false ||
+  randomizedSeedInput.type !== 'string' ||
+  randomizedStep?.env?.RAWENGINE_BUN_TEST_SEED !== '${{ inputs.randomized_seed || github.run_id }}'
+)
+  throw new Error('Randomized Bun tests must default to the run id and allow exact workflow-dispatch seed replay.');
 
 const closure = jobs['frontend-full'];
 if (closure?.if !== '${{ always() }}') throw new Error('Frontend closure must run after failures.');
