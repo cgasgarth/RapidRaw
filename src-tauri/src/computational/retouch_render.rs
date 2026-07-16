@@ -2,8 +2,6 @@ use std::borrow::Cow;
 
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, Rgba};
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
-use serde_json::Value;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -16,22 +14,6 @@ pub(crate) struct CurrentRetouchLayer {
     pub(crate) retouch_remove_source: Option<CurrentRetouchRemoveSource>,
     #[serde(default = "default_visible")]
     pub(crate) visible: bool,
-}
-
-/// Flat compatibility projection for the legacy adjustment bag. Current
-/// EditDocumentV2 compilation never deserializes or stores this DTO.
-#[cfg(test)]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct LegacyRetouchLayer {
-    #[serde(default = "default_layer_opacity")]
-    opacity: f32,
-    #[serde(default)]
-    retouch_clone_source: Option<CurrentRetouchCloneSource>,
-    #[serde(default)]
-    retouch_remove_source: Option<CurrentRetouchRemoveSource>,
-    #[serde(default = "default_visible")]
-    visible: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -78,28 +60,6 @@ fn default_visible() -> bool {
 enum RetouchOperation<'a> {
     CloneOrHeal(&'a CurrentRetouchCloneSource),
     Remove(&'a CurrentRetouchRemoveSource),
-}
-
-#[cfg(test)]
-pub(crate) fn apply_clone_retouch_layers<'a>(
-    image: &'a DynamicImage,
-    adjustments: &Value,
-    mask_bitmaps: &[GrayImage],
-) -> Cow<'a, DynamicImage> {
-    let layers: Vec<CurrentRetouchLayer> = adjustments
-        .get("masks")
-        .and_then(|masks| serde_json::from_value::<Vec<LegacyRetouchLayer>>(masks.clone()).ok())
-        .unwrap_or_default()
-        .into_iter()
-        .map(|layer| CurrentRetouchLayer {
-            opacity: layer.opacity,
-            retouch_clone_source: layer.retouch_clone_source,
-            retouch_remove_source: layer.retouch_remove_source,
-            visible: layer.visible,
-        })
-        .collect();
-
-    apply_typed_clone_retouch_layers(image, &layers, mask_bitmaps)
 }
 
 fn apply_typed_clone_retouch_layers<'a>(
@@ -421,37 +381,127 @@ fn blend_rgba(base: &Rgba<f32>, source: Rgba<f32>, alpha: f32) -> Rgba<f32> {
 #[cfg(test)]
 mod tests {
     use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Rgba};
-    use serde_json::json;
+    use serde_json::{Value, json};
 
-    use super::apply_clone_retouch_layers;
+    use super::apply_current_clone_retouch_layers;
+
+    fn current_document_with_retouch(
+        field: &'static str,
+        retouch: Value,
+    ) -> crate::adjustments::edit_document_v2::CompiledCurrentEditDocument {
+        let mut document = crate::exif_processing::neutral_current_edit_document();
+        let scene = &document["nodes"]["scene_global_color_tone"]["params"];
+        let presence = &document["nodes"]["color_presence"]["params"];
+        let curves = &document["nodes"]["scene_curve"]["params"];
+        let detail = &document["nodes"]["detail_denoise_dehaze"]["params"];
+        let creative = &document["nodes"]["display_creative"]["params"];
+        let selective = &document["nodes"]["selective_color_mixer"]["params"];
+        let grading = &document["nodes"]["perceptual_grading"]["params"];
+        let tone_equalizer = &document["nodes"]["tone_equalizer"]["params"];
+        let mut layer = json!({
+            "adjustments": {
+                "blacks": scene["blacks"],
+                "brightness": scene["brightness"],
+                "clarity": detail["clarity"],
+                "colorGrading": grading["colorGrading"],
+                "perceptualGradingV1": grading["perceptualGradingV1"],
+                "colorNoiseReduction": detail["colorNoiseReduction"],
+                "contrast": scene["contrast"],
+                "curves": curves["curves"],
+                "pointCurves": curves["pointCurves"],
+                "parametricCurve": curves["parametricCurve"],
+                "curveMode": curves["curveMode"],
+                "dehaze": detail["dehaze"],
+                "effectsEnabled": true,
+                "exposure": scene["exposure"],
+                "flareAmount": creative["flareAmount"],
+                "glowAmount": creative["glowAmount"],
+                "halationAmount": creative["halationAmount"],
+                "highlights": scene["highlights"],
+                "hue": presence["hue"],
+                "hsl": selective["hsl"],
+                "selectiveColorRangeControls": selective["selectiveColorRangeControls"],
+                "lumaNoiseReduction": detail["lumaNoiseReduction"],
+                "saturation": presence["saturation"],
+                "shadows": scene["shadows"],
+                "sharpness": detail["sharpness"],
+                "sharpnessThreshold": detail["sharpnessThreshold"],
+                "structure": detail["structure"],
+                "temperature": 0,
+                "tint": 0,
+                "toneEqualizer": tone_equalizer["toneEqualizer"],
+                "vibrance": presence["vibrance"],
+                "whites": scene["whites"]
+            },
+            "blendMode": "normal",
+            "editNodes": {
+                "basic": { "enabled": true },
+                "color": { "enabled": true },
+                "curves": { "enabled": true },
+                "details": { "enabled": true }
+            },
+            "editNodeSchemaVersion": 1,
+            "id": "retouch-layer",
+            "invert": false,
+            "name": "Retouch",
+            "opacity": 100,
+            "subMasks": [],
+            "visible": true
+        });
+        layer
+            .as_object_mut()
+            .expect("current retouch layer is an object")
+            .insert(field.to_string(), retouch);
+        let layers = json!([layer]);
+        document["layers"]["masks"] = layers.clone();
+        document["nodes"]["layers"]["params"]["masks"] = layers;
+        serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(document)
+            .expect("current retouch document must deserialize")
+            .compile()
+            .expect("current retouch document must compile")
+    }
+
+    #[test]
+    fn current_retouch_projection_rejects_flat_layer_envelopes() {
+        let flat_layer = json!({
+            "adjustments": {},
+            "id": "legacy-flat-layer",
+            "name": "Legacy",
+            "opacity": 100,
+            "retouchCloneSource": {
+                "retouchMode": "clone",
+                "sourcePoint": { "x": 0.0, "y": 0.5 },
+                "targetPoint": { "x": 1.0, "y": 0.5 },
+                "scale": 1,
+                "rotationDegrees": 0
+            },
+            "visible": true
+        });
+
+        let error = serde_json::from_value::<super::CurrentRetouchLayer>(flat_layer)
+            .expect_err("flat layer envelopes must not enter current retouch execution");
+        assert!(error.to_string().contains("unknown field"));
+    }
 
     #[test]
     fn clone_retouch_samples_source_into_target_region() {
         let image = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(5, 3, |x, y| {
             Rgba([x as f32 / 10.0, y as f32 / 10.0, 0.0, 1.0])
         }));
-        let adjustments = json!({
-            "masks": [{
-                "id": "clone-layer",
-                "name": "Clone",
-                "visible": true,
-                "opacity": 100,
-                "invert": false,
-                "adjustments": {},
-                "retouchCloneSource": {
+        let document = current_document_with_retouch(
+            "retouchCloneSource",
+            json!({
                     "retouchMode": "clone",
                     "sourcePoint": { "x": 0.0, "y": 0.5 },
-                    "targetPoint": { "x": 1.0, "y": 0.5 },
-                    "radiusPx": 1.5,
+                "targetPoint": { "x": 1.0, "y": 0.5 },
+                "radiusPx": 1.5,
                     "featherRadiusPx": 0,
                     "scale": 1,
                     "rotationDegrees": 0
-                },
-                "subMasks": []
-            }]
-        });
+            }),
+        );
 
-        let rendered = apply_clone_retouch_layers(&image, &adjustments, &[])
+        let rendered = apply_current_clone_retouch_layers(&image, document.retouch_layers(), &[])
             .as_ref()
             .to_rgba32f();
 
@@ -471,28 +521,20 @@ mod tests {
                 Rgba([0.1, 0.1, 0.1, 1.0])
             }
         }));
-        let adjustments = json!({
-            "masks": [{
-                "id": "heal-layer",
-                "name": "Heal",
-                "visible": true,
-                "opacity": 100,
-                "invert": false,
-                "adjustments": {},
-                "retouchCloneSource": {
+        let document = current_document_with_retouch(
+            "retouchCloneSource",
+            json!({
                     "retouchMode": "heal",
                     "sourcePoint": { "x": 0.0, "y": 0.5 },
-                    "targetPoint": { "x": 1.0, "y": 0.5 },
-                    "radiusPx": 1.5,
+                "targetPoint": { "x": 1.0, "y": 0.5 },
+                "radiusPx": 1.5,
                     "featherRadiusPx": 0,
                     "scale": 1,
                     "rotationDegrees": 0
-                },
-                "subMasks": []
-            }]
-        });
+            }),
+        );
 
-        let rendered = apply_clone_retouch_layers(&image, &adjustments, &[])
+        let rendered = apply_current_clone_retouch_layers(&image, document.retouch_layers(), &[])
             .as_ref()
             .to_rgba32f();
         let healed = rendered.get_pixel(4, 1);
@@ -515,32 +557,19 @@ mod tests {
         }));
         let mut mask = GrayImage::from_pixel(5, 3, Luma([0]));
         mask.put_pixel(4, 1, Luma([255]));
-        let adjustments = json!({
-            "masks": [{
-                "id": "remove-layer",
-                "name": "Remove",
-                "visible": true,
-                "opacity": 100,
-                "invert": false,
-                "adjustments": {},
-                "retouchRemoveSource": {
-                    "generator": "local_patch_fill_v1",
-                    "generatorVersion": 1,
+        let document = current_document_with_retouch(
+            "retouchRemoveSource",
+            json!({
                     "resolvedSourcePoint": { "x": 0.0, "y": 0.5 },
-                    "targetMaskId": "remove-target",
                     "radiusPx": 1.5,
-                    "featherRadiusPx": 0,
-                    "searchRadiusMultiplier": 2,
-                    "seed": 7,
-                    "status": "ready"
-                },
-                "subMasks": []
-            }]
-        });
+                    "featherRadiusPx": 0
+            }),
+        );
 
-        let rendered = apply_clone_retouch_layers(&image, &adjustments, &[mask])
-            .as_ref()
-            .to_rgba32f();
+        let rendered =
+            apply_current_clone_retouch_layers(&image, document.retouch_layers(), &[mask])
+                .as_ref()
+                .to_rgba32f();
         let removed = rendered.get_pixel(4, 1);
 
         assert_eq!(removed[0], 0.7);

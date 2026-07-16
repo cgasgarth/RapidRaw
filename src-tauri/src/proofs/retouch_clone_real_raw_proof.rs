@@ -471,7 +471,7 @@ fn run_private_retouch_clone_real_raw_proof(
             output_artifact_count,
             raw_decode_path: "load_base_image_from_bytes".to_string(),
             render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
-            retouch_path: "retouch_render::apply_clone_retouch_layers".to_string(),
+            retouch_path: "retouch_render::apply_current_clone_retouch_layers".to_string(),
         },
         source_issue: 4709,
         validation_mode: "private_raw_native_clone_heal_remove_retouch_preview_export_proof"
