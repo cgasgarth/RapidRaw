@@ -503,7 +503,7 @@ interface Hsl {
 
 export interface BlackWhiteMixerSettings {
   enabled: boolean;
-  process: 'continuous_sensitivity_v1' | 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
+  process: 'continuous_sensitivity_v1' | 'neutral_panchromatic_v1';
   presetId:
     | 'manual'
     | 'neutral_panchromatic'
@@ -788,7 +788,7 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
 
 const INITIAL_BLACK_WHITE_MIXER: BlackWhiteMixerSettings = {
   enabled: false,
-  process: 'legacy_fixed_band_v1',
+  process: 'continuous_sensitivity_v1',
   presetId: 'manual',
   sourceClass: 'color_source',
   weights: {

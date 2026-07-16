@@ -84,6 +84,7 @@ mod tests {
             },
             "blackWhiteMixer": {
                 "enabled": true,
+                "process": "continuous_sensitivity_v1",
                 "weights": {
                     "reds": 100,
                     "oranges": 0,

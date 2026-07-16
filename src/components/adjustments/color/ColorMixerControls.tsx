@@ -57,17 +57,9 @@ const channelMixerSources: Array<ChannelMixerSource> = ['red', 'green', 'blue', 
 
 export const enableBlackWhiteMixer = (
   settings: BlackWhiteMixerSettings,
-  activeChannel: BlackWhiteMixerChannel,
+  _activeChannel: BlackWhiteMixerChannel,
 ): BlackWhiteMixerSettings => {
-  const hasAdjustment = Object.values(settings.weights).some((weight) => weight !== 0);
-  if (!hasAdjustment && settings.process === 'legacy_fixed_band_v1') {
-    return { ...settings, enabled: true, process: 'continuous_sensitivity_v1' };
-  }
-  return {
-    ...settings,
-    enabled: true,
-    weights: hasAdjustment ? settings.weights : { ...settings.weights, [activeChannel]: 20 },
-  };
+  return { ...settings, enabled: true };
 };
 
 export const isBlackWhiteMixerModified = (settings: BlackWhiteMixerSettings): boolean =>

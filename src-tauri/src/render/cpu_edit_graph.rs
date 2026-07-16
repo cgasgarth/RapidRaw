@@ -375,8 +375,11 @@ pub(crate) fn execute_cpu_edit_graph(
         ));
         color = apply_luma_levels(color, adjustments.global.levels, preserve_extended);
         let scene_monochrome_toning = adjustments.global.black_white_mixer.enabled != 0
-            && adjustments.global.black_white_mixer.process
-                != crate::monochrome::LEGACY_FIXED_BAND_V1
+            && matches!(
+                adjustments.global.black_white_mixer.process,
+                crate::monochrome::NEUTRAL_PANCHROMATIC_V1
+                    | crate::monochrome::CONTINUOUS_SENSITIVITY_V1
+            )
             && adjustments.global.black_white_mixer.implementation_version
                 == crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION;
         let apply_grading = |input| {

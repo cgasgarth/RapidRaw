@@ -212,18 +212,7 @@ pub fn handle_import_legacy_presets_from_file(
     let content = fs::read_to_string(&file_path)
         .map_err(|e| format!("Failed to read legacy preset file: {}", e))?;
 
-    let xmp_content = if file_path.to_lowercase().ends_with(".lrtemplate") {
-        let re = Regex::new(r#"(?s)s.xmp = "(.*)""#).unwrap();
-        if let Some(caps) = re.captures(&content) {
-            caps.get(1)
-                .map(|m| m.as_str().replace(r#"\""#, r#"""#))
-                .unwrap_or(content)
-        } else {
-            content
-        }
-    } else {
-        content
-    };
+    let xmp_content = extract_legacy_xmp(&file_path, content);
 
     let converted_preset = preset_converter::convert_xmp_to_preset(&xmp_content)?;
 
@@ -236,6 +225,21 @@ pub fn handle_import_legacy_presets_from_file(
 
     save_presets(current_presets.clone(), app_handle)?;
     Ok(current_presets)
+}
+
+fn extract_legacy_xmp(file_path: &str, content: String) -> String {
+    if file_path.to_lowercase().ends_with(".lrtemplate") {
+        let re = Regex::new(r#"(?s)s\.xmp = "(.*)""#).expect("static lrtemplate regex");
+        if let Some(caps) = re.captures(&content) {
+            caps.get(1)
+                .map(|m| m.as_str().replace(r#"\""#, r#"""#))
+                .unwrap_or(content)
+        } else {
+            content
+        }
+    } else {
+        content
+    }
 }
 
 #[tauri::command]
@@ -294,7 +298,9 @@ pub fn save_community_preset(
 
 #[cfg(test)]
 mod tests {
-    use super::{Preset, PresetItem, read_presets_from_path, write_presets_to_path};
+    use super::{
+        Preset, PresetItem, extract_legacy_xmp, read_presets_from_path, write_presets_to_path,
+    };
     use serde_json::json;
     use std::fs;
 
@@ -348,5 +354,25 @@ mod tests {
             panic!("expected legacy preset item");
         };
         assert!(legacy_preset.edit_document_v2.is_none());
+    }
+
+    #[test]
+    fn lrtemplate_embedded_xmp_reaches_current_monochrome_converter() {
+        let embedded = extract_legacy_xmp(
+            "/tmp/current-bw.lrtemplate",
+            r#"s.xmp = "<rdf:Description crs:Treatment=\"Black &amp; White\" crs:GrayMixerBlue=\"-24\" />""#
+                .to_string(),
+        );
+        let preset = crate::preset_converter::convert_xmp_to_preset(&embedded)
+            .expect("embedded lrtemplate XMP converts");
+
+        assert_eq!(
+            preset.adjustments["blackWhiteMixer"]["process"],
+            "continuous_sensitivity_v1"
+        );
+        assert_eq!(
+            preset.adjustments["blackWhiteMixer"]["weights"]["blues"],
+            -24.0
+        );
     }
 }

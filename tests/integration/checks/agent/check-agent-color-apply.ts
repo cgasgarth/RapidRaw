@@ -269,6 +269,7 @@ const result = await applyAgentColor({
   color: {
     blackWhiteMixer: {
       enabled: true,
+      process: 'continuous_sensitivity_v1',
       weights: { aquas: 0, blues: -8, greens: 0, magentas: 0, oranges: 12, purples: 0, reds: 10, yellows: 6 },
     },
     cameraProfile: 'camera_portrait',
