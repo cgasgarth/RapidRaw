@@ -16,6 +16,7 @@ import {
   getReferenceMatchLayerCompatibility,
   mergeReferenceSourceIdentities,
   type ReferenceHistogramSummary,
+  type ReferenceMatchGroup,
   type ReferenceMatchReference,
   resolveReferenceMatchRenderAdjustments,
   selectReferenceMatchReferences,
@@ -249,7 +250,9 @@ describe('color-managed reference matching', () => {
       impact: 100,
       proposal,
     });
-    expect(toneOnly.exposure).toBe(proposal.diffs.find((diff) => diff.key === 'exposure')?.proposed);
+    const exposureDiff = proposal.diffs.find((diff) => diff.key === 'exposure');
+    if (exposureDiff === undefined) throw new Error('Expected exposure diff.');
+    expect(toneOnly.exposure).toBe(exposureDiff.proposed);
     expect(toneOnly.whiteBalanceTechnical).toEqual(INITIAL_ADJUSTMENTS.whiteBalanceTechnical);
     expect(toneOnly.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
     expect(toneOnly.crop).toBe(INITIAL_ADJUSTMENTS.crop);
@@ -268,12 +271,11 @@ describe('color-managed reference matching', () => {
       proposal,
     });
     expect(colorOnly.whiteBalanceTechnical.mode).toBe('kelvin_tint');
-    expect(colorOnly.whiteBalanceTechnical.kelvin).toBe(
-      proposal.diffs.find((diff) => diff.key === 'whiteBalanceKelvin')?.proposed,
-    );
-    expect(colorOnly.whiteBalanceTechnical.duv).toBe(
-      proposal.diffs.find((diff) => diff.key === 'whiteBalanceDuv')?.proposed,
-    );
+    const kelvinDiff = proposal.diffs.find((diff) => diff.key === 'whiteBalanceKelvin');
+    const duvDiff = proposal.diffs.find((diff) => diff.key === 'whiteBalanceDuv');
+    if (kelvinDiff === undefined || duvDiff === undefined) throw new Error('Expected white-balance diffs.');
+    expect(colorOnly.whiteBalanceTechnical.kelvin).toBe(kelvinDiff.proposed);
+    expect(colorOnly.whiteBalanceTechnical.duv).toBe(duvDiff.proposed);
     expect(colorOnly.whiteBalanceTechnical.synchronization).toEqual(locked.whiteBalanceTechnical.synchronization);
   });
 
@@ -309,11 +311,15 @@ describe('color-managed reference matching', () => {
     expect(receipt.appliedDiffs).toEqual(
       proposal.diffs
         .filter((diff) => diff.group === 'tone')
-        .map((diff) => ({
-          after: INITIAL_ADJUSTMENTS[diff.key] + (diff.proposed - diff.current) * 0.4,
-          before: INITIAL_ADJUSTMENTS[diff.key],
-          key: diff.key,
-        }))
+        .map((diff) => {
+          const before = INITIAL_ADJUSTMENTS[diff.key];
+          if (typeof before !== 'number') throw new Error(`Expected numeric tone adjustment: ${diff.key}`);
+          return {
+            after: before + (diff.proposed - diff.current) * 0.4,
+            before,
+            key: diff.key,
+          };
+        })
         .sort((left, right) => left.key.localeCompare(right.key)),
     );
     const layer = createReferenceMatchAdjustmentLayer({
@@ -423,7 +429,7 @@ describe('color-managed reference matching', () => {
         'Spatial analysis is unavailable; inspect localized subject differences before apply.',
       ]),
     );
-    expect(proposal?.diffs.some((diff) => diff.key === 'cameraProfile')).toBe(false);
+    expect(proposal?.diffs.some((diff) => String(diff.key) === 'cameraProfile')).toBe(false);
   });
 
   test('uses coarse spatial tiles to warn when a localized mismatch is unsafe to fit globally', () => {

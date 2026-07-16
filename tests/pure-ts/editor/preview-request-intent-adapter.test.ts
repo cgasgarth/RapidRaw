@@ -91,7 +91,7 @@ const harness = () => {
       const identity = queued.state[request.kind].identity;
       if (identity === undefined) throw new Error('Expected a scheduled preview identity.');
       coordinator.dispatch({ identity, type: 'operation-started' });
-      scheduled.push({ causalGeneration, delayMs, identity, request });
+      scheduled.push({ ...(causalGeneration === undefined ? {} : { causalGeneration }), delayMs, identity, request });
       return identity;
     },
   });

@@ -10,7 +10,7 @@ const change = {
     profileSha256: 'sha256:display-profile',
     scaleFactorBits: 4_607_182_418_800_017_400,
   },
-};
+} as const;
 
 describe('display target change protocol', () => {
   test('accepts the typed native identity and rejects malformed color contracts', () => {

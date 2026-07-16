@@ -12,6 +12,7 @@ import {
   type PreviewArtifact,
   PreviewCoordinator,
   type PreviewCoordinatorEffect,
+  type PreviewOperationIdentity,
   type PreviewSchedulingInputSnapshot,
   type PreviewSessionIdentity,
   quantizePreviewRoi,
@@ -23,6 +24,11 @@ import {
   PreviewRequestScopeAdapter,
   type PreviewRequestScopeInput,
 } from '../../../src/utils/previewRequestScopeAdapter';
+
+const requireIdentity = (identity: PreviewOperationIdentity | undefined): PreviewOperationIdentity => {
+  if (identity === undefined) throw new Error('Expected preview operation identity.');
+  return identity;
+};
 
 const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessionIdentity => {
   const values = {
@@ -615,7 +621,7 @@ test('new render inputs cancel the previous operation and start newest work', ()
   const first = transition(state, { kind: 'interactive', type: 'render-inputs-changed', identity: session() });
   state = first.state;
   expect(first.effects).toEqual([
-    { type: 'start', identity: state.interactive.identity, reason: 'render-inputs-changed' },
+    { type: 'start', identity: requireIdentity(state.interactive.identity), reason: 'render-inputs-changed' },
   ]);
   state = transition(state, { type: 'operation-started', identity: state.interactive.identity! }).state;
   const second = transition(state, {
@@ -625,8 +631,8 @@ test('new render inputs cancel the previous operation and start newest work', ()
     type: 'render-inputs-changed',
   });
   expect(second.effects).toEqual([
-    { type: 'cancel', identity: first.state.interactive.identity, reason: 'newer-render-inputs' },
-    { type: 'start', identity: second.state.interactive.identity, reason: 'slider-updated' },
+    { type: 'cancel', identity: requireIdentity(first.state.interactive.identity), reason: 'newer-render-inputs' },
+    { type: 'start', identity: requireIdentity(second.state.interactive.identity), reason: 'slider-updated' },
   ]);
   expect(second.state.interactive.status).toBe('queued');
 });
@@ -728,18 +734,18 @@ test('settled completion wins over a late interactive result and releases replac
   });
   expect(settledDone.effects).toContainEqual({
     type: 'cancel',
-    identity: interactive.state.interactive.identity,
+    identity: requireIdentity(interactive.state.interactive.identity),
     reason: 'settled-operation-presented',
   });
   expect(settledDone.effects).toContainEqual({
     type: 'present',
-    identity: settled.state.settled.identity,
+    identity: requireIdentity(settled.state.settled.identity),
     reason: 'operation-presented',
   });
   expect(settledDone.effects).toContainEqual({
     type: 'publish',
-    artifact: { identity: settled.state.settled.identity, url: 'blob:settled' },
-    identity: settled.state.settled.identity,
+    artifact: { identity: requireIdentity(settled.state.settled.identity), url: 'blob:settled' },
+    identity: requireIdentity(settled.state.settled.identity),
     reason: 'operation-presented',
   });
   state = settledDone.state;
@@ -906,7 +912,7 @@ test('viewport changes cancel active work and retain one canonical ROI snapshot'
   });
   expect(viewport.effects).toContainEqual({
     type: 'cancel',
-    identity: started.state.settled.identity,
+    identity: requireIdentity(started.state.settled.identity),
     reason: 'viewport-changed',
   });
   expect(viewport.state.viewport).toEqual({
@@ -950,7 +956,7 @@ test('viewport transitions retain the last canonical pixels and reject the cance
 
   expect(viewport.state.visibleArtifact?.url).toBe('blob:canonical-base');
   expect(viewport.effects).toEqual([
-    { type: 'cancel', identity: successor.state.settled.identity, reason: 'viewport-changed' },
+    { type: 'cancel', identity: requireIdentity(successor.state.settled.identity), reason: 'viewport-changed' },
   ]);
 
   const late = transition(viewport.state, {
@@ -987,7 +993,7 @@ test('display generation accepts only newer identities and releases reordered co
   const invalidated = transition(state, { generation: 3, type: 'display-generation-changed' });
   expect(invalidated.effects).toEqual([
     {
-      identity: replacement.state.settled.identity,
+      identity: requireIdentity(replacement.state.settled.identity),
       reason: 'display-generation-changed',
       type: 'cancel',
     },

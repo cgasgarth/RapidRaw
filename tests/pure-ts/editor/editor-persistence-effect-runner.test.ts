@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -29,25 +30,31 @@ const flush = async () => {
 class FakeClock {
   private nextId = 1;
   private now = 0;
-  private readonly tasks = new Map<number, { callback: () => void; due: number }>();
+  private readonly tasks = new Map<
+    ReturnType<typeof setTimeout>,
+    { callback: () => void; due: number; order: number }
+  >();
 
   clearTimer = (timer: ReturnType<typeof setTimeout>): void => {
-    this.tasks.delete(Number(timer));
+    clearTimeout(timer);
+    this.tasks.delete(timer);
   };
 
   setTimer = (callback: () => void, delayMs: number): ReturnType<typeof setTimeout> => {
-    const id = this.nextId++;
-    this.tasks.set(id, { callback, due: this.now + delayMs });
-    return id;
+    const order = this.nextId++;
+    const timer = setTimeout(() => {}, 2_147_483_647);
+    this.tasks.set(timer, { callback, due: this.now + delayMs, order });
+    return timer;
   };
 
   advance(delayMs: number): void {
     this.now += delayMs;
     const ready = [...this.tasks.entries()]
       .filter(([, task]) => task.due <= this.now)
-      .sort((left, right) => left[1].due - right[1].due || left[0] - right[0]);
-    for (const [id, task] of ready) {
-      this.tasks.delete(id);
+      .sort((left, right) => left[1].due - right[1].due || left[1].order - right[1].order);
+    for (const [timer, task] of ready) {
+      clearTimeout(timer);
+      this.tasks.delete(timer);
       task.callback();
     }
   }
@@ -78,17 +85,22 @@ const editReceipt = (
   transactionId: `transaction-${imageSessionId}-${String(adjustmentRevision)}`,
 });
 
-const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersistenceInput => ({
-  adjustmentRevision: 1,
-  adjustments: adjustments(1),
-  imageSessionId: 'session-a',
-  interactionActive: false,
-  multiSelection: null,
-  path: '/fixtures/a.raw',
-  receipt: editReceipt('session-a', 1),
-  sessionGeneration: 1,
-  ...overrides,
-});
+const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersistenceInput => {
+  const { editDocumentV2, ...rest } = overrides;
+  return {
+    adjustmentRevision: 1,
+    adjustments: adjustments(1),
+    editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments(1)),
+    imageSessionId: 'session-a',
+    interactionActive: false,
+    multiSelection: null,
+    path: '/fixtures/a.raw',
+    receipt: editReceipt('session-a', 1),
+    sessionGeneration: 1,
+    ...rest,
+    ...(editDocumentV2 === undefined ? {} : { editDocumentV2 }),
+  };
+};
 
 const prime = (runner: EditorPersistenceEffectRunner, overrides: Partial<EditorPersistenceInput> = {}): void => {
   runner.installSession(
@@ -122,7 +134,7 @@ function harness(
 
 describe('editor persistence effect runner', () => {
   test('accepts native receipt envelopes for primary and multi-selection saves', () => {
-    const nativeReceipt = {
+    const nativeReceipt = editorPersistenceReceiptSchema.parse({
       adjustments: adjustments(1),
       adjustmentRevision: 1,
       catalogRevision: null,
@@ -133,7 +145,7 @@ describe('editor persistence effect runner', () => {
       sidecarRevision: `sha256:${'a'.repeat(64)}`,
       thumbnailRevision: 'b'.repeat(64),
       transactionId: 'transaction-a-1',
-    };
+    });
 
     expect(editorPersistenceReceiptSchema.parse(nativeReceipt)).toEqual(nativeReceipt);
     expect(editorPersistenceReceiptArraySchema.parse([nativeReceipt])).toEqual([nativeReceipt]);
@@ -153,7 +165,8 @@ describe('editor persistence effect runner', () => {
     clock.advance(100);
 
     expect(executions).toBe(0);
-    expect(snapshots).toEqual([{ adjustments: primed.adjustments, path: primed.path }]);
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({ adjustments: primed.adjustments, path: primed.path });
   });
 
   test('uses fake time and waits until interaction settles', async () => {
@@ -240,7 +253,7 @@ describe('editor persistence effect runner', () => {
     );
     clock.advance(100);
     expect(executions).toHaveLength(1);
-    expect(snapshots.at(-1)).toEqual({ adjustments: adjustments(3), path: '/fixtures/a.raw' });
+    expect(snapshots.at(-1)).toMatchObject({ adjustments: adjustments(3), path: '/fixtures/a.raw' });
   });
 
   test('serializes revisions so a delayed predecessor cannot overwrite the newest sidecar', async () => {
@@ -273,7 +286,7 @@ describe('editor persistence effect runner', () => {
 
     expect(accepted.map(({ execution }) => execution.revision)).toEqual([2]);
     expect(failures).toHaveLength(0);
-    expect(snapshots.at(-1)).toEqual({ adjustments: adjustments(2), path: '/fixtures/a.raw' });
+    expect(snapshots.at(-1)).toMatchObject({ adjustments: adjustments(2), path: '/fixtures/a.raw' });
   });
 
   test('A to B to successor-A rejects stale success and failure', async () => {
@@ -353,10 +366,10 @@ describe('editor persistence effect runner', () => {
   test('cancellation aborts running work and prevents queued execution', async () => {
     const running = deferred<EditorPersistenceReceipt>();
     let executions = 0;
-    let signal: AbortSignal | null = null;
+    const execution: { signal?: AbortSignal } = {};
     const { accepted, clock, failures, runner } = harness(async (_value, nextSignal) => {
       executions += 1;
-      signal = nextSignal;
+      execution.signal = nextSignal;
       return running.promise;
     });
 
@@ -370,7 +383,7 @@ describe('editor persistence effect runner', () => {
     runner.submitCommitted(input(), 0);
     clock.advance(0);
     runner.cancel();
-    expect(signal?.aborted).toBe(true);
+    expect(execution.signal?.aborted).toBe(true);
     running.reject(new Error('cancelled'));
     await flush();
     expect(accepted).toHaveLength(0);
