@@ -7,7 +7,7 @@ import {
 } from '../../../src/utils/editorPresentationDescriptor';
 
 const geometry = createEditorOverlayGeometry({
-  crop: { height: 1800, width: 2400, x: 320, y: 180 },
+  crop: { height: 1800, unit: 'px', width: 2400, x: 320, y: 180 },
   devicePixelRatio: 2,
   geometryEpoch: 12,
   orientationSteps: 1,
