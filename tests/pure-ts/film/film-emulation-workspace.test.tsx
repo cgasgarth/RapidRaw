@@ -88,6 +88,11 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   });
   expect(profiled.adjustmentRevision).toBe(5);
   expect(profiled.history).toHaveLength(4);
+  expect(profiled.editDocumentV2.nodes.film_look.params).toEqual({
+    filmLookId: 'film_look.measured.monochrome_d65.v1',
+    filmLookStrength: 75,
+  });
+  expect(profiled.editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
 
   const historyBeforeReset = profiled.history.length;
   await click(container, 'button[aria-label="Reset film emulation"]');
@@ -101,6 +106,7 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   });
   expect(reset.history).toHaveLength(historyBeforeReset + 1);
   expect(reset.adjustmentRevision).toBe(6);
+  expect(reset.editDocumentV2.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
 
   await click(container, 'button[aria-label="Reset film emulation"]');
   expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 6, historyIndex: 4 });
