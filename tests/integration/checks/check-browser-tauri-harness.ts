@@ -2964,7 +2964,8 @@ try {
     });
   });
 
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  const pageUrl = browserScenario === 'full' ? `${baseUrl}?qaPersistedRecovery=1` : baseUrl;
+  await page.goto(pageUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
   await verifySchemaOwnedTauriTransport(page);
   await verifyEditorRenderAuthorityBoundary(page);
@@ -3004,6 +3005,18 @@ try {
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
   const imageCanvas = page.getByTestId('image-canvas');
   await imageCanvas.waitFor({ timeout: 10_000 });
+  if (browserScenario === 'full') {
+    const recoveryToast = page.getByText('Recovered incompatible saved edits and reopened with safe render state.', {
+      exact: false,
+    });
+    await recoveryToast.waitFor({ timeout: 10_000 });
+    if ((await recoveryToast.count()) !== 1) {
+      throw new Error('Persisted render recovery must publish one bounded diagnostic.');
+    }
+    if ((await page.getByText('Failed to load image:', { exact: false }).count()) !== 0) {
+      throw new Error('Recovered current authority incorrectly failed the decoded image session.');
+    }
+  }
   if (browserScenario === 'preview-url-lifetime') {
     await verifyPreviewUrlLifetime(page);
     if (consoleErrors.length > 0) {

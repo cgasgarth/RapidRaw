@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::{BufReader, Cursor, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
@@ -60,6 +61,22 @@ pub struct PersistedStateLoad {
 const CURRENT_SIDECAR_CONTRACT: &str = "rapidraw.sidecar.v1";
 const CURRENT_SIDECAR_SCHEMA_VERSION: u32 = 1;
 const MAX_QUARANTINE_BACKUPS: usize = 3;
+static SIDECAR_LOAD_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Weak<Mutex<()>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn sidecar_load_lock(sidecar_path: &Path) -> Result<Arc<Mutex<()>>, String> {
+    let mut locks = SIDECAR_LOAD_LOCKS
+        .lock()
+        .map_err(|_| "Persisted sidecar lock registry is poisoned".to_string())?;
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(sidecar_path).and_then(Weak::upgrade) {
+        return Ok(lock);
+    }
+
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(sidecar_path.to_path_buf(), Arc::downgrade(&lock));
+    Ok(lock)
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -94,6 +111,13 @@ pub fn load_sidecar_recovering(
     sidecar_path: &Path,
     expected_source_identity: Option<&str>,
 ) -> Result<PersistedStateLoad, String> {
+    let sidecar_lock = sidecar_load_lock(sidecar_path)?;
+    let _sidecar_guard = sidecar_lock.lock().map_err(|_| {
+        format!(
+            "Persisted sidecar lock is poisoned: {}",
+            sidecar_path.display()
+        )
+    })?;
     let source_identity = expected_source_identity
         .map(str::to_string)
         .unwrap_or_else(|| source_identity_from_sidecar_path(sidecar_path));
@@ -1908,6 +1932,250 @@ mod tests {
     }
 
     #[test]
+    fn invalid_object_only_optional_authority_is_quarantined_then_reopens_neutral_and_editable() {
+        fn set_path(value: &mut JsonValue, path: &[&str], replacement: JsonValue) {
+            let (segment, remainder) = path.split_first().expect("non-empty test path");
+            if remainder.is_empty() {
+                value
+                    .as_object_mut()
+                    .expect("test path parent object")
+                    .insert((*segment).to_string(), replacement);
+                return;
+            }
+            let object = value.as_object_mut().expect("test path object");
+            let child = object
+                .entry((*segment).to_string())
+                .or_insert_with(|| serde_json::json!({}));
+            if !child.is_object() {
+                *child = serde_json::json!({});
+            }
+            set_path(child, remainder, replacement);
+        }
+
+        let invalid_cases = [
+            (
+                "scene-null",
+                vec!["nodes", "scene_curve", "params", "sceneCurveV1"],
+                JsonValue::Null,
+            ),
+            (
+                "output-null",
+                vec!["nodes", "scene_curve", "params", "outputCurveV1"],
+                JsonValue::Null,
+            ),
+            (
+                "scene-scalar",
+                vec!["nodes", "scene_curve", "params", "sceneCurveV1"],
+                serde_json::json!(0.5),
+            ),
+            (
+                "output-malformed",
+                vec!["nodes", "scene_curve", "params", "outputCurveV1"],
+                serde_json::json!({"domain": "view_encoded"}),
+            ),
+            (
+                "film-stage-null",
+                vec![
+                    "nodes",
+                    "film_emulation",
+                    "params",
+                    "filmEmulation",
+                    "stageParams",
+                ],
+                JsonValue::Null,
+            ),
+            (
+                "film-characteristic-null",
+                vec![
+                    "nodes",
+                    "film_emulation",
+                    "params",
+                    "filmEmulation",
+                    "characteristicCurve",
+                ],
+                JsonValue::Null,
+            ),
+            (
+                "future-field",
+                vec!["nodes", "scene_curve", "params", "futureCurveV3"],
+                serde_json::json!({"schemaVersion": 3}),
+            ),
+        ];
+
+        for (name, path, invalid_value) in invalid_cases {
+            let temp = tempfile::tempdir().unwrap();
+            let source = temp.path().join(format!("{name}.arw"));
+            let sidecar = get_primary_sidecar_path(&source);
+            let mut envelope = metadata_for(&source);
+            save_sidecar_metadata_atomic(&sidecar, &envelope).unwrap();
+
+            let mut persisted: JsonValue =
+                serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
+            set_path(&mut persisted["editDocumentV2"], &path, invalid_value);
+            let corrupt_bytes = serde_json::to_vec_pretty(&persisted).unwrap();
+            fs::write(&sidecar, &corrupt_bytes).unwrap();
+
+            let recovered =
+                load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+                    .expect("invalid current authority must recover");
+            assert_eq!(
+                recovered.outcome,
+                PersistedStateOutcome::Quarantined,
+                "{name}"
+            );
+            assert_eq!(
+                recovered.reason_codes,
+                ["edit_document_v2_invalid"],
+                "{name}"
+            );
+            assert_eq!(
+                fs::read(recovered.backup_path.as_ref().unwrap()).unwrap(),
+                corrupt_bytes,
+                "{name} original bytes"
+            );
+            assert!(!sidecar.exists(), "{name} corrupt authority retired");
+            assert!(recovered.metadata.adjustments.is_null(), "{name}");
+            let neutral = recovered.metadata.edit_document_v2.as_ref().unwrap();
+            crate::adjustments::edit_document_v2::validate_edit_document_v2(neutral)
+                .expect("neutral recovery remains strict current state");
+            let params = neutral["nodes"]["scene_curve"]["params"]
+                .as_object()
+                .unwrap();
+            assert!(!params.contains_key("sceneCurveV1"), "{name}");
+            assert!(!params.contains_key("outputCurveV1"), "{name}");
+
+            envelope = recovered.metadata;
+            envelope.edit_document_v2.as_mut().unwrap()["nodes"]["scene_global_color_tone"]["params"]
+                ["exposure"] = serde_json::json!(0.4);
+            save_sidecar_metadata_atomic(&sidecar, &envelope)
+                .expect("first real edit after recovery must save");
+            let newest_valid_bytes = fs::read(&sidecar).unwrap();
+
+            let mut stale_corrupt = envelope.clone();
+            stale_corrupt.edit_document_v2.as_mut().unwrap()["nodes"]["scene_curve"]["params"]["sceneCurveV1"] =
+                JsonValue::Null;
+            let error = save_sidecar_metadata_atomic(&sidecar, &stale_corrupt)
+                .expect_err("late corrupt authority must not overwrite newer valid state");
+            assert!(error.contains("editDocumentV2"), "{name}: {error}");
+            assert_eq!(fs::read(&sidecar).unwrap(), newest_valid_bytes, "{name}");
+
+            let reopened =
+                load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+                    .expect("new valid edit must reopen");
+            assert_eq!(reopened.outcome, PersistedStateOutcome::Current, "{name}");
+            assert_eq!(
+                reopened.metadata.edit_document_v2.unwrap()["nodes"]["scene_global_color_tone"]["params"]
+                    ["exposure"],
+                serde_json::json!(0.4),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn concurrent_invalid_sidecar_loads_quarantine_exactly_once_without_enoent() {
+        use std::sync::Barrier;
+
+        const WORKERS: usize = 8;
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("concurrent-film.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let metadata = metadata_for(&source);
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+
+        let mut persisted: JsonValue =
+            serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
+        persisted["editDocumentV2"]["nodes"]["film_emulation"]["params"]["filmEmulation"] = serde_json::json!({
+            "nodeType": "film_emulation",
+            "contractVersion": 1,
+            "enabled": true,
+            "profileRef": {
+                "contentSha256": "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef",
+                "id": "rapidraw.reference_film.v1",
+                "version": "1"
+            },
+            "stageParams": null,
+            "characteristicCurve": null,
+            "mix": 0.65,
+            "workingSpace": "acescg_linear_v1",
+            "seedPolicy": "source_stable_v1"
+        });
+        let corrupt_bytes = serde_json::to_vec_pretty(&persisted).unwrap();
+        fs::write(&sidecar, &corrupt_bytes).unwrap();
+
+        let barrier = Arc::new(Barrier::new(WORKERS));
+        let source_identity = source.to_string_lossy().into_owned();
+        let handles = (0..WORKERS)
+            .map(|_| {
+                let barrier = Arc::clone(&barrier);
+                let sidecar = sidecar.clone();
+                let source_identity = source_identity.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    load_sidecar_recovering(&sidecar, Some(&source_identity))
+                })
+            })
+            .collect::<Vec<_>>();
+        let loads = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("recovery worker must not panic"))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("every concurrent recovery must succeed");
+
+        assert_eq!(
+            loads
+                .iter()
+                .filter(|load| load.outcome == PersistedStateOutcome::Quarantined)
+                .count(),
+            1
+        );
+        assert_eq!(
+            loads
+                .iter()
+                .filter(|load| load.outcome == PersistedStateOutcome::Absent)
+                .count(),
+            WORKERS - 1
+        );
+        assert!(loads.iter().all(|load| load.metadata.adjustments.is_null()));
+        assert!(!sidecar.exists());
+        assert_eq!(
+            fs::read(sidecar.with_extension("rrdata.quarantine")).unwrap(),
+            corrupt_bytes
+        );
+        assert!(!sidecar.with_extension("rrdata.quarantine.2").exists());
+    }
+
+    #[test]
+    fn valid_optional_scene_curve_objects_roundtrip_without_recovery() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("valid-curves.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let mut metadata = metadata_for(&source);
+        let params =
+            &mut metadata.edit_document_v2.as_mut().unwrap()["nodes"]["scene_curve"]["params"];
+        params["sceneCurveV1"] = serde_json::json!({
+            "channelMode": "luminance_preserving",
+            "middleGrey": 0.18,
+            "points": [{"xEv": -16, "yEv": -16}, {"xEv": 16, "yEv": 16}]
+        });
+        params["outputCurveV1"] = serde_json::json!({
+            "domain": "view_encoded",
+            "peakNits": 203,
+            "points": [{"input": 0, "output": 0}, {"input": 1, "output": 1}],
+            "sdrReferenceWhiteNits": 203,
+            "targetIdentity": "rapid-view-default"
+        });
+
+        save_sidecar_metadata_atomic(&sidecar, &metadata).expect("valid curve authority saves");
+        let reopened = load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+            .expect("valid curve authority reopens");
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        let params = &reopened.metadata.edit_document_v2.unwrap()["nodes"]["scene_curve"]["params"];
+        assert!(params["sceneCurveV1"].is_object());
+        assert!(params["outputCurveV1"].is_object());
+    }
+
+    #[test]
     fn unsupported_and_malformed_sidecars_are_backed_up_then_retired() {
         let cases = [
             (
@@ -2083,8 +2351,9 @@ fn save_then_load_preserves_normalized_portrait_crop_exactly() {
     let first_bytes = fs::read(&sidecar).unwrap();
     let loaded = load_sidecar_recovering(&sidecar, None).unwrap();
     assert_eq!(loaded.outcome, PersistedStateOutcome::Current);
+    assert!(loaded.metadata.adjustments.is_null());
     assert_eq!(
-        loaded.metadata.adjustments["crop"],
+        loaded.metadata.edit_document_v2.as_ref().unwrap()["geometry"]["crop"],
         serde_json::json!({ "unit": "normalized", "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6 })
     );
     assert_eq!(loaded.metadata.rating, 5);

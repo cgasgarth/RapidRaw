@@ -2905,8 +2905,11 @@ struct LayerV2 {
     layer_group_name: Option<String>,
     name: String,
     opacity: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     reference_match_application_receipt: Option<Map<String, Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     retouch_clone_source: Option<crate::retouch_render::CurrentRetouchCloneSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     retouch_remove_source: Option<crate::retouch_render::CurrentRetouchRemoveSource>,
     sub_masks: Vec<SourceArtifactSubMaskV2>,
     visible: bool,
@@ -2941,6 +2944,7 @@ pub(crate) struct SourceArtifactSubMaskV2 {
     pub(crate) mode: SourceArtifactSubMaskModeV2,
     pub(crate) name: Option<String>,
     pub(crate) opacity: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) parameters: Option<BTreeMap<String, Value>>,
     #[serde(rename = "type")]
     pub(crate) mask_type: SourceArtifactMaskTypeV2,
@@ -4050,9 +4054,189 @@ fn normalize_test_numbers(value: &mut Value) {
     }
 }
 
+const OBJECT_ONLY_OPTIONAL_PATHS: &[(&str, &[&str])] = &[
+    (
+        "extensions.quarantinedNodes",
+        &["extensions", "quarantinedNodes"],
+    ),
+    (
+        "nodes.film_emulation.params.filmEmulation.stageParams",
+        &[
+            "nodes",
+            "film_emulation",
+            "params",
+            "filmEmulation",
+            "stageParams",
+        ],
+    ),
+    (
+        "nodes.film_emulation.params.filmEmulation.residualLut",
+        &[
+            "nodes",
+            "film_emulation",
+            "params",
+            "filmEmulation",
+            "residualLut",
+        ],
+    ),
+    (
+        "nodes.film_emulation.params.filmEmulation.characteristicCurve",
+        &[
+            "nodes",
+            "film_emulation",
+            "params",
+            "filmEmulation",
+            "characteristicCurve",
+        ],
+    ),
+    (
+        "nodes.film_emulation.params.filmEmulation.characteristicCurve.density",
+        &[
+            "nodes",
+            "film_emulation",
+            "params",
+            "filmEmulation",
+            "characteristicCurve",
+            "density",
+        ],
+    ),
+    (
+        "nodes.scene_curve.params.outputCurveV1",
+        &["nodes", "scene_curve", "params", "outputCurveV1"],
+    ),
+    (
+        "nodes.scene_curve.params.sceneCurveV1",
+        &["nodes", "scene_curve", "params", "sceneCurveV1"],
+    ),
+    (
+        "layers.masks[*].referenceMatchApplicationReceipt",
+        &["layers", "masks", "*", "referenceMatchApplicationReceipt"],
+    ),
+    (
+        "layers.masks[*].retouchCloneSource",
+        &["layers", "masks", "*", "retouchCloneSource"],
+    ),
+    (
+        "layers.masks[*].retouchRemoveSource",
+        &["layers", "masks", "*", "retouchRemoveSource"],
+    ),
+    (
+        "layers.masks[*].subMasks[*].parameters",
+        &["layers", "masks", "*", "subMasks", "*", "parameters"],
+    ),
+    (
+        "nodes.layers.params.masks[*].referenceMatchApplicationReceipt",
+        &[
+            "nodes",
+            "layers",
+            "params",
+            "masks",
+            "*",
+            "referenceMatchApplicationReceipt",
+        ],
+    ),
+    (
+        "nodes.layers.params.masks[*].retouchCloneSource",
+        &[
+            "nodes",
+            "layers",
+            "params",
+            "masks",
+            "*",
+            "retouchCloneSource",
+        ],
+    ),
+    (
+        "nodes.layers.params.masks[*].retouchRemoveSource",
+        &[
+            "nodes",
+            "layers",
+            "params",
+            "masks",
+            "*",
+            "retouchRemoveSource",
+        ],
+    ),
+    (
+        "nodes.layers.params.masks[*].subMasks[*].parameters",
+        &[
+            "nodes",
+            "layers",
+            "params",
+            "masks",
+            "*",
+            "subMasks",
+            "*",
+            "parameters",
+        ],
+    ),
+    (
+        "sourceArtifacts.aiPatches[*].subMasks[*].parameters",
+        &[
+            "sourceArtifacts",
+            "aiPatches",
+            "*",
+            "subMasks",
+            "*",
+            "parameters",
+        ],
+    ),
+    (
+        "nodes.source_artifacts.params.aiPatches[*].subMasks[*].parameters",
+        &[
+            "nodes",
+            "source_artifacts",
+            "params",
+            "aiPatches",
+            "*",
+            "subMasks",
+            "*",
+            "parameters",
+        ],
+    ),
+];
+
+fn validate_present_object_at_path(
+    value: &Value,
+    segments: &[&str],
+    display_path: &str,
+) -> Result<(), String> {
+    let Some((segment, remainder)) = segments.split_first() else {
+        return value.is_object().then_some(()).ok_or_else(|| {
+            format!(
+                "EditDocumentV2 optional current authority '{display_path}' must be an object when present"
+            )
+        });
+    };
+    if *segment == "*" {
+        if let Some(values) = value.as_array() {
+            for child in values {
+                validate_present_object_at_path(child, remainder, display_path)?;
+            }
+        }
+        return Ok(());
+    }
+    if let Some(child) = value.as_object().and_then(|object| object.get(*segment)) {
+        validate_present_object_at_path(child, remainder, display_path)?;
+    }
+    Ok(())
+}
+
+fn validate_object_only_optional_authority(value: &Value) -> Result<(), String> {
+    for (display_path, segments) in OBJECT_ONLY_OPTIONAL_PATHS {
+        validate_present_object_at_path(value, segments, display_path)?;
+    }
+    Ok(())
+}
+
+fn parse_current_edit_document(value: &Value) -> Result<EditDocumentV2, String> {
+    validate_object_only_optional_authority(value)?;
+    serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 persistence payload is invalid: {error}"))
+}
+
 pub(crate) fn validate_edit_document_v2(value: &Value) -> Result<(), String> {
-    let document: EditDocumentV2 = serde_json::from_value(value.clone())
-        .map_err(|error| format!("EditDocumentV2 persistence payload is invalid: {error}"))?;
+    let document = parse_current_edit_document(value)?;
     document.validate_document_contract()
 }
 
@@ -4073,8 +4257,8 @@ pub(crate) fn validate_edit_document_v2_copy_payload(value: &Value) -> Result<()
 
 #[cfg(test)]
 pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {
-    let document: EditDocumentV2 = serde_json::from_value(value.clone())
-        .map_err(|error| format!("EditDocumentV2 render payload is invalid: {error}"))?;
+    let document = parse_current_edit_document(value)
+        .map_err(|error| error.replace("persistence payload", "render payload"))?;
     document.validate_document_contract()?;
     let projection: FlatNodeProjectionV2 = serde_json::from_value(value.clone())
         .map_err(|error| format!("EditDocumentV2 flat adapter is invalid: {error}"))?;
@@ -5814,8 +5998,14 @@ mod tests {
             loaded.outcome,
             crate::exif_processing::PersistedStateOutcome::Quarantined
         );
-        assert!(loaded.metadata.adjustments.is_object());
-        assert!(loaded.metadata.edit_document_v2.is_some());
+        assert!(loaded.metadata.adjustments.is_null());
+        let recovered_document = loaded
+            .metadata
+            .edit_document_v2
+            .as_ref()
+            .expect("quarantine recovery returns one neutral current document");
+        crate::adjustments::edit_document_v2::validate_edit_document_v2(recovered_document)
+            .expect("recovery document must remain strict current authority");
         assert_eq!(
             std::fs::read(loaded.backup_path.expect("byte-preserving backup")).unwrap(),
             original_bytes
@@ -6033,6 +6223,109 @@ mod tests {
         let error = compile_test_document(invalid_headroom)
             .expect_err("output curve below reference white must fail");
         assert!(error.contains("InvalidTargetLuminance"));
+    }
+
+    #[test]
+    fn object_only_optional_authority_is_rejected_before_serde_and_omitted_on_write() {
+        fn set_path(value: &mut Value, segments: &[&str], replacement: Value) {
+            let (segment, remainder) = segments.split_first().expect("non-empty test path");
+            if remainder.is_empty() {
+                value
+                    .as_object_mut()
+                    .expect("test path parent object")
+                    .insert((*segment).to_string(), replacement);
+                return;
+            }
+            if *segment == "*" {
+                let values = value.as_array_mut().expect("test wildcard array");
+                if values.is_empty() {
+                    values.push(json!({}));
+                }
+                set_path(&mut values[0], remainder, replacement);
+                return;
+            }
+            let object = value.as_object_mut().expect("test path object");
+            let child = object.entry((*segment).to_string()).or_insert_with(|| {
+                if remainder[0] == "*" {
+                    json!([])
+                } else {
+                    json!({})
+                }
+            });
+            if remainder[0] == "*" && !child.is_array() {
+                *child = json!([]);
+            } else if remainder[0] != "*" && !child.is_object() {
+                *child = json!({});
+            }
+            set_path(child, remainder, replacement);
+        }
+
+        let mut complete = current_document();
+        complete["nodes"]["film_emulation"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": film_emulation_params(),
+            "process": "scene_referred_v2",
+            "type": "film_emulation"
+        });
+        let layer = layer();
+        complete["layers"]["masks"] = json!([layer]);
+        complete["nodes"]["layers"]["params"]["masks"] = json!([layer]);
+        let patch = source_patch();
+        complete["sourceArtifacts"]["aiPatches"] = json!([patch]);
+        complete["nodes"]["source_artifacts"]["params"]["aiPatches"] = json!([patch]);
+
+        for (display_path, segments) in super::OBJECT_ONLY_OPTIONAL_PATHS {
+            for invalid in [Value::Null, json!(false), json!("object"), json!([0, 1])] {
+                let mut document = complete.clone();
+                set_path(&mut document, segments, invalid);
+                let error = super::validate_edit_document_v2(&document)
+                    .expect_err("present object-only optional authority must fail before serde");
+                assert!(error.contains(display_path), "{display_path}: {error}");
+                assert!(
+                    error.contains("must be an object when present"),
+                    "{display_path}: {error}"
+                );
+            }
+        }
+
+        complete["nodes"]["scene_curve"]["params"]
+            .as_object_mut()
+            .unwrap()
+            .remove("sceneCurveV1");
+        complete["nodes"]["scene_curve"]["params"]
+            .as_object_mut()
+            .unwrap()
+            .remove("outputCurveV1");
+        let parsed =
+            super::parse_current_edit_document(&complete).expect("complete current document");
+        parsed
+            .validate_document_contract()
+            .expect("complete current document compiles");
+        let serialized = serde_json::to_value(parsed).expect("serialize current document");
+        let film = &serialized["nodes"]["film_emulation"]["params"]["filmEmulation"];
+        assert!(!film.as_object().unwrap().contains_key("stageParams"));
+        assert!(!film.as_object().unwrap().contains_key("residualLut"));
+        assert!(
+            !film
+                .as_object()
+                .unwrap()
+                .contains_key("characteristicCurve")
+        );
+        let curves = serialized["nodes"]["scene_curve"]["params"]
+            .as_object()
+            .unwrap();
+        assert!(!curves.contains_key("sceneCurveV1"));
+        assert!(!curves.contains_key("outputCurveV1"));
+        for layer_path in [
+            &serialized["layers"]["masks"][0],
+            &serialized["nodes"]["layers"]["params"]["masks"][0],
+        ] {
+            let layer = layer_path.as_object().unwrap();
+            assert!(!layer.contains_key("referenceMatchApplicationReceipt"));
+            assert!(!layer.contains_key("retouchCloneSource"));
+            assert!(!layer.contains_key("retouchRemoveSource"));
+        }
     }
 
     #[test]
