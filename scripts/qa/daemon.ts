@@ -19,6 +19,7 @@ const engine = new QaDaemonEngine(
 );
 let closing = false;
 let forcedShutdownTimer: ReturnType<typeof setTimeout> | undefined;
+const forcedShutdownTimeoutMs = 2_000;
 const server = createServer((socket) => {
   socket.setEncoding('utf8');
   let buffer = '';
@@ -79,7 +80,7 @@ const shutdown = async () => {
   // adapter is unwinding. Do not leave the ownership record behind forever.
   forcedShutdownTimer = setTimeout(() => {
     void releaseDaemonState(state).finally(() => process.exit(0));
-  }, 5_000);
+  }, forcedShutdownTimeoutMs);
   forcedShutdownTimer.unref();
 };
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => void shutdown());

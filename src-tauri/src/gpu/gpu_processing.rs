@@ -3937,7 +3937,10 @@ mod blur_pass_tests {
             (scene_referred - encode(0.272_228_72)).abs() <= 0.01,
             "scene_referred={scene_referred}"
         );
-        assert_eq!(scene_referred, graph_v1);
+        assert!(
+            (scene_referred - graph_v1).abs() <= 0.001,
+            "graph versions must agree within one RGBA16F quantization step: graph_v1={graph_v1}, scene_referred={scene_referred}"
+        );
         assert_eq!(scene_referred, scene_referred_warm);
         let processor = state
             .gpu()
