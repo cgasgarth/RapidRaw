@@ -129,8 +129,35 @@ jobs:
           bun run check:actions
           bun tests/integration/checks/check-github-action-pins.ts
 
+  main-native-currentness:
+    name: 'native: latest-main gate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run-matrix: ${{ steps.currentness.outputs.run-command }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - id: currentness
+        name: Check whether this run still owns main native validation
+        env:
+          RAWENGINE_MAIN_COMMAND_RECEIPT: artifacts/ci/main-native-currentness.json
+        run: bun scripts/ci/run-latest-main-command.ts -- true
+      - name: Upload main native currentness receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-native-currentness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/main-native-currentness.json
+          retention-days: 14
+          if-no-files-found: error
+
   native-capability-matrix:
     name: 'native: full capability matrix'
+    needs: main-native-currentness
+    if: ${{ always() && (needs.main-native-currentness.result != 'success' || needs.main-native-currentness.outputs.run-matrix == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -148,11 +175,22 @@ jobs:
           key: v1-${{ runner.os }}-${{ runner.arch }}-main-native-capabilities
           cache-on-failure: true
       - name: Validate all maintained native profiles and leaf features
-        run: |
-          bun tests/integration/checks/check-native-feature-leaves.ts
-          bun run check:native-profiles
-          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational
-          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features
+        env:
+          RAWENGINE_MAIN_COMMAND_RECEIPT: artifacts/ci/main-native-supersession.json
+        run: >-
+          bun scripts/ci/run-latest-main-command.ts -- bash -euo pipefail -c
+          'bun tests/integration/checks/check-native-feature-leaves.ts;
+          bun run check:native-profiles;
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-computational;
+          cargo test --manifest-path src-tauri/Cargo.toml --locked -p rapidraw-codecs --all-features'
+      - name: Upload native supersession receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-native-supersession-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/main-native-supersession.json
+          retention-days: 14
+          if-no-files-found: error
 
   dependency-security-license:
     name: 'dependencies: exhaustive security and licenses'
