@@ -503,6 +503,10 @@ export const ImageCanvas = memo(
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
       currentFrameHealth: rendererHandoff.committedBackend === 'wgpu' ? 'fresh' : null,
       hasRenderedFirstFrame,
+      hasViewportTransform:
+        Math.abs(transformState.positionX) > 0.01 ||
+        Math.abs(transformState.positionY) > 0.01 ||
+        Math.abs(transformState.scale - 1) > 0.01,
       previewSource,
       requiresCpuComposition: hasCurrentCpuPreview || coherentInteractivePatch !== null || isExportSoftProofEnabled,
       selectedImageIsReady: selectedImage.isReady,

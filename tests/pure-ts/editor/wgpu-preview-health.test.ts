@@ -79,4 +79,21 @@ describe('resolveWgpuPreviewVisibility', () => {
       shouldHideCpuPreview: false,
     });
   });
+
+  it('keeps CPU visible while a zoom or pan transform awaits compositor proof', () => {
+    expect(
+      resolveWgpuPreviewVisibility({
+        currentFrameHealth: 'fresh',
+        hasRenderedFirstFrame: true,
+        hasViewportTransform: true,
+        previewSource: 'blob:preview',
+        selectedImageIsReady: true,
+        useWgpuRenderer: true,
+      }),
+    ).toEqual({
+      health: 'cpu-composition',
+      previewBackend: 'cpu-fallback',
+      shouldHideCpuPreview: false,
+    });
+  });
 });

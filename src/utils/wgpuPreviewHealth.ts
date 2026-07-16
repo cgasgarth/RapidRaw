@@ -10,6 +10,12 @@ export type WgpuPreviewHealth =
 export interface WgpuPreviewHealthInput {
   currentFrameHealth?: 'fresh' | null | undefined;
   hasRenderedFirstFrame: boolean;
+  /**
+   * Native WGPU receipts prove the source texture, but not that a transformed
+   * viewport is visible after the canvas transform has changed. Keep the
+   * current CPU layer in place until that compositor path has its own proof.
+   */
+  hasViewportTransform?: boolean | undefined;
   previewSource: string | null | undefined;
   requiresCpuComposition?: boolean | undefined;
   selectedImageIsReady: boolean;
@@ -25,6 +31,7 @@ export interface WgpuPreviewVisibility {
 export const resolveWgpuPreviewVisibility = ({
   currentFrameHealth,
   hasRenderedFirstFrame,
+  hasViewportTransform = false,
   previewSource,
   requiresCpuComposition = false,
   selectedImageIsReady,
@@ -46,7 +53,7 @@ export const resolveWgpuPreviewVisibility = ({
     return { health: 'missing-cpu-preview', previewBackend: 'cpu-fallback', shouldHideCpuPreview: false };
   }
 
-  if (requiresCpuComposition) {
+  if (requiresCpuComposition || hasViewportTransform) {
     return { health: 'cpu-composition', previewBackend: 'cpu-fallback', shouldHideCpuPreview: false };
   }
 
