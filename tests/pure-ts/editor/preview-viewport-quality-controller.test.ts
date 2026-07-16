@@ -58,7 +58,10 @@ describe('preview viewport quality controller', () => {
   test('derives zoom requests from cropped source identity and preserves configured fallback', () => {
     const controller = new PreviewViewportQualityController();
     const cropped = controller.snapshot(
-      input({ crop: { height: 1800, width: 2400 }, zoomMode: { devicePixelsPerImagePixel: 2, kind: 'ratio' } }),
+      input({
+        crop: { height: 1800, unit: 'px', width: 2400, x: 0, y: 0 },
+        zoomMode: { devicePixelsPerImagePixel: 2, kind: 'ratio' },
+      }),
     );
     const disabled = controller.snapshot(
       input({

@@ -153,9 +153,9 @@ describe('preview invalidation effect runner', () => {
   });
 
   test('reordered, duplicate, and malformed display events cannot schedule', async () => {
-    let emit: ((payload: unknown) => void) | null = null;
+    const subscription: { emit?: (payload: unknown) => void } = {};
     const { coordinator, effects, runner } = harness(async (onPayload) => {
-      emit = onPayload;
+      subscription.emit = onPayload;
       return () => undefined;
     });
     const currentSource = source('/fixtures/a.raw', 1);
@@ -176,11 +176,11 @@ describe('preview invalidation effect runner', () => {
       scopeRecoveryRequestId: 0,
       targetResolution: 1400,
     });
-    if (emit === null) throw new Error('Expected display event subscription.');
-    emit(displayPayload(3));
-    emit(displayPayload(2));
-    emit(displayPayload(3));
-    emit({ displayResourceGeneration: 'invalid' });
+    if (subscription.emit === undefined) throw new Error('Expected display event subscription.');
+    subscription.emit(displayPayload(3));
+    subscription.emit(displayPayload(2));
+    subscription.emit(displayPayload(3));
+    subscription.emit({ displayResourceGeneration: 'invalid' });
 
     expect(captures).toEqual([1400]);
     expect(effects.filter((effect) => effect.type === 'schedule-edited')).toHaveLength(1);
@@ -284,14 +284,16 @@ describe('preview invalidation effect runner', () => {
   });
 
   test('listener setup resolved after unmount is disposed and cannot have a late effect', async () => {
-    let emit: ((payload: unknown) => void) | null = null;
-    let resolveSubscription: ((unlisten: () => void) => void) | null = null;
+    const listener: {
+      emit?: (payload: unknown) => void;
+      resolve?: (unlisten: () => void) => void;
+    } = {};
     let unlistenCount = 0;
     const subscription = new Promise<() => void>((resolve) => {
-      resolveSubscription = resolve;
+      listener.resolve = resolve;
     });
     const { coordinator, runner } = harness((onPayload) => {
-      emit = onPayload;
+      listener.emit = onPayload;
       return subscription;
     });
     const currentSource = source('/fixtures/a.raw', 1);
@@ -303,13 +305,13 @@ describe('preview invalidation effect runner', () => {
     runner.installSession(initial.edited.request.session, 0);
     runner.updateSource({ capture, scopeRecoveryRequestId: 0, targetResolution: 1200 });
     runner.stop('editor-unmounted');
-    if (resolveSubscription === null) throw new Error('Expected pending listener setup.');
-    resolveSubscription(() => {
+    if (listener.resolve === undefined) throw new Error('Expected pending listener setup.');
+    listener.resolve(() => {
       unlistenCount += 1;
     });
     await tick();
-    if (emit === null) throw new Error('Expected captured display callback.');
-    emit(displayPayload(2));
+    if (listener.emit === undefined) throw new Error('Expected captured display callback.');
+    listener.emit(displayPayload(2));
 
     expect(unlistenCount).toBe(1);
     expect(coordinator.snapshot().session).toBeNull();

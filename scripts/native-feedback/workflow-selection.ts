@@ -40,7 +40,7 @@ export function selectNativeFeedbackWorkflow(paths: readonly string[]): NativeFe
 if (import.meta.main) {
   const pathsFileIndex = process.argv.indexOf('--paths-file');
   const pathsFile = pathsFileIndex < 0 ? undefined : process.argv[pathsFileIndex + 1];
-  const output = Bun.env.GITHUB_OUTPUT;
+  const output = Bun.env['GITHUB_OUTPUT'];
   if (pathsFile === undefined || output === undefined)
     throw new Error('Usage: GITHUB_OUTPUT=<path> bun workflow-selection.ts --paths-file <newline-paths>');
   const paths = (await Bun.file(pathsFile).text()).split('\n');

@@ -8,7 +8,7 @@ import {
 import { createEditorOverlayGeometry } from '../../../src/utils/editorOverlayGeometry';
 
 const geometry = createEditorOverlayGeometry({
-  crop: { height: 1200, width: 1600, x: 200, y: 100 },
+  crop: { height: 1200, unit: 'px', width: 1600, x: 200, y: 100 },
   devicePixelRatio: 2,
   geometryEpoch: 7,
   orientationSteps: 1,

@@ -6,7 +6,11 @@ import {
   requestPreviewGeometry,
   toPreviewGeometryInvokeArgs,
 } from '../../../src/tauri/previewGeometry';
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+} from '../../../src/utils/adjustments';
 
 const params: PreviewGeometryParams = {
   distortion: 0,
@@ -56,7 +60,7 @@ describe('preview geometry authority contract', () => {
   test('invokes the typed boundary and validates the native data URL payload', async () => {
     const calls: Array<{ args?: Record<string, unknown>; command: string }> = [];
     const result = await requestPreviewGeometry(request(), async (command, args) => {
-      calls.push({ args, command });
+      calls.push({ ...(args === undefined ? {} : { args }), command });
       return 'data:image/jpeg;base64,fixture';
     });
     expect(calls).toEqual([
@@ -109,6 +113,8 @@ describe('preview geometry authority contract', () => {
     const localMask = request();
     localMask.adjustments.masks.push({
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: 'local-1',
       invert: false,
       name: 'Local exposure',
@@ -123,6 +129,8 @@ describe('preview geometry authority contract', () => {
     const first = request();
     first.adjustments.masks.push({
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: 'clone-1',
       invert: false,
       name: 'Clone',

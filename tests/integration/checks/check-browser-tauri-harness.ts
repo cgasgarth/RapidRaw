@@ -2801,16 +2801,31 @@ try {
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .waitFor({ timeout: 10_000 });
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (!harness) throw new Error('Browser Tauri harness was not installed before image open.');
+    harness.imageOpenDelayMs = 2_000;
+  });
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
     .first()
     .dblclick();
   const provisionalBadge = page.getByTestId('embedded-preview-provisional-badge');
-  await provisionalBadge.waitFor({ state: 'visible', timeout: 10_000 });
-  if (!(await provisionalBadge.textContent())?.includes('Camera preview')) {
-    throw new Error('Embedded RAW preview was not visibly labeled as provisional.');
-  }
+  await page.waitForFunction(
+    () => {
+      const badge = document.querySelector('[data-testid="embedded-preview-provisional-badge"]');
+      if (!(badge instanceof HTMLElement)) return false;
+      const style = getComputedStyle(badge);
+      return style.display !== 'none' && style.visibility !== 'hidden' && badge.textContent?.includes('Camera preview');
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
   await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (harness) harness.imageOpenDelayMs = 250;
+  });
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });

@@ -77,10 +77,12 @@ describe('directional image prefetch scheduler', () => {
     const serialStalls: number[] = [];
 
     for (let index = 0; index < paths.length; index += 1) {
-      stagedStalls.push(warmed.has(paths[index]) ? 0 : 80);
+      const currentPath = paths[index];
+      if (currentPath === undefined) throw new Error('Expected benchmark path.');
+      stagedStalls.push(warmed.has(currentPath) ? 0 : 80);
       serialStalls.push(80);
       const request = scheduler.schedule({
-        currentPath: paths[index],
+        currentPath,
         memoryPressure: false,
         now: index * 500,
         orderedPaths: paths,
