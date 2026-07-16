@@ -37,7 +37,7 @@ const operations: EditGraphParameterPatchOperationV1[] = [
   },
 ];
 
-const buildCommand = (dryRun: boolean) =>
+const buildCommand = (dryRun: boolean, commandOperations: readonly EditGraphParameterPatchOperationV1[] = operations) =>
   editGraphCommandEnvelopeV1Schema.parse({
     actor: { id: 'test-agent', kind: ActorKind.Agent, sessionId: 'agent-editgraph-test' },
     approval: dryRun
@@ -49,7 +49,7 @@ const buildCommand = (dryRun: boolean) =>
     dryRun,
     expectedGraphRevision: 'history_0',
     idempotencyKey: `agent-editgraph:${dryRun ? 'dry-run' : 'apply'}`,
-    parameters: { label: 'Agent EditGraph transaction test', operations },
+    parameters: { label: 'Agent EditGraph transaction test', operations: commandOperations },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     target: { imagePath: sourcePath, kind: 'image' },
   });
@@ -150,8 +150,8 @@ describe('agent EditGraph EditTransaction bridge', () => {
       },
     ];
     const bridge = new RawEngineLocalAppServerBridge();
-    const dryRun = { ...buildCommand(true), parameters: { label: 'No-op', operations: noOpOperations } };
-    const apply = { ...buildCommand(false), parameters: { label: 'No-op', operations: noOpOperations } };
+    const dryRun = buildCommand(true, noOpOperations);
+    const apply = buildCommand(false, noOpOperations);
     await dryRunEditGraphCommandInLiveEditor(dryRun, bridge, 'editgraph-no-op-dry-run');
     await applyEditGraphCommandToLiveEditor(apply, bridge, 'editgraph-no-op-apply');
 
@@ -220,7 +220,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
       buildAgentEditGraphEditTransaction(
         { ...fallbackState, imageSessionId: 83 },
         identity,
-        { ...fallbackState.adjustments, exposure: 0.2 },
+        { ...fallbackState.adjustmentSnapshot.value, exposure: 0.2 },
         'stale-reopened-a',
       ),
     ).toThrow('agent_editgraph_transaction.stale_session:editor-image-session:81:editor-image-session:83');
