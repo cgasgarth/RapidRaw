@@ -52,8 +52,9 @@ const root=${JSON.stringify(options.root)};
 const coordinator=${JSON.stringify(options.coordinator)};
 const outer=await acquireResourceLease({label:'outer-validation-output',resource:validationOutputResource(root,'dist'),root:coordinator});
 try {
+  console.log('nested-output-acquired '+outer.ownerId);
   for(let index=0;index<${String(options.repetitions)};index+=1){
-    const node={id:'nested-output-'+index,command:['bun','-e',"await Bun.write('dist/artifact',Bun.env.RAWENGINE_RESOURCE_OWNER_ID??'missing')"],dependencies:[],inputs:['frontend'],resourceClass:'light',cachePolicy:'none',modes:['commit'],timeoutMs:2000,outputs:['dist']};
+    const node={id:'nested-output-'+index,command:['/bin/sh','-c','mkdir -p dist && printf %s "$RAWENGINE_RESOURCE_OWNER_ID" > dist/artifact'],dependencies:[],inputs:['frontend'],resourceClass:'light',cachePolicy:'none',modes:['commit'],timeoutMs:2000,outputs:['dist']};
     const exitCode=await runValidation([node],{mode:'commit',changedPaths:['input.ts'],noCache:true,verifyCache:false,explainCache:false,root,resourceCoordinatorRoot:coordinator});
     if(exitCode!==0)process.exit(23);
   }
@@ -993,9 +994,10 @@ await lease.release();`;
         results.map(({ stderr, stdout }) => `${stdout}\n${stderr}`).join('\n---\n'),
       ).toEqual([0, 0, 0]);
       for (let index = 0; index < results.length; index += 1) {
+        expect(results[index]?.stdout).toContain(`nested-output-acquired nested-output-owner-${String(index)}`);
         expect(results[index]?.stdout).toContain(`nested-output-complete nested-output-owner-${String(index)}`);
       }
-      expect(await Bun.file(join(coordinator, `${validationOutputResource(root, 'dist')}.lock`)).exists()).toBeFalse();
+      expect((await readdir(coordinator)).sort()).toEqual([]);
     } finally {
       for (const child of children) {
         if (child.exitCode === null) child.kill('SIGKILL');
