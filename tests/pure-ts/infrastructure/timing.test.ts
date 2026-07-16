@@ -33,12 +33,12 @@ test('throttle invokes immediately and keeps the latest trailing call', async ()
 });
 
 test('throttle preserves a pending trailing window across event-loop delay', () => {
-  const calls = [];
+  const calls: string[] = [];
   const realNow = Date.now;
   let now = 1_000;
   Date.now = () => now;
   try {
-    const throttled = throttle((value) => calls.push(value), 20);
+    const throttled = throttle((value: string) => calls.push(value), 20);
     throttled('a');
     throttled('b');
     now += 25;
