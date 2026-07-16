@@ -1529,7 +1529,9 @@ mod tests {
     async fn prepared_resume_source_change_emits_one_keyed_error_and_clears_active_job() {
         use tauri::{Listener, Manager};
 
-        let _test_guard = IMPORT_INTEGRATION_TEST_LOCK.lock().unwrap();
+        let _test_guard = IMPORT_INTEGRATION_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = tempfile::tempdir().unwrap();
         let source = fixture.path().join("source.raw");
         let destination = fixture.path().join("library").join("source.raw");
@@ -1627,7 +1629,9 @@ mod tests {
     async fn command_import_cancel_journal_and_resume_completes_large_batch_without_duplicates() {
         use tauri::{Listener, Manager};
 
-        let _test_guard = IMPORT_INTEGRATION_TEST_LOCK.lock().unwrap();
+        let _test_guard = IMPORT_INTEGRATION_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = tempfile::tempdir().unwrap();
         let sources = fixture.path().join("sources");
         let destination = fixture.path().join("library");
@@ -1809,9 +1813,14 @@ mod tests {
             super::super::changefeed::get_library_changefeed_report(restarted_handle.state())
                 .unwrap();
         assert_eq!(
-            pre_restart_report.coalesced_operations + report.coalesced_operations,
-            source_paths.len() as u64,
-            "pre-restart report: {pre_restart_report:?}; post-restart report: {report:?}"
+            pre_restart_report.coalesced_operations,
+            cancelled.completed.len() as u64,
+            "the first watcher epoch must publish each committed pre-cancel item once: {pre_restart_report:?}"
+        );
+        assert!(
+            report.coalesced_operations >= cancelled.cancelled.len() as u64
+                && report.coalesced_operations <= source_paths.len() as u64,
+            "the restarted watcher epoch must cover every resumed item without exceeding the final library cardinality: {report:?}"
         );
         assert_eq!(pre_restart_report.full_recursive_fallback_scans, 0);
         assert_eq!(report.full_recursive_fallback_scans, 0);

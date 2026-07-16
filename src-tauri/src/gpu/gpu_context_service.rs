@@ -169,7 +169,7 @@ impl GpuContextService {
         self.core.publish_context(token, context)
     }
 
-    #[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
+    #[cfg(any(target_os = "macos", feature = "validation-harness"))]
     pub(crate) fn install_coordinator(
         &self,
         coordinator: Arc<DisplayTargetCoordinator>,

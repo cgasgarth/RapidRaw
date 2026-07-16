@@ -50,13 +50,13 @@ jobs:
         run: bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
 
       - name: Generate bundle analysis report
-        if: ${{ always() }}
+        if: ${{ success() }}
         run: |
           bun scripts/ci/generate-vite-bundle-report.ts
           bun scripts/ci/write-vite-bundle-step-summary.ts
 
       - name: Upload bundle analysis report
-        if: ${{ always() }}
+        if: ${{ success() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: main-vite-bundle-report-${{ github.run_id }}-${{ github.run_attempt }}
