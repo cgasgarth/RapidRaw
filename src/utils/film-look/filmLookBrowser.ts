@@ -1,4 +1,5 @@
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../adjustments';
+import { buildTechnicalWhiteBalance } from '../color/whiteBalance';
 
 export type FilmLookCategory =
   | 'black_and_white'
@@ -8,7 +9,7 @@ export type FilmLookCategory =
   | 'color_fade'
   | 'color_warm';
 
-type FilmLookAdjustmentKey =
+type FilmLookGlobalAdjustmentKey =
   | 'blacks'
   | 'contrast'
   | 'glowAmount'
@@ -18,10 +19,12 @@ type FilmLookAdjustmentKey =
   | 'highlights'
   | 'halationAmount'
   | 'saturation'
-  | 'shadows'
-  | 'temperature';
+  | 'shadows';
+type FilmLookAdjustmentKey = FilmLookGlobalAdjustmentKey | 'temperature';
 
-export type FilmLookAdjustmentPatch = Partial<Pick<Adjustments, FilmLookAdjustmentKey>>;
+export type FilmLookAdjustmentPatch = Partial<Pick<Adjustments, FilmLookGlobalAdjustmentKey>> & {
+  temperature?: number;
+};
 export type FilmLookRuntimeSupportState = 'adjustment_patch_preview_export';
 export type FilmLookSortMode = 'adjustment_count_desc' | 'catalog' | 'name_asc' | 'strength_desc';
 
@@ -176,7 +179,7 @@ export const resetFilmLookControlledAdjustments = (): FilmLookAdjustmentPatch =>
   const resetPatch: FilmLookAdjustmentPatch = {};
 
   for (const key of FILM_LOOK_ADJUSTMENT_KEYS) {
-    resetPatch[key] = INITIAL_ADJUSTMENTS[key];
+    resetPatch[key] = key === 'temperature' ? 0 : INITIAL_ADJUSTMENTS[key];
   }
 
   return resetPatch;
@@ -191,6 +194,21 @@ export const buildFilmLookAppliedAdjustmentPatch = (
   ...resetFilmLookControlledAdjustments(),
   ...scaleFilmLookAdjustmentPatch(look, strength),
 });
+
+export const lowerFilmLookAdjustmentPatchToCurrent = (
+  patch: FilmLookAdjustmentPatch,
+  inputSemantics: Adjustments['whiteBalanceTechnical']['inputSemantics'],
+): Partial<Adjustments> => {
+  const { temperature, ...currentPatch } = patch;
+  if (temperature === undefined) return currentPatch;
+  return {
+    ...currentPatch,
+    whiteBalanceTechnical:
+      temperature === 0
+        ? { ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical), inputSemantics }
+        : buildTechnicalWhiteBalance('kelvin_tint', 6_504 + temperature * 50, 0, 'preset', inputSemantics),
+  };
+};
 
 export const buildFilmLookPresetDraft = (look: FilmLookBrowserItem, strength: number): FilmLookPresetDraft => ({
   adjustments: scaleFilmLookAdjustmentPatch(look, strength),

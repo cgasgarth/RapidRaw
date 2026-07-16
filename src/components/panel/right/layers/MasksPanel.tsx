@@ -3788,7 +3788,16 @@ function SettingsPanel({
     const currentAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...container.adjustments };
     const newAdjustments =
       typeof updater === 'function' ? updater(currentAdjustments) : { ...currentAdjustments, ...updater };
-    updateContainer(container.id, { adjustments: newAdjustments });
+    const localTemperature = Object.getOwnPropertyDescriptor(newAdjustments, 'temperature')?.value;
+    const localTint = Object.getOwnPropertyDescriptor(newAdjustments, 'tint')?.value;
+    updateContainer(container.id, {
+      adjustments: {
+        ...container.adjustments,
+        ...newAdjustments,
+        temperature: typeof localTemperature === 'number' ? localTemperature : container.adjustments.temperature,
+        tint: typeof localTint === 'number' ? localTint : container.adjustments.tint,
+      },
+    });
   };
 
   const handleToggleSection = (section: string) => {

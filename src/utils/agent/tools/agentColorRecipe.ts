@@ -1,5 +1,4 @@
 import type { Adjustments } from '../../adjustments';
-import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
 
 export const buildAgentColorRecipeHashInput = (adjustments: Adjustments) => ({
   blackWhiteMixer: adjustments.blackWhiteMixer,
@@ -12,12 +11,5 @@ export const buildAgentColorRecipeHashInput = (adjustments: Adjustments) => ({
   selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
   skinToneUniformity: adjustments.skinToneUniformity,
   whiteBalanceTechnical: adjustments.whiteBalanceTechnical,
-  creativeTemperature: adjustments.creativeTemperature,
-  creativeTint: adjustments.creativeTint,
-  temperature: adjustments.temperature,
-  tint: adjustments.tint,
   vibrance: adjustments.vibrance,
 });
-
-const hashAgentColorRecipeInput = (adjustments: Adjustments): string =>
-  stableAgentPreviewHash(JSON.stringify(buildAgentColorRecipeHashInput(adjustments)));

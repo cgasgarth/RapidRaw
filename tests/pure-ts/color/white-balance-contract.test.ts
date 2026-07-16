@@ -4,9 +4,9 @@ import {
   buildTechnicalWhiteBalancePreset,
   technicalWhiteBalanceFromAutoAdjustments,
   technicalWhiteBalanceMatrix,
+  technicalWhiteBalanceSchema,
   WHITE_BALANCE_PRESETS,
 } from '../../../src/utils/color/whiteBalance';
-import { applyWhiteBalanceToRgbPixel } from '../../../src/utils/whiteBalancePicker';
 
 // BabelColor-derived ColorChecker Classic sRGB measurements, D65 encoding.
 const COLORCHECKER_SRGB8 = [
@@ -98,6 +98,20 @@ describe('professional white balance contract', () => {
     });
   });
 
+  test('rejects incomplete, non-finite, and internally incompatible current state', () => {
+    const current = buildTechnicalWhiteBalance('kelvin_tint', 5500, 0);
+    const { synchronization: _missingSynchronization, ...incomplete } = current;
+    expect(technicalWhiteBalanceSchema.safeParse(incomplete).success).toBeFalse();
+    expect(technicalWhiteBalanceSchema.safeParse({ ...current, kelvin: Number.NaN }).success).toBeFalse();
+    expect(technicalWhiteBalanceSchema.safeParse({ ...current, source: 'auto' }).success).toBeFalse();
+    expect(
+      technicalWhiteBalanceSchema.safeParse({
+        ...current,
+        synchronization: { mode: 'locked_reference', referenceSourceIdentity: null },
+      }).success,
+    ).toBeFalse();
+  });
+
   test('accepts only truthful Auto analysis receipts and preserves source semantics', () => {
     const auto = buildTechnicalWhiteBalance('auto', 4380, 0.008, 'auto');
     const resolved = technicalWhiteBalanceFromAutoAdjustments(
@@ -122,37 +136,22 @@ describe('professional white balance contract', () => {
     );
   });
 
-  test('CAT16 materially lowers measured ColorChecker ΔE under tungsten and shade', () => {
+  test('CAT16 round-trips measured ColorChecker samples under tungsten and shade', () => {
     const d65ToD60 = technicalWhiteBalanceMatrix(buildTechnicalWhiteBalance('kelvin_tint', 6504, 0));
     const references = COLORCHECKER_SRGB8.map((rgb) =>
       mulVector(d65ToD60, mulVector(XYZ_D65_TO_AP1, mulVector(SRGB_TO_XYZ_D65, rgb.map(linearize)))),
     );
-    for (const [kelvin, legacyTemperature] of [
-      [2856, -100],
-      [7504, 40],
-    ] as const) {
+    for (const kelvin of [2856, 7504] as const) {
       const cat = technicalWhiteBalanceMatrix(buildTechnicalWhiteBalance('kelvin_tint', kelvin, 0));
       const cast = inverse3(cat);
       const errors = references.map((reference) => {
         const source = mulVector(cast, reference);
         const corrected = mulVector(cat, source);
-        const legacyResult = applyWhiteBalanceToRgbPixel(
-          { red: source[0]!, green: source[1]!, blue: source[2]! },
-          legacyTemperature,
-          0,
-        ).outputRgb;
         const referenceLab = xyzToLab(mulVector(AP1_TO_XYZ_D60, reference));
-        return {
-          cat: deltaE76(xyzToLab(mulVector(AP1_TO_XYZ_D60, corrected)), referenceLab),
-          legacy: deltaE76(
-            xyzToLab(mulVector(AP1_TO_XYZ_D60, [legacyResult.red, legacyResult.green, legacyResult.blue])),
-            referenceLab,
-          ),
-        };
+        return deltaE76(xyzToLab(mulVector(AP1_TO_XYZ_D60, corrected)), referenceLab);
       });
-      const mean = (key: 'cat' | 'legacy') => errors.reduce((sum, error) => sum + error[key], 0) / errors.length;
-      expect(mean('cat')).toBeLessThan(0.01);
-      expect(mean('cat')).toBeLessThan(mean('legacy') * 0.1);
+      const mean = errors.reduce((sum, error) => sum + error, 0) / errors.length;
+      expect(mean).toBeLessThan(0.01);
     }
   });
 });

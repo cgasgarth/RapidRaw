@@ -362,13 +362,7 @@ export interface Adjustments {
   selectiveColorRangeControls: Record<SelectiveColorRangeKey, SelectiveColorRangeControl>;
   skinToneUniformity: SkinToneUniformitySettings;
   structure: number;
-  /** Legacy creative offsets. Preserved byte-for-byte for old sidecars. */
-  temperature: number;
-  tint: number;
-  creativeTemperature: number;
-  creativeTint: number;
   whiteBalanceTechnical: TechnicalWhiteBalance;
-  whiteBalanceMigration: 'native_v1' | 'legacy_creative_temperature_tint_v1';
   toneMapper: 'agx' | 'basic' | 'rapidView';
   toneEqualizer: ToneEqualizerSettingsV1;
   viewTransform: ViewTransformSettingsV1;
@@ -1052,12 +1046,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     targetSaturation: 0.38,
   },
   structure: 0,
-  temperature: 0,
-  tint: 0,
-  creativeTemperature: 0,
-  creativeTint: 0,
   whiteBalanceTechnical: structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
-  whiteBalanceMigration: 'native_v1',
   toneMapper: 'rapidView',
   toneEqualizer: structuredClone(INITIAL_TONE_EQUALIZER),
   viewTransform: {
@@ -1224,12 +1213,26 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       }) as AiPatch,
   );
 
+  if (
+    Object.hasOwn(loadedAdjustments, 'temperature') ||
+    Object.hasOwn(loadedAdjustments, 'tint') ||
+    Object.hasOwn(loadedAdjustments, 'creativeTemperature') ||
+    Object.hasOwn(loadedAdjustments, 'creativeTint') ||
+    Object.hasOwn(loadedAdjustments, 'whiteBalanceMigration')
+  ) {
+    throw new Error('adjustments.obsolete_white_balance_representation');
+  }
+  if (!Object.hasOwn(loadedAdjustments, 'whiteBalanceTechnical')) {
+    throw new Error('adjustments.missing_white_balance_technical');
+  }
   const parsedTechnicalWhiteBalance = technicalWhiteBalanceSchema.safeParse(loadedAdjustments.whiteBalanceTechnical);
+  if (!parsedTechnicalWhiteBalance.success) {
+    throw new Error('adjustments.invalid_white_balance_technical');
+  }
   const parsedReferenceMatchReceipt = matchLookApplicationReceiptV1Schema.safeParse(
     loadedAdjustments.referenceMatchApplicationReceipt,
   );
   const parsedFilmEmulation = filmEmulationNodeV1Schema.nullable().safeParse(loadedAdjustments.filmEmulation);
-  const isLegacyWhiteBalance = !parsedTechnicalWhiteBalance.success;
   const loadedCameraProfileAmount = loadedAdjustments.cameraProfileAmount;
   const cameraProfileAmount =
     loadedCameraProfileAmount !== undefined && Number.isFinite(loadedCameraProfileAmount)
@@ -1244,16 +1247,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     hue: loadedAdjustments.hue ?? INITIAL_ADJUSTMENTS.hue,
-    creativeTemperature: isLegacyWhiteBalance
-      ? (loadedAdjustments.temperature ?? INITIAL_ADJUSTMENTS.temperature)
-      : (loadedAdjustments.creativeTemperature ?? INITIAL_ADJUSTMENTS.creativeTemperature),
-    creativeTint: isLegacyWhiteBalance
-      ? (loadedAdjustments.tint ?? INITIAL_ADJUSTMENTS.tint)
-      : (loadedAdjustments.creativeTint ?? INITIAL_ADJUSTMENTS.creativeTint),
-    whiteBalanceTechnical: parsedTechnicalWhiteBalance.success
-      ? parsedTechnicalWhiteBalance.data
-      : structuredClone(INITIAL_TECHNICAL_WHITE_BALANCE),
-    whiteBalanceMigration: isLegacyWhiteBalance ? 'legacy_creative_temperature_tint_v1' : 'native_v1',
+    whiteBalanceTechnical: parsedTechnicalWhiteBalance.data,
     referenceMatchApplicationReceipt: parsedReferenceMatchReceipt.success ? parsedReferenceMatchReceipt.data : null,
     lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
@@ -1393,13 +1387,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
     {
       label: 'modals.copyPaste.groups.whiteBalance',
-      keys: [
-        'whiteBalanceTechnical',
-        'creativeTemperature',
-        'creativeTint',
-        ColorAdjustment.Temperature,
-        ColorAdjustment.Tint,
-      ],
+      keys: ['whiteBalanceTechnical'],
     },
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'modals.copyPaste.groups.hueShift', keys: [ColorAdjustment.Hue] },
@@ -1569,8 +1557,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Saturation,
     ColorAdjustment.CameraProfile,
     ColorAdjustment.ToneCurve,
-    ColorAdjustment.Temperature,
-    ColorAdjustment.Tint,
+    'whiteBalanceTechnical',
     ColorAdjustment.Vibrance,
     ColorAdjustment.Hue,
     ColorAdjustment.BlackWhiteMixer,

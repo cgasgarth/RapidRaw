@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { isDeepStrictEqual } from 'node:util';
+
 import { z } from 'zod';
 
 import { ToolType } from '../../../../src/components/panel/right/layers/Masks.tsx';
@@ -15,6 +17,7 @@ import {
   agentColorApplyRequestSchema,
   applyAgentColor,
 } from '../../../../src/utils/agent/tools/agentColorApplyTool.ts';
+import { buildTechnicalWhiteBalance } from '../../../../src/utils/color/whiteBalance.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../../src/utils/profileTonePresets.ts';
 import {
@@ -268,6 +271,7 @@ if (
   throw new Error('agent color typed HSL dry-run mutated live editor state.');
 }
 
+const agentWhiteBalance = buildTechnicalWhiteBalance('kelvin_tint', 5900, -0.003);
 const result = await applyAgentColor({
   color: {
     blackWhiteMixer: {
@@ -325,8 +329,7 @@ const result = await applyAgentColor({
       targetLuminance: 0.58,
       targetSaturation: 0.42,
     },
-    temperature: 8,
-    tint: -3,
+    whiteBalanceTechnical: agentWhiteBalance,
     toneCurve: 'soft_contrast',
     vibrance: 14,
   },
@@ -339,25 +342,36 @@ const parsedResult = colorResultSchema.parse(result);
 const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
-if (
-  state.adjustmentSnapshot.value.temperature !== 8 ||
-  state.adjustmentSnapshot.value.tint !== -3 ||
-  state.adjustmentSnapshot.value.vibrance !== 14 ||
-  state.adjustmentSnapshot.value.hsl.oranges.saturation !== 12 ||
-  state.adjustmentSnapshot.value.colorGrading.highlights.saturation !== 7 ||
-  state.adjustmentSnapshot.value.colorBalanceRgb.highlights.red !== 6 ||
-  state.adjustmentSnapshot.value.channelMixer.red.red !== 104 ||
-  state.adjustmentSnapshot.value.blackWhiteMixer.weights.oranges !== 12 ||
-  state.adjustmentSnapshot.value.cameraProfile !== 'camera_portrait' ||
-  state.adjustmentSnapshot.value.colorCalibration.redSaturation !== 8 ||
-  state.adjustmentSnapshot.value.skinToneUniformity.hueUniformity !== 0.38 ||
-  state.adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees !== 42 ||
-  state.adjustmentSnapshot.value.toneCurve !== 'soft_contrast' ||
-  state.adjustmentSnapshot.value.curveMode !== 'parametric' ||
-  state.adjustmentSnapshot.value.parametricCurve.luma.highlights !==
-    TONE_CURVE_PARAMETRIC_PRESETS.soft_contrast.highlights
-) {
-  throw new Error('agent.color.apply did not mutate representative color adjustments.');
+const colorMutationFailures = [
+  [
+    'whiteBalanceTechnical',
+    isDeepStrictEqual(state.adjustmentSnapshot.value.whiteBalanceTechnical, agentWhiteBalance),
+    true,
+  ],
+  ['vibrance', state.adjustmentSnapshot.value.vibrance, 14],
+  ['hsl.oranges.saturation', state.adjustmentSnapshot.value.hsl.oranges.saturation, 12],
+  ['colorGrading.highlights.saturation', state.adjustmentSnapshot.value.colorGrading.highlights.saturation, 7],
+  ['colorBalanceRgb.highlights.red', state.adjustmentSnapshot.value.colorBalanceRgb.highlights.red, 6],
+  ['channelMixer.red.red', state.adjustmentSnapshot.value.channelMixer.red.red, 104],
+  ['blackWhiteMixer.weights.oranges', state.adjustmentSnapshot.value.blackWhiteMixer.weights.oranges, 12],
+  ['cameraProfile', state.adjustmentSnapshot.value.cameraProfile, 'camera_portrait'],
+  ['colorCalibration.redSaturation', state.adjustmentSnapshot.value.colorCalibration.redSaturation, 8],
+  ['skinToneUniformity.hueUniformity', state.adjustmentSnapshot.value.skinToneUniformity.hueUniformity, 0.38],
+  [
+    'selectiveColorRangeControls.oranges.widthDegrees',
+    state.adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees,
+    42,
+  ],
+  ['toneCurve', state.adjustmentSnapshot.value.toneCurve, 'soft_contrast'],
+  ['curveMode', state.adjustmentSnapshot.value.curveMode, 'parametric'],
+  [
+    'parametricCurve.luma.highlights',
+    state.adjustmentSnapshot.value.parametricCurve.luma.highlights,
+    TONE_CURVE_PARAMETRIC_PRESETS.soft_contrast.highlights,
+  ],
+].filter(([, actual, expected]) => actual !== expected);
+if (colorMutationFailures.length > 0) {
+  throw new Error(`agent.color.apply mutation mismatch: ${JSON.stringify(colorMutationFailures)}`);
 }
 if (state.historyIndex !== 1 || state.history.length !== 2 || state.uncroppedAdjustedPreviewUrl !== null) {
   throw new Error('agent.color.apply must create undo history and invalidate stale preview output.');
@@ -373,7 +387,8 @@ if (
 }
 if (
   state.editDocumentV2.nodes.camera_input?.params.cameraProfile !== 'camera_portrait' ||
-  state.editDocumentV2.nodes.camera_input.params.temperature !== 8 ||
+  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.kelvin !== agentWhiteBalance.kelvin ||
+  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.duv !== agentWhiteBalance.duv ||
   state.editDocumentV2.nodes.perceptual_grading?.params.colorGrading.highlights.saturation !== 7 ||
   state.editDocumentV2.nodes.color_presence?.params.saturation !== 5
 ) {
@@ -410,8 +425,7 @@ for (const field of [
   'saturation',
   'selectiveColorRangeControls',
   'skinToneUniformity',
-  'temperature',
-  'tint',
+  'whiteBalanceTechnical',
   'toneCurve',
   'vibrance',
 ]) {

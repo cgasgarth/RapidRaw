@@ -1906,13 +1906,6 @@ enum CameraInputWhiteBalancePresetV2 {
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-enum CameraInputWhiteBalanceMigrationV2 {
-    NativeV1,
-    LegacyCreativeTemperatureTintV1,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalanceSemanticsV2 {
     RawSceneLinear,
     RenderedSceneLinearApproximation,
@@ -1955,12 +1948,6 @@ struct CameraInputTechnicalWhiteBalanceV2 {
 struct CameraInputV2 {
     camera_profile: String,
     camera_profile_amount: f64,
-    creative_temperature: f64,
-    creative_tint: f64,
-    temperature: f64,
-    tint: f64,
-    white_balance: Option<Value>,
-    white_balance_migration: CameraInputWhiteBalanceMigrationV2,
     white_balance_technical: CameraInputTechnicalWhiteBalanceV2,
 }
 
@@ -1992,15 +1979,6 @@ impl CameraInputV2 {
             0.0,
             100.0,
         )?;
-        validate_camera_input_parameter(
-            "creativeTemperature",
-            self.creative_temperature,
-            -100.0,
-            100.0,
-        )?;
-        validate_camera_input_parameter("creativeTint", self.creative_tint, -100.0, 100.0)?;
-        validate_camera_input_parameter("temperature", self.temperature, -100.0, 100.0)?;
-        validate_camera_input_parameter("tint", self.tint, -100.0, 100.0)?;
         let white_balance = &self.white_balance_technical;
         validate_camera_input_parameter(
             "whiteBalanceTechnical.kelvin",
@@ -2043,6 +2021,39 @@ impl CameraInputV2 {
                     .to_string(),
             );
         }
+        let source_matches_mode = matches!(
+            (&white_balance.mode, &white_balance.source),
+            (
+                CameraInputWhiteBalanceModeV2::AsShot,
+                CameraInputWhiteBalanceSourceV2::AsShot
+            ) | (
+                CameraInputWhiteBalanceModeV2::Auto,
+                CameraInputWhiteBalanceSourceV2::Auto
+            ) | (
+                CameraInputWhiteBalanceModeV2::Preset,
+                CameraInputWhiteBalanceSourceV2::Preset
+            ) | (
+                CameraInputWhiteBalanceModeV2::Chromaticity,
+                CameraInputWhiteBalanceSourceV2::Picker | CameraInputWhiteBalanceSourceV2::User
+            ) | (
+                CameraInputWhiteBalanceModeV2::KelvinTint,
+                CameraInputWhiteBalanceSourceV2::Preset | CameraInputWhiteBalanceSourceV2::User
+            )
+        );
+        if !source_matches_mode {
+            return Err(
+                "EditDocumentV2 camera_input whiteBalanceTechnical mode/source is incompatible"
+                    .to_string(),
+            );
+        }
+        if matches!(white_balance.mode, CameraInputWhiteBalanceModeV2::Preset)
+            != white_balance.preset_id.is_some()
+        {
+            return Err(
+                "EditDocumentV2 camera_input whiteBalanceTechnical preset identity is invalid"
+                    .to_string(),
+            );
+        }
         if white_balance
             .synchronization
             .reference_source_identity
@@ -2053,16 +2064,20 @@ impl CameraInputV2 {
                 "EditDocumentV2 camera_input synchronization identity is invalid".to_string(),
             );
         }
-        let _ = (
-            &self.white_balance,
-            &self.white_balance_migration,
-            &white_balance.input_semantics,
-            &white_balance.mode,
-            &white_balance.preset_id,
-            white_balance.sample_count,
-            &white_balance.source,
-            &white_balance.synchronization.mode,
-        );
+        if matches!(
+            white_balance.synchronization.mode,
+            CameraInputWhiteBalanceSynchronizationModeV2::LockedReference
+        ) != white_balance
+            .synchronization
+            .reference_source_identity
+            .is_some()
+        {
+            return Err(
+                "EditDocumentV2 camera_input synchronization mode/reference is incompatible"
+                    .to_string(),
+            );
+        }
+        let _ = (&white_balance.input_semantics, white_balance.sample_count);
         Ok(())
     }
 }
@@ -3354,11 +3369,6 @@ mod tests {
                     "params": {
                         "cameraProfile": "camera_standard",
                         "cameraProfileAmount": 100,
-                        "creativeTemperature": 0,
-                        "creativeTint": 0,
-                        "temperature": 12,
-                        "tint": -3,
-                        "whiteBalanceMigration": "native_v1",
                         "whiteBalanceTechnical": {
                             "adaptation": "cat16_v1",
                             "confidence": null,
@@ -3612,8 +3622,6 @@ mod tests {
             "effectsEnabled": true,
             "shadows": 14,
             "sharpness": 24,
-            "temperature": 12,
-            "tint": -3,
             "toneMapper": "basic",
             "vibrance": 11,
             "whites": 9
@@ -3631,6 +3639,8 @@ mod tests {
         expected["localContrastMidtoneMask"] = json!(44);
         expected["localContrastRadiusPx"] = json!(36);
         expected["sharpnessThreshold"] = json!(20);
+        expected["skinToneUniformity"] =
+            skin_tone_uniformity_params()["skinToneUniformity"].clone();
         expected["structure"] = json!(21);
         expected["effectsEnabled"] = json!(true);
         expected["sectionVisibility"] =
@@ -3648,9 +3658,6 @@ mod tests {
         expected["lensTcaEnabled"] = json!(true);
         expected["lensVignetteAmount"] = json!(100);
         expected["lensVignetteEnabled"] = json!(true);
-        expected["creativeTemperature"] = json!(0);
-        expected["creativeTint"] = json!(0);
-        expected["whiteBalanceMigration"] = json!("native_v1");
         expected["whiteBalanceTechnical"] = json!({
             "adaptation": "cat16_v1",
             "confidence": null,
@@ -4047,6 +4054,23 @@ mod tests {
 
     #[test]
     fn camera_input_compiler_rejects_unowned_and_malformed_render_authority() {
+        for field in [
+            "creativeTemperature",
+            "creativeTint",
+            "temperature",
+            "tint",
+            "whiteBalance",
+            "whiteBalanceMigration",
+        ] {
+            let mut obsolete = document_with_legacy(json!({}));
+            obsolete["nodes"]["camera_input"]["params"][field] = json!(0);
+            let error = serde_json::from_value::<EditDocumentV2>(obsolete)
+                .expect("document envelope remains parseable")
+                .into_render_adjustments()
+                .expect_err("obsolete white-balance authority must fail");
+            assert!(error.contains("unknown field"), "{field}: {error}");
+        }
+
         let mut unowned = document_with_legacy(json!({}));
         unowned["nodes"]["camera_input"]["params"]["futureInput"] = json!(1);
         let error = serde_json::from_value::<EditDocumentV2>(unowned)
@@ -4081,6 +4105,24 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid white-balance chromaticity must fail");
         assert!(error.contains("chromaticity is invalid"));
+
+        let mut incompatible_source = document_with_legacy(json!({}));
+        incompatible_source["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["source"] =
+            json!("auto");
+        let error = serde_json::from_value::<EditDocumentV2>(incompatible_source)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("incompatible white-balance mode/source must fail");
+        assert!(error.contains("mode/source is incompatible"));
+
+        let mut invalid_reference_lock = document_with_legacy(json!({}));
+        invalid_reference_lock["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["synchronization"]
+            ["mode"] = json!("locked_reference");
+        let error = serde_json::from_value::<EditDocumentV2>(invalid_reference_lock)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("locked reference without source identity must fail");
+        assert!(error.contains("mode/reference is incompatible"));
     }
 
     #[test]

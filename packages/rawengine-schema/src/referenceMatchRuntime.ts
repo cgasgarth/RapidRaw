@@ -79,7 +79,7 @@ export const matchLookNodeDiffV1Schema = z
   .object({
     current: z.number().finite(),
     group: referenceMatchGroupV1Schema,
-    key: z.enum(['exposure', 'contrast', 'creativeTemperature', 'creativeTint', 'saturation', 'vibrance']),
+    key: z.enum(['exposure', 'contrast', 'whiteBalanceKelvin', 'whiteBalanceDuv', 'saturation', 'vibrance']),
     proposed: z.number().finite(),
   })
   .strict();
@@ -88,7 +88,7 @@ const appliedNodeDiffV1Schema = z
   .object({
     after: z.number().finite(),
     before: z.number().finite(),
-    key: z.enum(['exposure', 'contrast', 'creativeTemperature', 'creativeTint', 'saturation', 'vibrance']),
+    key: z.enum(['exposure', 'contrast', 'whiteBalanceKelvin', 'whiteBalanceDuv', 'saturation', 'vibrance']),
   })
   .strict();
 

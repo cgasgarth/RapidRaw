@@ -2679,6 +2679,10 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
                 .and_then(Value::as_bool)
         });
     let mut reset_adjustments = serde_json::Map::new();
+    reset_adjustments.insert(
+        "whiteBalanceTechnical".to_string(),
+        crate::color::white_balance::default_technical_white_balance_json(),
+    );
     if let Some(enabled) = effects_enabled {
         reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
     }
@@ -5386,7 +5390,8 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
         metadata.adjustments,
         serde_json::json!({
             "effectsEnabled": false,
-            "sectionVisibility": { "basic": false }
+            "sectionVisibility": { "basic": false },
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
         })
     );
     assert_eq!(metadata.rating, 4);
@@ -5416,7 +5421,10 @@ fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
     let temp = tempfile::tempdir().unwrap();
     let sidecar = temp.path().join("image.rrdata");
     let original = ImageMetadata {
-        adjustments: serde_json::json!({"exposure": 2}),
+        adjustments: serde_json::json!({
+            "exposure": 2,
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+        }),
         raw_engine_artifacts: Some(RawEngineArtifacts {
             layer_stack_sidecars: vec![serde_json::json!({"layers": [1]})],
             ..RawEngineArtifacts::default()
@@ -5430,7 +5438,12 @@ fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
     save_metadata_sidecar(&sidecar, &reset).unwrap();
 
     let reopened = load_sidecar_strict_for_reset(&sidecar).unwrap();
-    assert_eq!(reopened.adjustments, serde_json::json!({}));
+    assert_eq!(
+        reopened.adjustments,
+        serde_json::json!({
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+        })
+    );
     assert!(
         reopened
             .raw_engine_artifacts

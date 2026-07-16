@@ -7,6 +7,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from './adjustments';
+import { buildTechnicalWhiteBalance } from './color/whiteBalance';
 import type { PreviewOperationIdentity } from './previewCoordinator';
 
 export type ReferenceMatchMode = 'match-look' | 'normalize';
@@ -135,11 +136,11 @@ export const mergeReferenceSourceIdentities = (
 
 export type ReferenceMatchAdjustmentKey =
   | 'contrast'
-  | 'creativeTemperature'
-  | 'creativeTint'
   | 'exposure'
   | 'saturation'
-  | 'vibrance';
+  | 'vibrance'
+  | 'whiteBalanceDuv'
+  | 'whiteBalanceKelvin';
 
 export interface ReferenceMatchDiff {
   current: number;
@@ -169,6 +170,15 @@ export interface ReferenceMatchPreviewCandidate {
 }
 
 const REFERENCE_MATCH_LAYER_KEYS = new Set<ReferenceMatchAdjustmentKey>(['exposure', 'contrast', 'saturation']);
+
+export const getReferenceMatchAdjustmentValue = (
+  adjustments: Adjustments,
+  key: ReferenceMatchAdjustmentKey,
+): number => {
+  if (key === 'whiteBalanceKelvin') return adjustments.whiteBalanceTechnical.kelvin;
+  if (key === 'whiteBalanceDuv') return adjustments.whiteBalanceTechnical.duv;
+  return adjustments[key];
+};
 
 export interface ReferenceMatchLayerCompatibility {
   supported: boolean;
@@ -381,31 +391,23 @@ export const createReferenceMatchProposal = ({
     },
   ];
   if (mode === 'match-look') {
+    const temperatureDelta = reference.redMean - reference.blueMean - (target.redMean - target.blueMean);
+    const tintDelta =
+      reference.greenMean -
+      (reference.redMean + reference.blueMean) / 2 -
+      (target.greenMean - (target.redMean + target.blueMean) / 2);
     diffs.push(
       {
-        current: adjustments.creativeTemperature,
+        current: adjustments.whiteBalanceTechnical.kelvin,
         group: 'color',
-        key: 'creativeTemperature',
-        proposed: clamp(
-          adjustments.creativeTemperature +
-            (reference.redMean - reference.blueMean - (target.redMean - target.blueMean)) * 100,
-          -100,
-          100,
-        ),
+        key: 'whiteBalanceKelvin',
+        proposed: clamp(adjustments.whiteBalanceTechnical.kelvin + temperatureDelta * 8_000, 1_667, 25_000),
       },
       {
-        current: adjustments.creativeTint,
+        current: adjustments.whiteBalanceTechnical.duv,
         group: 'color',
-        key: 'creativeTint',
-        proposed: clamp(
-          adjustments.creativeTint +
-            (reference.greenMean -
-              (reference.redMean + reference.blueMean) / 2 -
-              (target.greenMean - (target.redMean + target.blueMean) / 2)) *
-              100,
-          -100,
-          100,
-        ),
+        key: 'whiteBalanceDuv',
+        proposed: clamp(adjustments.whiteBalanceTechnical.duv + tintDelta * 0.05, -0.05, 0.05),
       },
       {
         current: adjustments.saturation,
@@ -455,7 +457,10 @@ export const createReferenceMatchProposal = ({
         ? ['Spatial analysis is unavailable; inspect localized subject differences before apply.']
         : []),
   ];
-  const recommendedDiffs = diffs.filter((diff) => Math.abs(diff.proposed - diff.current) >= 0.005);
+  const recommendedDiffs = diffs.filter((diff) => {
+    const minimumDelta = diff.key === 'whiteBalanceKelvin' ? 1 : diff.key === 'whiteBalanceDuv' ? 0.000_01 : 0.005;
+    return Math.abs(diff.proposed - diff.current) >= minimumDelta;
+  });
   if (recommendedDiffs.length === 0) return null;
   const effectiveWeight = selectedReferences.reduce((sum, item) => sum + item.weight, 0);
   const effectiveReferences = selectedReferences
@@ -499,9 +504,33 @@ export const applyReferenceMatchProposal = ({
 }): Adjustments => {
   const amount = clamp(impact, 0, 100) / 100;
   const next = { ...adjustments };
+  let whiteBalanceKelvin = adjustments.whiteBalanceTechnical.kelvin;
+  let whiteBalanceDuv = adjustments.whiteBalanceTechnical.duv;
+  let whiteBalanceChanged = false;
   for (const diff of proposal.diffs) {
     if (!enabledGroups.has(diff.group)) continue;
-    next[diff.key] = diff.current + (diff.proposed - diff.current) * amount;
+    const applied = diff.current + (diff.proposed - diff.current) * amount;
+    if (diff.key === 'whiteBalanceKelvin') {
+      whiteBalanceKelvin = applied;
+      whiteBalanceChanged ||= applied !== diff.current;
+    } else if (diff.key === 'whiteBalanceDuv') {
+      whiteBalanceDuv = applied;
+      whiteBalanceChanged ||= applied !== diff.current;
+    } else {
+      next[diff.key] = applied;
+    }
+  }
+  if (whiteBalanceChanged) {
+    next.whiteBalanceTechnical = {
+      ...buildTechnicalWhiteBalance(
+        'kelvin_tint',
+        whiteBalanceKelvin,
+        whiteBalanceDuv,
+        'user',
+        adjustments.whiteBalanceTechnical.inputSemantics,
+      ),
+      synchronization: structuredClone(adjustments.whiteBalanceTechnical.synchronization),
+    };
   }
   return next;
 };
@@ -519,8 +548,16 @@ export const createReferenceMatchAppliedDiffs = ({
 }): MatchLookApplicationReceiptV1['appliedDiffs'] => {
   const applied = applyReferenceMatchProposal({ adjustments, enabledGroups, impact, proposal });
   return proposal.diffs
-    .filter((diff) => enabledGroups.has(diff.group) && applied[diff.key] !== adjustments[diff.key])
-    .map((diff) => ({ after: applied[diff.key], before: adjustments[diff.key], key: diff.key }))
+    .filter(
+      (diff) =>
+        enabledGroups.has(diff.group) &&
+        getReferenceMatchAdjustmentValue(applied, diff.key) !== getReferenceMatchAdjustmentValue(adjustments, diff.key),
+    )
+    .map((diff) => ({
+      after: getReferenceMatchAdjustmentValue(applied, diff.key),
+      before: getReferenceMatchAdjustmentValue(adjustments, diff.key),
+      key: diff.key,
+    }))
     .sort((left, right) => left.key.localeCompare(right.key));
 };
 

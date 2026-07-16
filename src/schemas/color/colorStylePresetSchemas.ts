@@ -24,8 +24,6 @@ const colorStylePresetCategorySchema = z.enum([
 const colorStylePresetAdjustmentKeySchema = z.enum([
   'colorCalibration',
   'colorGrading',
-  'creativeTemperature',
-  'creativeTint',
   'curveMode',
   'curves',
   'cameraProfile',
@@ -38,8 +36,6 @@ const colorStylePresetAdjustmentKeySchema = z.enum([
   'parametricCurve',
   'pointCurves',
   'saturation',
-  'temperature',
-  'tint',
   'toneCurve',
   'vibrance',
 ]);

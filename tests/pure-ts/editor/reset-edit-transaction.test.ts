@@ -28,7 +28,7 @@ const selectedImage = {
 };
 const receipt = resetAdjustmentsResultsSchema.parse([
   {
-    adjustments: {},
+    adjustments: { whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical) },
     path: sourcePath,
     renderGeneration: 9,
     revision: `sha256:${'a'.repeat(64)}`,

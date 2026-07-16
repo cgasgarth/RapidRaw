@@ -88,28 +88,15 @@ describe('camera input edit transaction', () => {
     });
   });
 
-  test('commits the complete technical and creative white-balance identity atomically', () => {
+  test('commits the complete technical white-balance identity atomically', () => {
     const whiteBalanceTechnical = buildTechnicalWhiteBalance('kelvin_tint', 5_200, -0.012, 'user', 'raw_scene_linear');
     const state = useEditorStore.getState();
     const result = state.applyEditTransaction(
-      buildCameraInputEditTransaction(
-        state,
-        identity(),
-        {
-          creativeTemperature: 14,
-          creativeTint: -8,
-          whiteBalanceMigration: 'native_v1',
-          whiteBalanceTechnical,
-        },
-        'white-balance',
-      ),
+      buildCameraInputEditTransaction(state, identity(), { whiteBalanceTechnical }, 'white-balance'),
     );
 
-    expect(result.changedKeys).toEqual(['creativeTemperature', 'creativeTint', 'whiteBalanceTechnical']);
+    expect(result.changedKeys).toEqual(['whiteBalanceTechnical']);
     expect(result.afterEditDocumentV2.nodes.camera_input.params).toMatchObject({
-      creativeTemperature: 14,
-      creativeTint: -8,
-      whiteBalanceMigration: 'native_v1',
       whiteBalanceTechnical,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);

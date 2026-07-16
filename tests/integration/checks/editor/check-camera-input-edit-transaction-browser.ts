@@ -16,9 +16,6 @@ const cameraInputSchema = z
   .object({
     cameraProfile: z.string(),
     cameraProfileAmount: z.number(),
-    creativeTemperature: z.number(),
-    creativeTint: z.number(),
-    whiteBalanceMigration: z.string(),
     whiteBalanceTechnical: z.object({ duv: z.number(), kelvin: z.number(), mode: z.string() }).passthrough(),
   })
   .passthrough();
@@ -92,13 +89,16 @@ const calls = async (page: Page, command: string) =>
     command,
   );
 
-const waitForCount = async (page: Page, command: string, expected: number) => {
+const waitForCount = async (page: Page, command: string, expected: number, phase = 'unspecified') => {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     if ((await calls(page, command)).length >= expected) return;
     await page.waitForTimeout(50);
   }
-  throw new Error(`Timed out waiting for ${String(expected)} ${command} calls.`);
+  const observed = (await calls(page, command)).length;
+  throw new Error(
+    `Timed out waiting for ${String(expected)} ${command} calls during ${phase}; observed ${String(observed)}.`,
+  );
 };
 
 const waitForCompletedCall = async (page: Page, command: string, index: number) => {
@@ -183,18 +183,33 @@ const queueAutoWhiteBalanceResponse = async (
     window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.autoAdjustResponses.push({
       delayMs,
       value: {
+        blacks: 0,
+        brightness: 0,
+        centré: 0,
+        clarity: 0,
+        contrast: 0,
+        dehaze: 0,
+        exposure: 0,
+        highlights: 0,
+        shadows: 0,
+        vibrance: 0,
+        vignetteAmount: 0,
         whiteBalanceTechnical: {
           adaptation: 'cat16_v1',
           confidence: 0.9,
           contract: 'rapidraw.white_balance.v1',
           duv,
+          inputSemantics: 'raw_scene_linear',
           kelvin,
           mode: 'auto',
+          presetId: null,
           sampleCount: 512,
           source: 'auto',
+          synchronization: { mode: 'per_image', referenceSourceIdentity: null },
           x: 0.35,
           y: 0.36,
         },
+        whites: 0,
       },
     });
   }, response);
@@ -251,7 +266,7 @@ try {
     .getByTestId('camera-profile-browser-popover')
     .getByRole('button', { name: 'Neutral', exact: true })
     .click();
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 1);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 1, 'profile');
   await waitForCount(page, 'apply_adjustments', baselineRenders + 1);
   await waitForRenderedCameraInput(page, 'camera_neutral', { duv: 0, kelvin: 6504, mode: 'as_shot' });
   if ((await profileControls.getAttribute('data-camera-profile')) !== 'camera_neutral') {
@@ -259,7 +274,7 @@ try {
   }
 
   await page.getByTestId('color-white-balance-mode').selectOption('kelvin_tint');
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 2);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 2, 'kelvin mode');
   await waitForCount(page, 'apply_adjustments', baselineRenders + 2);
   await waitForRenderedCameraInput(page, 'camera_neutral', { duv: 0, kelvin: 6504, mode: 'kelvin_tint' });
   await page.getByTestId('color-white-balance-kelvin').waitFor();
@@ -303,14 +318,14 @@ try {
 
   const presetBaselineSaves = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
   await page.getByTestId('color-white-balance-mode').selectOption('preset');
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', presetBaselineSaves + 1);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', presetBaselineSaves + 1, 'preset mode');
   await waitForRenderedCameraInput(page, 'camera_standard', { duv: 0, kelvin: 6504, mode: 'preset' });
   const presetAutoCalls = (await calls(page, 'calculate_auto_adjustments')).length;
   const presetAutoTransactions = await countAutoWhiteBalanceTransactions(page, sourcePath, 6900);
   await queueAutoWhiteBalanceResponse(page, { delayMs: 600, duv: -0.006, kelvin: 6900 });
   await page.getByTestId('color-white-balance-mode').selectOption('auto');
   await page.getByTestId('color-white-balance-preset').selectOption('tungsten');
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', presetBaselineSaves + 2);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', presetBaselineSaves + 2, 'preset selection');
   await waitForRenderedCameraInput(page, 'camera_standard', { duv: 0, kelvin: 2856, mode: 'preset' });
   await waitForCompletedCall(page, 'calculate_auto_adjustments', presetAutoCalls);
   await page.waitForTimeout(100);
@@ -327,7 +342,7 @@ try {
   await queueAutoWhiteBalanceResponse(page, { delayMs: 500, duv: 0.002, kelvin: 5250 });
   await page.getByTestId('color-white-balance-mode').selectOption('auto');
   await page.getByTestId('color-white-balance-as-shot').click();
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', resetBaselineSaves + 1);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', resetBaselineSaves + 1, 'as-shot reset');
   await waitForRenderedCameraInput(page, 'camera_standard', { duv: 0, kelvin: 6504, mode: 'as_shot' });
   await waitForCompletedCall(page, 'calculate_auto_adjustments', resetAutoCalls);
   await page.waitForTimeout(100);
@@ -344,7 +359,7 @@ try {
   await queueAutoWhiteBalanceResponse(page, { delayMs: 20, duv: 0.004, kelvin: 4850 });
   await page.getByTestId('color-white-balance-mode').selectOption('auto');
   await waitForCompletedCall(page, 'calculate_auto_adjustments', autoCalls);
-  await waitForCount(page, 'save_metadata_and_update_thumbnail', autoBaselineSaves + 1);
+  await waitForCount(page, 'save_metadata_and_update_thumbnail', autoBaselineSaves + 1, 'auto commit');
   await waitForCount(page, 'apply_adjustments', autoBaselineRenders + 1);
   await waitForRenderedCameraInput(page, 'camera_standard', { duv: 0.004, kelvin: 4850, mode: 'auto' });
   const autoPersistence = persistenceSchema.parse(

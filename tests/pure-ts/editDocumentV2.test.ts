@@ -745,10 +745,9 @@ describe('EditDocumentV2 legacy adapter', () => {
     ).toThrow();
   });
 
-  test('camera input defaults legacy state and rejects malformed render authority', () => {
+  test('camera input defaults current technical state and rejects obsolete or malformed render authority', () => {
     const {
       cameraProfileAmount: _cameraProfileAmount,
-      whiteBalanceMigration: _whiteBalanceMigration,
       whiteBalanceTechnical: _whiteBalanceTechnical,
       ...legacyCameraInput
     } = structuredClone(INITIAL_ADJUSTMENTS);
@@ -756,20 +755,24 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(defaulted.nodes.camera_input?.params).toMatchObject({
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
-      whiteBalanceMigration: 'native_v1',
       whiteBalanceTechnical: { contract: 'rapidraw.white_balance.v1', mode: 'as_shot', source: 'as_shot' },
     });
     expect(defaulted.migration?.defaulted).toEqual(
-      expect.arrayContaining([
-        'camera_input.cameraProfileAmount',
-        'camera_input.whiteBalanceMigration',
-        'camera_input.whiteBalanceTechnical',
-      ]),
+      expect.arrayContaining(['camera_input.cameraProfileAmount', 'camera_input.whiteBalanceTechnical']),
     );
 
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     const cameraNode = document.nodes.camera_input;
     expect(compileEditDocumentNodeV2(cameraNode).params).toEqual(cameraNode?.params);
+    expect(() =>
+      editDocumentV2Schema.parse({
+        ...document,
+        nodes: {
+          ...document.nodes,
+          camera_input: { ...cameraNode, params: { ...cameraNode?.params, whiteBalanceMigration: 'native_v1' } },
+        },
+      }),
+    ).toThrow();
     expect(() =>
       editDocumentV2Schema.parse({
         ...document,

@@ -1,8 +1,30 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub(crate) const WHITE_BALANCE_CONTRACT: &str = "rapidraw.white_balance.v1";
 pub const D60_XY: [f64; 2] = [0.32168, 0.33767];
+
+pub(crate) fn default_technical_white_balance_json() -> Value {
+    serde_json::json!({
+        "adaptation": "cat16_v1",
+        "confidence": null,
+        "contract": WHITE_BALANCE_CONTRACT,
+        "duv": 0.0,
+        "inputSemantics": "raw_scene_linear",
+        "kelvin": 6504.0,
+        "mode": "as_shot",
+        "presetId": null,
+        "sampleCount": null,
+        "source": "as_shot",
+        "synchronization": {
+            "mode": "per_image",
+            "referenceSourceIdentity": null
+        },
+        "x": D60_XY[0],
+        "y": D60_XY[1]
+    })
+}
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -23,6 +45,165 @@ pub(crate) enum WhiteBalanceInputSemanticsV1 {
     /// Scene-linear RGB decoded from a rendered (JPEG/TIFF/PNG) source. This is
     /// useful but cannot reconstruct the camera illuminant removed in-camera.
     RenderedSceneLinearApproximation,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CurrentWhiteBalanceSourceV1 {
+    AsShot,
+    Auto,
+    Picker,
+    Preset,
+    User,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CurrentWhiteBalancePresetV1 {
+    Tungsten,
+    Daylight,
+    Flash,
+    Cloudy,
+    Shade,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CurrentWhiteBalanceSynchronizationModeV1 {
+    PerImage,
+    LockedReference,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CurrentWhiteBalanceSynchronizationV1 {
+    mode: CurrentWhiteBalanceSynchronizationModeV1,
+    reference_source_identity: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CurrentTechnicalWhiteBalanceV1 {
+    adaptation: String,
+    confidence: Option<f64>,
+    contract: String,
+    duv: f64,
+    input_semantics: WhiteBalanceInputSemanticsV1,
+    kelvin: f64,
+    mode: WhiteBalanceModeV1,
+    preset_id: Option<CurrentWhiteBalancePresetV1>,
+    sample_count: Option<u64>,
+    source: CurrentWhiteBalanceSourceV1,
+    synchronization: CurrentWhiteBalanceSynchronizationV1,
+    x: f64,
+    y: f64,
+}
+
+const CURRENT_TECHNICAL_WHITE_BALANCE_KEYS: [&str; 13] = [
+    "adaptation",
+    "confidence",
+    "contract",
+    "duv",
+    "inputSemantics",
+    "kelvin",
+    "mode",
+    "presetId",
+    "sampleCount",
+    "source",
+    "synchronization",
+    "x",
+    "y",
+];
+
+pub(crate) fn compile_current_technical_white_balance(value: &Value) -> Result<WhiteBalancePlanV1> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| anyhow!("white_balance_technical_must_be_an_object"))?;
+    if object.len() != CURRENT_TECHNICAL_WHITE_BALANCE_KEYS.len()
+        || CURRENT_TECHNICAL_WHITE_BALANCE_KEYS
+            .iter()
+            .any(|key| !object.contains_key(*key))
+    {
+        return Err(anyhow!("white_balance_technical_must_be_complete"));
+    }
+    let synchronization = object
+        .get("synchronization")
+        .and_then(Value::as_object)
+        .ok_or_else(|| anyhow!("white_balance_technical_synchronization_must_be_an_object"))?;
+    if synchronization.len() != 2
+        || !synchronization.contains_key("mode")
+        || !synchronization.contains_key("referenceSourceIdentity")
+    {
+        return Err(anyhow!(
+            "white_balance_technical_synchronization_must_be_complete"
+        ));
+    }
+    let current = serde_json::from_value::<CurrentTechnicalWhiteBalanceV1>(value.clone())
+        .map_err(|error| anyhow!("white_balance_technical_schema_invalid: {error}"))?;
+    if current.contract != WHITE_BALANCE_CONTRACT || current.adaptation != "cat16_v1" {
+        return Err(anyhow!("white_balance_technical_contract_invalid"));
+    }
+    if !(1_667.0..=25_000.0).contains(&current.kelvin)
+        || !(-0.05..=0.05).contains(&current.duv)
+        || !current.x.is_finite()
+        || !current.y.is_finite()
+        || current.x <= 0.0
+        || current.x >= 1.0
+        || current.y <= 0.0
+        || current.y >= 1.0
+        || current.x + current.y >= 1.0
+    {
+        return Err(anyhow!("white_balance_technical_illuminant_invalid"));
+    }
+    if current
+        .confidence
+        .is_some_and(|confidence| !confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
+    {
+        return Err(anyhow!("white_balance_technical_confidence_invalid"));
+    }
+    let source_matches_mode = matches!(
+        (current.mode, current.source),
+        (
+            WhiteBalanceModeV1::AsShot,
+            CurrentWhiteBalanceSourceV1::AsShot
+        ) | (WhiteBalanceModeV1::Auto, CurrentWhiteBalanceSourceV1::Auto)
+            | (
+                WhiteBalanceModeV1::Preset,
+                CurrentWhiteBalanceSourceV1::Preset
+            )
+            | (
+                WhiteBalanceModeV1::Chromaticity,
+                CurrentWhiteBalanceSourceV1::Picker | CurrentWhiteBalanceSourceV1::User
+            )
+            | (
+                WhiteBalanceModeV1::KelvinTint,
+                CurrentWhiteBalanceSourceV1::Preset | CurrentWhiteBalanceSourceV1::User
+            )
+    );
+    if !source_matches_mode {
+        return Err(anyhow!("white_balance_technical_mode_source_incompatible"));
+    }
+    if (current.mode == WhiteBalanceModeV1::Preset) != current.preset_id.is_some() {
+        return Err(anyhow!("white_balance_technical_preset_identity_invalid"));
+    }
+    let reference_identity = current.synchronization.reference_source_identity.as_deref();
+    if reference_identity.is_some_and(|identity| identity.trim().is_empty())
+        || (current.synchronization.mode
+            == CurrentWhiteBalanceSynchronizationModeV1::LockedReference)
+            != reference_identity.is_some()
+    {
+        return Err(anyhow!("white_balance_technical_synchronization_invalid"));
+    }
+    let _ = current.sample_count;
+    compile_white_balance_plan(WhiteBalancePlanInputV1 {
+        mode: current.mode,
+        kelvin: current.kelvin,
+        duv: current.duv,
+        x: Some(current.x),
+        y: Some(current.y),
+        input_semantics: current.input_semantics,
+        camera_channel_gains: None,
+    })
 }
 
 #[derive(Debug, Clone, Deserialize)]

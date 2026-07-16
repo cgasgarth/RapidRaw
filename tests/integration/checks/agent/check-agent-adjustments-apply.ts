@@ -12,6 +12,7 @@ import {
   applyAgentGlobalAdjustments,
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
+import { buildTechnicalWhiteBalance } from '../../../../src/utils/color/whiteBalance.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3161.ARW';
@@ -104,6 +105,7 @@ if (!staleRejected) {
   throw new Error('agent.adjustments.dry_run did not reject a stale recipe hash.');
 }
 
+const technicalWhiteBalance = buildTechnicalWhiteBalance('kelvin_tint', 5800, -0.004);
 const adjustments = {
   clarity: 18,
   contrast: 24,
@@ -111,8 +113,7 @@ const adjustments = {
   highlights: -22,
   saturation: 8,
   shadows: 16,
-  temperature: 12,
-  tint: -4,
+  whiteBalanceTechnical: technicalWhiteBalance,
   vibrance: 10,
 };
 const dryRun = await dryRunAgentGlobalAdjustments({
@@ -185,11 +186,14 @@ const result = await applyAgentGlobalAdjustments({
 });
 
 const state = useEditorStore.getState();
-if (state.adjustments.exposure !== 0.42 || state.adjustments.contrast !== 24 || state.adjustments.temperature !== 12) {
+if (state.adjustments.exposure !== 0.42 || state.adjustments.contrast !== 24) {
   throw new Error('agent.adjustments.apply did not mutate bounded global adjustments.');
 }
-if (state.adjustments.tint !== -4 || state.adjustments.vibrance !== 10) {
-  throw new Error('agent.adjustments.apply did not persist color temperature/tint/vibrance adjustments.');
+if (
+  JSON.stringify(state.adjustments.whiteBalanceTechnical) !== JSON.stringify(technicalWhiteBalance) ||
+  state.adjustments.vibrance !== 10
+) {
+  throw new Error('agent.adjustments.apply did not persist technical white balance and vibrance adjustments.');
 }
 if (state.historyIndex !== 1 || state.history.length !== 2) {
   throw new Error('agent.adjustments.apply must create one undoable history entry.');
@@ -203,11 +207,11 @@ if (
   throw new Error('agent.adjustments.apply did not publish one atomic EditTransaction receipt.');
 }
 if (
-  state.history[state.historyIndex]?.temperature !== 12 ||
-  state.history[state.historyIndex]?.tint !== -4 ||
+  state.history[state.historyIndex]?.whiteBalanceTechnical.kelvin !== technicalWhiteBalance.kelvin ||
+  state.history[state.historyIndex]?.whiteBalanceTechnical.duv !== technicalWhiteBalance.duv ||
   state.history[state.historyIndex]?.vibrance !== 10 ||
-  state.editDocumentV2.nodes.camera_input?.params.temperature !== 12 ||
-  state.editDocumentV2.nodes.camera_input.params.tint !== -4
+  state.editDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical.kelvin !== technicalWhiteBalance.kelvin ||
+  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.duv !== technicalWhiteBalance.duv
 ) {
   throw new Error('agent.adjustments.apply did not atomically persist extra global color fields in history and graph.');
 }
@@ -234,7 +238,7 @@ if (
 ) {
   throw new Error('agent.adjustments.apply did not return a complete mutation receipt.');
 }
-for (const field of ['exposure', 'contrast', 'temperature', 'tint', 'vibrance']) {
+for (const field of ['exposure', 'contrast', 'whiteBalanceTechnical', 'vibrance']) {
   if (!result.adjustedFields.includes(field)) {
     throw new Error(`agent.adjustments.apply response missing adjusted field: ${field}`);
   }

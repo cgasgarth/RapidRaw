@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { rawEngineAgentInitialPreviewReceiptV2Schema } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
+import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   agentInitialPromptContextSchema,
@@ -51,8 +52,7 @@ const sessionAdjustmentPatchSchema = z
     highlights: z.number().min(-100).max(100).optional(),
     saturation: z.number().min(-100).max(100).optional(),
     shadows: z.number().min(-100).max(100).optional(),
-    temperature: z.number().min(-100).max(100).optional(),
-    tint: z.number().min(-100).max(100).optional(),
+    whiteBalanceTechnical: technicalWhiteBalanceSchema.optional(),
     vibrance: z.number().min(-100).max(100).optional(),
     whites: z.number().min(-100).max(100).optional(),
   })
