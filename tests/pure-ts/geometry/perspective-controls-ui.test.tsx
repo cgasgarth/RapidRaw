@@ -30,6 +30,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
     historyIndex: 0,
     imageSession: createEditorImageSession({ generation: 1, path: '/fixture/guided.ARW', source: 'cache' }),
     selectedImage: {
+      exif: null,
       height: 3000,
       isRaw: true,
       isReady: true,

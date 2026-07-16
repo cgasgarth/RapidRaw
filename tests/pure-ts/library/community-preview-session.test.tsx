@@ -41,8 +41,8 @@ test('rejects stale folder and preset generations, revokes their URLs, and owns 
 
   await render('folder-a', ['/a.RAW'], [preset('A')]);
   const requestA = generation(0);
-  expect(requestA.args.imagePaths).toEqual(['/a.RAW']);
-  expect((requestA.args.presets as CommunityPreset[])[0]?.adjustments).toMatchObject({ exposure: 0.5, contrast: 0 });
+  expect(requestA.args['imagePaths']).toEqual(['/a.RAW']);
+  expect(requestA.args['presets']).toMatchObject([{ adjustments: { contrast: 0, exposure: 0.5 } }]);
 
   await render('folder-b', ['/b.RAW'], [preset('A')]);
   const requestB = generation(1);
@@ -107,7 +107,7 @@ test('accepts a fallback path only in the keyed session that requested it', asyn
   await act(async () => fallbackRequests[1]?.resolve(new Response(new Uint8Array([2]))));
   const currentSave = command('save_temp_file', 1);
   await act(async () => currentSave.deferred.resolve('/tmp/current.jpg'));
-  expect(generation(0).args.imagePaths).toEqual(['/tmp/current.jpg']);
+  expect(generation(0).args['imagePaths']).toEqual(['/tmp/current.jpg']);
 });
 
 test('preserves the Save Community Preset payload contract', () => {

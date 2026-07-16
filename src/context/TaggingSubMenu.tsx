@@ -16,10 +16,15 @@ interface TaggingSubMenuProps {
   appSettings: AppSettings | null;
   hideContextMenu: () => void;
   initialTags: { tag: string; isUser: boolean }[];
-  invokeCommand?: typeof invoke;
+  invokeCommand?: TagMutationInvoker;
   onTagsChanged: (paths: string[], newTags: { tag: string; isUser: boolean }[]) => void;
   paths: string[];
 }
+
+type TagMutationCommand = typeof Invokes.AddTagForPaths | typeof Invokes.RemoveTagForPaths;
+type TagMutationInvoker = (command: TagMutationCommand, args: { paths: string[]; tag: string }) => Promise<unknown>;
+
+const invokeTagMutation: TagMutationInvoker = (command, args) => invoke<unknown>(command, args);
 
 const USER_TAG_PREFIX = 'user:';
 
@@ -31,7 +36,7 @@ const tagVariants: Variants = {
 export function TaggingDraft({
   paths,
   initialTags,
-  invokeCommand = invoke,
+  invokeCommand = invokeTagMutation,
   onTagsChanged,
   appSettings,
   hideContextMenu,

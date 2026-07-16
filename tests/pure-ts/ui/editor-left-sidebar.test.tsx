@@ -107,7 +107,7 @@ function SidebarHarness({
       );
     },
     onVisibleChange: setIsVisible,
-    slots: lifecycle ? { presets: createElement(PresetsLifecycleProbe, { lifecycle }) } : undefined,
+    ...(lifecycle === undefined ? {} : { slots: { presets: createElement(PresetsLifecycleProbe, { lifecycle }) } }),
     width: 288,
   });
 }
@@ -121,7 +121,13 @@ async function renderSidebar({
 } = {}) {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
-  return render(createElement(I18nextProvider, { i18n }, createElement(SidebarHarness, { changes, lifecycle })));
+  return render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(SidebarHarness, { changes, ...(lifecycle === undefined ? {} : { lifecycle }) }),
+    ),
+  );
 }
 
 function getRequiredElement<T extends Element = Element>(container: Element, selector: string): T {

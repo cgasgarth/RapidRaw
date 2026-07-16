@@ -47,9 +47,9 @@ test('active numeric sliders update the selected range and its three-way summary
   expect(rendered.container.querySelector('[data-testid="color-grading-summary-midtones"]')?.textContent).toContain(
     'H125 S0 L0',
   );
-  expect(rendered.container.querySelector('[data-testid="color-grading-view-midtones"]')?.dataset.modified).toBe(
-    'true',
-  );
+  expect(
+    rendered.container.querySelector<HTMLElement>('[data-testid="color-grading-view-midtones"]')?.dataset['modified'],
+  ).toBe('true');
   expect(rendered.getChangeCount()).toBe(1);
 });
 
@@ -66,15 +66,16 @@ test('preset apply is one adjustment operation and exposes exact active matching
   });
 
   const preset = COLOR_GRADING_PRESETS[0];
+  if (preset === undefined) throw new Error('Expected at least one color grading preset.');
   expect(rendered.getAdjustments().colorGrading).toEqual({
-    balance: preset?.balance,
-    blending: preset?.blending,
-    global: preset?.global,
-    highlights: preset?.highlights,
-    midtones: preset?.midtones,
-    shadows: preset?.shadows,
+    balance: preset.balance,
+    blending: preset.blending,
+    global: preset.global,
+    highlights: preset.highlights,
+    midtones: preset.midtones,
+    shadows: preset.shadows,
   });
-  expect(rendered.container.querySelector('[aria-haspopup="listbox"]')?.textContent).toContain(preset?.name);
+  expect(rendered.container.querySelector('[aria-haspopup="listbox"]')?.textContent).toContain(preset.name);
   expect(rendered.container.querySelector('[role="listbox"]')).toBeNull();
   expect(rendered.getChangeCount()).toBe(1);
 
@@ -90,16 +91,19 @@ test('preset menu supports deterministic keyboard navigation and focus restorati
   await click(rendered.container, '[aria-haspopup="listbox"]');
 
   const options = rendered.container.querySelectorAll<HTMLButtonElement>('[role="option"]');
-  expect(document.activeElement).toBe(options[0]);
+  const firstOption = options[0];
+  const secondOption = options[1];
+  if (firstOption === undefined || secondOption === undefined) throw new Error('Expected keyboard preset options.');
+  expect(document.activeElement).toBe(firstOption);
 
   await act(async () => {
-    options[0]?.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+    firstOption.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
     await flushPromises();
   });
-  expect(document.activeElement).toBe(options[1]);
+  expect(document.activeElement).toBe(secondOption);
 
   await act(async () => {
-    options[1]?.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    secondOption.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
     await flushPromises();
   });
   expect(rendered.container.querySelector('[role="listbox"]')).toBeNull();

@@ -44,7 +44,6 @@ test('HDR same-source reopen creates a fresh keyed session', async () => {
       progressMessage: null,
       runtimePlan: null,
       settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
-      sourceMetadata: undefined,
       sourcePaths: paths,
     }),
   );
@@ -119,7 +118,6 @@ test('a save completing after HDR reopen cannot publish its old output path into
       progressMessage: null,
       runtimePlan: null,
       settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
-      sourceMetadata: undefined,
       sourcePaths,
     }),
   );
@@ -159,7 +157,7 @@ async function renderMerge(factory: (isOpen: boolean, paths: string[]) => React.
 function operationId(container: Element) {
   const modal = container.querySelector<HTMLElement>('[data-merge-operation-id]');
   if (modal === null) throw new Error('Expected keyed merge session.');
-  return modal.dataset.mergeOperationId ?? '';
+  return modal.dataset['mergeOperationId'] ?? '';
 }
 
 function requiredButton(container: Element) {

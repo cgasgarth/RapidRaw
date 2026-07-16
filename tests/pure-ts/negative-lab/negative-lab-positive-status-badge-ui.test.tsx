@@ -11,23 +11,23 @@ import type { NegativeLabReopenedPositiveArtifactStatus } from '../../../src/uti
 describe('Negative Lab positive status badge UI', () => {
   test('visibly distinguishes current, stale, and missing persisted positive artifacts', async () => {
     const current = await renderBadge(buildStatus({ state: 'current' }));
-    expect(current.badge.dataset.negativeLabPositiveState).toBe('current');
+    expect(current.badge.dataset['negativeLabPositiveState']).toBe('current');
     expect(current.badge.textContent).toBe('NL Current');
-    expect(current.badge.dataset.tooltip).toContain('matches persisted provenance');
+    expect(current.badge.dataset['tooltip']).toContain('matches persisted provenance');
 
     const stale = await renderBadge(buildStatus({ invalidationReasons: ['recipe_hash_changed'], state: 'stale' }));
-    expect(stale.badge.dataset.negativeLabPositiveState).toBe('stale');
+    expect(stale.badge.dataset['negativeLabPositiveState']).toBe('stale');
     expect(stale.badge.textContent).toBe('NL Stale');
-    expect(stale.badge.dataset.negativeLabPositiveReasons).toBe('recipe_hash_changed');
-    expect(stale.badge.dataset.tooltip).toContain('accepted dry-run plan changed');
+    expect(stale.badge.dataset['negativeLabPositiveReasons']).toBe('recipe_hash_changed');
+    expect(stale.badge.dataset['tooltip']).toContain('accepted dry-run plan changed');
 
     const missing = await renderBadge(
       buildStatus({ invalidationReasons: ['output_artifact_missing'], state: 'missing' }),
     );
-    expect(missing.badge.dataset.negativeLabPositiveState).toBe('missing');
+    expect(missing.badge.dataset['negativeLabPositiveState']).toBe('missing');
     expect(missing.badge.textContent).toBe('NL Missing');
-    expect(missing.badge.dataset.negativeLabPositiveReasons).toBe('output_artifact_missing');
-    expect(missing.badge.dataset.tooltip).toContain('output artifact missing');
+    expect(missing.badge.dataset['negativeLabPositiveReasons']).toBe('output_artifact_missing');
+    expect(missing.badge.dataset['tooltip']).toContain('output artifact missing');
   });
 });
 

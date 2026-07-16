@@ -89,13 +89,13 @@ async function renderThumbnail(path: string, url: string | null, compact: boolea
 
 function layerUrls(container: Element) {
   return [...container.querySelectorAll<HTMLElement>('[data-thumbnail-layer-url]')].map(
-    (element) => element.dataset.thumbnailLayerUrl,
+    (element) => element.dataset['thumbnailLayerUrl'],
   );
 }
 
 function layer(container: Element, url: string) {
   const element = [...container.querySelectorAll<HTMLElement>('[data-thumbnail-layer-url]')].find(
-    (candidate) => candidate.dataset.thumbnailLayerUrl === url,
+    (candidate) => candidate.dataset['thumbnailLayerUrl'] === url,
   );
   if (element === undefined) throw new Error(`Expected thumbnail layer ${url}.`);
   return element;

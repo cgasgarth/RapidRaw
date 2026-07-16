@@ -108,7 +108,7 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
   });
 
   expect(getAdjustments()).toMatchObject({ brightness: 0.4, contrast: 18, exposure: 0.65, toneMapper: 'agx' });
-  expect(mapperRow.dataset.modified).toBe('true');
+  expect(mapperRow.dataset['modified']).toBe('true');
   expect(container.querySelector('[data-testid="rapid-view-controls"]')).toBeNull();
 
   await act(async () => {
@@ -122,7 +122,7 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
     exposure: 0.65,
     toneMapper: 'rapidView',
   });
-  expect(mapperRow.dataset.modified).toBe('false');
+  expect(mapperRow.dataset['modified']).toBe('false');
 });
 
 test('mask and forced tone-mapper contexts omit only the global process selector', async () => {
@@ -173,7 +173,7 @@ function BasicHarness({
 
   return createElement(BasicAdjustments, {
     adjustments,
-    appSettings: tonemapperOverrideEnabled ? { tonemapperOverrideEnabled: true } : undefined,
+    ...(tonemapperOverrideEnabled ? { appSettings: { tonemapperOverrideEnabled: true } } : {}),
     isForMask,
     setAdjustments: (update) => {
       setAdjustmentsState((previous) => {

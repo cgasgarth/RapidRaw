@@ -83,9 +83,19 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     await act(async () => {
       for (const observer of observers) {
         if (!observer.target) continue;
+        const contentRect = new DOMRect(0, 0, width, height);
+        const observedSize = [{ blockSize: height, inlineSize: width }];
         observer.callback(
-          [{ contentRect: new window.DOMRect(0, 0, width, height), target: observer.target } as ResizeObserverEntry],
-          observer as ResizeObserver,
+          [
+            {
+              borderBoxSize: observedSize,
+              contentBoxSize: observedSize,
+              contentRect,
+              devicePixelContentBoxSize: observedSize,
+              target: observer.target,
+            },
+          ],
+          observer,
         );
       }
     });

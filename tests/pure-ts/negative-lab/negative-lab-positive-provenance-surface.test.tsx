@@ -38,6 +38,7 @@ describe('Negative Lab positive provenance surface', () => {
         },
       },
     });
+    if (provenance === null) throw new Error('Expected current positive provenance.');
 
     const { badge, container } = await renderSurface(provenance, null);
     expect(badge.dataset.negativeLabPositiveState).toBe('current');
@@ -95,13 +96,14 @@ describe('Negative Lab positive provenance surface', () => {
       imagePath: '/roll/frame-001-positive.tif',
       metadata,
     });
+    if (provenance === null) throw new Error('Expected stale positive provenance.');
     const status = buildNegativeLabReopenedSavedPositiveArtifactStatus({
       imagePath: '/roll/frame-001-positive.tif',
       metadata,
     });
 
     const { badge, container } = await renderSurface(provenance, status);
-    expect(badge.dataset.negativeLabPositiveState).toBe('stale');
+    expect(badge.dataset['negativeLabPositiveState']).toBe('stale');
     expect(container.querySelector('[data-testid="metadata-negative-lab-positive-warning"]')).not.toBeNull();
     expect(
       container.querySelector('[data-negative-lab-warning-reasons]')?.getAttribute('data-negative-lab-warning-reasons'),

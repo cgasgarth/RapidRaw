@@ -50,10 +50,12 @@ test('Detail inspector commits chromatic aberration through lens node authority'
   });
 
   expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(23);
-  expect(useEditorStore.getState().editDocumentV2.nodes.lens_correction.params.chromaticAberrationRedCyan).toBe(23);
-  expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params).not.toHaveProperty(
-    'chromaticAberrationRedCyan',
-  );
+  const editDocument = useEditorStore.getState().editDocumentV2;
+  const lensNode = editDocument.nodes['lens_correction'];
+  const detailNode = editDocument.nodes['detail_denoise_dehaze'];
+  if (lensNode === undefined || detailNode === undefined) throw new Error('Expected lens and detail authority nodes.');
+  expect(lensNode.params['chromaticAberrationRedCyan']).toBe(23);
+  expect(detailNode.params).not.toHaveProperty('chromaticAberrationRedCyan');
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 1,
     source: 'manual-control',

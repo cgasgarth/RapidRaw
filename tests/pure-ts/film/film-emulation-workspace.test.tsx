@@ -39,10 +39,10 @@ test('Film workspace edits publish one current transaction and reset only Film-o
     source: 'film-workspace',
   });
   expect(enabled.adjustmentSnapshot.value.filmEmulation).toEqual(enabled.adjustmentSnapshot.value.filmEmulation);
-  expect(enabled.editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(
-    enabled.adjustmentSnapshot.value.filmEmulation,
-  );
-  expect(enabled.editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
+  const enabledFilmNode = enabled.editDocumentV2.nodes['film_emulation'];
+  if (enabledFilmNode === undefined) throw new Error('Expected enabled Film node.');
+  expect(enabledFilmNode.params['filmEmulation']).toEqual(enabled.adjustmentSnapshot.value.filmEmulation);
+  expect(enabled.editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('filmEmulation');
   expect(enabled.finalPreviewUrl).toBeNull();
   expect(enabled.exportSoftProofTransform).toBeNull();
 
@@ -82,9 +82,9 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   expect(profiled.adjustmentSnapshot.value.exposure).toBe(1.25);
   expect(profiled.adjustmentRevision).toBe(4);
   expect(profiled.history).toHaveLength(3);
-  expect(profiled.editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(
-    profiled.adjustmentSnapshot.value.filmEmulation,
-  );
+  const profiledFilmNode = profiled.editDocumentV2.nodes['film_emulation'];
+  if (profiledFilmNode === undefined) throw new Error('Expected profiled Film node.');
+  expect(profiledFilmNode.params['filmEmulation']).toEqual(profiled.adjustmentSnapshot.value.filmEmulation);
 
   const baselineProfile = getFilmBaselineProfileCatalog().find(
     (profile) => profile.profile.id === 'rapidraw.soft_color_negative.v1',
@@ -107,7 +107,9 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   expect(reset.adjustmentSnapshot.value.saturation).toBe(INITIAL_ADJUSTMENTS.saturation);
   expect(reset.history).toHaveLength(historyBeforeReset + 1);
   expect(reset.adjustmentRevision).toBe(6);
-  expect(reset.editDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: null });
+  const resetFilmNode = reset.editDocumentV2.nodes['film_emulation'];
+  if (resetFilmNode === undefined) throw new Error('Expected reset Film node.');
+  expect(resetFilmNode.params).toEqual({ filmEmulation: null });
 
   await click(container, 'button[aria-label="Reset film emulation"]');
   expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 6, historyIndex: 4 });

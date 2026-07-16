@@ -141,7 +141,7 @@ function patch(url: string): InteractivePatch {
     basePreviewUrl: 'blob:base-a',
     fullHeight: 100,
     fullWidth: 200,
-    geometryIdentity: 'geometry',
+    geometryIdentity: 1,
     normH: 0.5,
     normW: 0.5,
     normX: 0.1,
