@@ -215,6 +215,32 @@ jobs:
           bun test tests/pure-ts/native-feedback.test.ts
           bun tests/integration/checks/check-native-feature-leaves.ts
 
+  fast-validation-harness:
+    name: 'pr fast: validation harness compile'
+    needs: plan
+    if: needs.plan.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/install-tauri-linux-deps
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          # `shared-key` replaces both the automatic job identity and `key`.
+          # Reproduce main's generated rust-test cache identity byte-for-byte.
+          shared-key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long-rust-test
+          cache-on-failure: false
+      - name: Compile the optimized app validation feature surface
+        working-directory: src-tauri
+        run: >-
+          cargo check --quiet --locked --lib
+          --no-default-features --features required-ci,validation-harness
+
   fast-workflow:
     name: 'pr fast: workflow contracts'
     needs: plan
@@ -262,6 +288,7 @@ jobs:
       - fast-visual
       - fast-js-security
       - fast-rust
+      - fast-validation-harness
       - fast-workflow
       - fast-docs
     if: always() && (github.event_name == 'pull_request' || inputs.pull_request_number != '')
