@@ -216,30 +216,29 @@ jobs:
           bun tests/integration/checks/check-native-feature-leaves.ts
 
   fast-validation-harness:
-    name: 'pr fast: macOS validation harness compile'
+    name: 'pr fast: validation harness compile'
     needs: plan
     if: needs.plan.outputs.rust == 'true'
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/install-tauri-linux-deps
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
-          cache: false
           rustflags: ''
           rust-src-dir: src-tauri
-          target: aarch64-apple-darwin
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          # Reuse the maintained main macOS smoke cache. The target/toolchain/features
-          # are identical, while this bounded PR lane only checks the library surface.
-          key: v1-main-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
+          # Reuse the maintained main Rust-test cache; this lane adds only the
+          # validation-harness feature surface to the already-built library graph.
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long
           cache-on-failure: false
       - name: Compile the optimized app validation feature surface
         working-directory: src-tauri
         run: >-
-          cargo check --quiet --locked --target aarch64-apple-darwin --lib
+          cargo check --quiet --locked --lib
           --no-default-features --features required-ci,validation-harness
 
   fast-workflow:

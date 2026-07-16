@@ -69,7 +69,7 @@ describe('four-minute PR CI contract', () => {
         },
         {
           completed_at: '2026-07-13T23:24:45.000Z',
-          name: 'pr fast: macOS validation harness compile',
+          name: 'pr fast: validation harness compile',
           started_at: '2026-07-13T23:24:05.000Z',
         },
         {
@@ -118,7 +118,7 @@ describe('four-minute PR CI contract', () => {
         },
         {
           completedAt: '2026-07-13T23:25:05.000Z',
-          name: 'pr fast: macOS validation harness compile',
+          name: 'pr fast: validation harness compile',
           startedAt: '2026-07-13T23:24:05.000Z',
         },
       ],
