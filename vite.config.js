@@ -16,15 +16,15 @@ const hmrPort =
     : parseTcpPort(process.env.RAWENGINE_DEV_SERVER_HMR_PORT, 'RAWENGINE_DEV_SERVER_HMR_PORT');
 
 // https://vitejs.dev/config/
-export default defineConfig(async ({ command }) => ({
+export default defineConfig(async () => ({
   ...(process.env.RAWENGINE_VITE_CACHE_DIR === undefined ? {} : { cacheDir: process.env.RAWENGINE_VITE_CACHE_DIR }),
-  plugins: [createViteProductBundleGuardPlugin(), startupPrebootOrderingPlugin(), tailwindcss(), react()],
-  define: {
-    __RAWENGINE_BROWSER_TAURI_HARNESS__: JSON.stringify(
-      command === 'serve' || process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
-    ),
-  },
-
+  plugins: [
+    createViteProductBundleGuardPlugin(),
+    startupPrebootOrderingPlugin(),
+    browserTauriHarnessEntryPlugin(),
+    tailwindcss(),
+    react(),
+  ],
   clearScreen: false,
   server: {
     port: devServerPort,
@@ -64,6 +64,21 @@ function startupPrebootOrderingPlugin() {
         if (!moduleMatch || prebootOffset < 0 || (moduleMatch.index ?? 0) > prebootOffset) return html;
         return html.replace(moduleMatch[0], '').replace('</body>', `${moduleMatch[0].trim()}\n  </body>`);
       },
+    },
+  };
+}
+
+function browserTauriHarnessEntryPlugin() {
+  return {
+    name: 'rapidraw-browser-tauri-harness-entry',
+    apply: 'serve',
+    transform(source, id) {
+      if (!id.endsWith('/src/main.ts')) return;
+      return [
+        'import { installBrowserTauriHarness } from "/src/validation/browserTauriHarness.mts";',
+        'installBrowserTauriHarness();',
+        source,
+      ].join('\n');
     },
   };
 }
