@@ -9,6 +9,7 @@ import { GlobalStatusSurfaces } from './components/app/GlobalStatusSurfaces';
 import { LibraryExportPanelRoot } from './components/app/LibraryExportPanelRoot';
 import { RenderIsland } from './components/app/RenderIsland';
 import { EditorWorkspaceRoot, LibraryWorkspaceRoot } from './components/app/WorkspaceRoots';
+import EditorCollectionsSection from './components/panel/editor/EditorCollectionsSection';
 import { EditorHistorySection, EditorSnapshotsSection } from './components/panel/editor/EditorHistorySections';
 import EditorLeftSidebar, { type EditorLeftSectionId } from './components/panel/editor/EditorLeftSidebar';
 import EditorNavigator, { type EditorTransformController } from './components/panel/editor/EditorNavigator';
@@ -630,6 +631,7 @@ function App() {
                   setEditorRegionVisibility('leftSidebar', visible);
                 }}
                 slots={{
+                  collections: <EditorCollectionsSection onSelectAlbum={handleSelectAlbumVoid} />,
                   focusSources: <FocusStackRetouchPanel packagePath={selectedImage?.path ?? ''} />,
                   history: <EditorHistorySection />,
                   navigator: (
