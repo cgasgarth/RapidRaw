@@ -3073,7 +3073,10 @@ mod blur_pass_tests {
 
     #[test]
     fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
-        let raw = serde_json::json!({"rawEngineEditGraphVersion": 1, "exposure": 20});
+        let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
+            "rawEngineEditGraphVersion": 1,
+            "exposure": 20
+        }));
         let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
         let plan = crate::render_plan::compile_render_plan(
             &raw,

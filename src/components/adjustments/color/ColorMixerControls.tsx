@@ -111,16 +111,10 @@ export const formatRgbSummary = (values: { red: number; green: number; blue: num
 export const resetColorBalanceRange = (
   settings: ColorBalanceRgbSettings,
   range: ColorBalanceRgbRange,
-): ColorBalanceRgbSettings => {
-  const reset = {
-    ...settings,
-    [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
-  };
-  const hasAdjustment = colorBalanceRanges.some((candidateRange) =>
-    colorBalanceChannels.some((channel) => reset[candidateRange][channel] !== 0),
-  );
-  return hasAdjustment ? reset : { ...reset, enabled: false };
-};
+): ColorBalanceRgbSettings => ({
+  ...settings,
+  [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
+});
 
 export const resetChannelMixerOutput = (
   settings: ChannelMixerSettings,

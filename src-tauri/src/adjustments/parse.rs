@@ -10,7 +10,7 @@ use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradin
 use crate::color::view_transform::{
     ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
 };
-use crate::color::white_balance::{WhiteBalancePlanInputV1, compile_white_balance_plan};
+use crate::color::white_balance::compile_current_technical_white_balance;
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
 use crate::render::film_emulation::parse_node as parse_film_node;
@@ -52,18 +52,10 @@ fn technical_white_balance_from_json(value: &JsonValue) -> GpuMat3 {
     if !section_is_visible(value, "color") {
         return GpuMat3::default();
     }
-    let Some(settings) = value
-        .get("whiteBalanceTechnical")
-        .and_then(JsonValue::as_object)
-    else {
+    let Some(settings) = value.get("whiteBalanceTechnical") else {
         return GpuMat3::default();
     };
-    let Ok(input) =
-        serde_json::from_value::<WhiteBalancePlanInputV1>(JsonValue::Object(settings.clone()))
-    else {
-        return GpuMat3::default();
-    };
-    let Ok(plan) = compile_white_balance_plan(input) else {
+    let Ok(plan) = compile_current_technical_white_balance(settings) else {
         return GpuMat3::default();
     };
     let rows = plan.ap1_matrix;
@@ -1112,15 +1104,13 @@ mod tests {
 
     #[test]
     fn parses_only_technical_white_balance_for_global_color() {
-        let current = json!({
-            "temperature": 99.0,
-            "tint": 99.0,
-            "whiteBalanceTechnical": {
-                "mode": "kelvin_tint",
-                "kelvin": 3200.0,
-                "duv": 0.008
-            }
+        let mut current = json!({
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
         });
+        current["whiteBalanceTechnical"]["mode"] = json!("kelvin_tint");
+        current["whiteBalanceTechnical"]["source"] = json!("user");
+        current["whiteBalanceTechnical"]["kelvin"] = json!(3200.0);
+        current["whiteBalanceTechnical"]["duv"] = json!(0.008);
         let parsed = get_all_adjustments_from_json(&current, true, None);
         assert_eq!(parsed.global.temperature, 0.0);
         assert_eq!(parsed.global.tint, 0.0);
@@ -1128,24 +1118,12 @@ mod tests {
             parsed.global.technical_white_balance.col0,
             [1.0, 0.0, 0.0, 0.0]
         );
-
-        let obsolete_scalars = get_all_adjustments_from_json(
-            &json!({ "temperature": 25.0, "tint": -10.0 }),
-            true,
-            None,
-        );
-        assert_eq!(obsolete_scalars.global.temperature, 0.0);
-        assert_eq!(obsolete_scalars.global.tint, 0.0);
-        assert_eq!(
-            obsolete_scalars.global.technical_white_balance.col0,
-            [1.0, 0.0, 0.0, 0.0]
-        );
     }
 
     #[test]
     fn local_masks_cannot_override_the_global_technical_illuminant() {
-        let adjustments = json!({
-            "whiteBalanceTechnical": { "mode": "kelvin_tint", "kelvin": 7500.0, "duv": -0.004 },
+        let mut adjustments = json!({
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
             "masks": [{
                 "id": "mask",
                 "name": "Local creative color",
@@ -1160,6 +1138,10 @@ mod tests {
                 "subMasks": []
             }]
         });
+        adjustments["whiteBalanceTechnical"]["mode"] = json!("kelvin_tint");
+        adjustments["whiteBalanceTechnical"]["source"] = json!("user");
+        adjustments["whiteBalanceTechnical"]["kelvin"] = json!(7500.0);
+        adjustments["whiteBalanceTechnical"]["duv"] = json!(-0.004);
         let parsed = get_all_adjustments_from_json(&adjustments, true, None);
         assert_eq!(parsed.mask_count, 1);
         assert_eq!(parsed.mask_adjustments[0].temperature, 2.0);

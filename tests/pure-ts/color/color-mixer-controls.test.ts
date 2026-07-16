@@ -94,11 +94,6 @@ describe('Advanced mixer view models', () => {
     expect(resetBalance.shadows).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows);
     expect(resetBalance.highlights.blue).toBe(-8);
 
-    const onlyActiveRange = structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb);
-    onlyActiveRange.enabled = true;
-    onlyActiveRange.midtones.red = 12;
-    expect(resetColorBalanceRange(onlyActiveRange, 'midtones').enabled).toBe(false);
-
     const mixer = structuredClone(INITIAL_ADJUSTMENTS.channelMixer);
     mixer.red.green = 25;
     mixer.blue.constant = -5;

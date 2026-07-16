@@ -3622,8 +3622,6 @@ mod tests {
             "effectsEnabled": true,
             "shadows": 14,
             "sharpness": 24,
-            "temperature": 12,
-            "tint": -3,
             "toneMapper": "basic",
             "vibrance": 11,
             "whites": 9
@@ -3639,6 +3637,8 @@ mod tests {
         expected["localContrastMidtoneMask"] = json!(44);
         expected["localContrastRadiusPx"] = json!(36);
         expected["sharpnessThreshold"] = json!(20);
+        expected["skinToneUniformity"] =
+            skin_tone_uniformity_params()["skinToneUniformity"].clone();
         expected["structure"] = json!(21);
         expected["effectsEnabled"] = json!(true);
         expected["sectionVisibility"] =
