@@ -2628,10 +2628,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         initial_linear_rgb = color_from_texture;
     }
-    // Technical illuminant correction is the first scene-linear color node.
+    // Technical illuminant correction is the first scene-linear color node,
+    // so multi-phase execution must apply it exactly once at scene input.
     // Legacy temperature/tint remains a later creative operation and masks
     // never mutate this matrix.
-    initial_linear_rgb = adjustments.global.technical_white_balance * initial_linear_rgb;
+    if (scene_input_phase) {
+        initial_linear_rgb = adjustments.global.technical_white_balance * initial_linear_rgb;
+    }
 
     var t_exposure = adjustments.global.exposure;
     var t_brightness = adjustments.global.brightness;
