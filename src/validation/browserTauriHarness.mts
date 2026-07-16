@@ -1538,7 +1538,7 @@ const encodeHarnessPreviewJpeg = async (
 
 const createHarnessApplyPreview = async (args: Record<string, unknown> | undefined): Promise<ArrayBuffer> => {
   const request = normalizeHarnessApplyPreviewRequest(args);
-  if (request.roi === null) emitHarnessPreviewAnalytics(request);
+  emitHarnessPreviewAnalytics(request);
   const injected = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyPreviewResponses.shift();
   if (injected !== undefined) {
     const canvas = document.createElement('canvas');

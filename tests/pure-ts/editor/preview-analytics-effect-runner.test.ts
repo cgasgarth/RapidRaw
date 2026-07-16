@@ -47,6 +47,27 @@ const analyticsPayload = (identity: PreviewOperationIdentity, marker = 1) => ({
   timing: { finishingMs: 0, fullImageConversions: 0, samplingMs: 0, sourcePixelsRead: 1 },
 });
 
+const completeAnalyticsPayload = (identity: PreviewOperationIdentity, marker = 1) => {
+  const resource = (suffix: string) => ({
+    byteLen: 256 * 256 * 4,
+    mimeType: 'application/x-rapidraw-rgba8',
+    resourceId: marker.toString(16).repeat(64).slice(0, 64),
+    url: `rapidraw-analytics://localhost/${suffix}-${marker}`,
+  });
+  return {
+    ...analyticsPayload(identity, marker),
+    requestedProducts: 31,
+    scopes: {
+      height: 256,
+      luma: resource('luma'),
+      parade: resource('parade'),
+      rgb: resource('rgb'),
+      vectorscope: resource('vectorscope'),
+      width: 256,
+    },
+  };
+};
+
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const harness = () => {
@@ -145,6 +166,8 @@ describe('preview analytics effect runner', () => {
     bindPresentation(secondIdentity);
     expect(updates.at(-1)).toEqual({
       histogram: null,
+      previewScopeRecoveryError: null,
+      previewScopeRecoveryState: 'idle',
       previewScopeStatus: null,
       referenceMatchSpatialAnalysis: null,
       waveform: null,
@@ -225,6 +248,8 @@ describe('preview analytics effect runner', () => {
     expect(updates).toEqual([
       {
         histogram: null,
+        previewScopeRecoveryError: null,
+        previewScopeRecoveryState: 'idle',
         previewScopeStatus: null,
         referenceMatchSpatialAnalysis: null,
         waveform: null,
@@ -262,5 +287,121 @@ describe('preview analytics effect runner', () => {
     subscription.install(() => undefined);
     await started;
     expect(ready).toBe(true);
+  });
+
+  test('accepted native and URL previews reach complete current scopes and reject superseded ROI and image receipts', async () => {
+    const { bindPresentation, dispatch, emit, runner, updates } = harness();
+    await runner.start();
+
+    const nativeQueued = dispatch({
+      identity: session({ backend: 'wgpu' }),
+      kind: 'settled',
+      type: 'render-inputs-changed',
+    });
+    const nativeIdentity = requiredIdentity(nativeQueued);
+    dispatch({ identity: nativeIdentity, type: 'operation-started' });
+    emit(completeAnalyticsPayload(nativeIdentity, 1));
+    dispatch({ identity: nativeIdentity, type: 'operation-completed' });
+    expect(bindPresentation(nativeIdentity)).toBe(true);
+    expect(updates.at(-1)).toMatchObject({
+      histogram: { luma: { data: [1] } },
+      previewScopeRecoveryError: null,
+      previewScopeRecoveryState: 'idle',
+      previewScopeStatus: { histogramReady: true, waveformReady: true },
+      waveform: {
+        luma: 'rapidraw-analytics://localhost/luma-1',
+        parade: 'rapidraw-analytics://localhost/parade-1',
+        rgb: 'rapidraw-analytics://localhost/rgb-1',
+        vectorscope: 'rapidraw-analytics://localhost/vectorscope-1',
+      },
+    });
+
+    const roiQueued = dispatch({
+      identity: session({ roiFingerprint: '[0.1,0.2,0.5,0.5]', viewportRevision: 2 }),
+      kind: 'settled',
+      type: 'render-inputs-changed',
+    });
+    const roiIdentity = requiredIdentity(roiQueued);
+    dispatch({ identity: roiIdentity, type: 'operation-started' });
+    dispatch({
+      artifact: { identity: roiIdentity, url: 'blob:roi' },
+      identity: roiIdentity,
+      type: 'operation-completed',
+    });
+    expect(bindPresentation(roiIdentity)).toBe(true);
+    const beforeStale = updates.length;
+    emit(completeAnalyticsPayload(nativeIdentity, 9));
+    expect(updates).toHaveLength(beforeStale);
+    emit(completeAnalyticsPayload(roiIdentity, 2));
+    expect(updates.at(-1)).toMatchObject({ histogram: { luma: { data: [2] } } });
+
+    const switched = dispatch({
+      session: session({ imageSessionId: 2, sourceImagePath: '/fixtures/b.jpg', sourceRevision: 2 }),
+      type: 'image-session-installed',
+    });
+    expect(switched.state.visibleIdentity).toBeNull();
+    const beforeOldImage = updates.length;
+    emit(completeAnalyticsPayload(roiIdentity, 3));
+    expect(updates).toHaveLength(beforeOldImage);
+
+    const jpegQueued = dispatch({
+      identity: session({ backend: 'cpu', imageSessionId: 2, sourceImagePath: '/fixtures/b.jpg', sourceRevision: 2 }),
+      kind: 'settled',
+      type: 'render-inputs-changed',
+    });
+    const jpegIdentity = requiredIdentity(jpegQueued);
+    dispatch({ identity: jpegIdentity, type: 'operation-started' });
+    dispatch({
+      artifact: { identity: jpegIdentity, url: 'blob:jpeg' },
+      identity: jpegIdentity,
+      type: 'operation-completed',
+    });
+    expect(
+      bindPresentation(jpegIdentity, {
+        exportSoftProofTransform: null,
+        isExportSoftProofEnabled: false,
+        selectedImagePath: '/fixtures/b.jpg',
+      }),
+    ).toBe(true);
+    emit(completeAnalyticsPayload(jpegIdentity, 4));
+    expect(updates.at(-1)).toMatchObject({
+      previewScopeStatus: { histogramReady: true, path: '/fixtures/b.jpg', waveformReady: true },
+    });
+  });
+
+  test('missing analytics reaches an explicit terminal error instead of pending forever', async () => {
+    const coordinator = new PreviewCoordinator();
+    const updates: PreviewAnalyticsUpdate[] = [];
+    let runner: PreviewAnalyticsEffectRunner;
+    const dispatch = (event: PreviewCoordinatorEvent) => {
+      const transition = coordinator.dispatch(event);
+      runner.consume(transition.effects);
+      return transition;
+    };
+    runner = new PreviewAnalyticsEffectRunner({
+      analyticsTimeoutMs: 0,
+      dispatch,
+      publish: (update) => updates.push(update),
+      subscribe: async () => () => undefined,
+    });
+    await runner.start();
+    const queued = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+    const identity = requiredIdentity(queued);
+    dispatch({ identity, type: 'operation-started' });
+    dispatch({ identity, type: 'operation-completed' });
+    expect(
+      runner.bindPresentation(identity, {
+        exportSoftProofTransform: null,
+        isExportSoftProofEnabled: false,
+        selectedImagePath: '/fixtures/a.raw',
+      }),
+    ).toBe(true);
+    await tick();
+    expect(updates.at(-1)).toMatchObject({
+      previewScopeRecoveryError: 'Current preview analytics did not reach a terminal receipt.',
+      previewScopeRecoveryState: 'error',
+      previewScopeStatus: { warningCodes: ['preview_scope_error:analytics_timeout'] },
+    });
+    runner.stop();
   });
 });

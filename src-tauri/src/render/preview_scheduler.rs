@@ -371,7 +371,6 @@ mod tests {
                 target_resolution: None,
                 roi: None,
                 compute_waveform: false,
-                active_waveform_channel: None,
                 viewer_sample_graph_revision: None,
                 responder: tx,
             },

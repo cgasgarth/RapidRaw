@@ -21,7 +21,8 @@ pub(crate) struct ApplyAdjustmentsRequest {
     target_resolution: Option<u32>,
     roi: Option<(f32, f32, f32, f32)>,
     compute_waveform: bool,
-    active_waveform_channel: Option<String>,
+    #[serde(rename = "activeWaveformChannel")]
+    _active_waveform_channel: Option<String>,
     viewer_sample_graph_revision: Option<String>,
 }
 
@@ -62,7 +63,6 @@ pub(crate) async fn apply_adjustments(
         target_resolution: request.target_resolution,
         roi: request.roi,
         compute_waveform: request.compute_waveform,
-        active_waveform_channel: request.active_waveform_channel,
         viewer_sample_graph_revision: request.viewer_sample_graph_revision,
         responder: tx,
     };

@@ -236,6 +236,7 @@ export interface PreviewCoordinatorState {
   settled: PreviewOperationState;
   session: PreviewSessionIdentity | null;
   staleCompletionCount: number;
+  visibleIdentity: PreviewOperationIdentity | null;
   visibleArtifact: PreviewArtifact | null;
   viewport: PreviewViewportSnapshot | null;
 }
@@ -316,6 +317,7 @@ export function createPreviewCoordinatorState(): PreviewCoordinatorState {
     settled: idleOperation(),
     session: null,
     staleCompletionCount: 0,
+    visibleIdentity: null,
     visibleArtifact: null,
     viewport: null,
   };
@@ -429,6 +431,7 @@ function cancelActiveOperations(
     releasedUrls.add(next.visibleArtifact.url);
     next = { ...next, visibleArtifact: null };
   }
+  if (releaseVisibleArtifact) next = { ...next, visibleIdentity: null };
   if (releaseVisibleArtifact && next.originalArtifact !== null) {
     if (!releasedUrls.has(next.originalArtifact.url)) {
       effects.push({ type: 'release-url', url: next.originalArtifact.url, reason });
@@ -437,7 +440,7 @@ function cancelActiveOperations(
   }
   if (releaseVisibleArtifact) {
     next = discardPendingAnalytics(next, effects, reason);
-    if (next.analytics.status !== 'idle' || state.visibleArtifact !== null) {
+    if (next.analytics.status !== 'idle' || state.visibleIdentity !== null) {
       effects.push({ reason, type: 'clear-analytics' });
       next = withAnalyticsReceipt(next, { action: 'cleared', operationId: null, reason, receiptId: null });
     }
@@ -649,7 +652,7 @@ export function reducePreviewCoordinator(
   if (event.type === 'analytics-result-received') {
     const identity = previewOperationIdentitySchema.parse(event.identity);
     const receiptId = positiveRevisionSchema.parse(event.receiptId);
-    const visibleCurrent = state.visibleArtifact !== null && sameOperation(state.visibleArtifact.identity, identity);
+    const visibleCurrent = state.visibleIdentity !== null && sameOperation(state.visibleIdentity, identity);
     const alreadyPublished =
       state.analytics.status === 'presented' && sameOperation(state.analytics.identity, identity);
     const operation = operationForKind(state, identity.kind);
@@ -1027,38 +1030,42 @@ export function reducePreviewCoordinator(
       }
       return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
     }
-    const settledArtifactMatchesInteractiveInputs =
+    const settledPresentationMatchesInteractiveInputs =
       identity.kind === 'interactive' &&
-      state.visibleArtifact?.identity.kind === 'settled' &&
-      fingerprintPreviewSessionIdentity(state.visibleArtifact.identity.session) ===
+      state.visibleIdentity?.kind === 'settled' &&
+      fingerprintPreviewSessionIdentity(state.visibleIdentity.session) ===
         fingerprintPreviewSessionIdentity(identity.session);
     const shouldPublish =
-      event.artifact !== undefined && identity.kind !== 'analytics' && !settledArtifactMatchesInteractiveInputs;
+      event.artifact !== undefined && identity.kind !== 'analytics' && !settledPresentationMatchesInteractiveInputs;
     if (event.artifact !== undefined && !shouldPublish && event.artifact.url !== state.visibleArtifact?.url) {
       effects.push({ type: 'release-url', url: event.artifact.url, reason: 'artifact-not-presented' });
     }
-    if (shouldPublish || (event.artifact === undefined && identity.kind !== 'analytics')) {
+    const shouldPresent = shouldPublish || (event.artifact === undefined && identity.kind !== 'analytics');
+    if (shouldPresent) {
+      if (state.visibleIdentity !== null && !sameOperation(state.visibleIdentity, identity)) {
+        effects.push({ reason: 'presented-frame-replaced', type: 'clear-analytics' });
+        state = withAnalyticsReceipt(
+          { ...state, analytics: idleOperation() },
+          {
+            action: 'cleared',
+            operationId: state.visibleIdentity.operationId,
+            reason: 'presented-frame-replaced',
+            receiptId: null,
+          },
+        );
+      }
       effects.push({ type: 'present', identity, reason: 'operation-presented' });
+      state = { ...state, visibleIdentity: identity };
     }
     if (shouldPublish && event.artifact !== undefined) {
       const previousUrl = state.visibleArtifact?.url;
       if (previousUrl !== undefined && previousUrl !== event.artifact.url) {
         effects.push({ type: 'release-url', url: previousUrl, reason: 'artifact-replaced' });
       }
-      if (state.visibleArtifact !== null && !sameOperation(state.visibleArtifact.identity, identity)) {
-        effects.push({ reason: 'presented-artifact-replaced', type: 'clear-analytics' });
-        state = withAnalyticsReceipt(
-          { ...state, analytics: idleOperation() },
-          {
-            action: 'cleared',
-            operationId: state.visibleArtifact.identity.operationId,
-            reason: 'presented-artifact-replaced',
-            receiptId: null,
-          },
-        );
-      }
       effects.push({ type: 'publish', artifact: event.artifact, identity, reason: 'operation-presented' });
       state = { ...state, visibleArtifact: event.artifact };
+    }
+    if (shouldPresent) {
       const pending = state.pendingAnalytics.find((intent) => sameOperation(intent.identity, identity));
       state = discardPendingAnalytics(
         state,

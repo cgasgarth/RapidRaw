@@ -41,7 +41,8 @@ fn validate_current_source(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ExportSoftProofPreviewRequest {
-    active_waveform_channel: Option<String>,
+    #[serde(rename = "activeWaveformChannel")]
+    _active_waveform_channel: Option<String>,
     black_point_compensation: bool,
     compute_waveform: bool,
     color_profile: export::export_processing::ExportColorProfile,
@@ -305,7 +306,6 @@ pub(crate) fn generate_export_soft_proof_preview(
                 } else {
                     AnalyticsProducts::empty()
                 },
-            active_waveform_channel: request.active_waveform_channel,
             policy: AnalyticsSamplingPolicy::default(),
         });
     }

@@ -227,7 +227,7 @@ struct SpatialTileAccumulator {
 }
 
 impl Accumulator {
-    fn new(products: AnalyticsProducts, active_channel: Option<&str>, plan: &SamplingPlan) -> Self {
+    fn new(products: AnalyticsProducts, plan: &SamplingPlan) -> Self {
         let waveform = products.contains(AnalyticsProducts::WAVEFORM);
         Self {
             histogram: products
@@ -236,8 +236,7 @@ impl Accumulator {
             spatial: products.contains(AnalyticsProducts::HISTOGRAM).then(|| {
                 Box::new([SpatialTileAccumulator::default(); SPATIAL_GRID * SPATIAL_GRID])
             }),
-            rgb: (waveform && active_channel != Some("luma"))
-                .then(|| [scope_bins(), scope_bins(), scope_bins()]),
+            rgb: waveform.then(|| [scope_bins(), scope_bins(), scope_bins()]),
             luma: waveform.then(scope_bins),
             parade: products
                 .contains(AnalyticsProducts::PARADE)
@@ -454,7 +453,7 @@ pub fn calculate(
         return Err("Image has zero dimensions.".into());
     }
     let plan = sampling_plan(w, h);
-    let mut acc = Accumulator::new(job.products, job.active_waveform_channel.as_deref(), &plan);
+    let mut acc = Accumulator::new(job.products, &plan);
     let started = Instant::now();
     scan(&job.image, &plan, &mut acc, &current)?;
     let sampling_ms = started.elapsed().as_secs_f64() * 1000.0;
@@ -755,7 +754,7 @@ pub fn calculate_gamut_warning_overlay_from_image(
 ) -> Result<GamutWarningOverlayData, String> {
     let (w, h) = image.dimensions();
     let p = sampling_plan(w, h);
-    let mut a = Accumulator::new(AnalyticsProducts::GAMUT_MASK, None, &p);
+    let mut a = Accumulator::new(AnalyticsProducts::GAMUT_MASK, &p);
     scan(image, &p, &mut a, &|| true)?;
     let rgba = a.gamut.take().unwrap();
     let png = encode_png(&rgba, p.gamut_width, p.gamut_height)?;
@@ -785,7 +784,6 @@ fn compat_job(image: &DynamicImage, products: AnalyticsProducts) -> AnalyticsJob
         frame_id: AnalyticsFrameId::default(),
         image: Arc::new(image.clone()),
         products,
-        active_waveform_channel: None,
         policy: Default::default(),
     }
 }
@@ -810,6 +808,14 @@ mod tests {
         let result = calculate(&job, || true).unwrap();
         assert_eq!(result.timing.full_image_conversions, 0);
         assert_eq!(result.timing.source_pixels_read, 4);
+        let histogram = result.histogram.expect("all products include histogram");
+        assert!(histogram.luma.iter().any(|value| *value > 0.0));
+        let scopes = result.scopes.expect("all products include scopes");
+        for resource in [scopes.luma, scopes.rgb, scopes.parade, scopes.vectorscope] {
+            let resource = resource.expect("every current scope product is published");
+            assert!(resource.byte_len > 0);
+            assert!(!resource.url.is_empty());
+        }
     }
     #[test]
     fn disabled_products_allocate_no_outputs() {

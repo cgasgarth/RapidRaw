@@ -25,16 +25,20 @@ export interface PreviewAnalyticsPresentationState {
 
 export interface PreviewAnalyticsUpdate {
   histogram?: ChannelConfig | null;
-  previewScopeRecoveryState?: 'idle';
+  previewScopeRecoveryError?: string | null;
+  previewScopeRecoveryState?: 'error' | 'idle';
   previewScopeStatus?: PreviewScopeStatus | null;
   referenceMatchSpatialAnalysis?: ReferenceSpatialAnalysis | null;
   waveform?: WaveformData | null;
 }
 
 export interface PreviewAnalyticsEffectRunnerOptions {
+  readonly analyticsTimeoutMs?: number;
+  readonly clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
   readonly dispatch: PreviewCoordinatorDispatch;
   readonly now?: () => Date;
   readonly publish: (update: PreviewAnalyticsUpdate) => void;
+  readonly setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   readonly subscribe?: AnalyticsSubscribe;
 }
 
@@ -43,6 +47,8 @@ const subscribeAnalytics = async (onPayload: (payload: unknown) => void): Promis
 
 const clearUpdate = (): PreviewAnalyticsUpdate => ({
   histogram: null,
+  previewScopeRecoveryError: null,
+  previewScopeRecoveryState: 'idle',
   previewScopeStatus: null,
   referenceMatchSpatialAnalysis: null,
   waveform: null,
@@ -58,10 +64,13 @@ export class PreviewAnalyticsEffectRunner {
   private readonly pending = new Map<number, AnalyticsResultPayload>();
   private readonly presentations = new Map<string, PreviewAnalyticsPresentationState>();
   private readonly subscribe: AnalyticsSubscribe;
+  private readonly timeoutMs: number;
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
   private unlisten: (() => void) | null = null;
 
   constructor(private readonly options: PreviewAnalyticsEffectRunnerOptions) {
     this.subscribe = options.subscribe ?? subscribeAnalytics;
+    this.timeoutMs = options.analyticsTimeoutMs ?? 15_000;
   }
 
   consume(effects: readonly PreviewCoordinatorEffect[]): void {
@@ -69,7 +78,7 @@ export class PreviewAnalyticsEffectRunner {
       effects.filter((effect) => effect.type === 'publish-analytics').map((effect) => effect.receiptId),
     );
     for (const effect of effects) {
-      if (effect.type === 'publish' && effect.identity.kind !== 'original') {
+      if (effect.type === 'present' && effect.identity.kind !== 'original') {
         this.presentedIdentity = fingerprintPreviewOperationIdentity(effect.identity);
         this.presentations.clear();
       } else if (effect.type === 'publish-analytics') {
@@ -86,6 +95,7 @@ export class PreviewAnalyticsEffectRunner {
         this.pending.delete(effect.receiptId);
         this.awaitingPresentation.delete(effect.receiptId);
       } else if (effect.type === 'clear-analytics') {
+        this.clearTimers();
         for (const receiptId of this.pending.keys()) {
           if (!publishedReceiptIds.has(receiptId)) this.pending.delete(receiptId);
         }
@@ -105,12 +115,16 @@ export class PreviewAnalyticsEffectRunner {
     const capturedPresentation = structuredClone(presentation);
     this.presentations.clear();
     this.presentations.set(fingerprint, capturedPresentation);
+    this.armTimeout(fingerprint, capturedPresentation);
     for (const [receiptId, awaitingIdentity] of this.awaitingPresentation) {
       if (awaitingIdentity !== fingerprint) continue;
       const result = this.pending.get(receiptId);
       this.awaitingPresentation.delete(receiptId);
       this.pending.delete(receiptId);
-      if (result !== undefined) this.publishResult(result, capturedPresentation);
+      if (result !== undefined) {
+        this.clearTimeout(fingerprint);
+        this.publishResult(result, capturedPresentation);
+      }
     }
     return true;
   }
@@ -146,6 +160,7 @@ export class PreviewAnalyticsEffectRunner {
     this.unlisten = null;
     this.pending.clear();
     this.awaitingPresentation.clear();
+    this.clearTimers();
     this.presentedIdentity = null;
     this.presentations.clear();
   }
@@ -156,6 +171,7 @@ export class PreviewAnalyticsEffectRunner {
 
   private publishResult(result: AnalyticsResultPayload, presentation: PreviewAnalyticsPresentationState): void {
     if (presentation.selectedImagePath !== result.path) return;
+    this.clearTimeout(fingerprintPreviewOperationIdentity(result.previewOperationIdentity));
     const histogram: ChannelConfig | null = result.histogram
       ? {
           blue: { color: '#3b82f6', data: result.histogram.blue },
@@ -165,7 +181,13 @@ export class PreviewAnalyticsEffectRunner {
         }
       : null;
     const scopes = result.scopes;
-    const waveform: WaveformData | null = scopes
+    const scopesComplete =
+      scopes !== null &&
+      scopes.luma !== null &&
+      scopes.parade !== null &&
+      scopes.rgb !== null &&
+      scopes.vectorscope !== null;
+    const waveform: WaveformData | null = scopesComplete
       ? {
           blue: '',
           green: '',
@@ -180,26 +202,41 @@ export class PreviewAnalyticsEffectRunner {
       : null;
     const transform = presentation.exportSoftProofTransform;
     const exportPreview = presentation.isExportSoftProofEnabled && transform !== null;
+    const histogramComplete =
+      result.histogram !== null &&
+      result.histogram.blue.length > 0 &&
+      result.histogram.green.length > 0 &&
+      result.histogram.luma.length > 0 &&
+      result.histogram.red.length > 0;
+    const terminalError = !histogramComplete
+      ? 'Analytics completed without a nonempty histogram.'
+      : !scopesComplete
+        ? 'Analytics completed without all current preview scopes.'
+        : null;
     this.options.publish({
       histogram,
-      previewScopeRecoveryState: 'idle',
+      previewScopeRecoveryError: terminalError,
+      previewScopeRecoveryState: terminalError === null ? 'idle' : 'error',
       previewScopeStatus: {
         displayTransformLabel: transform?.colorManagedTransform ?? 'Display preview transform',
         exportProfileLabel: exportPreview ? transform.effectiveColorProfile : null,
         exportRenderingIntentLabel: exportPreview ? transform.effectiveRenderingIntent : null,
-        histogramReady: histogram !== null,
+        histogramReady: histogramComplete,
         path: result.path,
         renderBasis: exportPreview ? 'export_preview' : 'editor_preview',
         softProofTransformApplied: transform?.transformApplied ?? false,
         sourceLabel: exportPreview ? 'Export preview' : 'Edited preview',
         updatedAt: (this.options.now?.() ?? new Date()).toISOString(),
-        waveformReady: waveform !== null,
-        warningCodes: exportPreview
-          ? [
-              transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
-              'render_target_matches_export_recipe',
-            ]
-          : [],
+        waveformReady: scopesComplete,
+        warningCodes: [
+          ...(terminalError === null ? [] : ['preview_scope_error:incomplete_analytics_receipt']),
+          ...(exportPreview
+            ? [
+                transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',
+                'render_target_matches_export_recipe',
+              ]
+            : []),
+        ],
         workingTransformLabel: 'Working RGB',
       },
       referenceMatchSpatialAnalysis: result.spatial
@@ -212,5 +249,51 @@ export class PreviewAnalyticsEffectRunner {
         : null,
       waveform,
     });
+  }
+
+  private armTimeout(identity: string, presentation: PreviewAnalyticsPresentationState): void {
+    this.clearTimers();
+    const setTimer = this.options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
+    const timer = setTimer(() => {
+      this.timers.delete(identity);
+      if (!this.active || this.presentedIdentity !== identity) return;
+      const path = presentation.selectedImagePath;
+      if (path === null) return;
+      const message = 'Current preview analytics did not reach a terminal receipt.';
+      this.options.publish({
+        histogram: null,
+        previewScopeRecoveryError: message,
+        previewScopeRecoveryState: 'error',
+        previewScopeStatus: {
+          displayTransformLabel:
+            presentation.exportSoftProofTransform?.colorManagedTransform ?? 'Display preview transform',
+          exportProfileLabel: null,
+          exportRenderingIntentLabel: null,
+          histogramReady: false,
+          path,
+          renderBasis: 'editor_preview',
+          softProofTransformApplied: false,
+          sourceLabel: 'Edited preview',
+          updatedAt: (this.options.now?.() ?? new Date()).toISOString(),
+          waveformReady: false,
+          warningCodes: ['preview_scope_error:analytics_timeout'],
+          workingTransformLabel: 'Working RGB',
+        },
+        referenceMatchSpatialAnalysis: null,
+        waveform: null,
+      });
+    }, this.timeoutMs);
+    this.timers.set(identity, timer);
+  }
+
+  private clearTimeout(identity: string): void {
+    const timer = this.timers.get(identity);
+    if (timer === undefined) return;
+    (this.options.clearTimer ?? ((value) => globalThis.clearTimeout(value)))(timer);
+    this.timers.delete(identity);
+  }
+
+  private clearTimers(): void {
+    for (const identity of this.timers.keys()) this.clearTimeout(identity);
   }
 }
