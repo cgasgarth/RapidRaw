@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test';
 import type {} from '../../src/validation/browserTauriHarnessContract';
 import { openCommandPalette, openEditorFixture, openLibraryFixture } from './fixtures';
 import type { QaScenario } from './model';
@@ -6,6 +7,131 @@ const browserDefaults = {
   artifactContracts: [],
   requiredCapabilities: ['browser-tauri-harness'],
 } as const;
+
+const copyPasteSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
+
+async function seedLegacyCopyPasteSettings(page: Page): Promise<void> {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.evaluate((storageKey) => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        copyPasteSettings: {
+          includedAdjustments: ['exposure'],
+          knownAdjustments: ['exposure'],
+          mode: 'merge',
+        },
+      }),
+    );
+  }, copyPasteSettingsStorageKey);
+}
+
+async function waitForLegacyCopyPasteReset(page: Page): Promise<void> {
+  await page.waitForFunction((storageKey) => {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null) return false;
+    const settings = JSON.parse(raw) as { copyPasteSettings?: Record<string, unknown> };
+    return (
+      settings.copyPasteSettings?.['pasteMode'] === 'merge' &&
+      Array.isArray(settings.copyPasteSettings?.['selectedNodeIds']) &&
+      !Object.hasOwn(settings.copyPasteSettings, 'includedAdjustments')
+    );
+  }, copyPasteSettingsStorageKey);
+}
+
+async function openCopyPasteSettingsDialog(page: Page): Promise<Locator> {
+  await openCommandPalette(page);
+  const palette = page.getByRole('dialog', { name: /Command Palette/u });
+  await palette.getByLabel(/Search commands/u).fill('copy paste');
+  await palette.getByRole('button', { name: /Copy and paste settings/u }).click();
+  return page.getByRole('dialog', { name: /Copy & Paste Settings/u });
+}
+
+async function saveSingleToneReplaceSettings(page: Page, dialog: Locator): Promise<void> {
+  await dialog.getByRole('button', { name: 'Select None' }).click();
+  await dialog.getByRole('checkbox', { exact: true, name: 'Tone' }).check({ force: true });
+  await dialog.getByRole('radio', { name: 'Replace' }).click();
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.waitForFunction((storageKey) => {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null) return false;
+    const settings = JSON.parse(raw) as {
+      copyPasteSettings?: { pasteMode?: unknown; selectedNodeIds?: unknown };
+    };
+    return (
+      settings.copyPasteSettings?.pasteMode === 'replace' &&
+      JSON.stringify(settings.copyPasteSettings.selectedNodeIds) === '["scene_global_color_tone"]'
+    );
+  }, copyPasteSettingsStorageKey);
+}
+
+async function reopenSavedEditorSession(page: Page): Promise<void> {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const continueSession = page.getByRole('button', { name: 'Continue Session' });
+  if (
+    await continueSession
+      .waitFor({ timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await continueSession.click();
+  }
+  const thumbnail = page.getByRole('button', { name: /browser-harness\.ARW/u }).first();
+  if (
+    !(await thumbnail
+      .waitFor({ timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false))
+  ) {
+    await page.getByRole('button', { name: /(?:Add|Open) Folder/u }).click({ noWaitAfter: true });
+    await thumbnail.waitFor({ timeout: 10_000 });
+  }
+  await thumbnail.dblclick();
+  await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
+  await page.getByTestId('image-canvas').waitFor({ timeout: 10_000 });
+}
+
+async function assertReopenedCopyPasteSettings(dialog: Locator): Promise<void> {
+  const checkedCount = await dialog
+    .getByRole('checkbox')
+    .evaluateAll((checkboxes) => checkboxes.filter((checkbox) => (checkbox as HTMLInputElement).checked).length);
+  if (
+    (await dialog.getByRole('radio', { name: 'Replace' }).getAttribute('aria-checked')) !== 'true' ||
+    !(await dialog.getByRole('checkbox', { exact: true, name: 'Tone' }).isChecked()) ||
+    checkedCount !== 1
+  ) {
+    throw new Error('Current node copy/paste settings did not survive a full app reopen.');
+  }
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+}
+
+async function exerciseCopyPasteUndoRedo(page: Page): Promise<void> {
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.getByTestId('adjustments-inspector').waitFor();
+  const exposureValue = page.getByTestId('basic-control-exposure-value');
+  await exposureValue.click();
+  let exposureInput = page.getByTestId('basic-control-exposure-input');
+  await exposureInput.fill('0.8');
+  await exposureInput.press('Enter');
+  const transferZone = page.getByTestId('editor-bottom-transfer-zone');
+  await transferZone.getByRole('button', { exact: true, name: 'Copy Settings' }).click();
+  await exposureValue.click();
+  exposureInput = page.getByTestId('basic-control-exposure-input');
+  await exposureInput.fill('0.2');
+  await exposureInput.press('Enter');
+  await transferZone.getByRole('button', { exact: true, name: 'Paste Settings' }).click();
+  const exposureEquals = (expected: number) =>
+    page.waitForFunction(
+      (value) =>
+        Number(document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim()) === value,
+      expected,
+    );
+  await exposureEquals(0.8);
+  await page.getByRole('button', { name: /^Undo/u }).click();
+  await exposureEquals(0.2);
+  await page.getByRole('button', { name: /^Redo/u }).click();
+  await exposureEquals(0.8);
+}
 
 const libraryScaleScenario = (imageCount: 10_000 | 50_000 | 100_000): QaScenario => ({
   ...browserDefaults,
@@ -830,21 +956,25 @@ export const qaScenarios: readonly QaScenario[] = [
     dependencies: [],
     fixture: { id: 'editor' },
     isolation: 'fresh-context',
-    timeoutMs: 45_000,
+    timeoutMs: 90_000,
     async run({ page }) {
+      await seedLegacyCopyPasteSettings(page);
       await openEditorFixture(page);
-      await openCommandPalette(page);
-      const palette = page.getByRole('dialog', { name: /Command Palette/u });
-      await palette.getByLabel(/Search commands/u).fill('copy paste');
-      await palette.getByRole('button', { name: /Copy and paste settings/u }).click();
-      const dialog = page.getByRole('dialog', { name: /Copy & Paste Settings/u });
-      await dialog.getByText('Dust Spot Visualization').waitFor();
+      await waitForLegacyCopyPasteReset(page);
+      const dialog = await openCopyPasteSettingsDialog(page);
+      await dialog.getByText('Tone', { exact: true }).waitFor();
       if ((await dialog.getByText('DustSpotVisualization').count()) !== 0)
         throw new Error('Copy & Paste Settings exposed an internal identifier.');
+      if ((await dialog.getByText('Dust Spot Visualization').count()) !== 0)
+        throw new Error('Copy & Paste Settings exposed a non-copyable node.');
       const save = dialog.getByRole('button', { name: 'Save' });
       const box = await save.boundingBox();
       if (box === null || box.y < 0 || box.y + box.height > 720)
         throw new Error('Copy & Paste Settings Save is outside the constrained viewport.');
+      await saveSingleToneReplaceSettings(page, dialog);
+      await reopenSavedEditorSession(page);
+      await assertReopenedCopyPasteSettings(await openCopyPasteSettingsDialog(page));
+      await exerciseCopyPasteUndoRedo(page);
     },
   },
   {

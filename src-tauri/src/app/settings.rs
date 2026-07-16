@@ -84,138 +84,93 @@ pub enum PasteMode {
     Replace,
 }
 
-pub fn all_available_adjustments() -> HashSet<String> {
-    [
-        "exposure",
-        "brightness",
-        "contrast",
-        "curves",
-        "pointCurves",
-        "parametricCurve",
-        "curveMode",
-        "highlights",
-        "shadows",
-        "whites",
-        "blacks",
-        "toneMapper",
-        "temperature",
-        "tint",
-        "saturation",
-        "vibrance",
-        "hsl",
-        "hue",
-        "colorGrading",
-        "colorCalibration",
-        "clarity",
-        "structure",
-        "dehaze",
-        "sharpness",
-        "sharpnessThreshold",
-        "centré",
-        "lumaNoiseReduction",
-        "colorNoiseReduction",
-        "chromaticAberrationRedCyan",
-        "chromaticAberrationBlueYellow",
-        "vignetteAmount",
-        "vignetteFeather",
-        "vignetteMidpoint",
-        "vignetteRoundness",
-        "grainAmount",
-        "grainRoughness",
-        "grainSize",
-        "lutIntensity",
-        "lutName",
-        "lutPath",
-        "lutSize",
-        "lutData",
-        "glowAmount",
-        "halationAmount",
-        "flareAmount",
-        "crop",
-        "aspectRatio",
-        "rotation",
-        "flipHorizontal",
-        "flipVertical",
-        "orientationSteps",
-        "transformDistortion",
-        "transformVertical",
-        "transformHorizontal",
-        "transformRotate",
-        "transformAspect",
-        "transformScale",
-        "transformXOffset",
-        "transformYOffset",
-        "masks",
-        "lensCorrectionMode",
-        "lensMaker",
-        "lensModel",
-        "lensDistortionAmount",
-        "lensVignetteAmount",
-        "lensTcaAmount",
-        "lensDistortionEnabled",
-        "lensTcaEnabled",
-        "lensVignetteEnabled",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect()
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum CopyPasteNodeId {
+    SceneGlobalColorTone,
+    ColorPresence,
+    SceneCurve,
+    ToneEqualizer,
+    SceneToViewTransform,
+    DisplayCreative,
+    FilmEmulation,
+    DetailDenoiseDehaze,
+    PointColor,
+    ColorBalanceRgb,
+    SelectiveColorMixer,
+    SkinToneUniformity,
+    BlackWhiteMixer,
+    ChannelMixer,
+    LumaLevels,
+    PerceptualGrading,
+    CameraInput,
+    LensCorrection,
+    ColorCalibration,
+    Geometry,
 }
 
-pub fn default_included_adjustments() -> HashSet<String> {
-    let mut defaults = all_available_adjustments();
+const DEFAULT_COPY_PASTE_NODE_IDS: [CopyPasteNodeId; 18] = [
+    CopyPasteNodeId::SceneGlobalColorTone,
+    CopyPasteNodeId::ColorPresence,
+    CopyPasteNodeId::SceneCurve,
+    CopyPasteNodeId::ToneEqualizer,
+    CopyPasteNodeId::SceneToViewTransform,
+    CopyPasteNodeId::DisplayCreative,
+    CopyPasteNodeId::FilmEmulation,
+    CopyPasteNodeId::DetailDenoiseDehaze,
+    CopyPasteNodeId::PointColor,
+    CopyPasteNodeId::ColorBalanceRgb,
+    CopyPasteNodeId::SelectiveColorMixer,
+    CopyPasteNodeId::SkinToneUniformity,
+    CopyPasteNodeId::BlackWhiteMixer,
+    CopyPasteNodeId::ChannelMixer,
+    CopyPasteNodeId::LumaLevels,
+    CopyPasteNodeId::PerceptualGrading,
+    CopyPasteNodeId::CameraInput,
+    CopyPasteNodeId::ColorCalibration,
+];
 
-    let off_by_default = [
-        "crop",
-        "aspectRatio",
-        "rotation",
-        "flipHorizontal",
-        "flipVertical",
-        "orientationSteps",
-        "transformDistortion",
-        "transformVertical",
-        "transformHorizontal",
-        "transformRotate",
-        "transformAspect",
-        "transformScale",
-        "transformXOffset",
-        "transformYOffset",
-        "masks",
-        "lensCorrectionMode",
-        "lensMaker",
-        "lensModel",
-        "lensDistortionAmount",
-        "lensVignetteAmount",
-        "lensTcaAmount",
-        "lensDistortionEnabled",
-        "lensTcaEnabled",
-        "lensVignetteEnabled",
-    ];
-
-    for item in off_by_default.iter() {
-        defaults.remove(*item);
+fn deserialize_unique_copy_paste_node_ids<'de, D>(
+    deserializer: D,
+) -> Result<Vec<CopyPasteNodeId>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let node_ids = Vec::<CopyPasteNodeId>::deserialize(deserializer)?;
+    let mut seen = HashSet::new();
+    if let Some(duplicate) = node_ids.iter().find(|node_id| !seen.insert(**node_id)) {
+        return Err(serde::de::Error::custom(format!(
+            "duplicate copy/paste node id: {duplicate:?}"
+        )));
     }
-
-    defaults
+    Ok(node_ids)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CopyPasteSettings {
-    pub mode: PasteMode,
-    #[serde(default = "default_included_adjustments")]
-    pub included_adjustments: HashSet<String>,
-    #[serde(default)]
-    pub known_adjustments: HashSet<String>,
+    pub paste_mode: PasteMode,
+    #[serde(deserialize_with = "deserialize_unique_copy_paste_node_ids")]
+    pub selected_node_ids: Vec<CopyPasteNodeId>,
 }
 
 impl Default for CopyPasteSettings {
     fn default() -> Self {
         Self {
-            mode: PasteMode::Merge,
-            included_adjustments: default_included_adjustments(),
-            known_adjustments: all_available_adjustments(),
+            paste_mode: PasteMode::Merge,
+            selected_node_ids: DEFAULT_COPY_PASTE_NODE_IDS.to_vec(),
         }
     }
+}
+
+fn deserialize_copy_paste_settings_or_default<'de, D>(
+    deserializer: D,
+) -> Result<CopyPasteSettings, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -418,7 +373,10 @@ pub struct AppSettings {
     pub adjustment_visibility: HashMap<String, bool>,
     #[serde(default = "default_open_tree_sections")]
     pub open_tree_sections: Vec<String>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_copy_paste_settings_or_default"
+    )]
     pub copy_paste_settings: CopyPasteSettings,
     #[serde(default)]
     pub raw_highlight_compression: Option<f32>,
@@ -662,51 +620,28 @@ pub fn get_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
 pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
     let path = get_settings_path(&app_handle)?;
 
-    let mut settings: AppSettings = if path.exists() {
+    let (mut settings, copy_paste_settings_were_reset): (AppSettings, bool) = if path.exists() {
         let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&content).unwrap_or_default()
+        let value = serde_json::from_str::<Value>(&content).unwrap_or_default();
+        let copy_paste_settings_were_reset =
+            value.get("copyPasteSettings").is_some_and(|settings| {
+                serde_json::from_value::<CopyPasteSettings>(settings.clone()).is_err()
+            });
+        (
+            serde_json::from_value(value).unwrap_or_default(),
+            copy_paste_settings_were_reset,
+        )
     } else {
-        AppSettings::default()
+        (AppSettings::default(), false)
     };
 
-    let all_current_keys = all_available_adjustments();
-    let default_included = default_included_adjustments();
-    let mut settings_modified = false;
+    let mut settings_modified = copy_paste_settings_were_reset;
 
     if settings.root_folders.is_empty()
         && let Some(last) = &settings.last_root_path
     {
         settings.root_folders.push(last.clone());
         settings_modified = true;
-    }
-
-    let is_first_migration = settings.copy_paste_settings.known_adjustments.is_empty();
-
-    if is_first_migration {
-        settings.copy_paste_settings.included_adjustments = default_included;
-        settings.copy_paste_settings.known_adjustments = all_current_keys;
-        settings_modified = true;
-    } else {
-        let new_features: Vec<String> = all_current_keys
-            .difference(&settings.copy_paste_settings.known_adjustments)
-            .cloned()
-            .collect();
-
-        if !new_features.is_empty() {
-            for feature in new_features {
-                if default_included.contains(&feature) {
-                    settings
-                        .copy_paste_settings
-                        .included_adjustments
-                        .insert(feature.clone());
-                }
-                settings
-                    .copy_paste_settings
-                    .known_adjustments
-                    .insert(feature);
-            }
-            settings_modified = true;
-        }
     }
 
     if settings_modified && let Ok(json_string) = serde_json::to_string_pretty(&settings) {
@@ -800,6 +735,69 @@ pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(),
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copy_paste_settings_round_trip_current_node_ids() {
+        let settings = CopyPasteSettings {
+            paste_mode: PasteMode::Replace,
+            selected_node_ids: vec![
+                CopyPasteNodeId::SceneGlobalColorTone,
+                CopyPasteNodeId::Geometry,
+            ],
+        };
+
+        let serialized = serde_json::to_value(&settings).unwrap();
+        assert_eq!(
+            serialized,
+            serde_json::json!({
+                "pasteMode": "replace",
+                "selectedNodeIds": ["scene_global_color_tone", "geometry"]
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<CopyPasteSettings>(serialized).unwrap(),
+            settings
+        );
+    }
+
+    #[test]
+    fn copy_paste_settings_reject_legacy_unknown_duplicate_and_malformed_state() {
+        let invalid = [
+            serde_json::json!({
+                "mode": "merge",
+                "includedAdjustments": ["exposure"],
+                "knownAdjustments": ["exposure"]
+            }),
+            serde_json::json!({"pasteMode": "merge", "selectedNodeIds": ["layers"]}),
+            serde_json::json!({
+                "pasteMode": "merge",
+                "selectedNodeIds": ["scene_curve", "scene_curve"]
+            }),
+            serde_json::json!({"pasteMode": "append", "selectedNodeIds": []}),
+            serde_json::json!({"pasteMode": "merge", "selectedNodeIds": [], "unexpected": true}),
+        ];
+
+        for value in invalid {
+            assert!(serde_json::from_value::<CopyPasteSettings>(value).is_err());
+        }
+    }
+
+    #[test]
+    fn app_settings_reset_only_invalid_copy_paste_state() {
+        let settings: AppSettings = serde_json::from_value(serde_json::json!({
+            "copyPasteSettings": {
+                "mode": "merge",
+                "includedAdjustments": ["exposure"]
+            },
+            "imageCacheSize": 17,
+            "language": "fr"
+        }))
+        .unwrap();
+
+        assert_eq!(settings.copy_paste_settings, CopyPasteSettings::default());
+        assert_eq!(settings.image_cache_size, Some(17));
+        assert_eq!(settings.language.as_deref(), Some("fr"));
+    }
 
     const CURRENT_EXPORT_RECIPE_FIELDS: [&str; 24] = [
         "blackPointCompensation",

@@ -14,6 +14,7 @@ import {
   type ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../../components/ui/AppProperties';
+import { resolveCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { nativeCapabilityManifestSchema } from '../../schemas/nativeCapabilitySchemas';
 import { type PanelScopesLayout, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -21,8 +22,7 @@ import { useNativeCapabilityStore } from '../../store/useNativeCapabilityStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { DisplayMode, PasteMode } from '../../utils/adjustments';
-import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../utils/editDocumentV2';
+import { DisplayMode } from '../../utils/adjustments';
 import { frontendStartupReporter } from '../../utils/startup/startupTraceReporter';
 import { DEFAULT_THEME_ID, THEMES, type ThemeProps } from '../../utils/themes';
 import { clampPanelScopesHeight } from '../../utils/waveformSizing';
@@ -199,18 +199,16 @@ export const useAppInitialization = ({
   useEffect(() => {
     invoke<InitializationSettings>(Invokes.LoadSettings)
       .then(async (settings) => {
-        if (!settings.copyPasteSettings || settings.copyPasteSettings.includedAdjustments.length === 0) {
-          settings.copyPasteSettings = {
-            mode: PasteMode.Merge,
-            includedAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-            knownAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-          };
-        }
+        const copyPasteSettingsResolution = resolveCopyPasteSettings(settings.copyPasteSettings);
+        let settingsChanged = copyPasteSettingsResolution.wasReset;
+        settings.copyPasteSettings = copyPasteSettingsResolution.settings;
 
         if (!settings.language) {
           settings.language = getDefaultLanguage(i18n);
-          await handleSettingsChange(settings);
+          settingsChanged = true;
         }
+
+        if (settingsChanged) await handleSettingsChange(settings);
 
         setAppSettings(settings);
         await i18n.changeLanguage(settings.language);

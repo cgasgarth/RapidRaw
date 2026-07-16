@@ -2797,12 +2797,12 @@
         "vignette": "Vinheta",
         "whiteBalance": "Balanço de Branco"
       },
-      "includedAdjustments": "Ajustes Incluídos",
       "modeMerge": "Mesclar",
       "modeReplace": "Substituir",
       "pasteMode": "Modo de Colagem",
       "save": "Salvar",
       "selectAll": "Selecionar Tudo",
+      "selectedNodes": "Ajustes Incluídos",
       "selectNone": "Desmarcar Tudo",
       "title": "Copiar e Colar Configurações"
     },
