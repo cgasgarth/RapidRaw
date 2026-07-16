@@ -1,14 +1,35 @@
 import { expect, test } from 'bun:test';
 
+import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks.tsx';
 import {
   createMaskLikeClipboardActions,
+  type MaskLikeContainer,
   moveSubMaskBetweenContainers,
   reorderMaskListContainers,
   splitSubMaskToContainer,
 } from '../../../src/utils/mask/maskClipboard.ts';
 
-const subMask = (id) => ({ id, invert: false, mode: 'Additive', opacity: 100, type: 'Brush', visible: true });
-const container = (id, subMasks) => ({ id, invert: false, name: id, subMasks });
+interface TestMaskContainer extends MaskLikeContainer {}
+
+const subMask = (id: string): SubMask => ({
+  id,
+  invert: false,
+  mode: SubMaskMode.Additive,
+  opacity: 100,
+  type: Mask.Brush,
+  visible: true,
+});
+const container = (id: string, subMasks: Array<SubMask>): TestMaskContainer => ({
+  id,
+  invert: false,
+  name: id,
+  subMasks,
+});
+const requireContainer = (containers: Array<TestMaskContainer>, index: number): TestMaskContainer => {
+  const value = containers[index];
+  if (value === undefined) throw new Error(`Expected mask container at index ${String(index)}.`);
+  return value;
+};
 
 test('reorderMaskListContainers moves an item by target id', () => {
   const result = reorderMaskListContainers([container('a', []), container('b', []), container('c', [])], 'a', 'c');
@@ -22,7 +43,7 @@ test('splitSubMaskToContainer removes a submask and appends a new container', ()
   );
 
   expect(result?.containers.map((item) => item.id)).toEqual(['a', 'b']);
-  expect(result?.containers[0].subMasks.map((item) => item.id)).toEqual(['s2']);
+  expect(result?.containers[0]?.subMasks.map((item) => item.id)).toEqual(['s2']);
   expect(result?.container.subMasks.map((item) => item.id)).toEqual(['s1']);
 });
 
@@ -34,7 +55,7 @@ test('moveSubMaskBetweenContainers handles same-container reorder and cross-cont
     's2',
     's1',
   );
-  expect(sameContainer?.[0].subMasks.map((item) => item.id)).toEqual(['s2', 's1']);
+  expect(sameContainer?.[0]?.subMasks.map((item) => item.id)).toEqual(['s2', 's1']);
 
   const crossContainer = moveSubMaskBetweenContainers(
     [container('a', [subMask('s1')]), container('b', [subMask('s2')])],
@@ -48,8 +69,8 @@ test('moveSubMaskBetweenContainers handles same-container reorder and cross-cont
 
 test('createMaskLikeClipboardActions shares duplicate, invert, and paste orchestration', () => {
   let containers = [container('a', [subMask('s1')]), container('b', [])];
-  const insertedContainers = [];
-  const insertedSubMasks = [];
+  const insertedContainers: Array<{ container: TestMaskContainer; insertIndex: number | undefined }> = [];
+  const insertedSubMasks: Array<{ containerId: string; insertIndex: number | undefined; subMask: SubMask }> = [];
   const actions = createMaskLikeClipboardActions({
     cloneContainerForDuplicate: (source, options) => ({
       ...source,
@@ -64,7 +85,11 @@ test('createMaskLikeClipboardActions shares duplicate, invert, and paste orchest
       ...source,
       id: `${source.id}-copy`,
       invert: options.invert ? !source.invert : source.invert,
-      name: options.rename === false ? source.name : `${source.name ?? source.id} Copy`,
+      ...(options.rename === false
+        ? source.name === undefined
+          ? {}
+          : { name: source.name }
+        : { name: `${source.name ?? source.id} Copy` }),
     }),
     cloneSubMaskForPaste: (source) => ({ ...source, id: `${source.id}-paste` }),
     containers,
@@ -81,8 +106,8 @@ test('createMaskLikeClipboardActions shares duplicate, invert, and paste orchest
     invertedSubMaskContainerName: (source) => `Invert ${source.id}`,
   });
 
-  actions.duplicateContainer(containers[0]);
-  actions.duplicateAndInvertContainer(containers[0]);
+  actions.duplicateContainer(requireContainer(containers, 0));
+  actions.duplicateAndInvertContainer(requireContainer(containers, 0));
   actions.pasteContainer('b');
   actions.duplicateSubMask('a', subMask('s2'), 0);
   actions.duplicateAndInvertSubMask('a', subMask('s3'));

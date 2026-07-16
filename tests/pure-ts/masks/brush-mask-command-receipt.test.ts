@@ -60,6 +60,7 @@ describe('brush mask command receipt', () => {
 
     expect(result.commandId).toBe(receipt.commandId);
     expect(result.dryRun).toBe(true);
+    if (!result.dryRun) throw new Error('Expected brush mask dry-run result.');
     expect(result.maskArtifacts[0]?.contentHash).toMatch(/^fnv1a32:[0-9a-f]{8}$/);
     expect(result.parameterDiff[0]?.value).toMatchObject({
       provenance: {
