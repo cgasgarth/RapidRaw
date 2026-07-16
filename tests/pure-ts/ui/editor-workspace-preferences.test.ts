@@ -30,7 +30,7 @@ afterEach(() => {
     bottomPanelHeight: 144,
     compactEditorPanelHeightOverride: null,
     editorWorkspacePreferences: createDefaultEditorWorkspacePreferences(),
-    editorWorkspaceViewport: { height: 0, isCompactPortrait: false, width: 0 },
+    editorWorkspaceViewport: { height: 0, isCompactPortrait: false, isPortrait: false, width: 0 },
     isCommandPaletteOpen: false,
     leftPanelWidth: 256,
     recentRightPanels: [Panel.Color],
@@ -151,11 +151,13 @@ describe('editor workspace preferences', () => {
     const compact = getEffectiveEditorWorkspaceLayout(preferences, {
       height: 560,
       isCompactPortrait: true,
+      isPortrait: false,
       width: 760,
     });
     const desktop = getEffectiveEditorWorkspaceLayout(preferences, {
       height: 900,
       isCompactPortrait: false,
+      isPortrait: false,
       width: 1600,
     });
 
@@ -173,7 +175,9 @@ describe('editor workspace preferences', () => {
 
   test('persists narrow preference actions but not transient UI state', () => {
     const storage = installStorage();
-    useUIStore.getState().setEditorWorkspaceViewport({ height: 900, isCompactPortrait: false, width: 1440 });
+    useUIStore
+      .getState()
+      .setEditorWorkspaceViewport({ height: 900, isCompactPortrait: false, isPortrait: false, width: 1440 });
     useUIStore.getState().setEditorRegionSize('leftSidebar', 312);
     useUIStore.getState().setEditorRegionVisibility('filmstrip', false);
     useUIStore.getState().setEditorSectionExpanded(Panel.Adjustments, 'details', true);
@@ -208,7 +212,7 @@ describe('editor workspace preferences', () => {
 
     const after = useEditorStore.getState();
     expect(after.adjustmentRevision).toBe(7);
-    expect(after.adjustments).toBe(before.adjustments);
+    expect(after.adjustmentSnapshot).toBe(before.adjustmentSnapshot);
     expect(after.editDocumentV2).toBe(before.editDocumentV2);
     expect(after.history).toBe(before.history);
     expect(after.lastEditApplicationReceipt).toBeNull();

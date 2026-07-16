@@ -52,7 +52,7 @@ describe('frontend startup trace reporter', () => {
   test('correlates shell and hydration phases to one native trace in command order', async () => {
     const calls: Array<{ args?: Record<string, unknown>; command: string }> = [];
     const reporter = createFrontendStartupReporter(async <T>(command: string, args?: Record<string, unknown>) => {
-      calls.push({ args, command });
+      calls.push({ command, ...(args === undefined ? {} : { args }) });
       if (command === Invokes.GetStartupTrace) return snapshot() as T;
       if (command === Invokes.RecordFrontendStartupPhase) return snapshot() as T;
       return undefined as T;
