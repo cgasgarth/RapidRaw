@@ -1661,12 +1661,12 @@ function ProfessionalEditorStatusChipsVisualSmoke() {
 function ProfessionalEditorBottomBar() {
   return (
     <BottomBar
-      filmstripHeight={96}
+      filmstripHeight={112}
       imageList={professionalEditorShellImageList}
       imageRatings={{ [professionalEditorShellImage.path]: 4 }}
       isCopied={false}
       isCopyDisabled={false}
-      isFilmstripVisible={false}
+      isFilmstripVisible={true}
       isLoading={false}
       isPasted={false}
       isPasteDisabled={false}
@@ -1683,7 +1683,7 @@ function ProfessionalEditorBottomBar() {
       rating={4}
       selectedImage={professionalEditorShellImage}
       setIsFilmstripVisible={() => {}}
-      showFilmstrip={false}
+      showFilmstrip={true}
       showZoomControls={false}
       thumbnailAspectRatio={ThumbnailAspectRatio.Cover}
       totalImages={1}
@@ -1850,10 +1850,12 @@ function ProfessionalFilmstripContextVisualSmoke() {
 
 function ProfessionalEditorPanelHost({
   activePanel,
+  layout = 'vertical',
   onPanelSelect,
   slideDirection = 0,
 }: {
   activePanel: Panel | null;
+  layout?: 'horizontal' | 'vertical';
   onPanelSelect: (panel: Panel) => void;
   slideDirection?: number;
 }) {
@@ -1862,10 +1864,19 @@ function ProfessionalEditorPanelHost({
   return (
     <>
       <div data-visual-smoke-section="professional-editor-rail">
-        <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={onPanelSelect} />
+        <RightPanelSwitcher
+          activePanel={activePanel}
+          hiddenPanels={[Panel.Presets]}
+          isInstantTransition={true}
+          layout={layout}
+          onPanelSelect={onPanelSelect}
+        />
       </div>
       <div
-        className="min-h-0 min-w-0 overflow-hidden border-l border-editor-border"
+        className={cx(
+          'min-h-0 min-w-0 overflow-hidden',
+          layout === 'vertical' ? 'border-l border-editor-border' : 'border-t border-editor-border',
+        )}
         data-visual-smoke-section="professional-editor-panel"
       >
         <ContextMenuProvider>
@@ -1890,7 +1901,7 @@ function ProfessionalEditorPanelHost({
   );
 }
 
-function ProfessionalEditorShellVisualSmoke() {
+function ProfessionalEditorShellFixture({ state }: { state: 'collapsed' | 'default' | 'fullscreen' }) {
   const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
   useProfessionalEditorSmokeState();
   const handlePanelSelect = (panel: Panel) => {
@@ -1898,16 +1909,86 @@ function ProfessionalEditorShellVisualSmoke() {
     setActivePanel(panel);
   };
 
+  if (state === 'fullscreen') {
+    return (
+      <main
+        className="relative h-screen overflow-hidden bg-editor-viewer-matte font-sans text-text-primary"
+        data-visual-smoke-ready="true"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShellFullscreen}
+      >
+        <span className="sr-only">{copy.professionalEditorShellFullscreen}</span>
+        <div className="h-full" data-visual-smoke-section="professional-editor-fullscreen-canvas">
+          <ProfessionalEditorCanvasWell />
+        </div>
+        <div
+          className="absolute bottom-3 right-3 rounded border border-editor-overlay-stroke bg-editor-overlay-surface px-2 py-1 text-[11px] text-text-secondary"
+          data-visual-smoke-section="professional-editor-fullscreen-exit"
+        >
+          {copy.professionalEditorFullscreenFit}
+        </div>
+        <div className="sr-only" data-visual-smoke-section="professional-editor-fullscreen-focus" />
+        <div className="sr-only" data-visual-smoke-section="professional-editor-fullscreen-dpr" />
+        <div className="sr-only" data-visual-smoke-section="professional-editor-fullscreen-zoom" />
+      </main>
+    );
+  }
+
+  const collapsed = state === 'collapsed';
   return (
     <main
-      className="h-full min-h-screen bg-editor-matte p-3 font-sans text-text-primary"
+      className="h-screen min-h-screen overflow-hidden bg-editor-matte font-sans text-text-primary"
+      data-develop-shell-state={state}
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell}
+      data-visual-smoke-mode={
+        collapsed
+          ? VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShellCollapsed
+          : VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell
+      }
     >
-      <div className="flex h-[calc(100vh-24px)] min-h-0 gap-2 overflow-hidden">
-        <section className="flex min-w-0 flex-1 flex-col gap-2">
+      {collapsed ? <span className="sr-only">{copy.professionalEditorShellCollapsed}</span> : null}
+      <div
+        className="grid h-full min-h-0 overflow-hidden"
+        style={{
+          gridTemplateColumns: collapsed
+            ? '80px minmax(0, 1fr) 42px'
+            : 'clamp(132px,16.944vw,244px) minmax(0,1fr) clamp(196px,25.278vw,364px)',
+        }}
+      >
+        <aside
+          className="min-h-0 overflow-hidden border-r border-editor-divider bg-editor-panel"
+          data-visual-smoke-section="professional-editor-left-workflow"
+        >
+          {collapsed ? (
+            <div className="flex h-full items-start justify-center pt-3 text-text-secondary">›</div>
+          ) : (
+            <>
+              <div className="flex h-9 items-center justify-between border-b border-editor-divider px-2 text-[13px] font-semibold">
+                <span>{copy.professionalEditorDevelop}</span>
+                <span className="text-text-secondary">‹</span>
+              </div>
+              <div className="border-b border-editor-divider p-2">
+                <div className="aspect-[3/2] w-full bg-[linear-gradient(145deg,#24343b,#78907a_55%,#d7b47e)]" />
+                <div className="mt-1 flex justify-between text-[10px] text-text-secondary">
+                  <span>{copy.professionalEditorFit}</span>
+                  <span>{copy.professionalEditorOneToOne}</span>
+                </div>
+              </div>
+              {['Presets', 'Snapshots', 'History'].map((label) => (
+                <div className="flex h-7 items-center border-b border-editor-divider px-2 text-[11px]" key={label}>
+                  {label}
+                </div>
+              ))}
+            </>
+          )}
+        </aside>
+
+        <section
+          className="grid min-h-0 min-w-0"
+          data-visual-smoke-section="professional-editor-center"
+          style={{ gridTemplateRows: collapsed ? '36px minmax(0,1fr) 40px' : '36px minmax(0,1fr) 152px' }}
+        >
           <div
-            className="flex min-h-11 shrink-0 items-center justify-between rounded-lg border border-editor-border bg-editor-panel px-3"
+            className="flex h-9 shrink-0 items-center justify-between border-b border-editor-divider bg-editor-panel px-2"
             data-visual-smoke-section="professional-editor-toolbar"
             data-testid="professional-editor-shell-toolbar"
           >
@@ -1917,27 +1998,52 @@ function ProfessionalEditorShellVisualSmoke() {
             </div>
             <span className={editorChromeStatusChipClassName('warning')}>{copy.professionalEditorSoftProof}</span>
           </div>
-          <ProfessionalEditorCanvasWell />
+          <div className="min-h-0" data-visual-smoke-section="professional-editor-canvas">
+            <ProfessionalEditorCanvasWell />
+          </div>
           <div
+            className="min-h-0 overflow-hidden border-t border-editor-divider"
             data-visual-smoke-section="professional-editor-bottom-bar"
             data-testid="professional-editor-shell-bottom-bar"
           >
-            <ProfessionalEditorBottomBar />
+            {collapsed ? (
+              <div className="flex h-10 items-center justify-between bg-editor-panel px-2 text-[11px] text-text-secondary">
+                <span>{copy.professionalEditorSelectionCount}</span>
+                <span>{copy.professionalEditorCollapsedZoom}</span>
+              </div>
+            ) : (
+              <ProfessionalEditorBottomBar />
+            )}
           </div>
         </section>
 
-        <div className="w-2 shrink-0 rounded bg-editor-matte" data-testid="professional-editor-shell-resizer" />
-
         <aside
-          className="grid h-full min-w-0 overflow-hidden rounded-lg border border-editor-border bg-editor-panel"
+          className="grid h-full min-w-0 overflow-hidden border-l border-editor-divider bg-editor-panel"
+          data-visual-smoke-section="professional-editor-right-inspector"
           data-testid="professional-editor-shell-right-panel"
-          style={{ gridTemplateColumns: '42px minmax(0, 360px)' }}
+          style={collapsed ? { gridTemplateColumns: '42px 0' } : { gridTemplateRows: '44px minmax(0, 1fr)' }}
         >
-          <ProfessionalEditorPanelHost activePanel={activePanel} onPanelSelect={handlePanelSelect} />
+          <ProfessionalEditorPanelHost
+            activePanel={activePanel}
+            layout={collapsed ? 'vertical' : 'horizontal'}
+            onPanelSelect={handlePanelSelect}
+          />
         </aside>
       </div>
     </main>
   );
+}
+
+function ProfessionalEditorShellVisualSmoke() {
+  return <ProfessionalEditorShellFixture state="default" />;
+}
+
+function ProfessionalEditorShellCollapsedVisualSmoke() {
+  return <ProfessionalEditorShellFixture state="collapsed" />;
+}
+
+function ProfessionalEditorShellFullscreenVisualSmoke() {
+  return <ProfessionalEditorShellFixture state="fullscreen" />;
 }
 
 const exportProofFooterReceipt = {
@@ -2218,6 +2324,8 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorStatusChips]: ProfessionalEditorStatusChipsVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext]: ProfessionalFilmstripContextVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell]: ProfessionalEditorShellVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShellCollapsed]: ProfessionalEditorShellCollapsedVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShellFullscreen]: ProfessionalEditorShellFullscreenVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorToolbar]: ProfessionalEditorToolbarVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorTokens]: ProfessionalEditorTokensVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ProfessionalExportProofFooter]: ProfessionalExportProofFooterVisualSmoke,
@@ -3929,6 +4037,14 @@ const copy = {
   editorParityWorkflow: 'Workflow',
   professionalEditorTokens: 'Professional editor tokens',
   professionalEditorShell: 'Professional editor shell',
+  professionalEditorShellCollapsed: 'Professional editor shell · collapsed',
+  professionalEditorShellFullscreen: 'Professional editor shell · fullscreen',
+  professionalEditorDevelop: 'Develop',
+  professionalEditorFit: 'Fit',
+  professionalEditorOneToOne: '1:1',
+  professionalEditorSelectionCount: '1 of 12',
+  professionalEditorCollapsedZoom: 'Fit · 100%',
+  professionalEditorFullscreenFit: 'Fullscreen · Fit',
   professionalEditorToolbar: 'Professional editor toolbar',
   professionalEditorToolbarDisabled: 'disabled',
   professionalExportProofFooter: 'Export proof footer',

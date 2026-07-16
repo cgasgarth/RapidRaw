@@ -10,6 +10,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import { DEVELOP_SHELL_RESIZER_SIZE, DEVELOP_SHELL_RIGHT_RAIL_WIDTH } from '../../utils/developShellGeometry';
 import type { EditorZoomCommand } from '../../utils/editorZoom';
 import { EditorRightPanelRoot } from '../app/EditorRightPanelRoot';
 import BottomBar from '../panel/BottomBar';
@@ -51,8 +52,6 @@ interface EditorViewProps {
   requestThumbnails: (paths: string[]) => void;
   refreshImageList: () => Promise<void>;
 }
-
-const DESKTOP_RIGHT_RAIL_WIDTH = 42;
 
 export default function EditorView({
   transformWrapperRef,
@@ -125,8 +124,8 @@ export default function EditorView({
   const previousFullScreenRef = useRef(isFullScreen);
   const fullScreenRestoreFocusRef = useRef<HTMLElement | null>(null);
   const desktopRightShellWidth = activeRightPanel
-    ? rightPanelWidth + DESKTOP_RIGHT_RAIL_WIDTH + 8
-    : DESKTOP_RIGHT_RAIL_WIDTH;
+    ? rightPanelWidth + DEVELOP_SHELL_RESIZER_SIZE
+    : DEVELOP_SHELL_RIGHT_RAIL_WIDTH;
 
   useEffect(() => {
     const wasFullScreen = previousFullScreenRef.current;
@@ -295,7 +294,7 @@ export default function EditorView({
     >
       {!isCompactPortrait && (
         <Resizer
-          className="editor-shell-resizer editor-shell-resizer-horizontal"
+          className="editor-shell-resizer editor-shell-resizer-horizontal !h-1"
           direction={Orientation.Horizontal}
           onMouseDown={createResizeHandler('bottom', bottomPanelHeight)}
         />
@@ -501,21 +500,39 @@ export default function EditorView({
           <>
             {activeRightPanel && (
               <Resizer
-                className="editor-shell-resizer editor-shell-resizer-vertical"
+                className="editor-shell-resizer editor-shell-resizer-vertical !w-1"
                 direction={Orientation.Vertical}
                 onMouseDown={createResizeHandler('right', rightPanelWidth)}
               />
             )}
-            <div
-              className="grid h-full min-w-0 overflow-hidden bg-editor-panel"
-              style={{
-                gridTemplateColumns: `${DESKTOP_RIGHT_RAIL_WIDTH}px minmax(0, ${activeRightPanel ? rightPanelWidth : 0}px)`,
-              }}
-            >
+            {activeRightPanel ? (
               <div
-                className={cx('h-full border-r border-editor-divider', !activeRightPanel && 'border-r-0')}
-                data-editor-region="tool-rail"
+                className="grid h-full min-w-0 overflow-hidden bg-editor-panel"
+                style={{ gridTemplateRows: '44px minmax(0, 1fr)', width: `${rightPanelWidth}px` }}
+              >
+                <div className="border-b border-editor-divider" data-editor-region="tool-tabs" ref={rightRailRef}>
+                  <RightPanelSwitcher
+                    activePanel={activeRightPanel}
+                    hiddenPanels={[Panel.Presets]}
+                    onPanelSelect={handleRightPanelSelect}
+                    isInstantTransition={isInstantTransition}
+                    layout="horizontal"
+                  />
+                </div>
+                <div
+                  className="min-h-0 min-w-0 overflow-hidden"
+                  data-editor-region="inspector"
+                  ref={inspectorRegionRef}
+                >
+                  {editorRightPanelContent}
+                </div>
+              </div>
+            ) : (
+              <div
+                className="h-full border-l border-editor-divider bg-editor-matte"
+                data-editor-region="collapsed-tool-rail"
                 ref={rightRailRef}
+                style={{ width: `${DEVELOP_SHELL_RIGHT_RAIL_WIDTH}px` }}
               >
                 <RightPanelSwitcher
                   activePanel={activeRightPanel}
@@ -524,12 +541,7 @@ export default function EditorView({
                   isInstantTransition={isInstantTransition}
                 />
               </div>
-              <div className="h-full min-w-0 overflow-hidden" data-editor-region="inspector" ref={inspectorRegionRef}>
-                <div style={{ width: `${rightPanelWidth}px` }} className="h-full min-w-0">
-                  {editorRightPanelContent}
-                </div>
-              </div>
-            </div>
+            )}
           </>
         )}
       </div>

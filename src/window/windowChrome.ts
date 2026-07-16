@@ -17,7 +17,7 @@ export function resolveWindowChromeLayout({
 }: WindowChromeInput): WindowChromeLayout {
   if (!osPlatform) {
     return {
-      compactTopUiHeight: 60,
+      compactTopUiHeight: 36,
       kind: 'native',
       reserveCollapsedLeadingWidth: 32,
     };
@@ -25,7 +25,7 @@ export function resolveWindowChromeLayout({
 
   if (osPlatform === 'macos' && !isWindowFullScreen) {
     return {
-      compactTopUiHeight: 60,
+      compactTopUiHeight: 36,
       kind: 'macos-overlay',
       reserveCollapsedLeadingWidth: 80,
     };
@@ -33,14 +33,14 @@ export function resolveWindowChromeLayout({
 
   if (!decorationsEnabled && !isWindowFullScreen) {
     return {
-      compactTopUiHeight: 110,
+      compactTopUiHeight: 84,
       kind: 'custom-titlebar',
       reserveCollapsedLeadingWidth: 32,
     };
   }
 
   return {
-    compactTopUiHeight: 60,
+    compactTopUiHeight: 36,
     kind: 'native',
     reserveCollapsedLeadingWidth: 32,
   };

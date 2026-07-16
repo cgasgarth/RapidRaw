@@ -209,7 +209,7 @@ const EditorToolbar = memo(
     return (
       <div
         aria-label={t('editor.accessibility.workspace')}
-        className="relative z-40 grid h-10 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-editor-divider bg-editor-panel px-2"
+        className="relative z-40 grid h-9 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-editor-divider bg-editor-panel px-2"
         data-tauri-drag-region
         data-testid="editor-command-bar"
         data-toolbar-compare-mode={compareMode}

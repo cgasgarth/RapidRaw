@@ -190,7 +190,7 @@ export async function runVisualSmokeCapture({
         await captureScenario({
           scenario,
           targetOutputPath: scenario.compactOutputPath,
-          targetViewport: compactPortraitViewport,
+          targetViewport: scenario.compactViewport ?? compactPortraitViewport,
         });
       }
       if (scenario.reducedMotionOutputPath !== undefined) {

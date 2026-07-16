@@ -120,7 +120,7 @@ export const buildEditorBottomCommandModel = ({
 };
 
 const iconButtonClassName =
-  'relative flex h-8 w-8 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary active:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+  'relative flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-panel-raised hover:text-text-primary active:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 
 function StarRating({
   disabled,
@@ -138,7 +138,7 @@ function StarRating({
   return (
     <div
       aria-label={t('contextMenus.editor.rating')}
-      className={cx('flex h-8 shrink-0 items-center', disabled && 'cursor-not-allowed opacity-60')}
+      className={cx('flex h-7 shrink-0 items-center', disabled && 'cursor-not-allowed opacity-60')}
       data-mixed={mixed ? 'true' : 'false'}
       role="group"
     >
@@ -454,7 +454,7 @@ function EditorBottomCommandBar(props: BottomBarProps) {
       ) : null}
       <div
         aria-label={t('ui.bottomBar.tooltips.quickFilter')}
-        className="flex h-11 min-w-0 items-center gap-1 border-t border-editor-border px-2"
+        className="flex h-9 min-w-0 items-center gap-1 border-t border-editor-border px-2"
         data-active-filters={model.hasActiveFilters ? 'true' : 'false'}
         data-testid={props.showFilmstrip ? 'editor-bottom-bar-controls' : 'editor-bottom-bar-compact-controls'}
         role="toolbar"
