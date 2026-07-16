@@ -8,11 +8,12 @@ import { z } from 'zod';
 
 import { rawOpenEditExportRunReportSchema } from '../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.ts';
+import { resolveNativeQaAppDeploymentPaths } from '../qa/native-app-deployment.ts';
 
 const DEFAULT_ALASKA_RAW_DIR = '/Users/cgas/Pictures/Capture One/Alaska';
 const OUTPUT_ROOT = 'private-artifacts/validation/native-raw-edit-smoke';
 const FIXTURE_ROOT = 'private-fixtures/native-raw-edit-smoke';
-const QA_APP_PATH = 'src-tauri/target/debug/bundle/macos/RawEngine QA Current.app';
+const QA_APP_PATH = resolveNativeQaAppDeploymentPaths(process.cwd()).qaAppPath;
 const RAW_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.rw2']);
 const MAX_DISCOVERY_DEPTH = 2;
 const MAX_HTML_JSON_CHARS = 16_000;
