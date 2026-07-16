@@ -360,9 +360,6 @@ pub fn dehaze_receipt(
 }
 
 pub fn scene_dehaze_is_active(adjustments: &AllAdjustments) -> bool {
-    if adjustments.global.edit_graph_version < 2.0 {
-        return false;
-    }
     let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
     adjustments.global.dehaze != 0.0
         || adjustments.mask_adjustments[..mask_count]
@@ -813,12 +810,9 @@ mod tests {
     }
 
     #[test]
-    fn source_analysis_is_opt_in_for_scene_graph_v2_and_legacy_never_builds_it() {
+    fn source_analysis_is_enabled_for_the_current_scene_graph() {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.dehaze = 0.1;
-        adjustments.global.edit_graph_version = 1.0;
-        assert!(!scene_dehaze_is_active(&adjustments));
-        adjustments.global.edit_graph_version = 2.0;
         assert!(scene_dehaze_is_active(&adjustments));
     }
 

@@ -54,13 +54,7 @@ pub(crate) fn calculate_perceptual_grading_render_hash(base_hash: u64, adjustmen
 }
 
 fn typed_settings(adjustments: &Value) -> Option<&Value> {
-    let graph_version = adjustments
-        .get("rawEngineEditGraphVersion")
-        .and_then(Value::as_u64)
-        .unwrap_or(1);
-    (graph_version >= 2)
-        .then(|| adjustments.get("perceptualGradingV1"))
-        .flatten()
+    adjustments.get("perceptualGradingV1")
 }
 
 #[cfg(test)]
@@ -107,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_v2_grading_changes_real_output_and_hash() {
+    fn current_typed_grading_changes_real_output_and_hash() {
         let source = image();
         let adjustments = adjustments();
         let output = apply_perceptual_grading_stage(&source, &adjustments);
@@ -126,14 +120,8 @@ mod tests {
     }
 
     #[test]
-    fn legacy_and_malformed_state_fail_safe_without_reinterpretation() {
+    fn malformed_state_fails_safe_without_reinterpretation() {
         let source = image();
-        let mut legacy = adjustments();
-        legacy["rawEngineEditGraphVersion"] = json!(1);
-        assert!(matches!(
-            apply_perceptual_grading_stage(&source, &legacy),
-            Cow::Borrowed(_)
-        ));
         let mut malformed = adjustments();
         malformed["perceptualGradingV1"]["falloff"] = json!(0);
         assert!(matches!(

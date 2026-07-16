@@ -3326,7 +3326,7 @@ mod tests {
             Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
         }));
         let adjustments = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 1,
+            "rawEngineEditGraphVersion": 2,
             "exposure": 18,
             "contrast": 12,
             "showClipping": false
@@ -3382,12 +3382,15 @@ mod tests {
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
         );
-        assert_eq!(preview_plan.edit_graph.pipeline_version, 1);
+        assert_eq!(
+            preview_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
     }
 
     #[test]
     #[cfg(feature = "tauri-test")]
-    fn private_real_raw_v2_preview_export_and_legacy_delta_proof_when_enabled() {
+    fn private_real_raw_current_preview_export_and_removed_graph_rejection_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
             return;
         }
@@ -3449,42 +3452,51 @@ mod tests {
             )
             .expect("graph-authoritative real RAW render succeeds")
         };
-        let v2_recipe = recipe(2);
-        let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
-        let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
-        let v2_receipt = state
+        let current_recipe = recipe(crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION);
+        let preview = render(&current_recipe, "current_edit_graph_private_raw_preview");
+        let export = render(&current_recipe, "current_edit_graph_private_raw_export");
+        let current_receipt = state
             .gpu()
             .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
-            .expect("real RAW v2 render publishes a GPU execution receipt");
-        let legacy = render(&recipe(1), "edit_graph_v1_private_raw_migration_baseline");
+            .expect("real RAW current render publishes a GPU execution receipt");
+        let removed_graph_error =
+            super::process_image_for_export_pipeline_with_tonemapper_override(
+                &source_path,
+                &base,
+                &recipe(1),
+                &context,
+                &state,
+                true,
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
+                "removed_edit_graph_private_raw_rejection",
+                Some(0),
+                &[],
+            )
+            .expect_err("removed graph v1 must be rejected before renderer dispatch");
+        assert!(
+            removed_graph_error.contains("unsupported edit graph version 1"),
+            "unexpected removed graph rejection: {removed_graph_error}"
+        );
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
-        let legacy_pixels = legacy.to_rgba16().into_raw();
         assert_eq!(preview.dimensions(), base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
-        assert_ne!(preview_pixels, legacy_pixels);
-        let changed = preview_pixels
-            .iter()
-            .zip(&legacy_pixels)
-            .filter(|(v2, v1)| v2 != v1)
-            .count();
-        assert!(changed > preview_pixels.len() / 100);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "current_edit_graph_private_raw_proof dimensions={}x{} preview_export_sha256={} removed_graph_rejection={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
-            changed,
             hex::encode(digest),
-            v2_receipt.phase_dispatch_count,
-            v2_receipt.command_buffer_count,
-            v2_receipt.queue_submit_count,
-            v2_receipt.cache_hits,
-            v2_receipt.cache_misses,
-            v2_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
-            v2_receipt.wall_time.as_secs_f64() * 1000.0,
+            removed_graph_error,
+            current_receipt.phase_dispatch_count,
+            current_receipt.command_buffer_count,
+            current_receipt.queue_submit_count,
+            current_receipt.cache_hits,
+            current_receipt.cache_misses,
+            current_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
+            current_receipt.wall_time.as_secs_f64() * 1000.0,
         );
     }
 

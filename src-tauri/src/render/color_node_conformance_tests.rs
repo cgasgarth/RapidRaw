@@ -12,7 +12,8 @@ use crate::AppState;
 use crate::adjustments::abi::{AllAdjustments, GlobalAdjustments, MAX_MASKS, MaskAdjustments};
 use crate::gpu_processing::{
     EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, Roi, acquire_gpu_test_lock,
-    get_or_init_compute_gpu_context_for_tests, process_and_get_unclamped_dynamic_image,
+    current_test_graph, get_or_init_compute_gpu_context_for_tests,
+    process_and_get_unclamped_dynamic_image,
 };
 use crate::lut_processing::Lut;
 use crate::mixer_render::apply_native_color_mixer_adjustments;
@@ -350,7 +351,11 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
             mask_bitmaps: &[],
             lut: None,
             roi: None,
-            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+            edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                AllAdjustments::default(),
+                false,
+                false,
+            )),
         },
         "color_node_registry_identity",
     )
@@ -365,7 +370,11 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
             mask_bitmaps: &[],
             lut: None,
             roi: None,
-            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+            edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                AllAdjustments::default(),
+                false,
+                false,
+            )),
         },
         "color_node_registry_identity_repeat",
     )
@@ -388,25 +397,28 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
                     apply_pre_gpu_detail_stages(&source, 1, &detail_json(contract.id), false)
                         .image
                         .into_owned();
-                let render = |consumer: &str| {
-                    process_and_get_unclamped_dynamic_image(
-                        &context,
-                        &state,
-                        &staged,
-                        PreGpuImageIdentity::for_source(&staged, contract.id),
-                        RenderRequest {
-                            adjustments: AllAdjustments::default(),
-                            mask_bitmaps: &[],
-                            lut: None,
-                            roi: None,
-                            edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
-                        },
-                        consumer,
-                    )
-                    .unwrap_or_else(|error| {
-                        panic!("{} CPU-to-WGPU handoff failed: {error}", contract.id)
-                    })
-                };
+                let render =
+                    |consumer: &str| {
+                        process_and_get_unclamped_dynamic_image(
+                            &context,
+                            &state,
+                            &staged,
+                            PreGpuImageIdentity::for_source(&staged, contract.id),
+                            RenderRequest {
+                                adjustments: AllAdjustments::default(),
+                                mask_bitmaps: &[],
+                                lut: None,
+                                roi: None,
+                                edit_graph: EditGraphExecutionAuthority::Compiled(
+                                    current_test_graph(AllAdjustments::default(), false, false),
+                                ),
+                            },
+                            consumer,
+                        )
+                        .unwrap_or_else(|error| {
+                            panic!("{} CPU-to-WGPU handoff failed: {error}", contract.id)
+                        })
+                    };
                 let preview = render("color_node_cpu_preview");
                 if contract.id == "scene_wavelet_detail" {
                     let export = render("color_node_cpu_export");
@@ -430,6 +442,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
                     &[]
                 };
                 let lut = (contract.id == "lut_3d").then(lut_fixture);
+                let graph = current_test_graph(adjustments, !masks.is_empty(), lut.is_some());
                 process_and_get_unclamped_dynamic_image(
                     &context,
                     &state,
@@ -440,7 +453,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
                         mask_bitmaps: masks,
                         lut,
                         roi: None,
-                        edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                        edit_graph: EditGraphExecutionAuthority::Compiled(graph),
                     },
                     contract.id,
                 )
@@ -594,7 +607,11 @@ fn production_wgpu_nodes_satisfy_metamorphic_color_properties() {
                 mask_bitmaps: masks,
                 lut: None,
                 roi,
-                edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                    adjustments,
+                    !masks.is_empty(),
+                    false,
+                )),
             },
             label,
         )
@@ -771,7 +788,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         tint,
         vibrance,
         hue,
-        edit_graph_version,
+        _pad_current_contract,
         dehaze_atmosphere_r,
         dehaze_atmosphere_g,
         dehaze_atmosphere_b,
@@ -869,7 +886,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         tint,
         vibrance,
         hue,
-        edit_graph_version,
+        _pad_current_contract,
         dehaze_atmosphere_r,
         dehaze_atmosphere_g,
         dehaze_atmosphere_b,

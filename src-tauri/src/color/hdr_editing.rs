@@ -771,7 +771,9 @@ mod tests {
                 mask_bitmaps: &[],
                 lut: None,
                 roi: None,
-                edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                edit_graph: EditGraphExecutionAuthority::Compiled(
+                    crate::gpu_processing::current_test_graph(adjustments, false, false),
+                ),
             },
             "hdr_sdr_rendition",
         )

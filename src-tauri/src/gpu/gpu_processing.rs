@@ -712,19 +712,14 @@ fn resolve_blur_pass_needs(adjustments: &AllAdjustments) -> BlurPassNeeds {
 
 fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
     let global = &adjustments.global;
-    let graph_v2 = global.edit_graph_version >= 2.0;
     let global_guided_active = global.contrast != 0.0
         || global.highlights != 0.0
         || global.shadows != 0.0
         || global.whites != 0.0
         || global.blacks != 0.0;
-    let global_v2_only_active =
-        graph_v2 && (global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5);
-    let mut radius = (global_guided_active || global_v2_only_active).then_some(if graph_v2 {
-        global.tone_equalizer.params1[1].clamp(4.0, 64.0)
-    } else {
-        3.5
-    });
+    let global_current_active = global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5;
+    let mut radius = (global_guided_active || global_current_active)
+        .then_some(global.tone_equalizer.params1[1].clamp(4.0, 64.0));
 
     let mask_count = (adjustments.mask_count as usize).min(MAX_MASKS);
     for mask in &adjustments.mask_adjustments[..mask_count] {
@@ -733,14 +728,9 @@ fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
             || mask.shadows != 0.0
             || mask.whites != 0.0
             || mask.blacks != 0.0;
-        let local_v2_only_active =
-            graph_v2 && (mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5);
-        if local_guided_active || local_v2_only_active {
-            let local_radius = if graph_v2 {
-                mask.tone_equalizer.params1[1].clamp(4.0, 64.0)
-            } else {
-                3.5
-            };
+        let local_current_active = mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5;
+        if local_guided_active || local_current_active {
+            let local_radius = mask.tone_equalizer.params1[1].clamp(4.0, 64.0);
             radius = Some(radius.map_or(local_radius, |current| current.max(local_radius)));
         }
     }
@@ -823,16 +813,7 @@ fn compile_gpu_render_graph_with_runtime(
         .unwrap_or(0);
     let tile_edge = 2048_u64 + u64::from(tile_halo) * 2;
     let live_blur_surfaces = blur_products.len() as u64 + u64::from(!blur_products.is_empty());
-    let execution_phase_count = runtime.map_or_else(
-        || {
-            if adjustments.global.edit_graph_version >= 2.0 {
-                3
-            } else {
-                1
-            }
-        },
-        |runtime| runtime.dispatch_groups().len() as u32,
-    );
+    let execution_phase_count = runtime.map_or(3, |runtime| runtime.dispatch_groups().len() as u32);
     let registered_wgpu_module_count = runtime.map_or(0, |runtime| runtime.modules().len() as u32);
     let registered_wgpu_phase_count =
         runtime.map_or(0, |runtime| runtime.dispatch_groups().len() as u32);
@@ -1126,8 +1107,35 @@ fn post_film_tap_identity(
 
 pub enum EditGraphExecutionAuthority {
     Compiled(Arc<crate::edit_graph::CompiledEditGraph>),
-    #[cfg(all(test, feature = "tauri-test"))]
-    TestOnlyLegacy,
+}
+
+#[cfg(all(test, feature = "tauri-test"))]
+pub(crate) fn current_test_graph(
+    adjustments: AllAdjustments,
+    has_masks: bool,
+    has_lut: bool,
+) -> Arc<crate::edit_graph::CompiledEditGraph> {
+    let neutral = AllAdjustments::default();
+    Arc::new(crate::edit_graph::CompiledEditGraph::compile(
+        crate::edit_graph::EditGraphCompileInputs {
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &adjustments,
+            neutral_adjustments: &neutral,
+            scene_curve: None,
+            film_emulation: None,
+            output_curve: None,
+            has_geometry_or_retouch: false,
+            has_detail: false,
+            has_masks,
+            has_lut,
+            show_clipping: adjustments.global.show_clipping != 0,
+        },
+    ))
 }
 
 fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String> {
@@ -1160,8 +1168,6 @@ fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String
                 return Err("edit_graph.invalid_wgpu_runtime_receipt".to_string());
             }
         }
-        #[cfg(all(test, feature = "tauri-test"))]
-        EditGraphExecutionAuthority::TestOnlyLegacy => {}
     }
     Ok(())
 }
@@ -1201,7 +1207,7 @@ struct FlareParams {
     contrast: f32,
     whites: f32,
     aspect_ratio: f32,
-    edit_graph_version: f32,
+    _pad: f32,
 }
 
 struct FlareResources {
@@ -2085,69 +2091,42 @@ impl GpuProcessor {
             .as_ref()
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
-        let mut adjustments = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => {
-                let mut authoritative = edit_graph.shader_abi();
-                // Source analysis is render-ephemeral: the graph owns all user edits while
-                // these four fields carry the source-bound compiled Dehaze artifact.
-                authoritative.global.dehaze_atmosphere_r =
-                    request.adjustments.global.dehaze_atmosphere_r;
-                authoritative.global.dehaze_atmosphere_g =
-                    request.adjustments.global.dehaze_atmosphere_g;
-                authoritative.global.dehaze_atmosphere_b =
-                    request.adjustments.global.dehaze_atmosphere_b;
-                authoritative.global.dehaze_atmosphere_confidence =
-                    request.adjustments.global.dehaze_atmosphere_confidence;
-                authoritative
-            }
-            #[cfg(all(test, feature = "tauri-test"))]
-            EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
-        };
-        let wgpu_runtime = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => Some(
-                crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
-                    .map_err(str::to_owned)?,
-            ),
-            #[cfg(all(test, feature = "tauri-test"))]
-            EditGraphExecutionAuthority::TestOnlyLegacy => None,
-        };
+        let EditGraphExecutionAuthority::Compiled(edit_graph) = &request.edit_graph;
+        let mut adjustments = edit_graph.shader_abi();
+        // Source analysis is render-ephemeral: the graph owns all user edits while
+        // these four fields carry the source-bound compiled Dehaze artifact.
+        adjustments.global.dehaze_atmosphere_r = request.adjustments.global.dehaze_atmosphere_r;
+        adjustments.global.dehaze_atmosphere_g = request.adjustments.global.dehaze_atmosphere_g;
+        adjustments.global.dehaze_atmosphere_b = request.adjustments.global.dehaze_atmosphere_b;
+        adjustments.global.dehaze_atmosphere_confidence =
+            request.adjustments.global.dehaze_atmosphere_confidence;
+        let wgpu_runtime = crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
+            .map_err(str::to_owned)?;
         let graph = compile_gpu_render_graph_with_runtime(
             &adjustments,
             request.lut.is_some(),
             request.mask_bitmaps.len(),
             width,
             height,
-            wgpu_runtime.as_ref(),
+            Some(&wgpu_runtime),
         );
-        let split_scene_view_display = wgpu_runtime.as_ref().map_or(
-            adjustments.global.edit_graph_version >= 2.0,
-            |runtime| {
-                matches!(
-                    runtime.dispatch_groups(),
-                    [scene, view, display]
-                        if scene.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::Scene
-                            && view.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::View
-                            && display.phase
-                                == crate::render::wgpu_nodes::WgpuDispatchPhase::DisplayTransport
-                )
-            },
+        let split_scene_view_display = matches!(
+            wgpu_runtime.dispatch_groups(),
+            [scene, view, display]
+                if scene.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::Scene
+                    && view.phase == crate::render::wgpu_nodes::WgpuDispatchPhase::View
+                    && display.phase
+                        == crate::render::wgpu_nodes::WgpuDispatchPhase::DisplayTransport
         );
-        if capture_post_film.is_some() && !split_scene_view_display {
-            return Err("film_runtime_proof_requires_split_scene_view_display".to_string());
+        if !split_scene_view_display {
+            return Err("edit_graph.current_wgpu_dispatch_contract_invalid".to_string());
         }
-        let shader_execution_phases = if split_scene_view_display {
-            let groups = wgpu_runtime
-                .as_ref()
-                .expect("split WGPU execution requires a typed runtime")
-                .dispatch_groups();
-            [
-                groups[0].phase.shader_execution_phase(),
-                groups[1].phase.shader_execution_phase(),
-                groups[2].phase.shader_execution_phase(),
-            ]
-        } else {
-            [0, 0, 0]
-        };
+        let groups = wgpu_runtime.dispatch_groups();
+        let shader_execution_phases = [
+            groups[0].phase.shader_execution_phase(),
+            groups[1].phase.shader_execution_phase(),
+            groups[2].phase.shader_execution_phase(),
+        ];
         let blur_pass_needs = resolve_blur_pass_needs(&adjustments);
         #[cfg(test)]
         let blur_pass_needs = if FORCE_ALL_BLUR_PASSES.load(Ordering::Relaxed) {
@@ -2179,7 +2158,7 @@ impl GpuProcessor {
                 contrast: adjustments.global.contrast,
                 whites: adjustments.global.whites,
                 aspect_ratio,
-                edit_graph_version: adjustments.global.edit_graph_version,
+                _pad: 0.0,
             };
             queue.write_buffer(&flare.params_buffer, 0, bytemuck::bytes_of(&f_params));
 
@@ -2506,11 +2485,7 @@ impl GpuProcessor {
                     },
                     wgpu::BindGroupEntry {
                         binding: MAIN_BINDING_OUTPUT_TEXTURE,
-                        resource: wgpu::BindingResource::TextureView(if split_scene_view_display {
-                            &self.working_texture_view
-                        } else {
-                            &self.tile_output_texture_view
-                        }),
+                        resource: wgpu::BindingResource::TextureView(&self.working_texture_view),
                     },
                     wgpu::BindGroupEntry {
                         binding: MAIN_BINDING_ADJUSTMENTS,
@@ -2597,7 +2572,7 @@ impl GpuProcessor {
                         | (u32::from(did_create_structure_blur) * BLUR_FLAG_STRUCTURE)
                         | (u32::from(did_create_dehaze_blur) * BLUR_FLAG_DEHAZE),
                     flare_enabled: use_flare,
-                    abi_version: MAIN_BIND_GROUP_ABI_VERSION + u32::from(split_scene_view_display),
+                    abi_version: MAIN_BIND_GROUP_ABI_VERSION + 1,
                 };
                 let bind_group = {
                     let mut resources = self.resources.lock().unwrap();
@@ -2625,111 +2600,101 @@ impl GpuProcessor {
                     }
                 };
 
-                let view_bind_group = if split_scene_view_display {
-                    let mut view_adjustments = tile_adjustments;
-                    view_adjustments.execution_phase = shader_execution_phases[1];
-                    queue.write_buffer(
-                        &self.view_adjustments_buffer,
-                        0,
-                        bytemuck::bytes_of(&view_adjustments),
-                    );
-                    let mut view_entries = vec![
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_INPUT_TEXTURE,
-                            resource: wgpu::BindingResource::TextureView(
-                                &self.working_texture_view,
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_OUTPUT_TEXTURE,
-                            resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_ADJUSTMENTS,
-                            resource: self.view_adjustments_buffer.as_entire_binding(),
-                        },
-                    ];
-                    view_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                let mut view_adjustments = tile_adjustments;
+                view_adjustments.execution_phase = shader_execution_phases[1];
+                queue.write_buffer(
+                    &self.view_adjustments_buffer,
+                    0,
+                    bytemuck::bytes_of(&view_adjustments),
+                );
+                let mut view_entries = vec![
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_INPUT_TEXTURE,
+                        resource: wgpu::BindingResource::TextureView(&self.working_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_OUTPUT_TEXTURE,
+                        resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_ADJUSTMENTS,
+                        resource: self.view_adjustments_buffer.as_entire_binding(),
+                    },
+                ];
+                view_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                let view_bind_group = {
                     let mut resources = self.resources.lock().unwrap();
-                    Some(
-                        if let Some(hit) = resources
-                            .view_bind_group_cache
-                            .as_ref()
-                            .filter(|entry| entry.key == bind_group_key)
-                            .map(|entry| entry.bind_group.clone())
-                        {
-                            resources.resource_cache.counters.bind_group_hits += 1;
-                            hit
-                        } else {
-                            let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                label: Some("Cached View-pass Bind Group"),
-                                layout: &self.main_bgl,
-                                entries: &view_entries,
-                            });
-                            resources.view_bind_group_cache = Some(CachedMainBindGroup {
-                                key: bind_group_key,
-                                bind_group: created.clone(),
-                            });
-                            resources.resource_cache.counters.bind_group_misses += 1;
-                            resources.resource_cache.counters.bind_group_creations += 1;
-                            created
-                        },
-                    )
-                } else {
-                    None
+                    if let Some(hit) = resources
+                        .view_bind_group_cache
+                        .as_ref()
+                        .filter(|entry| entry.key == bind_group_key)
+                        .map(|entry| entry.bind_group.clone())
+                    {
+                        resources.resource_cache.counters.bind_group_hits += 1;
+                        hit
+                    } else {
+                        let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Cached View-pass Bind Group"),
+                            layout: &self.main_bgl,
+                            entries: &view_entries,
+                        });
+                        resources.view_bind_group_cache = Some(CachedMainBindGroup {
+                            key: bind_group_key,
+                            bind_group: created.clone(),
+                        });
+                        resources.resource_cache.counters.bind_group_misses += 1;
+                        resources.resource_cache.counters.bind_group_creations += 1;
+                        created
+                    }
                 };
-                let display_bind_group = if split_scene_view_display {
-                    let mut display_adjustments = tile_adjustments;
-                    display_adjustments.execution_phase = shader_execution_phases[2];
-                    queue.write_buffer(
-                        &self.display_adjustments_buffer,
-                        0,
-                        bytemuck::bytes_of(&display_adjustments),
-                    );
-                    let mut display_entries = vec![
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_INPUT_TEXTURE,
-                            resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_OUTPUT_TEXTURE,
-                            resource: wgpu::BindingResource::TextureView(
-                                &self.tile_output_texture_view,
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: MAIN_BINDING_ADJUSTMENTS,
-                            resource: self.display_adjustments_buffer.as_entire_binding(),
-                        },
-                    ];
-                    display_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                let mut display_adjustments = tile_adjustments;
+                display_adjustments.execution_phase = shader_execution_phases[2];
+                queue.write_buffer(
+                    &self.display_adjustments_buffer,
+                    0,
+                    bytemuck::bytes_of(&display_adjustments),
+                );
+                let mut display_entries = vec![
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_INPUT_TEXTURE,
+                        resource: wgpu::BindingResource::TextureView(&self.output_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_OUTPUT_TEXTURE,
+                        resource: wgpu::BindingResource::TextureView(
+                            &self.tile_output_texture_view,
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: MAIN_BINDING_ADJUSTMENTS,
+                        resource: self.display_adjustments_buffer.as_entire_binding(),
+                    },
+                ];
+                display_entries.extend(bind_group_entries.iter().skip(3).cloned());
+                let display_bind_group = {
                     let mut resources = self.resources.lock().unwrap();
-                    Some(
-                        if let Some(hit) = resources
-                            .display_bind_group_cache
-                            .as_ref()
-                            .filter(|entry| entry.key == bind_group_key)
-                            .map(|entry| entry.bind_group.clone())
-                        {
-                            resources.resource_cache.counters.bind_group_hits += 1;
-                            hit
-                        } else {
-                            let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                label: Some("Cached Display-pass Bind Group"),
-                                layout: &self.main_bgl,
-                                entries: &display_entries,
-                            });
-                            resources.display_bind_group_cache = Some(CachedMainBindGroup {
-                                key: bind_group_key,
-                                bind_group: created.clone(),
-                            });
-                            resources.resource_cache.counters.bind_group_misses += 1;
-                            resources.resource_cache.counters.bind_group_creations += 1;
-                            created
-                        },
-                    )
-                } else {
-                    None
+                    if let Some(hit) = resources
+                        .display_bind_group_cache
+                        .as_ref()
+                        .filter(|entry| entry.key == bind_group_key)
+                        .map(|entry| entry.bind_group.clone())
+                    {
+                        resources.resource_cache.counters.bind_group_hits += 1;
+                        hit
+                    } else {
+                        let created = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Cached Display-pass Bind Group"),
+                            layout: &self.main_bgl,
+                            entries: &display_entries,
+                        });
+                        resources.display_bind_group_cache = Some(CachedMainBindGroup {
+                            key: bind_group_key,
+                            bind_group: created.clone(),
+                        });
+                        resources.resource_cache.counters.bind_group_misses += 1;
+                        resources.resource_cache.counters.bind_group_creations += 1;
+                        created
+                    }
                 };
 
                 {
@@ -2745,7 +2710,31 @@ impl GpuProcessor {
                 let crop_x_start = x_start - input_x_start;
                 let crop_y_start = y_start - input_y_start;
 
-                if output_to_display && !split_scene_view_display {
+                // Keep the dependent scene -> view -> display graph in one
+                // command encoder. Wgpu can then track each storage-write ->
+                // sampled-read transition across compute-pass boundaries,
+                // including on software Vulkan adapters.
+                {
+                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                    compute_pass.set_pipeline(&self.main_pipeline);
+                    compute_pass.set_bind_group(0, &view_bind_group, &[]);
+                    compute_pass.dispatch_workgroups(
+                        input_width.div_ceil(8),
+                        input_height.div_ceil(8),
+                        1,
+                    );
+                }
+                {
+                    let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
+                    compute_pass.set_pipeline(&self.main_pipeline);
+                    compute_pass.set_bind_group(0, &display_bind_group, &[]);
+                    compute_pass.dispatch_workgroups(
+                        input_width.div_ceil(8),
+                        input_height.div_ceil(8),
+                        1,
+                    );
+                }
+                if output_to_display {
                     main_encoder.copy_texture_to_texture(
                         wgpu::TexelCopyTextureInfo {
                             texture: &self.tile_output_texture,
@@ -2773,64 +2762,6 @@ impl GpuProcessor {
                             depth_or_array_layers: 1,
                         },
                     );
-                }
-
-                // Keep the dependent scene -> view -> display graph in one
-                // command encoder. Wgpu can then track each storage-write ->
-                // sampled-read transition across compute-pass boundaries,
-                // including on software Vulkan adapters.
-                if let Some(view_bind_group) = view_bind_group.as_ref() {
-                    {
-                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
-                        compute_pass.set_pipeline(&self.main_pipeline);
-                        compute_pass.set_bind_group(0, view_bind_group, &[]);
-                        compute_pass.dispatch_workgroups(
-                            input_width.div_ceil(8),
-                            input_height.div_ceil(8),
-                            1,
-                        );
-                    }
-                }
-                if let Some(display_bind_group) = display_bind_group.as_ref() {
-                    {
-                        let mut compute_pass = main_encoder.begin_compute_pass(&Default::default());
-                        compute_pass.set_pipeline(&self.main_pipeline);
-                        compute_pass.set_bind_group(0, display_bind_group, &[]);
-                        compute_pass.dispatch_workgroups(
-                            input_width.div_ceil(8),
-                            input_height.div_ceil(8),
-                            1,
-                        );
-                    }
-                    if output_to_display {
-                        main_encoder.copy_texture_to_texture(
-                            wgpu::TexelCopyTextureInfo {
-                                texture: &self.tile_output_texture,
-                                mip_level: 0,
-                                origin: wgpu::Origin3d {
-                                    x: crop_x_start,
-                                    y: crop_y_start,
-                                    z: 0,
-                                },
-                                aspect: wgpu::TextureAspect::All,
-                            },
-                            wgpu::TexelCopyTextureInfo {
-                                texture: &self.working_texture,
-                                mip_level: 0,
-                                origin: wgpu::Origin3d {
-                                    x: x_start,
-                                    y: y_start,
-                                    z: 0,
-                                },
-                                aspect: wgpu::TextureAspect::All,
-                            },
-                            wgpu::Extent3d {
-                                width: tile_width,
-                                height: tile_height,
-                                depth_or_array_layers: 1,
-                            },
-                        );
-                    }
                 }
                 let tile_command_buffer = main_encoder.finish();
                 queue.submit(std::iter::once(tile_command_buffer));
@@ -2937,24 +2868,16 @@ impl GpuProcessor {
             cache_misses: (cache_after.mask_misses - cache_before.mask_misses)
                 + (cache_after.lut_misses - cache_before.lut_misses)
                 + (cache_after.bind_group_misses - cache_before.bind_group_misses),
-            domain_conversions: if split_scene_view_display {
-                &[
-                    "acescg_scene_linear_extended_v1->display_encoded_srgb_v1",
-                    "display_encoded_srgb_v1->render_transport_encoded_v1",
-                ]
-            } else {
-                &["legacy_fused_scene_view_output_v1"]
-            },
-            declared_clamps: if split_scene_view_display {
-                &[
-                    "algorithm_local_hsv_saturation",
-                    "algorithm_local_mask_influence",
-                    "display_clipping_overlay_threshold",
-                    "final_output_quantization_only",
-                ]
-            } else {
-                &["legacy_implementation_defined"]
-            },
+            domain_conversions: &[
+                "acescg_scene_linear_extended_v1->display_encoded_srgb_v1",
+                "display_encoded_srgb_v1->render_transport_encoded_v1",
+            ],
+            declared_clamps: &[
+                "algorithm_local_hsv_saturation",
+                "algorithm_local_mask_influence",
+                "display_clipping_overlay_threshold",
+                "final_output_quantization_only",
+            ],
             dehaze: *self.last_dehaze_receipt.lock().unwrap(),
         };
         self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
@@ -3150,7 +3073,15 @@ mod blur_pass_tests {
                 .collect::<Vec<_>>(),
             vec![BlurSemantic::Tonal, BlurSemantic::Clarity]
         );
-        assert_eq!(graph.tile_halo, 16);
+        assert_eq!(
+            graph
+                .blur_products
+                .iter()
+                .find(|product| product.semantic == BlurSemantic::Tonal)
+                .map(|product| product.base_radius()),
+            Some(32.0)
+        );
+        assert_eq!(graph.tile_halo, 64);
         assert!(graph.estimated_peak_resource_bytes > 0);
         assert_ne!(graph.fingerprint, exposure.fingerprint);
     }
@@ -3192,29 +3123,19 @@ mod blur_pass_tests {
         let mut compiles = 0_u32;
         for (width, height, class) in dimensions {
             for (workload, baseline, has_lut, masks) in &workloads {
-                let mut legacy = *baseline;
-                legacy.global.edit_graph_version = 1.0;
-                let mut v2 = *baseline;
-                v2.global.edit_graph_version = 2.0;
-                let legacy_plan =
-                    compile_gpu_render_graph(&legacy, *has_lut, *masks, width, height);
-                let v2_plan = compile_gpu_render_graph(&v2, *has_lut, *masks, width, height);
-                assert_eq!(
-                    legacy_plan.blur_products.len(),
-                    v2_plan.blur_products.len(),
-                    "v2 must not add transport surfaces for {class}/{workload}"
-                );
+                let plan = compile_gpu_render_graph(baseline, *has_lut, *masks, width, height);
                 assert!(
-                    v2_plan.estimated_peak_resource_bytes
-                        <= legacy_plan.estimated_peak_resource_bytes.saturating_mul(2),
-                    "scale-aware v2 halo must remain within the 2x resource budget for {class}/{workload}: legacy={} v2={}",
-                    legacy_plan.estimated_peak_resource_bytes,
-                    v2_plan.estimated_peak_resource_bytes
+                    plan.estimated_peak_resource_bytes > 0,
+                    "current graph must model resources for {class}/{workload}"
                 );
-                assert_ne!(legacy_plan.fingerprint, v2_plan.fingerprint);
+                assert_eq!(
+                    plan.fingerprint,
+                    compile_gpu_render_graph(baseline, *has_lut, *masks, width, height).fingerprint,
+                    "current graph identity must be deterministic for {class}/{workload}"
+                );
                 for _ in 0..1_000 {
                     std::hint::black_box(compile_gpu_render_graph(
-                        std::hint::black_box(&v2),
+                        std::hint::black_box(baseline),
                         *has_lut,
                         *masks,
                         width,
@@ -3238,7 +3159,7 @@ mod blur_pass_tests {
     #[test]
     fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
         let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
-            "rawEngineEditGraphVersion": 1,
+            "rawEngineEditGraphVersion": 2,
             "exposure": 20
         }));
         let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
@@ -3670,9 +3591,8 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn graph_v2_tone_equalizer_radius_drives_blur_identity_and_tile_halo() {
+    fn current_tone_equalizer_radius_drives_blur_identity_and_tile_halo() {
         let mut adjustments = AllAdjustments::default();
-        adjustments.global.edit_graph_version = 2.0;
         adjustments.global.tone_equalizer.params0[0] = 1.0;
         adjustments.global.tone_equalizer.params1[1] = 48.0;
         assert_eq!(tonal_blur_base_radius(&adjustments), Some(48.0));
@@ -3701,11 +3621,9 @@ mod blur_pass_tests {
     }
 
     #[test]
-    fn graph_v2_brightness_uses_default_guidance_but_v1_brightness_does_not() {
+    fn current_brightness_uses_default_guidance() {
         let mut adjustments = AllAdjustments::default();
         adjustments.global.brightness = 0.5;
-        assert_eq!(tonal_blur_base_radius(&adjustments), None);
-        adjustments.global.edit_graph_version = 2.0;
         adjustments.global.tone_equalizer.params1[1] = 32.0;
         assert_eq!(tonal_blur_base_radius(&adjustments), Some(32.0));
     }
@@ -3853,7 +3771,7 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let adjustments = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 1,
+            "rawEngineEditGraphVersion": 2,
             "exposure": 35
         }));
         let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
@@ -3919,7 +3837,15 @@ mod blur_pass_tests {
             plan.edit_graph
                 .receipt
                 .ordered_node_ids
-                .contains(&"legacy_gpu_scene_view_pass")
+                .contains(&"scene_to_view_transform")
+        );
+        assert!(
+            !plan
+                .edit_graph
+                .receipt
+                .ordered_node_ids
+                .iter()
+                .any(|node| node.contains("legacy"))
         );
     }
 
@@ -4018,7 +3944,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
+    fn current_scene_graph_preserves_extended_values_with_cpu_wgpu_parity() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -4033,38 +3959,35 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let recipe = |version| {
-            crate::render_plan::current_render_adjustments(json!({
-                "rawEngineEditGraphVersion": version,
-                "channelMixer": {
-                    "enabled": true,
-                    "preserveLuminance": false,
-                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
-                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
-                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
-                },
-                "curves": {
-                    "luma": [
-                        { "x": 0, "y": 0 },
-                        { "x": 128, "y": 140 },
-                        { "x": 255, "y": 255 }
-                    ]
-                }
-            }))
-        };
-        let render = |version| {
-            let raw = recipe(version);
+        let recipe = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": 2,
+            "channelMixer": {
+                "enabled": true,
+                "preserveLuminance": false,
+                "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
+                "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
+            },
+            "curves": {
+                "luma": [
+                    { "x": 0, "y": 0 },
+                    { "x": 128, "y": 140 },
+                    { "x": 255, "y": 255 }
+                ]
+            }
+        }));
+        let render = || {
+            let raw = recipe.clone();
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, 2),
                     is_raw: false,
                     tonemapper_override: Some(0),
                 },
                 None,
             )
             .unwrap();
-            assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
             let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
@@ -4080,7 +4003,7 @@ mod blur_pass_tests {
                 &context,
                 &state,
                 &source,
-                PreGpuImageIdentity::for_source(&source, &format!("v{version}")),
+                PreGpuImageIdentity::for_source(&source, "current-scene-graph"),
                 RenderRequest {
                     adjustments: plan.adjustments,
                     mask_bitmaps: &[],
@@ -4088,7 +4011,7 @@ mod blur_pass_tests {
                     roi: None,
                     edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
                 },
-                "scene_referred_v2_delta",
+                "current_scene_graph_extended_range",
             )
             .unwrap()
             .to_rgba32f()
@@ -4097,27 +4020,26 @@ mod blur_pass_tests {
             for channel in 0..3 {
                 assert!(
                     (cpu[channel] - gpu[channel]).abs() <= 0.01,
-                    "CPU/GPU v{version} channel {channel}: cpu={cpu:?} gpu={gpu:?}"
+                    "CPU/GPU current graph channel {channel}: cpu={cpu:?} gpu={gpu:?}"
                 );
             }
             gpu
         };
 
-        let legacy = render(1);
-        let v2 = render(2);
+        let current = render();
         assert!(
-            legacy[..3]
-                .iter()
-                .all(|channel| (0.0..=1.01).contains(channel))
+            current[0] > 1.0,
+            "current red should retain over-range: {current:?}"
         );
-        assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
-        assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
-        assert_ne!(legacy, v2);
+        assert!(
+            current[2] < 0.0,
+            "current blue should retain negative values: {current:?}"
+        );
     }
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn current_monochrome_uses_ap1_luminance_across_graph_versions() {
+    fn current_monochrome_uses_ap1_luminance_on_cold_and_warm_dispatches() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -4132,9 +4054,9 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let render = |version: u64| {
+        let render = || {
             let raw = crate::render_plan::current_render_adjustments(json!({
-                "rawEngineEditGraphVersion": version,
+                "rawEngineEditGraphVersion": 2,
                 "blackWhiteMixer": {
                     "enabled": true,
                     "process": "neutral_panchromatic_v1",
@@ -4147,7 +4069,7 @@ mod blur_pass_tests {
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, 2),
                     is_raw: false,
                     tonemapper_override: Some(0),
                 },
@@ -4169,7 +4091,7 @@ mod blur_pass_tests {
                 &context,
                 &state,
                 &source,
-                PreGpuImageIdentity::for_source(&source, &format!("luma-v{version}")),
+                PreGpuImageIdentity::for_source(&source, "current-luma"),
                 RenderRequest {
                     adjustments: plan.adjustments,
                     mask_bitmaps: &[],
@@ -4183,25 +4105,16 @@ mod blur_pass_tests {
             .to_rgba32f()
             .get_pixel(1, 1)
             .0[0];
-            assert!((cpu - gpu).abs() <= 0.01, "v{version}: cpu={cpu} gpu={gpu}");
+            assert!((cpu - gpu).abs() <= 0.01, "current: cpu={cpu} gpu={gpu}");
             gpu
         };
 
-        let graph_v1 = render(1);
-        let scene_referred = render(2);
-        let scene_referred_warm = render(2);
+        let scene_referred = render();
+        let scene_referred_warm = render();
         let encode = |linear: f32| 1.055 * linear.powf(1.0 / 2.4) - 0.055;
-        assert!(
-            (graph_v1 - encode(0.272_228_72)).abs() <= 0.01,
-            "graph_v1={graph_v1}"
-        );
         assert!(
             (scene_referred - encode(0.272_228_72)).abs() <= 0.01,
             "scene_referred={scene_referred}"
-        );
-        assert!(
-            (scene_referred - graph_v1).abs() <= 0.001,
-            "graph versions must agree within one RGBA16F quantization step: graph_v1={graph_v1}, scene_referred={scene_referred}"
         );
         assert_eq!(scene_referred, scene_referred_warm);
         let processor = state
@@ -4212,7 +4125,7 @@ mod blur_pass_tests {
         let receipt = processor
             .processor
             .last_execution_receipt()
-            .expect("v2 GPU execution publishes a runtime receipt");
+            .expect("current GPU execution publishes a runtime receipt");
         assert_eq!(receipt.phase_dispatch_count, 3);
         assert_eq!(receipt.registered_wgpu_phase_count, 3);
         assert!(receipt.registered_wgpu_module_count >= 3, "{receipt:?}");
@@ -4812,7 +4725,11 @@ mod blur_pass_tests {
                         mask_bitmaps: &[],
                         lut: None,
                         roi: None,
-                        edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                        edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                            adjustments,
+                            false,
+                            false,
+                        )),
                     },
                     "blur_pass_parity",
                 )
@@ -4976,7 +4893,7 @@ mod blur_pass_tests {
             .expect("dehaze render publishes an execution receipt");
         let dehaze = execution
             .dehaze
-            .expect("scene graph v2 dehaze publishes a typed receipt");
+            .expect("current scene graph dehaze publishes a typed receipt");
         assert_eq!(
             dehaze.guidance_mode,
             crate::color::dehaze::DehazeGuidanceMode::ImageDerivedEdgeAware
@@ -5035,7 +4952,11 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        adjustments,
+                        false,
+                        false,
+                    )),
                 },
                 "rapid_view_parity",
             )
@@ -5103,7 +5024,11 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        AllAdjustments::default(),
+                        false,
+                        false,
+                    )),
                 },
                 "pipeline_cache_parity",
             )
@@ -5155,7 +5080,11 @@ mod blur_pass_tests {
                 mask_bitmaps: &[],
                 lut: None,
                 roi: None,
-                edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                    flare_adjustments,
+                    false,
+                    false,
+                )),
             },
             "pipeline_cache_optional_flare",
         )
@@ -5230,7 +5159,11 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        adjustments,
+                        false,
+                        false,
+                    )),
                 },
                 "exposure_reuse",
             )
@@ -5330,7 +5263,11 @@ mod blur_pass_tests {
                     mask_bitmaps: &[],
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        adjustments,
+                        false,
+                        false,
+                    )),
                 },
                 "private_raw_pixel_revision",
             )
@@ -5473,7 +5410,11 @@ mod blur_pass_tests {
                     mask_bitmaps: std::slice::from_ref(&mask),
                     lut: Some(lut.clone()),
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        adjustments,
+                        true,
+                        true,
+                    )),
                 },
                 "resource_reuse",
             )
@@ -5498,11 +5439,13 @@ mod blur_pass_tests {
         assert_eq!(counters.texture_creations, 2);
         assert_eq!(counters.gpu_upload_bytes, 16 * 16 * 2 + 2 * 2 * 2 * 8);
         assert_eq!(counters.cpu_conversion_bytes, 16 * 16 * 2);
-        assert_eq!(counters.bind_group_creations, 1);
-        assert_eq!(counters.bind_group_hits, 19);
+        assert_eq!(counters.bind_group_creations, 3);
+        assert_eq!(counters.bind_group_hits, 57);
         let mut resources = processor.resources.lock().unwrap();
         resources.resource_cache = GpuResourceCache::default();
         resources.main_bind_group_cache = None;
+        resources.view_bind_group_cache = None;
+        resources.display_bind_group_cache = None;
         drop(resources);
         drop(processor_state);
 
@@ -5547,7 +5490,11 @@ mod blur_pass_tests {
                     mask_bitmaps: masks,
                     lut: None,
                     roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                        adjustments,
+                        !masks.is_empty(),
+                        false,
+                    )),
                 },
                 "partial_mask_upload",
             )
@@ -5674,15 +5621,8 @@ pub fn process_and_get_unclamped_dynamic_image_with_film_tap(
     caller_id: &str,
     profile_content_sha256: &str,
 ) -> Result<(DynamicImage, GpuPostFilmTapReceiptV1), String> {
-    let capture_identity = match &request.edit_graph {
-        EditGraphExecutionAuthority::Compiled(graph) => {
-            post_film_tap_identity(graph, profile_content_sha256)?
-        }
-        #[cfg(all(test, feature = "tauri-test"))]
-        EditGraphExecutionAuthority::TestOnlyLegacy => {
-            return Err("film_runtime_proof_compiled_film_node_missing".to_string());
-        }
-    };
+    let EditGraphExecutionAuthority::Compiled(graph) = &request.edit_graph;
+    let capture_identity = post_film_tap_identity(graph, profile_content_sha256)?;
     let (image, receipt) = process_and_get_dynamic_image_inner(
         context,
         state,
@@ -5771,15 +5711,7 @@ fn process_and_get_dynamic_image_inner(
             height,
             max_dim
         );
-        #[cfg(not(all(test, feature = "tauri-test")))]
         let EditGraphExecutionAuthority::Compiled(edit_graph) = &request.edit_graph;
-        #[cfg(all(test, feature = "tauri-test"))]
-        let edit_graph = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph,
-            EditGraphExecutionAuthority::TestOnlyLegacy => {
-                return Err("edit_graph.cpu_reference_requires_compiled_authority".into());
-            }
-        };
         return crate::cpu_edit_graph::execute_cpu_edit_graph(
             base_image,
             &request.adjustments,

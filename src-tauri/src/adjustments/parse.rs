@@ -409,8 +409,8 @@ fn parse_point_color(value: &JsonValue) -> PointColorGpuSettings {
     output
 }
 
-fn parse_perceptual_grading(value: &JsonValue, graph_v2: bool) -> PerceptualGradingGpuSettings {
-    if !graph_v2 || !section_is_visible(value, "color") {
+fn parse_perceptual_grading(value: &JsonValue) -> PerceptualGradingGpuSettings {
+    if !section_is_visible(value, "color") {
         return PerceptualGradingGpuSettings::default();
     }
     let Some(settings) = value.get("perceptualGradingV1") else {
@@ -568,7 +568,7 @@ fn get_global_adjustments_from_json(
         tint: 0.0,
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
-        edit_graph_version: 0.0,
+        _pad_current_contract: 0.0,
         dehaze_atmosphere_r: 0.0,
         dehaze_atmosphere_g: 0.0,
         dehaze_atmosphere_b: 0.0,
@@ -806,13 +806,7 @@ fn get_global_adjustments_from_json(
         ),
         tone_equalizer: parse_tone_equalizer(js_adjustments),
         point_color: parse_point_color(js_adjustments),
-        perceptual_grading: parse_perceptual_grading(
-            js_adjustments,
-            js_adjustments["rawEngineEditGraphVersion"]
-                .as_u64()
-                .unwrap_or(1)
-                >= 2,
-        ),
+        perceptual_grading: parse_perceptual_grading(js_adjustments),
         scene_curve_knots: [Default::default(); 32],
         scene_curve_parameters: Default::default(),
         output_curve_knots: [Default::default(); 32],
@@ -942,7 +936,7 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         _pad_end7: 0.0,
         tone_equalizer: parse_tone_equalizer(adj),
         point_color: parse_point_color(adj),
-        perceptual_grading: parse_perceptual_grading(adj, true),
+        perceptual_grading: parse_perceptual_grading(adj),
     };
     if mask.perceptual_grading.policy[3] > 0.5 {
         mask.color_grading_shadows = ColorGradeSettings::default();
@@ -1310,7 +1304,7 @@ mod tests {
     }
 
     #[test]
-    fn perceptual_grading_is_v2_only_and_packs_global_and_local_plans() {
+    fn perceptual_grading_packs_global_and_local_current_plans() {
         let grading = json!({
             "shadows": {"hueDegrees": 210, "chroma": 0.12, "saturation": 0.1, "brilliance": 0, "luminanceEv": -0.1},
             "midtones": {"hueDegrees": 25, "chroma": 0.08, "saturation": 0.2, "brilliance": 0.15, "luminanceEv": 0},
@@ -1321,9 +1315,9 @@ mod tests {
             "perceptualModel": "oklab_d65_from_acescg_v1",
             "neutralProtection": 0.7, "skinProtection": 0.2
         });
-        let recipe = |version| {
+        let recipe = || {
             json!({
-                "rawEngineEditGraphVersion": version,
+                "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
                 "perceptualGradingV1": grading.clone(),
                 "masks": [{
                     "id": "local", "name": "Local", "visible": true, "invert": false,
@@ -1332,10 +1326,7 @@ mod tests {
                 }]
             })
         };
-        let legacy = get_all_adjustments_from_json(&recipe(1), true, None);
-        assert_eq!(legacy.global.perceptual_grading.policy[3], 0.0);
-
-        let native = get_all_adjustments_from_json(&recipe(2), true, None);
+        let native = get_all_adjustments_from_json(&recipe(), true, None);
         assert_eq!(native.global.perceptual_grading.policy[3], 1.0);
         assert_eq!(native.mask_count, 1);
         assert_eq!(native.mask_adjustments[0].perceptual_grading.policy[3], 1.0);

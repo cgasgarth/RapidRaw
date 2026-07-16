@@ -328,14 +328,12 @@ pub fn compile_render_plan(
             message: "crop coordinates and dimensions must be in 0..=1".into(),
         });
     }
-    let mut adjustments = get_all_adjustments_from_json_with_masks(
+    let adjustments = get_all_adjustments_from_json_with_masks(
         &effective,
         context.is_raw,
         context.tonemapper_override,
         &masks,
     );
-    adjustments.global.edit_graph_version =
-        crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION as f32;
     validate_perspective_analysis_currentness(&effective, context.revision.source_revision)?;
     let geometry = get_geometry_params_from_json(&effective);
     let mut fingerprints = fingerprints(
@@ -365,14 +363,12 @@ pub fn compile_render_plan(
         ]);
     }
     let neutral_json = current_render_adjustments_for_neutral_pipeline();
-    let mut neutral_adjustments = get_all_adjustments_from_json_with_masks(
+    let neutral_adjustments = get_all_adjustments_from_json_with_masks(
         &neutral_json,
         context.is_raw,
         context.tonemapper_override,
         &[],
     );
-    neutral_adjustments.global.edit_graph_version =
-        crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION as f32;
     let neutral_detail = hash_selected(&neutral_json, DETAIL_FINGERPRINT_FIELDS);
     let default_geometry = GeometryParams::default();
     let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
@@ -2103,10 +2099,7 @@ mod tests {
             "masks":[{"id":"m1","name":"Local","visible":true,"invert":false,"opacity":80,
                 "blendMode":"multiply","adjustments":{"contrast":15},"subMasks":[]}]
         }));
-        let mut parsed =
-            crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
-        parsed.global.edit_graph_version =
-            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION as f32;
+        let parsed = crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
         let compiled = compile_render_plan(
             &raw,
             CompileRenderPlanContext {

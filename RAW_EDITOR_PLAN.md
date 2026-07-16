@@ -2021,7 +2021,7 @@ Required ADR fleet:
 - `ADR-003: Versioned non-destructive edit graph`
   - Decision: originals are immutable; sidecars store versioned graph operations.
   - Validation: original hash tests, sidecar roundtrip, migration tests.
-  - Runtime decision: [ADR-GRAPH-001](docs/color/architecture/versioned-edit-graph-adr-2026-07-13.md) defines the compiled legacy-v1 execution, currentness, and migration contract implemented by #5399.
+  - Runtime decision: [ADR-GRAPH-001](docs/color/architecture/versioned-edit-graph-adr-2026-07-13.md) defines the strict current-only compiled graph, CPU fallback, and WGPU execution contract established by #5399, with graph-v1 compatibility retired by #5948/#5965.
 - `ADR-004: Scene-referred color pipeline`
   - Decision: internal editing defaults to scene-referred processing with explicit display/output transforms.
   - Validation: ColorChecker metrics, CPU/GPU parity, gamut tests, clipping tests.

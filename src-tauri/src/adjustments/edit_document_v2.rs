@@ -3861,8 +3861,7 @@ mod tests {
         );
         assert_eq!(compiled_render.mask_count, expected_render.mask_count);
         let source = [4.0, 0.4, 0.08];
-        let monochrome =
-            apply_black_white_mixer(source, compiled_render.global.black_white_mixer, true);
+        let monochrome = apply_black_white_mixer(source, compiled_render.global.black_white_mixer);
         assert_eq!(monochrome, [monochrome[0]; 3]);
         assert_ne!(monochrome, source);
         assert!(monochrome[0].is_finite());
@@ -4757,8 +4756,7 @@ mod tests {
             .into_render_adjustments()
             .expect("channel-mixer document compiles");
         let adjustments = get_all_adjustments_from_json(&compiled, false, None);
-        let output =
-            apply_channel_mixer([0.5, 0.25, 0.75], adjustments.global.channel_mixer, false);
+        let output = apply_channel_mixer([0.5, 0.25, 0.75], adjustments.global.channel_mixer);
         assert!(
             (output[0] - 0.58).abs() <= 1.0e-6,
             "unexpected red output: {output:?}"
@@ -4823,11 +4821,8 @@ mod tests {
             .into_render_adjustments()
             .expect("color-balance document compiles");
         let adjustments = get_all_adjustments_from_json(&compiled, false, None);
-        let output = apply_color_balance_rgb(
-            [0.5, 0.25, 0.75],
-            adjustments.global.color_balance_rgb,
-            false,
-        );
+        let output =
+            apply_color_balance_rgb([0.5, 0.25, 0.75], adjustments.global.color_balance_rgb);
         assert!(
             (output[0] - 0.55).abs() <= 1.0e-6,
             "unexpected red output: {output:?}"
@@ -4905,7 +4900,7 @@ mod tests {
             .into_render_adjustments()
             .expect("levels document compiles");
         let adjustments = get_all_adjustments_from_json(&compiled, false, None);
-        let output = apply_luma_levels(Vec3::splat(0.5), adjustments.global.levels, false);
+        let output = apply_luma_levels(Vec3::splat(0.5), adjustments.global.levels);
         let expected = 0.2 + 0.6 * 0.5_f32.sqrt();
         assert!(
             (output.x - expected).abs() <= 1.0e-6

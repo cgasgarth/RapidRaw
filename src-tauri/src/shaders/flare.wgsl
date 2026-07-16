@@ -6,7 +6,7 @@ struct FlareParams {
     contrast: f32,
     whites: f32,
     aspect_ratio: f32,
-    edit_graph_version: f32,
+    _pad: f32,
 }
 
 @group(0) @binding(0) var input_texture: texture_2d<f32>;
@@ -15,12 +15,7 @@ struct FlareParams {
 @group(0) @binding(3) var input_sampler: sampler;
 
 fn scene_luminance(c: vec3<f32>) -> f32 {
-    let coefficients = select(
-        vec3<f32>(0.2126, 0.7152, 0.0722),
-        vec3<f32>(0.27222872, 0.67408174, 0.05368952),
-        params.edit_graph_version >= 2.0,
-    );
-    return dot(c, coefficients);
+    return dot(c, vec3<f32>(0.27222872, 0.67408174, 0.05368952));
 }
 
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {

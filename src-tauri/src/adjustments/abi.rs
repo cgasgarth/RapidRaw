@@ -275,7 +275,7 @@ pub struct GlobalAdjustments {
     pub tint: f32,
     pub vibrance: f32,
     pub hue: f32,
-    pub edit_graph_version: f32,
+    pub(crate) _pad_current_contract: f32,
     pub(crate) dehaze_atmosphere_r: f32,
     pub(crate) dehaze_atmosphere_g: f32,
     pub(crate) dehaze_atmosphere_b: f32,

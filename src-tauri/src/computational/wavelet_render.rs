@@ -153,13 +153,6 @@ fn resolved_multiscale_settings(
 }
 
 fn macro_multiscale_settings(adjustments: &Value) -> Option<MultiscaleDetailSettingsV1> {
-    let graph_version = adjustments
-        .get("rawEngineEditGraphVersion")
-        .and_then(Value::as_u64)
-        .unwrap_or(1);
-    if graph_version < 2 {
-        return None;
-    }
     let control = |key: &str| {
         adjustments
             .get(key)
@@ -203,13 +196,7 @@ fn macro_multiscale_settings(adjustments: &Value) -> Option<MultiscaleDetailSett
 }
 
 fn typed_multiscale_settings(adjustments: &Value) -> Option<&Value> {
-    let graph_version = adjustments
-        .get("rawEngineEditGraphVersion")
-        .and_then(Value::as_u64)
-        .unwrap_or(1);
-    (graph_version >= 2)
-        .then(|| adjustments.get("multiscaleDetailV1"))
-        .flatten()
+    adjustments.get("multiscaleDetailV1")
 }
 
 #[cfg(test)]
@@ -378,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_v2_user_controls_compile_to_distinct_scale_aware_bands() {
+    fn current_user_controls_compile_to_distinct_scale_aware_bands() {
         let sharpness = json!({"rawEngineEditGraphVersion": 2, "sharpness": 80});
         let clarity = json!({"rawEngineEditGraphVersion": 2, "clarity": 80});
         let structure = json!({"rawEngineEditGraphVersion": 2, "structure": 80});
@@ -396,29 +383,18 @@ mod tests {
     }
 
     #[test]
-    fn graph_v2_user_controls_execute_real_pixels_and_legacy_graph_stays_unchanged() {
+    fn current_user_controls_execute_real_pixels() {
         let image = synthetic_texture_image();
-        let modern = json!({
+        let current = json!({
             "rawEngineEditGraphVersion": 2,
             "sharpness": 65,
             "clarity": 40,
             "structure": 25
         });
-        let legacy = json!({
-            "rawEngineEditGraphVersion": 1,
-            "sharpness": 65,
-            "clarity": 40,
-            "structure": 25
-        });
-        let output = apply_wavelet_detail_stage(&image, &modern);
+        let output = apply_wavelet_detail_stage(&image, &current);
         assert!(matches!(output, Cow::Owned(_)));
         assert!(max_delta(&image, output.as_ref()) > 0.0001);
-        assert!(multiscale_owns_legacy_global_detail(&modern));
-        assert!(!multiscale_owns_legacy_global_detail(&legacy));
-        assert!(matches!(
-            apply_wavelet_detail_stage(&image, &legacy),
-            Cow::Borrowed(_)
-        ));
+        assert!(multiscale_owns_legacy_global_detail(&current));
     }
 
     #[test]

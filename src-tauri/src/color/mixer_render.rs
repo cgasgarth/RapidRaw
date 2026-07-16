@@ -16,9 +16,6 @@ use crate::monochrome::{
     neutral_panchromatic_v1,
 };
 
-const REC709_RED: f32 = 0.2126;
-const REC709_GREEN: f32 = 0.7152;
-const REC709_BLUE: f32 = 0.0722;
 const ACESCG_RED: f32 = 0.272_228_72;
 const ACESCG_GREEN: f32 = 0.674_081_74;
 const ACESCG_BLUE: f32 = 0.053_689_52;
@@ -27,15 +24,6 @@ const ACESCG_BLUE: f32 = 0.053_689_52;
 pub(crate) fn apply_native_color_mixer_adjustments<'a>(
     image: Cow<'a, DynamicImage>,
     global: &GlobalAdjustments,
-) -> Cow<'a, DynamicImage> {
-    apply_native_color_mixer_adjustments_for_graph(image, global, false)
-}
-
-#[cfg(test)]
-pub(crate) fn apply_native_color_mixer_adjustments_for_graph<'a>(
-    image: Cow<'a, DynamicImage>,
-    global: &GlobalAdjustments,
-    preserve_extended: bool,
 ) -> Cow<'a, DynamicImage> {
     if !has_active_native_color_mixer_adjustments(global) {
         return image;
@@ -46,9 +34,9 @@ pub(crate) fn apply_native_color_mixer_adjustments_for_graph<'a>(
 
     pixels.par_chunks_exact_mut(4).for_each(|pixel| {
         let mut color = [pixel[0], pixel[1], pixel[2]];
-        color = apply_color_balance_rgb(color, global.color_balance_rgb, preserve_extended);
-        color = apply_channel_mixer(color, global.channel_mixer, preserve_extended);
-        color = apply_black_white_mixer(color, global.black_white_mixer, preserve_extended);
+        color = apply_color_balance_rgb(color, global.color_balance_rgb);
+        color = apply_channel_mixer(color, global.channel_mixer);
+        color = apply_black_white_mixer(color, global.black_white_mixer);
         pixel[..3].copy_from_slice(&color);
     });
 
@@ -67,13 +55,12 @@ pub(crate) fn has_active_native_color_mixer_adjustments(global: &GlobalAdjustmen
 pub(crate) fn apply_color_balance_rgb(
     color: [f32; 3],
     settings: ColorBalanceRgbSettings,
-    preserve_extended: bool,
 ) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
     }
 
-    let source_luma = scene_luminance(color, preserve_extended);
+    let source_luma = scene_luminance(color);
     let [shadows, midtones, highlights] = color_balance_rgb_weights(source_luma);
     let offset = [
         (settings.shadows[0] * shadows
@@ -89,17 +76,13 @@ pub(crate) fn apply_color_balance_rgb(
             + settings.highlights[2] * highlights)
             / 400.0,
     ];
-    let balanced = if preserve_extended {
-        add_rgb(color, offset)
-    } else {
-        clamp_rgb(add_rgb(color, offset))
-    };
+    let balanced = add_rgb(color, offset);
 
     if settings.preserve_luminance == 0 {
         return balanced;
     }
 
-    preserve_color_balance_luminance(balanced, source_luma, preserve_extended)
+    preserve_color_balance_luminance(balanced, source_luma)
 }
 
 fn color_balance_rgb_weights(luma: f32) -> [f32; 3] {
@@ -115,46 +98,36 @@ fn color_balance_rgb_weights(luma: f32) -> [f32; 3] {
     [shadows / total, midtones / total, highlights / total]
 }
 
-pub(crate) fn apply_channel_mixer(
-    color: [f32; 3],
-    settings: ChannelMixerSettings,
-    preserve_extended: bool,
-) -> [f32; 3] {
+pub(crate) fn apply_channel_mixer(color: [f32; 3], settings: ChannelMixerSettings) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
     }
 
     let mixed = [
-        apply_channel_mixer_row(color, settings.red, preserve_extended),
-        apply_channel_mixer_row(color, settings.green, preserve_extended),
-        apply_channel_mixer_row(color, settings.blue, preserve_extended),
+        apply_channel_mixer_row(color, settings.red),
+        apply_channel_mixer_row(color, settings.green),
+        apply_channel_mixer_row(color, settings.blue),
     ];
 
     if settings.preserve_luminance == 0 {
         return mixed;
     }
 
-    let source_luma = scene_luminance(color, preserve_extended);
+    let source_luma = scene_luminance(color);
     if source_luma <= 0.0 {
         return mixed;
     }
 
-    preserve_color_balance_luminance(mixed, source_luma, preserve_extended)
+    preserve_color_balance_luminance(mixed, source_luma)
 }
 
-fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow, preserve_extended: bool) -> f32 {
-    let mixed = color[0] * row.red + color[1] * row.green + color[2] * row.blue + row.constant;
-    if preserve_extended {
-        mixed
-    } else {
-        mixed.clamp(0.0, 1.0)
-    }
+fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow) -> f32 {
+    color[0] * row.red + color[1] * row.green + color[2] * row.blue + row.constant
 }
 
 pub(crate) fn apply_black_white_mixer(
     color: [f32; 3],
     settings: BlackWhiteMixerSettings,
-    _preserve_extended: bool,
 ) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
@@ -193,31 +166,17 @@ pub(crate) fn apply_black_white_mixer(
     color
 }
 
-fn preserve_color_balance_luminance(
-    color: [f32; 3],
-    source_luma: f32,
-    preserve_extended: bool,
-) -> [f32; 3] {
-    let output_luma = scene_luminance(color, preserve_extended);
+fn preserve_color_balance_luminance(color: [f32; 3], source_luma: f32) -> [f32; 3] {
+    let output_luma = scene_luminance(color);
     if output_luma <= 0.0 {
         return color;
     }
 
-    let scaled = scale_rgb(color, source_luma / output_luma);
-    if preserve_extended {
-        scaled
-    } else {
-        clamp_rgb(scaled)
-    }
+    scale_rgb(color, source_luma / output_luma)
 }
 
-fn scene_luminance(color: [f32; 3], scene_referred_v2: bool) -> f32 {
-    let coefficients = if scene_referred_v2 {
-        [ACESCG_RED, ACESCG_GREEN, ACESCG_BLUE]
-    } else {
-        [REC709_RED, REC709_GREEN, REC709_BLUE]
-    };
-    color[0] * coefficients[0] + color[1] * coefficients[1] + color[2] * coefficients[2]
+fn scene_luminance(color: [f32; 3]) -> f32 {
+    color[0] * ACESCG_RED + color[1] * ACESCG_GREEN + color[2] * ACESCG_BLUE
 }
 
 fn add_rgb(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
@@ -226,14 +185,6 @@ fn add_rgb(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
 
 fn scale_rgb(color: [f32; 3], scale: f32) -> [f32; 3] {
     [color[0] * scale, color[1] * scale, color[2] * scale]
-}
-
-fn clamp_rgb(color: [f32; 3]) -> [f32; 3] {
-    [
-        color[0].clamp(0.0, 1.0),
-        color[1].clamp(0.0, 1.0),
-        color[2].clamp(0.0, 1.0),
-    ]
 }
 
 #[cfg(test)]
@@ -316,12 +267,10 @@ mod tests {
         let source = [0.68, 0.48, 0.34];
         let expected = apply_black_white_mixer(
             apply_channel_mixer(
-                apply_color_balance_rgb(source, adjustments.global.color_balance_rgb, false),
+                apply_color_balance_rgb(source, adjustments.global.color_balance_rgb),
                 adjustments.global.channel_mixer,
-                false,
             ),
             adjustments.global.black_white_mixer,
-            false,
         );
 
         let rendered =
@@ -365,7 +314,7 @@ mod tests {
         let source = [0.9, 0.0, 0.0];
         let expected = continuous_sensitivity_v1(source, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
-        let result = apply_black_white_mixer(source, adjustments.global.black_white_mixer, false);
+        let result = apply_black_white_mixer(source, adjustments.global.black_white_mixer);
 
         assert_eq!(result, expected);
     }
@@ -392,7 +341,7 @@ mod tests {
             settings.implementation_version,
             MONOCHROME_IMPLEMENTATION_VERSION
         );
-        let output = apply_black_white_mixer([4.0, 2.0, 0.5], settings, false);
+        let output = apply_black_white_mixer([4.0, 2.0, 0.5], settings);
         assert!(
             output[0] > 1.0,
             "neutral scene process must not apply an SDR clamp"
@@ -419,7 +368,7 @@ mod tests {
         );
         let settings = adjustments.global.black_white_mixer;
         assert_eq!(settings.source_class, MONOCHROME_SENSOR_SOURCE);
-        let output = apply_black_white_mixer([8.0, 0.4, 0.2], settings, true);
+        let output = apply_black_white_mixer([8.0, 0.4, 0.2], settings);
         assert_eq!(output, [output[0]; 3]);
         assert!(output[0] > 1.0);
     }
@@ -441,7 +390,7 @@ mod tests {
         );
 
         assert_eq!(
-            apply_color_balance_rgb([0.0, 0.0, 0.0], settings.global.color_balance_rgb, false),
+            apply_color_balance_rgb([0.0, 0.0, 0.0], settings.global.color_balance_rgb),
             [0.0, 0.0, 0.0]
         );
     }
@@ -456,8 +405,9 @@ mod gpu_runtime_tests {
     use crate::AppState;
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::gpu_processing::{
-        RenderRequest, Roi, acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
-        process_and_get_dynamic_image, process_and_get_unclamped_dynamic_image,
+        EditGraphExecutionAuthority, RenderRequest, Roi, acquire_gpu_test_lock, current_test_graph,
+        get_or_init_compute_gpu_context_for_tests, process_and_get_dynamic_image,
+        process_and_get_unclamped_dynamic_image,
     };
 
     fn render_request(
@@ -469,7 +419,11 @@ mod gpu_runtime_tests {
             mask_bitmaps: &[],
             lut: None,
             roi,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::TestOnlyLegacy,
+            edit_graph: EditGraphExecutionAuthority::Compiled(current_test_graph(
+                adjustments,
+                false,
+                false,
+            )),
         }
     }
 

@@ -7,8 +7,6 @@ const AP1_LUMA: [f64; 3] = [0.272_228_72, 0.674_081_74, 0.053_689_52];
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ViewTransformProcess {
-    LegacyBasicV1,
-    LegacyAgxV1,
     RapidViewV1,
 }
 
@@ -91,9 +89,6 @@ pub struct ViewTransformReceiptV1 {
 impl ViewTransformPlanV1 {
     pub fn compile(settings: ViewTransformSettingsV1) -> Result<Self, String> {
         validate_settings(settings)?;
-        if settings.process != ViewTransformProcess::RapidViewV1 {
-            return Err("view_transform_legacy_process_requires_legacy_executor".to_string());
-        }
         let span = settings.source_white_ev - settings.source_black_ev;
         let latitude = settings.latitude.clamp(0.0, 1.0);
         let toe_width_ev = (0.12 + settings.toe * 1.35 + (1.0 - latitude) * 0.35).min(span * 0.2);
@@ -467,5 +462,19 @@ mod tests {
         );
         let plan = ViewTransformPlanV1::compile(ViewTransformSettingsV1::default()).unwrap();
         assert_eq!(plan.apply_rgb([f32::NAN, 0.2, 0.3]), [0.0; 3]);
+    }
+
+    #[test]
+    fn removed_view_processes_fail_deserialization() {
+        for process in ["legacyBasicV1", "legacyAgxV1"] {
+            let mut serialized = serde_json::to_value(ViewTransformSettingsV1::default()).unwrap();
+            serialized["process"] = process.into();
+            let error = serde_json::from_value::<ViewTransformSettingsV1>(serialized)
+                .expect_err("removed view process must not deserialize");
+            assert!(
+                error.to_string().contains("unknown variant"),
+                "unexpected {process} rejection: {error}"
+            );
+        }
     }
 }

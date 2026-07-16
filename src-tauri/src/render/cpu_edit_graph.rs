@@ -25,18 +25,6 @@ use crate::tone::tone_equalizer::{
     band_weights, edge_aware_exposure_ev, scene_luminance as tone_scene_luminance,
 };
 
-thread_local! {
-    static SCENE_REFERRED_V2_LUMA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-struct SceneLumaGuard(bool);
-
-impl Drop for SceneLumaGuard {
-    fn drop(&mut self) {
-        SCENE_REFERRED_V2_LUMA.set(self.0);
-    }
-}
-
 #[derive(Clone, Copy)]
 struct EffectiveAdjustments {
     exposure: f32,
@@ -77,11 +65,8 @@ pub(crate) fn execute_cpu_edit_graph(
     let mut authoritative_adjustments = graph.shader_abi();
     prepare_cpu_dehaze(base_image, &mut authoritative_adjustments);
     let adjustments = &authoritative_adjustments;
-    let previous_luma_model = SCENE_REFERRED_V2_LUMA.replace(graph.pipeline_version >= 2);
-    let _luma_guard = SceneLumaGuard(previous_luma_model);
     let global = &adjustments.global;
 
-    let preserve_extended = graph.pipeline_version >= 2;
     let source = base_image.to_rgba32f();
     let (width, height) = source.dimensions();
     if mask_bitmaps
@@ -281,27 +266,18 @@ pub(crate) fn execute_cpu_edit_graph(
             height,
             effective.flare,
         );
-        color = if graph.pipeline_version >= 2 {
-            apply_scene_dehaze_v1(
-                color,
-                dehaze_guidance,
-                adjustments.global.is_raw_image == 1,
-                effective.dehaze,
-                Vec3::new(
-                    global.dehaze_atmosphere_r,
-                    global.dehaze_atmosphere_g,
-                    global.dehaze_atmosphere_b,
-                ),
-                global.dehaze_atmosphere_confidence,
-            )
-        } else {
-            legacy_fixed_atmosphere_dehaze_v1(
-                color,
-                dehaze_guidance,
-                adjustments.global.is_raw_image == 1,
-                effective.dehaze,
-            )
-        };
+        color = apply_scene_dehaze_v1(
+            color,
+            dehaze_guidance,
+            adjustments.global.is_raw_image == 1,
+            effective.dehaze,
+            Vec3::new(
+                global.dehaze_atmosphere_r,
+                global.dehaze_atmosphere_g,
+                global.dehaze_atmosphere_b,
+            ),
+            global.dehaze_atmosphere_confidence,
+        );
         color = apply_centre_tonal_and_color(color, global.centré, x, y, width, height);
         color = apply_white_balance(color, effective.temperature, effective.tint);
         let tonal = tonal_blur.as_ref().map_or(input[index], |blur| blur[index]);
@@ -310,33 +286,20 @@ pub(crate) fn execute_cpu_edit_graph(
         } else {
             srgb_to_linear(tonal)
         };
-        if preserve_extended {
-            let local_tone_plan = local_tone_adjustments.then(|| tone_equalizer_plan(effective));
-            let tone_plan = local_tone_plan.as_ref().unwrap_or(&global_tone_plan);
-            let tone_source = if adjustments.global.is_raw_image == 1 {
-                input[index]
-            } else {
-                srgb_to_linear(input[index])
-            } * 2.0_f32.powf(global.exposure);
-            let guidance = tonal_linear * 2.0_f32.powf(global.exposure);
-            color = Vec3::from_array(tone_plan.apply_rgb(
-                color.to_array(),
-                tone_source.to_array(),
-                guidance.to_array(),
-                adjustments.global.rapid_view_parameters0[0],
-            ));
+        let local_tone_plan = local_tone_adjustments.then(|| tone_equalizer_plan(effective));
+        let tone_plan = local_tone_plan.as_ref().unwrap_or(&global_tone_plan);
+        let tone_source = if adjustments.global.is_raw_image == 1 {
+            input[index]
         } else {
-            color = apply_filmic_exposure(color, effective.brightness);
-            color = apply_tonal_adjustments(
-                color,
-                tonal_linear,
-                effective.contrast,
-                effective.shadows,
-                effective.whites,
-                effective.blacks,
-            );
-            color = apply_highlights_adjustment(color, effective.highlights);
-        }
+            srgb_to_linear(input[index])
+        } * 2.0_f32.powf(global.exposure);
+        let guidance = tonal_linear * 2.0_f32.powf(global.exposure);
+        color = Vec3::from_array(tone_plan.apply_rgb(
+            color.to_array(),
+            tone_source.to_array(),
+            guidance.to_array(),
+            adjustments.global.rapid_view_parameters0[0],
+        ));
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
         color = apply_skin_tone_uniformity(color, adjustments.global.skin_tone_uniformity);
@@ -369,14 +332,12 @@ pub(crate) fn execute_cpu_edit_graph(
         color = Vec3::from_array(apply_color_balance_rgb(
             color.to_array(),
             adjustments.global.color_balance_rgb,
-            preserve_extended,
         ));
         color = Vec3::from_array(apply_channel_mixer(
             color.to_array(),
             adjustments.global.channel_mixer,
-            preserve_extended,
         ));
-        color = apply_luma_levels(color, adjustments.global.levels, preserve_extended);
+        color = apply_luma_levels(color, adjustments.global.levels);
         let scene_monochrome_toning = adjustments.global.black_white_mixer.enabled != 0
             && matches!(
                 adjustments.global.black_white_mixer.process,
@@ -403,7 +364,6 @@ pub(crate) fn execute_cpu_edit_graph(
         color = Vec3::from_array(apply_black_white_mixer(
             color.to_array(),
             adjustments.global.black_white_mixer,
-            preserve_extended,
         ));
         if scene_monochrome_toning {
             color = apply_grading(color);
@@ -421,37 +381,27 @@ pub(crate) fn execute_cpu_edit_graph(
             );
             color = crate::render::film_emulation::apply_pixel_at(color, film, x, y);
         }
-        if preserve_extended {
-            // V2 crosses a real RGBA16F scene intermediate before the view
-            // dispatch. Mirror its finite storage range in the CPU reference.
-            color = color.map(round_rgba16f_storage);
-        }
+        // The current graph crosses a real RGBA16F scene intermediate before the view
+        // dispatch. Mirror its finite storage range in the CPU reference.
+        color = color.map(round_rgba16f_storage);
         color = if adjustments.global.tonemapper_mode == 2 {
             let mapped = rapid_view_plan(adjustments).apply_rgb(color.to_array());
             linear_to_srgb_extended(Vec3::from_array(mapped))
         } else if adjustments.global.tonemapper_mode == 1 {
             agx_full_transform(color, adjustments)
         } else if adjustments.global.is_raw_image == 1 {
-            let encoded = if preserve_extended {
-                linear_to_srgb_extended(color)
-            } else {
-                linear_to_srgb(color)
-            };
+            let encoded = linear_to_srgb_extended(color);
             let gamma = encoded.map(|channel| channel.max(0.0).powf(1.0 / 1.1));
             let contrast = gamma * gamma * (Vec3::splat(3.0) - gamma * 2.0);
             gamma.lerp(contrast, 0.75)
-        } else if preserve_extended {
-            linear_to_srgb_extended(color)
         } else {
-            linear_to_srgb(color)
+            linear_to_srgb_extended(color)
         };
-        if preserve_extended {
-            // The view dispatch writes another RGBA16F intermediate consumed
-            // by display curves, LUTs, and grain.
-            color = color.map(round_rgba16f_storage);
-        }
-        color = apply_all_curves(color, adjustments, preserve_extended);
-        color = apply_local_curves(color, adjustments, mask_bitmaps, x, y, preserve_extended);
+        // The view dispatch writes another RGBA16F intermediate consumed
+        // by display curves, LUTs, and grain.
+        color = color.map(round_rgba16f_storage);
+        color = apply_all_curves(color, adjustments);
+        color = apply_local_curves(color, adjustments, mask_bitmaps, x, y);
         if let Some(lut) = lut {
             color = color.lerp(
                 sample_lut_tetrahedral(color, lut),
@@ -692,19 +642,14 @@ fn round_rgba16f_storage(value: f32) -> f32 {
 
 fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
     let global = &adjustments.global;
-    let graph_v2 = global.edit_graph_version >= 2.0;
     let global_guided_active = global.contrast != 0.0
         || global.highlights != 0.0
         || global.shadows != 0.0
         || global.whites != 0.0
         || global.blacks != 0.0;
-    let global_v2_only_active =
-        graph_v2 && (global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5);
-    let mut radius = (global_guided_active || global_v2_only_active).then_some(if graph_v2 {
-        global.tone_equalizer.params1[1].clamp(4.0, 64.0)
-    } else {
-        3.5
-    });
+    let global_current_active = global.brightness != 0.0 || global.tone_equalizer.params0[0] > 0.5;
+    let mut radius = (global_guided_active || global_current_active)
+        .then_some(global.tone_equalizer.params1[1].clamp(4.0, 64.0));
 
     let mask_count = (adjustments.mask_count as usize).min(adjustments.mask_adjustments.len());
     for mask in &adjustments.mask_adjustments[..mask_count] {
@@ -713,14 +658,9 @@ fn tonal_blur_base_radius(adjustments: &AllAdjustments) -> Option<f32> {
             || mask.shadows != 0.0
             || mask.whites != 0.0
             || mask.blacks != 0.0;
-        let local_v2_only_active =
-            graph_v2 && (mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5);
-        if local_guided_active || local_v2_only_active {
-            let local_radius = if graph_v2 {
-                mask.tone_equalizer.params1[1].clamp(4.0, 64.0)
-            } else {
-                3.5
-            };
+        let local_current_active = mask.brightness != 0.0 || mask.tone_equalizer.params0[0] > 0.5;
+        if local_guided_active || local_current_active {
+            let local_radius = mask.tone_equalizer.params1[1].clamp(4.0, 64.0);
             radius = Some(radius.map_or(local_radius, |current| current.max(local_radius)));
         }
     }
@@ -939,39 +879,6 @@ fn apply_centre_tonal_and_color(
 
 fn blur_to_linear(color: Vec3, is_raw: bool) -> Vec3 {
     if is_raw { color } else { srgb_to_linear(color) }
-}
-
-fn legacy_fixed_atmosphere_dehaze_v1(
-    color: Vec3,
-    blurred: Vec3,
-    is_raw: bool,
-    amount: f32,
-) -> Vec3 {
-    if amount == 0.0 {
-        return color;
-    }
-    let blurred = blur_to_linear(blurred, is_raw);
-    let atmosphere = Vec3::new(0.95, 0.97, 1.0);
-    if amount < 0.0 {
-        let dark = (blurred.min_element() - 0.02).max(0.0);
-        let depth = dark / (dark + 0.2);
-        return color.lerp(atmosphere, amount.abs() * 0.7 * (0.4 + 0.6 * depth));
-    }
-    let pixel_dark = color.min_element();
-    let regional_dark = blurred.min_element();
-    let edge = (scene_luminance(color.max(Vec3::ZERO)).sqrt()
-        - scene_luminance(blurred.max(Vec3::ZERO)).sqrt())
-    .abs();
-    let spatial_dark = regional_dark + (pixel_dark - regional_dark) * smoothstep(0.02, 0.15, edge);
-    let safe_dark = (spatial_dark - 0.02).max(0.0);
-    let transmission = (1.0 - amount * (safe_dark / (safe_dark + 0.2)) * 0.85).max(0.15);
-    let mut recovered = (color - atmosphere) / transmission + atmosphere;
-    let recovered_luma = scene_luminance(recovered.max(Vec3::ZERO));
-    recovered += Vec3::splat(smoothstep(0.1, 0.0, recovered_luma) * (1.0 - transmission) * 0.15);
-    let final_luma = scene_luminance(recovered.max(Vec3::ZERO));
-    Vec3::splat(final_luma)
-        .lerp(recovered, 1.0 + (1.0 - transmission) * 0.5)
-        .max(Vec3::ZERO)
 }
 
 fn apply_scene_dehaze_v1(
@@ -1667,7 +1574,6 @@ fn apply_local_curves(
     masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
     x: u32,
     y: u32,
-    preserve_extended: bool,
 ) -> Vec3 {
     let count = (adjustments.mask_count as usize)
         .min(masks.len())
@@ -1688,7 +1594,6 @@ fn apply_local_curves(
             local.green_curve_count,
             &local.blue_curve,
             local.blue_curve_count,
-            preserve_extended,
         );
         color = blend_mask_layer(color, curved, influence, local.blend_mode);
     }
@@ -1700,13 +1605,7 @@ fn scene_luminance(color: Vec3) -> f32 {
 }
 
 fn scene_luminance_coefficients() -> Vec3 {
-    SCENE_REFERRED_V2_LUMA.with(|v2| {
-        if v2.get() {
-            Vec3::new(0.272_228_72, 0.674_081_74, 0.053_689_52)
-        } else {
-            Vec3::new(0.2126, 0.7152, 0.0722)
-        }
-    })
+    Vec3::new(0.272_228_72, 0.674_081_74, 0.053_689_52)
 }
 
 fn view_encoded_luma(color: Vec3) -> f32 {
@@ -1721,12 +1620,6 @@ fn srgb_to_linear(color: Vec3) -> Vec3 {
             ((channel + 0.055) / 1.055).powf(2.4)
         }
     })
-}
-
-fn linear_to_srgb(color: Vec3) -> Vec3 {
-    color
-        .clamp(Vec3::ZERO, Vec3::ONE)
-        .map(srgb_encode_magnitude)
 }
 
 fn linear_to_srgb_extended(color: Vec3) -> Vec3 {
@@ -1879,33 +1772,6 @@ fn shadow_multiplier(luma: f32, shadows: f32, blacks: f32) -> f32 {
     multiplier
 }
 
-fn apply_highlights_adjustment(color: Vec3, highlights: f32) -> Vec3 {
-    if highlights == 0.0 {
-        return color;
-    }
-    let luma = scene_luminance(color.max(Vec3::ZERO));
-    // Keep the transcendental in its useful domain. Scene-linear values may be far above
-    // display white, where tanh is already saturated but backend approximations can diverge.
-    let mask_input = (luma.max(0.0001) * 1.5).min(8.0).tanh();
-    let mask = smoothstep(0.3, 0.95, mask_input);
-    if mask < 0.001 {
-        return color;
-    }
-    let adjusted = if highlights < 0.0 {
-        let new_luma = if luma <= 1.0 {
-            luma.powf(1.0 - highlights * 1.75)
-        } else {
-            let excess = luma - 1.0;
-            1.0 + excess / (1.0 + excess * -highlights * 6.0)
-        };
-        let tonal = color * (new_luma / luma.max(0.0001));
-        tonal.lerp(Vec3::splat(new_luma), smoothstep(1.0, 10.0, luma))
-    } else {
-        color * 2.0_f32.powf(highlights * 1.75)
-    };
-    color.lerp(adjusted, mask)
-}
-
 fn apply_color_calibration(color: Vec3, settings: ColorCalibrationSettings) -> Vec3 {
     let red = Vec3::new(
         1.0 - settings.red_hue.abs(),
@@ -1971,13 +1837,7 @@ pub(crate) fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
         (280.0, 55.0),
         (330.0, 50.0),
     ];
-    let negative_residual = SCENE_REFERRED_V2_LUMA.with(|v2| {
-        if v2.get() {
-            color.min(Vec3::ZERO)
-        } else {
-            Vec3::ZERO
-        }
-    });
+    let negative_residual = color.min(Vec3::ZERO);
     let safe = color.max(Vec3::ZERO);
     if (safe.x - safe.y).abs() < 0.001 && (safe.y - safe.z).abs() < 0.001 {
         return safe + negative_residual;
@@ -2088,25 +1948,17 @@ pub(crate) fn apply_skin_tone_uniformity(
     ) + negative_residual
 }
 
-pub(crate) fn apply_luma_levels(
-    color: Vec3,
-    settings: LevelsSettings,
-    preserve_extended: bool,
-) -> Vec3 {
+pub(crate) fn apply_luma_levels(color: Vec3, settings: LevelsSettings) -> Vec3 {
     if settings.enabled == 0 {
         return color;
     }
-    let source_luma = if preserve_extended {
-        scene_luminance(color)
-    } else {
-        scene_luminance(color).max(0.0)
-    };
+    let source_luma = scene_luminance(color);
     let input_range = (settings.input_white - settings.input_black).max(0.0001);
     let normalized = (source_luma - settings.input_black) / input_range;
     let output_range = settings.output_white - settings.output_black;
-    let output_luma = if preserve_extended && normalized < 0.0 {
+    let output_luma = if normalized < 0.0 {
         settings.output_black + normalized * output_range
-    } else if preserve_extended && normalized > 1.0 {
+    } else if normalized > 1.0 {
         settings.output_white + (normalized - 1.0) * output_range
     } else {
         settings.output_black
@@ -2118,12 +1970,7 @@ pub(crate) fn apply_luma_levels(
     if source_luma.abs() <= 0.0001 {
         return Vec3::splat(output_luma);
     }
-    let adjusted = color * (output_luma / source_luma);
-    if preserve_extended {
-        adjusted
-    } else {
-        adjusted.clamp(Vec3::ZERO, Vec3::ONE)
-    }
+    color * (output_luma / source_luma)
 }
 
 fn apply_color_grading(
@@ -2200,7 +2047,7 @@ fn apply_vignette(
     }
 }
 
-fn apply_all_curves(color: Vec3, adjustments: &AllAdjustments, preserve_extended: bool) -> Vec3 {
+fn apply_all_curves(color: Vec3, adjustments: &AllAdjustments) -> Vec3 {
     let global = &adjustments.global;
     apply_curve_set(
         color,
@@ -2212,7 +2059,6 @@ fn apply_all_curves(color: Vec3, adjustments: &AllAdjustments, preserve_extended
         global.green_curve_count,
         &global.blue_curve,
         global.blue_curve_count,
-        preserve_extended,
     )
 }
 
@@ -2227,45 +2073,34 @@ fn apply_curve_set(
     green_count: u32,
     blue_curve: &[Point; 16],
     blue_count: u32,
-    preserve_extended: bool,
 ) -> Vec3 {
     let luma_default = is_default_curve(luma_curve, luma_count);
     let red_default = is_default_curve(red_curve, red_count);
     let green_default = is_default_curve(green_curve, green_count);
     let blue_default = is_default_curve(blue_curve, blue_count);
     let rgb_active = !red_default || !green_default || !blue_default;
-    if preserve_extended && luma_default && !rgb_active {
+    if luma_default && !rgb_active {
         return color;
     }
     if !rgb_active {
         return Vec3::new(
-            apply_curve(color.x, luma_curve, luma_count, preserve_extended),
-            apply_curve(color.y, luma_curve, luma_count, preserve_extended),
-            apply_curve(color.z, luma_curve, luma_count, preserve_extended),
+            apply_curve(color.x, luma_curve, luma_count),
+            apply_curve(color.y, luma_curve, luma_count),
+            apply_curve(color.z, luma_curve, luma_count),
         );
     }
     let graded = Vec3::new(
-        apply_curve(color.x, red_curve, red_count, preserve_extended),
-        apply_curve(color.y, green_curve, green_count, preserve_extended),
-        apply_curve(color.z, blue_curve, blue_count, preserve_extended),
+        apply_curve(color.x, red_curve, red_count),
+        apply_curve(color.y, green_curve, green_count),
+        apply_curve(color.z, blue_curve, blue_count),
     );
-    let target_luma = apply_curve(
-        view_encoded_luma(color),
-        luma_curve,
-        luma_count,
-        preserve_extended,
-    );
+    let target_luma = apply_curve(view_encoded_luma(color), luma_curve, luma_count);
     let graded_luma = view_encoded_luma(graded);
-    let mut result = if graded_luma > 0.001 {
+    if graded_luma > 0.001 {
         graded * (target_luma / graded_luma)
     } else {
         Vec3::splat(target_luma)
-    };
-    let maximum = result.max_element();
-    if !preserve_extended && maximum > 1.0 {
-        result /= maximum;
     }
-    result
 }
 
 fn is_default_curve(points: &[Point; 16], count: u32) -> bool {
@@ -2282,13 +2117,8 @@ fn is_default_curve(points: &[Point; 16], count: u32) -> bool {
             .is_some_and(|point| (point.x - 255.0).abs() < 0.1 && (point.y - 255.0).abs() < 0.1)
 }
 
-fn apply_curve(value: f32, points: &[Point; 16], count: u32, preserve_extended: bool) -> f32 {
-    crate::tone::legacy_curves::evaluate_legacy_display_curve_v1(
-        value,
-        points,
-        count,
-        preserve_extended,
-    )
+fn apply_curve(value: f32, points: &[Point; 16], count: u32) -> f32 {
+    crate::tone::legacy_curves::evaluate_legacy_display_curve_v1(value, points, count, true)
 }
 
 fn apply_grain(
