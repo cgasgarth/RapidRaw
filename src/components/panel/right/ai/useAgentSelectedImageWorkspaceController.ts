@@ -49,7 +49,6 @@ import {
 } from '../../../../utils/agent/session/agentSessionHistory';
 import type { SelectedImage } from '../../../ui/AppProperties';
 
-const LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY = 'rawengine.agent.selectedImageLiveSessionAudit.v1';
 const WORKSPACE_SESSION_ID = 'agent-workspace-selected-image';
 const AGENT_AUDIT_EXPORT_FILE_TOOL_NAME = 'rawengine.agent.audit.export';
 
@@ -149,7 +148,6 @@ const createLocalAgentSelectedImageLiveSessionAuditStorageAdapter = ({
   if (typeof globalThis.localStorage === 'undefined') return null;
 
   const storageKey = buildAgentSelectedImageLiveSessionAuditStorageKey({
-    namespace: LIVE_AGENT_SELECTED_IMAGE_SESSION_AUDIT_KEY,
     selectedImagePath,
     sessionId,
   });
@@ -341,12 +339,12 @@ export const useAgentSelectedImageWorkspaceController = ({
     setActivityEntries((entries) => [...entries, buildActivityEntry(entries.length, entry)]);
   }, []);
 
-  const persistAuditRecord = useCallback((record: AgentSelectedImageLiveSessionAuditRecord) => {
+  const persistAuditRecord = useCallback(async (record: AgentSelectedImageLiveSessionAuditRecord) => {
     const adapter = createLocalAgentSelectedImageLiveSessionAuditStorageAdapter({
       selectedImagePath: record.receipt.selectedImagePath,
       sessionId: record.receipt.sessionId,
     });
-    if (adapter !== null) appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
+    if (adapter !== null) await appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
     setAuditRecord(record);
   }, []);
 
@@ -725,7 +723,7 @@ export const useAgentSelectedImageWorkspaceController = ({
         checkpoint: rollbackCheckpoint,
       });
       const recoveryRequestId = rollbackAudit.receipt.recoveries?.at(-1)?.recoveryRequestId;
-      persistAuditRecord(rollbackAudit);
+      await persistAuditRecord(rollbackAudit);
       setStatus('rolled_back');
       pushActivityEntry({
         body: rollbackAudit.receipt.rollbackReceiptGraphRevision ?? rollbackAudit.receipt.rollbackGraphRevision,
