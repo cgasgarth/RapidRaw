@@ -2703,7 +2703,7 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
 }
 
 const BATCH_AUTO_ADJUST_CONTRACT_V1: &str = "rapidraw.batch_auto_adjust.v1";
-const LEGACY_AUTO_ADJUST_ENGINE_V1: &str = "rapidraw.legacy_auto_adjust.v1";
+const AUTO_ADJUST_ENGINE_V1: &str = "rapidraw.auto_adjust.v1";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2800,7 +2800,7 @@ fn batch_auto_adjust_receipt(
         blake3::hash(
             format!(
                 "{}\0{}\0{}\0{}",
-                path, source_revision, persisted.sidecar_revision, LEGACY_AUTO_ADJUST_ENGINE_V1
+                path, source_revision, persisted.sidecar_revision, AUTO_ADJUST_ENGINE_V1
             )
             .as_bytes()
         )
@@ -2811,7 +2811,7 @@ fn batch_auto_adjust_receipt(
             base_adjustment_document_revision,
             adjustment_document_revision: persisted.sidecar_revision.clone(),
             adjustments: metadata.adjustments.clone(),
-            engine: LEGACY_AUTO_ADJUST_ENGINE_V1.to_string(),
+            engine: AUTO_ADJUST_ENGINE_V1.to_string(),
             render_fingerprint: persisted.render_fingerprint.clone(),
             source_identity: source_path.to_string_lossy().to_string(),
             source_revision,
@@ -2993,7 +2993,7 @@ pub async fn commit_batch_auto_adjustment(
     tauri::async_runtime::spawn_blocking(move || {
         let path = request.path;
         let receipt = request.receipt;
-        if receipt.engine != LEGACY_AUTO_ADJUST_ENGINE_V1 || receipt.source_identity.is_empty() {
+        if receipt.engine != AUTO_ADJUST_ENGINE_V1 || receipt.source_identity.is_empty() {
             return Ok(failed_batch_auto_adjust_result_with_code(
                 &path,
                 "invalid_prepared_receipt",
@@ -4589,7 +4589,10 @@ mod tests {
         let source = temp.path().join("source.raw");
         fs::write(&source, b"raw-source").unwrap();
         let metadata = ImageMetadata {
-            adjustments: serde_json::json!({"exposure": 0.5}),
+            adjustments: serde_json::json!({
+                "exposure": 0.5,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
+            }),
             ..ImageMetadata::default()
         };
 
@@ -4604,7 +4607,7 @@ mod tests {
 
         assert_eq!(receipt.adjustments, metadata.adjustments);
         assert_eq!(receipt.base_adjustment_document_revision, base_revision);
-        assert_eq!(receipt.engine, LEGACY_AUTO_ADJUST_ENGINE_V1);
+        assert_eq!(receipt.engine, AUTO_ADJUST_ENGINE_V1);
         assert!(receipt.adjustment_document_revision.starts_with("sha256:"));
         assert!(receipt.render_fingerprint.starts_with("u64:"));
         assert!(receipt.source_revision.starts_with("source-revision-v1:"));
@@ -4665,9 +4668,12 @@ mod tests {
         let base_revision = format!("sha256:{}", "0".repeat(64));
         let receipt = BatchAutoAdjustReceiptV1 {
             adjustment_document_revision: format!("sha256:{}", "1".repeat(64)),
-            adjustments: serde_json::json!({"exposure": 0.65}),
+            adjustments: serde_json::json!({
+                "exposure": 0.65,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
+            }),
             base_adjustment_document_revision: base_revision.clone(),
-            engine: LEGACY_AUTO_ADJUST_ENGINE_V1.into(),
+            engine: AUTO_ADJUST_ENGINE_V1.into(),
             render_fingerprint: "u64:1111111111111111".into(),
             source_identity: "/fixtures/source.raw".into(),
             source_revision: format!("source-revision-v1:{}", "2".repeat(64)),

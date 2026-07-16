@@ -7,10 +7,10 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  type BasicToneAdjustmentPayload,
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import {
   type AgentLiveBasicTonePixel,
@@ -27,7 +27,7 @@ import {
 
 export interface AgentBasicToneDryRunPreviewOptions {
   operationId: string;
-  requestedAdjustments: LegacyBasicToneAdjustmentPayload;
+  requestedAdjustments: BasicToneAdjustmentPayload;
   sessionId: string;
 }
 

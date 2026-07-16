@@ -27,7 +27,6 @@ macro_rules! with_commands {
             ("editor", crate::image_open_session::get_image_open_diagnostics),
             ("editor", crate::image_loader::is_image_cached),
             ("editor", crate::auto_adjust::calculate_auto_adjustments),
-            ("editor", crate::auto_adjust::calculate_legacy_auto_adjustments_v1),
             ("editor", crate::color::auto_edit::analyze_auto_edit),
             ("editor", crate::color::auto_edit::preview_auto_edit_proposal),
             ("editor", crate::color::auto_edit::apply_auto_edit_proposal),

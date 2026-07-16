@@ -4,9 +4,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import {
   BASIC_TONE_ADJUSTMENT_KEYS,
+  type BasicToneAdjustmentPayload,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
@@ -157,7 +157,7 @@ const EXTRA_ADJUSTMENT_KEYS = ['whiteBalanceTechnical', 'vibrance'] as const sat
 const buildRequestedBasicTone = (
   base: Adjustments,
   patch: z.infer<typeof agentGlobalAdjustmentPatchSchema>,
-): LegacyBasicToneAdjustmentPayload => ({
+): BasicToneAdjustmentPayload => ({
   blacks: patch.blacks ?? base.blacks,
   brightness: patch.brightness ?? base.brightness,
   clarity: patch.clarity ?? base.clarity,

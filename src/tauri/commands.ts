@@ -16,7 +16,6 @@ export enum Invokes {
   AnalyzePerspectiveCorrection = 'analyze_perspective_correction',
   BatchDenoiseImages = 'batch_denoise_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
-  CalculateLegacyAutoAdjustmentsV1 = 'calculate_legacy_auto_adjustments_v1',
   CancelAutoEditAnalysis = 'cancel_auto_edit_analysis',
   CancelAiModelLoad = 'cancel_ai_model_load',
   CancelComputationalMergeJob = 'cancel_computational_merge_job',
@@ -127,9 +126,6 @@ export enum Invokes {
   ImportExternalEditorVariant = 'import_external_editor_variant',
   LaunchExternalEditor = 'launch_external_editor',
   InvokeGenerativeReplaceWithMaskDef = 'invoke_generative_replace_with_mask_def',
-  /** @deprecated Use InvokeGenerativeReplaceWithMaskDef. */
-  // biome-ignore lint/suspicious/noDuplicateEnumValues: Backward-compatible typo alias shares the corrected command string.
-  InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
   IsImageCached = 'is_image_cached',
   ListCameraProfiles = 'list_camera_profiles',
   ListImagesInDir = 'list_images_in_dir',

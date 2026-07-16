@@ -7,9 +7,9 @@ import { toneColorCommandEnvelopeV1Schema } from '../../../packages/rawengine-sc
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
+  basicToneAdjustmentPayloadSchema,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  legacyBasicToneAdjustmentPayloadSchema,
 } from '../../../src/utils/basicToneCommandBridge.ts';
 
 const fixtureSchema = z
@@ -27,17 +27,17 @@ const fixtureSchema = z
       })
       .strict(),
     issue: z.literal(2321),
-    legacyAdjustmentPayload: legacyBasicToneAdjustmentPayloadSchema,
-    runtimeStatus: z.literal('typed_command_envelope_compatibility_fixture'),
+    basicToneAdjustmentPayload: basicToneAdjustmentPayloadSchema,
+    runtimeStatus: z.literal('typed_command_envelope_fixture'),
     schemaVersion: z.literal(1),
   })
   .strict();
 
 const fixture = fixtureSchema.parse(
-  JSON.parse(readFileSync('fixtures/validation/compatibility/basic-tone-command-envelope-compatibility.json', 'utf8')),
+  JSON.parse(readFileSync('fixtures/validation/command-envelope/basic-tone-command-envelope.json', 'utf8')),
 );
 const command = buildBasicToneCommandEnvelope(
-  fixture.legacyAdjustmentPayload,
+  fixture.basicToneAdjustmentPayload,
   buildBasicToneImageCommandContext({
     expectedGraphRevision: 'history_2321',
     imagePath: '/validation/typed-adjustment-envelope.CR3',
@@ -66,24 +66,24 @@ const replayParameterKeys = [
 ] as const;
 const replayParameters = Object.fromEntries(replayParameterKeys.map((key) => [key, parsedCommand.parameters[key]]));
 if (JSON.stringify(replayParameters) !== JSON.stringify(fixture.expectedCommandParameters)) {
-  failures.push('Command parameters do not match the compatibility fixture.');
+  failures.push('Command parameters do not match the current fixture.');
 }
-if (replayedAdjustments.exposure !== fixture.legacyAdjustmentPayload.exposure) {
+if (replayedAdjustments.exposure !== fixture.basicToneAdjustmentPayload.exposure) {
   failures.push('Replay did not preserve exposure.');
 }
-if (replayedAdjustments.blacks !== fixture.legacyAdjustmentPayload.blacks) {
+if (replayedAdjustments.blacks !== fixture.basicToneAdjustmentPayload.blacks) {
   failures.push('Replay did not preserve black point.');
 }
 if (replayedAdjustments.brightness !== INITIAL_ADJUSTMENTS.brightness) {
   failures.push('Replay changed brightness even though Basic Tone V1 does not command it yet.');
 }
 
-const invalidLegacyPayload = legacyBasicToneAdjustmentPayloadSchema.safeParse({
-  ...fixture.legacyAdjustmentPayload,
+const invalidBasicTonePayload = basicToneAdjustmentPayloadSchema.safeParse({
+  ...fixture.basicToneAdjustmentPayload,
   exposure: 15,
 });
-if (invalidLegacyPayload.success) {
-  failures.push('Legacy payload compatibility schema accepted out-of-range exposure.');
+if (invalidBasicTonePayload.success) {
+  failures.push('Basic Tone payload schema accepted out-of-range exposure.');
 }
 
 if (failures.length > 0) {
@@ -92,4 +92,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('typed adjustment command envelope ok (legacy payload -> command -> replay)');
+console.log('typed adjustment command envelope ok (basic tone payload -> command -> replay)');
