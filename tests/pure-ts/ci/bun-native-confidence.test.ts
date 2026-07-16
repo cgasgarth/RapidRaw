@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { BUN_COVERAGE_FLOORS, enforceCoverageFloors, summarizeLcov } from '../../../scripts/ci/check-bun-coverage.ts';
 import { buildBunCoverageCommand } from '../../../scripts/ci/run-bun-coverage.ts';
 import {
+  buildRandomizedChildEnv,
   buildRandomizedTestArgs,
   DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS,
   RANDOMIZED_SUITE_RUN_COUNT,
@@ -40,7 +41,10 @@ async function processIsExecuting(pid: number): Promise<boolean> {
   return state !== '' && !state.startsWith('Z');
 }
 
-async function captured(command: string[], options: { cwd: string; env?: Record<string, string>; timeoutMs?: number }) {
+async function captured(
+  command: string[],
+  options: { cwd: string; env?: Record<string, string | undefined>; timeoutMs?: number },
+) {
   const child = Bun.spawn(command, {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
@@ -83,6 +87,11 @@ describe('Bun native confidence gates', () => {
     expect(resolveRandomizedPassTimeout(undefined)).toBe(DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS);
     expect(resolveRandomizedPassTimeout('750')).toBe(750);
     expect(randomizedTestReproduction(seed)).toBe('RAWENGINE_BUN_TEST_SEED=424242 bun run test:randomized');
+    expect(buildRandomizedChildEnv({ CI: 'true', FORCE_COLOR: '1' })).toEqual({
+      CI: 'true',
+      FORCE_COLOR: '1',
+      NO_COLOR: '1',
+    });
     expect(buildBunCoverageCommand()).toEqual([
       'bun',
       'test',
@@ -92,6 +101,38 @@ describe('Bun native confidence gates', () => {
       '--coverage',
       'tests/pure-ts',
     ]);
+  });
+
+  test('prevents color detection from touching Bun lazy stdout during concurrent module loading', async () => {
+    const probe = [
+      'Object.defineProperty(process, "stdout", {',
+      '  configurable: true,',
+      '  get() { throw new Error("lazy stdout was touched"); },',
+      '});',
+      'const colors = await import("picocolors");',
+      'if (colors.default.isColorSupported) throw new Error("color remained enabled");',
+      'process.stderr.write("picocolors loaded without stdout\\n");',
+    ].join('\n');
+    const unsafeResult = await captured(['bun', '-e', probe], {
+      cwd: process.cwd(),
+      env: { CI: 'true', FORCE_COLOR: '', NO_COLOR: '' },
+    });
+    expect(unsafeResult.exitCode).not.toBe(0);
+    expect(unsafeResult.output).toContain('lazy stdout was touched');
+
+    const results = await Promise.all(
+      Array.from({ length: 32 }, () =>
+        captured(['bun', '-e', probe], {
+          cwd: process.cwd(),
+          env: buildRandomizedChildEnv({ CI: 'true' }),
+        }),
+      ),
+    );
+    for (const result of results) {
+      expect(result.exitCode, result.output).toBe(0);
+      expect(result.output).toContain('picocolors loaded without stdout');
+      expect(result.output).not.toContain('lazy stdout was touched');
+    }
   });
 
   test('fails closed when Bun native coverage misses its configured threshold', async () => {
