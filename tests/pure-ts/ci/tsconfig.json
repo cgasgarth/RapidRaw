@@ -129,6 +129,7 @@
     "../tone-equalizer-settings.test.ts",
     "../utils/raw-warning-receipts.test.ts",
     "../scoped-autofix.test.ts",
+    "../validation/browserHarnessReleaseGate.test.ts",
     "../ui/editor-before-after-compare.test.ts",
     "../ui/editor-workspace-preferences.test.ts",
     "../ui/lens-correction-session.test.ts",

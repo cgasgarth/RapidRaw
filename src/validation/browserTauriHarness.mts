@@ -4,6 +4,7 @@ import { Invokes } from '../tauri/commands.ts';
 import { INITIAL_ADJUSTMENTS } from '../utils/adjustments.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
+import { createBrowserHarnessReleaseGate } from './browserHarnessReleaseGate.ts';
 import type {
   BrowserHarnessImage,
   BrowserTauriEventCallback,
@@ -24,6 +25,7 @@ declare global {
 const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === '1';
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
+let imageOpenCompletionGate = createBrowserHarnessReleaseGate();
 const commandNames: Record<
   | 'analyzeAutoEdit'
   | 'analyzePerspectiveCorrection'
@@ -298,6 +300,7 @@ export const installBrowserTauriHarness = (): void => {
     for (const callbackId of eventListeners.get(event) ?? [])
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
+  imageOpenCompletionGate = createBrowserHarnessReleaseGate();
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
     aiSubjectMaskResponses: [],
     applyAdjustmentsToPathsDelayMs: 0,
@@ -310,11 +313,13 @@ export const installBrowserTauriHarness = (): void => {
     enabled: true,
     failNextSettingsSave: false,
     imageOpenDelayMs: 250,
+    holdNextImageOpenCompletion: imageOpenCompletionGate.holdNext,
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
     resetAdjustmentsResponses: [],
     perspectiveAnalysisResponses: [],
+    releaseHeldImageOpenCompletion: imageOpenCompletionGate.releaseHeld,
     revokedObjectUrls: [],
     tonePlacementResponses: [],
     viewerSampleResponses: [],
@@ -835,19 +840,17 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         },
         sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
       });
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            decodeReadyMillis: 250,
-            decoded,
-            imageId: request.imageId ?? request.path ?? 'browser-harness-image',
-            joinedPrefetch: false,
-            metadataFingerprint: '0'.repeat(64),
-            metadataReadyMillis: 1,
-            sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
-          });
-        }, window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.imageOpenDelayMs ?? 250);
-      });
+      return imageOpenCompletionGate
+        .wait(window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.imageOpenDelayMs ?? 250)
+        .then(() => ({
+          decodeReadyMillis: 250,
+          decoded,
+          imageId: request.imageId ?? request.path ?? 'browser-harness-image',
+          joinedPrefetch: false,
+          metadataFingerprint: '0'.repeat(64),
+          metadataReadyMillis: 1,
+          sessionId: request.sessionId ?? { imageSession: 0, selectionGeneration: 0 },
+        }));
     }
     case commandNames.scheduleImagePrefetch:
       return Promise.resolve({

@@ -2806,7 +2806,7 @@ try {
   await page.evaluate(() => {
     const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
     if (!harness) throw new Error('Browser Tauri harness was not installed before image open.');
-    harness.imageOpenDelayMs = 2_000;
+    harness.holdNextImageOpenCompletion();
   });
   await page
     .getByRole('button', { name: /browser-harness\.ARW/u })
@@ -2823,11 +2823,12 @@ try {
     undefined,
     { timeout: 10_000 },
   );
-  await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
   await page.evaluate(() => {
-    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
-    if (harness) harness.imageOpenDelayMs = 250;
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.releaseHeldImageOpenCompletion() !== true) {
+      throw new Error('Browser Tauri harness did not hold the selected image-open completion.');
+    }
   });
+  await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Editor preview' }).waitFor({ timeout: 10_000 });
   await page.getByRole('region', { name: 'Image preview' }).waitFor({ timeout: 10_000 });
