@@ -579,6 +579,7 @@ export const useKeyboardShortcuts = ({
     ];
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       const state = getStoreState();
 
       const isCommandPaletteShortcut =
