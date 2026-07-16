@@ -1,16 +1,24 @@
 import { describe, expect, test } from 'bun:test';
 
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
+  copyEditDocumentV2Nodes,
+  createDefaultEditDocumentV2,
+  legacyAdjustmentsToEditDocumentV2,
+  updateEditDocumentV2Node,
+} from '../../../src/utils/editDocumentV2';
+import {
+  buildEditorPersistenceRequest,
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
   type EditorPersistenceInput,
   type EditorPersistenceReceipt,
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
+  editorPersistenceRequestSchema,
 } from '../../../src/utils/editorPersistenceEffectRunner';
 import type { EditApplicationReceipt } from '../../../src/utils/editTransaction';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -66,6 +74,12 @@ class FakeClock {
 
 const adjustments = (exposure: number) => ({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure });
 
+const currentDocument = (exposure: number) =>
+  updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', (tone) => ({
+    ...tone,
+    exposure,
+  }));
+
 const receipt = (path: string, revision = 1): EditorPersistenceReceipt => ({
   path,
   sidecarRevision: `sha256:${String(revision).padStart(64, '0')}`,
@@ -90,7 +104,7 @@ const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersisten
   return {
     adjustmentRevision: 1,
     adjustments: adjustments(1),
-    editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments(1)),
+    editDocumentV2: currentDocument(1),
     imageSessionId: 'session-a',
     interactionActive: false,
     multiSelection: null,
@@ -133,6 +147,87 @@ function harness(
 }
 
 describe('editor persistence effect runner', () => {
+  test('seals migration-shaped editor state into the exact strict current native request', () => {
+    const migrationShaped = legacyAdjustmentsToEditDocumentV2(adjustments(0.75));
+    migrationShaped.extensions['quarantinedNodes'] = { future_curve_v3: { schemaVersion: 3 } };
+
+    const request = buildEditorPersistenceRequest({
+      editDocumentV2: migrationShaped,
+      path: '/fixtures/a.raw',
+      transaction: {
+        baseAdjustmentRevision: 0,
+        imageSessionId: 'session-a',
+        nextAdjustmentRevision: 1,
+        transactionId: 'transaction-a-1',
+      },
+    });
+
+    expect(request.editDocumentV2.extensions).toEqual({
+      quarantinedNodes: { future_curve_v3: { schemaVersion: 3 } },
+    });
+    expect(request.editDocumentV2).not.toHaveProperty('migration');
+    expect(JSON.stringify(request)).not.toContain('legacyAdjustments');
+    expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
+  });
+
+  test('rejects malformed, flat legacy, and unquarantined future authority without replacing the last valid request', () => {
+    const valid = buildEditorPersistenceRequest({ editDocumentV2: currentDocument(0.4), path: '/fixtures/a.raw' });
+    let persisted = { catalogRevision: 7, request: structuredClone(valid), sidecarRevision: 'sha256:last-valid' };
+    const malformed = structuredClone(valid);
+    const malformedTone = malformed.editDocumentV2.nodes['scene_global_color_tone'];
+    if (malformedTone === undefined) throw new Error('Expected current scene-global tone node.');
+    malformedTone.params['exposure'] = 8;
+    const flatLegacy = { adjustments: { exposure: 1 }, path: '/fixtures/a.raw' };
+    const future = structuredClone(valid);
+    Object.assign(future.editDocumentV2.nodes, {
+      future_curve_v3: {
+        enabled: true,
+        implementationVersion: 3,
+        params: {},
+        process: 'scene_referred_v3',
+        type: 'future_curve_v3',
+      },
+    });
+
+    for (const candidate of [malformed, flatLegacy, future]) {
+      const result = editorPersistenceRequestSchema.safeParse(candidate);
+      expect(result.success).toBeFalse();
+      if (result.success) {
+        persisted = {
+          catalogRevision: persisted.catalogRevision + 1,
+          request: result.data,
+          sidecarRevision: 'sha256:unexpected-replacement',
+        };
+      }
+    }
+    expect(persisted).toEqual({ catalogRevision: 7, request: valid, sidecarRevision: 'sha256:last-valid' });
+  });
+
+  test('persists a committed edit through autosave and exact restart/reopen hydration', async () => {
+    let persisted: ReturnType<typeof buildEditorPersistenceRequest> | null = null;
+    const { accepted, clock, failures, runner } = harness(async (execution) => {
+      persisted = buildEditorPersistenceRequest({
+        editDocumentV2: execution.editDocumentV2,
+        path: execution.path,
+        transaction: execution.transaction,
+      });
+      return receipt(execution.path, execution.revision);
+    });
+    const initial = currentDocument(0);
+    runner.installSession(input({ adjustmentRevision: 0, adjustments: adjustments(0), editDocumentV2: initial }));
+    const edited = currentDocument(1.25);
+    runner.submitCommitted(input({ adjustments: adjustments(1.25), editDocumentV2: edited }), 0);
+    clock.advance(0);
+    await flush();
+
+    expect(failures).toHaveLength(0);
+    expect(accepted).toHaveLength(1);
+    if (persisted === null) throw new Error('Expected autosave persistence request.');
+    const restarted = JSON.parse(JSON.stringify(persisted)) as { editDocumentV2: unknown };
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: restarted.editDocumentV2 }, adjustments(1.25));
+    expect(reopened).toEqual(edited);
+  });
+
   test('accepts native receipt envelopes for primary and multi-selection saves', () => {
     const nativeReceipt = editorPersistenceReceiptSchema.parse({
       adjustmentRevision: 1,
@@ -272,7 +367,12 @@ describe('editor persistence effect runner', () => {
     runner.submitCommitted(input(), 0);
     clock.advance(0);
     runner.submitCommitted(
-      input({ adjustmentRevision: 2, adjustments: adjustments(2), receipt: editReceipt('session-a', 2) }),
+      input({
+        adjustmentRevision: 2,
+        adjustments: adjustments(2),
+        editDocumentV2: currentDocument(2),
+        receipt: editReceipt('session-a', 2),
+      }),
       0,
     );
     clock.advance(0);
@@ -287,6 +387,7 @@ describe('editor persistence effect runner', () => {
     await flush();
 
     expect(accepted.map(({ execution }) => execution.revision)).toEqual([2]);
+    expect(accepted[0]?.execution.editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(2);
     expect(failures).toHaveLength(0);
     expect(snapshots.at(-1)).toMatchObject({ adjustments: adjustments(2), path: '/fixtures/a.raw' });
   });

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { z } from 'zod';
 
-import type { EditDocumentEditorSection } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentEditorSection, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
@@ -34,6 +34,7 @@ import {
 } from '../../utils/copyPasteEditTransaction';
 import { copyEditDocumentV2Nodes, selectEditDocumentV2CopyPayload } from '../../utils/editDocumentV2';
 import {
+  buildEditorPersistenceRequest,
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
 } from '../../utils/editorPersistenceEffectRunner';
@@ -75,7 +76,7 @@ import {
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 
-export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
+export const debouncedSetHistory = debounce((_newAdj: Adjustments) => {
   const state = useEditorStore.getState();
   state.pushHistory({
     adjustmentRevision: state.adjustmentRevision,
@@ -84,16 +85,21 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
 }, 500);
 
 export const debouncedSave = debounce(
-  (path: string, adjustmentsToSave: Adjustments, transaction?: EditTransactionPersistenceContext) => {
-    const editDocumentV2 = useEditorStore.getState().editDocumentV2;
+  (
+    path: string,
+    adjustmentsToSave: Adjustments,
+    editDocumentV2: EditDocumentV2,
+    transaction?: EditTransactionPersistenceContext,
+  ) => {
+    const request = buildEditorPersistenceRequest({
+      editDocumentV2,
+      path,
+      ...(transaction === undefined ? {} : { transaction }),
+    });
     void trackEditorPersistence(
       path,
       adjustmentsToSave,
-      invokeWithSchema(
-        Invokes.SaveMetadataAndUpdateThumbnail,
-        { path, editDocumentV2, transaction },
-        editorPersistenceReceiptSchema,
-      ),
+      invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
     ).catch((err: unknown) => {
       console.error('Auto-save failed:', err);
       toast.error(`Failed to save changes: ${formatUnknownError(err)}`);

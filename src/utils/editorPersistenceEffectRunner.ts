@@ -1,13 +1,14 @@
 import { z } from 'zod';
-import type {
-  EditDocumentNodeTypeV2,
-  EditDocumentV2,
-  EditDocumentV2CopyPayload,
+import {
+  currentRenderEditDocumentV2Schema,
+  type EditDocumentNodeTypeV2,
+  type EditDocumentV2,
+  type EditDocumentV2CopyPayload,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
-import { copyEditDocumentV2Nodes } from './editDocumentV2';
+import { copyEditDocumentV2Nodes, prepareEditDocumentV2ForPersistence } from './editDocumentV2';
 import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
 import { invokeWithSchema } from './tauriSchemaInvoke';
@@ -27,6 +28,37 @@ export const editorPersistenceReceiptSchema = z
   .strict();
 
 export const editorPersistenceReceiptArraySchema = z.array(editorPersistenceReceiptSchema);
+
+const editorPersistenceTransactionSchema = z
+  .object({
+    baseAdjustmentRevision: z.number().int().nonnegative(),
+    imageSessionId: z.string().min(1),
+    nextAdjustmentRevision: z.number().int().nonnegative(),
+    transactionId: z.string().min(1),
+  })
+  .strict()
+  .refine((transaction) => transaction.nextAdjustmentRevision > transaction.baseAdjustmentRevision, {
+    message: 'nextAdjustmentRevision must advance baseAdjustmentRevision.',
+  });
+
+/** Exact frontend-to-native save boundary. No migration metadata or compatibility extensions may cross it. */
+export const editorPersistenceRequestSchema = z
+  .object({
+    editDocumentV2: currentRenderEditDocumentV2Schema,
+    path: z.string().trim().min(1),
+    transaction: editorPersistenceTransactionSchema.nullable().optional(),
+  })
+  .strict();
+
+export type EditorPersistenceRequest = z.infer<typeof editorPersistenceRequestSchema>;
+
+export const buildEditorPersistenceRequest = (
+  request: Omit<EditorPersistenceRequest, 'editDocumentV2'> & { editDocumentV2: EditDocumentV2 },
+): EditorPersistenceRequest =>
+  editorPersistenceRequestSchema.parse({
+    ...request,
+    editDocumentV2: prepareEditDocumentV2ForPersistence(request.editDocumentV2),
+  });
 
 export interface EditorPersistenceSnapshot {
   adjustments: Adjustments;
@@ -88,18 +120,15 @@ export interface EditorPersistenceEffectRunnerOptions {
 }
 
 const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal) => {
+  const request = buildEditorPersistenceRequest({
+    editDocumentV2: input.editDocumentV2,
+    path: input.path,
+    ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
+  });
   const receipt = await trackEditorPersistence(
     input.path,
     input.adjustments,
-    invokeWithSchema(
-      Invokes.SaveMetadataAndUpdateThumbnail,
-      {
-        editDocumentV2: input.editDocumentV2,
-        path: input.path,
-        ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
-      },
-      editorPersistenceReceiptSchema,
-    ),
+    invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
   );
   if (receipt.path !== input.path) {
     throw new Error(`editor_persistence.receipt_path_mismatch:${receipt.path}:${input.path}`);

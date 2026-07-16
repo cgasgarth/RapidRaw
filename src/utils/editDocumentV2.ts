@@ -118,18 +118,13 @@ export const createDefaultEditDocumentV2 = (): EditDocumentV2 => {
       },
     ]),
   );
-  const legacyAdjustments = Object.fromEntries(
-    Object.entries(INITIAL_ADJUSTMENTS).filter(
-      ([key]) => key !== 'effectsEnabled' && !PROVENANCE_FIELDS.has(key) && nodeTypeForField(key) === null,
-    ),
-  );
   const nodeParams = (nodeType: EditDocumentNodeTypeV2): Record<string, unknown> => {
     const node = nodes[nodeType];
     if (node === undefined) throw new Error(`edit_document.default_node_missing:${nodeType}`);
     return node.params;
   };
   return editDocumentV2Schema.parse({
-    extensions: { legacyAdjustments },
+    extensions: {},
     // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
     geometry: nodeParams('geometry'),
     graphProcess: 'scene_referred_v2',
@@ -451,6 +446,26 @@ export const prepareEditDocumentV2ForRender = (
   };
   currentRenderEditDocumentV2Schema.parse(next);
   return next;
+};
+
+/**
+ * Seal typed editor authority for persistence. Derived migration and flat
+ * projection metadata are excluded; only current future-node quarantine may
+ * cross the native save boundary.
+ */
+export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
+  const quarantinedNodes = document.extensions['quarantinedNodes'];
+  return currentRenderEditDocumentV2Schema.parse({
+    extensions: quarantinedNodes === undefined ? {} : { quarantinedNodes },
+    geometry: document.geometry,
+    graphProcess: document.graphProcess,
+    layers: document.layers,
+    nodes: document.nodes,
+    provenance: document.provenance,
+    schemaVersion: document.schemaVersion,
+    sourceDecode: document.sourceDecode,
+    sourceArtifacts: document.sourceArtifacts,
+  });
 };
 
 export interface PreparedCurrentEditDocumentPayload {

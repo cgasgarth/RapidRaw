@@ -83,6 +83,7 @@ import {
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
 import { editDocumentV2ToLegacyAdjustments } from '../../utils/editDocumentV2';
+import { buildEditorPersistenceRequest } from '../../utils/editorPersistenceEffectRunner';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from '../../utils/hdrAutoStackSelection';
@@ -605,17 +606,17 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
         void (async () => {
           let expectedBaseRevision: string | null = null;
-          if (capturedSelection !== null && capturedAdjustments !== null) {
+          if (capturedSelection !== null && capturedAdjustments !== null && capturedEditDocumentV2 !== null) {
             const matchingSave = await awaitMatchingEditorSave(capturedSelection.path, capturedAdjustments);
             const barrierReceipt =
               matchingSave ??
               (await invokeWithSchema(
                 Invokes.SaveMetadataAndUpdateThumbnail,
-                {
+                buildEditorPersistenceRequest({
                   editDocumentV2: capturedEditDocumentV2,
                   path: capturedSelection.path,
                   transaction: null,
-                },
+                }),
                 batchAutoAdjustPersistenceBarrierReceiptSchema,
               ));
             barrierPersisted = true;
@@ -756,7 +757,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   currentAdjustments: current.selectedImage ? current.adjustmentSnapshot.value : null,
                 })
               ) {
-                debouncedSave(capturedSelection.path, capturedAdjustments);
+                if (capturedEditDocumentV2 !== null) {
+                  debouncedSave(capturedSelection.path, capturedAdjustments, capturedEditDocumentV2);
+                }
               }
             }
             console.error('Failed to apply auto adjustments to paths:', err);

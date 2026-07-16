@@ -535,6 +535,7 @@ export const useKeyboardShortcuts = ({
                 debouncedSave(
                   prepared.imagePath,
                   result.after,
+                  result.afterEditDocumentV2,
                   buildEditTransactionPersistenceContext(prepared.request, result),
                 );
               }
