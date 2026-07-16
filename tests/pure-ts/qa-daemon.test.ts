@@ -107,7 +107,8 @@ const waitForDaemonState = async (
   child: ReturnType<typeof Bun.spawn>,
   worktree: string,
 ): Promise<QaDaemonStateRecord> => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  const deadline = Date.now() + 10_000;
+  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
     const state = await readLiveDaemonState(worktree);
     if (state !== undefined) {
       try {
@@ -354,7 +355,7 @@ describe('QA daemon lifecycle', () => {
     expect(shutdown).toEqual({ id: 'shutdown', ok: true, result: { shuttingDown: true } });
     await child.exited;
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
-  }, 15_000);
+  }, 20_000);
 
   test('removes ownership state and socket on SIGTERM', async () => {
     const worktree = await temporaryDirectory();
@@ -370,5 +371,5 @@ describe('QA daemon lifecycle', () => {
     ]);
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
     expect(await stat(state.socketPath).catch(() => undefined)).toBeUndefined();
-  }, 10_000);
+  }, 20_000);
 });

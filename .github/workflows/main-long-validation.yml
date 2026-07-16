@@ -58,6 +58,35 @@ jobs:
       - name: Run Bun tests with native parallel scheduling
         run: bun run test:unit
 
+  frontend-coverage:
+    name: 'frontend: Bun native coverage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Enforce native Bun coverage thresholds
+        run: bun run test:coverage
+      - name: Upload Bun coverage report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-bun-coverage-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/bun-coverage/lcov.info
+          retention-days: 14
+          if-no-files-found: error
+
+  frontend-randomized:
+    name: 'frontend: randomized isolation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Repeat the Bun suite in a reproducible random order
+        env:
+          RAWENGINE_BUN_TEST_SEED: ${{ github.run_id }}
+        run: bun run test:randomized
+
   frontend-browser:
     name: 'frontend: browser and visual runtime'
     runs-on: ubuntu-latest
@@ -100,6 +129,8 @@ jobs:
       - frontend-static
       - frontend-contracts
       - frontend-unit
+      - frontend-coverage
+      - frontend-randomized
       - frontend-browser
       - frontend-bundle
     if: ${{ always() }}

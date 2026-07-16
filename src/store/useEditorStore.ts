@@ -345,7 +345,7 @@ const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorS
         source: { identity: update.selectedImage?.path ?? null, kind: 'original' },
       };
     }
-    update.transformedOriginalUrl = null;
+    if (!('transformedOriginalUrl' in update)) update.transformedOriginalUrl = null;
     update.previewQualityStatus = null;
     update.lastReferenceMatchApplicationReceipt = null;
     update.referenceMatchPreview = null;

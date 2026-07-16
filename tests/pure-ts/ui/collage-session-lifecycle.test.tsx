@@ -4,10 +4,11 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const calls: Array<{ args: Record<string, unknown>; command: string }> = [];
-const invoke = mock(async (command: string, args: Record<string, unknown> = {}) => {
+const defaultInvoke = async (command: string, args: Record<string, unknown> = {}) => {
   calls.push({ args, command });
   return command === 'load_metadata' ? { adjustments: null } : [1, 2, 3];
-});
+};
+const invoke = mock(defaultInvoke);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
 const { CollageSession, default: CollageModal } = await import('../../../src/components/modals/editing/CollageModal');
@@ -20,6 +21,7 @@ afterEach(async () => {
   cleanup = null;
   calls.length = 0;
   invoke.mockClear();
+  invoke.mockImplementation(defaultInvoke);
   document?.body.replaceChildren();
 });
 
