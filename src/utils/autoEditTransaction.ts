@@ -1,38 +1,10 @@
 import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { AdjustmentSnapshot } from './adjustmentSnapshots';
 import { publishAdjustmentSnapshot } from './adjustmentSnapshots';
-import { selectEditDocumentNode } from './editDocumentSelectors';
+import type { Adjustments } from './adjustments';
 import { type EditNodeOperation, type EditTransactionRequest, reduceEditTransaction } from './editTransaction';
 
-export interface AutoEditAdjustmentProposal {
-  blackWhiteMixer: EditDocumentNodeParamsV2<'black_white_mixer'>['blackWhiteMixer'];
-  blacks: number;
-  brightness: number;
-  centré: number;
-  clarity: number;
-  contrast: number;
-  dehaze: number;
-  exposure: number;
-  highlights: number;
-  shadows: number;
-  vibrance: number;
-  vignetteAmount: number;
-  whiteBalanceTechnical: EditDocumentNodeParamsV2<'camera_input'>['whiteBalanceTechnical'];
-  whites: number;
-}
-
-export const selectAutoEditAdjustmentProposal = (document: EditDocumentV2): AutoEditAdjustmentProposal => ({
-  blackWhiteMixer: selectEditDocumentNode(document, 'black_white_mixer').params['blackWhiteMixer'],
-  ...selectEditDocumentNode(document, 'scene_global_color_tone').params,
-  centré: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['centré'],
-  clarity: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['clarity'],
-  dehaze: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['dehaze'],
-  vibrance: selectEditDocumentNode(document, 'color_presence').params['vibrance'],
-  vignetteAmount: selectEditDocumentNode(document, 'display_creative').params['vignetteAmount'],
-  whiteBalanceTechnical: selectEditDocumentNode(document, 'camera_input').params['whiteBalanceTechnical'],
-});
-
-const buildAutoEditNodeOperations = (adjustments: AutoEditAdjustmentProposal): readonly EditNodeOperation[] => [
+const buildAutoEditNodeOperations = (adjustments: Adjustments): readonly EditNodeOperation[] => [
   {
     nodeType: 'scene_global_color_tone',
     patch: {
@@ -180,13 +152,13 @@ export const createAutoEditPreviewSession = ({
           baseAdjustmentRevision: base.adjustmentRevision,
           history: 'none',
           imageSessionId: base.imageSessionId,
-          operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
+          operations: buildAutoEditNodeOperations(adjustments),
           persistence: 'preview-only',
           source: 'auto-edit',
           transactionId: `auto-edit-preview:${proposalId}`,
         },
         base.imageSessionId,
-      ).afterEditDocumentV2,
+      ).after,
     ),
   };
 };
@@ -234,7 +206,7 @@ export const buildAutoEditTransactionRequest = (
   baseAdjustmentRevision: base.adjustmentRevision,
   history: 'single-entry',
   imageSessionId: base.imageSessionId,
-  operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
+  operations: buildAutoEditNodeOperations(adjustments),
   persistence: 'commit',
   source: 'auto-edit',
   transactionId,

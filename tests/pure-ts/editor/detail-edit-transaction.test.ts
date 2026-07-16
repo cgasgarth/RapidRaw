@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentDetailDenoiseDehazeV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { DetailsAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildDetailEditTransaction,
@@ -73,18 +72,15 @@ describe('detail edit transaction', () => {
       { nodeType: 'detail_denoise_dehaze', patch: { sharpness: 25 }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['sharpness'],
+      changedKeys: ['nodes.detail_denoise_dehaze.params.sharpness'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
     expect(
-      editDocumentDetailDenoiseDehazeV2Schema.parse(result.afterEditDocumentV2.nodes['detail_denoise_dehaze']?.params)
-        .sharpness,
+      editDocumentDetailDenoiseDehazeV2Schema.parse(result.after.nodes['detail_denoise_dehaze']?.params).sharpness,
     ).toBe(25);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -165,16 +161,14 @@ describe('detail edit transaction', () => {
       buildDetailEditTransaction(state, identity(), DetailsAdjustment.LocalContrastRadiusPx, 42, 'local-radius'),
     );
 
-    expect(result.changedKeys).toEqual(['localContrastRadiusPx']);
+    expect(result.changedKeys).toEqual(['nodes.detail_denoise_dehaze.params.localContrastRadiusPx']);
     expect(
-      editDocumentDetailDenoiseDehazeV2Schema.parse(result.afterEditDocumentV2.nodes['detail_denoise_dehaze']?.params)
+      editDocumentDetailDenoiseDehazeV2Schema.parse(result.after.nodes['detail_denoise_dehaze']?.params)
         .localContrastRadiusPx,
     ).toBe(42);
     expect(result.after.nodes['detail_denoise_dehaze']).not.toBe(beforeDetail);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(
-      useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['localContrastRadiusPx'],
-    ).toBe(42);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(42);
 
     useEditorStore.getState().undo();
     expect(
@@ -274,7 +268,7 @@ describe('detail edit transaction', () => {
     const result = state.applyEditTransaction(
       buildDetailEditTransaction(state, fallbackIdentity, DetailsAdjustment.Sharpness, 18, 'fallback-detail'),
     );
-    expect(result).toMatchObject({ changedKeys: ['sharpness'], noOp: false });
+    expect(result).toMatchObject({ changedKeys: ['nodes.detail_denoise_dehaze.params.sharpness'], noOp: false });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackIdentity.imageSessionId,
       transactionId: 'fallback-detail',

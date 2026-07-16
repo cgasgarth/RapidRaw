@@ -91,7 +91,10 @@ describe('app event logger', () => {
         action: 'build_basic_tone_command',
         component: 'editor.edit-command',
         details: {
-          changedKeys: ['exposure', 'contrast'],
+          changedKeys: [
+            'nodes.scene_global_color_tone.params.exposure',
+            'nodes.scene_global_color_tone.params.contrast',
+          ],
           commandType: 'toneColor.setBasicTone',
           dryRun: true,
           imagePath: '/Users/example/Pictures/Capture One/Alaska/private-frame.nef',

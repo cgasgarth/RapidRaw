@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { PerspectiveCorrectionSettings } from '../../../packages/rawengine-schema/src/geometry/perspective/perspectiveSchemas';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
@@ -106,14 +105,22 @@ describe('perspective correction edit transaction', () => {
       },
     ]);
     const result = state.applyEditTransaction(request);
+    const resultGeometry = editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params);
 
     expect(resultGeometry.perspectiveCorrection.resolvedPlan).toEqual(resolvedPlan);
     expect(result.after.nodes['geometry']).not.toBe(beforeGeometry);
     expect(resultGeometry.perspectiveCorrection).toEqual(result.after.geometry.perspectiveCorrection);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
+    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('perspectiveCorrection');
+    const reopened = hydrateImageOpenEditDocumentV2(
+      {
+        adjustments: structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
+        editDocumentV2: structuredClone(result.after),
+      },
+      structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
+    );
     expect(editDocumentGeometryV2Schema.parse(reopened.nodes['geometry']?.params).perspectiveCorrection).toEqual(
-      result.after.perspectiveCorrection,
+      resultGeometry.perspectiveCorrection,
     );
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -208,7 +215,11 @@ describe('perspective correction edit transaction', () => {
     const result = state.applyEditTransaction(
       buildPerspectiveCorrectionEditTransaction(state, fallbackIdentity, { amount: 72 }, 'fallback-perspective'),
     );
-    expect(result).toMatchObject({ changedKeys: ['perspectiveCorrection'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.geometry.params.perspectiveCorrection'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,

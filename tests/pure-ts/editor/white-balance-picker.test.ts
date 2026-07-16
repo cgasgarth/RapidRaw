@@ -170,17 +170,13 @@ describe('white balance picker runtime command path', () => {
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
-    expect(selectEditDocumentNode(state.editDocumentV2, 'camera_input').params['whiteBalanceTechnical'].kelvin).toBe(
-      command.receipt.resultingKelvin,
-    );
-    expect(selectEditDocumentNode(state.editDocumentV2, 'camera_input').params['whiteBalanceTechnical'].duv).toBe(
-      command.receipt.resultingDuv,
-    );
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.kelvin).toBe(command.receipt.resultingKelvin);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.duv).toBe(command.receipt.resultingDuv);
     expect(result.after.nodes['camera_input']?.params['whiteBalanceTechnical']).toMatchObject({
       mode: 'chromaticity',
       source: 'picker',
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(result.beforeEditDocumentV2.nodes['geometry']);
+    expect(result.after.nodes['geometry']).toBe(result.before.nodes['geometry']);
     expect(state.finalPreviewUrl).toBeNull();
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -252,7 +248,13 @@ describe('white balance picker runtime command path', () => {
       baseAdjustmentRevision: 0,
       history: 'single-entry',
       imageSessionId: stale.imageSessionId,
-      operations: [{ patch: { exposure: 0.25 }, type: 'patch-adjustments' }],
+      operations: [
+        {
+          nodeType: 'scene_global_color_tone',
+          patch: { exposure: 0.25 },
+          type: 'patch-edit-document-node',
+        },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',

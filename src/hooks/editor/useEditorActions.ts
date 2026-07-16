@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { z } from 'zod';
+
 import {
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentEditorSection,
-  type EditDocumentV2,
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+
 import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -13,14 +14,13 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
-import { type Adjustments, INITIAL_ADJUSTMENTS, PasteMode } from '../../utils/adjustments';
-import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from '../../utils/appEventLogger';
 import {
-  BASIC_TONE_ADJUSTMENT_KEYS,
-  buildBasicToneCommandEnvelope,
-  buildBasicToneImageCommandContext,
-  hasBasicToneAdjustmentChange,
-} from '../../utils/basicToneCommandBridge';
+  type Adjustments,
+  bindTypedCurveGraphVersion,
+  INITIAL_ADJUSTMENTS,
+  normalizeLoadedAdjustments,
+  PasteMode,
+} from '../../utils/adjustments';
 import {
   buildContextAutoAdjustEditTransaction,
   captureContextAutoAdjustBase,
@@ -37,6 +37,8 @@ import {
 import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
 import {
   copyEditDocumentV2Nodes,
+  legacyAdjustmentsToEditDocumentV2,
+  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   selectEditDocumentV2CopyPayload,
   setEditDocumentV2NodeEnabled,
 } from '../../utils/editDocumentV2';
@@ -57,11 +59,10 @@ import {
   resolveEditorZoom,
 } from '../../utils/editorZoom';
 import {
-  buildAdjustmentMutationOperations,
   buildEditorSectionNodeEnablementOperations,
   buildEditTransactionPersistenceContext,
+  type EditNodeOperation,
   type EditTransactionPersistenceContext,
-  type EditTransactionRequest,
 } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
@@ -82,7 +83,7 @@ import {
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debounce } from '../../utils/timing';
 
-export const debouncedSetHistory = debounce((_newAdj: Adjustments) => {
+export const debouncedSetHistory = debounce((_newAdjustments: Adjustments) => {
   const state = useEditorStore.getState();
   state.pushHistory({
     adjustmentRevision: state.adjustmentRevision,
@@ -118,78 +119,45 @@ export const awaitMatchingEditorSave = async (
   document: EditDocumentV2,
 ): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, document);
 
-const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
 const lutLoadResponseSchema = z.object({ size: z.number().int().positive() }).strict();
 const androidContentUriNameSchema = z.string().min(1);
 let contextAutoAdjustRequestGeneration = 0;
 
 const createOperationId = (): string => crypto.randomUUID();
 
-const getChangedBasicToneKeys = (previous: Adjustments, next: Adjustments): Array<string> =>
-  BASIC_TONE_ADJUSTMENT_KEYS.filter((key) => previous[key] !== next[key]);
-
 export function useEditorActions() {
-  const setEditor = useEditorStore((s) => s.setEditor);
   const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
 
-  const setAdjustments = useCallback(
-    (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
+  const commitEditNodeOperations = useCallback(
+    (operations: readonly EditNodeOperation[]) => {
       const state = useEditorStore.getState();
-      const prev = state.adjustmentSnapshot.value;
-      const proposedAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
-      const newAdjustments = reconcileReferenceMatchReceiptsAfterEdit(prev, proposedAdjustments);
-      const expectedGraphRevision = `history_${state.historyIndex + 1}`;
-      const commandContext =
-        state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
-          ? buildBasicToneImageCommandContext({
-              expectedGraphRevision,
-              imagePath: state.selectedImage.path,
-              operationId: createOperationId(),
-              sessionId: BASIC_TONE_SESSION_ID,
-            })
-          : null;
-      let lastBasicToneCommand = state.lastBasicToneCommand;
-
-      if (commandContext) {
-        const operation = beginAppOperation({
-          action: 'build_basic_tone_command',
-          component: 'editor.edit-command',
-          details: {
-            changedKeys: getChangedBasicToneKeys(prev, newAdjustments),
-            commandType: 'toneColor.setBasicTone',
-            dryRun: true,
-            expectedGraphRevision,
-          },
-          domain: 'edit-command',
-          operationId: commandContext.commandId,
-          traceId: commandContext.correlationId,
-        });
-        try {
-          lastBasicToneCommand = buildBasicToneCommandEnvelope(newAdjustments, commandContext, { dryRun: true });
-          logAppOperationSuccess(operation, {
-            commandType: lastBasicToneCommand.commandType,
-            dryRun: lastBasicToneCommand.dryRun,
-            schemaVersion: lastBasicToneCommand.schemaVersion,
-          });
-        } catch (error) {
-          logAppOperationFailure(operation, error);
-          throw error;
-        }
-      }
-
-      const request: EditTransactionRequest = {
+      applyEditTransaction({
         transactionId: createOperationId(),
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'manual-control',
-        operations: buildAdjustmentMutationOperations(prev, newAdjustments, state.editDocumentV2),
+        operations,
         history: 'single-entry',
         persistence: 'commit',
-      };
-      applyEditTransaction(request);
-      if (lastBasicToneCommand !== state.lastBasicToneCommand) setEditor({ lastBasicToneCommand });
+      });
     },
     [applyEditTransaction],
+  );
+
+  const setAdjustments = useCallback(
+    (value: Partial<Adjustments> | ((previous: Adjustments) => Adjustments)) => {
+      const state = useEditorStore.getState();
+      const current = state.adjustmentSnapshot.value;
+      const next = typeof value === 'function' ? value(current) : { ...current, ...value };
+      let document = legacyAdjustmentsToEditDocumentV2(reconcileReferenceMatchReceiptsAfterEdit(current, next));
+      for (const { nodeType } of EDIT_DOCUMENT_NODE_DESCRIPTORS) {
+        if (nodeType === 'display_creative') continue;
+        const enabled = state.editDocumentV2.nodes[nodeType]?.enabled;
+        if (enabled !== undefined) document = setEditDocumentV2NodeEnabled(document, nodeType, enabled);
+      }
+      commitEditNodeOperations([{ editDocumentV2: document, type: 'replace-edit-document' }]);
+    },
+    [commitEditNodeOperations],
   );
 
   const setEditorSectionEnabled = useCallback(
@@ -455,6 +423,7 @@ export function useEditorActions() {
 
   return {
     commitEditNodeOperations,
+    setAdjustments,
     setEditorSectionEnabled,
     handleRotate,
     handleAutoAdjustments,

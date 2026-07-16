@@ -53,9 +53,13 @@ describe('color calibration edit transaction', () => {
       buildColorCalibrationEditTransaction(state, identity(), colorCalibration, 'calibration-red-hue'),
     );
 
-    expect(result).toMatchObject({ changedKeys: ['colorCalibration'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.afterEditDocumentV2.nodes['color_calibration']?.params).toEqual({ colorCalibration });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.color_calibration.params.colorCalibration'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(result.after.nodes['color_calibration']?.params).toEqual({ colorCalibration });
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -120,7 +124,11 @@ describe('color calibration edit transaction', () => {
     const result = state.applyEditTransaction(
       buildColorCalibrationEditTransaction(state, fallbackIdentity, next, 'fallback-calibration'),
     );
-    expect(result).toMatchObject({ changedKeys: ['colorCalibration'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.color_calibration.params.colorCalibration'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,

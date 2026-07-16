@@ -88,12 +88,14 @@ describe('context Auto Adjust edit transaction', () => {
       buildContextAutoAdjustEditTransaction(state, base, patch, 'context-auto-adjust'),
     );
 
-    expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35 });
-    expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
+    expect(result.after.nodes['scene_global_color_tone']?.params).toMatchObject({ contrast: 18, exposure: 0.35 });
+    expect(result.after.nodes['camera_input']?.params['whiteBalanceTechnical']).toMatchObject({
+      inputSemantics: 'raw_scene_linear',
+    });
     expect(result.after).not.toHaveProperty('sectionVisibility');
-    expect(result.afterEditDocumentV2.nodes['scene_curve']?.enabled).toBeFalse();
-    expect(result.after.effectsEnabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['scene_curve']?.enabled).toBeFalse();
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',

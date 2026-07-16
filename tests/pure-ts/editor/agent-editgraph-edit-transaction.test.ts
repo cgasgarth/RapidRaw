@@ -13,7 +13,6 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   applyEditGraphCommandToLiveEditor,
@@ -127,7 +126,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 12 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { contrast: 12 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-manual-edit',

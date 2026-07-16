@@ -1,8 +1,8 @@
 import { upsertLayerStackSidecarInSidecar } from '../../../packages/rawengine-schema/src';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { NegativeLabSavedPositiveHandoff } from '../../schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import type { MaskContainer } from '../adjustments';
-import { buildAdjustmentMutationOperations } from '../editTransaction';
 import { buildLayerStackSidecarFromMasks } from '../layers/layerStackCommandBridge';
 
 export interface NegativeConversionEditorHandoff {
@@ -33,18 +33,17 @@ function appendAcceptedDustHealLayers(layers: Array<MaskContainer> | undefined):
   if (layers === undefined || layers.length === 0) return;
 
   const state = useEditorStore.getState();
-  const existingLayerIds = new Set(state.adjustmentSnapshot.value.masks.map((layer) => layer.id));
+  const existingLayerIds = new Set(state.editDocumentV2.layers.masks.map((layer) => layer.id));
   const newLayers = layers.filter((layer) => !existingLayerIds.has(layer.id));
   if (newLayers.length === 0) return;
-  const adjustments = {
-    ...state.adjustmentSnapshot.value,
-    masks: [...state.adjustmentSnapshot.value.masks, ...newLayers],
-  };
+  const parsedLayers = editDocumentLayersV2Schema.parse({
+    masks: [...state.editDocumentV2.layers.masks, ...newLayers],
+  });
   state.applyEditTransaction({
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-    operations: buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, adjustments, state.editDocumentV2),
+    operations: [{ nodeType: 'layers', patch: parsedLayers, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'layer-command',
     transactionId: `negative-lab-dust-handoff:${newLayers.map(({ id }) => id).join(',')}`,

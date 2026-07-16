@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -52,9 +51,9 @@ describe('current Film workspace transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result.changedKeys).toEqual(['filmEmulation']);
-    expect(result.after.filmEmulation).toEqual(node(0.72));
-    expect(requiredNode(result.afterEditDocumentV2, 'film_emulation').params).toEqual({ filmEmulation: node(0.72) });
+    expect(result.changedKeys).toEqual(['nodes.film_emulation.params.filmEmulation']);
+    expect(result.after.nodes['film_emulation']?.params['filmEmulation']).toEqual(node(0.72));
+    expect(requiredNode(result.after, 'film_emulation').params).toEqual({ filmEmulation: node(0.72) });
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();

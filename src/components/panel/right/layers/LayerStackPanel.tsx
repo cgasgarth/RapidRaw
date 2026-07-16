@@ -18,7 +18,6 @@ import {
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { readLayerStackSidecarsFromSidecar } from '../../../../../packages/rawengine-schema/src';
-import { debouncedSave } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
@@ -32,7 +31,6 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
-import { selectEditDocumentGeometry, selectEditDocumentMasks } from '../../../../utils/editDocumentSelectors';
 import {
   applyBrushLocalAdjustmentLayerFlow,
   createBrushLocalAdjustmentLayerDraft,
@@ -648,18 +646,10 @@ export function LayerStackPanel({
       result.sidecar,
     );
     const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
-    const transactionResult = applyEditTransaction(transactionRequest);
+    applyEditTransaction(transactionRequest);
     setLayerGraphRevision(result.graphRevision);
     setLastCommandType(result.command.commandType);
     setLastChangedLayerCount(result.commandResult.changedLayerIds.length);
-    if (selectedImage?.path) {
-      debouncedSave(
-        selectedImage.path,
-        transactionResult.after,
-        transactionResult.afterEditDocumentV2,
-        buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
-      );
-    }
     setLocalSelectedLayerId(nextSelectedLayerId);
     onSelectMaskContainer(
       nextSelectedLayerId === BASE_LAYER_ID || nextSelectedLayerId.startsWith('group:') ? null : nextSelectedLayerId,
@@ -901,20 +891,12 @@ export function LayerStackPanel({
       masks: result.masks,
     });
     const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
-    const transactionResult = applyEditTransaction(transactionRequest);
+    applyEditTransaction(transactionRequest);
     setEditor({
       activeMaskContainerId: layerId,
       activeMaskId: maskId,
       brushSettings: { feather: 48, size: 96, tool: ToolType.Brush },
     });
-    if (selectedImage?.path) {
-      debouncedSave(
-        selectedImage.path,
-        transactionResult.after,
-        transactionResult.afterEditDocumentV2,
-        buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
-      );
-    }
     setLocalSelectedLayerId(layerId);
     onSelectMaskContainer(layerId);
   };

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildLensModalEditTransaction,
@@ -120,14 +119,14 @@ describe('crop modal edit transactions', () => {
 
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'geometry-tool' });
     expect(result.changedKeys).toEqual([
-      'transformAspect',
-      'transformDistortion',
-      'transformHorizontal',
-      'transformRotate',
-      'transformScale',
-      'transformVertical',
-      'transformXOffset',
-      'transformYOffset',
+      'nodes.geometry.params.transformAspect',
+      'nodes.geometry.params.transformDistortion',
+      'nodes.geometry.params.transformHorizontal',
+      'nodes.geometry.params.transformRotate',
+      'nodes.geometry.params.transformScale',
+      'nodes.geometry.params.transformVertical',
+      'nodes.geometry.params.transformXOffset',
+      'nodes.geometry.params.transformYOffset',
     ]);
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt).toMatchObject({
@@ -154,7 +153,7 @@ describe('crop modal edit transactions', () => {
     ]);
     const result = state.applyEditTransaction(request);
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'manual-control' });
-    expect(result.after).toMatchObject(lensInput);
+    expect(result.after.nodes['lens_correction']?.params).toMatchObject(lensInput);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       persistence: 'commit',

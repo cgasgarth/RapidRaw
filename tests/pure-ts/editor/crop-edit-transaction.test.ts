@@ -5,7 +5,6 @@ import {
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CropStraightenSessionIdentity } from '../../../src/components/panel/editor/cropStraightenController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildCropEditTransaction } from '../../../src/utils/cropEditTransaction';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
@@ -73,17 +72,15 @@ describe('crop edit transaction', () => {
 
     expect(request.operations).toEqual([{ nodeType: 'geometry', patch: { crop }, type: 'patch-edit-document-node' }]);
     expect(result).toMatchObject({
-      changedKeys: ['crop'],
+      changedKeys: ['nodes.geometry.params.crop'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'geometry-tool',
     });
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
-    const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
+    const geometry = editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params);
     expect(geometry.crop).toEqual(crop);
-    expect(result.afterEditDocumentV2.geometry).toEqual(geometry);
+    expect(result.after.geometry).toEqual(geometry);
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -134,7 +131,7 @@ describe('crop edit transaction', () => {
       baseAdjustmentRevision: 0,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { exposure: 0.5 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.5 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildCopyPasteEditTransaction,
@@ -76,10 +75,7 @@ describe('copy/paste edit transaction', () => {
     ]);
     expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
     expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.75);
-    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
-      brightness: 0.2,
-      exposure: 0.75,
-    });
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.75 });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -124,7 +120,7 @@ describe('copy/paste edit transaction', () => {
     expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(1.5);
     expect(result.after.nodes['camera_input']).toBe(cameraInputBefore);
     expect(result.after.nodes['camera_input']?.params['whiteBalanceTechnical']).toEqual(
-      state.editDocumentV2.nodes['camera_input']!.params['whiteBalanceTechnical'],
+      state.adjustmentSnapshot.value.whiteBalanceTechnical,
     );
   });
 
@@ -183,7 +179,9 @@ describe('copy/paste edit transaction', () => {
       baseAdjustmentRevision: 1,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 0.25 }, type: 'patch-adjustments' }],
+      operations: [
+        { nodeType: 'scene_global_color_tone', patch: { contrast: 0.25 }, type: 'patch-edit-document-node' },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',
@@ -327,7 +325,9 @@ describe('copy/paste edit transaction', () => {
       baseAdjustmentRevision: newerState.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 0.25 }, type: 'patch-adjustments' }],
+      operations: [
+        { nodeType: 'scene_global_color_tone', patch: { contrast: 0.25 }, type: 'patch-edit-document-node' },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-after-paste',

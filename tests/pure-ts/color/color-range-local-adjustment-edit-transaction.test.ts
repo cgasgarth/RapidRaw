@@ -150,13 +150,15 @@ describe('Color range local adjustment EditTransaction boundary', () => {
       buildColorRangeAdjustments('color-range-stale'),
       'color-range-stale',
     );
-    base.applyEditTransaction(
-      buildLayerEditTransactionRequest(
-        base,
-        { ...base.adjustmentSnapshot.value, exposure: 0.5 },
-        'newer-editor-transaction',
-      ),
-    );
+    base.applyEditTransaction({
+      baseAdjustmentRevision: base.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: 'editor-image-session:17',
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.5 }, type: 'patch-edit-document-node' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'newer-editor-transaction',
+    });
 
     expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
     const committed = useEditorStore.getState();

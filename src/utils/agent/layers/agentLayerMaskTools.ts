@@ -412,7 +412,13 @@ const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>, operationId: strin
     buildAgentToolEditTransaction(
       state,
       identity,
-      { ...state.adjustmentSnapshot.value, masks: [...masks] },
+      [
+        {
+          nodeType: 'layers',
+          patch: editDocumentLayersV2Schema.parse({ masks }),
+          type: 'patch-edit-document-node',
+        },
+      ],
       `${operationId}_apply`,
     ),
   );
@@ -1042,3 +1048,5 @@ export const applyAgentObjectSelection = (
     undoGraphRevision,
   });
 };
+
+import { editDocumentLayersV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';

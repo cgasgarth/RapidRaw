@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { BasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
@@ -68,7 +67,11 @@ describe('basic tone slider interaction authority', () => {
     }
 
     const result = useEditorStore.getState().commitBasicToneSliderInteraction('drag-exposure');
-    expect(result).toMatchObject({ changedKeys: ['exposure'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 1,
       basicToneSliderInteraction: null,

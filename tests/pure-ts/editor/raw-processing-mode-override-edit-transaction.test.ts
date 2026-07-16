@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createEditDocumentPresetPayload } from '../../../src/utils/editDocumentPreset';
 import {
@@ -69,16 +68,14 @@ describe('raw processing mode override edit transaction', () => {
       },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['rawProcessingModeOverride'],
+      changedKeys: ['nodes.source_decode.params.rawProcessingModeOverride'],
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    expect(result.after.rawProcessingModeOverride).toBe('maximum');
-    expect(result.afterEditDocumentV2.sourceDecode.rawProcessingModeOverride).toBe('maximum');
-    expect(selectRawProcessingModeOverride(result.afterEditDocumentV2)).toBe('maximum');
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.sourceDecode.rawProcessingModeOverride).toBe('maximum');
+    expect(result.after.sourceDecode.rawProcessingModeOverride).toBe('maximum');
+    expect(selectRawProcessingModeOverride(result.after)).toBe('maximum');
+    expect(result.after.nodes['scene_global_color_tone']).toBe(result.before.nodes['scene_global_color_tone']);
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2.sourceDecode.rawProcessingModeOverride).toBeNull();

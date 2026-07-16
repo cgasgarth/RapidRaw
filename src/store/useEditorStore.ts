@@ -15,13 +15,7 @@ import {
   PatchResidencyTracker,
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
-import {
-  type Adjustments,
-  type BasicAdjustment,
-  DisplayMode,
-  INITIAL_ADJUSTMENTS,
-  type MaskContainer,
-} from '../utils/adjustments';
+import { type Adjustments, type BasicAdjustment, DisplayMode, type MaskContainer } from '../utils/adjustments';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
@@ -40,11 +34,8 @@ import { createDefaultEditDocumentV2, type EditDocumentV2CopyPayload } from '../
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
-  goToEditHistoryIndex,
   pushEditHistoryEntryWithCheckpoints,
-  redoEditHistory,
   renameEditHistoryCheckpoint,
-  undoEditHistory,
 } from '../utils/editHistory';
 import {
   DEFAULT_EDITOR_COMPARE_STATE,
@@ -808,24 +799,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       const reconcilesHydratedNativeCommit =
         nativeHistoryBaseline !== undefined && !areEditDocumentsEqual(state.editDocumentV2, nativeHistoryBaseline);
-      if (
-        reconcilesHydratedNativeCommit &&
-        !areEditDocumentsEqual(state.editDocumentV2, nextResult.afterEditDocumentV2)
-      ) {
+      if (reconcilesHydratedNativeCommit && !areEditDocumentsEqual(state.editDocumentV2, nextResult.after)) {
         throw new Error('edit_transaction.native_history_baseline_mismatch');
       }
       if (
         historyTargetIndex !== undefined &&
-        !areEditDocumentsEqual(state.history[historyTargetIndex], nextResult.afterEditDocumentV2)
+        !areEditDocumentsEqual(state.history[historyTargetIndex], nextResult.after)
       ) {
         throw new Error('edit_transaction.history_target_mismatch');
       }
       if (
         compensationHistory !== undefined &&
-        !areEditDocumentsEqual(
-          compensationHistory.entries[compensationHistory.historyIndex],
-          nextResult.afterEditDocumentV2,
-        )
+        !areEditDocumentsEqual(compensationHistory.entries[compensationHistory.historyIndex], nextResult.after)
       ) {
         throw new Error('edit_transaction.compensation_edit_document_history_target_mismatch');
       }
@@ -853,7 +838,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (request.history === 'reset') {
           return {
             ...historyNavigationPreviewInvalidation,
-            history: [structuredClone(nextResult.afterEditDocumentV2)],
+            history: [structuredClone(nextResult.after)],
             historyCheckpoints: [],
             historyIndex: 0,
           };
@@ -870,11 +855,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 historyIndex: compensationHistory.historyIndex,
               }
             : request.history === 'reset'
-              ? { history: [nextResult.afterEditDocumentV2], checkpoints: [], historyIndex: 0 }
+              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
               : coalescedReceipt
                 ? {
                     history: currentHistory.map((entry, index) =>
-                      index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
+                      index === state.historyIndex ? nextResult.after : entry,
                     ),
                     checkpoints: state.historyCheckpoints,
                     historyIndex: state.historyIndex,
@@ -888,12 +873,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                         )
                       : currentHistory,
                     state.historyIndex,
-                    nextResult.afterEditDocumentV2,
+                    nextResult.after,
                     state.historyCheckpoints,
                   );
       return {
         ...historyNavigationPreviewInvalidation,
-        ...publishEditDocumentState(state, nextResult.afterEditDocumentV2),
+        ...publishEditDocumentState(state, nextResult.after),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
         basicToneSliderInteraction: null,
         isSliderDragging: false,
@@ -903,10 +888,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
         ...(historyTargetIndex === undefined
           ? {}
-          : resolveAiSelectionState(
-              state,
-              selectEditDocumentSourceArtifacts(nextResult.afterEditDocumentV2).aiPatches,
-            )),
+          : resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(nextResult.after).aiPatches)),
       };
     });
     if (!result) throw new Error('edit_transaction.not_applied');
@@ -937,7 +919,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           latestValue: value,
           previewSnapshot: publishAdjustmentSnapshot(
             interaction.previewSnapshot ?? state.adjustmentSnapshot,
-            result.afterEditDocumentV2,
+            result.after,
           ),
         },
       };

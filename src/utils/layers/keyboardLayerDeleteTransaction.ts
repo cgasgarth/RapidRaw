@@ -3,10 +3,9 @@ import {
   upsertLayerStackSidecarInSidecar,
 } from '../../../packages/rawengine-schema/src';
 import { type EditDocumentV2, editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
-import { selectEditDocumentMasks } from '../editDocumentSelectors';
+import type { Adjustments } from '../adjustments';
 import type { EditTransactionRequest } from '../editTransaction';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
-import { persistLayerStackSidecarInAdjustments } from './layerStackSidecarAdjustments';
 
 export interface KeyboardLayerDeleteState {
   adjustmentRevision: number;
@@ -47,7 +46,10 @@ export const buildKeyboardLayerDeleteTransaction = (
       sessionId: 'rapidraw-keyboard-layer-delete',
     },
   );
-  const rawEngineArtifacts = upsertLayerStackSidecarInSidecar(state.editDocumentV2, deleted.sidecar).rawEngineArtifacts;
+  const rawEngineArtifacts = upsertLayerStackSidecarInSidecar(
+    state.adjustmentSnapshot.value,
+    deleted.sidecar,
+  ).rawEngineArtifacts;
   if (rawEngineArtifacts === undefined) throw new Error('keyboard_layer_delete.missing_sidecar_artifacts');
   return {
     graphRevision: deleted.graphRevision,
@@ -56,11 +58,14 @@ export const buildKeyboardLayerDeleteTransaction = (
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-      operations: buildAdjustmentMutationOperations(
-        state.adjustmentSnapshot.value,
-        nextAdjustments,
-        state.editDocumentV2,
-      ),
+      operations: [
+        {
+          nodeType: 'layers',
+          patch: editDocumentLayersV2Schema.parse({ masks: deleted.masks }),
+          type: 'patch-edit-document-node',
+        },
+        { rawEngineArtifacts, type: 'set-layer-stack-artifacts' },
+      ],
       persistence: 'commit',
       source: 'layer-command',
       transactionId: operationId,

@@ -10,10 +10,9 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
 import type { EditorZoomCommand } from '../../utils/editorZoom';
-import { buildEditTransactionPersistenceContext } from '../../utils/editTransaction';
 import { KEYBIND_DEFINITIONS, normalizeCombo } from '../../utils/keyboardUtils';
 import { buildKeyboardLayerDeleteTransaction } from '../../utils/layers/keyboardLayerDeleteTransaction';
-import { debouncedSave, useEditorActions } from '../editor/useEditorActions';
+import { useEditorActions } from '../editor/useEditorActions';
 import { useLibraryActions } from '../library/useLibraryActions';
 
 interface KeyboardShortcutsProps {
@@ -532,12 +531,6 @@ export const useKeyboardShortcuts = ({
               const result = s.editor.applyEditTransaction(prepared.request);
               if (!result.noOp) {
                 s.ui.markLayerMaskProvenanceStale({ layerIds: [layerId], reason: 'layer_deleted' });
-                debouncedSave(
-                  prepared.imagePath,
-                  result.after,
-                  result.afterEditDocumentV2,
-                  buildEditTransactionPersistenceContext(prepared.request, result),
-                );
               }
             }
             s.editor.setEditor({

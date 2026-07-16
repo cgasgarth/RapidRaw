@@ -71,7 +71,7 @@ describe('skin-tone uniformity edit transaction', () => {
       },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['skinToneUniformity'],
+      changedKeys: ['nodes.skin_tone_uniformity.params.skinToneUniformity'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
       nextAdjustmentRevision: 1,
       noOp: false,
@@ -83,8 +83,8 @@ describe('skin-tone uniformity edit transaction', () => {
       navigatorPreviewArtifact: null,
       transformedOriginalUrl: null,
     });
-    expect(selectSkinToneUniformity(result.afterEditDocumentV2)).toEqual(edited);
-    expect(result.afterEditDocumentV2.nodes['selective_color_mixer']).toBe(sibling);
+    expect(selectSkinToneUniformity(result.after)).toEqual(edited);
+    expect(result.after.nodes['selective_color_mixer']).toBe(sibling);
 
     const editedState = useEditorStore.getState();
     editedState.applyEditTransaction(

@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import type { ViewerObjectPromptKey } from '../../../src/components/panel/editor/viewerObjectPromptInteractionController';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildObjectPromptEditTransaction } from '../../../src/utils/objectPromptEditTransaction';
@@ -101,8 +100,12 @@ describe('Object Prompt edit transaction', () => {
     );
     const result = useEditorStore.getState().applyEditTransaction(request);
 
-    expect(result).toMatchObject({ changedKeys: ['masks'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.after.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.layers.params.masks'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(result.after.layers.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       persistence: 'commit',

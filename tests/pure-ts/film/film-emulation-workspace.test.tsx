@@ -36,7 +36,7 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   expect(enabled.lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 1,
     baseAdjustmentRevision: 0,
-    changedKeys: ['filmEmulation'],
+    changedKeys: ['nodes.film_emulation.params.filmEmulation'],
     source: 'film-workspace',
   });
   expect(enabled.editDocumentV2.nodes['film_emulation']!.params['filmEmulation']).toEqual(

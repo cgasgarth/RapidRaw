@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import type { ViewerPickerCommitResult } from '../../../src/components/panel/editor/viewerPickerInteractionControllers';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
-import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildViewerPickerEditTransaction } from '../../../src/utils/viewerPickerEditTransaction';
 
 const sourcePath = '/fixture/viewer-picker.ARW';
@@ -117,12 +117,12 @@ describe('viewer picker edit transaction', () => {
 
     expect(request).toMatchObject({ history: 'single-entry', persistence: 'commit', source: 'picker' });
     expect(result).toMatchObject({
-      changedKeys: ['pointColor'],
+      changedKeys: ['nodes.point_color.params.pointColor'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    expect(result.after.pointColor).toMatchObject({
+    expect(result.after.nodes['point_color']?.params['pointColor']).toMatchObject({
       enabled: true,
       selectedPointId: 'point-id',
       points: [{ id: 'point-id', samples: [{ id: 'sample-id' }] }],
@@ -160,8 +160,16 @@ describe('viewer picker edit transaction', () => {
       .applyEditTransaction(
         buildViewerPickerEditTransaction(currentTransactionState(), command, 'viewer-picker:tone:1'),
       );
-    expect(result).toMatchObject({ changedKeys: ['toneEqualizer'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.after.toneEqualizer).toMatchObject({ enabled: true, previewMode: 2, selectedBand: 4 });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.tone_equalizer.params.toneEqualizer'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(result.after.nodes['tone_equalizer']?.params['toneEqualizer']).toMatchObject({
+      enabled: true,
+      previewMode: 2,
+      selectedBand: 4,
+    });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackSessionId,
       source: 'picker',

@@ -59,7 +59,7 @@ export const buildLutLoadEditTransaction = (
       {
         nodeType: 'display_creative',
         patch: {
-          lutData: lut.data,
+          lutData: lut.data ?? null,
           lutIntensity: lut.intensity,
           lutName: lut.name,
           lutPath: lut.path,

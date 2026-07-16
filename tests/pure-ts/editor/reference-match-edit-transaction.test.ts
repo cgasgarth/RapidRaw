@@ -6,7 +6,6 @@ import {
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookProposalV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
@@ -85,10 +84,8 @@ describe('reference match edit transaction', () => {
     if (commit === null) throw new Error('Expected global transaction');
 
     const result = state.applyEditTransaction(commit.request);
-    expect(result.after).toMatchObject({
-      exposure: 0.4,
-      referenceMatchApplicationReceipt: commit.receipt,
-    });
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.4);
+    expect(result.after.provenance.referenceMatchApplicationReceipt).toEqual(commit.receipt);
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',
@@ -140,17 +137,16 @@ describe('reference match edit transaction', () => {
     if (commit === null) throw new Error('Expected white-balance transaction');
 
     const result = useEditorStore.getState().applyEditTransaction(commit.request);
-    expect(result.after.whiteBalanceTechnical).toMatchObject({
+    const whiteBalance = editDocumentCameraInputV2Schema.parse(
+      result.after.nodes['camera_input']?.params,
+    ).whiteBalanceTechnical;
+    expect(whiteBalance).toMatchObject({
       duv: 0.008,
       kelvin: 7_200,
       mode: 'kelvin_tint',
       source: 'user',
       synchronization: { mode: 'locked_reference', referenceSourceIdentity: '/fixture/reference.ARW' },
     });
-    expect(
-      editDocumentCameraInputV2Schema.parse(result.afterEditDocumentV2.nodes['camera_input']?.params)
-        .whiteBalanceTechnical,
-    ).toEqual(result.after.whiteBalanceTechnical);
     expect(commit.receipt.appliedDiffs.map((diff) => diff.key)).toEqual(['whiteBalanceDuv', 'whiteBalanceKelvin']);
   });
 
@@ -170,14 +166,14 @@ describe('reference match edit transaction', () => {
     if (commit === null) throw new Error('Expected layer transaction');
 
     const result = state.applyEditTransaction(commit.request);
-    expect(result.after.exposure).toBe(0);
-    expect(result.after.masks[0]).toMatchObject({
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0);
+    expect(result.after.layers.masks[0]).toMatchObject({
       id: 'reference-layer',
       opacity: 100,
       referenceMatchApplicationReceipt: commit.receipt,
     });
-    expect(result.after.masks[0]?.adjustments.exposure).toBeCloseTo(0.6, 8);
-    expect(editDocumentLayersV2Schema.parse(result.afterEditDocumentV2.nodes['layers']?.params).masks).toHaveLength(1);
+    expect(result.after.layers.masks[0]?.adjustments['exposure']).toBeCloseTo(0.6, 8);
+    expect(editDocumentLayersV2Schema.parse(result.after.nodes['layers']?.params).masks).toHaveLength(1);
     expect(result.applicationReceipt).toMatchObject({ persistence: 'commit', source: 'reference-match' });
     expect(useEditorStore.getState()).toMatchObject({ historyIndex: 1, adjustmentRevision: 1 });
   });

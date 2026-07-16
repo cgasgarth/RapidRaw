@@ -584,7 +584,7 @@ describe('edited preview effect runner', () => {
       receipt: {
         adjustmentRevision: 2,
         baseAdjustmentRevision: 1,
-        changedKeys: ['exposure'],
+        changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
         imageSessionId: 'session-a',
         persistence: 'commit' as const,
         source: 'manual-control' as const,

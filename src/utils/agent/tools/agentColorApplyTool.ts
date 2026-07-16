@@ -461,7 +461,75 @@ export const applyAgentColor = async (
   );
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'color_presence',
+          patch: { saturation: nextAdjustments.saturation, vibrance: nextAdjustments.vibrance },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'camera_input',
+          patch: {
+            cameraProfile: nextAdjustments.cameraProfile,
+            whiteBalanceTechnical: nextAdjustments.whiteBalanceTechnical,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'scene_curve',
+          patch: {
+            ...(nextAdjustments.curveMode === undefined ? {} : { curveMode: nextAdjustments.curveMode }),
+            ...(nextAdjustments.parametricCurve === undefined
+              ? {}
+              : { parametricCurve: nextAdjustments.parametricCurve }),
+            toneCurve: nextAdjustments.toneCurve,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'selective_color_mixer',
+          patch: {
+            hsl: nextAdjustments.hsl,
+            selectiveColorRangeControls: nextAdjustments.selectiveColorRangeControls,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'black_white_mixer',
+          patch: { blackWhiteMixer: nextAdjustments.blackWhiteMixer },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'channel_mixer',
+          patch: { channelMixer: nextAdjustments.channelMixer },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'color_balance_rgb',
+          patch: { colorBalanceRgb: nextAdjustments.colorBalanceRgb },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'color_calibration',
+          patch: { colorCalibration: nextAdjustments.colorCalibration },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'perceptual_grading',
+          patch: { colorGrading: nextAdjustments.colorGrading },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'skin_tone_uniformity',
+          patch: { skinToneUniformity: nextAdjustments.skinToneUniformity },
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();

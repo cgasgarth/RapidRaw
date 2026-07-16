@@ -68,15 +68,13 @@ describe('channel mixer edit transaction', () => {
       { nodeType: 'channel_mixer', patch: { channelMixer }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['channelMixer'],
+      changedKeys: ['nodes.channel_mixer.params.channelMixer'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['channel_mixer']?.params).toMatchObject({ channelMixer });
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.nodes['channel_mixer']?.params).toMatchObject({ channelMixer });
+    expect(result.after.nodes['scene_global_color_tone']).toBe(result.before.nodes['scene_global_color_tone']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -164,7 +162,11 @@ describe('channel mixer edit transaction', () => {
     const result = state.applyEditTransaction(
       buildChannelMixerEditTransaction(state, fallbackIdentity, next, 'fallback-channel'),
     );
-    expect(result).toMatchObject({ changedKeys: ['channelMixer'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.channel_mixer.params.channelMixer'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,

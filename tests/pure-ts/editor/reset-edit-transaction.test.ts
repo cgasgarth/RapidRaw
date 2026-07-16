@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   createDefaultEditDocumentV2,
@@ -80,12 +79,10 @@ describe('Reset edit transaction', () => {
     const result = state.applyEditTransaction(request);
 
     expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed', source: 'reset' });
-    expect(result.after).toMatchObject({
-      aiPatches: [],
-      aspectRatio: 1.5,
-      effectsEnabled: false,
-      exposure: 0,
-    });
+    expect(result.after.sourceArtifacts.aiPatches).toEqual([]);
+    expect(result.after.geometry.aspectRatio).toBe(1.5);
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0);
     expect(result.after).not.toHaveProperty('sectionVisibility');
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 5,
@@ -94,7 +91,7 @@ describe('Reset edit transaction', () => {
       transactionId: 'reset-native',
     });
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 5, historyIndex: 0 });
-    expect(useEditorStore.getState().history).toEqual([result.afterEditDocumentV2]);
+    expect(useEditorStore.getState().history).toEqual([result.after]);
   });
 
   test('rejects stale source, session, revision, and mismatched native receipts', () => {

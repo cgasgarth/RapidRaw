@@ -61,15 +61,18 @@ describe('perceptual grading edit transaction', () => {
     const result = state.applyEditTransaction(request);
 
     expect(result).toMatchObject({
-      changedKeys: ['colorGrading', 'perceptualGradingV1'],
+      changedKeys: [
+        'nodes.perceptual_grading.params.colorGrading',
+        'nodes.perceptual_grading.params.perceptualGradingV1',
+      ],
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    expect(result.afterEditDocumentV2.nodes['perceptual_grading']?.params).toEqual({
+    expect(result.after.nodes['perceptual_grading']?.params).toEqual({
       colorGrading,
       perceptualGradingV1,
     });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -146,7 +149,10 @@ describe('perceptual grading edit transaction', () => {
       buildPerceptualGradingEditTransaction(state, fallbackIdentity, next, nextPerceptual, 'fallback-grading'),
     );
     expect(result).toMatchObject({
-      changedKeys: ['colorGrading', 'perceptualGradingV1'],
+      changedKeys: [
+        'nodes.perceptual_grading.params.colorGrading',
+        'nodes.perceptual_grading.params.perceptualGradingV1',
+      ],
       nextAdjustmentRevision: 1,
       noOp: false,
     });

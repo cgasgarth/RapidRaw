@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   createRawEngineLocalAppServerBridge,
   type RawEngineLocalAppServerBridge,
@@ -13,11 +15,11 @@ import {
   editGraphMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import {
   buildAgentEditGraphEditTransaction,
   captureAgentEditGraphCommitIdentity,
 } from '../../agentEditGraphEditTransaction';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 
 type LiveEditGraphBridge = RawEngineLocalAppServerBridge;
 type EditGraphParameterPatchCommandV1 = Extract<
@@ -29,8 +31,16 @@ const adjustmentPathPattern = /^\/adjustments\/([A-Za-z0-9_]+)$/u;
 
 const currentGraphRevision = (): string => `history_${useEditorStore.getState().historyIndex}`;
 
-const isAdjustmentKey = (key: string): key is Extract<keyof Adjustments, string> =>
-  key in useEditorStore.getState().adjustmentSnapshot.value;
+type LiveSceneToneKey = keyof EditDocumentNodeParamsV2<'scene_global_color_tone'>;
+const liveSceneToneKeySchema = z.enum([
+  'blacks',
+  'brightness',
+  'contrast',
+  'exposure',
+  'highlights',
+  'shadows',
+  'whites',
+]);
 
 const assertSelectedImageTarget = (command: EditGraphCommandEnvelopeV1): void => {
   const selectedImage = useEditorStore.getState().selectedImage;
@@ -46,19 +56,20 @@ const assertCurrentRevision = (command: EditGraphCommandEnvelopeV1): void => {
   }
 };
 
-const assertSupportedOperation = (operation: EditGraphParameterPatchOperationV1): keyof Adjustments => {
+const assertSupportedOperation = (operation: EditGraphParameterPatchOperationV1): LiveSceneToneKey => {
   const match = adjustmentPathPattern.exec(operation.path);
   if (match === null) throw new Error(`Live editor editGraph command rejected unsupported path: ${operation.path}`);
   const key = match[1];
-  if (key === undefined || !isAdjustmentKey(key)) {
+  const parsedKey = liveSceneToneKeySchema.safeParse(key);
+  if (!parsedKey.success) {
     throw new Error(`Live editor editGraph command rejected unknown adjustment key: ${key ?? operation.path}`);
   }
-  return key;
+  return parsedKey.data;
 };
 
 const assertPreviousValueMatches = (
-  adjustments: Adjustments,
-  key: keyof Adjustments,
+  adjustments: EditDocumentNodeParamsV2<'scene_global_color_tone'>,
+  key: LiveSceneToneKey,
   operation: EditGraphParameterPatchOperationV1,
 ): void => {
   if (operation.previousValue === undefined) return;
@@ -67,24 +78,21 @@ const assertPreviousValueMatches = (
   }
 };
 
-const applyEditGraphOperationsToAdjustments = (
-  base: Adjustments,
+const buildSceneTonePatchFromEditGraphOperations = (
+  base: EditDocumentNodeParamsV2<'scene_global_color_tone'>,
   operations: readonly EditGraphParameterPatchOperationV1[],
-): Adjustments => {
-  const next: Adjustments = { ...base };
-  const editableNext = next as Record<keyof Adjustments, unknown>;
+): Readonly<Partial<EditDocumentNodeParamsV2<'scene_global_color_tone'>>> => {
+  const patch: Partial<EditDocumentNodeParamsV2<'scene_global_color_tone'>> = {};
 
   for (const operation of operations) {
     const key = assertSupportedOperation(operation);
     assertPreviousValueMatches(base, key, operation);
-    if (operation.op === 'remove') {
-      editableNext[key] = undefined;
-    } else {
-      editableNext[key] = operation.value;
+    if (operation.op === 'remove' || typeof operation.value !== 'number' || !Number.isFinite(operation.value)) {
+      throw new Error(`Live editor editGraph command rejected invalid scene-tone value for ${key}.`);
     }
+    patch[key] = operation.value;
   }
-
-  return next;
+  return patch;
 };
 
 const parseLiveEditGraphCommand = (commandInput: EditGraphCommandEnvelopeV1): EditGraphParameterPatchCommandV1 => {
@@ -141,15 +149,15 @@ export const applyEditGraphCommandToLiveEditor = async (
   const state = useEditorStore.getState();
   const commitIdentity = captureAgentEditGraphCommitIdentity(state);
   if (commitIdentity === null) throw new Error('Live editor editGraph apply requires a selected image session.');
-  const nextAdjustments = applyEditGraphOperationsToAdjustments(
-    state.adjustmentSnapshot.value,
+  const patch = buildSceneTonePatchFromEditGraphOperations(
+    selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params,
     command.parameters.operations,
   );
   const bridgeResult = await dispatchEditGraphBridgeCommand(bridge, command, requestId);
   const mutation = editGraphMutationResultV1Schema.parse(bridgeResult);
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentEditGraphEditTransaction(currentState, commitIdentity, nextAdjustments, command.commandId),
+    buildAgentEditGraphEditTransaction(currentState, commitIdentity, patch, command.commandId),
   );
 
   return mutation;

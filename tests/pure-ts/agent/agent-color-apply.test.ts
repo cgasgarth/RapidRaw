@@ -143,7 +143,13 @@ describe('agent color apply preview refresh', () => {
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: state.imageSession.id,
-      operations: [{ patch: { exposure: 0.2 }, type: 'patch-adjustments' }],
+      operations: [
+        {
+          nodeType: 'scene_global_color_tone',
+          patch: { exposure: 0.2 },
+          type: 'patch-edit-document-node',
+        },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-color-edit',

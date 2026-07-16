@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { calculateCenteredCrop, normalizedCropFromPixelCrop } from '../../../src/utils/cropUtils';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
@@ -91,7 +90,12 @@ describe('orientation rotate edit transaction', () => {
     const after = useEditorStore.getState();
 
     expect(result).toMatchObject({
-      changedKeys: ['aspectRatio', 'crop', 'orientationSteps', 'rotation'],
+      changedKeys: [
+        'nodes.geometry.params.aspectRatio',
+        'nodes.geometry.params.crop',
+        'nodes.geometry.params.orientationSteps',
+        'nodes.geometry.params.rotation',
+      ],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'geometry-tool',
@@ -105,7 +109,7 @@ describe('orientation rotate edit transaction', () => {
     });
     expect(after.finalPreviewUrl).toBeNull();
     expect(after.navigatorPreviewArtifact).toBeNull();
-    expect(editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params)).toMatchObject({
+    expect(editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params)).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 1,
       rotation: 0,
@@ -199,7 +203,7 @@ describe('orientation rotate edit transaction', () => {
       ],
       noOp: false,
     });
-    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 3,
     });

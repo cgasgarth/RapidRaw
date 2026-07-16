@@ -14,7 +14,6 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
-  applyBasicToneCommandEnvelopeToAdjustments,
   type BasicToneAdjustmentPayload,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
@@ -23,7 +22,6 @@ import {
   buildBasicToneImageCommandContext,
 } from '../../basicToneCommandBridge';
 import { buildBasicToneCommandEditTransaction, captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
-import { buildAdjustmentMutationOperations } from '../../editTransaction';
 import { createLiveEditorAppServerBridge } from './agentLiveEditorCoreState';
 
 export type AgentLiveBasicTonePixel = readonly [number, number, number];
@@ -376,18 +374,29 @@ export const applyBasicToneToLiveEditor = async ({
     currentState.applyBasicToneCommand(applyCommand, commitIdentity);
   } else {
     const baseTransaction = buildBasicToneCommandEditTransaction(currentState, commitIdentity, applyCommand);
-    const commandAdjustments = applyBasicToneCommandEnvelopeToAdjustments(
-      currentState.adjustmentSnapshot.value,
-      applyCommand,
-    );
-    const nextAdjustments = { ...commandAdjustments, ...additionalAdjustmentPatch };
     const result = currentState.applyEditTransaction({
       ...baseTransaction,
-      operations: buildAdjustmentMutationOperations(
-        currentState.adjustmentSnapshot.value,
-        nextAdjustments,
-        currentState.editDocumentV2,
-      ),
+      operations: [
+        ...baseTransaction.operations,
+        ...(additionalAdjustmentPatch.vibrance === undefined
+          ? []
+          : [
+              {
+                nodeType: 'color_presence' as const,
+                patch: { vibrance: additionalAdjustmentPatch.vibrance },
+                type: 'patch-edit-document-node' as const,
+              },
+            ]),
+        ...(additionalAdjustmentPatch.whiteBalanceTechnical === undefined
+          ? []
+          : [
+              {
+                nodeType: 'camera_input' as const,
+                patch: { whiteBalanceTechnical: additionalAdjustmentPatch.whiteBalanceTechnical },
+                type: 'patch-edit-document-node' as const,
+              },
+            ]),
+      ],
     });
     useEditorStore
       .getState()

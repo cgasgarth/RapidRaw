@@ -1,5 +1,10 @@
+import {
+  type EditDocumentV2,
+  editDocumentLayersV2Schema,
+  editDocumentSourceArtifactsV2Schema,
+} from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { SubMask } from '../components/panel/right/layers/Masks';
-import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
+import { selectEditDocumentLayers, selectEditDocumentSourceArtifacts } from './editDocumentSelectors';
 import type { EditApplicationReceipt, EditTransactionRequest } from './editTransaction';
 
 export interface SubMaskInteractionIdentity {
@@ -30,7 +35,7 @@ export const scheduleSubMaskInteractionEnd = (
 
 export interface SubMaskInteractionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'aiPatches' | 'masks'> };
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   lastEditApplicationReceipt: EditApplicationReceipt | null;
@@ -73,11 +78,17 @@ const isCurrentInteraction = (state: SubMaskInteractionState, identity: SubMaskI
   );
 };
 
-const updateContainers = <Container extends MaskContainer | AiPatch>(
+type InteractiveSubMaskContainer = {
+  readonly id: string;
+  readonly subMasks: readonly { readonly id: string }[];
+};
+
+const updateContainers = <Container extends InteractiveSubMaskContainer, ParsedContainer>(
   containers: readonly Container[],
   identity: SubMaskInteractionIdentity,
   patch: Partial<SubMask>,
-): Container[] => {
+  parse: (value: unknown) => readonly ParsedContainer[],
+): readonly ParsedContainer[] => {
   const matchingContainers = containers.filter((container) => container.id === identity.containerId);
   const matchingSubMasks = matchingContainers.flatMap((container) =>
     container.subMasks.filter((subMask) => subMask.id === identity.subMaskId),
@@ -85,7 +96,7 @@ const updateContainers = <Container extends MaskContainer | AiPatch>(
   if (matchingContainers.length !== 1 || matchingSubMasks.length !== 1) {
     throw new Error('sub_mask_interaction.stale_target');
   }
-  return containers.map((container) =>
+  const updated = containers.map((container) =>
     container.id === identity.containerId
       ? {
           ...container,
@@ -96,7 +107,8 @@ const updateContainers = <Container extends MaskContainer | AiPatch>(
           ),
         }
       : container,
-  ) as Container[];
+  );
+  return parse(updated);
 };
 
 export const buildSubMaskInteractionEditTransaction = (
@@ -109,10 +121,22 @@ export const buildSubMaskInteractionEditTransaction = (
   if (subMaskId === null) throw new Error('sub_mask_interaction.missing_id');
   if (subMaskId !== identity.subMaskId) throw new Error('sub_mask_interaction.stale_target');
   const masks =
-    identity.containerKind === 'masks' ? updateContainers(state.adjustmentSnapshot.value.masks, identity, patch) : null;
+    identity.containerKind === 'masks'
+      ? updateContainers(
+          selectEditDocumentLayers(state.editDocumentV2).masks,
+          identity,
+          patch,
+          (value) => editDocumentLayersV2Schema.parse({ masks: value }).masks,
+        )
+      : null;
   const aiPatches =
     identity.containerKind === 'aiPatches'
-      ? updateContainers(state.adjustmentSnapshot.value.aiPatches, identity, patch)
+      ? updateContainers(
+          selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches,
+          identity,
+          patch,
+          (value) => editDocumentSourceArtifactsV2Schema.parse({ aiPatches: value }).aiPatches,
+        )
       : null;
 
   return {
@@ -121,13 +145,19 @@ export const buildSubMaskInteractionEditTransaction = (
     imageSessionId: identity.imageSessionId,
     operations: [
       ...(masks !== null
-        ? [{ nodeType: 'layers' as const, patch: { masks }, type: 'patch-edit-document-node' as const }]
+        ? [
+            {
+              nodeType: 'layers' as const,
+              patch: editDocumentLayersV2Schema.parse({ masks }),
+              type: 'patch-edit-document-node' as const,
+            },
+          ]
         : []),
       ...(aiPatches !== null
         ? [
             {
               nodeType: 'source_artifacts' as const,
-              patch: { aiPatches },
+              patch: editDocumentSourceArtifactsV2Schema.parse({ aiPatches }),
               type: 'patch-edit-document-node' as const,
             },
           ]

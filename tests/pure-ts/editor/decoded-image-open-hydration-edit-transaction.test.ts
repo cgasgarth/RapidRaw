@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
@@ -93,7 +92,7 @@ describe('decoded image-open hydration edit transaction', () => {
       baseAdjustmentRevision: staleIdentity.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { exposure: 2.1 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 2.1 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-user-edit',
@@ -129,8 +128,9 @@ describe('decoded image-open hydration edit transaction', () => {
       imageSessionId: session.id,
       operations: [
         {
-          adjustments: { ...metadataState.adjustmentSnapshot.value, contrast: 9 },
-          type: 'replace-adjustments',
+          nodeType: 'scene_global_color_tone',
+          patch: { contrast: 9 },
+          type: 'patch-edit-document-node',
         },
       ],
       persistence: 'native-committed',

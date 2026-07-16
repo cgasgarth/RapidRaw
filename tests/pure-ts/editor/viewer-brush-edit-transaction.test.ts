@@ -7,7 +7,6 @@ import {
 } from '../../../src/components/panel/editor/viewerBrushInteractionController';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildViewerBrushEditTransaction } from '../../../src/utils/viewerBrushEditTransaction';
@@ -172,7 +171,7 @@ describe('viewer brush edit transaction', () => {
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    const storedLines = requireStoredBrushLines(state.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters);
+    const storedLines = requireStoredBrushLines(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters);
     expect(storedLines).toHaveLength(1);
     const firstLine = storedLines[0];
     const storedPoints =
@@ -278,7 +277,11 @@ describe('viewer brush edit transaction', () => {
       buildViewerBrushEditTransaction({ ...current, geometryEpoch, sourceRevision }, command, 'viewer-brush:ai-flow'),
     );
 
-    expect(result).toMatchObject({ changedKeys: ['aiPatches'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.source_artifacts.params.aiPatches'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(
       requireStoredBrushLines(
         useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks[0]?.parameters,

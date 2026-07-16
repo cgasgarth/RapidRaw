@@ -197,7 +197,11 @@ describe('basic tone command apply path', () => {
     expect(applied.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       baseAdjustmentRevision: 0,
-      changedKeys: expect.arrayContaining(['exposure', 'highlights', 'whites']),
+      changedKeys: expect.arrayContaining([
+        'nodes.scene_global_color_tone.params.exposure',
+        'nodes.scene_global_color_tone.params.highlights',
+        'nodes.scene_global_color_tone.params.whites',
+      ]),
       persistence: 'commit',
       source: 'agent-command',
       transactionId: applyCommand.commandId,
@@ -346,7 +350,7 @@ const commitInterveningExposure = (exposure: number) => {
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'coalesced-interaction',
     imageSessionId: state.imageSession?.id ?? '',
-    operations: [{ patch: { exposure }, type: 'patch-adjustments' }],
+    operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure }, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'manual-control',
     transactionId: 'intervening-coalesced-edit',

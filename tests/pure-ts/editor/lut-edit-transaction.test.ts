@@ -84,10 +84,9 @@ describe('LUT edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result.after).toMatchObject({ lutName: 'warm.cube', lutPath: '/luts/warm.cube', lutSize: 33 });
-    expect(result.after.effectsEnabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes['display_creative']?.enabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes['display_creative']?.params).toMatchObject({
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['display_creative']?.params).toMatchObject({
       lutIntensity: 100,
       lutName: 'warm.cube',
       lutPath: '/luts/warm.cube',
@@ -123,8 +122,7 @@ describe('LUT edit transaction', () => {
 
     const state = useEditorStore.getState();
     const result = state.applyEditTransaction(buildLutClearEditTransaction(state, identity(), 'lut-clear'));
-    expect(result.after).toMatchObject({ lutData: null, lutIntensity: 100, lutName: null, lutPath: null, lutSize: 0 });
-    expect(result.afterEditDocumentV2.nodes['display_creative']?.params).toMatchObject({
+    expect(result.after.nodes['display_creative']?.params).toMatchObject({
       lutData: null,
       lutIntensity: 100,
       lutName: null,

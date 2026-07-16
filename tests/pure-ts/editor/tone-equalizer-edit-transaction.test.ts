@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentToneEqualizerV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { BasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
@@ -61,14 +60,18 @@ describe('tone equalizer edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result).toMatchObject({ changedKeys: ['toneEqualizer'], nextAdjustmentRevision: 1, noOp: false });
-    expect(
-      editDocumentToneEqualizerV2Schema.parse(result.afterEditDocumentV2.nodes['tone_equalizer']?.params).toneEqualizer,
-    ).toEqual({
-      ...INITIAL_ADJUSTMENTS.toneEqualizer,
-      enabled: true,
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.tone_equalizer.params.toneEqualizer'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
     });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(editDocumentToneEqualizerV2Schema.parse(result.after.nodes['tone_equalizer']?.params).toneEqualizer).toEqual(
+      {
+        ...INITIAL_ADJUSTMENTS.toneEqualizer,
+        enabled: true,
+      },
+    );
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();

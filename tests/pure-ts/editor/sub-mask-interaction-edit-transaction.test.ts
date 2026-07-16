@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
@@ -145,7 +144,7 @@ describe('sub-mask interaction edit transaction', () => {
       nextAdjustmentRevision: 2,
       noOp: false,
     });
-    expect(state.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toMatchObject({
+    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toMatchObject({
       centerX: 160,
       centerY: 250,
     });
@@ -247,46 +246,44 @@ describe('sub-mask interaction edit transaction', () => {
   test('rejects moved, replaced, and duplicate target identities without mutation', () => {
     const identity = captureIdentity('radial-drag:target');
     const before = useEditorStore.getState();
-    const originalContainer = before.adjustmentSnapshot.value.masks[0];
+    const originalContainer = before.editDocumentV2.layers.masks[0];
     if (originalContainer === undefined) throw new Error('expected mask container');
     const originalSubMask = originalContainer.subMasks[0];
     if (originalSubMask === undefined) throw new Error('expected submask');
-    const movedAdjustments = {
-      ...before.adjustmentSnapshot.value,
-      masks: [{ ...originalContainer, id: 'layer:successor' }],
-    };
+    const layersNode = before.editDocumentV2.nodes['layers'];
+    if (layersNode === undefined) throw new Error('expected layers node');
+    const documentWithMasks = (masks: typeof before.editDocumentV2.layers.masks) => ({
+      ...before.editDocumentV2,
+      layers: { masks },
+      nodes: { ...before.editDocumentV2.nodes, layers: { ...layersNode, params: { masks } } },
+    });
+    const movedMasks = [{ ...originalContainer, id: 'layer:successor' }];
     const movedState = {
       ...before,
-      adjustmentSnapshot: { ...before.adjustmentSnapshot, value: movedAdjustments },
+      editDocumentV2: documentWithMasks(movedMasks),
     };
     expect(() => buildSubMaskInteractionEditTransaction(movedState, identity, maskSubId, { opacity: 60 })).toThrow(
       'sub_mask_interaction.stale_target',
     );
 
-    const duplicateAdjustments = {
-      ...before.adjustmentSnapshot.value,
-      masks: [originalContainer, structuredClone(originalContainer)],
-    };
+    const duplicateMasks = [originalContainer, structuredClone(originalContainer)];
     const duplicateState = {
       ...before,
-      adjustmentSnapshot: { ...before.adjustmentSnapshot, value: duplicateAdjustments },
+      editDocumentV2: documentWithMasks(duplicateMasks),
     };
     expect(() => buildSubMaskInteractionEditTransaction(duplicateState, identity, maskSubId, { opacity: 60 })).toThrow(
       'sub_mask_interaction.stale_target',
     );
 
-    const duplicateSubMaskAdjustments = {
-      ...before.adjustmentSnapshot.value,
-      masks: [
-        {
-          ...originalContainer,
-          subMasks: [originalSubMask, structuredClone(originalSubMask)],
-        },
-      ],
-    };
+    const duplicateSubMaskMasks = [
+      {
+        ...originalContainer,
+        subMasks: [originalSubMask, structuredClone(originalSubMask)],
+      },
+    ];
     const duplicateSubMaskState = {
       ...before,
-      adjustmentSnapshot: { ...before.adjustmentSnapshot, value: duplicateSubMaskAdjustments },
+      editDocumentV2: documentWithMasks(duplicateSubMaskMasks),
     };
     expect(() =>
       buildSubMaskInteractionEditTransaction(duplicateSubMaskState, identity, maskSubId, { opacity: 60 }),
@@ -331,8 +328,8 @@ describe('sub-mask interaction edit transaction', () => {
       }),
     ]);
     const result = useEditorStore.getState().applyEditTransaction(request);
-    expect(result).toMatchObject({ changedKeys: ['aiPatches'], noOp: false });
-    expect(result.after.aiPatches[0]?.subMasks[0]?.parameters).toEqual({
+    expect(result).toMatchObject({ changedKeys: ['nodes.source_artifacts.params.aiPatches'], noOp: false });
+    expect(result.after.sourceArtifacts.aiPatches[0]?.subMasks[0]?.parameters).toEqual({
       feather: 0.4,
       points: [{ x: 10, y: 20 }],
     });

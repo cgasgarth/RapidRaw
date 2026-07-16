@@ -185,7 +185,7 @@ describe('agent live typed basic-tone adjustment', () => {
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: state.imageSession.id,
-      operations: [{ patch: { vibrance: 4 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'color_presence', patch: { vibrance: 4 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-tone-edit',

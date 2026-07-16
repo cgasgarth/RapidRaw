@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
@@ -58,17 +57,13 @@ describe('orientation flip edit transaction', () => {
       { nodeType: 'geometry', patch: { flipHorizontal: true }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['flipHorizontal'],
+      changedKeys: ['nodes.geometry.params.flipHorizontal'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'geometry-tool',
     });
-    expect(
-      editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params).flipHorizontal,
-    ).toBe(true);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params).flipHorizontal).toBe(true);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({

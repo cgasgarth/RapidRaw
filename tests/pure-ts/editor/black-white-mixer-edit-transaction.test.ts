@@ -63,15 +63,13 @@ describe('black-and-white mixer edit transaction', () => {
       { nodeType: 'black_white_mixer', patch: { blackWhiteMixer }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['blackWhiteMixer'],
+      changedKeys: ['nodes.black_white_mixer.params.blackWhiteMixer'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['black_white_mixer']?.params).toMatchObject({ blackWhiteMixer });
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.nodes['black_white_mixer']?.params).toMatchObject({ blackWhiteMixer });
+    expect(result.after.nodes['scene_global_color_tone']).toBe(result.before.nodes['scene_global_color_tone']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -142,7 +140,11 @@ describe('black-and-white mixer edit transaction', () => {
     const result = state.applyEditTransaction(
       buildBlackWhiteMixerEditTransaction(state, fallbackIdentity, next, 'fallback-black-white'),
     );
-    expect(result).toMatchObject({ changedKeys: ['blackWhiteMixer'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.black_white_mixer.params.blackWhiteMixer'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,

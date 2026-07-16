@@ -292,7 +292,29 @@ export const applyAgentLensProfile = async (
         );
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'lens_correction',
+          patch: {
+            lensCorrectionMode: nextAdjustments.lensCorrectionMode,
+            lensDistortionAmount: nextAdjustments.lensDistortionAmount,
+            lensDistortionEnabled: nextAdjustments.lensDistortionEnabled,
+            lensDistortionParams: nextAdjustments.lensDistortionParams,
+            lensMaker: nextAdjustments.lensMaker,
+            lensModel: nextAdjustments.lensModel,
+            lensTcaAmount: nextAdjustments.lensTcaAmount,
+            lensTcaEnabled: nextAdjustments.lensTcaEnabled,
+            lensVignetteAmount: nextAdjustments.lensVignetteAmount,
+            lensVignetteEnabled: nextAdjustments.lensVignetteEnabled,
+          },
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();

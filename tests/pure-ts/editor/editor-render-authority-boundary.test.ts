@@ -93,7 +93,7 @@ describe('editor render-authority boundary', () => {
     });
     const committed = useEditorStore.getState();
 
-    expect(result.afterEditDocumentV2).toBe(committed.editDocumentV2);
+    expect(result.after).toBe(committed.editDocumentV2);
     expect(committed.adjustmentRevision).toBe(1);
     expect(committed.history).toEqual([original, committed.editDocumentV2]);
     expect(committed.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(1.25);

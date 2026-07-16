@@ -69,12 +69,12 @@ describe('camera input edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result.after).toMatchObject({ cameraProfile: 'camera_neutral', cameraProfileAmount: 72, exposure: 0.45 });
-    expect(result.afterEditDocumentV2.nodes['camera_input']?.params).toMatchObject({
+    expect(result.after.nodes['camera_input']?.params).toMatchObject({
       cameraProfile: 'camera_neutral',
       cameraProfileAmount: 72,
     });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.45);
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -97,8 +97,8 @@ describe('camera input edit transaction', () => {
       buildCameraInputEditTransaction(state, identity(), { whiteBalanceTechnical }, 'white-balance'),
     );
 
-    expect(result.changedKeys).toEqual(['whiteBalanceTechnical']);
-    expect(result.afterEditDocumentV2.nodes['camera_input']?.params).toMatchObject({
+    expect(result.changedKeys).toEqual(['nodes.camera_input.params.whiteBalanceTechnical']);
+    expect(result.after.nodes['camera_input']?.params).toMatchObject({
       whiteBalanceTechnical,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
@@ -216,7 +216,10 @@ describe('camera input edit transaction', () => {
           'fallback-camera',
         ),
       );
-    expect(result).toMatchObject({ changedKeys: ['cameraProfile', 'cameraProfileAmount'], noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.camera_input.params.cameraProfile', 'nodes.camera_input.params.cameraProfileAmount'],
+      noOp: false,
+    });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({

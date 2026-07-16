@@ -143,8 +143,8 @@ describe('current RapidRaw preset envelope', () => {
 
     const result = state.applyEditTransaction(request);
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'preset' });
-    expect(result.after).toMatchObject({ brightness: 0.2, exposure: 0.75 });
-    expect(result.afterEditDocumentV2.nodes['source_artifacts']).toBe(sourceArtifactsBefore);
+    expect(result.after.nodes['scene_global_color_tone']?.params).toMatchObject({ brightness: 0.2, exposure: 0.75 });
+    expect(result.after.nodes['source_artifacts']).toBe(sourceArtifactsBefore);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(-0.5);
     useEditorStore.getState().redo();
@@ -290,8 +290,6 @@ describe('current RapidRaw preset envelope', () => {
         'exposure'
       ],
     ).toBe(0.8);
-    const preview = buildPresetPreviewAdjustments(imported);
-    if (preview === null) throw new Error('Expected imported preset preview.');
-    expect(selectEditDocumentNode(preview, 'scene_global_color_tone').params['exposure']).toBe(0.8);
+    expect(buildPresetPreviewAdjustments(imported)?.exposure).toBe(0.8);
   });
 });

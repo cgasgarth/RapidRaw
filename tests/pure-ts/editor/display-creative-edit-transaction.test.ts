@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentDisplayCreativeV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { CreativeAdjustment, Effect, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildDisplayCreativeEditTransaction,
@@ -71,18 +70,15 @@ describe('display creative edit transaction', () => {
       { nodeType: 'display_creative', patch: { vignetteAmount: -32 }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['vignetteAmount'],
+      changedKeys: ['nodes.display_creative.params.vignetteAmount'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
     expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
-        .vignetteAmount,
+      editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params).vignetteAmount,
     ).toBe(-32);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -103,12 +99,11 @@ describe('display creative edit transaction', () => {
       buildDisplayCreativeEditTransaction(state, identity(), Effect.LutIntensity, 0, 'display-creative-lut-zero'),
     );
 
-    expect(result.changedKeys).toEqual(['lutIntensity']);
-    expect(result.after.lutIntensity).toBe(0);
-    expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
-        .lutIntensity,
-    ).toBe(0);
+    expect(result.changedKeys).toEqual(['nodes.display_creative.params.lutIntensity']);
+    expect(result.after.nodes['display_creative']?.params['lutIntensity']).toBe(0);
+    expect(editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params).lutIntensity).toBe(
+      0,
+    );
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -191,9 +186,7 @@ describe('display creative edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params),
-    ).toMatchObject({
+    expect(editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params)).toMatchObject({
       grainAmount: 28,
       grainRoughness: 50,
       grainSize: 34,
@@ -229,7 +222,7 @@ describe('display creative edit transaction', () => {
           'fallback-display',
         ),
       );
-    expect(result).toMatchObject({ changedKeys: ['vignetteAmount'], noOp: false });
+    expect(result).toMatchObject({ changedKeys: ['nodes.display_creative.params.vignetteAmount'], noOp: false });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackIdentity.imageSessionId,
       transactionId: 'fallback-display',

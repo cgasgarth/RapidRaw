@@ -59,9 +59,13 @@ describe('point color edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result).toMatchObject({ changedKeys: ['pointColor'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.afterEditDocumentV2.nodes['point_color']?.params).toMatchObject({ pointColor: { enabled: true } });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.point_color.params.pointColor'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(result.after.nodes['point_color']?.params).toMatchObject({ pointColor: { enabled: true } });
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -119,7 +123,11 @@ describe('point color edit transaction', () => {
     const result = state.applyEditTransaction(
       buildPointColorEditTransaction(state, fallbackIdentity, { enabled: true }, 'fallback-point-color'),
     );
-    expect(result).toMatchObject({ changedKeys: ['pointColor'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.point_color.params.pointColor'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,

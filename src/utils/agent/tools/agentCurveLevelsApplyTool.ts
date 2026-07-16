@@ -336,7 +336,26 @@ export const applyAgentCurveLevels = async (
   const nextAdjustments = applyCurveLevelsPatchToAdjustments(beforeAdjustments, parsedRequest.curveLevels);
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'scene_curve',
+          patch: {
+            ...(nextAdjustments.curveMode === undefined ? {} : { curveMode: nextAdjustments.curveMode }),
+            ...(nextAdjustments.parametricCurve === undefined
+              ? {}
+              : { parametricCurve: nextAdjustments.parametricCurve }),
+            ...(nextAdjustments.pointCurves === undefined ? {} : { pointCurves: nextAdjustments.pointCurves }),
+            toneCurve: nextAdjustments.toneCurve,
+          },
+          type: 'patch-edit-document-node',
+        },
+        { nodeType: 'luma_levels', patch: { levels: nextAdjustments.levels }, type: 'patch-edit-document-node' },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();

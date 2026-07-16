@@ -581,8 +581,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setSelectedPresetId(preset.id);
         if (result.noOp) return;
         setAppliedPreset({
-          before: result.beforeEditDocumentV2,
-          expected: result.afterEditDocumentV2,
+          before: result.before,
+          expected: result.after,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,
@@ -610,8 +610,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(null);
         if (result.noOp) return;
         setAppliedPreset({
-          before: result.beforeEditDocumentV2,
-          expected: result.afterEditDocumentV2,
+          before: result.before,
+          expected: result.after,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,

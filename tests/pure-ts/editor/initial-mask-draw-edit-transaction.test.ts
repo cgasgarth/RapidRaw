@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import type { ViewerInitialMaskDrawSessionKey } from '../../../src/components/panel/editor/viewerInitialMaskDrawInteractionController';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildInitialMaskDrawEditTransaction } from '../../../src/utils/initialMaskDrawEditTransaction';
@@ -96,12 +95,12 @@ describe('initial mask draw edit transaction', () => {
     const result = useEditorStore.getState().applyEditTransaction(request);
 
     expect(result).toMatchObject({
-      changedKeys: ['masks'],
+      changedKeys: ['nodes.layers.params.masks'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'layer-command',
     });
-    expect(result.after.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
+    expect(result.after.layers.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,

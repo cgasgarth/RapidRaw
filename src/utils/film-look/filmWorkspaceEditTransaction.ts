@@ -1,7 +1,6 @@
 import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from '../adjustments';
 import type { EditTransactionHistory, EditTransactionRequest } from '../editTransaction';
-import { reconcileReferenceMatchReceiptsAfterEdit } from '../referenceMatchTransfer';
 
 export interface FilmWorkspaceEditState {
   adjustmentRevision: number;
@@ -22,14 +21,6 @@ export const buildFilmWorkspaceEditTransactionRequest = (
   transactionId: string,
   history: EditTransactionHistory = 'single-entry',
 ): EditTransactionRequest => {
-  const next = reconcileReferenceMatchReceiptsAfterEdit(state.adjustmentSnapshot.value, {
-    ...state.adjustmentSnapshot.value,
-    ...structuredClone(patch),
-  });
-  const provenancePatch =
-    next.referenceMatchApplicationReceipt === state.adjustmentSnapshot.value.referenceMatchApplicationReceipt
-      ? {}
-      : { referenceMatchApplicationReceipt: next.referenceMatchApplicationReceipt };
   const ownsFilmEmulation = Object.hasOwn(patch, 'filmEmulation');
   return {
     transactionId,
@@ -46,8 +37,8 @@ export const buildFilmWorkspaceEditTransactionRequest = (
             },
           ]
         : []),
-      ...(Object.keys(provenancePatch).length > 0
-        ? [{ patch: provenancePatch, type: 'patch-adjustments' as const }]
+      ...(ownsFilmEmulation && state.editDocumentV2.provenance.referenceMatchApplicationReceipt !== null
+        ? [{ receipt: null, type: 'set-reference-match-application-receipt' as const }]
         : []),
     ],
     history,

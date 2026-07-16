@@ -47,6 +47,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { editDocumentLayersV2Schema } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
@@ -1614,7 +1615,13 @@ export function MasksPanel() {
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'layer-command',
-        operations: [{ type: 'patch-edit-document-node', nodeType: 'layers', patch: { masks: committed.masks } }],
+        operations: [
+          {
+            type: 'patch-edit-document-node',
+            nodeType: 'layers',
+            patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
+          },
+        ],
         history: 'single-entry',
         persistence: 'commit',
       });

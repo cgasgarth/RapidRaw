@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import {
@@ -57,7 +58,7 @@ const transactionFor = (masks: readonly MaskContainer[], transactionId: string) 
   operations: [
     {
       nodeType: 'layers' as const,
-      patch: editDocumentLayersV2Schema.parse({ masks }),
+      patch: editDocumentLayersV2Schema.parse({ masks: adjustments.masks }),
       type: 'patch-edit-document-node' as const,
     },
   ],
@@ -89,7 +90,7 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
       transactionId: 'mask-tone-enable',
     });
     expect(result.changedKeys).toEqual(['nodes.layers.params.masks']);
-    expect(selectEditDocumentMasks(committed.editDocumentV2)[0]?.adjustments.toneEqualizer.enabled).toBe(true);
+    expect(committed.adjustmentSnapshot.value.masks[0]?.adjustments.toneEqualizer.enabled).toBe(true);
     expect(committed.adjustmentRevision).toBe(1);
     expect(committed.history).toHaveLength(2);
     expect(committed.historyIndex).toBe(1);
@@ -146,7 +147,21 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
       },
     );
     const stale = transactionFor(proposed, 'mask-tone-stale');
-    base.applyEditTransaction(transactionFor({ ...base.adjustmentSnapshot.value, exposure: 0.25 }, 'newer-edit'));
+    base.applyEditTransaction({
+      baseAdjustmentRevision: base.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: 'editor-image-session:44',
+      operations: [
+        {
+          nodeType: 'scene_global_color_tone',
+          patch: { exposure: 0.25 },
+          type: 'patch-edit-document-node',
+        },
+      ],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'newer-edit',
+    });
 
     expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
     const committed = useEditorStore.getState();

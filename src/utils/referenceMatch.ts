@@ -143,6 +143,11 @@ export type ReferenceMatchAdjustmentKey =
   | 'whiteBalanceDuv'
   | 'whiteBalanceKelvin';
 
+export type ReferenceMatchGlobalAdjustments = Pick<
+  Adjustments,
+  'contrast' | 'exposure' | 'saturation' | 'vibrance' | 'whiteBalanceTechnical'
+>;
+
 export interface ReferenceMatchDiff {
   current: number;
   group: ReferenceMatchGroup;
@@ -173,7 +178,7 @@ export interface ReferenceMatchPreviewCandidate {
 const REFERENCE_MATCH_LAYER_KEYS = new Set<ReferenceMatchAdjustmentKey>(['exposure', 'contrast', 'saturation']);
 
 export const getReferenceMatchAdjustmentValue = (
-  adjustments: Adjustments,
+  adjustments: ReferenceMatchGlobalAdjustments,
   key: ReferenceMatchAdjustmentKey,
 ): number => {
   if (key === 'whiteBalanceKelvin') return adjustments.whiteBalanceTechnical.kelvin;
@@ -492,17 +497,17 @@ export const createReferenceMatchProposal = ({
   });
 };
 
-export const applyReferenceMatchProposal = ({
+export const applyReferenceMatchProposal = <AdjustmentsType extends ReferenceMatchGlobalAdjustments>({
   adjustments,
   enabledGroups,
   impact,
   proposal,
 }: {
-  adjustments: Adjustments;
+  adjustments: AdjustmentsType;
   enabledGroups: ReadonlySet<ReferenceMatchGroup>;
   impact: number;
   proposal: ReferenceMatchProposal;
-}): Adjustments => {
+}): AdjustmentsType => {
   const amount = clamp(impact, 0, 100) / 100;
   const next = { ...adjustments };
   let whiteBalanceKelvin = adjustments.whiteBalanceTechnical.kelvin;
@@ -542,7 +547,7 @@ export const createReferenceMatchAppliedDiffs = ({
   impact,
   proposal,
 }: {
-  adjustments: Adjustments;
+  adjustments: ReferenceMatchGlobalAdjustments;
   enabledGroups: ReadonlySet<ReferenceMatchGroup>;
   impact: number;
   proposal: ReferenceMatchProposal;

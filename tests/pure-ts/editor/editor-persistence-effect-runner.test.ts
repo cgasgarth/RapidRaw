@@ -93,7 +93,7 @@ const editReceipt = (
 ): EditApplicationReceipt => ({
   adjustmentRevision,
   baseAdjustmentRevision: adjustmentRevision - 1,
-  changedKeys: ['exposure'],
+  changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
   imageSessionId,
   persistence,
   source: 'manual-control',

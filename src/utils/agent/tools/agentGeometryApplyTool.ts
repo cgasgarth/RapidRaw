@@ -289,7 +289,33 @@ export const applyAgentGeometry = async (
   const nextAdjustments = applyGeometryPatchToAdjustments(beforeAdjustments, parsedRequest.geometry);
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'geometry',
+          patch: {
+            aspectRatio: nextAdjustments.aspectRatio,
+            crop: nextAdjustments.crop,
+            flipHorizontal: nextAdjustments.flipHorizontal,
+            flipVertical: nextAdjustments.flipVertical,
+            orientationSteps: nextAdjustments.orientationSteps,
+            rotation: nextAdjustments.rotation,
+            transformAspect: nextAdjustments.transformAspect,
+            transformDistortion: nextAdjustments.transformDistortion,
+            transformHorizontal: nextAdjustments.transformHorizontal,
+            transformRotate: nextAdjustments.transformRotate,
+            transformScale: nextAdjustments.transformScale,
+            transformVertical: nextAdjustments.transformVertical,
+            transformXOffset: nextAdjustments.transformXOffset,
+            transformYOffset: nextAdjustments.transformYOffset,
+          },
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();

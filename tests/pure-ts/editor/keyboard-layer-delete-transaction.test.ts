@@ -141,7 +141,7 @@ describe('keyboard layer delete EditTransaction boundary', () => {
       baseAdjustmentRevision: 0,
       history: 'single-entry',
       imageSessionId: 'editor-image-session:31',
-      operations: [{ patch: { exposure: 0.5 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.5 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',

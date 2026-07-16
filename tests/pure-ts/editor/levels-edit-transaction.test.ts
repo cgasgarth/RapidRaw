@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { editDocumentLumaLevelsV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { LevelsSettings } from '../../../src/schemas/color/levelsSchemas';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
@@ -78,7 +77,7 @@ describe('Levels edit transaction', () => {
       { nodeType: 'luma_levels', patch: { levels: next }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['levels'],
+      changedKeys: ['nodes.luma_levels.params.levels'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
       nextAdjustmentRevision: 1,
       noOp: false,
@@ -95,10 +94,11 @@ describe('Levels edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().editDocumentV2.nodes['luma_levels']!.params['levels']).toEqual(next);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.levels).toEqual(next);
     expect(editDocumentLumaLevelsV2Schema.parse(result.after.nodes['luma_levels']?.params).levels).toEqual(next);
     expect(result.after.nodes['luma_levels']).not.toBe(beforeNode);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('levels');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2.nodes['luma_levels']!.params['levels']).toEqual(
@@ -192,7 +192,11 @@ describe('Levels edit transaction', () => {
     const reset = editedState.applyEditTransaction(
       buildLevelsEditTransaction(editedState, identity({ adjustmentRevision: 1 }), initialLevels(), 'levels-reset'),
     );
-    expect(reset).toMatchObject({ changedKeys: ['levels'], nextAdjustmentRevision: 2, noOp: false });
+    expect(reset).toMatchObject({
+      changedKeys: ['nodes.luma_levels.params.levels'],
+      nextAdjustmentRevision: 2,
+      noOp: false,
+    });
     expect(useEditorStore.getState().history).toHaveLength(3);
     expect(useEditorStore.getState().editDocumentV2.nodes['luma_levels']!.params['levels']).toEqual(
       INITIAL_ADJUSTMENTS.levels,
@@ -232,7 +236,11 @@ describe('Levels edit transaction', () => {
     const fallbackResult = fallbackState.applyEditTransaction(
       buildLevelsEditTransaction(fallbackState, fallbackIdentity, fallbackLevels, 'fallback-levels'),
     );
-    expect(fallbackResult).toMatchObject({ changedKeys: ['levels'], nextAdjustmentRevision: 1, noOp: false });
+    expect(fallbackResult).toMatchObject({
+      changedKeys: ['nodes.luma_levels.params.levels'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackIdentity.imageSessionId,
       transactionId: 'fallback-levels',

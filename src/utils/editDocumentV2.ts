@@ -1,6 +1,7 @@
 import {
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeEnvelopeV2,
+  type EditDocumentNodeParamsV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   type EditDocumentV2CopyPayload,
@@ -12,6 +13,8 @@ import {
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import { layerStackSidecarPersistenceEnvelopeV1Schema } from '../../packages/rawengine-schema/src/layerStackSidecarPersistence';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from './adjustments';
 
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const normalizeGeometryParams = (params: Readonly<Record<string, unknown>>) =>
@@ -37,32 +40,247 @@ export const createDefaultEditDocumentV2 = (): EditDocumentV2 => {
     return node.params;
   };
   return editDocumentV2Schema.parse({
-    extensions: {},
+    extensions: { legacyAdjustments },
     geometry: nodeParams('geometry'),
     graphProcess: 'scene_referred_v2',
-    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
     layers: nodeParams('layers'),
     nodes,
     provenance: { referenceMatchApplicationReceipt: null },
     schemaVersion: 2,
-    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
     sourceDecode: nodeParams('source_decode'),
-    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
     sourceArtifacts: nodeParams('source_artifacts'),
   });
+};
+
+const readEffectsEnabled = (adjustments: Readonly<Record<string, unknown>>): boolean => {
+  // biome-ignore lint/complexity/useLiteralKeys: the migration adapter intentionally accepts an index signature.
+  if (typeof adjustments['effectsEnabled'] === 'boolean') return adjustments['effectsEnabled'];
+  // biome-ignore lint/complexity/useLiteralKeys: the migration adapter intentionally accepts an index signature.
+  const legacyVisibility = adjustments['sectionVisibility'];
+  return hasRecordShape(legacyVisibility) && typeof legacyVisibility['effects'] === 'boolean'
+    ? legacyVisibility['effects']
+    : true;
+};
+
+const readLegacySectionEnabled = (
+  adjustments: Readonly<Record<string, unknown>>,
+  section: 'basic' | 'color' | 'curves' | 'details',
+): boolean => {
+  // biome-ignore lint/complexity/useLiteralKeys: the adapter owns the legacy index-signature boundary.
+  const visibility = adjustments['sectionVisibility'];
+  return hasRecordShape(visibility) && typeof visibility[section] === 'boolean' ? visibility[section] : true;
+};
+
+const parseCurrentLayers = (params: Readonly<Record<string, unknown>>) =>
+  editDocumentLayersV2Schema.parse({
+    ...params,
+    masks: Array.isArray(params['masks']) ? params['masks'] : [],
+  });
+
+const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z.ZodType>> = {
+  black_white_mixer: editDocumentBlackWhiteMixerV2Schema,
+  camera_input: editDocumentCameraInputV2Schema,
+  channel_mixer: editDocumentChannelMixerV2Schema,
+  color_balance_rgb: editDocumentColorBalanceRgbV2Schema,
+  color_calibration: editDocumentColorCalibrationV2Schema,
+  detail_denoise_dehaze: editDocumentDetailDenoiseDehazeV2Schema,
+  display_creative: editDocumentDisplayCreativeV2Schema,
+  film_emulation: editDocumentFilmEmulationV2Schema,
+  lens_correction: editDocumentLensCorrectionV2Schema,
+  luma_levels: editDocumentLumaLevelsV2Schema,
+  perceptual_grading: editDocumentPerceptualGradingV2Schema,
+  point_color: editDocumentPointColorV2Schema,
+  color_presence: editDocumentColorPresenceV2Schema,
+  scene_global_color_tone: sceneGlobalColorToneParamsV2Schema,
+  scene_to_view_transform: editDocumentSceneToViewTransformV2Schema,
+  scene_curve: editDocumentSceneCurveV2Schema,
+  selective_color_mixer: editDocumentSelectiveColorMixerV2Schema,
+  skin_tone_uniformity: editDocumentSkinToneUniformityV2Schema,
+  source_decode: editDocumentSourceDecodeV2Schema,
+  tone_equalizer: editDocumentToneEqualizerV2Schema,
+};
+
+const normalizeMappedNodeParams = (
+  nodeType: EditDocumentNodeTypeV2,
+  defaults: Readonly<Record<string, unknown>>,
+  mappedParams: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const candidate = { ...defaults, ...mappedParams };
+  if (nodeType === 'geometry') return normalizeGeometryParams(candidate);
+  if (nodeType === 'layers') return parseCurrentLayers({ masks: [], ...mappedParams });
+  const schema = STRICT_LEGACY_NODE_PARAM_SCHEMAS[nodeType];
+  if (schema === undefined) return { ...mappedParams };
+  const parsed = schema.parse(candidate);
+  if (!hasRecordShape(parsed)) throw new Error(`EditDocumentV2 node '${nodeType}' params must be an object.`);
+  return { ...parsed };
+};
+
+export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
+  for (const field of ['filmLookId', 'filmLookStrength']) {
+    if (Object.hasOwn(adjustments, field)) {
+      throw new Error(`EditDocumentV2 rejects retired pre-node Film field '${field}'.`);
+    }
+  }
+  const entries = Object.entries(adjustments);
+  const layerStackArtifacts = layerStackSidecarPersistenceEnvelopeV1Schema.safeParse({
+    rawEngineArtifacts: adjustments['rawEngineArtifacts'],
+  });
+  const quarantinedOwnedEntries = entries.filter(([key, value]) => {
+    const schema = migratedOwnedFieldSchema(key);
+    return schema !== undefined && !schema.safeParse(value).success;
+  });
+  const quarantinedOwnedFields = new Set<string>(quarantinedOwnedEntries.map(([key]) => key));
+  const effectsEnabled = readEffectsEnabled(adjustments);
+  const disabledNodeTypes = new Set<EditDocumentNodeTypeV2>(
+    (['basic', 'color', 'curves', 'details'] as const).flatMap((section) =>
+      readLegacySectionEnabled(adjustments, section) ? [] : getEditDocumentNodeTypesForEditorSection(section),
+    ),
+  );
+  const mapped = entries
+    .map(([key]) => ({ key, nodeType: nodeTypeForField(key) }))
+    .filter(
+      (entry): entry is { key: string; nodeType: EditDocumentNodeTypeV2 } =>
+        entry.nodeType !== null && !quarantinedOwnedFields.has(entry.key),
+    );
+  const nodes = Object.fromEntries(
+    EDIT_DOCUMENT_NODE_DESCRIPTORS.map(({ nodeType }) => {
+      const descriptor = descriptorFor(nodeType);
+      const mappedParams = Object.fromEntries(
+        mapped.filter((entry) => entry.nodeType === nodeType).map(({ key }) => [key, adjustments[key]]),
+      );
+      const params = normalizeMappedNodeParams(nodeType, descriptor?.defaultParams ?? {}, mappedParams);
+      return [
+        nodeType,
+        {
+          enabled: nodeType === 'display_creative' ? effectsEnabled : !disabledNodeTypes.has(nodeType),
+          implementationVersion: descriptor?.implementationVersion ?? 1,
+          params,
+          process: descriptor?.process ?? 'scene_referred_v2',
+          type: nodeType,
+        },
+      ];
+    }),
+  );
+  const legacyAdjustments = Object.fromEntries(
+    entries.filter(
+      ([key]) =>
+        key !== 'effectsEnabled' &&
+        key !== 'rawEngineArtifacts' &&
+        key !== 'sectionVisibility' &&
+        nodeTypeForField(key) === null &&
+        !PROVENANCE_FIELDS.has(key),
+    ),
+  );
+  // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
+  const provenance = { referenceMatchApplicationReceipt: adjustments['referenceMatchApplicationReceipt'] ?? null };
+  const defaultedNodeParams = (
+    [
+      'camera_input',
+      'black_white_mixer',
+      'channel_mixer',
+      'color_balance_rgb',
+      'color_calibration',
+      'detail_denoise_dehaze',
+      'display_creative',
+      'geometry',
+      'lens_correction',
+      'luma_levels',
+      'perceptual_grading',
+      'point_color',
+      'scene_to_view_transform',
+      'scene_curve',
+      'selective_color_mixer',
+      'skin_tone_uniformity',
+      'source_decode',
+      'tone_equalizer',
+    ] as const
+  ).flatMap((nodeType) => {
+    const descriptor = descriptorFor(nodeType);
+    return Object.keys(descriptor?.defaultParams ?? {})
+      .filter((field) => !Object.hasOwn(adjustments, field) || quarantinedOwnedFields.has(field))
+      .map((field) => `${nodeType}.${field}`);
+  });
+  // biome-ignore lint/complexity/useLiteralKeys: legacy input intentionally uses an index signature.
+  const legacyCrop = adjustments['crop'];
+  const defaultedCropUnit = hasRecordShape(legacyCrop) && !Object.hasOwn(legacyCrop, 'unit');
+  return editDocumentV2Schema.parse({
+    extensions: {
+      legacyAdjustments,
+      ...(layerStackArtifacts.success && layerStackArtifacts.data.rawEngineArtifacts !== undefined
+        ? { rawEngineArtifacts: layerStackArtifacts.data.rawEngineArtifacts }
+        : {}),
+      ...(quarantinedOwnedEntries.length > 0
+        ? { quarantinedLegacyAdjustments: Object.fromEntries(quarantinedOwnedEntries) }
+        : {}),
+      ...(hasRecordShape(adjustments['sectionVisibility'])
+        ? { legacyDisclosureMetadata: { sectionVisibility: adjustments['sectionVisibility'] } }
+        : {}),
+    },
+    // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
+    geometry: nodes['geometry']?.params ?? {},
+    graphProcess: 'scene_referred_v2',
+    // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
+    layers: nodes['layers']?.params ?? {},
+    migration: {
+      defaulted: [...defaultedNodeParams, ...(defaultedCropUnit ? ['geometry.crop.unit'] : [])].sort(),
+      disabled: [...disabledNodeTypes, ...(effectsEnabled ? [] : ['display_creative' as const])].sort(),
+      mapped: [
+        ...mapped.map(({ key, nodeType }) => `${nodeType}.${key}`),
+        ...(Object.hasOwn(adjustments, 'effectsEnabled') ||
+        (hasRecordShape(adjustments['sectionVisibility']) && Object.hasOwn(adjustments['sectionVisibility'], 'effects'))
+          ? ['display_creative.enabled']
+          : []),
+        ...(entries.some(([key]) => PROVENANCE_FIELDS.has(key)) ? ['provenance.referenceMatchApplicationReceipt'] : []),
+      ].sort(),
+      quarantined: [
+        ...Object.keys(legacyAdjustments),
+        ...quarantinedOwnedFields,
+        ...(hasRecordShape(adjustments['sectionVisibility']) ? ['sectionVisibility'] : []),
+      ].sort(),
+      sourceSchemaVersion: 1,
+    },
+    nodes,
+    provenance,
+    schemaVersion: 2,
+    // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
+    sourceDecode: nodes['source_decode']?.params ?? {},
+    // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
+    sourceArtifacts: nodes['source_artifacts']?.params ?? {},
+  });
+};
+
+export const editDocumentV2ToLegacyAdjustments = (document: EditDocumentV2): Adjustments => {
+  const parsed = editDocumentV2Schema.parse(document);
+  // biome-ignore lint/complexity/useLiteralKeys: extensions intentionally quarantines future keys.
+  const legacy = parsed.extensions['legacyAdjustments'];
+  const nodeValues = Object.values(parsed.nodes).flatMap((node) => Object.entries(node.params));
+  const projection = Object.fromEntries([
+    ...Object.entries(legacy && typeof legacy === 'object' ? legacy : {}),
+    ...nodeValues,
+    ...(parsed.extensions['rawEngineArtifacts'] === undefined
+      ? []
+      : [['rawEngineArtifacts', parsed.extensions['rawEngineArtifacts']]]),
+    ['effectsEnabled', parsed.nodes['display_creative']?.enabled ?? true],
+    ['referenceMatchApplicationReceipt', parsed.provenance.referenceMatchApplicationReceipt],
+  ]) as Adjustments;
+  return projection.sceneCurveV1 !== undefined || projection.outputCurveV1 !== undefined
+    ? { ...projection, rawEngineEditGraphVersion: 2 }
+    : projection;
 };
 
 export const editDocumentV2NodeInventory = (document: EditDocumentV2): readonly EditDocumentNodeTypeV2[] =>
   Object.keys(document.nodes) as EditDocumentNodeTypeV2[];
 
-export const updateEditDocumentV2Node = (
+export const updateEditDocumentV2Node = <NodeType extends EditDocumentNodeTypeV2>(
   document: EditDocumentV2,
-  nodeType: EditDocumentNodeTypeV2,
-  update: (params: Readonly<Record<string, unknown>>) => Record<string, unknown>,
+  nodeType: NodeType,
+  update: (params: EditDocumentNodeParamsV2<NodeType>) => EditDocumentNodeParamsV2<NodeType>,
 ): EditDocumentV2 => {
   const node = document.nodes[nodeType];
   if (node === undefined) return document;
-  const updatedParams = update(node.params);
+  const typedParams = node.params as EditDocumentNodeParamsV2<NodeType>;
+  const updatedParams = update(typedParams);
+  if (updatedParams === typedParams) return document;
   if (nodeType === 'geometry') {
     const geometry = normalizeGeometryParams(updatedParams);
     const nextNode = editDocumentNodeEnvelopeV2Schema.parse({ ...node, params: geometry });
@@ -91,6 +309,26 @@ export const updateEditDocumentV2Node = (
   return next;
 };
 
+/** Apply a descriptor-typed partial update while preserving unrelated node/domain identities. */
+export const patchEditDocumentV2Node = <NodeType extends EditDocumentNodeTypeV2>(
+  document: EditDocumentV2,
+  nodeType: NodeType,
+  patch: Readonly<Partial<EditDocumentNodeParamsV2<NodeType>>>,
+): EditDocumentV2 => {
+  const currentParams = document.nodes[nodeType]?.params;
+  if (
+    currentParams !== undefined &&
+    Object.entries(patch).every(([key, value]) => Object.is(currentParams[key], value))
+  ) {
+    return document;
+  }
+  return updateEditDocumentV2Node(document, nodeType, (params) => {
+    const updatedParams: EditDocumentNodeParamsV2<NodeType> = structuredClone(params);
+    Object.assign(updatedParams, structuredClone(patch));
+    return updatedParams;
+  });
+};
+
 export const setEditDocumentV2NodeEnabled = (
   document: EditDocumentV2,
   nodeType: EditDocumentNodeTypeV2,
@@ -102,7 +340,7 @@ export const setEditDocumentV2NodeEnabled = (
     ...document,
     nodes: { ...document.nodes, [nodeType]: { ...node, enabled } },
   };
-  return editDocumentV2Schema.parse(next);
+  return next;
 };
 
 /** Publish source-owned AI artifacts atomically in the node and explicit domain. */
@@ -200,10 +438,10 @@ export const selectEditDocumentV2CopyPayload = (
 };
 
 /** Apply one focused node update across documents only when its descriptor allows batch edits. */
-export const batchUpdateEditDocumentV2Nodes = (
+export const batchUpdateEditDocumentV2Nodes = <NodeType extends EditDocumentNodeTypeV2>(
   documents: readonly EditDocumentV2[],
-  nodeType: EditDocumentNodeTypeV2,
-  update: (params: Readonly<Record<string, unknown>>, index: number) => Record<string, unknown>,
+  nodeType: NodeType,
+  update: (params: EditDocumentNodeParamsV2<NodeType>, index: number) => EditDocumentNodeParamsV2<NodeType>,
 ): readonly EditDocumentV2[] | null => {
   const descriptor = descriptorFor(nodeType);
   if (descriptor === undefined || !descriptor.capabilities.batch) return null;

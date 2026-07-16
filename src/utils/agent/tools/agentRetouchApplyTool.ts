@@ -534,7 +534,13 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     buildAgentToolEditTransaction(
       currentState,
       commitIdentity,
-      { ...state.adjustmentSnapshot.value, masks: [...result.masks] },
+      [
+        {
+          nodeType: 'layers',
+          patch: editDocumentLayersV2Schema.parse({ masks: result.masks }),
+          type: 'patch-edit-document-node',
+        },
+      ],
       `${parsedRequest.operationId}_apply`,
     ),
   );
@@ -564,3 +570,5 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     undoGraphRevision: beforeSnapshot.graphRevision,
   });
 };
+
+import { editDocumentLayersV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
