@@ -568,12 +568,14 @@ const histogramVisualStates: ReadonlyArray<{ label: string; state: HistogramHead
 ];
 
 function LightroomHistogramStatesVisualSmoke() {
+  const { t } = useTranslation();
   return (
     <main
       className="min-h-screen bg-editor-matte p-4 font-sans text-text-primary max-[520px]:p-2"
       data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LightroomHistogramStates}
       data-visual-smoke-ready="true"
     >
+      <h1 className="mb-3 text-sm font-semibold">{t('ui.waveform.header.region')}</h1>
       <div className="grid grid-cols-4 items-start gap-3 max-[1100px]:grid-cols-2 max-[520px]:grid-cols-1 max-[520px]:gap-2">
         {histogramVisualStates.map(({ label, state }, index) => (
           <section

@@ -93,7 +93,7 @@ export const VISUAL_SMOKE_SCENARIOS = [
   },
   {
     compactOutputFile: 'lightroom-histogram-states-390x844.png',
-    marker: 'Lightroom histogram states',
+    marker: 'Photo histogram and metadata',
     mode: VISUAL_SMOKE_SCENARIO_IDS.LightroomHistogramStates,
     outputFile: 'lightroom-histogram-states-1440x900.png',
     reviewOutputFile: 'lightroom-histogram-states-1968x1280.png',

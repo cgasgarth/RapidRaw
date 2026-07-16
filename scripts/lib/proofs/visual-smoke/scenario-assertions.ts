@@ -654,7 +654,25 @@ async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, 
     (await shadowClippingToggle.getAttribute('aria-pressed')) !== 'false' ||
     (await highlightClippingToggle.getAttribute('aria-pressed')) !== 'false'
   ) {
-    throw new Error(`${label} clipping controls should both start disabled.`);
+    throw new Error(`${label} clipping controls should both start unpressed.`);
+  }
+
+  const analyticsState = await strip.getAttribute('data-analytics-state');
+  if (analyticsState !== 'current') {
+    if (!['empty', 'loading', 'unavailable'].includes(analyticsState ?? '')) {
+      throw new Error(`${label} non-current histogram should expose a bounded fallback state, got ${analyticsState}.`);
+    }
+    if (!(await shadowClippingToggle.isDisabled()) || !(await highlightClippingToggle.isDisabled())) {
+      throw new Error(`${label} non-current histogram should keep both clipping controls disabled.`);
+    }
+    if ((await panel.getByTestId(`${stripTestId}-histogram`).count()) !== 0) {
+      throw new Error(`${label} non-current histogram should not fabricate histogram pixels.`);
+    }
+    return;
+  }
+
+  if ((await shadowClippingToggle.isDisabled()) || (await highlightClippingToggle.isDisabled())) {
+    throw new Error(`${label} current histogram should enable both clipping controls.`);
   }
   await shadowClippingToggle.click();
   await pageWaitForAttribute(page, strip, 'data-show-clipping', 'true', label);
