@@ -116,8 +116,8 @@ if (coverageConfig?.coverageSkipTestFiles !== true)
   throw new Error('Bun native coverage must exclude test files from product coverage.');
 if (coverageConfig?.coverageDir !== 'artifacts/bun-coverage')
   throw new Error('Bun native coverage must write to the ignored artifact tree.');
-if (coverageConfig?.coverageReporter?.toSorted().join(',') !== 'lcov,text')
-  throw new Error('Bun native coverage must publish text and LCOV reporters.');
+if (coverageConfig?.coverageReporter?.toSorted().join(',') !== 'lcov')
+  throw new Error('Bun native coverage must publish the compact LCOV report consumed by its global summary gate.');
 const allowedCoverageExclusions = ['fixtures/**', 'src/@types/resources.d.ts', 'tests/**'];
 if (coverageConfig?.coveragePathIgnorePatterns?.toSorted().join(',') !== allowedCoverageExclusions.join(','))
   throw new Error('Bun coverage exclusions must remain limited to documented generated/test-only paths.');
