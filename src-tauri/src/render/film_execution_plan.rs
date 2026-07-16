@@ -162,6 +162,7 @@ fn hash_image(image: &Rgb32FImage) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render::film_emulation::FilmProfileKindV1;
     use image::ImageBuffer;
 
     fn context(width: u32, height: u32) -> FilmFrameContextV1 {
@@ -184,6 +185,7 @@ mod tests {
             enabled: true,
             mix: 1.0,
             shaper_p: 0.35,
+            profile: FilmProfileKindV1::Reference,
             grain_amount: 0.0,
         };
         let first = execute_cpu(&image, params, &plan, &context(2, 2)).unwrap();
@@ -208,6 +210,7 @@ mod tests {
                     enabled: true,
                     mix: 1.0,
                     shaper_p: 0.35,
+                    profile: FilmProfileKindV1::Reference,
                     grain_amount: 0.0,
                 },
                 &plan,

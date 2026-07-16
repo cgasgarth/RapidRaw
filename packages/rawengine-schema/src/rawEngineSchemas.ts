@@ -5314,10 +5314,7 @@ export const filmRenderDomainV1Schema = z.enum([
   'display_referred',
 ]);
 
-export const filmHalationAlgorithmV1Schema = z.enum([
-  'legacy_rapidraw_red_fringe_v0',
-  'spectral_highlight_halation_v1',
-]);
+export const filmHalationAlgorithmV1Schema = z.literal('spectral_highlight_halation_v1');
 
 export const filmHalationBlendModeV1Schema = z.enum([
   'screen_warmth_preserving',
@@ -5514,18 +5511,7 @@ export const filmHalationModelV1Schema = z
       });
     }
 
-    if (model.algorithm === 'legacy_rapidraw_red_fringe_v0' && model.rendererSupport !== 'implemented_current_engine') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Legacy RapidRaw halation maps to the implemented current engine.',
-        path: ['rendererSupport'],
-      });
-    }
-
-    if (
-      model.algorithm === 'spectral_highlight_halation_v1' &&
-      model.rendererSupport === 'implemented_current_engine'
-    ) {
+    if (model.rendererSupport === 'implemented_current_engine') {
       context.addIssue({
         code: 'custom',
         message: 'Spectral highlight halation is not fully implemented by the current renderer.',
@@ -5534,12 +5520,9 @@ export const filmHalationModelV1Schema = z
     }
   });
 
-export const filmGlowAlgorithmV1Schema = z.enum(['legacy_rapidraw_glow_bloom_v0', 'luminance_bloom_glow_v1']);
+export const filmGlowAlgorithmV1Schema = z.literal('luminance_bloom_glow_v1');
 
-export const filmBlackAndWhiteAlgorithmV1Schema = z.enum([
-  'legacy_rapidraw_desaturate_v0',
-  'channel_mixer_filter_response_v1',
-]);
+export const filmBlackAndWhiteAlgorithmV1Schema = z.literal('channel_mixer_filter_response_v1');
 
 export const filmBlackAndWhiteFilterPresetV1Schema = z.enum([
   'none',
@@ -5819,18 +5802,7 @@ export const filmBlackAndWhiteModelV1Schema = z
       });
     }
 
-    if (model.algorithm === 'legacy_rapidraw_desaturate_v0' && model.rendererSupport !== 'implemented_current_engine') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Legacy RapidRaw desaturation maps to the implemented current engine.',
-        path: ['rendererSupport'],
-      });
-    }
-
-    if (
-      model.algorithm === 'channel_mixer_filter_response_v1' &&
-      model.rendererSupport === 'implemented_current_engine'
-    ) {
+    if (model.rendererSupport === 'implemented_current_engine') {
       context.addIssue({
         code: 'custom',
         message: 'Channel mixer filter response is not fully implemented by the current renderer.',
@@ -6067,15 +6039,7 @@ export const filmGlowModelV1Schema = z
       });
     }
 
-    if (model.algorithm === 'legacy_rapidraw_glow_bloom_v0' && model.rendererSupport !== 'implemented_current_engine') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Legacy RapidRaw glow maps to the implemented current engine.',
-        path: ['rendererSupport'],
-      });
-    }
-
-    if (model.algorithm === 'luminance_bloom_glow_v1' && model.rendererSupport === 'implemented_current_engine') {
+    if (model.rendererSupport === 'implemented_current_engine') {
       context.addIssue({
         code: 'custom',
         message: 'Luminance bloom/glow is not fully implemented by the current renderer.',
@@ -6084,7 +6048,7 @@ export const filmGlowModelV1Schema = z
     }
   });
 
-export const filmGrainAlgorithmV1Schema = z.enum(['legacy_rapidraw_luma_noise_v0', 'procedural_luma_chroma_noise_v1']);
+export const filmGrainAlgorithmV1Schema = z.literal('procedural_luma_chroma_noise_v1');
 
 export const filmGrainIsoPresetV1Schema = z.enum([
   'iso_50',
@@ -6192,18 +6156,7 @@ export const filmGrainModelV1Schema = z
       });
     }
 
-    if (model.algorithm === 'legacy_rapidraw_luma_noise_v0' && model.rendererSupport !== 'implemented_current_engine') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Legacy RapidRaw grain maps to the implemented current engine.',
-        path: ['rendererSupport'],
-      });
-    }
-
-    if (
-      model.algorithm === 'procedural_luma_chroma_noise_v1' &&
-      model.rendererSupport === 'implemented_current_engine'
-    ) {
+    if (model.rendererSupport === 'implemented_current_engine') {
       context.addIssue({
         code: 'custom',
         message: 'Procedural luma/chroma grain is not fully implemented by the current renderer.',

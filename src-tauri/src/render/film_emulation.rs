@@ -26,6 +26,14 @@ pub const REFERENCE_PROFILE_ID: &str = "rapidraw.reference_film.v1";
 pub const REFERENCE_PROFILE_VERSION: &str = "1";
 pub const REFERENCE_PROFILE_CONTENT_SHA256: &str =
     "sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef";
+pub const SOFT_COLOR_NEGATIVE_PROFILE_CONTENT_SHA256: &str =
+    "sha256:655a5d3e64e8b1816c7fe8f2cded98be3f25756798eaa1d2d5a925d784a344fd";
+pub const CLEAN_REVERSAL_PROFILE_CONTENT_SHA256: &str =
+    "sha256:f4e9d3181c251ae7431c3936407e872effed51899b4d23631f77e6fe0fedbe07";
+pub const TUNGSTEN_CINEMA_PRINT_PROFILE_CONTENT_SHA256: &str =
+    "sha256:05bb185d0ad0a3537823292e1184684e0e2f21babf383f2fb8c38298ae4cd9ce";
+pub const SILVER_MONOCHROME_PROFILE_CONTENT_SHA256: &str =
+    "sha256:a2b83783469b675abe47dd8f87e42682a71b20694676f3f7a603213ef2441b36";
 pub const REFERENCE_SHAPER_P: f32 = 0.35;
 #[allow(clippy::excessive_precision)]
 pub const AP1_LUMINANCE: Vec3 = Vec3::new(0.272_228_716_8, 0.674_081_765_8, 0.053_689_517_4);
@@ -60,11 +68,68 @@ pub struct FilmEmulationStageParamsV1 {
     pub reference_luminance_shaper_p: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FilmProfileKindV1 {
+    Reference,
+    SoftColorNegative,
+    CleanReversal,
+    TungstenCinemaPrint,
+    SilverMonochrome,
+}
+
+impl FilmProfileKindV1 {
+    pub const ALL: [Self; 5] = [
+        Self::Reference,
+        Self::SoftColorNegative,
+        Self::CleanReversal,
+        Self::TungstenCinemaPrint,
+        Self::SilverMonochrome,
+    ];
+
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Reference => REFERENCE_PROFILE_ID,
+            Self::SoftColorNegative => "rapidraw.soft_color_negative.v1",
+            Self::CleanReversal => "rapidraw.clean_reversal.v1",
+            Self::TungstenCinemaPrint => "rapidraw.tungsten_cinema_print.v1",
+            Self::SilverMonochrome => "rapidraw.silver_monochrome.v1",
+        }
+    }
+
+    pub const fn content_sha256(self) -> &'static str {
+        match self {
+            Self::Reference => REFERENCE_PROFILE_CONTENT_SHA256,
+            Self::SoftColorNegative => SOFT_COLOR_NEGATIVE_PROFILE_CONTENT_SHA256,
+            Self::CleanReversal => CLEAN_REVERSAL_PROFILE_CONTENT_SHA256,
+            Self::TungstenCinemaPrint => TUNGSTEN_CINEMA_PRINT_PROFILE_CONTENT_SHA256,
+            Self::SilverMonochrome => SILVER_MONOCHROME_PROFILE_CONTENT_SHA256,
+        }
+    }
+
+    const fn response_scale(self) -> f32 {
+        match self {
+            Self::Reference | Self::SilverMonochrome => 1.0,
+            Self::SoftColorNegative => 0.9,
+            Self::CleanReversal => 1.12,
+            Self::TungstenCinemaPrint => 1.02,
+        }
+    }
+
+    pub fn from_profile_ref(profile_ref: &FilmEmulationProfileRef) -> Option<Self> {
+        Self::ALL.into_iter().find(|profile| {
+            profile_ref.id == profile.id()
+                && profile_ref.version == REFERENCE_PROFILE_VERSION
+                && profile_ref.content_sha256 == profile.content_sha256()
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FilmEmulationParams {
     pub enabled: bool,
     pub mix: f32,
     pub shaper_p: f32,
+    pub profile: FilmProfileKindV1,
     /// Grain is opt-in; the governed reference profile is grain-off by default.
     pub grain_amount: f32,
 }
@@ -95,9 +160,9 @@ pub fn runtime_receipt(
         input_domain: "acescg_linear_v1".to_string(),
         output_domain: "acescg_linear_v1".to_string(),
         node_type: FILM_NODE_TYPE.to_string(),
-        profile_id: REFERENCE_PROFILE_ID.to_string(),
+        profile_id: params.profile.id().to_string(),
         profile_version: REFERENCE_PROFILE_VERSION.to_string(),
-        profile_content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
+        profile_content_sha256: params.profile.content_sha256().to_string(),
         mix: params.mix,
         enabled: params.enabled,
         post_film_pre_view_hash: post_hash.into(),
@@ -114,10 +179,19 @@ impl FilmEmulationNodeV1 {
         if self.working_space != "acescg_linear_v1" || self.seed_policy != "source_stable_v1" {
             return Err("film_emulation_invalid_scene_contract");
         }
-        if self.profile_ref.id != REFERENCE_PROFILE_ID
-            || self.profile_ref.version != REFERENCE_PROFILE_VERSION
-            || self.profile_ref.content_sha256 != REFERENCE_PROFILE_CONTENT_SHA256
-        {
+        let profile = FilmProfileKindV1::from_profile_ref(&self.profile_ref)
+            .ok_or("film_emulation_profile_hash_mismatch")?;
+        if let Some(curve) = &self.characteristic_curve {
+            curve.validate()?;
+            let expected = reference_curve()
+                .response_knots
+                .into_iter()
+                .map(|value| value * profile.response_scale());
+            if curve.response_knots.iter().copied().ne(expected) {
+                return Err("film_emulation_profile_curve_mismatch");
+            }
+        }
+        if self.profile_ref.version != REFERENCE_PROFILE_VERSION {
             return Err("film_emulation_profile_hash_mismatch");
         }
         if !self.mix.is_finite() || !(0.0..=1.0).contains(&self.mix) {
@@ -132,13 +206,11 @@ impl FilmEmulationNodeV1 {
         if !shaper_p.is_finite() || !(0.0001..=4.0).contains(&shaper_p) {
             return Err("film_emulation_invalid_stage_params");
         }
-        if let Some(curve) = &self.characteristic_curve {
-            curve.validate()?;
-        }
         Ok(FilmEmulationParams {
             enabled: self.enabled && self.mix > 0.0,
             mix: self.mix,
-            shaper_p,
+            shaper_p: shaper_p / profile.response_scale(),
+            profile,
             grain_amount: 0.0,
         })
     }
@@ -460,10 +532,7 @@ impl ApplyFilmEmulationOperationV1 {
         }
         match &self.operation {
             FilmEmulationOperationV1::SetProfile { profile_ref } => {
-                if profile_ref.id != REFERENCE_PROFILE_ID
-                    || profile_ref.version != REFERENCE_PROFILE_VERSION
-                    || profile_ref.content_sha256 != REFERENCE_PROFILE_CONTENT_SHA256
-                {
+                if FilmProfileKindV1::from_profile_ref(profile_ref).is_none() {
                     return Err("film_operation_profile_hash_mismatch");
                 }
             }
@@ -704,6 +773,7 @@ mod tests {
             enabled: true,
             mix,
             shaper_p: REFERENCE_SHAPER_P,
+            profile: FilmProfileKindV1::Reference,
             grain_amount: 0.0,
         }
     }
@@ -769,6 +839,65 @@ mod tests {
             runtime_receipt(params(1.0), "sha256:post").input_domain,
             "acescg_linear_v1"
         );
+    }
+
+    #[test]
+    fn every_current_builtin_profile_parses_with_exact_identity() {
+        let mut outputs = Vec::new();
+        for profile in FilmProfileKindV1::ALL {
+            let node = json!({
+                "nodeType": FILM_NODE_TYPE,
+                "contractVersion": 1,
+                "enabled": true,
+                "profileRef": {
+                    "id": profile.id(),
+                    "version": REFERENCE_PROFILE_VERSION,
+                    "contentSha256": profile.content_sha256()
+                },
+                "mix": 1,
+                "workingSpace": "acescg_linear_v1",
+                "seedPolicy": "source_stable_v1"
+            });
+            let parsed = parse_node(&json!({"filmEmulation": node}))
+                .unwrap()
+                .expect("current profile compiles");
+            let receipt = runtime_receipt(parsed, "sha256:post");
+            assert_eq!(receipt.profile_id, profile.id());
+            assert_eq!(receipt.profile_content_sha256, profile.content_sha256());
+            outputs.push(apply_pixel(Vec3::new(0.18, 0.36, 0.08), parsed));
+        }
+        assert_ne!(outputs[0], outputs[1]);
+        assert_ne!(outputs[0], outputs[2]);
+        assert_ne!(outputs[0], outputs[3]);
+    }
+
+    #[test]
+    fn removed_effect_model_ids_fail_before_pixel_execution() {
+        for algorithm in [
+            "legacy_rapidraw_red_fringe_v0",
+            "legacy_rapidraw_glow_bloom_v0",
+            "legacy_rapidraw_desaturate_v0",
+            "legacy_rapidraw_luma_noise_v0",
+        ] {
+            let node = json!({
+                "nodeType": FILM_NODE_TYPE,
+                "contractVersion": 1,
+                "enabled": true,
+                "profileRef": {
+                    "id": REFERENCE_PROFILE_ID,
+                    "version": REFERENCE_PROFILE_VERSION,
+                    "contentSha256": REFERENCE_PROFILE_CONTENT_SHA256
+                },
+                "mix": 1,
+                "workingSpace": "acescg_linear_v1",
+                "seedPolicy": "source_stable_v1",
+                "algorithm": algorithm
+            });
+            assert_eq!(
+                parse_node(&json!({"filmEmulation": node})),
+                Err("film_emulation_invalid_node")
+            );
+        }
     }
 
     #[test]

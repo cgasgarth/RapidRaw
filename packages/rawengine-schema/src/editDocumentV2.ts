@@ -1148,6 +1148,14 @@ export const editDocumentV2CopyPayloadSchema = z
           path: ['nodes', nodeType],
         });
       }
+      if (nodeType === 'film_emulation' && node !== undefined) {
+        const filmEmulation = editDocumentFilmEmulationV2Schema.safeParse(node.params);
+        if (!filmEmulation.success) {
+          for (const issue of filmEmulation.error.issues) {
+            context.addIssue({ ...issue, path: ['nodes', nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
     }
   });
 

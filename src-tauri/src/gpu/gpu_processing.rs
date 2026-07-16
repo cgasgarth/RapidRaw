@@ -1100,7 +1100,7 @@ fn post_film_tap_identity(
     {
         return Err("film_runtime_proof_profile_identity_invalid".to_string());
     }
-    if profile_content_sha256 != crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256 {
+    if profile_content_sha256 != film.profile.content_sha256() {
         return Err("film_runtime_proof_profile_identity_mismatch".to_string());
     }
     let compiled_edit_graph_fingerprint = graph.fingerprint;
@@ -1112,6 +1112,7 @@ fn post_film_tap_identity(
             &[u8::from(film.enabled)],
             &film.mix.to_le_bytes(),
             &film.shaper_p.to_le_bytes(),
+            film.profile.id().as_bytes(),
             &film.grain_amount.to_le_bytes(),
             b"film_emulation_wgsl_v1",
         ],
@@ -3330,6 +3331,30 @@ mod blur_pass_tests {
             post_film_tap_identity(&first.edit_graph, &wrong_profile),
             Err("film_runtime_proof_profile_identity_mismatch".to_string())
         );
+
+        for profile in crate::render::film_emulation::FilmProfileKindV1::ALL {
+            let adjustments = serde_json::json!({
+                "rawEngineEditGraphVersion": 2,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
+                "filmEmulation": {
+                    "nodeType": "film_emulation",
+                    "contractVersion": 1,
+                    "enabled": true,
+                    "profileRef": {
+                        "id": profile.id(),
+                        "version": "1",
+                        "contentSha256": profile.content_sha256()
+                    },
+                    "mix": 0.7,
+                    "workingSpace": "acescg_linear_v1",
+                    "seedPolicy": "source_stable_v1"
+                }
+            });
+            let plan = compile(adjustments, 10 + profile as u64);
+            let identity = post_film_tap_identity(&plan.edit_graph, profile.content_sha256())
+                .expect("current profile has a WGPU execution identity");
+            assert!(!identity.compiled_profile_sha256.is_empty());
+        }
     }
 
     #[test]
