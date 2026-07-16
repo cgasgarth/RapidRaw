@@ -36,7 +36,15 @@ export const selectBunFailureContext = (output: string): string => {
 };
 
 export const runBunUnit = async (targets: readonly string[] = ['tests/pure-ts']): Promise<number> => {
-  const command: [string, ...string[]] = ['bun', 'test', '--no-orphans', '--only-failures', '--parallel', ...targets];
+  const command: [string, ...string[]] = [
+    'bun',
+    'test',
+    '--no-orphans',
+    '--only-failures',
+    '--parallel',
+    '--parallel-delay=100',
+    ...targets,
+  ];
   const child = Bun.spawn(command, {
     env: { ...process.env, AGENT: '1' },
     stderr: 'pipe',

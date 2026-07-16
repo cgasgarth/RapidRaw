@@ -32,7 +32,17 @@ export function resolveRandomizedTestSeed(value: string | undefined): number {
 
 export function buildRandomizedTestArgs(seed: number, target = DEFAULT_RANDOMIZED_TEST_TARGET): string[] {
   explicitSeedSchema.parse(seed);
-  return ['test', '--no-orphans', '--dots', '--parallel', '--bail=1', '--randomize', `--seed=${seed}`, target];
+  return [
+    'test',
+    '--no-orphans',
+    '--dots',
+    '--parallel',
+    '--parallel-delay=100',
+    '--bail=1',
+    '--randomize',
+    `--seed=${seed}`,
+    target,
+  ];
 }
 
 export function randomizedTestReproduction(seed: number): string {

@@ -93,7 +93,7 @@ if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitR
 const coverageRunner = packageScripts['test:coverage'];
 if (
   coverageRunner !==
-  'bun test --no-orphans --dots --parallel --coverage tests/pure-ts && bun scripts/ci/check-bun-coverage.ts'
+  'bun test --no-orphans --dots --parallel --parallel-delay=100 --coverage tests/pure-ts && bun scripts/ci/check-bun-coverage.ts'
 )
   throw new Error('The coverage lane must use one CPU-sized native Bun run followed by the global LCOV gate.');
 if (/--shard|--retry|--parallel(?:=|\s+)\d|run-resource-coordinated|turbo/u.test(coverageRunner))

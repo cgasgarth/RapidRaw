@@ -46,7 +46,7 @@ test('preserves the actionable assertion', () => {
 
   expect(exitCode).toBe(1);
   expect(output).toContain('bun unit failed (exit=1)');
-  expect(output).toContain('reproduce: bun test --no-orphans --only-failures --parallel');
+  expect(output).toContain('reproduce: bun test --no-orphans --only-failures --parallel --parallel-delay=100');
   expect(output).toContain('4 |   expect({ actual: 1 }).toEqual({ actual: 2 });');
   expect(output).toContain(`${fixture}:4:`);
   expect(output).toContain('(fail) preserves the actionable assertion');

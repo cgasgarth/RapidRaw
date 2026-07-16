@@ -58,6 +58,7 @@ describe('Bun native confidence gates', () => {
       '--no-orphans',
       '--dots',
       '--parallel',
+      '--parallel-delay=100',
       '--bail=1',
       '--randomize',
       '--seed=424242',
