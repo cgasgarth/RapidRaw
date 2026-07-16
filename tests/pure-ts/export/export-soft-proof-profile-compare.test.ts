@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
@@ -22,10 +23,11 @@ const metadata = {
 };
 
 describe('export soft-proof profile compare', () => {
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   test('builds paired sRGB and Display P3 requests for the same adjustment payload', () => {
     const requests = buildSoftProofProfileCompareRequests({
       blackPointCompensation: true,
-      jsAdjustments: INITIAL_ADJUSTMENTS,
+      editDocumentV2,
       renderingIntent: ExportRenderingIntent.Perceptual,
       targetResolution: 1024,
     });
@@ -33,7 +35,7 @@ describe('export soft-proof profile compare', () => {
     expect(requests.map((entry) => entry.side)).toEqual(['srgb', 'displayP3']);
     expect(requests[0]?.request.colorProfile).toBe(ExportColorProfile.Srgb);
     expect(requests[1]?.request.colorProfile).toBe(ExportColorProfile.DisplayP3);
-    expect(requests[0]?.request.jsAdjustments).toBe(requests[1]?.request.jsAdjustments);
+    expect(requests[0]?.request.editDocumentV2).toBe(requests[1]?.request.editDocumentV2);
     expect(requests.every((entry) => entry.request.renderingIntent === ExportRenderingIntent.Perceptual)).toBe(true);
   });
 
@@ -58,7 +60,7 @@ describe('export soft-proof profile compare', () => {
   test('keeps distinct proof metadata and nonzero preview hashes', () => {
     const [srgbRequest, displayP3Request] = buildSoftProofProfileCompareRequests({
       blackPointCompensation: false,
-      jsAdjustments: INITIAL_ADJUSTMENTS,
+      editDocumentV2,
       renderingIntent: ExportRenderingIntent.RelativeColorimetric,
       targetResolution: 1024,
     });

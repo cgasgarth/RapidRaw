@@ -28,13 +28,14 @@ const identity: BatchAutoAdjustSelectionIdentity = {
   imageSessionId: session.id,
   path,
 };
+const appliedEditDocument = legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, exposure: 0.65 });
 const applied = batchAutoAdjustPathResultV1Schema.parse({
   contract: 'rapidraw.batch_auto_adjust.v1',
   path,
   receipt: {
     baseAdjustmentDocumentRevision: `sha256:${'0'.repeat(64)}`,
     adjustmentDocumentRevision: `sha256:${'1'.repeat(64)}`,
-    adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.65 },
+    editDocumentV2: appliedEditDocument,
     engine: 'rapidraw.auto_adjust.v1',
     renderFingerprint: 'u64:1111111111111111',
     sourceIdentity: path,

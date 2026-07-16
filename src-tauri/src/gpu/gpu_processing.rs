@@ -136,6 +136,7 @@ impl RevisionedImage {
 }
 
 impl PixelBufferRevision {
+    #[cfg(test)]
     pub fn combine_generations(generations: &[u64]) -> u64 {
         stable_revision_hash(&generations)
     }

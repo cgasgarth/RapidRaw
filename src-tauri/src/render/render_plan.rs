@@ -95,6 +95,7 @@ pub struct CompiledRenderPlan {
     pub revision: RenderPlanRevision,
     pub adjustments: AllAdjustments,
     pub geometry: GeometryParams,
+    #[cfg(test)]
     pub crop: Option<Crop>,
     pub masks: Arc<[MaskDefinition]>,
     pub lut: Option<Arc<Lut>>,
@@ -364,6 +365,7 @@ fn compile_current_edit_document_render_plan(
         revision: context.revision,
         adjustments,
         geometry,
+        #[cfg(test)]
         crop,
         masks: masks.into(),
         lut,
@@ -635,6 +637,7 @@ fn compile_render_plan_from_source(
         revision: context.revision,
         adjustments,
         geometry,
+        #[cfg(test)]
         crop,
         masks: masks.into(),
         lut,

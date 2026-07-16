@@ -72,7 +72,6 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { normalizeLoadedAdjustments } from '../../utils/adjustments';
 import {
   type BatchAutoAdjustSelectionIdentity,
   type BatchAutoAdjustSuccessorBaseline,
@@ -83,6 +82,7 @@ import {
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
+import { editDocumentV2ToLegacyAdjustments } from '../../utils/editDocumentV2';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
 import { buildHdrLaunchSourceMetadata, resolveHdrLaunchSourcePaths } from '../../utils/hdrAutoStackSelection';
@@ -612,7 +612,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               (await invokeWithSchema(
                 Invokes.SaveMetadataAndUpdateThumbnail,
                 {
-                  adjustments: capturedAdjustments,
+                  editDocumentV2: capturedEditDocumentV2,
                   path: capturedSelection.path,
                   transaction: null,
                 },
@@ -657,7 +657,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   if (committed.status === 'applied') globalImageCache.delete(committed.path);
                   if (useLibraryStore.getState().libraryActivePath === committed.path) {
                     setLibrary({
-                      libraryActiveAdjustments: normalizeLoadedAdjustments(committed.receipt.adjustments),
+                      libraryActiveAdjustments: editDocumentV2ToLegacyAdjustments(committed.receipt.editDocumentV2),
                     });
                   }
                   const latest = useEditorStore.getState();
@@ -680,7 +680,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       hydrationProtection.transactionId,
                     );
                   }
-                  const acceptedAdjustments = normalizeLoadedAdjustments(committed.receipt.adjustments);
+                  const acceptedAdjustments = editDocumentV2ToLegacyAdjustments(committed.receipt.editDocumentV2);
                   const reconciledHistoryBaseline = resolveBatchAutoAdjustReconciledHistoryBaseline({
                     acceptedAdjustments,
                     captured: capturedSelection,
@@ -726,7 +726,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             (result) => result.path === currentLibraryPath && result.status !== 'failed',
           );
           if (libraryResult?.status === 'applied') {
-            setLibrary({ libraryActiveAdjustments: normalizeLoadedAdjustments(libraryResult.receipt.adjustments) });
+            setLibrary({
+              libraryActiveAdjustments: editDocumentV2ToLegacyAdjustments(libraryResult.receipt.editDocumentV2),
+            });
           }
 
           const failures = results.filter((result) => result.status === 'failed');

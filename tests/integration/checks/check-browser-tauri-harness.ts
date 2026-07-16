@@ -10,7 +10,7 @@ import { waitForPageCondition } from '../../../scripts/lib/playwright-waits';
 import { installBrowserProofNetworkBoundary } from '../../../scripts/qa/browser-network-boundary';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 import { Invokes } from '../../../src/tauri/commands';
-import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
 import { DISPLAY_TARGET_CHANGED_EVENT } from '../../../src/utils/tauriEventNames';
 
 const host = '127.0.0.1';
@@ -144,41 +144,60 @@ async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
 }
 
 async function verifySchemaOwnedTauriTransport(page: Page): Promise<void> {
+  const editDocumentV2 = createDefaultEditDocumentV2();
+  editDocumentV2.extensions['browserHarnessTransport'] = {
+    omittedByJsonTransport: undefined,
+    schemaVersion: 1,
+  };
   const proof = await page.evaluate(
-    async ({ checkStatusCommand, saveMetadataCommand }) => {
+    async ({ checkStatusCommand, documentToPersist, loadMetadataCommand, saveMetadataCommand }) => {
       const invoke = window.__TAURI_INTERNALS__?.invoke;
       if (invoke === undefined) throw new Error('Browser Tauri transport is unavailable.');
       const status = await invoke(checkStatusCommand);
+      const path = '/tmp/rawengine-browser-harness/schema-boundary.ARW';
       const receipt = await invoke(saveMetadataCommand, {
-        adjustments: {
-          exposure: 0.5,
-          omittedByJsonTransport: undefined,
-          rawEngineArtifacts: { schemaVersion: 1 },
-        },
-        path: '/tmp/rawengine-browser-harness/schema-boundary.ARW',
+        editDocumentV2: documentToPersist,
+        path,
         transaction: null,
       });
-      const adjustments = typeof receipt === 'object' && receipt !== null ? Reflect.get(receipt, 'adjustments') : null;
+      const metadata = await invoke(loadMetadataCommand, { path });
+      const persistedDocument =
+        typeof metadata === 'object' && metadata !== null ? Reflect.get(metadata, 'editDocumentV2') : null;
+      const extensions =
+        typeof persistedDocument === 'object' && persistedDocument !== null
+          ? Reflect.get(persistedDocument, 'extensions')
+          : null;
+      const transport =
+        typeof extensions === 'object' && extensions !== null
+          ? Reflect.get(extensions, 'browserHarnessTransport')
+          : null;
       return {
         artifactSchemaVersion:
-          typeof adjustments === 'object' && adjustments !== null
-            ? Reflect.get(Reflect.get(adjustments, 'rawEngineArtifacts') ?? {}, 'schemaVersion')
-            : null,
+          typeof transport === 'object' && transport !== null ? Reflect.get(transport, 'schemaVersion') : null,
         hasOmittedProperty:
-          typeof adjustments === 'object' && adjustments !== null
-            ? Object.hasOwn(adjustments, 'omittedByJsonTransport')
+          typeof transport === 'object' && transport !== null
+            ? Object.hasOwn(transport, 'omittedByJsonTransport')
             : true,
+        receiptKeys: typeof receipt === 'object' && receipt !== null ? Object.keys(receipt).sort() : [],
         status,
       };
     },
     {
       checkStatusCommand: Invokes.CheckAIConnectorStatus,
+      documentToPersist: editDocumentV2,
+      loadMetadataCommand: Invokes.LoadMetadata,
       saveMetadataCommand: Invokes.SaveMetadataAndUpdateThumbnail,
     },
   );
   if (proof.status !== null) throw new Error('AI connector status command did not preserve its native unit response.');
   if (proof.hasOmittedProperty || proof.artifactSchemaVersion !== 1) {
     throw new Error(`Persistence receipt did not preserve native JSON transport semantics: ${JSON.stringify(proof)}`);
+  }
+  if (
+    JSON.stringify(proof.receiptKeys) !==
+    JSON.stringify(['catalogRevision', 'imageId', 'path', 'renderFingerprint', 'sidecarRevision', 'thumbnailRevision'])
+  ) {
+    throw new Error(`Persistence receipt diverged from the strict native shape: ${JSON.stringify(proof)}`);
   }
 }
 
@@ -471,9 +490,11 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
               ({ command }) => command === 'save_metadata_and_update_thumbnail',
             ) ?? [];
           const call = saves.at(-1);
-          const adjustments = call?.args?.['adjustments'];
-          if (typeof adjustments !== 'object' || adjustments === null || !('masks' in adjustments)) return false;
-          const masks = adjustments.masks;
+          const document = call?.args?.['editDocumentV2'];
+          if (typeof document !== 'object' || document === null || !('layers' in document)) return false;
+          const layers = document.layers;
+          if (typeof layers !== 'object' || layers === null || !('masks' in layers)) return false;
+          const masks = layers.masks;
           if (!Array.isArray(masks)) return false;
           const subMask = masks
             .flatMap((mask) =>
@@ -504,13 +525,12 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
         const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
           .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
           .at(-1);
-        const adjustments = call?.args?.['adjustments'];
+        const document = call?.args?.['editDocumentV2'];
+        const layers =
+          typeof document === 'object' && document !== null && 'layers' in document ? document.layers : null;
         const masks =
-          typeof adjustments === 'object' &&
-          adjustments !== null &&
-          'masks' in adjustments &&
-          Array.isArray(adjustments.masks)
-            ? adjustments.masks
+          typeof layers === 'object' && layers !== null && 'masks' in layers && Array.isArray(layers.masks)
+            ? layers.masks
             : [];
         return {
           ended: call?.endedAtMs !== null,
@@ -560,7 +580,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
           )
             return false;
           const latestSave = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(-1);
-          const masks = latestSave?.args?.['adjustments']?.['masks'];
+          const masks = latestSave?.args?.['editDocumentV2']?.['layers']?.['masks'];
           const persisted = Array.isArray(masks)
             ? masks.flatMap((mask) => mask['subMasks']).find((subMask) => subMask['id'] === maskId)?.['parameters']
             : null;
@@ -1092,23 +1112,21 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       render: latest('apply_adjustments'),
     };
   });
-  const persistedAdjustments = outputProof.persistence?.['adjustments'];
+  const persistedDocument = editDocumentV2Schema.parse(outputProof.persistence?.['editDocumentV2']);
   const overlayMask = outputProof.overlay?.['maskDef'];
   const renderRequest = outputProof.render?.['request'];
   if (
-    typeof persistedAdjustments !== 'object' ||
-    persistedAdjustments === null ||
     typeof overlayMask !== 'object' ||
     overlayMask === null ||
     typeof renderRequest !== 'object' ||
     renderRequest === null
   ) {
     throw new Error(
-      `Initial mask output proof was incomplete: persistence=${String(persistedAdjustments !== null)} overlay=${String(overlayMask !== null)} render=${String(renderRequest !== null)}.`,
+      `Initial mask output proof was incomplete: persistence=${String(persistedDocument !== null)} overlay=${String(overlayMask !== null)} render=${String(renderRequest !== null)}.`,
     );
   }
   const editDocument = editDocumentV2Schema.parse(renderRequest['editDocumentV2']);
-  const persistedLinear = persistedAdjustments.masks
+  const persistedLinear = persistedDocument.layers.masks
     .flatMap((mask) => mask.subMasks)
     .find((subMask) => subMask.type === 'linear');
   const overlayLinear = overlayMask.subMasks.find((subMask) => subMask.type === 'linear');
@@ -1178,9 +1196,12 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
         ({ command }) => command === 'save_metadata_and_update_thumbnail',
       ) ?? [];
-    const adjustments = saves.at(-1)?.args?.['adjustments'];
-    if (typeof adjustments !== 'object' || adjustments === null || !('masks' in adjustments)) return false;
-    return adjustments.masks
+    const document = saves.at(-1)?.args?.['editDocumentV2'];
+    if (typeof document !== 'object' || document === null || !('layers' in document)) return false;
+    const layers = document.layers;
+    if (typeof layers !== 'object' || layers === null || !('masks' in layers) || !Array.isArray(layers.masks))
+      return false;
+    return layers.masks
       .flatMap((mask) => mask.subMasks)
       .filter((subMask) => subMask.type === 'radial')
       .every((subMask) => subMask.parameters.isInitialDraw === true);
@@ -1287,7 +1308,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
       const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
         .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
         .at(-1);
-      const masks = call?.args?.['adjustments']?.['masks'];
+      const masks = call?.args?.['editDocumentV2']?.['layers']?.['masks'];
       const subMask = Array.isArray(masks)
         ? masks.flatMap((mask) => mask['subMasks']).find((candidate) => candidate['id'] === maskId)
         : null;
@@ -1435,7 +1456,7 @@ async function verifyInitialMaskDrawController(page: Page): Promise<void> {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
     const latestOverlay = calls.filter(({ command }) => command === 'generate_mask_overlay').at(-1);
     const latestSave = calls.filter(({ command }) => command === 'save_metadata_and_update_thumbnail').at(-1);
-    const persistedMasks = latestSave?.args?.['adjustments']?.['masks'];
+    const persistedMasks = latestSave?.args?.['editDocumentV2']?.['layers']?.['masks'];
     return {
       native: latestOverlay?.args?.['maskDef']?.['subMasks']?.find(
         (subMask: Record<string, unknown>) => subMask['id'] === maskId,
@@ -1492,7 +1513,7 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
         const latest = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
           .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
           .at(-1);
-        const masks = latest?.args?.['adjustments']?.['masks'];
+        const masks = latest?.args?.['editDocumentV2']?.['layers']?.['masks'];
         if (!Array.isArray(masks) || typeof latest?.endedAtMs !== 'number') return false;
         const mask = masks
           .flatMap((container) =>
@@ -1710,7 +1731,7 @@ async function verifyParametricMaskTargetController(page: Page): Promise<void> {
             ? []
             : [{ subMasks: latest('generate_mask_overlay')?.['maskDef']?.['subMasks'] }],
         ),
-        persisted: findMask(latest('save_metadata_and_update_thumbnail')?.['adjustments']?.['masks']),
+        persisted: findMask(latest('save_metadata_and_update_thumbnail')?.['editDocumentV2']?.['layers']?.['masks']),
         receipt: {
           source: document
             .querySelector('[data-testid="editor-image-preview-panel"]')
@@ -2038,7 +2059,7 @@ async function verifyAiMaskBoxController(page: Page): Promise<void> {
       render: latest('apply_adjustments'),
     };
   });
-  const persisted = proof.persistence?.['adjustments']?.['masks']
+  const persisted = proof.persistence?.['editDocumentV2']?.['layers']?.['masks']
     ?.flatMap((container: Record<string, unknown>) => container['subMasks'])
     .find((subMask: Record<string, unknown>) => subMask['type'] === 'ai-subject')?.['parameters'];
   const overlay = proof.overlay?.['maskDef']?.['subMasks']?.find(
@@ -2195,7 +2216,9 @@ async function verifyAiMaskBoxController(page: Page): Promise<void> {
       render: latest('apply_adjustments'),
     };
   });
-  const quickErasePersistedPatch = quickEraseProof.persistence?.['adjustments']?.['aiPatches']?.find(
+  const quickErasePersistedPatch = quickEraseProof.persistence?.['editDocumentV2']?.['sourceArtifacts']?.[
+    'aiPatches'
+  ]?.find(
     (patch: Record<string, unknown>) =>
       Array.isArray(patch['subMasks']) &&
       patch['subMasks'].some((subMask: Record<string, unknown>) => subMask['type'] === 'quick-eraser'),
@@ -2286,7 +2309,7 @@ async function verifyObjectPromptController(page: Page): Promise<void> {
           ({ command, endedAtMs }) => command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
         )
         .at(-1);
-      const masks = latest?.args?.['adjustments']?.['masks'];
+      const masks = latest?.args?.['editDocumentV2']?.['layers']?.['masks'];
       return Array.isArray(masks)
         ? (masks
             .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
@@ -2303,7 +2326,7 @@ async function verifyObjectPromptController(page: Page): Promise<void> {
                 command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
             )
             .at(-1);
-          const masks = latest?.args?.['adjustments']?.['masks'];
+          const masks = latest?.args?.['editDocumentV2']?.['layers']?.['masks'];
           if (!Array.isArray(masks)) return false;
           const parameters = masks
             .flatMap((container) => (Array.isArray(container?.['subMasks']) ? container['subMasks'] : []))
@@ -2351,7 +2374,7 @@ async function verifyObjectPromptController(page: Page): Promise<void> {
               command === 'save_metadata_and_update_thumbnail' && typeof endedAtMs === 'number',
           )
           .at(-1);
-        const masks = latest?.args?.['adjustments']?.['masks'];
+        const masks = latest?.args?.['editDocumentV2']?.['layers']?.['masks'];
         return (
           Array.isArray(masks) &&
           masks
@@ -2643,8 +2666,8 @@ async function verifyRetouchController(page: Page): Promise<void> {
       render: latest('apply_adjustments'),
     };
   });
-  const persistedAdjustments = proof.persistence?.['adjustments'];
-  const persistedLayer = persistedAdjustments?.['masks']?.find(
+  const persistedDocument = editDocumentV2Schema.parse(proof.persistence?.['editDocumentV2']);
+  const persistedLayer = persistedDocument.layers.masks.find(
     (layer: Record<string, unknown>) => typeof layer['retouchCloneSource'] === 'object',
   );
   const persistedSource = persistedLayer?.['retouchCloneSource'];
@@ -3583,8 +3606,24 @@ async function verifyAutoEditTransactionBoundary(page: Page): Promise<void> {
       .at(-1);
     return call?.args ?? null;
   });
+  const persistedDocument = persisted?.['editDocumentV2'];
+  const persistedNodes =
+    persistedDocument !== null && typeof persistedDocument === 'object' && !Array.isArray(persistedDocument)
+      ? (persistedDocument as Record<string, unknown>)['nodes']
+      : null;
+  const globalToneNode =
+    persistedNodes !== null && typeof persistedNodes === 'object' && !Array.isArray(persistedNodes)
+      ? (persistedNodes as Record<string, unknown>)['scene_global_color_tone']
+      : null;
+  const globalToneParams =
+    globalToneNode !== null && typeof globalToneNode === 'object' && !Array.isArray(globalToneNode)
+      ? (globalToneNode as Record<string, unknown>)['params']
+      : null;
   if (
-    persisted?.['adjustments']?.['exposure'] !== 0.5 ||
+    globalToneParams === null ||
+    typeof globalToneParams !== 'object' ||
+    Array.isArray(globalToneParams) ||
+    (globalToneParams as Record<string, unknown>)['exposure'] !== 0.5 ||
     persisted?.['transaction']?.['transactionId'] !== 'blake3:browser-harness-auto-edit-transaction' ||
     typeof persisted?.['transaction']?.['baseAdjustmentRevision'] !== 'number' ||
     persisted['transaction']['nextAdjustmentRevision'] !== persisted['transaction']['baseAdjustmentRevision'] + 1
@@ -3828,7 +3867,6 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(500);
   const baseline = await counts();
   const exposure = page.getByTestId('basic-control-exposure-value');
   await exposure.click();
@@ -3838,13 +3876,21 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const standardActivePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
   if (!standardActivePath) throw new Error('Batch Auto Adjust proof requires an active path.');
   await page.evaluate(() => {
-    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__) {
-      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 1_000;
-    }
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.holdNextBatchAutoAdjustCommitCompletion();
   });
   await invokeFromContextMenu();
   await waitForSingleAutoAdjustInvocation(baseline.autoAdjust);
-  await page.waitForTimeout(500);
+  await page.waitForFunction(
+    (expectedCommitCount) => {
+      const commits =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'commit_batch_auto_adjustment',
+        ) ?? [];
+      return commits.length === expectedCommitCount && commits.at(-1)?.endedAtMs === null;
+    },
+    baseline.commit + 1,
+    { timeout: 10_000 },
+  );
   const afterPrepare = await counts();
   if (afterPrepare.commit !== baseline.commit + 1) {
     const applyArgs = await page.evaluate(
@@ -3856,21 +3902,30 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     throw new Error(`Batch Auto Adjust did not reach selected-path commit: ${JSON.stringify(applyArgs)}`);
   }
   await switchAwayAndBack(standardActivePath);
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.releaseHeldBatchAutoAdjustCommitCompletion() !== true) {
+      throw new Error('Batch Auto Adjust commit completion was not held for successor hydration.');
+    }
+  });
 
-  await waitForPageCondition(
-    page,
-    () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
-    { timeout: 10_000 },
-  );
   await page.waitForFunction(
-    (expectedSaveCount) => {
+    ({ expectedCommitCount, expectedSaveCount }) => {
+      const commits =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'commit_batch_auto_adjustment',
+        ) ?? [];
       const saves =
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
           ({ command }) => command === 'save_metadata_and_update_thumbnail',
         ) ?? [];
-      return saves.length >= expectedSaveCount && saves[expectedSaveCount - 1]?.endedAtMs !== null;
+      return (
+        typeof commits[expectedCommitCount - 1]?.endedAtMs === 'number' &&
+        saves.length >= expectedSaveCount &&
+        saves[expectedSaveCount - 1]?.endedAtMs !== null &&
+        document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65'
+      );
     },
-    baseline.metadataSave + 1,
+    { expectedCommitCount: baseline.commit + 1, expectedSaveCount: baseline.metadataSave + 1 },
     { timeout: 10_000 },
   );
   const afterApply = await counts();
@@ -3902,8 +3957,9 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       barrierEndedAtMs: barrier?.endedAtMs ?? null,
     };
   }, baseline.metadataSave);
+  const barrierDocument = editDocumentV2Schema.parse(batchCalls.barrierArgs?.['editDocumentV2']);
   if (
-    batchCalls.barrierArgs?.['adjustments']?.['exposure'] !== 0.55 ||
+    barrierDocument.nodes.scene_global_color_tone?.params.exposure !== 0.55 ||
     batchCalls.applyArgs?.['expectedBaseRevision'] !== `sha256:${'a'.repeat(64)}` ||
     typeof batchCalls.barrierEndedAtMs !== 'number' ||
     typeof batchCalls.applyStartedAtMs !== 'number' ||
@@ -4632,7 +4688,7 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
         .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
         .slice(saves);
       return candidates.some((call) => {
-        const mixer = call.args?.['adjustments']?.['blackWhiteMixer'];
+        const mixer = call.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer'];
         const transaction = call.args?.['transaction'];
         return (
           typeof call.endedAtMs === 'number' &&
@@ -4674,13 +4730,21 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
             .slice(saves);
           const enable = persistenceCalls.find(
             (call) =>
-              call.args?.['adjustments']?.['blackWhiteMixer']?.['enabled'] === true &&
-              call.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 0,
+              call.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer']?.[
+                'enabled'
+              ] === true &&
+              call.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer']?.[
+                'weights'
+              ]?.['reds'] === 0,
           );
           const response = persistenceCalls.find(
             (call) =>
-              call.args?.['adjustments']?.['blackWhiteMixer']?.['enabled'] === true &&
-              call.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 32,
+              call.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer']?.[
+                'enabled'
+              ] === true &&
+              call.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer']?.[
+                'weights'
+              ]?.['reds'] === 32,
           );
           return (
             typeof enable?.endedAtMs === 'number' &&
@@ -4707,10 +4771,16 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   const persistence = await page.evaluate(() => {
     const call = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
       .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
-      .findLast((candidate) => candidate.args?.['adjustments']?.['blackWhiteMixer']?.['weights']?.['reds'] === 32);
+      .findLast(
+        (candidate) =>
+          candidate.args?.['editDocumentV2']?.['nodes']?.['black_white_mixer']?.['params']?.['blackWhiteMixer']?.[
+            'weights'
+          ]?.['reds'] === 32,
+      );
     return call?.args ?? null;
   });
-  const persistedMixer = persistence?.['adjustments']?.['blackWhiteMixer'];
+  const persistedMixer = editDocumentV2Schema.parse(persistence?.['editDocumentV2']).nodes.black_white_mixer?.params
+    .blackWhiteMixer;
   const transaction = persistence?.['transaction'];
   if (
     persistedMixer?.['enabled'] !== true ||
@@ -4812,7 +4882,8 @@ async function verifyChannelMixerTransaction(page: Page): Promise<void> {
       .at(-1);
     return call?.args ?? null;
   });
-  const persistedMixer = persistence?.['adjustments']?.['channelMixer'];
+  const persistedMixer = editDocumentV2Schema.parse(persistence?.['editDocumentV2']).nodes.channel_mixer?.params
+    .channelMixer;
   const transaction = persistence?.['transaction'];
   if (
     persistedMixer?.['enabled'] !== true ||
@@ -4874,28 +4945,19 @@ async function verifyColorRangeLocalAdjustmentTransaction(page: Page): Promise<v
     return call?.args ?? null;
   });
   const transaction = persisted?.['transaction'];
-  const adjustments = persisted?.['adjustments'];
-  const masks = Array.isArray(adjustments?.['masks']) ? adjustments['masks'] : [];
-  const sidecars = Array.isArray(adjustments?.['rawEngineArtifacts']?.['layerStackSidecars'])
-    ? adjustments['rawEngineArtifacts']['layerStackSidecars']
-    : [];
+  const persistedDocument = editDocumentV2Schema.parse(persisted?.['editDocumentV2']);
+  const masks = persistedDocument.layers.masks;
   const colorMask = masks
     .flatMap((mask) => (Array.isArray(mask?.['subMasks']) ? mask['subMasks'] : []))
     .find((mask) => mask?.['type'] === 'color');
-  const sidecar = sidecars.find(
-    (candidate) => candidate?.['sourceImagePath'] === '/tmp/rawengine-browser-harness/browser-harness.ARW',
-  );
   if (
     colorMask === undefined ||
-    sidecar === undefined ||
     typeof transaction?.['transactionId'] !== 'string' ||
     typeof transaction?.['baseAdjustmentRevision'] !== 'number' ||
-    transaction['nextAdjustmentRevision'] !== transaction['baseAdjustmentRevision'] + 1 ||
-    typeof sidecar?.['graphRevision'] !== 'string' ||
-    !sidecar['graphRevision'].includes(transaction['transactionId'])
+    transaction['nextAdjustmentRevision'] !== transaction['baseAdjustmentRevision'] + 1
   ) {
     throw new Error(
-      `Color-range local adjustment did not persist one revision-scoped layer artifact: ${JSON.stringify({ colorMask, sidecar, transaction })}`,
+      `Color-range local adjustment did not persist one revision-scoped typed layer: ${JSON.stringify({ colorMask, transaction })}`,
     );
   }
 }
@@ -5030,7 +5092,8 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
         .at(-1)?.args,
   );
   const transaction = persisted?.['transaction'];
-  const colorCalibration = persisted?.['adjustments']?.['colorCalibration'];
+  const colorCalibration = editDocumentV2Schema.parse(persisted?.['editDocumentV2']).nodes.color_calibration?.params
+    .colorCalibration;
   if (
     colorCalibration?.['shadowsTint'] !== 18 ||
     colorCalibration?.['redHue'] !== 12 ||

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { editDocumentV2Schema } from '../editDocumentV2';
 
 export const BATCH_AUTO_ADJUST_CONTRACT_V1 = 'rapidraw.batch_auto_adjust.v1' as const;
 
@@ -6,7 +7,7 @@ const acceptedPathReceiptSchema = z
   .object({
     baseAdjustmentDocumentRevision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
     adjustmentDocumentRevision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
-    adjustments: z.record(z.string(), z.unknown()),
+    editDocumentV2: editDocumentV2Schema,
     engine: z.literal('rapidraw.auto_adjust.v1'),
     renderFingerprint: z.string().regex(/^u64:[0-9a-f]{16}$/u),
     sourceIdentity: z.string().min(1),

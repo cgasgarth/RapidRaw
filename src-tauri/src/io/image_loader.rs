@@ -120,20 +120,6 @@ fn normalize_raw_processing_mode(mode: Option<&str>) -> &'static str {
     }
 }
 
-pub(crate) fn raw_processing_mode_override_from_adjustments(
-    adjustments: &Value,
-) -> Option<&'static str> {
-    adjustments
-        .get("rawProcessingModeOverride")
-        .and_then(Value::as_str)
-        .and_then(|mode| match mode {
-            "fast" => Some("fast"),
-            "balanced" => Some("balanced"),
-            "maximum" => Some("maximum"),
-            _ => None,
-        })
-}
-
 fn raw_processing_mode_recipe(mode: Option<&str>) -> RawProcessingModeRecipe {
     match normalize_raw_processing_mode(mode) {
         "fast" => RawProcessingModeRecipe {
@@ -266,29 +252,6 @@ fn resolve_capture_pre_sharpening_settings(
         },
     }
     .normalized()
-}
-
-pub(crate) fn raw_processing_settings_for_adjustments(
-    settings: &AppSettings,
-    adjustments: &Value,
-) -> AppSettings {
-    let Some(mode) = raw_processing_mode_override_from_adjustments(adjustments) else {
-        return settings.clone();
-    };
-    let recipe = raw_processing_mode_recipe(Some(mode));
-    AppSettings {
-        raw_processing_mode: Some(mode.to_string()),
-        raw_highlight_compression: Some(recipe.raw_highlight_compression),
-        raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
-        raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
-        raw_preprocessing_sharpening_detail: Some(recipe.raw_preprocessing_sharpening_detail),
-        raw_preprocessing_sharpening_edge_masking: Some(
-            recipe.raw_preprocessing_sharpening_edge_masking,
-        ),
-        raw_preprocessing_sharpening_radius: Some(recipe.raw_preprocessing_sharpening_radius),
-        apply_preprocessing_to_non_raws: Some(false),
-        ..settings.clone()
-    }
 }
 
 pub(crate) fn raw_processing_settings_for_current_document(
@@ -628,40 +591,6 @@ fn resolve_loaded_raw_source(
         image,
         ..loaded
     })
-}
-
-pub(crate) fn resolve_loaded_image_for_adjustments(
-    loaded: LoadedImage,
-    adjustments: &Value,
-    state: &AppState,
-    app_handle: &tauri::AppHandle,
-) -> Result<LoadedImage, String> {
-    if !loaded.is_raw {
-        return Ok(loaded);
-    }
-    let (source_path, _) = parse_virtual_path(&loaded.path);
-    let source_path_str = source_path.to_string_lossy().into_owned();
-    let settings =
-        raw_processing_settings_for_adjustments(&load_settings_or_default(app_handle), adjustments);
-    let technical_plans = RawTechnicalPlansV1 {
-        white_balance: technical_white_balance_plan_from_adjustments(adjustments),
-        camera_profile: camera_profile_selection_from_adjustments(adjustments).map(
-            |mut selection| {
-                selection.managed_root =
-                    crate::color::camera_profile::registry::managed_profile_root(app_handle)
-                        .unwrap_or_default();
-                selection
-            },
-        ),
-    };
-    resolve_loaded_raw_source(
-        loaded,
-        source_path,
-        source_path_str,
-        settings,
-        technical_plans,
-        state,
-    )
 }
 
 pub fn load_base_image_from_bytes(
@@ -1336,16 +1265,20 @@ pub(crate) async fn load_image_prepared(
     let source_path_str = source_path.to_string_lossy().to_string();
 
     let settings = load_settings_or_default(&app_handle);
-    let authoritative_adjustments =
-        crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
-            &metadata.adjustments,
-            metadata.edit_document_v2.as_ref(),
-        )?;
+    let current_document =
+        serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(
+            metadata
+                .edit_document_v2
+                .clone()
+                .ok_or_else(|| "image_open_current_edit_document_missing".to_string())?,
+        )
+        .map_err(|error| format!("image_open_current_edit_document_invalid:{error}"))?
+        .compile()?;
     let effective_settings =
-        raw_processing_settings_for_adjustments(&settings, &authoritative_adjustments);
+        raw_processing_settings_for_current_document(&settings, &current_document);
     let technical_plans = RawTechnicalPlansV1 {
-        white_balance: technical_white_balance_plan_from_adjustments(&authoritative_adjustments),
-        camera_profile: camera_profile_selection_from_adjustments(&authoritative_adjustments).map(
+        white_balance: Some(current_document.technical_white_balance_plan()?),
+        camera_profile: camera_profile_selection_from_current_document(&current_document).map(
             |mut selection| {
                 selection.managed_root =
                     crate::color::camera_profile::registry::managed_profile_root(&app_handle)
@@ -1851,47 +1784,6 @@ mod tests {
     }
 
     #[test]
-    fn raw_processing_mode_override_updates_settings_and_cache_key() {
-        let base_settings = AppSettings {
-            raw_processing_mode: Some("fast".to_string()),
-            raw_preprocessing_sharpening: Some(0.0),
-            ..AppSettings::default()
-        };
-        let adjustments = serde_json::json!({
-            "rawProcessingModeOverride": "maximum",
-        });
-
-        let resolved = raw_processing_settings_for_adjustments(&base_settings, &adjustments);
-        assert_eq!(resolved.raw_processing_mode.as_deref(), Some("maximum"));
-        assert_eq!(resolved.raw_preprocessing_color_nr, Some(0.65));
-        assert_eq!(resolved.raw_preprocessing_sharpening, Some(0.42));
-        let resolved_cache_key = raw_processing_profile_key(&resolved);
-        assert_eq!(resolved_cache_key.mode, "maximum");
-        assert_eq!(
-            resolved_cache_key.camera_profile_resolver_version,
-            "dual_illuminant_mired_v2"
-        );
-        assert_eq!(
-            resolved_cache_key.reconstruction_version,
-            "raw_reconstruction_v5_highlight_v2"
-        );
-        assert_eq!(
-            resolved_cache_key.highlight_compression_bits,
-            4.0_f32.to_bits()
-        );
-        assert!(
-            (f32::from_bits(resolved_cache_key.sharpening_bits[0]) - 0.441).abs() < f32::EPSILON
-        );
-
-        let inherited =
-            raw_processing_settings_for_adjustments(&base_settings, &serde_json::json!({}));
-        assert_eq!(inherited.raw_processing_mode.as_deref(), Some("fast"));
-        let inherited_cache_key = raw_processing_profile_key(&inherited);
-        assert_eq!(inherited_cache_key.mode, "fast");
-        assert_ne!(resolved_cache_key, inherited_cache_key);
-    }
-
-    #[test]
     fn raw_cache_key_changes_with_decode_affecting_settings() {
         let base = AppSettings {
             raw_processing_mode: Some("balanced".to_string()),
@@ -2124,75 +2016,42 @@ mod tests {
         let mut export_hashes = Vec::new();
 
         for mode in ["fast", "maximum"] {
-            let adjustments = serde_json::json!({
-                "rawProcessingModeOverride": mode,
-            });
-            let edit_document_v2 = serde_json::json!({
-                "extensions": {},
-                "geometry": {
-                    "aspectRatio": null,
-                    "crop": null,
-                    "flipHorizontal": false,
-                    "flipVertical": false,
-                    "orientationSteps": 0,
-                    "perspectiveCorrection": {
-                        "amount": 100,
-                        "cropPolicy": "auto_crop",
-                        "guides": [],
-                        "mode": "off",
-                        "resolvedPlan": null
-                    },
-                    "rotation": 0,
-                    "transformAspect": 0,
-                    "transformDistortion": 0,
-                    "transformHorizontal": 0,
-                    "transformRotate": 0,
-                    "transformScale": 100,
-                    "transformVertical": 0,
-                    "transformXOffset": 0,
-                    "transformYOffset": 0
-                },
-                "graphProcess": "scene_referred_v2",
-                "layers": { "masks": [] },
-                "nodes": {
-                    "source_decode": {
-                        "enabled": true,
-                        "implementationVersion": 1,
-                        "params": { "rawProcessingModeOverride": mode },
-                        "process": "scene_referred_v2",
-                        "type": "source_decode"
-                    }
-                },
-                "provenance": {},
-                "schemaVersion": 2,
-                "sourceDecode": { "rawProcessingModeOverride": mode },
-                "sourceArtifacts": { "aiPatches": [] }
-            });
+            let mut edit_document_v2 = crate::exif_processing::neutral_current_edit_document();
+            edit_document_v2["nodes"]["source_decode"]["params"] =
+                serde_json::json!({ "rawProcessingModeOverride": mode });
+            edit_document_v2["sourceDecode"] =
+                serde_json::json!({ "rawProcessingModeOverride": mode });
             let sidecar_path = report_dir.join(format!("override-{}.rrdata", mode));
             let sidecar = ImageMetadata {
-                adjustments: adjustments.clone(),
                 edit_document_v2: Some(edit_document_v2),
                 ..ImageMetadata::default()
             };
             crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)
                 .expect("write override sidecar");
             let reloaded = crate::exif_processing::load_sidecar(&sidecar_path);
-            let authoritative_adjustments =
-                crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
-                    &reloaded.adjustments,
-                    reloaded.edit_document_v2.as_ref(),
+            let document =
+                serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(
+                    reloaded
+                        .edit_document_v2
+                        .expect("reopened sidecar retains current document"),
                 )
-                .expect("resolve source-decode node after sidecar reopen");
-            assert_eq!(
-                raw_processing_mode_override_from_adjustments(&authoritative_adjustments),
-                Some(mode)
-            );
+                .expect("reopened current document deserializes")
+                .compile()
+                .expect("reopened current document compiles");
+            assert_eq!(document.raw_processing_mode_override(), Some(mode));
 
-            let settings =
-                raw_processing_settings_for_adjustments(&base_settings, &authoritative_adjustments);
-            let image =
-                load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
-                    .expect("decode private RAW with sidecar override");
+            let settings = raw_processing_settings_for_current_document(&base_settings, &document);
+            let image = load_and_composite_current_document_with_report(
+                &source_bytes,
+                &source_path,
+                &document,
+                false,
+                &settings,
+                None,
+                PathBuf::new(),
+            )
+            .expect("decode private RAW with typed sidecar override")
+            .0;
             let rgba = image.to_rgba8();
             let image_hash = blake3::hash(rgba.as_raw()).to_hex().to_string();
             let export_path = report_dir.join(format!("override-{}.tiff", mode));

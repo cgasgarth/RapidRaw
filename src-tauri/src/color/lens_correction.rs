@@ -748,22 +748,3 @@ pub fn get_lens_distortion_params(
     }
     Ok(None)
 }
-
-pub fn resolve_lens_params(
-    db: &LensDatabase,
-    maker: &str,
-    model: &str,
-    focal_length: f32,
-    aperture: Option<f32>,
-    distance: Option<f32>,
-) -> Option<LensDistortionParams> {
-    let maker_lenses = lenses_for_maker(db, maker);
-    if let Some(lens) = maker_lenses
-        .iter()
-        .find(|l| l.get_display_name(&maker_lenses) == model)
-    {
-        lens.get_distortion_params(focal_length, aperture, distance)
-    } else {
-        None
-    }
-}

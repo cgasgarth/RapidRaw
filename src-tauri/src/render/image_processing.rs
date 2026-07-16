@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
+#[cfg(feature = "tauri-test")]
 use crate::color::view_transform::{ViewTransformPlanV1, ViewTransformSettingsV1};
 
 pub use crate::geometry::IntoCowImage;
@@ -357,6 +358,7 @@ pub fn resolve_tonemapper_override_from_handle(
     resolve_tonemapper_override(&settings, is_raw)
 }
 
+#[cfg(feature = "tauri-test")]
 pub fn apply_cpu_agx_tonemap(image: &mut DynamicImage) {
     const AGX_EPSILON: f32 = 1.0e-6;
     const AGX_MIN_EV: f32 = -15.2;
@@ -468,6 +470,7 @@ pub fn apply_cpu_agx_tonemap(image: &mut DynamicImage) {
     *image = DynamicImage::ImageRgb32F(f32_image);
 }
 
+#[cfg(feature = "tauri-test")]
 pub fn apply_cpu_rapid_view(image: &mut DynamicImage) {
     let plan = ViewTransformPlanV1::compile(ViewTransformSettingsV1::default())
         .expect("built-in Rapid View settings must compile");
@@ -487,6 +490,7 @@ pub fn apply_cpu_rapid_view(image: &mut DynamicImage) {
     *image = DynamicImage::ImageRgb32F(f32_image);
 }
 
+#[cfg(test)]
 pub fn is_image_edited(
     adj: &serde_json::Value,
     is_raw: bool,

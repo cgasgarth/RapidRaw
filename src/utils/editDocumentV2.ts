@@ -453,6 +453,48 @@ export const prepareEditDocumentV2ForRender = (
   return next;
 };
 
+export interface PreparedCurrentEditDocumentPayload {
+  editDocumentV2: EditDocumentV2;
+  newlySentPatchIds: ReadonlySet<string>;
+}
+
+/** Strip only already-resident source artifact bytes from a strict current document. */
+export const prepareCurrentEditDocumentV2ForBackend = (
+  document: EditDocumentV2,
+  residentPatchIds: ReadonlySet<string>,
+): PreparedCurrentEditDocumentPayload => {
+  const editDocumentV2 = structuredClone(document);
+  const newlySentPatchIds = new Set<string>();
+  const prepareSubMasks = (subMasks: EditDocumentV2['layers']['masks'][number]['subMasks']): void => {
+    for (const subMask of subMasks) {
+      const parameters = subMask.parameters;
+      if (parameters === null || parameters === undefined) continue;
+      for (const key of ['mask_data_base64', 'maskDataBase64'] as const) {
+        if (parameters[key] === undefined || parameters[key] === null) continue;
+        if (residentPatchIds.has(subMask.id)) parameters[key] = null;
+        else newlySentPatchIds.add(subMask.id);
+      }
+    }
+  };
+
+  for (const layer of editDocumentV2.layers.masks) prepareSubMasks(layer.subMasks);
+  for (const patch of editDocumentV2.sourceArtifacts.aiPatches) {
+    if (patch.patchData !== null && !patch.isLoading) {
+      if (residentPatchIds.has(patch.id)) patch.patchData = null;
+      else newlySentPatchIds.add(patch.id);
+    }
+    prepareSubMasks(patch.subMasks);
+  }
+  const layersNode = editDocumentV2.nodes['layers'];
+  const sourceArtifactsNode = editDocumentV2.nodes['source_artifacts'];
+  if (layersNode === undefined || sourceArtifactsNode === undefined) {
+    throw new Error('Current EditDocumentV2 source-artifact residency nodes are missing.');
+  }
+  layersNode.params = editDocumentV2.layers;
+  sourceArtifactsNode.params = editDocumentV2.sourceArtifacts;
+  return { editDocumentV2: editDocumentV2Schema.parse(editDocumentV2), newlySentPatchIds };
+};
+
 /** Publish source-owned AI artifacts atomically in the node and explicit domain. */
 export const replaceEditDocumentV2SourceArtifacts = (
   document: EditDocumentV2,

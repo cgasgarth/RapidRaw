@@ -1,7 +1,11 @@
-import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2.ts';
+import {
+  editDocumentV2CopyPayloadSchema,
+  editDocumentV2Schema,
+} from '../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
 import { INITIAL_ADJUSTMENTS } from '../utils/adjustments.ts';
+import { createDefaultEditDocumentV2 } from '../utils/editDocumentV2.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
 import { createBrowserHarnessReleaseGate } from './browserHarnessReleaseGate.ts';
@@ -26,6 +30,7 @@ const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === '1';
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 let imageOpenCompletionGate = createBrowserHarnessReleaseGate();
+let batchAutoAdjustCommitCompletionGate = createBrowserHarnessReleaseGate();
 const commandNames: Record<
   | 'analyzeAutoEdit'
   | 'analyzePerspectiveCorrection'
@@ -227,6 +232,7 @@ let catalogIndexingOperationId = 0;
 let catalogPageSize = 256;
 let batchAutoAdjustInvocation = 0;
 const harnessAdjustmentsByPath = new Map<string, unknown>();
+const harnessEditDocumentsByPath = new Map<string, unknown>();
 let harnessImages: BrowserHarnessImage[] = [
   {
     exif: null,
@@ -260,6 +266,24 @@ let harnessImages: BrowserHarnessImage[] = [
 const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEventCallback => typeof value === 'function';
 
 const roundTripTauriJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
+const createMetadataSaveReceipt = (
+  path: string,
+  transaction: { imageSessionId?: unknown; nextAdjustmentRevision?: unknown; transactionId?: unknown } | undefined,
+  sidecarRevision: string,
+): Record<string, unknown> => ({
+  ...(typeof transaction?.nextAdjustmentRevision === 'number'
+    ? { adjustmentRevision: transaction.nextAdjustmentRevision }
+    : {}),
+  catalogRevision: null,
+  imageId: `path:${path}`,
+  ...(typeof transaction?.imageSessionId === 'string' ? { imageSessionId: transaction.imageSessionId } : {}),
+  path,
+  renderFingerprint: 'u64:0000000000000001',
+  sidecarRevision,
+  thumbnailRevision: 'd'.repeat(64),
+  ...(typeof transaction?.transactionId === 'string' ? { transactionId: transaction.transactionId } : {}),
+});
 
 interface BrowserTauriBootstrapInternals {
   __rawengineBrowserBootstrap: true;
@@ -301,6 +325,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   imageOpenCompletionGate = createBrowserHarnessReleaseGate();
+  batchAutoAdjustCommitCompletionGate = createBrowserHarnessReleaseGate();
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
     aiSubjectMaskResponses: [],
     applyAdjustmentsToPathsDelayMs: 0,
@@ -314,12 +339,14 @@ export const installBrowserTauriHarness = (): void => {
     failNextSettingsSave: false,
     imageOpenDelayMs: 250,
     holdNextImageOpenCompletion: imageOpenCompletionGate.holdNext,
+    holdNextBatchAutoAdjustCommitCompletion: batchAutoAdjustCommitCompletionGate.holdNext,
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
     resetAdjustmentsResponses: [],
     perspectiveAnalysisResponses: [],
     releaseHeldImageOpenCompletion: imageOpenCompletionGate.releaseHeld,
+    releaseHeldBatchAutoAdjustCommitCompletion: batchAutoAdjustCommitCompletionGate.releaseHeld,
     revokedObjectUrls: [],
     tonePlacementResponses: [],
     viewerSampleResponses: [],
@@ -516,8 +543,18 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       batchAutoAdjustInvocation += 1;
       const exposure = Number((0.6 + batchAutoAdjustInvocation * 0.05).toFixed(2));
       const results = paths.map((path, index) => {
-        const current = harnessAdjustmentsByPath.get(path);
-        const currentObject = typeof current === 'object' && current !== null ? current : {};
+        const stored = harnessEditDocumentsByPath.get(path);
+        const currentDocument = editDocumentV2Schema.parse(stored ?? createDefaultEditDocumentV2());
+        const toneNode = currentDocument.nodes['scene_global_color_tone'];
+        const cameraInputNode = currentDocument.nodes['camera_input'];
+        if (toneNode === undefined || cameraInputNode === undefined) {
+          throw new Error('Browser harness batch Auto Adjust requires current tone and camera-input nodes.');
+        }
+        toneNode.params = { ...toneNode.params, contrast: 12, exposure };
+        cameraInputNode.params = {
+          ...cameraInputNode.params,
+          whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+        };
         return {
           contract: 'rapidraw.batch_auto_adjust.v1',
           path,
@@ -526,12 +563,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             adjustmentDocumentRevision: `sha256:${String(index + 1)
               .repeat(64)
               .slice(0, 64)}`,
-            adjustments: {
-              ...structuredClone(currentObject),
-              contrast: 12,
-              exposure,
-              whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
-            },
+            editDocumentV2: currentDocument,
             engine: 'rapidraw.auto_adjust.v1',
             renderFingerprint: `u64:${String(index + 1)
               .repeat(16)
@@ -556,21 +588,19 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.commitBatchAutoAdjustment: {
       const request = args?.['request'] as { path?: string; receipt?: Record<string, unknown> } | undefined;
       const delayMs = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.batchAutoAdjustCommitDelayMs ?? 0;
-      return new Promise((resolve) => {
-        window.setTimeout(() => {
-          if (request?.path && request.receipt?.['adjustments']) {
-            harnessAdjustmentsByPath.set(request.path, structuredClone(request.receipt['adjustments']));
-          }
-          resolve({
-            contract: 'rapidraw.batch_auto_adjust.v1',
-            path: request?.path,
-            receipt: {
-              ...request?.receipt,
-              adjustmentDocumentRevision: `sha256:${'b'.repeat(64)}`,
-            },
-            status: 'applied',
-          });
-        }, delayMs);
+      return batchAutoAdjustCommitCompletionGate.wait(delayMs).then(() => {
+        if (request?.path && request.receipt?.['editDocumentV2']) {
+          harnessEditDocumentsByPath.set(request.path, structuredClone(request.receipt['editDocumentV2']));
+        }
+        return {
+          contract: 'rapidraw.batch_auto_adjust.v1',
+          path: request?.path,
+          receipt: {
+            ...request?.receipt,
+            adjustmentDocumentRevision: `sha256:${'b'.repeat(64)}`,
+          },
+          status: 'applied',
+        };
       });
     }
     case commandNames.previewAutoEditProposal: {
@@ -659,26 +689,23 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.cancelThumbnailGeneration:
       return Promise.resolve(true);
     case commandNames.applyAdjustmentsToPaths: {
-      const adjustments = roundTripTauriJson(args?.['adjustments'] ?? null);
+      const copyPayload = editDocumentV2CopyPayloadSchema.parse(roundTripTauriJson(args?.['editDocumentV2']));
       const paths = getStringArrayArg(args, 'paths');
-      for (const path of paths) harnessAdjustmentsByPath.set(path, structuredClone(adjustments));
+      for (const path of paths) {
+        const currentDocument = editDocumentV2Schema.parse(
+          harnessEditDocumentsByPath.get(path) ?? createDefaultEditDocumentV2(),
+        );
+        for (const [nodeType, node] of Object.entries(copyPayload.nodes)) {
+          if (node !== undefined) currentDocument.nodes[nodeType] = structuredClone(node);
+        }
+        harnessEditDocumentsByPath.set(path, currentDocument);
+      }
+      const transaction = args?.['transaction'] as
+        | { imageSessionId?: unknown; nextAdjustmentRevision?: unknown; transactionId?: unknown }
+        | undefined;
       return new Promise((resolve) => {
         window.setTimeout(
-          () =>
-            resolve(
-              paths.map((path) => ({
-                adjustments,
-                adjustmentRevision: null,
-                catalogRevision: null,
-                imageId: `path:${path}`,
-                imageSessionId: null,
-                path,
-                renderFingerprint: 'u64:0000000000000001',
-                sidecarRevision: `sha256:${'e'.repeat(64)}`,
-                thumbnailRevision: 'f'.repeat(64),
-                transactionId: null,
-              })),
-            ),
+          () => resolve(paths.map((path) => createMetadataSaveReceipt(path, transaction, `sha256:${'e'.repeat(64)}`))),
           window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.applyAdjustmentsToPathsDelayMs ?? 0,
         );
       });
@@ -692,21 +719,18 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
             reject(new Error(response.failure));
             return;
           }
-          if (args?.['adjustments']) harnessAdjustmentsByPath.set(path, structuredClone(args['adjustments']));
-          resolve({
-            adjustments: roundTripTauriJson(args?.['adjustments'] ?? null),
-            adjustmentRevision:
-              (args?.['transaction'] as { nextAdjustmentRevision?: unknown } | undefined)?.nextAdjustmentRevision ??
-              null,
-            catalogRevision: null,
-            imageId: `path:${path}`,
-            imageSessionId: (args?.['transaction'] as { imageSessionId?: unknown } | undefined)?.imageSessionId ?? null,
-            path,
-            renderFingerprint: 'u64:0000000000000001',
-            sidecarRevision: response?.sidecarRevision ?? `sha256:${'a'.repeat(64)}`,
-            thumbnailRevision: 'd'.repeat(64),
-            transactionId: (args?.['transaction'] as { transactionId?: unknown } | undefined)?.transactionId ?? null,
-          });
+          if (args?.['editDocumentV2']) {
+            harnessEditDocumentsByPath.set(path, roundTripTauriJson(args['editDocumentV2']));
+          }
+          resolve(
+            createMetadataSaveReceipt(
+              path,
+              args?.['transaction'] as
+                | { imageSessionId?: unknown; nextAdjustmentRevision?: unknown; transactionId?: unknown }
+                | undefined,
+              response?.sidecarRevision ?? `sha256:${'a'.repeat(64)}`,
+            ),
+          );
         }, response?.delayMs ?? 0);
       });
     }
@@ -796,7 +820,10 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.isImageCached:
       return Promise.resolve(false);
     case commandNames.loadMetadata:
-      return Promise.resolve({ adjustments: harnessAdjustmentsByPath.get(getStringArg(args, 'path') ?? '') ?? null });
+      return Promise.resolve({
+        adjustments: harnessAdjustmentsByPath.get(getStringArg(args, 'path') ?? '') ?? null,
+        editDocumentV2: harnessEditDocumentsByPath.get(getStringArg(args, 'path') ?? '') ?? null,
+      });
     case commandNames.loadPresets:
       return Promise.resolve([]);
     case commandNames.loadImage:
