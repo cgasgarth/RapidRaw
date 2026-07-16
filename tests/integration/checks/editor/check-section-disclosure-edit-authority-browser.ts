@@ -22,7 +22,6 @@ const documentSchema = z
 const saveSchema = z.object({
   args: z
     .object({
-      adjustments: z.record(z.string(), z.unknown()),
       editDocumentV2: documentSchema,
       transaction: z.object({ baseAdjustmentRevision: z.number(), nextAdjustmentRevision: z.number() }).passthrough(),
     })
@@ -205,12 +204,6 @@ const toggleGlobalSection = async (page: Page, testId: string, expectedNodes: re
       throw new Error(`${testId} did not disable ${nodeType}.`);
     }
   }
-  if ('sectionVisibility' in disabled.adjustments) {
-    throw new Error(`${testId} leaked disclosure into flat render authority.`);
-  }
-  if (expectedNodes.includes('display_creative') && disabled.adjustments['effectsEnabled'] !== false) {
-    throw new Error('Effects did not project its explicit compatibility authority.');
-  }
   await section.getByRole('button', { name: 'Enable section' }).click();
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', baselineSaves + 2);
 };
@@ -319,9 +312,9 @@ try {
   for (const sibling of ['color', 'curves', 'details']) {
     if (editNodes[sibling]?.enabled !== true) throw new Error(`Mask Basic toggle mutated sibling ${sibling}.`);
   }
-  const flatMasks = z.array(z.record(z.string(), z.unknown())).parse(maskDisabled.adjustments['masks']);
-  const flatMaskAdjustments = z.record(z.string(), z.unknown()).parse(flatMasks[0]?.['adjustments']);
-  if ('sectionVisibility' in flatMaskAdjustments) throw new Error('Mask disclosure leaked into flat render authority.');
+  if ('sectionVisibility' in firstMask.adjustments) {
+    throw new Error('Mask disclosure leaked into typed layer adjustment authority.');
+  }
   await maskSection.getByRole('button', { name: 'Enable section' }).click();
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', maskBaselineSaves + 2);
 
