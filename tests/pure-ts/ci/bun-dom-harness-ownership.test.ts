@@ -34,9 +34,14 @@ const bunfigSchema = z.object({
 });
 
 function expressionMember(expression: Expression): { object: string; property: string } | null {
-  if (expression.type !== 'MemberExpression' || expression.computed) return null;
-  if (expression.object.type !== 'Identifier' || expression.property.type !== 'Identifier') return null;
-  return { object: expression.object.name, property: expression.property.name };
+  if (expression.type !== 'MemberExpression' || expression.object.type !== 'Identifier') return null;
+  if (!expression.computed && expression.property.type === 'Identifier') {
+    return { object: expression.object.name, property: expression.property.name };
+  }
+  if (expression.computed && expression.property.type === 'Literal' && typeof expression.property.value === 'string') {
+    return { object: expression.object.name, property: expression.property.value };
+  }
+  return null;
 }
 
 function argumentIdentifier(argument: Argument | undefined): string | null {
@@ -70,9 +75,9 @@ export function auditBunDomHarnessSource(path: string, source: string): DomHarne
 
   new Visitor({
     AssignmentExpression(node) {
-      if (node.left.type !== 'MemberExpression' || node.left.computed) return;
-      if (node.left.object.type !== 'Identifier' || node.left.object.name !== 'globalThis') return;
-      if (node.left.property.type !== 'Identifier' || !ownedGlobalBindings.has(node.left.property.name)) return;
+      if (node.left.type !== 'MemberExpression') return;
+      const member = expressionMember(node.left);
+      if (member?.object !== 'globalThis' || !ownedGlobalBindings.has(member.property)) return;
       report('global-dom-assignment', node.start);
     },
     CallExpression(node) {
@@ -86,11 +91,14 @@ export function auditBunDomHarnessSource(path: string, source: string): DomHarne
         report('global-dom-assignment', node.start);
         return;
       }
-      if (
-        ((member.object === 'Object' && member.property === 'defineProperty') ||
-          (member.object === 'Reflect' && member.property === 'set')) &&
-        ownedGlobalBindings.has(argumentString(node.arguments[1]) ?? '')
-      ) {
+      if (member.object === 'Object' && member.property === 'defineProperties') {
+        report('global-dom-assignment', node.start);
+        return;
+      }
+      const mutatesNamedBinding =
+        (member.object === 'Object' && member.property === 'defineProperty') ||
+        (member.object === 'Reflect' && ['defineProperty', 'deleteProperty', 'set'].includes(member.property));
+      if (mutatesNamedBinding && ownedGlobalBindings.has(argumentString(node.arguments[1]) ?? '')) {
         report('global-dom-assignment', node.start);
       }
     },
@@ -115,6 +123,13 @@ export function auditBunDomHarnessSource(path: string, source: string): DomHarne
     NewExpression(node) {
       if (node.callee.type === 'Identifier' && node.callee.name === 'Window') {
         report('happy-dom-window', node.start);
+      }
+    },
+    UnaryExpression(node) {
+      if (node.operator !== 'delete' || node.argument.type !== 'MemberExpression') return;
+      const member = expressionMember(node.argument);
+      if (member?.object === 'globalThis' && ownedGlobalBindings.has(member.property)) {
+        report('global-dom-assignment', node.start);
       }
     },
     VariableDeclarator(node) {
@@ -154,6 +169,10 @@ describe('Bun DOM harness ownership', () => {
         `Object.assign(globalThis, { document: browser.document });`,
         `createRoot(document.body);`,
         `Object.defineProperty(globalThis, 'localStorage', { value: browser.localStorage });`,
+        `globalThis['window'] = browser;`,
+        `delete globalThis.navigator;`,
+        `Reflect.defineProperty(globalThis, 'document', { value: browser.document });`,
+        `Object.defineProperties(globalThis, { window: { value: browser } });`,
       ].join('\n'),
     );
 
@@ -165,6 +184,10 @@ describe('Bun DOM harness ownership', () => {
       'happy-dom-window',
       'global-dom-assignment',
       'bespoke-react-root',
+      'global-dom-assignment',
+      'global-dom-assignment',
+      'global-dom-assignment',
+      'global-dom-assignment',
       'global-dom-assignment',
     ]);
   });
