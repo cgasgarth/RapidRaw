@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { editDocumentSceneCurveV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS, type SceneCurveSettingsV1 } from '../../../src/utils/adjustments';
@@ -69,7 +70,9 @@ describe('typed curve edit transaction', () => {
       },
     ]);
     expect(result.after).toMatchObject({ exposure: 0.35, rawEngineEditGraphVersion: 2, sceneCurveV1: sceneCurve });
-    expect(result.afterEditDocumentV2.nodes.scene_curve.params.sceneCurveV1).toEqual(sceneCurve);
+    expect(
+      editDocumentSceneCurveV2Schema.parse(result.afterEditDocumentV2.nodes['scene_curve']?.params).sceneCurveV1,
+    ).toEqual(sceneCurve);
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -117,10 +120,12 @@ describe('typed curve edit transaction', () => {
 
     expect(result.after.sceneCurveV1).toEqual(sceneCurve);
     expect(result.after.outputCurveV1).toEqual(outputCurve);
-    expect(result.afterEditDocumentV2.nodes.scene_curve.params).toMatchObject({
-      outputCurveV1: outputCurve,
-      sceneCurveV1: sceneCurve,
-    });
+    expect(editDocumentSceneCurveV2Schema.parse(result.afterEditDocumentV2.nodes['scene_curve']?.params)).toMatchObject(
+      {
+        outputCurveV1: outputCurve,
+        sceneCurveV1: sceneCurve,
+      },
+    );
     expect(result.changedKeys).toEqual(['outputCurveV1']);
   });
 
