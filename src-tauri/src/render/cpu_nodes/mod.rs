@@ -123,7 +123,7 @@ impl CpuNodeRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::edit_graph::{EditGraphCompileInputs, SCENE_REFERRED_PIPELINE_VERSION};
+    use crate::edit_graph::EditGraphCompileInputs;
     use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
     use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -160,8 +160,6 @@ mod tests {
         .unwrap();
         let adjustments = crate::adjustments::abi::AllAdjustments::default();
         let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
-            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
-            version_was_explicit: true,
             source_fingerprint: 1,
             geometry_fingerprint: 2,
             retouch_fingerprint: 3,
@@ -213,8 +211,6 @@ mod tests {
     fn cpu_resource_receipts_follow_active_graph_node_descriptors() {
         let adjustments = crate::adjustments::abi::AllAdjustments::default();
         let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
-            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
-            version_was_explicit: true,
             source_fingerprint: 1,
             geometry_fingerprint: 2,
             retouch_fingerprint: 3,

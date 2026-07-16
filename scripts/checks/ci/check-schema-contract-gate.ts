@@ -59,7 +59,6 @@ const CONTRACT_COMMANDS = [
   ],
   ['bun', 'packages/rawengine-schema/scripts/check-samples.ts'],
   ['bun', 'packages/rawengine-schema/scripts/check-sample-artifacts.ts'],
-  ['bun', 'packages/rawengine-schema/scripts/check-edit-graph-migrations.ts'],
   ['bun', 'packages/rawengine-schema/scripts/check-edit-command-bus.ts'],
   ['bun', 'packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts'],
   ['bun', 'packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts'],

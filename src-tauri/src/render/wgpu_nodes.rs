@@ -8,8 +8,7 @@
 use std::sync::Arc;
 
 use crate::edit_graph::{
-    CompiledEditGraph, EditNodeKind, LEGACY_PIPELINE_VERSION, SCENE_REFERRED_PIPELINE_VERSION,
-    SpatialSupport, WgpuBindGroupLayoutKind, runtime_descriptor,
+    CompiledEditGraph, EditNodeKind, SpatialSupport, WgpuBindGroupLayoutKind, runtime_descriptor,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -41,9 +40,9 @@ fn shader_source_for(implementation: &'static str) -> Result<WgpuShaderSource, &
     match implementation {
         "scene_curve_wgsl_v1" => Ok(WgpuShaderSource::SceneCurve),
         "output_curve_wgsl_v1" => Ok(WgpuShaderSource::OutputCurve),
-        "shader_wgsl_scene_phase_v2"
-        | "shader_wgsl_view_display_phase_v2"
-        | "shader_wgsl_legacy_scene_view_v1" => Ok(WgpuShaderSource::FusedProduction),
+        "shader_wgsl_scene_phase_v2" | "shader_wgsl_view_display_phase_v2" => {
+            Ok(WgpuShaderSource::FusedProduction)
+        }
         "film_emulation_wgsl_v1" | "clipping_overlay_wgsl_v1" | "shader_transport_dither_v1" => {
             Ok(WgpuShaderSource::External)
         }
@@ -62,7 +61,6 @@ fn shader_accepts_layout(shader_source: WgpuShaderSource, layout: WgpuBindGroupL
                 | WgpuBindGroupLayoutKind::FusedSceneSpatialMaskV2
                 | WgpuBindGroupLayoutKind::FusedViewLutV2
                 | WgpuBindGroupLayoutKind::FusedDisplayLutMaskV2
-                | WgpuBindGroupLayoutKind::FusedLegacySceneViewV1
         ),
         WgpuShaderSource::External => layout == WgpuBindGroupLayoutKind::ExternalPointwiseV1,
     }
@@ -171,9 +169,7 @@ impl WgpuResourceKind {
 
 fn resource_kind(resource: &str) -> Result<WgpuResourceKind, &'static str> {
     match resource {
-        "scene_guidance_v1" | "detail_guidance_v1" | "legacy_scene_blur_v1" => {
-            Ok(WgpuResourceKind::SampledTexture2d)
-        }
+        "scene_guidance_v1" | "detail_guidance_v1" => Ok(WgpuResourceKind::SampledTexture2d),
         "view_transform_lut_v1" | "display_lut_v1" => Ok(WgpuResourceKind::SampledTexture3d),
         "mask_layers_v1" => Ok(WgpuResourceKind::SampledTexture2dArray),
         _ => Err("edit_graph.wgpu_unknown_resource_kind"),
@@ -198,7 +194,6 @@ pub(crate) struct WgpuNodeModule {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum WgpuDispatchPhase {
-    Legacy,
     Scene,
     View,
     DisplayTransport,
@@ -207,7 +202,6 @@ pub(crate) enum WgpuDispatchPhase {
 impl WgpuDispatchPhase {
     pub(crate) const fn stable_id(self) -> &'static str {
         match self {
-            Self::Legacy => "legacy",
             Self::Scene => "scene",
             Self::View => "view",
             Self::DisplayTransport => "display_transport",
@@ -216,7 +210,6 @@ impl WgpuDispatchPhase {
 
     pub(crate) const fn shader_execution_phase(self) -> u32 {
         match self {
-            Self::Legacy => 0,
             Self::Scene => 1,
             Self::View => 2,
             Self::DisplayTransport => 3,
@@ -242,34 +235,19 @@ pub(crate) struct WgpuNodeRuntime {
     max_halo_pixels: u16,
 }
 
-fn classify_dispatch_phase(
-    pipeline_version: u32,
-    modules: &[WgpuNodeModule],
-) -> Result<WgpuDispatchPhase, &'static str> {
+fn classify_dispatch_phase(modules: &[WgpuNodeModule]) -> Result<WgpuDispatchPhase, &'static str> {
     let phases = modules
         .iter()
         .map(|module| module.fused_phase)
         .collect::<Vec<_>>();
-    match pipeline_version {
-        SCENE_REFERRED_PIPELINE_VERSION if phases.iter().all(|phase| *phase == "scene") => {
-            Ok(WgpuDispatchPhase::Scene)
-        }
-        SCENE_REFERRED_PIPELINE_VERSION if phases.iter().all(|phase| *phase == "view") => {
-            Ok(WgpuDispatchPhase::View)
-        }
-        SCENE_REFERRED_PIPELINE_VERSION
-            if phases
-                .iter()
-                .all(|phase| matches!(*phase, "display" | "transport")) =>
+    match phases.as_slice() {
+        _ if phases.iter().all(|phase| *phase == "scene") => Ok(WgpuDispatchPhase::Scene),
+        _ if phases.iter().all(|phase| *phase == "view") => Ok(WgpuDispatchPhase::View),
+        _ if phases
+            .iter()
+            .all(|phase| matches!(*phase, "display" | "transport")) =>
         {
             Ok(WgpuDispatchPhase::DisplayTransport)
-        }
-        LEGACY_PIPELINE_VERSION
-            if phases
-                .iter()
-                .all(|phase| matches!(*phase, "legacy" | "display" | "transport")) =>
-        {
-            Ok(WgpuDispatchPhase::Legacy)
         }
         _ => Err("edit_graph.wgpu_fused_phase_mismatch"),
     }
@@ -359,7 +337,7 @@ impl WgpuNodeRuntime {
                 group_modules.push(*module);
             }
             if !kinds.is_empty() {
-                let phase = classify_dispatch_phase(graph.pipeline_version, &group_modules)?;
+                let phase = classify_dispatch_phase(&group_modules)?;
                 if group_modules
                     .iter()
                     .any(|module| module.entry_point != group_modules[0].entry_point)
@@ -393,15 +371,11 @@ impl WgpuNodeRuntime {
         if grouped_count != modules.len() {
             return Err("edit_graph.wgpu_fused_group_incomplete");
         }
-        let expected_phases: &[WgpuDispatchPhase] = match graph.pipeline_version {
-            SCENE_REFERRED_PIPELINE_VERSION => &[
-                WgpuDispatchPhase::Scene,
-                WgpuDispatchPhase::View,
-                WgpuDispatchPhase::DisplayTransport,
-            ],
-            LEGACY_PIPELINE_VERSION => &[WgpuDispatchPhase::Legacy],
-            _ => return Err("edit_graph.wgpu_unsupported_pipeline_version"),
-        };
+        let expected_phases: &[WgpuDispatchPhase] = &[
+            WgpuDispatchPhase::Scene,
+            WgpuDispatchPhase::View,
+            WgpuDispatchPhase::DisplayTransport,
+        ];
         let phases = dispatch_groups
             .iter()
             .map(|group| group.phase)
@@ -537,7 +511,7 @@ impl WgpuNodeRuntime {
 mod tests {
     use super::*;
     use crate::adjustments::abi::AllAdjustments;
-    use crate::edit_graph::{EditGraphCompileInputs, SCENE_REFERRED_PIPELINE_VERSION};
+    use crate::edit_graph::EditGraphCompileInputs;
     use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
     use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -573,8 +547,6 @@ mod tests {
         )
         .unwrap();
         crate::edit_graph::CompiledEditGraph::compile(EditGraphCompileInputs {
-            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
-            version_was_explicit: true,
             source_fingerprint: 1,
             geometry_fingerprint: 2,
             retouch_fingerprint: 3,
@@ -603,8 +575,6 @@ mod tests {
     fn graph_without_bound_resources() -> crate::edit_graph::CompiledEditGraph {
         let adjustments = AllAdjustments::default();
         crate::edit_graph::CompiledEditGraph::compile(EditGraphCompileInputs {
-            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
-            version_was_explicit: true,
             source_fingerprint: 1,
             geometry_fingerprint: 2,
             retouch_fingerprint: 3,
@@ -830,10 +800,6 @@ mod tests {
         };
         assert_eq!(
             dimension("scene_guidance_v1"),
-            wgpu::TextureViewDimension::D2
-        );
-        assert_eq!(
-            dimension("legacy_scene_blur_v1"),
             wgpu::TextureViewDimension::D2
         );
         assert_eq!(
