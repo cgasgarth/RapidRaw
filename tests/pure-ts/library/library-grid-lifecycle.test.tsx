@@ -42,11 +42,11 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
   const originalResizeObserver = globalThis.ResizeObserver;
   const originalScrollTo = window.HTMLElement.prototype.scrollTo;
   globalThis.ResizeObserver = TestResizeObserver;
-  window.HTMLElement.prototype.scrollTo = function scrollTo(options: ScrollToOptions) {
-    this.scrollTop = options.top ?? this.scrollTop;
+  window.HTMLElement.prototype.scrollTo = function scrollTo(xOrOptions?: number | ScrollToOptions, y?: number) {
+    this.scrollTop = typeof xOrOptions === 'number' ? (y ?? this.scrollTop) : (xOrOptions?.top ?? this.scrollTop);
   };
   libraryEntityRepository.replaceAll(images);
-  let view: ReturnType<typeof testingRender> | null = null;
+  let mountedView: ReturnType<typeof testingRender> | null = null;
   const render = async (
     imageList: ImageFile[],
     thumbnailSize: ThumbnailSize,
@@ -75,9 +75,11 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
         />
       </I18nextProvider>
     );
-    if (view === null) view = testingRender(element);
+    const view = mountedView ?? testingRender(element);
+    if (mountedView === null) mountedView = view;
     else view.rerender(element);
     await act(() => Promise.resolve());
+    return view;
   };
   const resize = async (width: number, height: number) => {
     await act(async () => {
@@ -101,8 +103,7 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     });
   };
 
-  await render(images, ThumbnailSize.Small, ThumbnailAspectRatio.Cover);
-  if (view === null) throw new Error('Expected library grid view');
+  const view = await render(images, ThumbnailSize.Small, ThumbnailAspectRatio.Cover);
   const { container } = view;
   await resize(600, 400);
   const list = container.querySelector<HTMLElement>('.custom-scrollbar');

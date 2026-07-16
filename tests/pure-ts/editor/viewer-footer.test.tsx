@@ -67,6 +67,8 @@ afterEach(() => {
         labelsVisible: true,
         mode: 'off',
         orientation: 'vertical',
+        source: { identity: null, kind: 'original' },
+        synchronizedTransform: 'locked',
       },
       previewQualityStatus: null,
       selectedImage: null,

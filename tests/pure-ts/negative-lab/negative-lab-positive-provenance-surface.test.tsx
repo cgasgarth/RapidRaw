@@ -41,7 +41,7 @@ describe('Negative Lab positive provenance surface', () => {
     if (provenance === null) throw new Error('Expected current positive provenance.');
 
     const { badge, container } = await renderSurface(provenance, null);
-    expect(badge.dataset.negativeLabPositiveState).toBe('current');
+    expect(badge.dataset['negativeLabPositiveState']).toBe('current');
     expect(badge.textContent).toBe('NL Current');
     expect(
       container.querySelector('[data-negative-lab-source-path]')?.getAttribute('data-negative-lab-source-path'),

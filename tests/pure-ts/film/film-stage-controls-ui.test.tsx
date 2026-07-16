@@ -40,7 +40,8 @@ describe('Film stage controls UI', () => {
       ),
     );
     const slider = view.getByRole('slider', { name: `${responseLabelKey} slider` });
-    expect(view.getByLabelText('Profile default')).toHaveAttribute('data-stage-modified', 'false');
+    expect(view.getByLabelText('Profile default').getAttribute('data-stage-modified')).toBe('false');
+    if (!(slider instanceof window.HTMLInputElement)) throw new Error('Expected descriptor slider');
     await act(async () => {
       slider.value = '1.25';
       const reactPropsKey = Object.keys(slider).find((key) => key.startsWith('__reactProps$'));

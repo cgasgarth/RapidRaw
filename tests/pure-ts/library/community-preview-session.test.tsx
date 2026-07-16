@@ -134,7 +134,7 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
   const originalFetch = globalThis.fetch;
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
-  if (fetchImplementation) globalThis.fetch = fetchImplementation;
+  if (fetchImplementation) Reflect.set(globalThis, 'fetch', fetchImplementation);
   URL.createObjectURL = () => `blob:${++objectUrl}`;
   URL.revokeObjectURL = (url: string | URL) => revoked.push(String(url));
   const view = testingRender(createElement(Fragment));
@@ -145,11 +145,9 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
     render: async (sessionId: string, localPaths: string[], presets: CommunityPreset[]) => {
       await act(async () => {
         view.rerender(
-          createElement(
-            CommunityPreviewSession,
-            { key: sessionId, localPaths, presets, sessionId },
-            (previews: Record<string, string | null>) => JSON.stringify(previews),
-          ),
+          <CommunityPreviewSession key={sessionId} localPaths={localPaths} presets={presets} sessionId={sessionId}>
+            {(previews: Record<string, string | null>) => JSON.stringify(previews)}
+          </CommunityPreviewSession>,
         );
       });
     },
@@ -157,7 +155,7 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
       if (!mounted) return;
       mounted = false;
       view.unmount();
-      globalThis.fetch = originalFetch;
+      Reflect.set(globalThis, 'fetch', originalFetch);
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
     },

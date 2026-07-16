@@ -120,7 +120,7 @@ function MaskDenoiseControlsHarness() {
   );
 }
 
-async function renderHarness(child: ReturnType<typeof createElement>): Promise<HTMLDivElement> {
+async function renderHarness(child: ReturnType<typeof createElement>): Promise<HTMLElement> {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     interpolation: { escapeValue: false },

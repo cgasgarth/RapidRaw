@@ -68,7 +68,7 @@ test('keyed path replacement discards outgoing layers and an unmounted placehold
 });
 
 async function renderThumbnail(path: string, url: string | null, compact: boolean, loads: string[] = []) {
-  let view: ReturnType<typeof testingRender> | null = null;
+  let mountedView: ReturnType<typeof testingRender> | null = null;
   const render = async (nextPath: string, nextUrl: string | null, nextCompact: boolean) => {
     const element = createElement(LibraryThumbnailImage, {
       aspectRatio: ThumbnailAspectRatio.Cover,
@@ -78,12 +78,13 @@ async function renderThumbnail(path: string, url: string | null, compact: boolea
       path: nextPath,
       url: nextUrl,
     });
-    if (view === null) view = testingRender(element);
+    const view = mountedView ?? testingRender(element);
+    if (mountedView === null) mountedView = view;
     else view.rerender(element);
     await act(() => Promise.resolve());
+    return view;
   };
-  await render(path, url, compact);
-  if (view === null) throw new Error('Expected thumbnail view');
+  const view = await render(path, url, compact);
   return { container: view.container, render };
 }
 

@@ -95,7 +95,7 @@ test('moves focus to the filmstrip toggle when an externally controlled lane col
 async function renderBottomBar(
   overrides: Partial<React.ComponentProps<typeof BottomBar>> = {},
   controlledFilmstrip = false,
-): Promise<{ container: HTMLDivElement }> {
+): Promise<{ container: HTMLElement }> {
   useLibraryStore.setState({
     filterCriteria: { colors: ['red'], rating: 3, rawStatus: initialLibraryState.filterCriteria.rawStatus },
     imageList: images,

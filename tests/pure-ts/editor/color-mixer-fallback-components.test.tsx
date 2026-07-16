@@ -192,7 +192,7 @@ function requireEditNode(nodeType: string) {
   return node;
 }
 
-function render(element: React.ReactElement): HTMLDivElement {
+function render(element: React.ReactElement): HTMLElement {
   return testingRender(createElement(I18nextProvider, { i18n }, element)).container;
 }
 

@@ -137,7 +137,7 @@ test('Film mix unmount releases only the slider interaction it owns', async () =
   useEditorStore.getState().setEditor({ isSliderDragging: false });
 });
 
-async function renderWorkspace(): Promise<HTMLDivElement> {
+async function renderWorkspace(): Promise<HTMLElement> {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
