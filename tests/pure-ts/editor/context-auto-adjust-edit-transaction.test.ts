@@ -14,10 +14,28 @@ import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from 
 const sourcePath = '/fixture/context-auto-adjust.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
 const selectedImage = {
+  exif: null,
   height: 3000,
+  isRaw: true,
   isReady: true,
+  metadata: null,
+  originalUrl: null,
   path: sourcePath,
-  rawDevelopmentReport: { contract: 'runtime-proof' },
+  rawDevelopmentReport: {
+    cameraProfile: {
+      algorithmId: 'dual_illuminant_mired_v1' as const,
+      candidateCount: 1,
+      illuminantEstimateConfidence: 'high' as const,
+      illuminantEstimateMethod: 'as_shot_white_xy' as const,
+      status: 'single_illuminant' as const,
+      warningCodes: [],
+    },
+    demosaicPath: 'standard' as const,
+    processingProfile: 'balanced' as const,
+    stageSamples: [],
+  },
+  thumbnailUrl: '',
+  width: 4000,
 };
 const patch = {
   blacks: -4,
@@ -73,9 +91,9 @@ describe('context Auto Adjust edit transaction', () => {
     expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35 });
     expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
     expect(result.after).not.toHaveProperty('sectionVisibility');
-    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes['scene_curve']?.enabled).toBeFalse();
     expect(result.after.effectsEnabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes['display_creative']?.enabled).toBeFalse();
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       persistence: 'commit',
