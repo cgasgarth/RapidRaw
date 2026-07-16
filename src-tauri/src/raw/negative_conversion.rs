@@ -1,4 +1,4 @@
-use crate::color::density::negative_log_density_channel;
+use crate::color::density::linear_negative_channel_to_density;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::jpeg_data_url;
 use crate::image_loader::{load_base_image_from_bytes, load_base_image_from_bytes_with_report};
@@ -86,7 +86,6 @@ pub struct NegativeConversionParams {
     pub white_point_offset: f32,
     #[serde(default = "default_white_point")]
     pub white_point: f32,
-    #[serde(default)]
     pub conversion_model: NegativeConversionModel,
     /// Hash of the loader-grounded source interpretation accepted by preview/apply.
     #[serde(default)]
@@ -105,10 +104,8 @@ pub struct NegativeConversionParams {
     pub render_intent: NegativeLabRenderIntent,
     #[serde(default)]
     pub flat_log_master: NegativeLabFlatLogMasterParams,
-    #[serde(default)]
     pub print_curve_algorithm: NegativeLabDensityPrintAlgorithm,
-    #[serde(default)]
-    pub print_curve_v2: Option<NegativeLabHdPaperCurveParams>,
+    pub print_curve_v2: NegativeLabHdPaperCurveParams,
     #[serde(default)]
     pub paper_profile: Option<NegativeLabPaperProfileSnapshot>,
     #[serde(default)]
@@ -167,7 +164,6 @@ pub struct NegativeLabProfileFitReceiptV1 {
 #[serde(rename_all = "snake_case")]
 pub enum NegativeConversionModel {
     #[default]
-    DensityRgbV1,
     NegativeLogDensityV1,
     /// Loader-grounded E-6/reversal scans are already positive film; they
     /// must not enter the negative-density/base-fog inversion path.
@@ -847,9 +843,9 @@ const NEGATIVE_LAB_BASE_FOG_WARNING_UNEVEN_ILLUMINATION: &str = "uneven_illumina
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
 const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
-const NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING: f32 = 0.98;
+const NEGATIVE_LAB_HIGHLIGHT_HEADROOM_RATIO: f32 = 0.99;
 const NEGATIVE_LAB_FRAME_EXPOSURE_STEP_EV: f32 = 0.05;
-const NEGATIVE_LAB_SHADOW_TARGET_FLOOR: f32 = 0.035;
+const NEGATIVE_LAB_SHADOW_PAPER_BLACK_RATIO: f32 = 1.05;
 const NEGATIVE_LAB_BLACK_POINT_STEP: f32 = 0.01;
 
 impl Default for NegativeLabFrameExposureOverridePayload {
@@ -1149,7 +1145,7 @@ impl Default for NegativeConversionParams {
             luma_range_clip: default_luma_range_clip(),
             white_point_offset: default_white_point_offset(),
             white_point: default_white_point(),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             source_interpretation_hash: None,
             color_finish: NegativeLabScannerColorFinishParams::default(),
             cmy_timing: NegativeLabCmyTimingParams::default(),
@@ -1158,8 +1154,8 @@ impl Default for NegativeConversionParams {
             optical_finish: NegativeLabOpticalFinishParams::default(),
             render_intent: NegativeLabRenderIntent::Print,
             flat_log_master: NegativeLabFlatLogMasterParams::default(),
-            print_curve_algorithm: NegativeLabDensityPrintAlgorithm::DensityRgbV1,
-            print_curve_v2: None,
+            print_curve_algorithm: NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2,
+            print_curve_v2: NegativeLabHdPaperCurveParams::default(),
             paper_profile: None,
             auto_meter: NegativeLabAutoMeterControls::default(),
         }
@@ -1379,9 +1375,22 @@ fn sample_rect_pixel_bounds(
     (start_x, end_x, start_y, end_y)
 }
 
+fn negative_lab_highlight_clipping_ceiling(params: &NegativeConversionParams) -> f32 {
+    (negative_lab_scene_linear_to_srgb(10.0_f32.powf(-params.print_curve_v2.d_min))
+        * NEGATIVE_LAB_HIGHLIGHT_HEADROOM_RATIO)
+        .clamp(0.0, 1.0)
+}
+
+fn negative_lab_shadow_target_floor(params: &NegativeConversionParams) -> f32 {
+    (negative_lab_scene_linear_to_srgb(10.0_f32.powf(-params.print_curve_v2.d_max))
+        * NEGATIVE_LAB_SHADOW_PAPER_BLACK_RATIO)
+        .clamp(0.0, 1.0)
+}
+
 fn negative_lab_highlight_patch_metrics(
     rendered: &DynamicImage,
     sample_rect: NegativeBaseFogSampleRect,
+    clipping_ceiling: f32,
 ) -> NegativeLabHighlightPatchMetrics {
     let rgb = rendered.to_rgb32f();
     let (width, height) = rgb.dimensions();
@@ -1397,7 +1406,7 @@ fn negative_lab_highlight_patch_metrics(
     for (x, y, pixel) in rgb.enumerate_pixels() {
         let channels = pixel.0;
         let max_channel = channels[0].max(channels[1]).max(channels[2]);
-        if max_channel >= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+        if max_channel >= clipping_ceiling {
             frame_clipped_count += 1;
         }
 
@@ -1407,7 +1416,7 @@ fn negative_lab_highlight_patch_metrics(
             sample_rgb_sum[2] += channels[2];
             sample_max_channels.push(max_channel);
             sample_count += 1;
-            if max_channel >= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+            if max_channel >= clipping_ceiling {
                 sample_clipped_count += 1;
             }
         }
@@ -1437,6 +1446,7 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
     sample_rect: NegativeBaseFogSampleRect,
 ) -> NegativeLabHighlightPatchExposureSuggestion {
     let sanitized_params = params.sanitized();
+    let clipping_ceiling = negative_lab_highlight_clipping_ceiling(&sanitized_params);
     let current_offset = snap_negative_lab_frame_exposure_offset(current_frame_exposure_offset);
     let effective_current_exposure =
         (sanitized_params.exposure + current_offset).clamp(MIN_EXPOSURE, MAX_EXPOSURE);
@@ -1445,9 +1455,10 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
         ..sanitized_params.clone()
     };
     let current_render = run_pipeline(input, &current_effective_params, None);
-    let current_metrics = negative_lab_highlight_patch_metrics(&current_render, sample_rect);
+    let current_metrics =
+        negative_lab_highlight_patch_metrics(&current_render, sample_rect, clipping_ceiling);
 
-    if current_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+    if current_metrics.sample_p99_max_channel <= clipping_ceiling {
         return NegativeLabHighlightPatchExposureSuggestion {
             application_risk: "low".to_string(),
             apply_allowed: false,
@@ -1488,9 +1499,9 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
         };
         let candidate_render = run_pipeline(input, &candidate_params, None);
         let candidate_metrics =
-            negative_lab_highlight_patch_metrics(&candidate_render, sample_rect);
+            negative_lab_highlight_patch_metrics(&candidate_render, sample_rect, clipping_ceiling);
 
-        if candidate_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING {
+        if candidate_metrics.sample_p99_max_channel <= clipping_ceiling {
             selected_delta = Some(candidate_offset - current_offset);
             selected_metrics = candidate_metrics;
             selected_effective_exposure = candidate_effective_exposure;
@@ -1512,8 +1523,7 @@ fn build_negative_lab_highlight_patch_exposure_suggestion(
     let offset_clamped =
         selected_offset <= MIN_EXPOSURE || selected_effective_exposure <= MIN_EXPOSURE;
     let application_risk = negative_lab_exposure_risk(correction_magnitude_ev);
-    let suggested_is_safe =
-        selected_metrics.sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING;
+    let suggested_is_safe = selected_metrics.sample_p99_max_channel <= clipping_ceiling;
     let apply_allowed = suggested_is_safe
         && !offset_clamped
         && correction_magnitude_ev <= 0.75
@@ -1588,10 +1598,11 @@ fn build_negative_lab_shadow_patch_black_point_suggestion(
     sample_rect: NegativeBaseFogSampleRect,
 ) -> NegativeLabShadowPatchBlackPointSuggestion {
     let sanitized_params = params.sanitized();
+    let target_floor = negative_lab_shadow_target_floor(&sanitized_params);
     let current_render = run_pipeline(input, &sanitized_params, None);
     let current_metrics = negative_lab_shadow_patch_metrics(&current_render, sample_rect);
 
-    if current_metrics.sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR {
+    if current_metrics.sample_p01_min_channel <= target_floor {
         return NegativeLabShadowPatchBlackPointSuggestion {
             application_risk: "low".to_string(),
             apply_allowed: false,
@@ -1629,7 +1640,7 @@ fn build_negative_lab_shadow_patch_black_point_suggestion(
         selected_black_point = candidate_black_point;
         selected_metrics = candidate_metrics;
 
-        if selected_metrics.sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR {
+        if selected_metrics.sample_p01_min_channel <= target_floor {
             suggested = true;
             break;
         }
@@ -2404,6 +2415,13 @@ fn upsert_negative_lab_layer_stack_sidecar(
 }
 
 impl NegativeConversionParams {
+    fn validate_current_contract(&self) -> Result<(), String> {
+        if self.bounds_schema_version != 1 {
+            return Err("Negative Lab bounds_schema_version must be 1.".to_string());
+        }
+        self.print_curve_v2.validate_current_contract()
+    }
+
     fn sanitized(self) -> Self {
         fn finite_or_default(value: f32, fallback: f32) -> f32 {
             if value.is_finite() { value } else { fallback }
@@ -2466,9 +2484,7 @@ impl NegativeConversionParams {
             render_intent: self.render_intent,
             flat_log_master: self.flat_log_master.sanitized(),
             print_curve_algorithm: self.print_curve_algorithm,
-            print_curve_v2: self
-                .print_curve_v2
-                .map(NegativeLabHdPaperCurveParams::sanitized),
+            print_curve_v2: self.print_curve_v2.sanitized(),
             paper_profile: self
                 .paper_profile
                 .map(NegativeLabPaperProfileSnapshot::sanitized),
@@ -2604,7 +2620,7 @@ struct NegativeLabPipelineRender {
 }
 
 fn negative_lab_density_from_linear_channel(value: f32) -> f32 {
-    negative_log_density_channel(value)
+    linear_negative_channel_to_density(value)
 }
 
 fn negative_lab_count_density_input_guards(raw_pixels: &[f32]) -> (u32, u32) {
@@ -2687,12 +2703,11 @@ fn build_negative_lab_density_scopes(
     } else {
         (0..NEGATIVE_LAB_SCOPE_CURVE_SAMPLES)
             .map(|sample_index| {
-                let position = if NEGATIVE_LAB_SCOPE_CURVE_SAMPLES == 1 {
-                    0.0
-                } else {
-                    sample_index as f32 / (NEGATIVE_LAB_SCOPE_CURVE_SAMPLES - 1) as f32
-                };
-                let index = ((curve_pairs.len() - 1) as f32 * position).round() as usize;
+                let index = negative_lab_scope_sample_index(
+                    curve_pairs.len(),
+                    sample_index,
+                    NEGATIVE_LAB_SCOPE_CURVE_SAMPLES,
+                );
                 NegativeLabDensityScopePoint {
                     input_density: curve_pairs[index].0,
                     output_luma: curve_pairs[index].1,
@@ -2711,6 +2726,20 @@ fn build_negative_lab_density_scopes(
         sample_count,
         schema_version: 1,
     }
+}
+
+fn negative_lab_scope_sample_index(
+    value_count: usize,
+    sample_index: usize,
+    sample_count: usize,
+) -> usize {
+    if value_count <= 1 || sample_count <= 1 {
+        return 0;
+    }
+
+    let denominator = sample_count - 1;
+    let numerator = sample_index.min(denominator) * (value_count - 1);
+    ((numerator + denominator / 2) / denominator).min(value_count - 1)
 }
 
 fn sanitize_sample_rect(rect: NegativeBaseFogSampleRect) -> Option<NegativeBaseFogSampleRect> {
@@ -3471,38 +3500,26 @@ fn run_pipeline_with_metrics(
     let mut normalized_density_buffer = vec![0.0f32; raw_pixels.len()];
     let mut scene_linear_print_buffer = vec![0.0f32; raw_pixels.len()];
 
-    let k = 4.0 * params.contrast;
-    let x0 = 0.6 - (params.exposure * 0.25);
-
-    let y0 = 1.0 / (1.0 + (k * x0).exp());
-    let y1 = 1.0 / (1.0 + (-k * (1.0 - x0)).exp());
-    let scale = 1.0 / (y1 - y0);
     let endpoint_span = (params.white_point - params.black_point).max(MIN_ENDPOINT_SEPARATION);
-    let apply_endpoints =
-        |value: f32| -> f32 { ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0) };
+    let apply_current_endpoints =
+        |value: f32| ((value - params.black_point) / endpoint_span).clamp(0.0, 1.0);
     let weights = [params.red_weight, params.green_weight, params.blue_weight];
-    let legacy_pre_curve_clamp = params.conversion_model == NegativeConversionModel::DensityRgbV1;
     let hd_curve = if let Some(profile) = params.paper_profile.as_ref() {
         if profile.compatible_with(params.process_family, params.render_intent) {
             let mut curve = profile.to_hd_curve();
-            if let Some(manual) = params.print_curve_v2.as_ref() {
-                let manual = manual.clone().sanitized();
-                curve.iso_r_grade = (curve.iso_r_grade * manual.iso_r_grade).clamp(0.5, 3.0);
-                curve.density_offset =
-                    (curve.density_offset + manual.density_offset).clamp(-0.5, 0.5);
-                curve.toe_strength =
-                    (curve.toe_strength + manual.toe_strength - 0.25).clamp(0.0, 1.0);
-                curve.shoulder_strength =
-                    (curve.shoulder_strength + manual.shoulder_strength - 0.25).clamp(0.0, 1.0);
-                curve.midtone_shape = (curve.midtone_shape + manual.midtone_shape).clamp(-1.0, 1.0);
-            }
-            Some(curve.sanitized())
+            let manual = params.print_curve_v2.clone().sanitized();
+            curve.iso_r_grade = (curve.iso_r_grade * manual.iso_r_grade).clamp(0.5, 3.0);
+            curve.density_offset = (curve.density_offset + manual.density_offset).clamp(-0.5, 0.5);
+            curve.toe_strength = (curve.toe_strength + manual.toe_strength - 0.25).clamp(0.0, 1.0);
+            curve.shoulder_strength =
+                (curve.shoulder_strength + manual.shoulder_strength - 0.25).clamp(0.0, 1.0);
+            curve.midtone_shape = (curve.midtone_shape + manual.midtone_shape).clamp(-1.0, 1.0);
+            curve.sanitized()
         } else {
-            None
+            params.print_curve_v2.clone().sanitized()
         }
     } else {
-        (params.print_curve_algorithm == NegativeLabDensityPrintAlgorithm::NegativeDensityPrintV2)
-            .then(|| params.print_curve_v2.unwrap_or_default().sanitized())
+        params.print_curve_v2.clone().sanitized()
     };
     let paper_profile_channel_cmy = params
         .paper_profile
@@ -3520,23 +3537,7 @@ fn run_pipeline_with_metrics(
                 [log_pixel[0], log_pixel[1], log_pixel[2]],
                 &robust_bounds,
             );
-            model_density_pixel.copy_from_slice(&[
-                if legacy_pre_curve_clamp {
-                    normalized_density[0].max(0.0)
-                } else {
-                    normalized_density[0]
-                },
-                if legacy_pre_curve_clamp {
-                    normalized_density[1].max(0.0)
-                } else {
-                    normalized_density[1]
-                },
-                if legacy_pre_curve_clamp {
-                    normalized_density[2].max(0.0)
-                } else {
-                    normalized_density[2]
-                },
-            ]);
+            model_density_pixel.copy_from_slice(&normalized_density);
         });
     let neutral_axis_analysis = analyze_neutral_axis(
         model_density_buffer.as_chunks::<3>().0,
@@ -3552,20 +3553,13 @@ fn run_pipeline_with_metrics(
         clipped_pixel_count,
         params.render_intent,
     );
-    // Legacy density_rgb_v1 callers may not provide a paper profile. When an
-    // auto meter is explicitly enabled and confidence permits application,
-    // materialize the native default H&D curve so the receipt corresponds to
-    // an actual render change instead of a no-op.
     let mut hd_curve = hd_curve;
-    if hd_curve.is_none() && (auto_meter.density_applied || auto_meter.grade_applied) {
-        hd_curve = Some(NegativeLabHdPaperCurveParams::default());
-    }
-    if let Some(curve) = hd_curve.as_mut() {
-        curve.density_offset =
-            (curve.density_offset + auto_meter.applied_density_offset).clamp(-0.5, 0.5);
-        curve.iso_r_grade = (curve.iso_r_grade * auto_meter.effective_iso_r_grade).clamp(0.5, 3.0);
-        *curve = curve.clone().sanitized();
-    }
+    hd_curve.density_offset =
+        (hd_curve.density_offset + params.exposure * 0.25 + auto_meter.applied_density_offset)
+            .clamp(-0.5, 0.5);
+    hd_curve.iso_r_grade =
+        (hd_curve.iso_r_grade * params.contrast * auto_meter.effective_iso_r_grade).clamp(0.5, 3.0);
+    hd_curve = hd_curve.sanitized();
 
     let mut density_metrics = out_buffer
         .par_chunks_mut(3)
@@ -3596,24 +3590,18 @@ fn run_pipeline_with_metrics(
                     &effective_cmy_timing,
                 );
 
-                let apply_curve = |x: f32| -> f32 {
-                    let sigmoid = 1.0 / (1.0 + (-k * (x - x0)).exp());
-                    let s_norm = (sigmoid - y0) * scale;
-                    s_norm.clamp(0.0, 1.0)
-                };
-
-                let mut r = hd_curve
-                    .as_ref()
-                    .map(|curve| scene_linear_reflectance(weighted_density[0], curve))
-                    .unwrap_or_else(|| apply_curve(weighted_density[0]));
-                let mut g = hd_curve
-                    .as_ref()
-                    .map(|curve| scene_linear_reflectance(weighted_density[1], curve))
-                    .unwrap_or_else(|| apply_curve(weighted_density[1]));
-                let mut b = hd_curve
-                    .as_ref()
-                    .map(|curve| scene_linear_reflectance(weighted_density[2], curve))
-                    .unwrap_or_else(|| apply_curve(weighted_density[2]));
+                let mut r = apply_current_endpoints(scene_linear_reflectance(
+                    weighted_density[0],
+                    &hd_curve,
+                ));
+                let mut g = apply_current_endpoints(scene_linear_reflectance(
+                    weighted_density[1],
+                    &hd_curve,
+                ));
+                let mut b = apply_current_endpoints(scene_linear_reflectance(
+                    weighted_density[2],
+                    &hd_curve,
+                ));
 
                 let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
                 let max_ch = r.max(g).max(b);
@@ -3627,11 +3615,7 @@ fn run_pipeline_with_metrics(
                     b = b + (luma - b) * sat_reduction;
                 }
 
-                let scene_linear = if hd_curve.is_some() {
-                    [r, g, b]
-                } else {
-                    [apply_endpoints(r), apply_endpoints(g), apply_endpoints(b)]
-                };
+                let scene_linear = [r, g, b];
                 scene_linear_print_pixel.copy_from_slice(&scene_linear);
                 out_pixel[0] = negative_lab_scene_linear_to_srgb(scene_linear[0]);
                 out_pixel[1] = negative_lab_scene_linear_to_srgb(scene_linear[1]);
@@ -4576,6 +4560,7 @@ pub async fn preview_negative_conversion(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
+    params.validate_current_contract()?;
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let interpretation = preflight_negative_lab_source_path(&source_path_str, &app_handle)?;
@@ -4619,6 +4604,7 @@ pub async fn render_negative_lab_dry_run_preview_artifact(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeLabDryRunPreviewArtifact, String> {
+    params.validate_current_contract()?;
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let interpretation = preflight_negative_lab_source_path(&source_path_str, &app_handle)?;
@@ -4709,6 +4695,7 @@ pub async fn suggest_negative_lab_neutral_patch_rgb_balance(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeLabNeutralPatchSuggestion, String> {
+    params.validate_current_contract()?;
     let sanitized_rect = sanitize_sample_rect(sample_rect)
         .ok_or_else(|| "Neutral patch sample rect is invalid.".to_string())?;
     let estimate =
@@ -4729,6 +4716,7 @@ pub async fn suggest_negative_lab_highlight_patch_exposure(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeLabHighlightPatchExposureSuggestion, String> {
+    params.validate_current_contract()?;
     let sanitized_rect = sanitize_sample_rect(sample_rect)
         .ok_or_else(|| "Highlight patch sample rect is invalid.".to_string())?;
     let (source_path, _) = parse_virtual_path(&path);
@@ -4784,6 +4772,7 @@ pub async fn suggest_negative_lab_shadow_patch_black_point(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeLabShadowPatchBlackPointSuggestion, String> {
+    params.validate_current_contract()?;
     let sanitized_rect = sanitize_sample_rect(sample_rect)
         .ok_or_else(|| "Shadow patch sample rect is invalid.".to_string())?;
     let (source_path, _) = parse_virtual_path(&path);
@@ -4837,6 +4826,7 @@ pub async fn convert_negatives(
     options: Option<NegativeConversionSaveOptions>,
     app_handle: AppHandle,
 ) -> Result<Vec<NegativeLabSavedPositiveHandoff>, String> {
+    params.validate_current_contract()?;
     tokio::task::spawn_blocking(move || {
         let mut results = Vec::new();
         let mut bundle_outputs = Vec::new();
@@ -5038,6 +5028,43 @@ mod tests {
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use std::path::PathBuf;
+
+    #[test]
+    fn current_recipe_identity_is_required_during_deserialization() {
+        let complete = serde_json::to_value(NegativeConversionParams::default())
+            .expect("serialize complete current recipe");
+
+        for field in [
+            "conversion_model",
+            "print_curve_algorithm",
+            "print_curve_v2",
+        ] {
+            let mut incomplete = complete.clone();
+            incomplete
+                .as_object_mut()
+                .expect("current recipe object")
+                .remove(field);
+            assert!(
+                serde_json::from_value::<NegativeConversionParams>(incomplete).is_err(),
+                "missing {field} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn current_recipe_validation_rejects_invalid_versions_and_curve_values() {
+        let mut params = NegativeConversionParams::default();
+        assert!(params.validate_current_contract().is_ok());
+
+        params.bounds_schema_version = 0;
+        assert!(params.validate_current_contract().is_err());
+        params = NegativeConversionParams::default();
+        params.print_curve_v2.toe_width = 0.0;
+        assert!(params.validate_current_contract().is_err());
+        params = NegativeConversionParams::default();
+        params.print_curve_v2.d_max = params.print_curve_v2.d_min + 0.7;
+        assert!(params.validate_current_contract().is_err());
+    }
 
     fn render_fixture(
         pixels: Vec<f32>,
@@ -5624,11 +5651,13 @@ mod tests {
 
         assert_eq!(suggestion.role, "highlight");
         assert_eq!(suggestion.status, "suggested");
-        assert!(suggestion.apply_allowed);
+        assert!(!suggestion.apply_allowed);
+        assert_eq!(suggestion.application_risk, "high");
         assert!(suggestion.suggested_exposure_delta_ev < 0.0);
-        assert!(suggestion.correction_magnitude_ev <= 0.75);
+        assert!(suggestion.correction_magnitude_ev <= 2.0);
         assert!(
-            suggestion.projected_sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING
+            suggestion.projected_sample_p99_max_channel
+                <= negative_lab_highlight_clipping_ceiling(&NegativeConversionParams::default())
         );
         assert!(
             suggestion.projected_frame_clipped_fraction
@@ -5668,7 +5697,8 @@ mod tests {
         assert!(!suggestion.apply_allowed);
         assert_near(suggestion.suggested_exposure_delta_ev, 0.0);
         assert!(
-            suggestion.current_sample_p99_max_channel <= NEGATIVE_LAB_HIGHLIGHT_CLIPPING_CEILING
+            suggestion.current_sample_p99_max_channel
+                <= negative_lab_highlight_clipping_ceiling(&NegativeConversionParams::default())
         );
     }
 
@@ -5709,7 +5739,10 @@ mod tests {
         assert!(suggestion.apply_allowed);
         assert!(suggestion.suggested_black_point_delta > 0.0);
         assert!(suggestion.correction_magnitude <= 0.35);
-        assert!(suggestion.projected_sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR);
+        assert!(
+            suggestion.projected_sample_p01_min_channel
+                <= negative_lab_shadow_target_floor(&NegativeConversionParams::default())
+        );
     }
 
     #[test]
@@ -5744,7 +5777,10 @@ mod tests {
         assert_eq!(suggestion.status, "already_safe");
         assert!(!suggestion.apply_allowed);
         assert_near(suggestion.suggested_black_point_delta, 0.0);
-        assert!(suggestion.current_sample_p01_min_channel <= NEGATIVE_LAB_SHADOW_TARGET_FLOOR);
+        assert!(
+            suggestion.current_sample_p01_min_channel
+                <= negative_lab_shadow_target_floor(&NegativeConversionParams::default())
+        );
     }
 
     #[test]
@@ -5822,7 +5858,7 @@ mod tests {
                 width: 0.1,
                 height: 0.1,
             }),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: f32::INFINITY,
             contrast: f32::NEG_INFINITY,
             black_point: f32::NAN,
@@ -6206,7 +6242,7 @@ mod tests {
             blue_weight: 1.02,
             base_fog_strength: 1.0,
             base_fog_sample: None,
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.1,
             contrast: 1.08,
             black_point: 0.0,
@@ -6472,7 +6508,7 @@ mod tests {
             blue_weight: 1.0,
             base_fog_strength: 1.0,
             base_fog_sample: None,
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,
@@ -6562,7 +6598,7 @@ mod tests {
             blue_weight: 0.98,
             base_fog_strength: 1.0,
             base_fog_sample: None,
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -6690,7 +6726,7 @@ mod tests {
                 blue_weight: f32::NEG_INFINITY,
                 base_fog_strength: 99.0,
                 base_fog_sample: None,
-                conversion_model: NegativeConversionModel::DensityRgbV1,
+                conversion_model: NegativeConversionModel::NegativeLogDensityV1,
                 exposure: 50.0,
                 contrast: -50.0,
                 black_point: 0.99,
@@ -6735,7 +6771,7 @@ mod tests {
                 blue_weight: 0.75,
                 base_fog_strength: 1.0,
                 base_fog_sample: None,
-                conversion_model: NegativeConversionModel::DensityRgbV1,
+                conversion_model: NegativeConversionModel::NegativeLogDensityV1,
                 exposure: 0.0,
                 contrast: 1.0,
                 black_point: 0.0,
@@ -6953,7 +6989,7 @@ mod tests {
                 width: 0.5,
                 height: 1.0,
             }),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.05,
             contrast: 1.1,
             black_point: 0.0,
@@ -7008,7 +7044,7 @@ mod tests {
                 width: 0.5,
                 height: 1.0,
             }),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.05,
             contrast: 1.1,
             black_point: 0.0,
@@ -7042,9 +7078,15 @@ mod tests {
 
         if let Ok(report_path) = std::env::var("RAWENGINE_NEGATIVE_LAB_DENSITY_CPU_REPORT") {
             let report = json!({
-                "algorithm": "density_rgb_v1",
+                "algorithm": "negative_density_print_v2",
                 "artifactHash": hash_rendered_image(&rendered),
                 "changedPixelCount": changed_pixel_count,
+                "currentRecipe": {
+                    "boundsSchemaVersion": params.bounds_schema_version,
+                    "conversionModel": "negative_log_density_v1",
+                    "printCurveAlgorithm": "negative_density_print_v2",
+                    "printCurveParams": params.print_curve_v2
+                },
                 "densityNormalizationMetrics": {
                     "axisBounds": {
                         "color": {
@@ -7115,22 +7157,6 @@ mod tests {
             )
             .unwrap(),
         );
-        let legacy_render = run_pipeline_with_metrics(
-            &input,
-            &NegativeConversionParams {
-                base_fog_sample: Some(NegativeBaseFogSampleRect {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.4,
-                    height: 1.0,
-                }),
-                contrast: 1.05,
-                exposure: 0.03,
-                ..NegativeConversionParams::default()
-            },
-            None,
-            None,
-        );
         let neg_log_render = run_pipeline_with_metrics(
             &input,
             &NegativeConversionParams {
@@ -7151,14 +7177,6 @@ mod tests {
         let rendered = neg_log_render.rendered_preview.to_rgb32f();
 
         assert!(rendered.as_raw().iter().all(|value| value.is_finite()));
-        assert!(
-            legacy_render
-                .density_normalization_metrics
-                .channel_bounds
-                .r
-                .min
-                >= 0.0
-        );
         let neg_log_channel_bounds = neg_log_render.density_normalization_metrics.channel_bounds;
         assert!(
             [
@@ -7190,7 +7208,7 @@ mod tests {
     }
 
     #[test]
-    fn negative_log_density_v1_preserves_preview_runtime_shape() {
+    fn negative_log_density_v1_preview_is_deterministic_and_current() {
         let input = DynamicImage::ImageRgb32F(
             Rgb32FImage::from_vec(
                 4,
@@ -7202,7 +7220,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let legacy_params = NegativeConversionParams {
+        let params = NegativeConversionParams {
             base_fog_sample: Some(NegativeBaseFogSampleRect {
                 x: 0.0,
                 y: 0.0,
@@ -7216,23 +7234,19 @@ mod tests {
             blue_weight: 0.96,
             ..NegativeConversionParams::default()
         };
-        let neg_log_params = NegativeConversionParams {
-            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
-            ..legacy_params.clone()
-        };
+        let first_render = run_pipeline_with_metrics(&input, &params, None, None);
+        let second_render = run_pipeline_with_metrics(&input, &params, None, None);
+        let first_rgb = first_render.rendered_preview.to_rgb32f();
+        let second_rgb = second_render.rendered_preview.to_rgb32f();
 
-        let legacy_render = run_pipeline_with_metrics(&input, &legacy_params, None, None);
-        let neg_log_render = run_pipeline_with_metrics(&input, &neg_log_params, None, None);
-        let legacy_rgb = legacy_render.rendered_preview.to_rgb32f();
-        let neg_log_rgb = neg_log_render.rendered_preview.to_rgb32f();
-
-        assert_eq!(legacy_rgb.dimensions(), neg_log_rgb.dimensions());
+        assert_eq!(first_rgb.dimensions(), second_rgb.dimensions());
         assert!(
-            legacy_rgb.as_raw().iter().all(|value| value.is_finite())
-                && neg_log_rgb.as_raw().iter().all(|value| value.is_finite())
+            first_rgb.as_raw().iter().all(|value| value.is_finite())
+                && second_rgb.as_raw().iter().all(|value| value.is_finite())
         );
+        assert_eq!(first_rgb.as_raw(), second_rgb.as_raw());
         assert!(
-            neg_log_render
+            first_render
                 .density_normalization_metrics
                 .channel_bounds
                 .r
@@ -7240,17 +7254,7 @@ mod tests {
                 < 0.0
         );
         assert_eq!(
-            legacy_render
-                .density_normalization_metrics
-                .channel_bounds
-                .r
-                .min,
-            0.0
-        );
-        assert_eq!(
-            neg_log_render
-                .density_normalization_metrics
-                .renderer_version,
+            first_render.density_normalization_metrics.renderer_version,
             NEGATIVE_LAB_LOG_DENSITY_RENDERER_VERSION
         );
     }
@@ -7312,7 +7316,7 @@ mod tests {
             blue_weight: selected_base_fog_candidate.estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: Some(selected_base_fog_candidate.sample_rect),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -7470,7 +7474,13 @@ mod tests {
             "Negative Lab public export proof must write a conversion bundle"
         );
         let report = json!({
-            "algorithm": "density_rgb_v1",
+            "algorithm": "negative_density_print_v2",
+            "currentRecipe": {
+                "boundsSchemaVersion": params.bounds_schema_version,
+                "conversionModel": "negative_log_density_v1",
+                "printCurveAlgorithm": "negative_density_print_v2",
+                "printCurveParams": params.print_curve_v2
+            },
             "appliedProfile": {
                 "claimLevel": "generic_starting_point_only",
                 "claimPolicy": applied_profile_claim_policy,
@@ -7661,7 +7671,7 @@ mod tests {
                 width: 0.35,
                 height: 0.35,
             }),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.05,
             contrast: 0.95,
             black_point: 0.0,
@@ -7847,7 +7857,7 @@ mod tests {
                 "previewOutputTransfer": "gamma_2_2_display_proof"
             },
             "densityDomainInversion": {
-                "algorithm": "density_rgb_v1",
+                "algorithm": "negative_log_density_v1",
                 "baseSample": {
                     "estimatedBaseDensity": base_fog_estimate.base_density,
                     "estimatedBaseRgb": base_fog_estimate.base_rgb,
@@ -7876,7 +7886,8 @@ mod tests {
                     "densityTransform": "-log10(clamp(linear_rgb, 1e-6, 1.0))",
                     "epsilonPolicy": "clamp_linear_rgb_min_1e-6",
                     "normalization": "subtract_sampled_base_density_then_divide_by_density_range",
-                    "printCurve": "sigmoid_density_curve_gamma_2_2_preview",
+                    "printCurve": "negative_density_print_v2",
+                    "printCurveParams": params.print_curve_v2,
                     "referenceDownscaleMaxEdge": 1080
                 },
                 "neutralBalance": {
@@ -8244,7 +8255,7 @@ mod tests {
             blue_weight: auto_estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: None,
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,
@@ -8257,7 +8268,7 @@ mod tests {
             blue_weight: sampled_estimate.blue_weight,
             base_fog_strength: 1.0,
             base_fog_sample: Some(sample_rect),
-            conversion_model: NegativeConversionModel::DensityRgbV1,
+            conversion_model: NegativeConversionModel::NegativeLogDensityV1,
             exposure: 0.0,
             contrast: 1.0,
             black_point: 0.0,
@@ -8644,6 +8655,25 @@ mod tests {
                 .windows(2)
                 .all(|points| points[0].input_density <= points[1].input_density)
         );
+    }
+
+    #[test]
+    fn native_density_scope_sampling_stays_in_bounds_for_full_resolution_frames() {
+        let full_frame_value_count = 24_000_000;
+        let indices = (0..NEGATIVE_LAB_SCOPE_CURVE_SAMPLES)
+            .map(|sample_index| {
+                negative_lab_scope_sample_index(
+                    full_frame_value_count,
+                    sample_index,
+                    NEGATIVE_LAB_SCOPE_CURVE_SAMPLES,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(indices.first(), Some(&0));
+        assert_eq!(indices.last(), Some(&(full_frame_value_count - 1)));
+        assert!(indices.windows(2).all(|pair| pair[0] <= pair[1]));
+        assert!(indices.iter().all(|index| *index < full_frame_value_count));
     }
 
     #[test]

@@ -15,7 +15,8 @@ contract without embedding ad hoc parameter JSON.
 
 The v1 schema deliberately separates:
 
-- objective inversion: `density_rgb_v1`;
+- objective inversion: `negative_log_density_v1`;
+- scene-linear H&D print mapping: `negative_density_print_v2`;
 - semi-objective normalization: `density_normalization_v1`;
 - process curve mapping: `process_profile_monotonic_v1`;
 - creative rendering: empty for v1 generic profiles until film-look presets land.

@@ -5,6 +5,7 @@ import {
   negativeLabFlatLogMasterParamsSchema,
   negativeLabPresetParamsSchema,
 } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../src/utils/negative-lab/negativeLabPresetCatalog';
 
 const command = {
   outputFormat: 'tiff16' as const,
@@ -25,11 +26,7 @@ describe('Negative Lab flat-log master intent', () => {
 
   test('preserves positive flat-log lift/gain in the recipe contract', () => {
     const params = negativeLabPresetParamsSchema.parse({
-      blue_weight: 1,
-      contrast: 1,
-      exposure: 0,
-      green_weight: 1,
-      red_weight: 1,
+      ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
       render_intent: 'flat_log_master',
       flat_log_master: { algorithm_version: 1, gain: 0.8, lift: 0.1 },
     });

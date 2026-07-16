@@ -36,7 +36,7 @@ const negativeLabProfileComparisonDeltaSchema = z
 const negativeLabProfileComparisonRenderEvidenceSchema = z
   .object({
     baseSampleReference: z.string().trim().min(1),
-    densityAlgorithm: z.enum(['density_rgb_v1', 'negative_density_print_v2']),
+    densityAlgorithm: z.literal('negative_density_print_v2'),
     metricHash: negativeLabProfileProvenanceHashSchema,
     metrics: z
       .object({
@@ -47,7 +47,7 @@ const negativeLabProfileComparisonRenderEvidenceSchema = z
       .strict(),
     outputTag: z.enum(['preview_display', 'export_linear']),
     previewHash: negativeLabProfileProvenanceHashSchema,
-    printCurveVersion: z.enum(['density_print_v2', 'legacy_density_rgb_v1']),
+    printCurveVersion: z.literal('density_print_v2'),
     renderHash: negativeLabProfileProvenanceHashSchema,
     warningCodes: z.array(z.string().trim().min(1)).min(1),
   })

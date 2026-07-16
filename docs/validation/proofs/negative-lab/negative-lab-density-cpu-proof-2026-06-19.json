@@ -1,7 +1,27 @@
 {
-  "algorithm": "density_rgb_v1",
-  "artifactHash": "fnv1a64:8e531a305204463e",
+  "algorithm": "negative_density_print_v2",
+  "artifactHash": "fnv1a64:aa6fe7a9aef87b42",
   "changedPixelCount": 8,
+  "currentRecipe": {
+    "boundsSchemaVersion": 1,
+    "conversionModel": "negative_log_density_v1",
+    "printCurveAlgorithm": "negative_density_print_v2",
+    "printCurveParams": {
+      "algorithm_version": 1,
+      "anchor_density": 0.5,
+      "d_max": 1.649999976158142,
+      "d_min": 0.03999999910593033,
+      "density_offset": 0,
+      "iso_r_grade": 1,
+      "midtone_shape": 0,
+      "output_domain": "scene_linear_print",
+      "schema_version": 2,
+      "shoulder_strength": 0.25,
+      "shoulder_width": 0.25,
+      "toe_strength": 0.25,
+      "toe_width": 0.25
+    }
+  },
   "densityNormalizationMetrics": {
     "axisBounds": {
       "color": {
@@ -85,19 +105,19 @@
     "channelBounds": {
       "blue": {
         "max": 1.0539549589157104,
-        "min": 0
+        "min": -0.014587135054171085
       },
       "green": {
         "max": 1.0625838041305542,
-        "min": 0
+        "min": -0.011199618689715862
       },
       "red": {
         "max": 1.0059621334075928,
-        "min": 0
+        "min": -0.015452047809958458
       }
     },
     "clippedPixelCount": 0,
-    "densityRangeUnclamped": 1.0625838041305542,
+    "densityRangeUnclamped": 1.078035831451416,
     "epsilonClampedPixelCount": 0,
     "rendererVersion": 2
   },
@@ -112,7 +132,7 @@
     "commercial_converter_parity"
   ],
   "inputContract": "declared_linear_scan_rgb",
-  "inputToOutputMeanAbsDelta": 0.5745485424995422,
+  "inputToOutputMeanAbsDelta": 0.5057118535041809,
   "issue": 2343,
   "monotonicLuma": true,
   "outputDimensions": {

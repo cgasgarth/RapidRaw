@@ -30,7 +30,7 @@ export const negativeLabBaseFogSampleRectSchema = z
     message: 'Negative Lab base/fog sample rect must stay within normalized image bounds.',
   });
 
-const negativeLabConversionModelSchema = z.enum(['density_rgb_v1', 'negative_log_density_v1', 'e6_positive_v1']);
+const negativeLabConversionModelSchema = z.enum(['negative_log_density_v1', 'e6_positive_v1']);
 const negativeLabRenderIntentSchema = z.enum(['print', 'flat_log_master']);
 export const negativeLabFlatLogMasterParamsSchema = z
   .object({
@@ -39,7 +39,7 @@ export const negativeLabFlatLogMasterParamsSchema = z
     lift: z.number().min(0).max(0.25).default(0.02),
   })
   .strict();
-export const negativeLabDensityPrintAlgorithmSchema = z.enum(['density_rgb_v1', 'negative_density_print_v2']);
+export const negativeLabDensityPrintAlgorithmSchema = z.literal('negative_density_print_v2');
 const negativeLabDensityPrintOutputTagSchema = z.enum(['preview_display', 'export_linear']);
 const negativeLabDetailFinishParamsSchema = z
   .object({
@@ -63,25 +63,46 @@ const negativeLabBaseFogBoundsProvenanceSchema = z.enum([
 
 const negativeLabDensityPrintV2ParamsSchema = z
   .object({
-    algorithm_version: z.literal(1).default(1),
-    anchor_density: z.number().min(0).max(1).default(0.5),
-    contrast_grade: z.number().min(0.5).max(2).default(1),
-    density_offset: z.number().min(-0.5).max(0.5).default(0),
-    d_max: z.number().min(1.1).max(3).default(1.65),
-    d_min: z.number().min(0).max(1).default(0.04),
-    iso_r_grade: z.number().min(0.5).max(3).default(1),
-    midtone_shape: z.number().min(-1).max(1).default(0),
-    schema_version: z.union([z.literal(1), z.literal(2)]).default(2),
-    shoulder_strength: z.number().min(0).max(1).default(0.25),
-    shoulder_width: z.number().min(0.01).max(0.5).default(0.25),
-    target_black_density: z.number().min(1.1).max(2.4).default(1.65),
-    target_white_density: z.number().min(0).max(0.25).default(0.04),
-    toe_strength: z.number().min(0).max(1).default(0.25),
-    toe_width: z.number().min(0.01).max(0.5).default(0.25),
-    output_domain: z.literal('scene_linear_print').default('scene_linear_print'),
+    algorithm_version: z.literal(1),
+    anchor_density: z.number().min(0).max(1),
+    contrast_grade: z.number().min(0.5).max(2),
+    density_offset: z.number().min(-0.5).max(0.5),
+    d_max: z.number().min(1.1).max(3),
+    d_min: z.number().min(0).max(1),
+    iso_r_grade: z.number().min(0.5).max(3),
+    midtone_shape: z.number().min(-1).max(1),
+    schema_version: z.literal(2),
+    shoulder_strength: z.number().min(0).max(1),
+    shoulder_width: z.number().min(0.01).max(0.5),
+    target_black_density: z.number().min(1.1).max(2.4),
+    target_white_density: z.number().min(0).max(0.25),
+    toe_strength: z.number().min(0).max(1),
+    toe_width: z.number().min(0.01).max(0.5),
+    output_domain: z.literal('scene_linear_print'),
   })
   .strict()
   .superRefine((params, context) => {
+    if (params.contrast_grade !== params.iso_r_grade) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab H&D contrast grade must match the canonical ISO-R grade.',
+        path: ['contrast_grade'],
+      });
+    }
+    if (params.target_black_density !== params.d_max) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab black target density must match canonical D-max.',
+        path: ['target_black_density'],
+      });
+    }
+    if (params.target_white_density !== params.d_min) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab white target density must match canonical D-min.',
+        path: ['target_white_density'],
+      });
+    }
     if (params.target_black_density - params.target_white_density < 0.8) {
       context.addIssue({
         code: 'custom',
@@ -90,22 +111,6 @@ const negativeLabDensityPrintV2ParamsSchema = z
       });
     }
   });
-
-/** Upgrades the original v1 density-print fields to the native H&D contract. */
-const migrateNegativeLabDensityPrintV2Params = (
-  params: Partial<z.input<typeof negativeLabDensityPrintV2ParamsSchema>>,
-): NegativeLabDensityPrintV2Params => {
-  const parsed = negativeLabDensityPrintV2ParamsSchema.parse({
-    ...params,
-    d_min: params.d_min ?? params.target_white_density,
-    d_max: params.d_max ?? params.target_black_density,
-    iso_r_grade: params.iso_r_grade ?? params.contrast_grade,
-  });
-  return {
-    ...parsed,
-    schema_version: 2,
-  };
-};
 
 export const negativeLabPresetParamsSchema = z
   .object({
@@ -145,7 +150,7 @@ export const negativeLabPresetParamsSchema = z
       .strict()
       .optional(),
     contrast: z.number().min(0.5).max(2.5),
-    conversion_model: negativeLabConversionModelSchema.default('density_rgb_v1'),
+    conversion_model: negativeLabConversionModelSchema,
     detail_finish: negativeLabDetailFinishParamsSchema.optional(),
     optical_finish: z
       .object({
@@ -167,9 +172,9 @@ export const negativeLabPresetParamsSchema = z
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
     luma_range_clip: z.number().min(0.01).max(0.3).default(0.08),
-    print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema.default('density_rgb_v1'),
-    print_curve_output_tag: negativeLabDensityPrintOutputTagSchema.default('preview_display'),
-    print_curve_v2: negativeLabDensityPrintV2ParamsSchema.nullable().default(null),
+    print_curve_algorithm: negativeLabDensityPrintAlgorithmSchema,
+    print_curve_output_tag: negativeLabDensityPrintOutputTagSchema,
+    print_curve_v2: negativeLabDensityPrintV2ParamsSchema,
     process_family: negativeLabUiPresetProcessFamilySchema.default('c41_color_negative'),
     render_intent: negativeLabRenderIntentSchema.optional(),
     flat_log_master: negativeLabFlatLogMasterParamsSchema.optional(),
@@ -184,22 +189,6 @@ export const negativeLabPresetParamsSchema = z
         code: 'custom',
         message: 'Negative Lab white point must stay at least 0.05 above black point.',
         path: ['white_point'],
-      });
-    }
-
-    if (params.print_curve_algorithm === 'negative_density_print_v2' && params.print_curve_v2 === null) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Negative Lab density print v2 requires versioned v2 print curve params.',
-        path: ['print_curve_v2'],
-      });
-    }
-
-    if (params.print_curve_algorithm === 'density_rgb_v1' && params.print_curve_v2 !== null) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Negative Lab density_rgb_v1 params must not carry v2 print curve params.',
-        path: ['print_curve_v2'],
       });
     }
   });
@@ -351,7 +340,7 @@ type NegativeLabBaseFogBoundsProvenance = z.infer<typeof negativeLabBaseFogBound
 type NegativeLabConversionModel = z.infer<typeof negativeLabConversionModelSchema>;
 type NegativeLabDensityPrintAlgorithm = z.infer<typeof negativeLabDensityPrintAlgorithmSchema>;
 type NegativeLabDensityPrintOutputTag = z.infer<typeof negativeLabDensityPrintOutputTagSchema>;
-type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;
+export type NegativeLabDensityPrintV2Params = z.infer<typeof negativeLabDensityPrintV2ParamsSchema>;
 type NegativeLabNativeDensityNormalizationMetrics = z.infer<typeof negativeLabNativeDensityNormalizationMetricsSchema>;
 export type NegativeLabPresetParams = z.infer<typeof negativeLabPresetParamsSchema>;
 export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltInUiPresetCatalogSchema>;

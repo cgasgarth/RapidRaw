@@ -128,10 +128,7 @@ const buildNegativeLabProfileComparisonRenderEvidence = ({
       profileParams: profile.params,
       swatch: buildNegativeLabProfilePreviewSwatch(currentParams, profile.params),
     }),
-    printCurveVersion:
-      profile.params.print_curve_algorithm === 'negative_density_print_v2'
-        ? ('density_print_v2' as const)
-        : ('legacy_density_rgb_v1' as const),
+    printCurveVersion: 'density_print_v2' as const,
     renderHash: formatProfileHash(renderPayload),
     warningCodes,
   };

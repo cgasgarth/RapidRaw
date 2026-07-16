@@ -35,38 +35,24 @@ const fn default_midtone_shape() -> f32 {
 #[serde(rename_all = "snake_case")]
 pub enum NegativeLabDensityPrintAlgorithm {
     #[default]
-    DensityRgbV1,
     NegativeDensityPrintV2,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct NegativeLabHdPaperCurveParams {
-    #[serde(default = "default_iso_r_grade")]
     pub iso_r_grade: f32,
-    #[serde(default = "default_anchor_density")]
     pub anchor_density: f32,
-    #[serde(default = "default_density_offset")]
     pub density_offset: f32,
-    #[serde(default = "default_d_min")]
     pub d_min: f32,
-    #[serde(default = "default_d_max")]
     pub d_max: f32,
-    #[serde(default = "default_toe_width")]
     pub toe_width: f32,
-    #[serde(default = "default_shoulder_width")]
     pub shoulder_width: f32,
-    #[serde(default = "default_toe_strength")]
     pub toe_strength: f32,
-    #[serde(default = "default_shoulder_strength")]
     pub shoulder_strength: f32,
-    #[serde(default = "default_midtone_shape")]
     pub midtone_shape: f32,
-    #[serde(default)]
     pub algorithm_version: u8,
-    #[serde(default)]
     pub schema_version: u8,
-    #[serde(default = "default_output_domain")]
     pub output_domain: String,
 }
 
@@ -95,6 +81,49 @@ impl Default for NegativeLabHdPaperCurveParams {
 }
 
 impl NegativeLabHdPaperCurveParams {
+    pub fn validate_current_contract(&self) -> Result<(), String> {
+        let finite_in = |name: &str, value: f32, min: f32, max: f32| {
+            if !value.is_finite() || !(min..=max).contains(&value) {
+                Err(format!(
+                    "Negative Lab density-print {name} must be finite and within [{min}, {max}]."
+                ))
+            } else {
+                Ok(())
+            }
+        };
+
+        finite_in("iso_r_grade", self.iso_r_grade, 0.5, 3.0)?;
+        finite_in("anchor_density", self.anchor_density, 0.0, 1.0)?;
+        finite_in("density_offset", self.density_offset, -0.5, 0.5)?;
+        finite_in("d_min", self.d_min, 0.0, 1.0)?;
+        finite_in("d_max", self.d_max, 1.1, 3.0)?;
+        finite_in("toe_width", self.toe_width, 0.01, 0.5)?;
+        finite_in("shoulder_width", self.shoulder_width, 0.01, 0.5)?;
+        finite_in("toe_strength", self.toe_strength, 0.0, 1.0)?;
+        finite_in("shoulder_strength", self.shoulder_strength, 0.0, 1.0)?;
+        finite_in("midtone_shape", self.midtone_shape, -1.0, 1.0)?;
+
+        if self.d_max - self.d_min < 0.8 {
+            return Err(
+                "Negative Lab density-print d_max must remain at least 0.8 above d_min."
+                    .to_string(),
+            );
+        }
+        if self.algorithm_version != 1 {
+            return Err("Negative Lab density-print algorithm_version must be 1.".to_string());
+        }
+        if self.schema_version != 2 {
+            return Err("Negative Lab density-print schema_version must be 2.".to_string());
+        }
+        if self.output_domain != "scene_linear_print" {
+            return Err(
+                "Negative Lab density-print output_domain must be scene_linear_print.".to_string(),
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn sanitized(self) -> Self {
         let defaults = Self::default();
         let finite = |v: f32, fallback: f32| if v.is_finite() { v } else { fallback };
@@ -158,5 +187,53 @@ mod tests {
         assert!(samples.windows(2).all(|pair| pair[1] >= pair[0]));
         assert!((samples[0] - 10.0_f32.powf(-params.d_max)).abs() < 0.02);
         assert!((samples[100] - 10.0_f32.powf(-params.d_min)).abs() < 0.02);
+    }
+
+    #[test]
+    fn current_contract_rejects_missing_and_invalid_fields_without_defaulting() {
+        let complete = serde_json::to_value(NegativeLabHdPaperCurveParams::default())
+            .expect("serialize complete density-print params");
+
+        for field in [
+            "iso_r_grade",
+            "anchor_density",
+            "density_offset",
+            "d_min",
+            "d_max",
+            "toe_width",
+            "shoulder_width",
+            "toe_strength",
+            "shoulder_strength",
+            "midtone_shape",
+            "algorithm_version",
+            "schema_version",
+            "output_domain",
+        ] {
+            let mut incomplete = complete.clone();
+            incomplete
+                .as_object_mut()
+                .expect("density-print params object")
+                .remove(field);
+            assert!(
+                serde_json::from_value::<NegativeLabHdPaperCurveParams>(incomplete).is_err(),
+                "missing {field} must be rejected"
+            );
+        }
+
+        let invalid = NegativeLabHdPaperCurveParams {
+            iso_r_grade: f32::NAN,
+            ..NegativeLabHdPaperCurveParams::default()
+        };
+        assert!(invalid.validate_current_contract().is_err());
+        let invalid = NegativeLabHdPaperCurveParams {
+            schema_version: 1,
+            ..NegativeLabHdPaperCurveParams::default()
+        };
+        assert!(invalid.validate_current_contract().is_err());
+        let invalid = NegativeLabHdPaperCurveParams {
+            output_domain: "display_referred".to_string(),
+            ..NegativeLabHdPaperCurveParams::default()
+        };
+        assert!(invalid.validate_current_contract().is_err());
     }
 }

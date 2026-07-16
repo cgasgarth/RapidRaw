@@ -11,11 +11,62 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Invokes } from '../../../../src/tauri/commands.ts';
 
 mock.module('@tauri-apps/api/core', () => ({
+  Channel: class Channel<T> {
+    onmessage: (message: T) => void = () => undefined;
+  },
+  Resource: class Resource {
+    readonly rid = 0;
+    close = async (): Promise<void> => undefined;
+  },
+  convertFileSrc: (path: string) => path,
   invoke: mock((command: string) => {
     if (command === Invokes.GeneratePreviewForPath) return Promise.resolve(new Uint8Array([1, 2, 3]));
+    if (command === Invokes.PreflightNegativeLabSource) {
+      return Promise.resolve({
+        appliedLinearization: 'native_raw_to_scene_linear_v1',
+        bitDepth: 32,
+        blockReasons: [],
+        confidence: 0.95,
+        decoderBackend: 'rawler',
+        decoderVersion: 'rawengine_rawler_v1',
+        dimensions: { height: 4000, width: 6000 },
+        embeddedIccProfile: false,
+        interpretationHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        nonFiniteFraction: 0,
+        orientation: 'unknown',
+        rawDemosaicMode: 'Linear',
+        sampleFormat: 'Rgba32F',
+        schemaVersion: 1,
+        sourceHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        sourceType: 'raw',
+        transferFunction: 'camera_rgb_profiled',
+        warningCodes: [],
+      });
+    }
     if (command === Invokes.RenderNegativeLabDryRunPreviewArtifact) {
       return Promise.resolve({
         artifactId: 'artifact_negative_lab_runtime_preview_test',
+        autoMeter: {
+          algorithmId: 'native_negative_lab_auto_meter_v1',
+          algorithmVersion: 1,
+          appliedDensityOffset: 0,
+          boundedDensityRange: 0.58,
+          confidence: 0.91,
+          confidenceThreshold: 0.58,
+          densityApplied: false,
+          effectiveIsoRGrade: 1,
+          gradeApplied: false,
+          lumaDensityP10: 0.18,
+          lumaDensityP50: 0.42,
+          lumaDensityP90: 0.76,
+          requestedAutoDensityEnabled: false,
+          requestedAutoDensityStrength: 1,
+          requestedAutoGradeEnabled: false,
+          requestedAutoGradeStrength: 1,
+          sampleCount: 400,
+          texturalDensityRangeP10P90: 0.58,
+          warningCodes: [],
+        },
         baseFogSampleSummary: {
           clippedFraction: 0,
           confidence: 0.81,
@@ -79,6 +130,19 @@ mock.module('@tauri-apps/api/core', () => ({
           epsilonClampedPixelCount: 0,
           rendererVersion: 1,
         },
+        densityScopes: {
+          algorithmId: 'native_negative_lab_density_scopes_v1',
+          clippedPixelCount: 0,
+          densityHistogram: { bins: Array.from({ length: 32 }, () => 1), max: 1.2, min: 0.1 },
+          gamutOutOfRangePixelCount: 0,
+          hAndDCurve: [
+            { inputDensity: 0.1, outputLuma: 0.04 },
+            { inputDensity: 0.8, outputLuma: 0.92 },
+          ],
+          outputLumaHistogram: { bins: Array.from({ length: 32 }, () => 1), max: 1, min: 0 },
+          sampleCount: 400,
+          schemaVersion: 1,
+        },
         dimensions: { height: 1, width: 1 },
         previewDataUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==',
         stageArtifacts: [
@@ -112,6 +176,8 @@ mock.module('@tauri-apps/api/core', () => ({
     }
     return Promise.resolve(null);
   }),
+  isTauri: () => false,
+  transformCallback: () => 0,
 }));
 
 mock.module('@tauri-apps/api/event', () => ({
@@ -139,7 +205,6 @@ assertRoleName('button', locale.modals.negativeConversion.resetTooltip);
 assertRoleName('button', locale.modals.negativeConversion.zoomOutTooltip);
 assertRoleName('button', locale.modals.negativeConversion.zoomInTooltip);
 assertRoleName('button', locale.modals.negativeConversion.resetViewTooltip);
-assertRoleName('button', locale.modals.negativeConversion.compareTooltip);
 
 assertRoleName('group', locale.modals.negativeConversion.baseFogSample);
 assertRoleName('button', locale.modals.negativeConversion.sampleLeftEdge);
@@ -170,6 +235,15 @@ assertRoleName('region', locale.modals.negativeConversion.dustScratchReview);
 
 if (document.querySelector('[data-testid="negative-lab-stage-preview-strip"]') === null) {
   failures.push('Negative Lab stage preview strip did not render named native stages.');
+}
+if (document.querySelector('[data-testid="negative-lab-source-positive-comparison"]') === null) {
+  failures.push('Negative Lab current source/positive comparison did not render.');
+}
+if (document.querySelector('[data-testid="negative-lab-v2-print-curve-controls"]') === null) {
+  failures.push('Negative Lab current H&D print controls did not render.');
+}
+if (document.querySelector('[data-testid="negative-lab-v2-algorithm-toggle"]') !== null) {
+  failures.push('Negative Lab exposed an obsolete density-print algorithm toggle.');
 }
 if (document.querySelector('[data-testid="negative-lab-stage-normalized_density"]') === null) {
   failures.push('Negative Lab normalized-density stage control is missing.');

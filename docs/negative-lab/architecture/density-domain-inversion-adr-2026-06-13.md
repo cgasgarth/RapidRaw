@@ -2,7 +2,7 @@
 
 - Date: 2026-06-13
 - Issue: #265 `negative-lab(adr): define density-domain inversion model`
-- Status: proposed
+- Status: accepted; current-contract amendment #5951 applied 2026-07-15
 - Scope: first architecture decision for objective negative conversion math,
   stage boundaries, controls, schema concepts, and validation expectations.
 
@@ -19,14 +19,16 @@ let inherited behavior become the product contract. The Negative Lab contract is
 local-first, macOS-first, non-destructive, replayable, and explicit about what is
 objective conversion versus creative rendering.
 
-This ADR defines the v1 target model, named `density_rgb_v1`. It does not claim
+This ADR defines the current target model, named `negative_log_density_v1`. It does not claim
 exact film-stock emulation, exact scanner characterization, or final UI
 implementation.
 
 ## Decision
 
-Negative conversion v1 will use a staged density-domain model. The canonical
-algorithm ID is `density_rgb_v1`.
+Negative conversion uses a staged density-domain model. The canonical
+conversion ID is `negative_log_density_v1`, paired with the required
+`negative_density_print_v2` H&D print curve. HEAD-created recipes persist the
+complete pair and are rejected if either identity or any H&D parameter is absent.
 
 1. **Acquisition input transform**
    - Decode the scan or camera RAW into `LinearScanRgb`, a declared,
@@ -324,7 +326,7 @@ A Pro Extended consult was started in the RapidRaw ChatGPT project on
 should stay a small contract ADR and recommended these changes, which are
 accepted into this document:
 
-- name the v1 model `density_rgb_v1`;
+- keep objective conversion explicitly versioned and separate from creative rendering;
 - operate on declared `LinearScanRgb` rather than display RGB;
 - express density as `D = log10(B / I)` with a versioned epsilon policy;
 - freeze stable warning codes early;

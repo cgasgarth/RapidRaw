@@ -713,20 +713,17 @@ function buildNegativeLabRuntimeProofV1({
       storageTransition: 'temp_cache_to_sidecar_artifact',
       warningCodes,
     },
-    printCurveParams:
-      densityPrintCurve === undefined
-        ? null
-        : {
-            contrastGrade: densityPrintCurve.contrastGrade,
-            densityOffset: densityPrintCurve.densityOffset,
-            midtoneShape: densityPrintCurve.midtoneShape,
-            outputTag: densityPrintCurve.outputTag,
-            schemaVersion: densityPrintCurve.schemaVersion,
-            shoulderStrength: densityPrintCurve.shoulderStrength,
-            targetBlackDensity: densityPrintCurve.targetBlackDensity,
-            targetWhiteDensity: densityPrintCurve.targetWhiteDensity,
-            toeStrength: densityPrintCurve.toeStrength,
-          },
+    printCurveParams: {
+      contrastGrade: densityPrintCurve.contrastGrade,
+      densityOffset: densityPrintCurve.densityOffset,
+      midtoneShape: densityPrintCurve.midtoneShape,
+      outputTag: densityPrintCurve.outputTag,
+      schemaVersion: densityPrintCurve.schemaVersion,
+      shoulderStrength: densityPrintCurve.shoulderStrength,
+      targetBlackDensity: densityPrintCurve.targetBlackDensity,
+      targetWhiteDensity: densityPrintCurve.targetWhiteDensity,
+      toeStrength: densityPrintCurve.toeStrength,
+    },
     scanMetricsSummary: {
       densityRangeUnclamped,
       frameCount,
@@ -743,7 +740,7 @@ function buildNegativeLabRuntimeProofV1({
         curveFamily: command.parameters.curveModel.curveFamily,
         densityMax: algorithm.densityMax,
         normalizationProfileId: command.parameters.curveModel.normalizationProfileId ?? null,
-        outputTag: densityPrintCurve?.outputTag ?? 'preview_display',
+        outputTag: densityPrintCurve.outputTag,
         processProfileId: command.parameters.curveModel.processProfileId ?? null,
       },
       densityNormalizationMetrics: {

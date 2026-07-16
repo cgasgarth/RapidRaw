@@ -40,7 +40,7 @@
       "warningCodes": ["low_acquisition_confidence"]
     },
     "algorithm": {
-      "algorithmId": "density_rgb_v1",
+      "algorithmId": "negative_log_density_v1",
       "algorithmVersion": 1,
       "densityMax": 3.2,
       "epsilonPolicyId": "density_epsilon_v1",
@@ -54,7 +54,17 @@
       "storageTransition": "temp_cache_to_sidecar_artifact",
       "warningCodes": ["low_acquisition_confidence"]
     },
-    "printCurveParams": null,
+    "printCurveParams": {
+      "contrastGrade": 1,
+      "densityOffset": 0,
+      "midtoneShape": 0,
+      "outputTag": "preview_display",
+      "schemaVersion": 2,
+      "shoulderStrength": 0.25,
+      "targetBlackDensity": 1.65,
+      "targetWhiteDensity": 0.04,
+      "toeStrength": 0.25
+    },
     "scanMetricsSummary": {
       "densityRangeUnclamped": 0.715,
       "frameCount": 1,

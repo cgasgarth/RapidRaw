@@ -375,7 +375,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     bounds_schema_version: 1;
     color_range_clip: number;
     contrast: number;
-    conversion_model?: 'density_rgb_v1' | 'negative_log_density_v1' | 'e6_positive_v1';
+    conversion_model: 'negative_log_density_v1' | 'e6_positive_v1';
     render_intent?: 'print' | 'flat_log_master';
     flat_log_master?: {
       algorithm_version: 1;
@@ -385,6 +385,26 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     exposure: number;
     green_weight: number;
     luma_range_clip: number;
+    print_curve_algorithm: 'negative_density_print_v2';
+    print_curve_output_tag: 'preview_display' | 'export_linear';
+    print_curve_v2: {
+      algorithm_version: 1;
+      anchor_density: number;
+      contrast_grade: number;
+      density_offset: number;
+      d_max: number;
+      d_min: number;
+      iso_r_grade: number;
+      midtone_shape: number;
+      output_domain: 'scene_linear_print';
+      schema_version: 2;
+      shoulder_strength: number;
+      shoulder_width: number;
+      target_black_density: number;
+      target_white_density: number;
+      toe_strength: number;
+      toe_width: number;
+    };
     red_weight: number;
     white_point_offset: number;
     white_point: number;
@@ -491,11 +511,9 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     Invokes.PreflightNegativeLabSource,
   );
   const conversionModel =
-    params.command.parameters.conversionModel.algorithmId === 'negative_log_density_v1'
-      ? 'negative_log_density_v1'
-      : params.command.parameters.conversionModel.algorithmId === 'e6_positive_v1'
-        ? 'e6_positive_v1'
-        : 'density_rgb_v1';
+    params.command.parameters.conversionModel.algorithmId === 'e6_positive_v1'
+      ? 'e6_positive_v1'
+      : 'negative_log_density_v1';
   const nativeArtifact = await invokeWithSchema(
     Invokes.RenderNegativeLabDryRunPreviewArtifact,
     {

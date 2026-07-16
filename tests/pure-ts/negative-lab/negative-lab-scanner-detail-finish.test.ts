@@ -1,14 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
 import { negativeLabPresetParamsSchema } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../src/utils/negative-lab/negativeLabPresetCatalog';
 
 describe('Negative Lab scanner detail finish contract', () => {
   const baseParams = {
-    blue_weight: 1,
-    contrast: 1,
-    exposure: 0,
-    green_weight: 1,
-    red_weight: 1,
+    ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
   };
 
   test('defaults to an exact disabled, versioned finish', () => {
