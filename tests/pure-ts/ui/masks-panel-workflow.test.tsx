@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, fireEvent, render } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement, type ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, type ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Mask } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
@@ -16,8 +16,6 @@ import {
 } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
 mock.module('@clerk/react', () => ({
   ClerkProvider: ({ children }: { children?: ReactNode }) => children ?? null,
   Show: ({ children }: { children?: ReactNode }) => children ?? null,
@@ -26,6 +24,8 @@ mock.module('@clerk/react', () => ({
   useClerk: () => ({ signOut: async () => undefined }),
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
 }));
+const invoke = mock(async (command: string) => (command === 'load_presets' ? [] : null));
+mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
 const firstMask: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -51,25 +51,19 @@ const secondMask: MaskContainer = {
   visible: true,
 };
 
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
-  useEditorStore.getState().hydrateEditorRenderAuthority({
-    activeMaskContainerId: null,
-    activeMaskId: null,
-    historyIndex: 0,
-    selectedImage: null,
-    editDocumentV2,
-    history: [editDocumentV2],
+  act(() => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      activeMaskContainerId: null,
+      activeMaskId: null,
+      historyIndex: 0,
+      selectedImage: null,
+      editDocumentV2,
+      history: [editDocumentV2],
+    });
   });
+  invoke.mockClear();
 });
 
 describe('compact masks panel workflow', () => {
@@ -82,10 +76,10 @@ describe('compact masks panel workflow', () => {
       history: [editDocumentV2],
     });
 
-    const { container } = await renderMasksPanel();
+    const { container, user } = await renderMasksPanel();
     expect(container.textContent).not.toContain('Mask Adjustments');
 
-    await clickControl(container, '[data-testid="mask-creation-linear"]');
+    await clickControl(user, container, '[data-testid="mask-creation-linear"]');
 
     const stateAfterCreate = useEditorStore.getState();
     const createdContainer = stateAfterCreate.adjustmentSnapshot.value.masks[0];
@@ -93,7 +87,7 @@ describe('compact masks panel workflow', () => {
     expect(stateAfterCreate.activeMaskContainerId).toBe(createdContainer?.id);
     expect(stateAfterCreate.activeMaskId).toBe(createdSubMask?.id);
 
-    await clickControl(container, '[data-testid="mask-reset-all"]');
+    await clickControl(user, container, '[data-testid="mask-reset-all"]');
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toHaveLength(0);
     expect(useEditorStore.getState().activeMaskContainerId).toBeNull();
     expect(useEditorStore.getState().activeMaskId).toBeNull();
@@ -111,7 +105,7 @@ describe('compact masks panel workflow', () => {
       history: [editDocumentV2],
     });
 
-    const { container } = await renderMasksPanel();
+    const { container, user } = await renderMasksPanel();
     const firstRow = required<HTMLElement>(container, '[data-testid="mask-container-row-mask-first"]');
     const secondRow = required<HTMLElement>(container, '[data-testid="mask-container-row-mask-second"]');
     const initialActiveContainerId = useEditorStore.getState().activeMaskContainerId;
@@ -125,7 +119,7 @@ describe('compact masks panel workflow', () => {
     ).toBe('true');
     expect(firstRow.dataset.maskContainerVisible).toBe('true');
 
-    await clickControl(container, '[data-testid="mask-contextual-create-brush"]');
+    await clickControl(user, container, '[data-testid="mask-contextual-create-brush"]');
 
     const activeContainer = useEditorStore
       .getState()
@@ -140,10 +134,7 @@ describe('compact masks panel workflow', () => {
     ).toBe('true');
 
     const revisionBeforeVisibility = useEditorStore.getState().adjustmentRevision;
-    await act(async () => {
-      required<HTMLButtonElement>(firstRow, '[aria-label="Hide Mask"]').click();
-      await flush();
-    });
+    await user.click(required<HTMLButtonElement>(firstRow, '[aria-label="Hide Mask"]'));
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(false);
     expect(firstRow.dataset.maskContainerVisible).toBe('false');
@@ -155,53 +146,35 @@ describe('compact masks panel workflow', () => {
     });
 
     const disclosure = required<HTMLButtonElement>(secondRow, 'button[aria-label^="Collapse"]');
-    await act(async () => {
-      disclosure.click();
-      await flush();
-    });
+    await user.click(disclosure);
     expect(secondRow.getAttribute('aria-expanded')).toBe('false');
 
-    await act(async () => {
+    act(() => {
       useEditorStore.getState().undo();
-      await flush();
     });
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(true);
     expect(useEditorStore.getState().editDocumentV2.nodes.layers?.params.masks[0]?.visible).toBe(true);
     expect(secondRow.getAttribute('aria-expanded')).toBe('false');
 
-    await act(async () => {
-      firstRow.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-      await flush();
-    });
+    fireEvent.keyDown(firstRow, { key: 'Enter' });
 
     expect(useEditorStore.getState().activeMaskContainerId).toBe(firstMask.id);
     expect(firstRow.getAttribute('aria-current')).toBe('true');
 
-    await act(async () => {
-      secondRow.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-      await flush();
-    });
+    fireEvent.keyDown(secondRow, { key: 'Enter' });
 
     expect(useEditorStore.getState().activeMaskContainerId).toBe(secondMask.id);
     expect(useEditorStore.getState().activeMaskId).toBeNull();
     expect(secondRow.getAttribute('aria-current')).toBe('true');
 
-    await act(async () => {
-      secondRow.dispatchEvent(
-        new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 16, clientY: 16 }),
-      );
-      await flush();
-    });
+    fireEvent.contextMenu(secondRow, { clientX: 16, clientY: 16 });
 
     const duplicate = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find((button) =>
       button.textContent?.includes('Duplicate Mask'),
     );
     if (duplicate === undefined) throw new Error('Expected Duplicate Mask in the mask context menu.');
 
-    await act(async () => {
-      duplicate.click();
-      await flush();
-    });
+    await user.click(duplicate);
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toHaveLength(3);
     expect(required<HTMLElement>(container, '[data-testid="mask-stack-count"]').textContent).toBe('3');
@@ -209,25 +182,13 @@ describe('compact masks panel workflow', () => {
 });
 
 async function renderMasksPanel() {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   const i18n = await createTestI18n();
   const { MasksPanel } = await import('../../../src/components/panel/right/layers/MasksPanel.tsx');
-
-  await act(async () => {
-    root.render(
-      createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(MasksPanel))),
-    );
-    await flush();
-    await flush();
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    await flush();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  const user = userEvent.setup();
+  const { container } = render(
+    createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(MasksPanel))),
+  );
+  return { container, user };
 }
 
 function required<T extends Element>(container: Element, selector: string): T {
@@ -236,43 +197,8 @@ function required<T extends Element>(container: Element, selector: string): T {
   return element;
 }
 
-async function clickControl(container: Element, selector: string) {
-  await act(async () => {
-    required<HTMLButtonElement>(container, selector).click();
-    await flush();
-    await flush();
-  });
-}
-
-async function flush() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/masks-panel-test' });
-  Object.defineProperty(window, '__TAURI_INTERNALS__', {
-    value: {
-      invoke: async (command: string) => (command === 'load_presets' ? [] : null),
-    },
-  });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    HTMLInputElement: window.HTMLInputElement,
-    KeyboardEvent: window.KeyboardEvent,
-    MouseEvent: window.MouseEvent,
-    navigator: window.navigator,
-    window,
-  });
-  Object.assign(globalThis, { ResizeObserver: TestResizeObserver });
-}
-
-class TestResizeObserver {
-  disconnect() {}
-
-  observe(_target: Element, _options?: ResizeObserverOptions) {}
-
-  unobserve(_target: Element) {}
+async function clickControl(user: UserEvent, container: Element, selector: string) {
+  await user.click(required<HTMLButtonElement>(container, selector));
 }
 
 async function createTestI18n() {

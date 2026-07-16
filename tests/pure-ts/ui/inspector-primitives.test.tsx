@@ -1,40 +1,22 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import CollapsibleSection from '../../../src/components/ui/CollapsibleSection.tsx';
 import InspectorSegmentedControl from '../../../src/components/ui/primitives/InspectorSegmentedControl.tsx';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 test('collapsible sections restore focus to their disclosure and inert hidden controls', async () => {
   const { container } = await renderWithI18n(createElement(CollapsibleHarness));
   const toggle = getRequiredElement<HTMLButtonElement>(container, '[data-testid="tone-section-toggle"]');
   const input = getRequiredElement<HTMLInputElement>(container, '[data-testid="tone-section-input"]');
 
-  await act(async () => {
-    input.focus();
-    toggle.click();
-    await flushPromises();
-  });
+  input.focus();
+  fireEvent.click(toggle);
 
   const region = getRequiredElement<HTMLDivElement>(container, '[role="region"]');
-  expect(document.activeElement).toBe(toggle);
+  await waitFor(() => expect(document.activeElement).toBe(toggle));
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(region.getAttribute('aria-hidden')).toBe('true');
   expect(region.inert).toBe(true);
@@ -51,10 +33,7 @@ test('collapsible sections retain Shift+F10 actions without nesting action butto
   );
   const toggle = getRequiredElement<HTMLButtonElement>(container, '[data-testid="tone-section-toggle"]');
 
-  await act(async () => {
-    toggle.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }));
-    await flushPromises();
-  });
+  fireEvent.keyDown(toggle, { key: 'F10', shiftKey: true });
 
   expect(actionPositions).toHaveLength(1);
   expect(toggle.querySelector('button')).toBeNull();
@@ -65,27 +44,18 @@ test('segmented controls use roving focus with arrow, Home, and End keyboard sel
   const { container } = await renderWithI18n(createElement(SegmentedHarness, { changes }));
   const raw = getRequiredElement<HTMLButtonElement>(container, '[role="radio"][aria-checked="true"]');
 
-  await act(async () => {
-    raw.focus();
-    raw.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
-    await flushPromises();
-  });
+  raw.focus();
+  fireEvent.keyDown(raw, { key: 'ArrowRight' });
   expect(changes).toEqual(['proof']);
   expect(document.activeElement?.textContent).toBe('Proof');
 
   const proof = getRequiredElement<HTMLButtonElement>(container, '[role="radio"][aria-checked="true"]');
-  await act(async () => {
-    proof.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'End' }));
-    await flushPromises();
-  });
+  fireEvent.keyDown(proof, { key: 'End' });
   expect(changes).toEqual(['proof', 'mask']);
   expect(document.activeElement?.textContent).toBe('Mask');
 
   const mask = getRequiredElement<HTMLButtonElement>(container, '[role="radio"][aria-checked="true"]');
-  await act(async () => {
-    mask.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Home' }));
-    await flushPromises();
-  });
+  fireEvent.keyDown(mask, { key: 'Home' });
   expect(changes).toEqual(['proof', 'mask', 'raw']);
   expect(document.activeElement?.textContent).toBe('RAW');
 });
@@ -129,19 +99,8 @@ function SegmentedHarness({ changes }: { changes: string[] }) {
 }
 
 async function renderWithI18n(element: React.ReactNode) {
-  installDom();
   const i18n = await createTestI18n();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, element));
-    await flushPromises();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  return render(createElement(I18nextProvider, { i18n }, element));
 }
 
 function getRequiredElement<T extends Element>(container: Element, selector: string): T {
@@ -150,19 +109,6 @@ function getRequiredElement<T extends Element>(container: Element, selector: str
     throw new Error(`Expected ${selector} to render.`);
   }
   return element;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/inspector-primitives-test' });
-  class TestResizeObserver {
-    observe() {}
-    disconnect() {}
-  }
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-  Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });
 }
 
 async function createTestI18n() {
@@ -186,8 +132,4 @@ async function createTestI18n() {
     },
   });
   return instance;
-}
-
-async function flushPromises() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
 }

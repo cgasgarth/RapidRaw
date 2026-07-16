@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot } from 'react-dom/client';
+import { fireEvent, render as testingRender } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
 
 import ConfigurePresetModal, {
   ConfigurePresetDraft,
@@ -17,7 +17,6 @@ let unmount: (() => Promise<void>) | null = null;
 afterEach(async () => {
   await unmount?.();
   unmount = null;
-  document?.body.replaceChildren();
 });
 
 test('preset draft starts from its keyed preset and saves once after accessible keyboard selection', async () => {
@@ -157,51 +156,38 @@ function settings(mode: PasteMode): CopyPasteSettings {
 }
 
 function installRuntime() {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    HTMLInputElement: window.HTMLInputElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    Node: window.Node,
-    window,
-  });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const rendered = testingRender(createElement('div'));
+  const user = userEvent.setup();
   let mounted = true;
   return {
     button: (text: string) => {
-      const button = [...container.querySelectorAll('button')].find((candidate) =>
+      const button = [...rendered.container.querySelectorAll('button')].find((candidate) =>
         candidate.textContent?.includes(text),
       );
       if (!button) throw new Error(`Missing button ${text}`);
       return button;
     },
-    click: async (element: Element) =>
-      act(async () => element.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))),
+    click: (element: Element) => user.click(element),
     input: (id: string) => {
-      const input = container.querySelector<HTMLInputElement>(`#${id}`);
+      const input = rendered.container.querySelector<HTMLInputElement>(`#${id}`);
       if (!input) throw new Error(`Missing input ${id}`);
       return input;
     },
-    key: async (element: Element, key: string) =>
-      act(async () => element.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key }))),
-    render: async (element: ReturnType<typeof createElement>) => act(async () => root.render(element)),
+    key: async (element: HTMLElement, key: string) => fireEvent.keyDown(element, { key }),
+    render: async (element: ReturnType<typeof createElement>) => rendered.rerender(element),
     renderModal: async (element: ReturnType<typeof createElement>, settle = true) => {
-      await act(async () => root.render(element));
-      if (settle) await act(async () => new Promise((resolve) => window.setTimeout(resolve, 20)));
+      rendered.rerender(element);
+      if (settle) await Promise.resolve();
     },
     selectedRadio: () => {
-      const radio = container.querySelector<HTMLButtonElement>('[role="radio"][aria-checked="true"]');
+      const radio = rendered.container.querySelector<HTMLButtonElement>('[role="radio"][aria-checked="true"]');
       if (!radio) throw new Error('Missing selected radio');
       return radio;
     },
     unmount: async () => {
       if (!mounted) return;
       mounted = false;
-      await act(async () => root.unmount());
+      rendered.unmount();
     },
   };
 }

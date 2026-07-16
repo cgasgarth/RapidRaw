@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { render as testingRender, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { act, createElement, type ReactElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import AgentChatShell, { buildAgentChatTimeline } from '../../../src/components/panel/right/ai/AgentChatShell.tsx';
@@ -16,8 +16,6 @@ import { buildAgentMediumPreviewEncodedBytesForTest } from '../../../src/utils/a
 import { getRawEngineImagePreview } from '../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import { setAgentSelectedImageModelTransportFactoryForTest } from '../../../src/utils/agent/session/agentCodexAppServerModelTransport.ts';
 import type { AgentSelectedImageModelTransport } from '../../../src/utils/agent/session/agentSelectedImageModelToolLoop.ts';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const selectedImage: SelectedImage = {
   exif: { ISO: '200', LensModel: 'FE 35mm F1.4 GM' },
@@ -64,15 +62,17 @@ const transcript: AgentChatTranscript = {
   ],
 };
 
-interface TauriTestWindow extends Window {
-  __TAURI_INTERNALS__: {
-    convertFileSrc: (path: string) => string;
-    invoke: () => Promise<ArrayBuffer>;
-  };
-}
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 let previewInvokeDelayMs = 0;
+
+mock.module('@tauri-apps/api/core', () => ({
+  convertFileSrc: (path: string) => path,
+  invoke: async () => {
+    if (previewInvokeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, previewInvokeDelayMs));
+    return buildPreviewBytes().slice(0);
+  },
+}));
+
+const i18n = await createTestI18n();
 
 beforeEach(() => {
   previewInvokeDelayMs = 0;
@@ -82,19 +82,14 @@ beforeEach(() => {
 
 afterEach(() => {
   setAgentSelectedImageModelTransportFactoryForTest(undefined);
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
+  act(() => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: initialEditDocumentV2,
+      historyCheckpoints: [],
+      historyIndex: 0,
+      selectedImage: null,
+      history: [initialEditDocumentV2],
     });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-  useEditorStore.getState().hydrateEditorRenderAuthority({
-    editDocumentV2: initialEditDocumentV2,
-    historyCheckpoints: [],
-    historyIndex: 0,
-    selectedImage: null,
-    history: [initialEditDocumentV2],
   });
 });
 
@@ -148,17 +143,13 @@ describe('agent chat shell', () => {
     const { container } = await render(createElement(AgentChatShell, { transcript }));
     const composer = required<HTMLElement>(container, '[data-testid="agent-live-prompt-composer"]');
     const input = required<HTMLTextAreaElement>(container, '[data-testid="agent-live-prompt-input"]');
+    const focusTracker = trackFocus(input);
+    const user = userEvent.setup();
 
-    await act(async () => {
-      quickStart(container, 'Recover highlights').click();
-      await flush();
-    });
+    await user.click(quickStart(container, 'Recover highlights'));
     expect(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').disabled).toBe(false);
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').click();
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus !== 'previewing');
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
+    await waitFor(() => expect(composer.dataset.livePromptStatus).not.toBe('previewing'));
     if (composer.dataset.livePromptStatus !== 'dry_run_ready') {
       throw new Error(
         `Expected a ready preview, got ${composer.dataset.livePromptStatus}: ${container.querySelector('[data-testid="agent-live-prompt-error"]')?.textContent ?? 'no error'}`,
@@ -172,7 +163,8 @@ describe('agent chat shell', () => {
       'ready',
     );
     expect(result.querySelector('[data-testid="agent-live-prompt-apply"]')).not.toBeNull();
-    expect(document.activeElement).toBe(input);
+    await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
+    focusTracker.focus.mockClear();
 
     const messageIds = Array.from(container.querySelectorAll<HTMLElement>('[data-testid^="agent-chat-message-"]')).map(
       (message) => message.dataset.testid,
@@ -183,43 +175,34 @@ describe('agent chat shell', () => {
       expect.stringContaining('live-agent-session-'),
     ]);
 
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-apply"]').click();
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus === 'applied');
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-apply"]'));
+    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('applied'));
     expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
       'applied',
     );
     expect(container.querySelector('[data-testid="agent-live-prompt-rollback"]')).not.toBeNull();
-    expect(document.activeElement).toBe(input);
+    await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
+    focusTracker.focus.mockClear();
 
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-rollback"]').click();
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus === 'rolled_back');
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-rollback"]'));
+    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('rolled_back'));
     expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
       'rolled_back',
     );
-    expect(document.activeElement).toBe(input);
+    await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
+    focusTracker.restore();
   });
 
   test('keeps a runtime failure in a concise lifecycle state instead of duplicating chat status messages', async () => {
     useEditorStore.getState().setEditor({ selectedImage: null });
     const { container } = await render(createElement(AgentChatShell, { transcript }));
     const composer = required<HTMLElement>(container, '[data-testid="agent-live-prompt-composer"]');
+    const user = userEvent.setup();
 
-    await act(async () => {
-      quickStart(container, 'Recover highlights').click();
-      await flush();
-    });
+    await user.click(quickStart(container, 'Recover highlights'));
     expect(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').disabled).toBe(false);
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').click();
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus === 'failed');
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
+    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('failed'));
 
     expect(required<HTMLElement>(container, '[data-testid="agent-live-prompt-error"]').textContent).toContain(
       'Select an image before previewing',
@@ -231,46 +214,32 @@ describe('agent chat shell', () => {
   });
 
   test('cancels an in-flight preview with Escape and restores the composer focus', async () => {
-    previewInvokeDelayMs = 30;
+    previewInvokeDelayMs = 250;
     const { container } = await render(createElement(AgentChatShell, { transcript }));
     const composer = required<HTMLElement>(container, '[data-testid="agent-live-prompt-composer"]');
     const input = required<HTMLTextAreaElement>(container, '[data-testid="agent-live-prompt-input"]');
+    const focusTracker = trackFocus(input);
+    const user = userEvent.setup();
 
-    await act(async () => {
-      quickStart(container, 'Recover highlights').click();
-      await flush();
-      required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').click();
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus === 'previewing');
+    await user.click(quickStart(container, 'Recover highlights'));
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
+    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('previewing'));
 
-    await act(async () => {
-      input.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-      await flush();
-    });
-    await waitFor(() => composer.dataset.livePromptStatus === 'cancelled');
+    await user.click(input);
+    focusTracker.focus.mockClear();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('cancelled'));
 
     expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
       'cancelled',
     );
-    expect(document.activeElement).toBe(input);
+    await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
+    focusTracker.restore();
   });
 });
 
-async function render(element: ReturnType<typeof createElement>) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  const i18n = await createTestI18n();
-
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, element));
-    await flush();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+async function render(element: ReactElement) {
+  return testingRender(createElement(I18nextProvider, { i18n }, element));
 }
 
 function seedEditor() {
@@ -293,46 +262,30 @@ function required<T extends Element>(container: Element, selector: string): T {
   return element;
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 2_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error('Timed out waiting for agent chat state.');
-    await act(async () => {
-      await flush();
-    });
-  }
-}
-
-function flush() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/agent-chat-shell' });
-  const currentImage = useEditorStore.getState().selectedImage;
-  const tinyJpeg =
-    currentImage === null
-      ? new Uint8Array([0xff, 0xd8, 0xff, 0xd9]).buffer
-      : (() => {
-          const currentPreview = getRawEngineImagePreview({ requestId: 'agent-chat-shell-ui-preview' });
-          return buildAgentMediumPreviewEncodedBytesForTest({
-            graphRevision: currentPreview.receipt.graphRevision,
-            imagePath: currentImage.path,
-            preview: currentPreview.preview,
-          }).buffer;
-        })();
-  const tauriWindow = window as TauriTestWindow;
-  tauriWindow.__TAURI_INTERNALS__ = {
-    convertFileSrc: (path) => path,
-    invoke: async () => {
-      if (previewInvokeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, previewInvokeDelayMs));
-      return tinyJpeg.slice(0);
+function trackFocus(element: HTMLElement) {
+  const originalFocus = element.focus;
+  const focus = mock((options?: FocusOptions) => originalFocus.call(element, options));
+  Object.defineProperty(element, 'focus', { configurable: true, value: focus });
+  return {
+    focus,
+    restore: () => {
+      Reflect.deleteProperty(element, 'focus');
     },
   };
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
+}
+
+function buildPreviewBytes(): ArrayBuffer {
+  const currentImage = useEditorStore.getState().selectedImage;
+  return currentImage === null
+    ? new Uint8Array([0xff, 0xd8, 0xff, 0xd9]).buffer
+    : (() => {
+        const currentPreview = getRawEngineImagePreview({ requestId: 'agent-chat-shell-ui-preview' });
+        return buildAgentMediumPreviewEncodedBytesForTest({
+          graphRevision: currentPreview.receipt.graphRevision,
+          imagePath: currentImage.path,
+          preview: currentPreview.preview,
+        }).buffer;
+      })();
 }
 
 function quickStart(container: Element, label: string): HTMLButtonElement {

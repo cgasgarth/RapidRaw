@@ -20,40 +20,10 @@ import {
   readLibraryWorkspacePreferences,
 } from '../../../src/utils/libraryWorkspacePreferences';
 
-const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-
-class MemoryStorage implements Storage {
-  private readonly values = new Map<string, string>();
-
-  get length() {
-    return this.values.size;
-  }
-
-  clear() {
-    this.values.clear();
-  }
-
-  getItem(key: string) {
-    return this.values.get(key) ?? null;
-  }
-
-  key(index: number) {
-    return Array.from(this.values.keys())[index] ?? null;
-  }
-
-  removeItem(key: string) {
-    this.values.delete(key);
-  }
-
-  setItem(key: string, value: string) {
-    this.values.set(key, value);
-  }
-}
-
-const installStorage = (storage: Storage) => {
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+const installStorage = () => {
+  localStorage.clear();
+  return localStorage;
 };
-
 afterEach(() => {
   useUIStore.setState({
     activeRightPanel: Panel.Color,
@@ -69,11 +39,7 @@ afterEach(() => {
     uiVisibility: { filmstrip: true, folderTree: true },
   });
 
-  if (originalLocalStorageDescriptor) {
-    Object.defineProperty(globalThis, 'localStorage', originalLocalStorageDescriptor);
-  } else {
-    delete (globalThis as { localStorage?: Storage }).localStorage;
-  }
+  localStorage.clear();
 });
 
 describe('editor workspace preferences', () => {
@@ -97,8 +63,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('ignores obsolete keys and incomplete current editor state', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     storage.setItem('rapidraw.lastEditingRightPanel.v1', Panel.Masks);
     storage.setItem('rapidraw.developPanelPinnedControlIds.v1', JSON.stringify(['exposure']));
     expect(readEditorWorkspacePreferences()).toEqual(createDefaultEditorWorkspacePreferences());
@@ -113,8 +78,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('uses valid current preferences and resets corrupt or future data', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     const current = createDefaultEditorWorkspacePreferences();
     current.rightInspector.activePanel = Panel.Agent;
     storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify(current));
@@ -129,8 +93,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('persists a complete default after current editor storage recovery', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     storage.setItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY, '{not-json');
 
     useUIStore.getState().hydrateEditorWorkspacePreferences();
@@ -140,8 +103,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('accepts only complete current library workspace storage', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     const current = createDefaultLibraryWorkspacePreferences();
     current.folderTree = { visible: false, width: 320 };
     storage.setItem(LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY, JSON.stringify(current));
@@ -153,8 +115,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('persists compact drawer states without overwriting the preferred drawer height', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     const preferences = createDefaultEditorWorkspacePreferences();
     preferences.compact.toolsHeight = 520;
     useUIStore.setState({
@@ -211,8 +172,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('persists narrow preference actions but not transient UI state', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     useUIStore.getState().setEditorWorkspaceViewport({ height: 900, isCompactPortrait: false, width: 1440 });
     useUIStore.getState().setEditorRegionSize('leftSidebar', 312);
     useUIStore.getState().setEditorRegionVisibility('filmstrip', false);
@@ -232,8 +192,7 @@ describe('editor workspace preferences', () => {
   });
 
   test('collapses Effects as a workspace-only preference with zero edit side effects', () => {
-    const storage = new MemoryStorage();
-    installStorage(storage);
+    const storage = installStorage();
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, grainAmount: 42 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -258,20 +217,19 @@ describe('editor workspace preferences', () => {
   });
 
   test('tolerates unavailable storage without blocking preference updates', () => {
-    installStorage({
-      clear: () => undefined,
-      getItem: () => {
-        throw new Error('storage unavailable');
-      },
-      key: () => null,
-      length: 0,
-      removeItem: () => undefined,
-      setItem: () => {
-        throw new Error('quota exceeded');
-      },
-    });
-
-    expect(() => saveEditorWorkspacePreferences(createDefaultEditorWorkspacePreferences())).not.toThrow();
-    expect(() => useUIStore.getState().setDefaultEditorZoomMode('fill')).not.toThrow();
+    const storageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    try {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        get: () => {
+          throw new Error('storage unavailable');
+        },
+      });
+      expect(() => saveEditorWorkspacePreferences(createDefaultEditorWorkspacePreferences())).not.toThrow();
+      expect(() => useUIStore.getState().setDefaultEditorZoomMode('fill')).not.toThrow();
+    } finally {
+      if (storageDescriptor === undefined) Reflect.deleteProperty(window, 'localStorage');
+      else Object.defineProperty(window, 'localStorage', storageDescriptor);
+    }
   });
 });
