@@ -128,13 +128,45 @@ describe('preview analytics effect runner', () => {
     expect(bindPresentation(identity)).toBe(true);
     expect(updates.at(-1)).toMatchObject({
       histogram: { luma: { data: [1] } },
-      previewScopeStatus: { path: '/fixtures/a.raw', updatedAt: '2026-07-15T12:00:00.000Z' },
+      previewScopeRecoveryError: null,
+      previewScopeRecoveryState: 'idle',
+      previewScopeStatus: {
+        histogramReady: true,
+        path: '/fixtures/a.raw',
+        updatedAt: '2026-07-15T12:00:00.000Z',
+        waveformReady: false,
+        warningCodes: [],
+      },
+      waveform: null,
     });
 
     const stale = { ...identity, generation: identity.generation + 1, operationId: identity.operationId + 1 };
     emit(analyticsPayload(stale, 9));
     expect(updates).toHaveLength(1);
     expect(runner.pendingCount()).toBe(0);
+  });
+
+  test('reports incomplete advanced scope products without discarding the authoritative histogram', async () => {
+    const { bindPresentation, dispatch, emit, runner, updates } = harness();
+    await runner.start();
+    const queued = dispatch({ identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+    const identity = requiredIdentity(queued);
+    dispatch({ identity, type: 'operation-started' });
+    emit({ ...analyticsPayload(identity), requestedProducts: 31 });
+    dispatch({ artifact: { identity, url: 'blob:current' }, identity, type: 'operation-completed' });
+    expect(bindPresentation(identity)).toBe(true);
+
+    expect(updates.at(-1)).toMatchObject({
+      histogram: { luma: { data: [1] } },
+      previewScopeRecoveryError: 'Analytics completed without all current preview scopes.',
+      previewScopeRecoveryState: 'error',
+      previewScopeStatus: {
+        histogramReady: true,
+        waveformReady: false,
+        warningCodes: ['preview_scope_error:incomplete_advanced_scopes_receipt'],
+      },
+      waveform: null,
+    });
   });
 
   test('replacement clears prior analytics and unmount drops pending payloads', async () => {

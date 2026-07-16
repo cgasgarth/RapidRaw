@@ -234,6 +234,68 @@ async function verifyEditorRenderAuthorityBoundary(page: Page): Promise<void> {
 }
 
 async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void> {
+  const analyticsHeader = page.locator('[data-testid$="-analytics-header"]').first();
+  await page.waitForFunction(() => {
+    const header = document.querySelector('[data-testid$="-analytics-header"]');
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return (
+      header?.getAttribute('data-analytics-state') === 'current' &&
+      header.getAttribute('data-state') === 'histogram' &&
+      calls.some(({ args, command }) => {
+        const request = command === 'apply_adjustments' ? args?.['request'] : null;
+        return (
+          typeof request === 'object' &&
+          request !== null &&
+          Reflect.get(request, 'computeWaveform') === false &&
+          typeof Reflect.get(request, 'previewOperationIdentity') === 'object'
+        );
+      })
+    );
+  });
+  if ((await analyticsHeader.locator('[data-testid$="-analytics-header-histogram"]').count()) !== 1) {
+    throw new Error('Closed advanced drawer did not publish one authoritative histogram.');
+  }
+  if ((await analyticsHeader.locator('[data-scope-mode]').count()) !== 0) {
+    throw new Error('Advanced scope modes leaked into the default histogram surface.');
+  }
+  if ((await analyticsHeader.locator('[data-testid$="-analytics-header-metadata"]').textContent())?.trim() === '') {
+    throw new Error('Histogram header omitted its compact photo metadata.');
+  }
+  const editStateBefore = await page.evaluate(async () => {
+    const module = await import('/src/store/useEditorStore.ts');
+    const state = module.useEditorStore.getState();
+    return { historyIndex: state.historyIndex, revision: state.adjustmentRevision };
+  });
+  const shadowClipping = analyticsHeader.locator('[data-testid$="-shadow-clipping-toggle"]');
+  const clippingPressedBefore = await shadowClipping.getAttribute('aria-pressed');
+  await shadowClipping.press('Enter');
+  if ((await shadowClipping.getAttribute('aria-pressed')) === clippingPressedBefore) {
+    throw new Error('Keyboard did not toggle the histogram clipping view state.');
+  }
+  await shadowClipping.click();
+  const viewStateProof = await page.evaluate(async () => {
+    const module = await import('/src/store/useEditorStore.ts');
+    const state = module.useEditorStore.getState();
+    const header = document.querySelector('[data-testid$="-analytics-header"]');
+    const clipping = header?.querySelector<HTMLButtonElement>('[data-testid$="-shadow-clipping-toggle"]');
+    return {
+      histogramFreshness: header?.getAttribute('data-preview-histogram-freshness'),
+      historyIndex: state.historyIndex,
+      pressedAfterKeyboardAndPointer: clipping?.getAttribute('aria-pressed'),
+      revision: state.adjustmentRevision,
+      state: header?.getAttribute('data-state'),
+    };
+  });
+  if (
+    viewStateProof.histogramFreshness !== 'current' ||
+    viewStateProof.historyIndex !== editStateBefore.historyIndex ||
+    viewStateProof.pressedAfterKeyboardAndPointer !== clippingPressedBefore ||
+    viewStateProof.revision !== editStateBefore.revision ||
+    viewStateProof.state !== 'histogram'
+  ) {
+    throw new Error(`Default histogram interaction proof failed: ${JSON.stringify(viewStateProof)}`);
+  }
+
   await page.locator('[data-testid$="-analytics-header-expand-toggle"]').first().click();
   await page.locator('[data-testid$="-analytics-header-recover-scopes"]').evaluateAll((buttons) => {
     const recover = buttons[0];
@@ -287,7 +349,6 @@ async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void
     );
   }
 
-  const analyticsHeader = page.locator('[data-testid$="-analytics-header"]').first();
   for (const mode of ['luma', 'rgb', 'parade', 'vectorscope', 'histogram']) {
     await page.locator(`[data-testid$="-analytics-header-mode-${mode}"]`).first().click();
     if ((await status.getAttribute('data-preview-scope-ready')) !== 'true') {

@@ -4614,6 +4614,35 @@ export default interface Resources {
           mode: 'Scope mode';
           resetHeight: 'Reset scope height';
         };
+        header: {
+          advancedScopes: 'Scopes';
+          dimensions: '{{width}} × {{height}}';
+          highlights: 'Highlights';
+          histogramLabel: 'Current photo RGB histogram';
+          openOutput: 'Open output controls';
+          photo: 'Photo';
+          proofOff: 'Proof off';
+          proofOn: 'Proof on: {{coverage}}';
+          region: 'Photo histogram and metadata';
+          resizeAdvanced: 'Resize advanced scopes';
+          retry: 'Retry histogram';
+          shadows: 'Shadows';
+          states: {
+            current: 'Histogram current';
+            degraded: 'Updating histogram for this photo';
+            empty: 'Select a photo to view its histogram';
+            error: 'Histogram could not be loaded';
+            loading: 'Building histogram…';
+            unavailable: 'Histogram unavailable for this preview';
+          };
+          zones: {
+            blacks: 'Blacks';
+            exposure: 'Exposure';
+            highlights: 'Highlights';
+            shadows: 'Shadows';
+            whites: 'Whites';
+          };
+        };
         scopeStatus: {
           pending: 'Scopes pending';
           ready: 'Scopes ready';

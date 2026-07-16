@@ -1,6 +1,6 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { AlertOctagon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PreviewScopeStatus } from '../../../store/useEditorStore';
 import { DisplayMode } from '../../../utils/adjustments';
@@ -50,12 +50,29 @@ interface Particle {
 interface HistogramChannel {
   color: string;
   data: Array<number>;
-  key: 'red' | 'green' | 'blue';
+  key: 'blue' | 'green' | 'luma' | 'red';
 }
 
-interface HistogramClippingSummary {
+export interface HistogramClippingSummary {
   highlightPercent: number;
   shadowPercent: number;
+}
+
+export interface HistogramHoverSample {
+  bin: number;
+  bluePercent: number;
+  greenPercent: number;
+  lumaPercent: number;
+  redPercent: number;
+  zone: 'blacks' | 'exposure' | 'highlights' | 'shadows' | 'whites';
+}
+
+interface HistogramViewProps {
+  histogram: ChannelConfig | null | undefined;
+  interactive?: boolean;
+  onHoverSample?: (sample: HistogramHoverSample | null) => void;
+  showClippingReadouts?: boolean;
+  testId?: string;
 }
 
 const modeButtons: ReadonlyArray<ModeButton> = [
@@ -96,18 +113,28 @@ const modeButtons: ReadonlyArray<ModeButton> = [
   },
 ] as const;
 
-const getHistogramChannelData = (channel: unknown): Array<number> => {
-  if (Array.isArray(channel)) return channel.filter((value): value is number => typeof value === 'number');
+export const getHistogramChannelData = (channel: unknown): Array<number> => {
+  if (Array.isArray(channel)) {
+    return channel.map((value) => (typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0));
+  }
   if (typeof channel === 'object' && channel !== null && 'data' in channel) {
     const { data } = channel as { data?: unknown };
-    if (Array.isArray(data)) return data.filter((value): value is number => typeof value === 'number');
+    if (Array.isArray(data)) {
+      return data.map((value) => (typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0));
+    }
   }
   return [];
 };
 
-const getHistogramClippingSummary = (channels: ReadonlyArray<HistogramChannel>): HistogramClippingSummary => {
+export const getHistogramClippingSummary = (histogram: ChannelConfig | null | undefined): HistogramClippingSummary => {
   let highlightPercent = 0;
   let shadowPercent = 0;
+
+  const channels: ReadonlyArray<HistogramChannel> = [
+    { key: 'red', color: '#ff625f', data: getHistogramChannelData(histogram?.red) },
+    { key: 'green', color: '#66d17a', data: getHistogramChannelData(histogram?.green) },
+    { key: 'blue', color: '#5c91ff', data: getHistogramChannelData(histogram?.blue) },
+  ];
 
   for (const channel of channels) {
     const total = channel.data.reduce((sum, value) => sum + Math.max(value, 0), 0);
@@ -122,44 +149,138 @@ const getHistogramClippingSummary = (channels: ReadonlyArray<HistogramChannel>):
   return { highlightPercent, shadowPercent };
 };
 
-const formatClipPercent = (value: number): string => {
+export const formatClipPercent = (value: number): string => {
   if (value > 0 && value < 0.1) return '<0.1%';
   return `${value.toFixed(1)}%`;
 };
 
-const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefined }) => {
+const zoneForBin = (bin: number): HistogramHoverSample['zone'] => {
+  if (bin < 26) return 'blacks';
+  if (bin < 77) return 'shadows';
+  if (bin < 179) return 'exposure';
+  if (bin < 230) return 'highlights';
+  return 'whites';
+};
+
+export const sampleHistogram = (
+  histogram: ChannelConfig | null | undefined,
+  requestedBin: number,
+): HistogramHoverSample | null => {
+  const red = getHistogramChannelData(histogram?.red);
+  const green = getHistogramChannelData(histogram?.green);
+  const blue = getHistogramChannelData(histogram?.blue);
+  const luma = getHistogramChannelData(histogram?.luma);
+  const binCount = Math.min(red.length, green.length, blue.length, luma.length);
+  if (binCount === 0) return null;
+
+  const bin = Math.min(binCount - 1, Math.max(0, Math.round(requestedBin)));
+  const peak = Math.max(...red, ...green, ...blue, ...luma, 1);
+  const asPercent = (data: number[]) => (Math.max(0, data[bin] ?? 0) / peak) * 100;
+  return {
+    bin,
+    bluePercent: asPercent(blue),
+    greenPercent: asPercent(green),
+    lumaPercent: asPercent(luma),
+    redPercent: asPercent(red),
+    zone: zoneForBin(Math.round((bin / Math.max(1, binCount - 1)) * 255)),
+  };
+};
+
+export const HistogramView = ({
+  histogram,
+  interactive = false,
+  onHoverSample,
+  showClippingReadouts = true,
+  testId = 'histogram-clipping-readouts',
+}: HistogramViewProps) => {
   const { t } = useTranslation();
   const redData = getHistogramChannelData(histogram?.red);
   const greenData = getHistogramChannelData(histogram?.green);
   const blueData = getHistogramChannelData(histogram?.blue);
+  const lumaData = getHistogramChannelData(histogram?.luma);
+  const [keyboardBin, setKeyboardBin] = useState<number | null>(null);
 
-  if (redData.length === 0 || greenData.length === 0 || blueData.length === 0) return null;
+  if (redData.length === 0 || greenData.length === 0 || blueData.length === 0 || lumaData.length === 0) return null;
 
   const redMax = Math.max(...redData);
   const greenMax = Math.max(...greenData);
   const blueMax = Math.max(...blueData);
-  const globalMax = Math.max(redMax, greenMax, blueMax, 1);
+  const lumaMax = Math.max(...lumaData);
+  const globalMax = Math.max(redMax, greenMax, blueMax, lumaMax, 1);
 
   const getFill = (data: number[]) => {
-    const pathData = data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L');
+    const denominator = Math.max(1, data.length - 1);
+    const pathData = data.map((val, i) => `${(i / denominator) * 255},${255 - (val / globalMax) * 255}`).join(' L');
     return `M0,255 L${pathData} L255,255 Z`;
   };
 
   const getLine = (data: number[]) => {
-    return `M${data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L')}`;
+    const denominator = Math.max(1, data.length - 1);
+    return `M${data.map((val, i) => `${(i / denominator) * 255},${255 - (val / globalMax) * 255}`).join(' L')}`;
   };
 
   const channels: Array<HistogramChannel> = [
-    { key: 'red', color: '#FF6B6B', data: redData },
-    { key: 'green', color: '#6BCB77', data: greenData },
-    { key: 'blue', color: '#4D96FF', data: blueData },
+    { key: 'luma', color: '#d8dde5', data: lumaData },
+    { key: 'red', color: '#ff625f', data: redData },
+    { key: 'green', color: '#66d17a', data: greenData },
+    { key: 'blue', color: '#5c91ff', data: blueData },
   ];
-  const clippingSummary = getHistogramClippingSummary(channels);
+  const clippingSummary = getHistogramClippingSummary(histogram);
   const shadowClipLabel = formatClipPercent(clippingSummary.shadowPercent);
   const highlightClipLabel = formatClipPercent(clippingSummary.highlightPercent);
 
+  const publishSample = (bin: number | null) => {
+    onHoverSample?.(bin === null ? null : sampleHistogram(histogram, bin));
+  };
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!interactive) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = bounds.width <= 0 ? 0 : (event.clientX - bounds.left) / bounds.width;
+    publishSample(position * (Math.min(redData.length, greenData.length, blueData.length, lumaData.length) - 1));
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!interactive) return;
+    const lastBin = Math.min(redData.length, greenData.length, blueData.length, lumaData.length) - 1;
+    const step = event.shiftKey ? 16 : 1;
+    const current = keyboardBin ?? Math.round(lastBin / 2);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? lastBin
+          : event.key === 'ArrowLeft'
+            ? Math.max(0, current - step)
+            : event.key === 'ArrowRight'
+              ? Math.min(lastBin, current + step)
+              : null;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setKeyboardBin(null);
+      publishSample(null);
+      return;
+    }
+    if (next === null) return;
+    event.preventDefault();
+    setKeyboardBin(next);
+    publishSample(next);
+  };
+
   return (
-    <div className="relative h-full w-full" data-testid="histogram-clipping-readouts">
+    <div
+      aria-label={t('ui.waveform.header.histogramLabel', { defaultValue: 'Current photo RGB histogram' })}
+      className="relative h-full w-full overflow-hidden"
+      data-histogram-bin-count={Math.min(redData.length, greenData.length, blueData.length, lumaData.length)}
+      data-testid={testId}
+      onBlur={() => {
+        setKeyboardBin(null);
+        publishSample(null);
+      }}
+      onKeyDown={handleKeyDown}
+      onPointerLeave={() => publishSample(null)}
+      onPointerMove={handlePointerMove}
+      role="img"
+      tabIndex={interactive ? 0 : undefined}
+    >
       <svg
         viewBox="0 0 255 255"
         className="w-full h-full overflow-visible pointer-events-none"
@@ -168,14 +289,14 @@ const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefi
         {channels.map((ch) => {
           if (ch.data.length === 0) return null;
           return (
-            <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
-              <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />
+            <g key={ch.key} style={{ mixBlendMode: ch.key === 'luma' ? 'normal' : 'screen' }}>
+              <path d={getFill(ch.data)} fill={ch.color} fillOpacity={ch.key === 'luma' ? 0.16 : 0.34} />
               <path
                 d={getLine(ch.data)}
                 fill="none"
                 stroke={ch.color}
-                strokeWidth={1.5}
-                strokeOpacity={1.8}
+                strokeWidth={ch.key === 'luma' ? 1 : 1.2}
+                strokeOpacity={ch.key === 'luma' ? 0.72 : 0.92}
                 vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
               />
@@ -183,92 +304,24 @@ const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefi
           );
         })}
       </svg>
-      <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-        <span
-          className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
-          data-shadow-clipping={shadowClipLabel}
-        >
-          {t('ui.waveform.clippingReadouts.shadows', { value: shadowClipLabel })}
-        </span>
-        <span
-          className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
-          data-highlight-clipping={highlightClipLabel}
-        >
-          {t('ui.waveform.clippingReadouts.highlights', { value: highlightClipLabel })}
-        </span>
-      </div>
+      {showClippingReadouts && (
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
+          <span
+            className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+            data-shadow-clipping={shadowClipLabel}
+          >
+            {t('ui.waveform.clippingReadouts.shadows', { value: shadowClipLabel })}
+          </span>
+          <span
+            className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+            data-highlight-clipping={highlightClipLabel}
+          >
+            {t('ui.waveform.clippingReadouts.highlights', { value: highlightClipLabel })}
+          </span>
+        </div>
+      )}
     </div>
   );
-};
-
-const FakeHistogramLoader = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let time = 0;
-    let lastTime = 0;
-
-    const ANIMATION_SPEED = 1.0;
-
-    const render = (currentTime: number) => {
-      if (lastTime === 0) lastTime = currentTime;
-
-      let dt = (currentTime - lastTime) / 1000;
-      lastTime = currentTime;
-
-      if (dt > 0.05) dt = 0.05;
-
-      time += dt * ANIMATION_SPEED;
-
-      ctx.clearRect(0, 0, 256, 256);
-      ctx.globalCompositeOperation = 'screen';
-
-      const drawChannel = (
-        color: string,
-        strokeColor: string,
-        offset: number,
-        amplitude: number,
-        phaseSpeed: number,
-      ) => {
-        ctx.beginPath();
-        ctx.moveTo(0, 256);
-        for (let x = 0; x <= 256; x += 4) {
-          const noise = Math.sin(x * 0.2 + time * phaseSpeed * 2) * 0.5;
-          const wave = Math.sin(x * 0.03 + time * phaseSpeed + offset) * amplitude;
-
-          const baseHeight = 1;
-
-          const y = 256 - baseHeight - Math.max(0, wave + noise);
-          ctx.lineTo(x, y);
-        }
-        ctx.lineTo(256, 256);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      };
-
-      drawChannel('rgba(255, 107, 107, 0.55)', 'rgba(255, 107, 107, 0.3)', 0, 5, 0.8);
-      drawChannel('rgba(107, 203, 119, 0.55)', 'rgba(107, 203, 119, 0.3)', 2, 4, -1.0);
-      drawChannel('rgba(77, 150, 255, 0.55)', 'rgba(77, 150, 255, 0.3)', 4, 6, 0.6);
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    animationFrameId = requestAnimationFrame(render);
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} width={256} height={256} className="w-full h-full opacity-60" />;
 };
 
 const useRawRgbaCanvas = (
@@ -708,7 +761,15 @@ export default function Waveform({
               }}
               className="absolute inset-0 pointer-events-none z-0"
             >
-              {isHistogram ? <FakeHistogramLoader /> : <FakeWaveformLoader mode={displayMode} />}
+              {isHistogram ? (
+                <div
+                  aria-hidden="true"
+                  className="h-full w-full animate-pulse bg-linear-to-b from-white/4 via-white/7 to-transparent"
+                  data-testid="histogram-loading-surface"
+                />
+              ) : (
+                <FakeWaveformLoader mode={displayMode} />
+              )}
             </motion.div>
           ) : null}
         </AnimatePresence>

@@ -4760,6 +4760,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "示波器",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "高光",
+        "histogramLabel": "当前照片 RGB 直方图",
+        "openOutput": "打开输出控制",
+        "photo": "照片",
+        "proofOff": "校样关闭",
+        "proofOn": "校样开启：{{coverage}}",
+        "region": "照片直方图和元数据",
+        "resizeAdvanced": "调整高级示波器大小",
+        "retry": "重试直方图",
+        "shadows": "阴影",
+        "states": {
+          "current": "直方图已更新",
+          "degraded": "正在更新此照片的直方图",
+          "empty": "选择照片以查看直方图",
+          "error": "无法加载直方图",
+          "loading": "正在生成直方图…",
+          "unavailable": "此预览无法使用直方图"
+        },
+        "zones": {
+          "blacks": "黑色色阶",
+          "exposure": "曝光",
+          "highlights": "高光",
+          "shadows": "阴影",
+          "whites": "白色色阶"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

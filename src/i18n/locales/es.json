@@ -4787,6 +4787,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "Monitores",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "Iluminaciones",
+        "histogramLabel": "Histograma RGB de la foto actual",
+        "openOutput": "Abrir controles de salida",
+        "photo": "Foto",
+        "proofOff": "Prueba desactivada",
+        "proofOn": "Prueba activada: {{coverage}}",
+        "region": "Histograma y metadatos de la foto",
+        "resizeAdvanced": "Redimensionar monitores avanzados",
+        "retry": "Reintentar histograma",
+        "shadows": "Sombras",
+        "states": {
+          "current": "Histograma actualizado",
+          "degraded": "Actualizando el histograma de esta foto",
+          "empty": "Selecciona una foto para ver su histograma",
+          "error": "No se pudo cargar el histograma",
+          "loading": "Creando histograma…",
+          "unavailable": "Histograma no disponible para esta previsualización"
+        },
+        "zones": {
+          "blacks": "Negros",
+          "exposure": "Exposición",
+          "highlights": "Iluminaciones",
+          "shadows": "Sombras",
+          "whites": "Blancos"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

@@ -128,6 +128,7 @@ describe('preview request intent adapter', () => {
 
     expect(prepared).not.toBeNull();
     expect(prepared?.delayMs).toBe(75);
+    expect(prepared?.request.computeWaveform).toBe(false);
     expect(scheduled).toEqual([]);
     expect(updates).toEqual([]);
     expect(coordinator.snapshot()).toEqual(before);

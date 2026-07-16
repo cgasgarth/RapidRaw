@@ -4808,6 +4808,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "Scopes",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "Lichter",
+        "histogramLabel": "RGB-Histogramm des aktuellen Fotos",
+        "openOutput": "Ausgabesteuerung öffnen",
+        "photo": "Foto",
+        "proofOff": "Proof aus",
+        "proofOn": "Proof an: {{coverage}}",
+        "region": "Fotohistogramm und Metadaten",
+        "resizeAdvanced": "Erweiterte Scopes skalieren",
+        "retry": "Histogramm erneut laden",
+        "shadows": "Tiefen",
+        "states": {
+          "current": "Histogramm aktuell",
+          "degraded": "Histogramm für dieses Foto wird aktualisiert",
+          "empty": "Foto auswählen, um das Histogramm anzuzeigen",
+          "error": "Histogramm konnte nicht geladen werden",
+          "loading": "Histogramm wird erstellt…",
+          "unavailable": "Histogramm für diese Vorschau nicht verfügbar"
+        },
+        "zones": {
+          "blacks": "Schwarz",
+          "exposure": "Belichtung",
+          "highlights": "Lichter",
+          "shadows": "Tiefen",
+          "whites": "Weiß"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

@@ -4782,6 +4782,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "Moniteurs",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "Hautes lumières",
+        "histogramLabel": "Histogramme RVB de la photo actuelle",
+        "openOutput": "Ouvrir les contrôles de sortie",
+        "photo": "Photo",
+        "proofOff": "Épreuvage désactivé",
+        "proofOn": "Épreuvage activé : {{coverage}}",
+        "region": "Histogramme et métadonnées de la photo",
+        "resizeAdvanced": "Redimensionner les moniteurs avancés",
+        "retry": "Réessayer l’histogramme",
+        "shadows": "Ombres",
+        "states": {
+          "current": "Histogramme à jour",
+          "degraded": "Mise à jour de l’histogramme de cette photo",
+          "empty": "Sélectionnez une photo pour afficher son histogramme",
+          "error": "Impossible de charger l’histogramme",
+          "loading": "Création de l’histogramme…",
+          "unavailable": "Histogramme indisponible pour cet aperçu"
+        },
+        "zones": {
+          "blacks": "Noirs",
+          "exposure": "Exposition",
+          "highlights": "Hautes lumières",
+          "shadows": "Ombres",
+          "whites": "Blancs"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",
