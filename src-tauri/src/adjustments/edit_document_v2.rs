@@ -199,13 +199,7 @@ struct SceneGlobalColorToneParamsV2 {
     contrast: f64,
     exposure: f64,
     highlights: f64,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    hue: Option<f64>,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    saturation: Option<f64>,
     shadows: f64,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    vibrance: Option<f64>,
     whites: f64,
 }
 
@@ -264,16 +258,7 @@ impl SceneGlobalColorToneParamsV2 {
         validate_scene_tone_parameter("contrast", self.contrast, -100.0, 100.0)?;
         validate_scene_tone_parameter("exposure", self.exposure, -5.0, 5.0)?;
         validate_scene_tone_parameter("highlights", self.highlights, -100.0, 100.0)?;
-        if let Some(hue) = self.hue {
-            validate_scene_tone_parameter("hue", hue, -180.0, 180.0)?;
-        }
-        if let Some(saturation) = self.saturation {
-            validate_scene_tone_parameter("saturation", saturation, -100.0, 100.0)?;
-        }
         validate_scene_tone_parameter("shadows", self.shadows, -100.0, 100.0)?;
-        if let Some(vibrance) = self.vibrance {
-            validate_scene_tone_parameter("vibrance", vibrance, -100.0, 100.0)?;
-        }
         validate_scene_tone_parameter("whites", self.whites, -100.0, 100.0)?;
         Ok(())
     }
@@ -3760,20 +3745,6 @@ impl EditDocumentV2 {
             ));
         }
         self.nodes.validate()?;
-        if self.nodes.scene_global_color_tone.params.hue.is_some()
-            || self
-                .nodes
-                .scene_global_color_tone
-                .params
-                .saturation
-                .is_some()
-            || self.nodes.scene_global_color_tone.params.vibrance.is_some()
-        {
-            return Err(
-                "EditDocumentV2 color_presence conflicts with legacy scene-global Color Presence fields"
-                    .to_string(),
-            );
-        }
         if self.nodes.geometry.params != self.geometry {
             return Err(
                 "EditDocumentV2 geometry domain disagrees with its node params".to_string(),
@@ -5638,12 +5609,8 @@ mod tests {
     }
 
     #[test]
-    fn color_presence_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
+    fn color_presence_compiler_drives_native_pixel_output_and_rejects_stale_ownership() {
         let mut value = current_document();
-        value["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
         value["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -5674,13 +5641,9 @@ mod tests {
         mixed_authority["nodes"]["scene_global_color_tone"]["params"]["saturation"] = json!(0);
         let error = compile_test_document(mixed_authority)
             .expect_err("mixed Color Presence ownership must fail");
-        assert!(error.contains("conflicts with legacy scene-global"));
+        assert!(error.contains("unknown field `saturation`"));
 
         let mut invalid_hue = current_document();
-        invalid_hue["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
         invalid_hue["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -5692,10 +5655,6 @@ mod tests {
         assert!(error.contains("field 'hue'"));
 
         let mut invalid_vibrance = current_document();
-        invalid_vibrance["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
         invalid_vibrance["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,

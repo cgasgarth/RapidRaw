@@ -557,7 +557,7 @@ pub(crate) fn resolve_loaded_image_for_current_document(
         adjustments,
     );
     let technical_plans = RawTechnicalPlansV1 {
-        white_balance: adjustments.technical_white_balance_plan().ok(),
+        white_balance: Some(adjustments.technical_white_balance_plan()?),
         camera_profile: camera_profile_selection_from_current_document(adjustments).map(
             |mut selection| {
                 selection.managed_root =

@@ -487,22 +487,115 @@ fn render_mapped_crop_preview(
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+    use std::sync::Arc;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     use base64::{Engine as _, engine::general_purpose};
     use image::{GrayImage, ImageFormat, Luma, RgbImage};
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::app_settings::AppSettings;
     use crate::editor::preview_geometry::{PreviewGeometryQuality, PreviewGeometryTarget};
     use crate::image_loader::load_base_image_from_bytes;
+    use crate::render::artifact_identity::tests_support::source as artifact_source;
+
+    fn loaded(image: DynamicImage) -> LoadedImage {
+        LoadedImage {
+            path: "/tmp/current-preview-fixture.dng".to_string(),
+            image: Arc::new(image),
+            is_raw: true,
+            artifact_source: artifact_source("/tmp/current-preview-fixture.dng"),
+        }
+    }
+
+    fn compiled_current(
+        mut update: impl FnMut(&mut Value),
+    ) -> crate::adjustments::edit_document_v2::CompiledCurrentEditDocument {
+        let mut value: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/edit-document/current-neutral-v2.json"
+        ))
+        .unwrap();
+        update(&mut value);
+        serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(value)
+            .unwrap()
+            .compile()
+            .unwrap()
+    }
 
     fn encoded_preview_fixture(image: DynamicImage) -> String {
         let mut bytes = Cursor::new(Vec::new());
         image.write_to(&mut bytes, ImageFormat::Png).unwrap();
         general_purpose::STANDARD.encode(bytes.into_inner())
+    }
+
+    #[test]
+    fn typed_current_preview_geometry_is_zoom_invariant_and_nonblank() {
+        let document = compiled_current(|value| {
+            let geometry = &mut value["nodes"]["geometry"]["params"];
+            geometry["orientationSteps"] = json!(1);
+            geometry["flipHorizontal"] = json!(true);
+            geometry["crop"] = json!({
+                "unit": "normalized", "x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5
+            });
+            value["geometry"] = geometry.clone();
+        });
+        let image = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(120, 80, |x, y| {
+            image::Rgb([0.1 + x as f32 / 240.0, 0.1 + y as f32 / 160.0, 0.2])
+        }));
+        let loaded = loaded(image);
+        let (small, small_scale, small_offset) =
+            generate_current_transformed_preview_cancellable(&loaded, &document, 30, None).unwrap();
+        let (large, large_scale, large_offset) =
+            generate_current_transformed_preview_cancellable(&loaded, &document, 60, None).unwrap();
+
+        assert_eq!(small.dimensions(), (20, 30));
+        assert_eq!(large.dimensions(), (40, 60));
+        assert!((small_scale - 0.5).abs() < 1e-6);
+        assert!((large_scale - 1.0).abs() < 1e-6);
+        assert_eq!(small_offset, large_offset);
+        assert!(small.to_rgb32f().as_raw().iter().any(|value| *value > 0.1));
+        assert!(large.to_rgb32f().as_raw().iter().any(|value| *value > 0.1));
+    }
+
+    #[test]
+    fn typed_current_preview_applies_source_artifact_once() {
+        let mask = GrayImage::from_pixel(20, 20, Luma([128]));
+        let color = RgbImage::from_pixel(20, 20, image::Rgb([255, 0, 0]));
+        let patch = json!({
+            "id": "typed-preview-patch",
+            "invert": false,
+            "isLoading": false,
+            "name": "Typed patch",
+            "patchData": {
+                "mask": encoded_preview_fixture(DynamicImage::ImageLuma8(mask)),
+                "color": encoded_preview_fixture(DynamicImage::ImageRgb8(color))
+            },
+            "prompt": "fixture",
+            "subMasks": [],
+            "visible": true
+        });
+        let document = compiled_current(|value| {
+            let artifacts = json!({"aiPatches": [patch.clone()]});
+            value["nodes"]["source_artifacts"]["params"] = artifacts.clone();
+            value["sourceArtifacts"] = artifacts;
+        });
+        let loaded = loaded(DynamicImage::ImageRgb32F(image::ImageBuffer::from_pixel(
+            20,
+            20,
+            image::Rgb([0.1, 0.1, 0.1]),
+        )));
+        let (preview, scale, offset) =
+            generate_current_transformed_preview_cancellable(&loaded, &document, 20, None).unwrap();
+        let preview = preview.to_rgb32f();
+        let center = preview.get_pixel(10, 10);
+
+        assert_eq!(preview.dimensions(), (20, 20));
+        assert_eq!(scale, 1.0);
+        assert_eq!(offset, (0.0, 0.0));
+        assert!((0.53..0.57).contains(&center[0]), "red={}", center[0]);
+        assert!((0.04..0.06).contains(&center[1]), "green={}", center[1]);
     }
 
     #[test]

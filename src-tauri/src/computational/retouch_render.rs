@@ -17,6 +17,21 @@ pub(crate) struct CurrentRetouchLayer {
     pub(crate) visible: bool,
 }
 
+/// Flat compatibility projection for the legacy adjustment bag. Current
+/// EditDocumentV2 compilation never deserializes or stores this DTO.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyRetouchLayer {
+    #[serde(default = "default_layer_opacity")]
+    opacity: f32,
+    #[serde(default)]
+    retouch_clone_source: Option<CurrentRetouchCloneSource>,
+    #[serde(default)]
+    retouch_remove_source: Option<CurrentRetouchRemoveSource>,
+    #[serde(default = "default_visible")]
+    visible: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct CurrentRetouchCloneSource {
@@ -70,8 +85,16 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
 ) -> Cow<'a, DynamicImage> {
     let layers: Vec<CurrentRetouchLayer> = adjustments
         .get("masks")
-        .and_then(|masks| serde_json::from_value(masks.clone()).ok())
-        .unwrap_or_default();
+        .and_then(|masks| serde_json::from_value::<Vec<LegacyRetouchLayer>>(masks.clone()).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|layer| CurrentRetouchLayer {
+            opacity: layer.opacity,
+            retouch_clone_source: layer.retouch_clone_source,
+            retouch_remove_source: layer.retouch_remove_source,
+            visible: layer.visible,
+        })
+        .collect();
 
     apply_typed_clone_retouch_layers(image, &layers, mask_bitmaps)
 }
