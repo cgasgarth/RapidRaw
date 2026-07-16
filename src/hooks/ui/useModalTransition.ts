@@ -13,7 +13,7 @@ export function useModalTransition(
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    let showTimer: ReturnType<typeof window.setTimeout> | null = null;
+    let showTimer: number | null = null;
 
     const mountTimer = window.setTimeout(() => {
       if (isOpen) {

@@ -405,6 +405,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
       toe_strength: number;
       toe_width: number;
     };
+    process_family: 'c41_color_negative' | 'black_and_white_silver_negative';
     red_weight: number;
     white_point_offset: number;
     white_point: number;
