@@ -205,6 +205,33 @@ impl ComputationalMergeJobRegistry {
         completed_weight: u64,
         app: Option<&AppHandle>,
     ) -> Result<ComputationalMergeProgress, String> {
+        self.publish_progress_with(
+            job_id,
+            stage,
+            completed_units,
+            total_units,
+            completed_weight,
+            |progress| {
+                if let Some(app) = app {
+                    app.emit(COMPUTATIONAL_MERGE_PROGRESS_EVENT, progress)
+                        .map_err(|error| {
+                            format!("computational_merge_progress_emit_failed:{error}")
+                        })?;
+                }
+                Ok(())
+            },
+        )
+    }
+
+    pub(crate) fn publish_progress_with(
+        &self,
+        job_id: &ComputationalMergeJobId,
+        stage: impl Into<String>,
+        completed_units: u64,
+        total_units: u64,
+        completed_weight: u64,
+        publish: impl FnOnce(&ComputationalMergeProgress) -> Result<(), String>,
+    ) -> Result<ComputationalMergeProgress, String> {
         let stage = stage.into();
         let progress = {
             let mut state = self
@@ -235,10 +262,7 @@ impl ComputationalMergeJobRegistry {
             entry.progress.fraction = completed_weight as f32 / entry.progress.total_weight as f32;
             entry.progress.clone()
         };
-        if let Some(app) = app {
-            app.emit(COMPUTATIONAL_MERGE_PROGRESS_EVENT, &progress)
-                .map_err(|error| format!("computational_merge_progress_emit_failed:{error}"))?;
-        }
+        publish(&progress)?;
         Ok(progress)
     }
 
@@ -328,17 +352,6 @@ fn entry_status(
     job_id: &ComputationalMergeJobId,
 ) -> Option<ComputationalMergeJobStatus> {
     state.get(job_id).map(|entry| entry.progress.status)
-}
-
-#[tauri::command]
-pub fn cancel_computational_merge_job(
-    job_id: String,
-    state: tauri::State<'_, crate::app_state::AppState>,
-) -> Result<bool, String> {
-    state
-        .computational()
-        .jobs()
-        .cancel(&ComputationalMergeJobId(job_id))
 }
 
 #[cfg(test)]

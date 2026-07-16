@@ -5,59 +5,11 @@
 //! cancellation so callers cannot publish stale results through an unrelated
 //! singleton slot.
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct OperationId(u64);
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum OperationState {
-    Running,
-    Cancelled,
-    Completed,
-}
-
-#[derive(Default)]
-struct OperationRegistry {
-    next_id: AtomicU64,
-    states: Mutex<HashMap<OperationId, OperationState>>,
-}
-
-impl OperationRegistry {
-    fn begin(&self) -> OperationId {
-        let id = OperationId(self.next_id.fetch_add(1, Ordering::Relaxed) + 1);
-        self.states
-            .lock()
-            .expect("operation registry poisoned")
-            .insert(id, OperationState::Running);
-        id
-    }
-
-    fn transition(&self, id: OperationId, state: OperationState) -> bool {
-        let mut states = self.states.lock().expect("operation registry poisoned");
-        let Some(current) = states.get_mut(&id) else {
-            return false;
-        };
-        if *current != OperationState::Running {
-            return false;
-        }
-        *current = state;
-        true
-    }
-
-    fn is_current(&self, id: OperationId) -> bool {
-        self.states
-            .lock()
-            .expect("operation registry poisoned")
-            .get(&id)
-            == Some(&OperationState::Running)
-    }
-}
+use std::sync::Arc;
 
 pub struct EditorRuntimeService {
     image: Arc<crate::editor::image_service::EditorImageService>,
+    image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
     viewer_sampling: Arc<crate::editor::viewer_sampling_service::ViewerSamplingService>,
 }
 
@@ -65,6 +17,7 @@ impl EditorRuntimeService {
     fn new(cache_budget: Arc<crate::render::native_cache::CacheBudgetCoordinator>) -> Self {
         Self {
             image: Arc::default(),
+            image_open: Arc::default(),
             viewer_sampling: Arc::new(
                 crate::editor::viewer_sampling_service::ViewerSamplingService::new(cache_budget),
             ),
@@ -105,6 +58,10 @@ impl EditorRuntimeService {
         self.viewer_sampling.clear_session();
     }
 
+    pub(crate) fn image_open(&self) -> &Arc<crate::image_open_session::ImageOpenCoordinator> {
+        &self.image_open
+    }
+
     pub(crate) fn clear_viewer_frames(&self) {
         self.viewer_sampling.clear_frames();
     }
@@ -136,23 +93,107 @@ impl EditorRuntimeService {
     }
 }
 
+/// Shared computational-job authority. This is a facade over the maintained
+/// merge registry, not a second scheduler or a parallel operation identity.
 #[derive(Clone, Default)]
 pub struct JobCoordinator {
-    operations: Arc<OperationRegistry>,
+    computational_merge: Arc<crate::merge::computational_job::ComputationalMergeJobRegistry>,
 }
 
 impl JobCoordinator {
-    pub fn begin(&self) -> OperationId {
-        self.operations.begin()
+    pub(crate) fn begin(
+        &self,
+        family: crate::merge::computational_job::ComputationalMergeFamily,
+        stage: impl Into<String>,
+        total_units: u64,
+        total_weight: u64,
+    ) -> Result<crate::merge::computational_job::ComputationalMergeJobHandle, String> {
+        self.computational_merge
+            .begin(family, stage, total_units, total_weight)
     }
-    pub fn cancel(&self, id: OperationId) -> bool {
-        self.operations.transition(id, OperationState::Cancelled)
+
+    pub(crate) fn cancel(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+    ) -> Result<bool, String> {
+        self.computational_merge.cancel(job_id)
     }
-    pub fn complete(&self, id: OperationId) -> bool {
-        self.operations.transition(id, OperationState::Completed)
+
+    pub(crate) fn cancel_active_family(
+        &self,
+        family: crate::merge::computational_job::ComputationalMergeFamily,
+    ) -> Result<bool, String> {
+        self.computational_merge.cancel_active_family(family)
     }
-    pub fn is_current(&self, id: OperationId) -> bool {
-        self.operations.is_current(id)
+
+    pub(crate) fn publish_progress(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+        stage: impl Into<String>,
+        completed_units: u64,
+        total_units: u64,
+        completed_weight: u64,
+        app: Option<&tauri::AppHandle>,
+    ) -> Result<crate::merge::computational_job::ComputationalMergeProgress, String> {
+        self.computational_merge.publish_progress(
+            job_id,
+            stage,
+            completed_units,
+            total_units,
+            completed_weight,
+            app,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn publish_progress_with(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+        stage: impl Into<String>,
+        completed_units: u64,
+        total_units: u64,
+        completed_weight: u64,
+        publish: impl FnOnce(
+            &crate::merge::computational_job::ComputationalMergeProgress,
+        ) -> Result<(), String>,
+    ) -> Result<crate::merge::computational_job::ComputationalMergeProgress, String> {
+        self.computational_merge.publish_progress_with(
+            job_id,
+            stage,
+            completed_units,
+            total_units,
+            completed_weight,
+            publish,
+        )
+    }
+
+    pub(crate) fn finish(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+    ) -> Result<bool, String> {
+        self.computational_merge.finish(job_id)
+    }
+
+    pub(crate) fn fail(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+    ) -> Result<bool, String> {
+        self.computational_merge.fail(job_id)
+    }
+
+    pub(crate) fn settle<T>(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+        result: Result<T, String>,
+    ) -> Result<T, String> {
+        self.computational_merge.settle(job_id, result)
+    }
+
+    pub(crate) fn progress(
+        &self,
+        job_id: &crate::merge::computational_job::ComputationalMergeJobId,
+    ) -> Option<crate::merge::computational_job::ComputationalMergeProgress> {
+        self.computational_merge.progress(job_id)
     }
 }
 
@@ -163,7 +204,7 @@ pub struct AppServices {
         Arc<crate::app::display_profile_service::DisplayProfileRuntimeService>,
     pub(crate) startup: Arc<crate::app::startup::StartupRuntimeService>,
     pub(crate) startup_files: Arc<crate::app::startup_file_handoff::StartupFileHandoffService>,
-    computational: crate::computational::runtime_services::ComputationalRuntimeServices,
+    computational: Arc<crate::computational::runtime_services::ComputationalRuntimeService>,
     pub(crate) payload_residency:
         Arc<crate::color::payload_residency_service::PayloadResidencyService>,
     gpu: crate::gpu::runtime_services::GpuRuntimeServices,
@@ -175,8 +216,6 @@ pub struct AppServices {
     #[cfg(feature = "ai")]
     pub(crate) ai: Arc<crate::ai::runtime_service::AiRuntimeService>,
     pub(crate) source_fingerprints: Arc<crate::source_revision::FingerprintCache>,
-    pub(crate) image_open: Arc<crate::image_open_session::ImageOpenCoordinator>,
-    pub jobs: Arc<JobCoordinator>,
 }
 
 impl AppServices {
@@ -188,12 +227,15 @@ impl AppServices {
             Arc::clone(&cache_budget),
         ));
         crate::patch_assets::initialize_patch_asset_cache(Arc::clone(&cache_budget));
+        let jobs = Arc::new(JobCoordinator::default());
         Self {
             editor: Arc::new(EditorRuntimeService::new(Arc::clone(&cache_budget))),
             display_profile: Arc::default(),
             startup: Arc::default(),
             startup_files: Arc::default(),
-            computational: Default::default(),
+            computational: Arc::new(
+                crate::computational::runtime_services::ComputationalRuntimeService::new(jobs),
+            ),
             payload_residency: Arc::default(),
             gpu: Default::default(),
             lens_database: Arc::default(),
@@ -204,8 +246,6 @@ impl AppServices {
             #[cfg(feature = "ai")]
             ai,
             source_fingerprints: Arc::new(crate::source_revision::FingerprintCache::new(64)),
-            image_open: Arc::default(),
-            jobs: Arc::default(),
         }
     }
 
@@ -219,7 +259,7 @@ impl AppServices {
 
     pub(crate) fn computational(
         &self,
-    ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {
+    ) -> &Arc<crate::computational::runtime_services::ComputationalRuntimeService> {
         &self.computational
     }
 
@@ -256,6 +296,7 @@ mod tests {
     use image::{DynamicImage, ImageBuffer};
     use std::sync::Barrier;
     use std::thread;
+    use std::time::Duration;
 
     fn editor_service() -> EditorRuntimeService {
         EditorRuntimeService::new(crate::render::native_cache::CacheBudgetCoordinator::new(
@@ -341,21 +382,109 @@ mod tests {
     }
 
     #[test]
-    fn registry_is_safe_for_concurrent_begin_and_cancel() {
+    fn job_coordinator_is_safe_for_concurrent_begin_and_cancel() {
         let service = Arc::new(JobCoordinator::default());
         let handles: Vec<_> = (0..8)
             .map(|_| {
                 let service = Arc::clone(&service);
                 thread::spawn(move || {
-                    let id = service.begin();
-                    assert!(service.cancel(id));
-                    assert!(!service.is_current(id));
+                    let job = service
+                        .begin(ComputationalMergeFamily::FocusStack, "tiles", 1, 1)
+                        .unwrap();
+                    assert!(service.cancel(&job.job_id).unwrap());
+                    assert!(job.cancellation_token.checkpoint().is_err());
+                    assert!(!service.finish(&job.job_id).unwrap());
                 })
             })
             .collect();
         for handle in handles {
             handle.join().unwrap();
         }
+    }
+
+    #[test]
+    fn progress_event_boundary_releases_the_job_lock_before_external_work() {
+        let service = Arc::new(JobCoordinator::default());
+        let job = service
+            .begin(ComputationalMergeFamily::Hdr, "decode", 2, 2)
+            .unwrap();
+        let job_id = job.job_id.clone();
+        let artifact = tempfile::NamedTempFile::new().unwrap();
+        let artifact_path = artifact.path().to_path_buf();
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let publisher = {
+            let service = Arc::clone(&service);
+            thread::spawn(move || {
+                service.publish_progress_with(&job_id, "merge", 1, 2, 1, |_| {
+                    std::fs::write(&artifact_path, b"event-payload")
+                        .map_err(|error| error.to_string())?;
+                    entered_tx.send(()).map_err(|error| error.to_string())?;
+                    release_rx
+                        .recv_timeout(Duration::from_secs(5))
+                        .map_err(|error| error.to_string())?;
+                    Ok(())
+                })
+            })
+        };
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+
+        let (cancel_tx, cancel_rx) = std::sync::mpsc::channel();
+        let cancel = {
+            let service = Arc::clone(&service);
+            let job_id = job.job_id.clone();
+            thread::spawn(move || cancel_tx.send(service.cancel(&job_id)).unwrap())
+        };
+        let cancelled_while_callback_waited = cancel_rx.recv_timeout(Duration::from_secs(5));
+        release_tx.send(()).unwrap();
+        cancel.join().unwrap();
+        publisher.join().unwrap().unwrap();
+
+        assert!(cancelled_while_callback_waited.unwrap().unwrap());
+        assert!(job.cancellation_token.checkpoint().is_err());
+        assert_eq!(std::fs::read(artifact.path()).unwrap(), b"event-payload");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn operation_handle_holds_no_service_lock_across_io_or_await() {
+        let service = Arc::new(JobCoordinator::default());
+        let job = service
+            .begin(ComputationalMergeFamily::FocusStack, "decode", 1, 1)
+            .unwrap();
+        let job_id = job.job_id.clone();
+        let token = job.cancellation_token.clone();
+        let directory = tempfile::tempdir().unwrap();
+        let artifact = directory.path().join("lease-proof.bin");
+        let entered = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let worker = {
+            let entered = Arc::clone(&entered);
+            let release = Arc::clone(&release);
+            tokio::spawn(async move {
+                std::fs::write(artifact, b"unlocked-io").unwrap();
+                entered.notify_one();
+                release.notified().await;
+                token.checkpoint()
+            })
+        };
+
+        entered.notified().await;
+        let cancellation = {
+            let service = Arc::clone(&service);
+            tokio::task::spawn_blocking(move || service.cancel(&job_id))
+        };
+        assert!(
+            tokio::time::timeout(Duration::from_secs(5), cancellation)
+                .await
+                .expect("cancellation must not wait for external I/O/await")
+                .unwrap()
+                .unwrap()
+        );
+        release.notify_one();
+        assert_eq!(
+            worker.await.unwrap(),
+            Err("computational_merge_cancelled".to_string())
+        );
     }
 
     #[test]

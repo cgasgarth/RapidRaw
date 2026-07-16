@@ -324,9 +324,9 @@ fn find_replay(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::services::JobCoordinator;
     use crate::merge::{
-        computational_job::{ComputationalMergeFamily, ComputationalMergeJobRegistry},
-        derived_output_provenance::stable_hash,
+        computational_job::ComputationalMergeFamily, derived_output_provenance::stable_hash,
     };
     use image::{Rgb, RgbImage};
 
@@ -405,7 +405,7 @@ mod tests {
             paths: paths.clone(),
         };
         let tile_plan = super::super::tiles::plan(160, 96, 2, 256 * 1024 * 1024, 32).unwrap();
-        let registry = ComputationalMergeJobRegistry::default();
+        let registry = JobCoordinator::default();
         let job = registry
             .begin(
                 ComputationalMergeFamily::FocusStack,

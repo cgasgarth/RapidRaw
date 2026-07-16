@@ -190,7 +190,7 @@ impl AppState {
 
     pub(crate) fn computational(
         &self,
-    ) -> &crate::computational::runtime_services::ComputationalRuntimeServices {
+    ) -> &std::sync::Arc<crate::computational::runtime_services::ComputationalRuntimeService> {
         self.services.computational()
     }
 

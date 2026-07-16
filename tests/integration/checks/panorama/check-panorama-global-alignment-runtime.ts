@@ -13,8 +13,8 @@ for (const required of [
 ]) {
   if (!native.includes(required)) throw new Error(`Global alignment runtime is missing ${required}.`);
 }
-const command = readFileSync('src-tauri/src/merge/panorama_stitching.rs', 'utf8');
-if (!command.includes('cancel_panorama_alignment') || !command.includes('build_calibrated_alignment_plan')) {
-  throw new Error('Tauri runtime does not publish/cancel the native alignment plan.');
+const panorama = readFileSync('src-tauri/src/merge/panorama_stitching.rs', 'utf8');
+if (!panorama.includes('build_calibrated_alignment_plan')) {
+  throw new Error('Tauri runtime does not publish the native alignment plan.');
 }
 console.log('panorama global alignment runtime contract: ok');

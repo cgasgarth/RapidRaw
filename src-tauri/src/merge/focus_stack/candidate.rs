@@ -9,9 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::merge::{
-    computational_job::{
-        ComputationalMergeCancellationToken, ComputationalMergeJobId, ComputationalMergeJobRegistry,
-    },
+    computational_job::{ComputationalMergeCancellationToken, ComputationalMergeJobId},
     derived_output_provenance::stable_hash,
     tile_runtime::AcceptedTilePlan,
 };
@@ -114,7 +112,7 @@ pub(crate) fn prepare(
     plan: &AcceptedTilePlan,
     job_id: &ComputationalMergeJobId,
     token: &ComputationalMergeCancellationToken,
-    registry: &ComputationalMergeJobRegistry,
+    registry: &crate::app::services::JobCoordinator,
 ) -> Result<CandidateOutput, String> {
     if paths.len() != identity.source_hashes.len() || paths.len() < 2 {
         return Err("focus_candidate_source_identity_mismatch".into());
@@ -334,9 +332,7 @@ pub(crate) fn validate(path: &Path, identity: &AcceptedFocusPlanIdentity) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merge::computational_job::{
-        ComputationalMergeFamily, ComputationalMergeJobRegistry,
-    };
+    use crate::merge::computational_job::ComputationalMergeFamily;
     use image::{Rgb, RgbImage};
 
     fn fixture(dir: &Path, name: &str, offset: u32) -> String {
@@ -384,7 +380,7 @@ mod tests {
         let identity = identity(&paths);
         let plan = super::super::tiles::plan(160, 96, 2, 256 * 1024 * 1024, 32).unwrap();
         assert!(plan.tile_count > 1);
-        let registry = ComputationalMergeJobRegistry::default();
+        let registry = crate::app::services::JobCoordinator::default();
         let first_job = registry
             .begin(
                 ComputationalMergeFamily::FocusStack,
@@ -446,7 +442,7 @@ mod tests {
         ];
         let identity = identity(&paths);
         let plan = super::super::tiles::plan(160, 96, 2, 256 * 1024 * 1024, 32).unwrap();
-        let registry = ComputationalMergeJobRegistry::default();
+        let registry = crate::app::services::JobCoordinator::default();
         let job = registry
             .begin(
                 ComputationalMergeFamily::FocusStack,
