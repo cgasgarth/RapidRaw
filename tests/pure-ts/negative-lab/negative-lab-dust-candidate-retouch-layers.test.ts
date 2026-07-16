@@ -133,8 +133,10 @@ describe('negative lab dust candidate retouch layers', () => {
       sidecar,
     );
     const persistedArtifacts = persistedAdjustments.rawEngineArtifacts;
-    expect(persistedArtifacts?.layerStackSidecars).toHaveLength(1);
-    expect(persistedArtifacts?.layerStackSidecars[0]?.sourceImagePath).toBe(imagePath);
+    const persistedSidecars = persistedArtifacts.layerStackSidecars;
+    if (persistedSidecars === undefined) throw new Error('Expected persisted layer stack sidecars.');
+    expect(persistedSidecars).toHaveLength(1);
+    expect(persistedSidecars[0]?.sourceImagePath).toBe(imagePath);
 
     const reupserted = persistLayerStackSidecarInAdjustments(persistedAdjustments, structuredClone(sidecar));
     expect(reupserted.rawEngineArtifacts?.layerStackSidecars).toHaveLength(1);

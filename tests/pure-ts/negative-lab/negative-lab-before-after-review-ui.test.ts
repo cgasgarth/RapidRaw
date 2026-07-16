@@ -1,8 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
+import type { NegativeLabRuntimeProofV1 } from '../../../packages/rawengine-schema/src';
 import { buildNegativeLabBeforeAfterReviewModel } from '../../../src/components/modals/negative-lab/NegativeConversionModal.tsx';
 
-const proof = {
+type NegativeLabBeforeAfterPreviewProof = NonNullable<
+  NegativeLabRuntimeProofV1['runtimePreview']['beforeAfterPreviewProof']
+>;
+
+const proof: NegativeLabBeforeAfterPreviewProof = {
   acceptedDryRunPlanRequirement: {
     acceptedDryRunPlanHash: 'sha256:negative_lab_dry_run_plan_001',
     dryRunPlanId: 'negative_lab_dry_run_plan_001',
@@ -37,7 +42,7 @@ const proof = {
     storage: 'source_file',
   },
   warningCodes: ['low_acquisition_confidence', 'uneven_illumination'],
-} as const;
+};
 
 describe('Negative Lab before/after review UI model', () => {
   test('maps runtime proof metadata into source and generated-positive review state', () => {

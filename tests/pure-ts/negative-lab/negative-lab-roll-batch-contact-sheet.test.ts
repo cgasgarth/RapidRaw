@@ -25,6 +25,10 @@ const targetPaths = [
   '/roll-batch/frame-003.tif',
   '/roll-batch/frame-004-positive.jpg',
 ];
+const [firstTargetPath, secondTargetPath, thirdTargetPath] = targetPaths;
+if (firstTargetPath === undefined || secondTargetPath === undefined || thirdTargetPath === undefined) {
+  throw new Error('Negative Lab roll fixture must contain three source frames.');
+}
 
 const buildAcceptedFingerprint = ({
   dryRunPlanJson,
@@ -50,7 +54,7 @@ const buildAcceptedFingerprint = ({
 
 describe('negative lab roll batch contact sheet workflow', () => {
   test('honors frame inclusion and health warning sorting before roll apply', () => {
-    const includedPathSet = new Set([targetPaths[0], targetPaths[1], targetPaths[2]]);
+    const includedPathSet = new Set([firstTargetPath, secondTargetPath, thirdTargetPath]);
     const frameHealthReport = buildNegativeLabFrameHealthReport({
       activePathIndex: 0,
       baseFogConfidence: 0.9,
