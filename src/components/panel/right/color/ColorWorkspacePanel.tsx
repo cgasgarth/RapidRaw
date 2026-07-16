@@ -37,7 +37,7 @@ export default function ColorWorkspacePanel() {
   });
   const { adjustments, editDocumentV2, isWbPickerActive, selectedImage, setEditor } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
       editDocumentV2: state.editDocumentV2,
       isWbPickerActive: state.isWbPickerActive,
       selectedImage: state.selectedImage,

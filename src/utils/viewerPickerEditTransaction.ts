@@ -7,7 +7,7 @@ import { applyToneEqualizerPickerSelection, applyToneEqualizerTargetedDelta } fr
 
 export interface ViewerPickerEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly geometryEpoch: number;
   readonly imageSession: { id: string } | null;
   readonly imageSessionId: number;
@@ -92,7 +92,8 @@ export const buildViewerPickerEditTransaction = (
   };
 
   if (command.kind === 'point-color') {
-    if (command.ordinal !== state.adjustments.pointColor.points.length + 1) rejectPicker('stale_point_ordinal');
+    if (command.ordinal !== state.adjustmentSnapshot.value.pointColor.points.length + 1)
+      rejectPicker('stale_point_ordinal');
     const point = buildPointColorPickerPoint(command, createId);
     return {
       ...buildPointColorEditTransaction(
@@ -100,7 +101,7 @@ export const buildViewerPickerEditTransaction = (
         identity,
         {
           enabled: true,
-          points: [...state.adjustments.pointColor.points, point],
+          points: [...state.adjustmentSnapshot.value.pointColor.points, point],
           selectedPointId: point.id,
         },
         transactionId,
@@ -109,7 +110,7 @@ export const buildViewerPickerEditTransaction = (
     };
   }
 
-  if (JSON.stringify(command.baseline.toneEqualizer) !== JSON.stringify(state.adjustments.toneEqualizer)) {
+  if (JSON.stringify(command.baseline.toneEqualizer) !== JSON.stringify(state.adjustmentSnapshot.value.toneEqualizer)) {
     rejectPicker('stale_tone_baseline');
   }
   const nextAdjustments =

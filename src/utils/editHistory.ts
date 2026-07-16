@@ -1,4 +1,7 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
+import { editDocumentV2ToLegacyAdjustments } from './editDocumentV2';
+import { sameAdjustmentValue } from './editTransaction';
 
 export interface EditHistoryCheckpoint {
   createdAt: string;
@@ -141,7 +144,8 @@ const ADJUSTMENT_LABELS: Record<string, string> = {
 const formatAdjustmentKey = (key: string): string =>
   ADJUSTMENT_LABELS[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./u, (first) => first.toUpperCase());
 
-const hasChanged = (prev: Adjustments, curr: Adjustments, key: string): boolean => prev[key] !== curr[key];
+const hasChanged = (prev: Adjustments, curr: Adjustments, key: string): boolean =>
+  !sameAdjustmentValue(prev[key], curr[key]);
 
 const pushMaskDiffLabels = (prev: Adjustments, curr: Adjustments, changed: Array<string>): void => {
   const prevMasks = prev.masks;
@@ -224,18 +228,21 @@ export function formatEditHistoryDiffLabel(prev: Adjustments, curr: Adjustments)
 }
 
 export function buildEditHistoryItems(
-  history: Array<Adjustments>,
+  history: Array<EditDocumentV2>,
   checkpoints: Array<EditHistoryCheckpoint>,
-): Array<EditHistoryItem<Adjustments>> {
+): Array<EditHistoryItem<EditDocumentV2>> {
   const checkpointsByIndex = new Map(checkpoints.map((checkpoint) => [checkpoint.historyIndex, checkpoint]));
 
+  const projections = history.map(editDocumentV2ToLegacyAdjustments);
   return history.map((adjustment, historyIndex) => {
     const checkpoint = checkpointsByIndex.get(historyIndex) ?? null;
+    const currentProjection = projections[historyIndex];
+    if (currentProjection === undefined) throw new Error(`edit_history.missing_projection:${String(historyIndex)}`);
     const label =
       checkpoint?.label.trim() ||
       (historyIndex === 0
         ? 'Initial State'
-        : formatEditHistoryDiffLabel(history[historyIndex - 1] ?? adjustment, adjustment));
+        : formatEditHistoryDiffLabel(projections[historyIndex - 1] ?? currentProjection, currentProjection));
 
     return {
       adjustment,

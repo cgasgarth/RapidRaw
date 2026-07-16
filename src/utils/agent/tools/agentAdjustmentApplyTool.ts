@@ -313,7 +313,7 @@ export const dryRunAgentGlobalAdjustments = async (
   if (imagePath === undefined) throw new Error('Cannot dry-run agent basic tone without a selected image.');
 
   const command = buildBasicToneCommandEnvelope(
-    buildRequestedBasicTone(initialState.adjustments, parsedRequest.adjustments),
+    buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
     buildBasicToneImageCommandContext({
       expectedGraphRevision: parsedRequest.expectedGraphRevision,
       imagePath,
@@ -428,7 +428,7 @@ export const applyAgentGlobalAdjustments = async (
     additionalAdjustmentPatch,
     expectedGraphRevision: parsedRequest.expectedGraphRevision,
     operationId: parsedRequest.operationId,
-    requestedAdjustments: buildRequestedBasicTone(initialState.adjustments, parsedRequest.adjustments),
+    requestedAdjustments: buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
     sessionId: parsedRequest.sessionId,
   });
 

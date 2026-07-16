@@ -22,7 +22,6 @@ const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index ===
 
 const seedEditor = () => {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-preview-receipts-current',
     hasRenderedFirstFrame: true,
@@ -32,7 +31,6 @@ const seedEditor = () => {
       [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
       [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
     },
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -46,6 +44,8 @@ const seedEditor = () => {
       width: 6048,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 };
 

@@ -316,11 +316,14 @@ export const applyAgentDetailEffects = async (
   if (commitIdentity === null) throw new Error('Agent detail/effects apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const nextAdjustments = applyDetailEffectsPatchToAdjustments(state.adjustments, parsedRequest.detailEffects);
+  const nextAdjustments = applyDetailEffectsPatchToAdjustments(
+    state.adjustmentSnapshot.value,
+    parsedRequest.detailEffects,
+  );
   const adjustedFields = DETAIL_EFFECTS_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.detailEffects[key] !== undefined &&
-      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const typedMutation =
     adjustedFields.length === 0
@@ -348,7 +351,7 @@ export const applyAgentDetailEffects = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustments,
+      before: state.adjustmentSnapshot.value,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

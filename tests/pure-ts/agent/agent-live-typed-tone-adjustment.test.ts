@@ -18,6 +18,7 @@ import {
   buildAgentToneAdjustmentPromptDraft,
   dryRunAgentToneAdjustment,
 } from '../../../src/utils/agent/tools/agentToneAdjustmentTool';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/agent-tone-adjustment/DSC_4799.ARW';
 
@@ -52,10 +53,9 @@ class DeferredToneAdjustmentBridge extends RawEngineLocalAppServerBridge {
 }
 
 const seedEditor = () => {
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-tone-adjustment-before',
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -69,6 +69,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2,
+    history: [editDocumentV2],
   });
 };
 
@@ -81,7 +83,7 @@ describe('agent live typed basic-tone adjustment', () => {
     const snapshot = buildAgentImageContextSnapshot();
     const draft = buildAgentToneAdjustmentPromptDraft(
       'Brighten the RAW, add contrast, recover highlights, and lift shadows.',
-      useEditorStore.getState().adjustments,
+      useEditorStore.getState().adjustmentSnapshot.value,
     );
     expect(draft.supported).toBe(true);
     if (!draft.supported) throw new Error('Expected a supported basic-tone prompt draft.');
@@ -141,14 +143,14 @@ describe('agent live typed basic-tone adjustment', () => {
     const before = useEditorStore.getState();
     const draft = buildAgentToneAdjustmentPromptDraft(
       'Remove the telephone pole from the background.',
-      before.adjustments,
+      before.adjustmentSnapshot.value,
     );
 
     expect(draft.supported).toBe(false);
     if (draft.supported) throw new Error('Expected an unsupported prompt draft.');
     expect(draft.reason).toContain('Only basic tone prompts');
     expect(useEditorStore.getState().historyIndex).toBe(0);
-    expect(useEditorStore.getState().adjustments).toEqual(before.adjustments);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(before.adjustmentSnapshot.value);
   });
 
   test('rejects accepted tone pixels after an intervening editor revision', async () => {
@@ -188,8 +190,8 @@ describe('agent live typed basic-tone adjustment', () => {
 
     await expect(pending).rejects.toThrow('Editor basic-tone apply rejected stale graph revision.');
     const after = useEditorStore.getState();
-    expect(after.adjustments.vibrance).toBe(4);
-    expect(after.adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(after.adjustmentSnapshot.value.vibrance).toBe(4);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-tone-edit');
   });
 

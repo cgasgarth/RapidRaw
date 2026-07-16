@@ -1,11 +1,12 @@
-import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import { type EditDocumentV2, editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
+import { editDocumentV2ToLegacyAdjustments, legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
 
 export interface AdjustmentSnapshot {
   readonly value: Readonly<Adjustments>;
   readonly editDocumentV2: Readonly<EditDocumentV2>;
-  readonly adjustmentRevision: number;
+  /** Preview-publication identity; the editor's sole edit revision lives in EditorState.adjustmentRevision. */
+  readonly renderRevision: number;
   readonly geometryRevision: number;
   readonly maskRevision: number;
   readonly patchRevision: number;
@@ -17,6 +18,9 @@ const shouldFreezeSnapshots = (): boolean =>
   (globalThis as typeof globalThis & { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !==
   'production';
 
+const isEditDocumentV2 = (value: EditDocumentV2 | Adjustments): value is EditDocumentV2 =>
+  editDocumentV2Schema.safeParse(value).success;
+
 const deepFreezeAdjustmentSnapshot = <T>(value: T, seen = new WeakSet<object>()): T => {
   if (!shouldFreezeSnapshots() || value === null || typeof value !== 'object' || seen.has(value)) return value;
   seen.add(value);
@@ -26,10 +30,16 @@ const deepFreezeAdjustmentSnapshot = <T>(value: T, seen = new WeakSet<object>())
 
 export const publishAdjustmentSnapshot = (
   previous: AdjustmentSnapshot | null,
-  value: Adjustments,
-  editDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(value),
+  documentOrLegacyProjection: EditDocumentV2 | Adjustments,
+  authoritativeDocument?: EditDocumentV2,
 ): AdjustmentSnapshot => {
-  if (previous?.value === value && previous.editDocumentV2 === editDocumentV2) return previous;
+  const editDocumentV2 =
+    authoritativeDocument ??
+    (isEditDocumentV2(documentOrLegacyProjection)
+      ? documentOrLegacyProjection
+      : legacyAdjustmentsToEditDocumentV2(documentOrLegacyProjection));
+  if (previous?.editDocumentV2 === editDocumentV2) return previous;
+  const value = editDocumentV2ToLegacyAdjustments(editDocumentV2);
   const geometryChanged = previous === null || geometryKeys.some((key) => previous.value[key] !== value[key]);
   const maskChanged = previous === null || previous.value.masks !== value.masks;
   const patchChanged = previous === null || previous.value.aiPatches !== value.aiPatches;
@@ -38,7 +48,7 @@ export const publishAdjustmentSnapshot = (
   return Object.freeze({
     value,
     editDocumentV2,
-    adjustmentRevision: (previous?.adjustmentRevision ?? 0) + 1,
+    renderRevision: (previous?.renderRevision ?? 0) + 1,
     geometryRevision: (previous?.geometryRevision ?? 0) + Number(geometryChanged),
     maskRevision: (previous?.maskRevision ?? 0) + Number(maskChanged),
     patchRevision: (previous?.patchRevision ?? 0) + Number(patchChanged),

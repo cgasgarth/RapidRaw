@@ -9,8 +9,8 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
 import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
-import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import type { AiMaskBoxAsyncRequest } from '../../utils/ai/aiMaskBoxAsyncOperations';
+import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
@@ -77,7 +77,12 @@ export function useAiMasking() {
 
   const handleGenerativeReplace = useCallback(
     async (patchId: string, prompt: string, useFastInpaint: boolean) => {
-      const { selectedImage, adjustments, isGeneratingAi, patchResidency } = useEditorStore.getState();
+      const {
+        selectedImage,
+        adjustmentSnapshot: { value: adjustments },
+        isGeneratingAi,
+        patchResidency,
+      } = useEditorStore.getState();
       if (!selectedImage?.path || isGeneratingAi) return;
 
       const patch: AiPatch | undefined = adjustments.aiPatches.find((p: AiPatch) => p.id === patchId);
@@ -188,7 +193,11 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiDepthMask = async (subMaskId: string, parameters: AiDepthMaskParameters) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
+    const {
+      selectedImage,
+      adjustmentSnapshot: { value: adjustments },
+      patchResidency,
+    } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -222,7 +231,11 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiForegroundMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
+    const {
+      selectedImage,
+      adjustmentSnapshot: { value: adjustments },
+      patchResidency,
+    } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -250,7 +263,11 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiWholePersonMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
+    const {
+      selectedImage,
+      adjustmentSnapshot: { value: adjustments },
+      patchResidency,
+    } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -282,7 +299,11 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiPersonPartMask = async (subMaskId: string, part: AiPeopleMaskPart) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
+    const {
+      selectedImage,
+      adjustmentSnapshot: { value: adjustments },
+      patchResidency,
+    } = useEditorStore.getState();
     if (!selectedImage?.path) return;
 
     const capability = getAiPeopleMaskPartCapability(part);
@@ -324,7 +345,11 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiSkyMask = async (subMaskId: string) => {
-    const { selectedImage, adjustments, patchResidency } = useEditorStore.getState();
+    const {
+      selectedImage,
+      adjustmentSnapshot: { value: adjustments },
+      patchResidency,
+    } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -352,7 +377,9 @@ export function useAiMasking() {
   };
 
   useEffect(() => {
-    const { adjustments } = useEditorStore.getState();
+    const {
+      adjustmentSnapshot: { value: adjustments },
+    } = useEditorStore.getState();
     const activeSubMask =
       adjustments.masks.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
       adjustments.aiPatches.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);

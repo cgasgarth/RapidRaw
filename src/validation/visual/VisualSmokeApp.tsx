@@ -412,7 +412,7 @@ function useAdjustmentPanelSmokeState() {
       },
     };
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
       copiedSectionAdjustments: {
         section: 'basic',
         values: {
@@ -422,7 +422,7 @@ function useAdjustmentPanelSmokeState() {
         },
       },
       histogram: null,
-      history: [adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
       historyIndex: 0,
       isWaveformVisible: false,
       previewScopeStatus: null,
@@ -1242,7 +1242,7 @@ function useProfessionalEditorToolbarSmokeState() {
       osPlatform: 'macos',
     });
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: masks,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(crop),
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
@@ -1255,7 +1255,7 @@ function useProfessionalEditorToolbarSmokeState() {
         transformApplied: true,
         transformPolicyFingerprint: 'sha256:professional-editor-toolbar-smoke',
       },
-      history: [initial, exposure, crop, masks],
+      history: [initial, exposure, crop, masks].map(legacyAdjustmentsToEditDocumentV2),
       historyIndex: 2,
       isExportSoftProofEnabled: true,
       selectedImage: professionalEditorToolbarImage,
@@ -1271,10 +1271,10 @@ function useProfessionalEditorSmokeState() {
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
       displaySize: { height: 540, width: 810 },
       histogram: null,
-      history: [adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
       historyIndex: 0,
       isWaveformVisible: false,
       originalSize: { height: professionalEditorShellImage.height, width: professionalEditorShellImage.width },
@@ -1299,11 +1299,11 @@ function useProfessionalFilmstripContextSmokeState() {
       shadows: 18,
     };
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
       copiedEditDocumentV2: copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2(adjustments)),
       displaySize: { height: 680, width: 1020 },
       histogram: null,
-      history: [adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
       historyIndex: 0,
       isWaveformVisible: false,
       originalSize: {
@@ -1554,10 +1554,12 @@ function useProfessionalEditorStatusChipsSmokeState() {
     };
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform,
       gamutWarningOverlay,
+      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      historyIndex: 0,
       isExportSoftProofEnabled: true,
       previewScopeStatus: {
         displayTransformLabel: 'Display P3',
@@ -2638,7 +2640,7 @@ const cropTransformSmokeImage: SelectedImage = {
 };
 
 function ProfessionalCropTransformWorkspaceVisualSmoke() {
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const overlayMode = useEditorStore((state) => state.overlayMode);
   const overlayRotation = useEditorStore((state) => state.overlayRotation);
   const isStraightenActive = useEditorStore((state) => state.isStraightenActive);
@@ -2666,11 +2668,11 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
     };
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: nextAdjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(nextAdjustments),
       displaySize: { height: 405, width: 720 },
       finalPreviewUrl: brushMaskCanvasImageDataUrl,
       hasRenderedFirstFrame: true,
-      history: [nextAdjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(nextAdjustments)],
       historyIndex: 0,
       isRotationActive: false,
       isStraightenActive: false,
@@ -3141,9 +3143,9 @@ function WorkflowRailVisualSmoke() {
   useEffect(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
       histogram: null,
-      history: [adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
       historyIndex: 0,
       isWaveformVisible: false,
       previewScopeStatus: null,
@@ -3376,7 +3378,7 @@ function AgentChatVisualSmoke() {
       sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
     });
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: INITIAL_ADJUSTMENTS,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
       finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
       hasRenderedFirstFrame: true,
       histogram: {
@@ -3385,7 +3387,7 @@ function AgentChatVisualSmoke() {
         [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
         [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
       },
-      history: [INITIAL_ADJUSTMENTS],
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)],
       historyIndex: 0,
       selectedImage: {
         exif: { ISO: '400', LensModel: 'FE 35mm F1.4 GM' },
@@ -3506,7 +3508,7 @@ function ProfessionalAgentReviewVisualSmoke() {
 function ProfessionalAgentReviewWorkspaceVisualSmoke() {
   useEffect(() => {
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: INITIAL_ADJUSTMENTS,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, exposure: 0.35 }),
       finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
       hasRenderedFirstFrame: true,
       histogram: {
@@ -3515,7 +3517,7 @@ function ProfessionalAgentReviewWorkspaceVisualSmoke() {
         [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
         [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
       },
-      history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.35 }],
+      history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.35 }].map(legacyAdjustmentsToEditDocumentV2),
       historyIndex: 1,
       lastBasicToneCommand: null,
       selectedImage: {
@@ -8072,7 +8074,7 @@ function NegativeLabRealRawPrivateReviewSmoke() {
 
 function FilmEmulationWorkspaceVisualSmoke() {
   const [ready, setReady] = useState(false);
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
@@ -8081,7 +8083,7 @@ function FilmEmulationWorkspaceVisualSmoke() {
     const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustments: initial,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(initial),
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
         colorManagedTransform: 'display-p3-preview',
@@ -8094,7 +8096,7 @@ function FilmEmulationWorkspaceVisualSmoke() {
         transformPolicyFingerprint: 'film-workspace-before',
       },
       finalPreviewUrl: 'blob:film-workspace-before',
-      history: [initial],
+      history: [legacyAdjustmentsToEditDocumentV2(initial)],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: null,

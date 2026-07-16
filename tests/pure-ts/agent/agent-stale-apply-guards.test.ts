@@ -27,13 +27,13 @@ import {
   buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../src/utils/agent/tools/agentAdjustmentApplyTool';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/pure-ts/agent-stale-apply-guards/DSC_4845.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-stale-apply-guards-before',
     hasRenderedFirstFrame: true,
@@ -43,7 +43,6 @@ const seedEditor = () => {
       [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
       [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
     },
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -57,6 +56,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 };
 
@@ -149,7 +150,17 @@ describe('agent stale apply guards', () => {
     const historyIndexBeforeApply = useEditorStore.getState().historyIndex;
 
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-      adjustments: { ...state.adjustments, exposure: state.adjustments.exposure + 0.35 },
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2({
+        ...state.adjustmentSnapshot.value,
+        exposure: state.adjustmentSnapshot.value.exposure + 0.35,
+      }),
+      history: [
+        legacyAdjustmentsToEditDocumentV2({
+          ...state.adjustmentSnapshot.value,
+          exposure: state.adjustmentSnapshot.value.exposure + 0.35,
+        }),
+      ],
+      historyIndex: 0,
       uncroppedAdjustedPreviewUrl: null,
     }));
 
@@ -216,15 +227,10 @@ describe('agent stale apply guards', () => {
     expect(
       agentHistoryRollbackRequestSchema.safeParse({
         ...request,
-        checkpoint: { ...checkpoint, editDocumentHistory: [], history: [] },
+        checkpoint: { ...checkpoint, history: [] },
       }).success,
     ).toBe(false);
-    const {
-      editDocumentHistory: _editDocumentHistory,
-      history: _history,
-      historyCheckpoints: _historyCheckpoints,
-      ...flat
-    } = checkpoint;
+    const { history: _history, historyCheckpoints: _historyCheckpoints, ...flat } = checkpoint;
     expect(agentHistoryRollbackRequestSchema.safeParse({ ...request, checkpoint: flat }).success).toBe(false);
   });
 

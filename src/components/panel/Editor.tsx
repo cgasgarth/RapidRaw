@@ -200,7 +200,8 @@ export default function Editor({
   const editorImageSessionGeneration = useEditorStore((s) => s.imageSessionId);
   const maskOverlayImageSessionId =
     editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`;
-  const adjustments = useEditorStore((s) => s.adjustments);
+  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
+  const editDocumentV2 = useEditorStore((s) => s.editDocumentV2);
   const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
@@ -217,7 +218,7 @@ export default function Editor({
     path: selectedImage?.path ?? null,
   });
   const adjustmentGeometryRevision = autoEditRenderSnapshot.geometryRevision;
-  const adjustmentRevision = autoEditRenderSnapshot.adjustmentRevision;
+  const adjustmentRevision = autoEditRenderSnapshot.renderRevision;
   const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
   const renderAdjustments =
     autoEditRenderSnapshot === adjustmentSnapshot
@@ -490,7 +491,7 @@ export default function Editor({
       if (receipt.selectedImagePath !== selectedImage.path) return;
       const preview = applyWhiteBalancePickerHoverPreview(session, command);
       wbPickerPreviewSessionRef.current = preview.session;
-      publishWhiteBalancePickerPreview(preview.adjustments);
+      publishWhiteBalancePickerPreview(preview.editDocumentV2);
     },
     [publishWhiteBalancePickerPreview, selectedImage],
   );
@@ -498,9 +499,9 @@ export default function Editor({
   const handleWbPreviewCancel = useCallback(() => {
     const session = wbPickerPreviewSessionRef.current;
     if (!session?.previewActive || !selectedImage || session.sourceIdentity !== selectedImage.path) return;
-    const baseAdjustments = cancelWhiteBalancePickerPreview(session, selectedImage.path);
+    const baseEditDocumentV2 = cancelWhiteBalancePickerPreview(session, selectedImage.path);
     wbPickerPreviewSessionRef.current = { ...session, lastPreviewIdentity: null, previewActive: false };
-    publishWhiteBalancePickerPreview(baseAdjustments);
+    publishWhiteBalancePickerPreview(baseEditDocumentV2);
   }, [publishWhiteBalancePickerPreview, selectedImage]);
 
   useEffect(() => {
@@ -509,7 +510,7 @@ export default function Editor({
         selectedImage &&
         (!wbPickerPreviewSessionRef.current || wbPickerPreviewSessionRef.current.sourceIdentity !== selectedImage.path)
       ) {
-        wbPickerPreviewSessionRef.current = createWhiteBalancePickerPreviewSession(adjustments, selectedImage.path);
+        wbPickerPreviewSessionRef.current = createWhiteBalancePickerPreviewSession(editDocumentV2, selectedImage.path);
       }
       return;
     }
@@ -518,7 +519,7 @@ export default function Editor({
       publishWhiteBalancePickerPreview(cancelWhiteBalancePickerPreview(session, selectedImage.path));
     }
     wbPickerPreviewSessionRef.current = null;
-  }, [adjustments, isWbPickerActive, publishWhiteBalancePickerPreview, selectedImage]);
+  }, [editDocumentV2, isWbPickerActive, publishWhiteBalancePickerPreview, selectedImage]);
 
   useEffect(() => {
     if (previousFullScreenRef.current === isFullScreen) return;

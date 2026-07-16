@@ -4,7 +4,7 @@ import type { EditTransactionRequest } from './editTransaction';
 
 export interface ToneEqualizerEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'toneEqualizer'>;
+  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'toneEqualizer'> };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -53,7 +53,12 @@ export const buildToneEqualizerEditTransaction = (
     operations: [
       {
         nodeType: 'tone_equalizer',
-        patch: { toneEqualizer: { ...structuredClone(state.adjustments.toneEqualizer), ...structuredClone(patch) } },
+        patch: {
+          toneEqualizer: {
+            ...structuredClone(state.adjustmentSnapshot.value.toneEqualizer),
+            ...structuredClone(patch),
+          },
+        },
         type: 'patch-edit-document-node',
       },
     ],

@@ -37,10 +37,7 @@ test('TypedCurveEditor exposes and commits through the canonical fallback sessio
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
@@ -58,6 +55,7 @@ test('TypedCurveEditor exposes and commits through the canonical fallback sessio
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
   const container = document.createElement('div');
   document.body.append(container);
@@ -78,7 +76,7 @@ test('TypedCurveEditor exposes and commits through the canonical fallback sessio
     channelMode.dispatchEvent(new window.Event('change', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustments.sceneCurveV1?.channelMode).toBe('linked_rgb');
+  expect(useEditorStore.getState().adjustmentSnapshot.value.sceneCurveV1?.channelMode).toBe('linked_rgb');
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:57',
     source: 'manual-control',

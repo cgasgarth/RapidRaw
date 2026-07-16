@@ -74,11 +74,8 @@ describe('crop modal edit transactions', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:crop-modal-before-final',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -91,6 +88,7 @@ describe('crop modal edit transactions', () => {
         url: 'blob:crop-modal-before-navigator',
       },
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -119,12 +117,12 @@ describe('crop modal edit transactions', () => {
 
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'geometry-tool' });
     expect(result.changedKeys).toEqual([
+      'transformAspect',
       'transformDistortion',
-      'transformVertical',
       'transformHorizontal',
       'transformRotate',
-      'transformAspect',
       'transformScale',
+      'transformVertical',
       'transformXOffset',
       'transformYOffset',
     ]);
@@ -138,7 +136,7 @@ describe('crop modal edit transactions', () => {
     expect(after.navigatorPreviewArtifact).toBeNull();
 
     after.undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       exposure: 0.45,
       transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion,
       transformScale: INITIAL_ADJUSTMENTS.transformScale,
@@ -164,16 +162,16 @@ describe('crop modal edit transactions', () => {
   test('keeps an unchanged lens modal apply an exact no-op without invalidating outputs', () => {
     const before = useEditorStore.getState();
     const currentLens: LensModalPatchInput = {
-      lensCorrectionMode: before.adjustments.lensCorrectionMode,
-      lensDistortionAmount: before.adjustments.lensDistortionAmount,
-      lensDistortionEnabled: before.adjustments.lensDistortionEnabled,
-      lensDistortionParams: before.adjustments.lensDistortionParams,
-      lensMaker: before.adjustments.lensMaker,
-      lensModel: before.adjustments.lensModel,
-      lensTcaAmount: before.adjustments.lensTcaAmount,
-      lensTcaEnabled: before.adjustments.lensTcaEnabled,
-      lensVignetteAmount: before.adjustments.lensVignetteAmount,
-      lensVignetteEnabled: before.adjustments.lensVignetteEnabled,
+      lensCorrectionMode: before.adjustmentSnapshot.value.lensCorrectionMode,
+      lensDistortionAmount: before.adjustmentSnapshot.value.lensDistortionAmount,
+      lensDistortionEnabled: before.adjustmentSnapshot.value.lensDistortionEnabled,
+      lensDistortionParams: before.adjustmentSnapshot.value.lensDistortionParams,
+      lensMaker: before.adjustmentSnapshot.value.lensMaker,
+      lensModel: before.adjustmentSnapshot.value.lensModel,
+      lensTcaAmount: before.adjustmentSnapshot.value.lensTcaAmount,
+      lensTcaEnabled: before.adjustmentSnapshot.value.lensTcaEnabled,
+      lensVignetteAmount: before.adjustmentSnapshot.value.lensVignetteAmount,
+      lensVignetteEnabled: before.adjustmentSnapshot.value.lensVignetteEnabled,
     };
     const result = before.applyEditTransaction(
       buildLensModalEditTransaction(before, identity(), currentLens, 'lens-modal-no-op'),
@@ -189,14 +187,14 @@ describe('crop modal edit transactions', () => {
   test('keeps an unchanged transform modal apply an exact no-op', () => {
     const before = useEditorStore.getState();
     const currentTransform = {
-      aspect: before.adjustments.transformAspect,
-      distortion: before.adjustments.transformDistortion,
-      horizontal: before.adjustments.transformHorizontal,
-      rotate: before.adjustments.transformRotate,
-      scale: before.adjustments.transformScale,
-      vertical: before.adjustments.transformVertical,
-      x_offset: before.adjustments.transformXOffset,
-      y_offset: before.adjustments.transformYOffset,
+      aspect: before.adjustmentSnapshot.value.transformAspect,
+      distortion: before.adjustmentSnapshot.value.transformDistortion,
+      horizontal: before.adjustmentSnapshot.value.transformHorizontal,
+      rotate: before.adjustmentSnapshot.value.transformRotate,
+      scale: before.adjustmentSnapshot.value.transformScale,
+      vertical: before.adjustmentSnapshot.value.transformVertical,
+      x_offset: before.adjustmentSnapshot.value.transformXOffset,
+      y_offset: before.adjustmentSnapshot.value.transformYOffset,
     };
     const result = before.applyEditTransaction(
       buildTransformModalEditTransaction(before, identity(), currentTransform, 'transform-modal-no-op'),
@@ -224,7 +222,7 @@ describe('crop modal edit transactions', () => {
       buildLensModalEditTransaction(before, identity({ adjustmentRevision: 1 }), lensInput, 'stale'),
     ).toThrow('crop_modal_transaction.stale_revision');
     expect(isCurrentCropModalEditIdentity(before, identity({ adjustmentRevision: 1 }))).toBe(false);
-    expect(useEditorStore.getState().adjustments).toBe(before.adjustments);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toBe(before.adjustmentSnapshot.value);
     expect(useEditorStore.getState().history).toBe(before.history);
   });
 

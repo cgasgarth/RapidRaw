@@ -20,10 +20,7 @@ const seedStore = () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), masks: [structuredClone(layer)] };
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
-    adjustments,
     finalPreviewUrl: 'blob:mask-tone-current',
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
@@ -36,6 +33,8 @@ const seedStore = () => {
       url: 'blob:navigator-before',
     },
     transformedOriginalUrl: 'blob:original-before',
+    editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
+    history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
   });
 };
 
@@ -54,10 +53,10 @@ beforeEach(seedStore);
 describe('mask Tone Equalizer EditTransaction boundary', () => {
   test('promotes the graph and updates the local layer through one canonical transaction', () => {
     const state = useEditorStore.getState();
-    const currentLayer = state.adjustments.masks[0];
+    const currentLayer = state.adjustmentSnapshot.value.masks[0];
     expect(currentLayer).toBeDefined();
     if (currentLayer === undefined) return;
-    const next = applyMaskContainerAdjustmentCandidate(state.adjustments, currentLayer.id, {
+    const next = applyMaskContainerAdjustmentCandidate(state.adjustmentSnapshot.value, currentLayer.id, {
       ...currentLayer.adjustments,
       toneEqualizer: { ...currentLayer.adjustments.toneEqualizer, enabled: true },
     });
@@ -72,8 +71,8 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
       transactionId: 'mask-tone-enable',
     });
     expect(result.changedKeys).toEqual(['rawEngineEditGraphVersion', 'masks']);
-    expect(committed.adjustments.rawEngineEditGraphVersion).toBe(2);
-    expect(committed.adjustments.masks[0]?.adjustments.toneEqualizer.enabled).toBe(true);
+    expect(committed.adjustmentSnapshot.value.rawEngineEditGraphVersion).toBe(2);
+    expect(committed.adjustmentSnapshot.value.masks[0]?.adjustments.toneEqualizer.enabled).toBe(true);
     expect(committed.adjustmentRevision).toBe(1);
     expect(committed.history).toHaveLength(2);
     expect(committed.historyIndex).toBe(1);
@@ -90,22 +89,22 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
 
   test('an exact repeated local adjustment remains a no-op and unrelated local edits do not promote graph v2', () => {
     const state = useEditorStore.getState();
-    const currentLayer = state.adjustments.masks[0];
+    const currentLayer = state.adjustmentSnapshot.value.masks[0];
     expect(currentLayer).toBeDefined();
     if (currentLayer === undefined) return;
 
     const unchanged = applyMaskContainerAdjustmentCandidate(
-      state.adjustments,
+      state.adjustmentSnapshot.value,
       currentLayer.id,
       currentLayer.adjustments,
     );
-    expect(unchanged).toBe(state.adjustments);
+    expect(unchanged).toBe(state.adjustmentSnapshot.value);
     const noOp = state.applyEditTransaction(transactionFor(unchanged, 'mask-tone-no-op'));
     expect(noOp.noOp).toBe(true);
     expect(useEditorStore.getState().history).toHaveLength(1);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toBeNull();
 
-    const exposureOnly = applyMaskContainerAdjustmentCandidate(state.adjustments, currentLayer.id, {
+    const exposureOnly = applyMaskContainerAdjustmentCandidate(state.adjustmentSnapshot.value, currentLayer.id, {
       ...currentLayer.adjustments,
       exposure: 0.4,
     });
@@ -114,19 +113,19 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
 
   test('rejects a stale tone-equalizer proposal without publishing graph promotion', () => {
     const base = useEditorStore.getState();
-    const currentLayer = base.adjustments.masks[0];
+    const currentLayer = base.adjustmentSnapshot.value.masks[0];
     expect(currentLayer).toBeDefined();
     if (currentLayer === undefined) return;
-    const proposed = applyMaskContainerAdjustmentCandidate(base.adjustments, currentLayer.id, {
+    const proposed = applyMaskContainerAdjustmentCandidate(base.adjustmentSnapshot.value, currentLayer.id, {
       ...currentLayer.adjustments,
       toneEqualizer: { ...currentLayer.adjustments.toneEqualizer, enabled: true },
     });
     const stale = transactionFor(proposed, 'mask-tone-stale');
-    base.applyEditTransaction(transactionFor({ ...base.adjustments, exposure: 0.25 }, 'newer-edit'));
+    base.applyEditTransaction(transactionFor({ ...base.adjustmentSnapshot.value, exposure: 0.25 }, 'newer-edit'));
 
     expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
     const committed = useEditorStore.getState();
-    expect(committed.adjustments.rawEngineEditGraphVersion).toBe(1);
-    expect(committed.adjustments.masks[0]?.adjustments.toneEqualizer.enabled).toBe(false);
+    expect(committed.adjustmentSnapshot.value.rawEngineEditGraphVersion).toBe(1);
+    expect(committed.adjustmentSnapshot.value.masks[0]?.adjustments.toneEqualizer.enabled).toBe(false);
   });
 });

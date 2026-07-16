@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  editDocumentV2ToLegacyAdjustments,
+  legacyAdjustmentsToEditDocumentV2,
+} from '../../../src/utils/editDocumentV2';
 import {
   applyEditorTeardownIfCurrent,
   buildEditorTeardownTransaction,
@@ -28,6 +32,8 @@ const selectedImage = {
 };
 
 describe('editor teardown transaction', () => {
+  const defaultDocument = createDefaultEditDocumentV2();
+  const defaultAdjustments = editDocumentV2ToLegacyAdjustments(defaultDocument);
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 12, exposure: 1.4 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
@@ -35,12 +41,10 @@ describe('editor teardown transaction', () => {
       activeMaskContainerId: 'mask-container-A',
       activeMaskId: 'mask-A',
       adjustmentRevision: 5,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:image-a-preview',
       hasRenderedFirstFrame: true,
-      history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'a', label: 'A' }],
       historyIndex: 1,
       imageSession: session,
@@ -152,12 +156,12 @@ describe('editor teardown transaction', () => {
       transformedOriginalUrl: null,
       uncroppedAdjustedPreviewUrl: null,
     });
-    expect(after.adjustments).toEqual(INITIAL_ADJUSTMENTS);
-    expect(after.history).toEqual([INITIAL_ADJUSTMENTS]);
+    expect(after.adjustmentSnapshot.value).toEqual(defaultAdjustments);
+    expect(after.history).toEqual([defaultDocument]);
     expect(after.historyCheckpoints).toEqual([]);
 
     after.undo();
-    expect(useEditorStore.getState().adjustments).toEqual(INITIAL_ADJUSTMENTS);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(defaultAdjustments);
     expect(useEditorStore.getState().selectedImage).toBeNull();
   });
 
@@ -168,16 +172,17 @@ describe('editor teardown transaction', () => {
     const request = buildEditorTeardownTransaction(imageA, identity, 'folder-switch');
     const pathB = '/fixtures/teardown-B.CR3';
     const sessionB = createEditorImageSession({ generation: 71, path: pathB, source: 'cold-load' });
-    const adjustmentsB = { ...imageA.adjustments, exposure: 2.2 };
+    const adjustmentsB = { ...imageA.adjustmentSnapshot.value, exposure: 2.2 };
+    const editDocumentB = legacyAdjustmentsToEditDocumentV2(adjustmentsB);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 6,
-      adjustments: adjustmentsB,
       finalPreviewUrl: 'blob:image-b-preview',
-      history: [adjustmentsB],
       historyIndex: 0,
       imageSession: sessionB,
       imageSessionId: sessionB.generation,
       selectedImage: { ...selectedImage, path: pathB },
+      editDocumentV2: editDocumentB,
+      history: [editDocumentB],
     });
     const before = useEditorStore.getState();
 
@@ -187,7 +192,7 @@ describe('editor teardown transaction', () => {
     const after = useEditorStore.getState();
     expect(after.imageSession).toBe(sessionB);
     expect(after.selectedImage).toBe(before.selectedImage);
-    expect(after.adjustments).toBe(adjustmentsB);
+    expect(after.adjustmentSnapshot.value).toEqual(adjustmentsB);
     expect(after.history).toBe(before.history);
     expect(after.finalPreviewUrl).toBe('blob:image-b-preview');
   });
@@ -204,19 +209,16 @@ describe('editor teardown transaction', () => {
     if (identity === null) throw new Error('Expected fallback teardown identity.');
     expect(applyEditorTeardownIfCurrent(legacy, identity, 'legacy-exit')).toBeTrue();
     expect(useEditorStore.getState()).toMatchObject({ imageSession: null, selectedImage: null });
-    expect(useEditorStore.getState().adjustments).toEqual(INITIAL_ADJUSTMENTS);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(defaultAdjustments);
   });
 
   test('clears an already-neutral session without inventing an adjustment revision', () => {
-    const neutral = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(neutral);
+    const editDocumentV2 = structuredClone(defaultDocument);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 9,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, neutral, editDocumentV2),
-      adjustments: neutral,
       editDocumentV2,
-      history: [neutral],
       historyIndex: 0,
+      history: [editDocumentV2],
     });
     const state = useEditorStore.getState();
     const identity = captureEditorTeardownIdentity(state);
@@ -252,7 +254,7 @@ describe('editor teardown transaction', () => {
       buildImageOpenHydrationEditTransaction(
         reentered,
         { adjustmentRevision: reentered.adjustmentRevision, imageSessionId: sessionB.id, path: pathB },
-        hydrated,
+        legacyAdjustmentsToEditDocumentV2(hydrated),
         're-enter-hydration',
       ),
     );
@@ -260,8 +262,8 @@ describe('editor teardown transaction', () => {
     const after = useEditorStore.getState();
     expect(after.imageSession).toBe(sessionB);
     expect(after.selectedImage?.path).toBe(pathB);
-    expect(after.adjustments.exposure).toBe(-0.6);
-    expect(after.adjustments.contrast).toBe(0);
-    expect(after.history).toEqual([hydrated]);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(-0.6);
+    expect(after.adjustmentSnapshot.value.contrast).toBe(0);
+    expect(after.history).toEqual([after.editDocumentV2]);
   });
 });

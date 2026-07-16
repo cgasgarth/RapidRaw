@@ -482,7 +482,7 @@ export function LayerStackPanel({
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const setEditor = useEditorStore((state) => state.setEditor);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const orientationSteps = useEditorStore((state) => state.adjustments.orientationSteps);
+  const orientationSteps = useEditorStore((state) => state.adjustmentSnapshot.value.orientationSteps);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
@@ -607,7 +607,7 @@ export function LayerStackPanel({
   ) => {
     const imagePath = selectedImage?.path ?? 'rapidraw://current-image';
     const currentState = useEditorStore.getState();
-    const persistedSidecar = readLayerStackSidecarsFromSidecar(currentState.adjustments).find(
+    const persistedSidecar = readLayerStackSidecarsFromSidecar(currentState.adjustmentSnapshot.value).find(
       (sidecar) => sidecar.sourceImagePath === imagePath,
     );
     const result = applyLayerStackCommandBridgeOperation(masks, operation, {
@@ -639,8 +639,11 @@ export function LayerStackPanel({
     });
     const nextMasks = materializeMasks(result.masks);
     const nextAdjustments = reconcileReferenceMatchReceiptsAfterEdit(
-      currentState.adjustments,
-      persistLayerStackSidecarInAdjustments({ ...currentState.adjustments, masks: nextMasks }, result.sidecar),
+      currentState.adjustmentSnapshot.value,
+      persistLayerStackSidecarInAdjustments(
+        { ...currentState.adjustmentSnapshot.value, masks: nextMasks },
+        result.sidecar,
+      ),
     );
     const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
     const transactionResult = applyEditTransaction(transactionRequest);
@@ -877,7 +880,7 @@ export function LayerStackPanel({
     });
     const currentState = useEditorStore.getState();
     const nextAdjustments = persistLayerStackSidecarInAdjustments(
-      { ...currentState.adjustments, masks: result.masks },
+      { ...currentState.adjustmentSnapshot.value, masks: result.masks },
       result.toneResult.sidecar,
     );
     setLayerGraphRevision(result.receipt.graphRevision);

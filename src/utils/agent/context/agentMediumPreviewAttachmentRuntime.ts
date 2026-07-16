@@ -163,7 +163,7 @@ const renderAgentMediumPreviewNative = async ({
   const { invoke } = await import('@tauri-apps/api/core');
   const bytes = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
     jpegQuality: Math.round(AGENT_MEDIUM_PREVIEW_QUALITY * 100),
-    jsAdjustments: structuredClone(adjustments ?? useEditorStore.getState().adjustments),
+    jsAdjustments: structuredClone(adjustments ?? useEditorStore.getState().adjustmentSnapshot.value),
     path: snapshot.activeImagePath,
     targetResolution: AGENT_MEDIUM_PREVIEW_LONG_EDGE_PX,
   });

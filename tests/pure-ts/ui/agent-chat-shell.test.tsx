@@ -90,13 +90,11 @@ afterEach(() => {
     renderedRoot = null;
   }
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
-    editDocumentHistory: [initialEditDocumentV2],
     editDocumentV2: initialEditDocumentV2,
-    history: [INITIAL_ADJUSTMENTS],
     historyCheckpoints: [],
     historyIndex: 0,
     selectedImage: null,
+    history: [initialEditDocumentV2],
   });
 });
 
@@ -277,17 +275,15 @@ async function render(element: ReturnType<typeof createElement>) {
 
 function seedEditor() {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
-    editDocumentHistory: [initialEditDocumentV2],
     editDocumentV2: initialEditDocumentV2,
     finalPreviewUrl: 'blob:agent-chat-shell-before',
     hasRenderedFirstFrame: true,
-    history: [INITIAL_ADJUSTMENTS],
     historyCheckpoints: [],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage,
     uncroppedAdjustedPreviewUrl: null,
+    history: [initialEditDocumentV2],
   });
 }
 

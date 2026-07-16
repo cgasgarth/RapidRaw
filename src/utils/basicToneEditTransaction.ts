@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments, BasicAdjustment } from './adjustments';
 import { applyBasicToneCommandEnvelopeToAdjustments, type BasicToneCommandEnvelope } from './basicToneCommandBridge';
 import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
@@ -16,7 +17,8 @@ export interface BasicToneEditTransactionState {
 }
 
 export interface BasicToneCommandEditTransactionState extends BasicToneEditTransactionState {
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
 }
 
 const currentImageSessionId = (state: BasicToneEditTransactionState): string =>
@@ -82,12 +84,12 @@ export const buildBasicToneCommandEditTransaction = (
       `basic_tone_transaction.stale_command_source:${typeof commandSource === 'string' ? commandSource : 'none'}:${identity.sourceIdentity}`,
     );
   }
-  const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustments, command);
+  const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustmentSnapshot.value, command);
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: buildAdjustmentMutationOperations(state.adjustments, adjustments),
+    operations: buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, adjustments, state.editDocumentV2),
     persistence: 'commit',
     source: 'agent-command',
     transactionId: command.commandId,

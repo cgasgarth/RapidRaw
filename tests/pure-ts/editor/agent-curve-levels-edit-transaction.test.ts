@@ -54,12 +54,9 @@ describe('agent curve/levels EditTransaction bridge', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:agent-curve-levels-current',
       hasRenderedFirstFrame: true,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -78,6 +75,7 @@ describe('agent curve/levels EditTransaction bridge', () => {
         width: 4000,
       },
       uncroppedAdjustedPreviewUrl: 'blob:agent-curve-levels-uncropped',
+      history: [editDocumentV2],
     });
   });
 
@@ -155,8 +153,8 @@ describe('agent curve/levels EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.exposure).toBe(0.2);
-    expect(after.adjustments.toneCurve).toBe(INITIAL_ADJUSTMENTS.toneCurve);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
+    expect(after.adjustmentSnapshot.value.toneCurve).toBe(INITIAL_ADJUSTMENTS.toneCurve);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-curve-levels-edit');
   });
 });

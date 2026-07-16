@@ -24,9 +24,7 @@ const sessionId = 'agent-typed-dispatch-test';
 
 const seedEditor = () => {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-typed-dispatch-before',
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -40,6 +38,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 };
 

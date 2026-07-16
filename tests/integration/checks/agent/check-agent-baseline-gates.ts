@@ -29,6 +29,7 @@ import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../src/utils/agen
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
 import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
 import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentRetouchApplyTool.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,
@@ -112,13 +113,14 @@ const assertRejected = (response: z.infer<typeof dispatchResponseSchema>, label:
   }
 };
 
+const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: null,
   hasRenderedFirstFrame: false,
   histogram: null,
-  history: [INITIAL_ADJUSTMENTS],
+  editDocumentV2: initialEditDocumentV2,
+  history: [initialEditDocumentV2],
   historyIndex: 0,
   selectedImage: null,
 });
@@ -129,8 +131,9 @@ assertRejected(
   'selected image',
 );
 
+const editedAdjustments = { ...INITIAL_ADJUSTMENTS, exposure: 0.2, highlights: -10 };
+const editedEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(editedAdjustments);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.2, highlights: -10 },
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-baseline-before',
   hasRenderedFirstFrame: true,
@@ -140,7 +143,8 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.2, highlights: -10 }],
+  editDocumentV2: editedEditDocumentV2,
+  history: [initialEditDocumentV2, editedEditDocumentV2],
   historyIndex: 1,
   selectedImage: {
     exif: { ISO: '400', LensModel: 'FE 24-70mm F2.8 GM II' },

@@ -36,15 +36,13 @@ describe('orientation flip edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -75,8 +73,8 @@ describe('orientation flip edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(false);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.35);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(false);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.35);
   });
 
   test('supports vertical flips, exact no-ops, and stale source/session/revision rejection', () => {

@@ -41,16 +41,13 @@ describe('descriptor-derived edit document presets', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
-      editDocumentHistory: [editDocumentV2],
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -109,12 +106,12 @@ describe('descriptor-derived edit document presets', () => {
     expect(result.after).toMatchObject({ brightness: 0.2, exposure: 0.75 });
     expect(result.afterEditDocumentV2.nodes.camera_input).toBe(cameraInputBefore);
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().editDocumentHistory).toHaveLength(2);
+    expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(-0.5);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(-0.5);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.75);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.75);
   });
 
   test('is exact no-op, reopens strictly, and publishes the same preview/export render node', () => {

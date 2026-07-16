@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import {
   buildTechnicalWhiteBalance,
@@ -6,6 +7,7 @@ import {
   type TechnicalWhiteBalance,
   technicalWhiteBalanceSchema,
 } from './color/whiteBalance';
+import { editDocumentV2ToLegacyAdjustments, updateEditDocumentV2Node } from './editDocumentV2';
 import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
 
@@ -101,6 +103,7 @@ class WhiteBalancePickerSampleError extends Error {
 
 export interface WhiteBalancePickerPreviewSession {
   baseAdjustments: Adjustments;
+  baseEditDocumentV2: EditDocumentV2;
   lastPreviewIdentity: string | null;
   previewActive: boolean;
   sourceIdentity: string;
@@ -108,7 +111,8 @@ export interface WhiteBalancePickerPreviewSession {
 
 export interface WhiteBalancePickerEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -125,14 +129,15 @@ export const buildWhiteBalancePickerEditTransaction = (
       `white_balance_picker_stale_source:${receipt.selectedImagePath}:${state.selectedImage?.path ?? 'none'}`,
     );
   }
-  const nextAdjustments = applyWhiteBalancePickerAdjustmentCommand(state.adjustments, command);
+  const nextAdjustments = applyWhiteBalancePickerAdjustmentCommand(state.adjustmentSnapshot.value, command);
   return {
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
     operations: buildAdjustmentMutationOperations(
-      state.adjustments,
-      reconcileReferenceMatchReceiptsAfterEdit(state.adjustments, nextAdjustments),
+      state.adjustmentSnapshot.value,
+      reconcileReferenceMatchReceiptsAfterEdit(state.adjustmentSnapshot.value, nextAdjustments),
+      state.editDocumentV2,
     ),
     persistence: 'commit',
     source: 'picker',
@@ -141,10 +146,11 @@ export const buildWhiteBalancePickerEditTransaction = (
 };
 
 export const createWhiteBalancePickerPreviewSession = (
-  baseAdjustments: Adjustments,
+  baseEditDocumentV2: EditDocumentV2,
   sourceIdentity: string,
 ): WhiteBalancePickerPreviewSession => ({
-  baseAdjustments: structuredClone(baseAdjustments),
+  baseAdjustments: editDocumentV2ToLegacyAdjustments(baseEditDocumentV2),
+  baseEditDocumentV2: structuredClone(baseEditDocumentV2),
   lastPreviewIdentity: null,
   previewActive: false,
   sourceIdentity,
@@ -153,11 +159,21 @@ export const createWhiteBalancePickerPreviewSession = (
 export const applyWhiteBalancePickerHoverPreview = (
   session: WhiteBalancePickerPreviewSession,
   command: WhiteBalancePickerAdjustmentCommand,
-): { adjustments: Adjustments; session: WhiteBalancePickerPreviewSession } => {
+): { editDocumentV2: EditDocumentV2; session: WhiteBalancePickerPreviewSession } => {
   const { receipt } = command;
   if (session.sourceIdentity !== receipt.selectedImagePath) throw new WhiteBalancePickerSampleError('stale_preview');
+  const previewAdjustments = applyWhiteBalancePickerAdjustmentCommand(
+    editDocumentV2ToLegacyAdjustments(session.baseEditDocumentV2),
+    command,
+  );
   return {
-    adjustments: applyWhiteBalancePickerAdjustmentCommand(session.baseAdjustments, command),
+    editDocumentV2: updateEditDocumentV2Node(session.baseEditDocumentV2, 'camera_input', (params) => ({
+      ...params,
+      temperature: previewAdjustments.temperature,
+      tint: previewAdjustments.tint,
+      whiteBalanceMigration: previewAdjustments.whiteBalanceMigration,
+      whiteBalanceTechnical: previewAdjustments.whiteBalanceTechnical,
+    })),
     session: {
       ...session,
       lastPreviewIdentity: receipt.previewIdentity,
@@ -169,9 +185,9 @@ export const applyWhiteBalancePickerHoverPreview = (
 export const cancelWhiteBalancePickerPreview = (
   session: WhiteBalancePickerPreviewSession,
   currentSourceIdentity: string,
-): Adjustments => {
+): EditDocumentV2 => {
   if (session.sourceIdentity !== currentSourceIdentity) throw new WhiteBalancePickerSampleError('stale_preview');
-  return structuredClone(session.baseAdjustments);
+  return structuredClone(session.baseEditDocumentV2);
 };
 
 export interface RgbPixel {

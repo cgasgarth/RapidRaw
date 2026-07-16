@@ -2,11 +2,13 @@ import {
   type EditDocumentEditorSection,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
+  editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
   getEditDocumentNodeTypesForEditorSection,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import {
+  editDocumentV2ToLegacyAdjustments,
   legacyAdjustmentsToEditDocumentV2,
   pasteEditDocumentV2Node,
   setEditDocumentV2NodeEnabled,
@@ -43,8 +45,8 @@ export type EditTransactionPersistence = 'commit' | 'native-committed' | 'previe
 
 /**
  * Operations intentionally describe adjustment intent rather than a store update.
- * `patch-adjustments` is the compatibility adapter used during migration; node-keyed
- * operations can be added without reintroducing another mutation authority.
+ * Every operation produces a new EditDocumentV2. The flat adjustment object is a
+ * read-only compatibility projection and is never transaction authority.
  */
 export type EditNodeOperation =
   | {
@@ -54,8 +56,9 @@ export type EditNodeOperation =
     }
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
   | { type: 'replace-edit-document-node'; nodeType: EditDocumentNodeTypeV2; node: unknown }
+  | { type: 'replace-edit-document'; editDocumentV2: EditDocumentV2 }
+  /** Temporary flat intent adapters; the reducer immediately lowers these into document authority. */
   | { type: 'patch-adjustments'; patch: Partial<Adjustments> }
-  | { type: 'replace-edit-authority'; adjustments: Adjustments; editDocumentV2: EditDocumentV2 }
   | { type: 'replace-adjustments'; adjustments: Adjustments };
 
 export const buildEditorSectionNodeEnablementOperations = (
@@ -81,8 +84,7 @@ export interface EditTransactionRequest {
   /** Required only for compensation; restores the exact authority captured before a failed optimistic commit. */
   compensationHistory?: {
     checkpoints: readonly EditHistoryCheckpoint[];
-    editDocumentEntries: readonly EditDocumentV2[];
-    entries: readonly Adjustments[];
+    entries: readonly EditDocumentV2[];
     historyIndex: number;
   };
   persistence: EditTransactionPersistence;
@@ -91,8 +93,7 @@ export interface EditTransactionRequest {
    * their history boundary. Preserve the pre-commit document so that the
    * already-hydrated result still becomes one atomic, undoable transaction.
    */
-  nativeCommittedHistoryBaseline?: Adjustments;
-  nativeCommittedEditDocumentHistoryBaseline?: EditDocumentV2;
+  nativeCommittedHistoryBaseline?: EditDocumentV2;
 }
 
 export interface EditTransactionResult {
@@ -141,14 +142,6 @@ export const buildEditTransactionPersistenceContext = (
     'nextAdjustmentRevision' in result ? result.nextAdjustmentRevision : result.adjustmentRevision,
 });
 
-const assertFinitePatch = (patch: Partial<Adjustments>): void => {
-  for (const [key, value] of Object.entries(patch)) {
-    if (typeof value === 'number' && !Number.isFinite(value)) {
-      throw new Error(`edit_transaction.invalid_value:${key}`);
-    }
-  }
-};
-
 const assertNodePatch = (nodeType: EditDocumentNodeTypeV2, patch: Readonly<Record<string, unknown>>): void => {
   const descriptor = getEditDocumentNodeDescriptor(nodeType);
   if (descriptor === undefined) throw new Error(`edit_transaction.unknown_node:${nodeType}`);
@@ -162,7 +155,15 @@ const assertNodePatch = (nodeType: EditDocumentNodeTypeV2, patch: Readonly<Recor
   }
 };
 
-const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
+const assertFiniteLegacyPatch = (patch: Partial<Adjustments>): void => {
+  for (const [key, value] of Object.entries(patch)) {
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      throw new Error(`edit_transaction.invalid_value:${key}`);
+    }
+  }
+};
+
+export const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
   if (Object.is(before, after)) return true;
   if (Array.isArray(before) || Array.isArray(after)) {
     return (
@@ -186,6 +187,9 @@ const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
 export const areEditDocumentsEqual = (before: EditDocumentV2 | undefined, after: EditDocumentV2 | undefined): boolean =>
   before !== undefined && after !== undefined && sameAdjustmentValue(before, after);
 
+const isEditDocumentV2 = (value: EditDocumentV2 | Adjustments): value is EditDocumentV2 =>
+  editDocumentV2Schema.safeParse(value).success;
+
 const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
   [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
     (key) => !sameAdjustmentValue(before[key as keyof Adjustments], after[key as keyof Adjustments]),
@@ -196,24 +200,6 @@ const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
  * Unmigrated domains still live in the flat bag, so rebuilding that whole bag
  * from a document captured before their latest edit would erase valid state.
  */
-const projectEditDocumentNodeToAdjustments = (
-  before: Adjustments,
-  document: EditDocumentV2,
-  nodeType: EditDocumentNodeTypeV2,
-): Adjustments => {
-  const descriptor = getEditDocumentNodeDescriptor(nodeType);
-  const node = document.nodes[nodeType];
-  if (descriptor === undefined || node === undefined) throw new Error(`edit_transaction.unknown_node:${nodeType}`);
-
-  const projected: Record<string, unknown> = {};
-  for (const field of descriptor.legacyFields) {
-    if (Object.hasOwn(node.params, field)) projected[field] = structuredClone(node.params[field]);
-  }
-  // biome-ignore lint/complexity/useLiteralKeys: projected is an intentional index-signature bridge.
-  if (nodeType === 'display_creative') projected['effectsEnabled'] = node.enabled;
-  return { ...before, ...projected };
-};
-
 const replaceLegacyAdjustmentsPreservingNodeEnablement = (
   adjustments: Adjustments,
   currentDocument: EditDocumentV2,
@@ -233,6 +219,7 @@ const replaceLegacyAdjustmentsPreservingNodeEnablement = (
 export const buildAdjustmentMutationOperations = (
   before: Adjustments,
   after: Adjustments,
+  currentDocument: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(before),
 ): readonly EditNodeOperation[] => {
   const keys = changedKeys(before, after);
   if (keys.length === 1 && keys[0] === 'effectsEnabled') {
@@ -270,7 +257,7 @@ export const buildAdjustmentMutationOperations = (
       keys.every((key) => descriptor.legacyFields.some((field) => field === key))
     );
   });
-  if (focusedNodeType === undefined) return [{ type: 'replace-adjustments', adjustments: after }];
+  if (focusedNodeType === undefined) return [{ adjustments: after, type: 'replace-adjustments' }];
   return [
     {
       type: 'patch-edit-document-node',
@@ -282,12 +269,17 @@ export const buildAdjustmentMutationOperations = (
 
 /** Reduce one revision-checked request without touching Zustand or persistence. */
 export const reduceEditTransaction = (
-  before: Adjustments,
+  currentDocumentOrLegacyProjection: EditDocumentV2 | Adjustments,
   currentAdjustmentRevision: number,
   request: EditTransactionRequest,
   currentImageSessionId?: string,
-  currentEditDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(before),
+  authoritativeDocument?: EditDocumentV2,
 ): EditTransactionResult => {
+  const currentEditDocumentV2 =
+    authoritativeDocument ??
+    (isEditDocumentV2(currentDocumentOrLegacyProjection)
+      ? currentDocumentOrLegacyProjection
+      : legacyAdjustmentsToEditDocumentV2(currentDocumentOrLegacyProjection));
   if (request.baseAdjustmentRevision !== currentAdjustmentRevision) {
     throw new Error(
       `edit_transaction.stale_base:${String(request.baseAdjustmentRevision)}:${String(currentAdjustmentRevision)}`,
@@ -298,23 +290,28 @@ export const reduceEditTransaction = (
     throw new Error(`edit_transaction.stale_session:${request.imageSessionId}:${currentImageSessionId}`);
   }
 
-  let after = before;
+  const before = editDocumentV2ToLegacyAdjustments(currentEditDocumentV2);
   let afterEditDocumentV2 = currentEditDocumentV2;
   const documentChangedKeys: string[] = [];
   for (const operation of request.operations) {
-    if (operation.type === 'replace-edit-authority') {
-      after = structuredClone(operation.adjustments);
+    if (operation.type === 'replace-edit-document') {
       afterEditDocumentV2 = structuredClone(operation.editDocumentV2);
       continue;
     }
     if (operation.type === 'replace-adjustments') {
-      const replacedAdjustments = structuredClone(operation.adjustments);
-      if (changedKeys(after, replacedAdjustments).length > 0) {
-        after = replacedAdjustments;
-        afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(after, afterEditDocumentV2);
-      } else {
-        after = replacedAdjustments;
-      }
+      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(
+        structuredClone(operation.adjustments),
+        afterEditDocumentV2,
+      );
+      continue;
+    }
+    if (operation.type === 'patch-adjustments') {
+      assertFiniteLegacyPatch(operation.patch);
+      const currentProjection = editDocumentV2ToLegacyAdjustments(afterEditDocumentV2);
+      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(
+        { ...currentProjection, ...structuredClone(operation.patch) },
+        afterEditDocumentV2,
+      );
       continue;
     }
     if (operation.type === 'patch-edit-document-node') {
@@ -323,23 +320,12 @@ export const reduceEditTransaction = (
         ...params,
         ...structuredClone(operation.patch),
       }));
-      const patchMatchesFlatAuthority = Object.entries(operation.patch).every(([key, value]) =>
-        sameAdjustmentValue(after[key as keyof Adjustments], value),
-      );
-      if (!sameAdjustmentValue(afterEditDocumentV2, patchedDocument) || !patchMatchesFlatAuthority) {
-        afterEditDocumentV2 = patchedDocument;
-        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
-      }
+      afterEditDocumentV2 = patchedDocument;
       continue;
     }
     if (operation.type === 'set-edit-document-node-enabled') {
       const previousEnabled = afterEditDocumentV2.nodes[operation.nodeType]?.enabled;
       afterEditDocumentV2 = setEditDocumentV2NodeEnabled(afterEditDocumentV2, operation.nodeType, operation.enabled);
-      // Effects has an explicit compatibility field. Other node enablement is
-      // document-only authority and must not churn the flat adjustment bag.
-      if (operation.nodeType === 'display_creative') {
-        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
-      }
       if (previousEnabled !== undefined && previousEnabled !== operation.enabled) {
         documentChangedKeys.push(`nodes.${operation.nodeType}.enabled`);
       }
@@ -349,7 +335,6 @@ export const reduceEditTransaction = (
       const replacedDocument = pasteEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, operation.node);
       if (replacedDocument !== afterEditDocumentV2) {
         afterEditDocumentV2 = replacedDocument;
-        after = projectEditDocumentNodeToAdjustments(after, afterEditDocumentV2, operation.nodeType);
         if (
           (request.source === 'copy-paste' || request.source === 'preset') &&
           afterEditDocumentV2.provenance.referenceMatchApplicationReceipt !== null
@@ -358,19 +343,12 @@ export const reduceEditTransaction = (
             ...afterEditDocumentV2,
             provenance: { ...afterEditDocumentV2.provenance, referenceMatchApplicationReceipt: null },
           };
-          after = { ...after, referenceMatchApplicationReceipt: null };
         }
       }
-      continue;
-    }
-    assertFinitePatch(operation.patch);
-    const patchedAdjustments = { ...after, ...structuredClone(operation.patch) };
-    if (changedKeys(after, patchedAdjustments).length > 0) {
-      after = patchedAdjustments;
-      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(after, afterEditDocumentV2);
     }
   }
 
+  const after = editDocumentV2ToLegacyAdjustments(afterEditDocumentV2);
   const flatChangedKeys = changedKeys(before, after);
   for (const nodeType of Object.keys({
     ...currentEditDocumentV2.nodes,

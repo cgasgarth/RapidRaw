@@ -33,10 +33,7 @@ describe('white balance picker runtime command path', () => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
-      adjustments,
       finalPreviewUrl: null,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       isWbPickerActive: false,
@@ -45,6 +42,8 @@ describe('white balance picker runtime command path', () => {
       selectedImage: null,
       transformedOriginalUrl: null,
       uncroppedAdjustedPreviewUrl: null,
+      editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
+      history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
     });
   });
 
@@ -142,14 +141,13 @@ describe('white balance picker runtime command path', () => {
     const initial = { ...INITIAL_ADJUSTMENTS, temperature: 3, tint: -2 };
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
-      adjustments: initial,
       finalPreviewUrl: 'blob:stale-before-picker',
-      history: [initial],
       historyIndex: 0,
       isWbPickerActive: true,
       selectedImage: selectedImageFor('/tmp/alaska-raw.NEF'),
       uncroppedAdjustedPreviewUrl: 'blob:stale-before-picker-uncropped',
+      editDocumentV2: publishAdjustmentSnapshot(null, initial).editDocumentV2,
+      history: [publishAdjustmentSnapshot(null, initial).editDocumentV2],
     });
 
     const command = buildWhiteBalancePickerAdjustmentCommand({
@@ -187,8 +185,8 @@ describe('white balance picker runtime command path', () => {
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustments.temperature).toBe(command.receipt.resultingTemperature);
-    expect(state.adjustments.tint).toBe(command.receipt.resultingTint);
+    expect(state.adjustmentSnapshot.value.temperature).toBe(command.receipt.resultingTemperature);
+    expect(state.adjustmentSnapshot.value.tint).toBe(command.receipt.resultingTint);
     expect(result.afterEditDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical).toMatchObject({
       mode: 'chromaticity',
       source: 'picker',
@@ -207,15 +205,15 @@ describe('white balance picker runtime command path', () => {
     state = useEditorStore.getState();
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(0);
-    expect(state.adjustments.temperature).toBe(initial.temperature);
-    expect(state.adjustments.tint).toBe(initial.tint);
+    expect(state.adjustmentSnapshot.value.temperature).toBe(initial.temperature);
+    expect(state.adjustmentSnapshot.value.tint).toBe(initial.tint);
 
     useEditorStore.getState().redo();
     state = useEditorStore.getState();
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustments.temperature).toBe(command.receipt.resultingTemperature);
-    expect(state.adjustments.tint).toBe(command.receipt.resultingTint);
+    expect(state.adjustmentSnapshot.value.temperature).toBe(command.receipt.resultingTemperature);
+    expect(state.adjustmentSnapshot.value.tint).toBe(command.receipt.resultingTint);
   });
 
   test('preserves exact no-ops and rejects stale source and revision identities', () => {
@@ -224,17 +222,19 @@ describe('white balance picker runtime command path', () => {
     const command = buildWhiteBalancePickerAdjustmentCommand({
       averageRgb: { blue: 120, green: 120, red: 120 },
       coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
-      currentTemperature: useEditorStore.getState().adjustments.temperature,
-      currentTint: useEditorStore.getState().adjustments.tint,
+      currentTemperature: useEditorStore.getState().adjustmentSnapshot.value.temperature,
+      currentTint: useEditorStore.getState().adjustmentSnapshot.value.tint,
       previewIdentity: 'blob:picker-current',
       selectedImagePath: imagePath,
     });
-    const applied = applyWhiteBalancePickerAdjustmentCommand(useEditorStore.getState().adjustments, command);
+    const applied = applyWhiteBalancePickerAdjustmentCommand(
+      useEditorStore.getState().adjustmentSnapshot.value,
+      command,
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, applied),
-      adjustments: applied,
-      history: [applied],
       historyIndex: 0,
+      editDocumentV2: publishAdjustmentSnapshot(null, applied).editDocumentV2,
+      history: [publishAdjustmentSnapshot(null, applied).editDocumentV2],
     });
     const state = useEditorStore.getState();
     const noOpRequest = buildWhiteBalancePickerEditTransaction(state, command, 'picker-no-op');
@@ -256,7 +256,7 @@ describe('white balance picker runtime command path', () => {
     ).toThrow('white_balance_picker_stale_source:/tmp/stale-picker-source.ARW:/tmp/current-picker-source.ARW');
 
     const stale = buildWhiteBalancePickerEditTransaction(state, command, 'picker-stale-revision');
-    const whiteBalanceBeforeStaleTransaction = structuredClone(state.adjustments.whiteBalanceTechnical);
+    const whiteBalanceBeforeStaleTransaction = structuredClone(state.adjustmentSnapshot.value.whiteBalanceTechnical);
     state.applyEditTransaction({
       baseAdjustmentRevision: 0,
       history: 'single-entry',
@@ -267,18 +267,20 @@ describe('white balance picker runtime command path', () => {
       transactionId: 'newer-edit',
     });
     expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
-    expect(useEditorStore.getState().adjustments.whiteBalanceTechnical).toEqual(whiteBalanceBeforeStaleTransaction);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.whiteBalanceTechnical).toEqual(
+      whiteBalanceBeforeStaleTransaction,
+    );
   });
 
   test('hover preview is history-free, cancellable, and source-revision safe', () => {
     const base = { ...INITIAL_ADJUSTMENTS, exposure: 0.25 };
-    let session = createWhiteBalancePickerPreviewSession(base, 'source:a');
+    const baseEditDocumentV2 = publishAdjustmentSnapshot(null, base).editDocumentV2;
+    let session = createWhiteBalancePickerPreviewSession(baseEditDocumentV2, 'source:a');
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, base),
-      adjustments: base,
-      history: [base],
       historyIndex: 0,
+      editDocumentV2: baseEditDocumentV2,
+      history: [baseEditDocumentV2],
     });
 
     const previewCommand = buildWhiteBalancePickerAdjustmentCommand({
@@ -291,15 +293,15 @@ describe('white balance picker runtime command path', () => {
     });
     const preview = applyWhiteBalancePickerHoverPreview(session, previewCommand);
     session = preview.session;
-    useEditorStore.getState().publishWhiteBalancePickerPreview(preview.adjustments);
+    useEditorStore.getState().publishWhiteBalancePickerPreview(preview.editDocumentV2);
     expect(useEditorStore.getState().history).toHaveLength(1);
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toBeNull();
-    expect(useEditorStore.getState().adjustments.whiteBalanceTechnical.mode).toBe('chromaticity');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.whiteBalanceTechnical.mode).toBe('chromaticity');
 
     expect(session.lastPreviewIdentity).toBe('preview:1');
     useEditorStore.getState().publishWhiteBalancePickerPreview(cancelWhiteBalancePickerPreview(session, 'source:a'));
-    expect(useEditorStore.getState().adjustments).toEqual(base);
+    expect(useEditorStore.getState().editDocumentV2).toEqual(baseEditDocumentV2);
     expect(() =>
       applyWhiteBalancePickerHoverPreview(session, {
         ...previewCommand,

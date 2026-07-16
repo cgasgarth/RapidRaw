@@ -1387,6 +1387,7 @@ export function MasksPanel() {
     activeMaskContainerId,
     activeMaskId,
     adjustments,
+    editDocumentV2,
     brushSettings,
     copiedMask,
     histogram,
@@ -1404,7 +1405,8 @@ export function MasksPanel() {
     useShallow((state) => ({
       activeMaskContainerId: state.activeMaskContainerId,
       activeMaskId: state.activeMaskId,
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
+      editDocumentV2: state.editDocumentV2,
       brushSettings: state.brushSettings,
       copiedMask: state.copiedMask,
       histogram: state.histogram,
@@ -1486,7 +1488,7 @@ export function MasksPanel() {
   }, [setMaskOverlaySettings]);
   const onSelectContainer = useCallback(
     (id: string | null) => {
-      const masks = useEditorStore.getState().adjustments.masks;
+      const masks = useEditorStore.getState().adjustmentSnapshot.value.masks;
       const selection = resolveMaskSelection(masks, { containerId: id, subMaskId: null });
       setEditor({ activeMaskContainerId: selection.containerId, activeMaskId: selection.subMaskId });
       if (selection.containerId !== null) {
@@ -1499,7 +1501,7 @@ export function MasksPanel() {
   const onSelectMask = useCallback(
     (id: string | null) => {
       const state = useEditorStore.getState();
-      const selection = resolveMaskSelection(state.adjustments.masks, {
+      const selection = resolveMaskSelection(state.adjustmentSnapshot.value.masks, {
         containerId: state.activeMaskContainerId,
         subMaskId: id,
       });
@@ -1541,7 +1543,7 @@ export function MasksPanel() {
   const commitMaskGraphCommand = useCallback(
     (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
       const state = useEditorStore.getState();
-      const result = command(state.adjustments.masks);
+      const result = command(state.adjustmentSnapshot.value.masks);
       if (result === null) return null;
       const committed = validateMaskGraphCommand(result);
       applyEditTransaction({
@@ -1580,7 +1582,7 @@ export function MasksPanel() {
   );
 
   const { showContextMenu } = useContextMenu();
-  const { presets } = usePresets(adjustments);
+  const { presets } = usePresets(adjustments, editDocumentV2);
 
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'mask-list-root' });
 
@@ -1686,7 +1688,7 @@ export function MasksPanel() {
     const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
     const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
     const subMask = createMaskLogic(type, SubMaskMode.Additive, personPart);
-    const count = useEditorStore.getState().adjustments.masks.length + 1;
+    const count = useEditorStore.getState().adjustmentSnapshot.value.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
       id: crypto.randomUUID(),
@@ -1850,7 +1852,7 @@ export function MasksPanel() {
 
   const updateContainer = (id: string, data: MaskContainerPatch) => {
     if (data.adjustments !== undefined) {
-      const current = useEditorStore.getState().adjustments;
+      const current = useEditorStore.getState().adjustmentSnapshot.value;
       const next = applyMaskContainerAdjustmentCandidate(current, id, data.adjustments);
       if (next === current) return;
       markMaskPanelProvenanceStale('source_state_changed', [id]);

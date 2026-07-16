@@ -47,15 +47,13 @@ describe('detail edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -86,9 +84,9 @@ describe('detail edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.sharpness).toBe(0);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.sharpness).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
   });
 
   test('owns the migrated Detail keys, exact no-ops, and stale source/session/revision rejection', () => {
@@ -153,10 +151,10 @@ describe('detail edit transaction', () => {
     expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(42);
     expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze).not.toBe(beforeDetail);
     expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
-    expect(useEditorStore.getState().adjustments.localContrastRadiusPx).toBe(42);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(42);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.localContrastRadiusPx).toBe(24);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(24);
     expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params.localContrastRadiusPx).toBe(24);
   });
 
@@ -244,7 +242,7 @@ describe('detail edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.sharpness).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.sharpness).toBe(0);
     expect(() =>
       buildDetailEditTransaction({ ...state, imageSessionId: 25 }, fallbackIdentity, 'sharpness', 20, 'stale-fallback'),
     ).toThrow('detail_transaction.stale_session');

@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerAiMaskBoxSessionKey } from '../components/panel/editor/viewerAiMaskBoxInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
 import type { Adjustments } from './adjustments';
@@ -6,7 +7,8 @@ import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction'
 
 export interface AiMaskBoxEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
   readonly imageSession?: { readonly id: string } | null;
@@ -33,11 +35,12 @@ export const buildAiMaskBoxEditTransaction = (
   if (key.sourceRevision !== state.sourceRevision) reject('stale_graph');
   if (key.geometryEpoch !== state.geometryEpoch) reject('stale_geometry');
 
-  const family = state.adjustments[key.containerFamily];
+  const family = state.adjustmentSnapshot.value[key.containerFamily];
   const duplicateContainerCount = family.filter((container) => container.id === key.containerId).length;
   if (duplicateContainerCount !== 1)
     reject(duplicateContainerCount === 0 ? 'missing_container' : 'duplicate_container');
-  const siblingFamily = key.containerFamily === 'masks' ? state.adjustments.aiPatches : state.adjustments.masks;
+  const siblingFamily =
+    key.containerFamily === 'masks' ? state.adjustmentSnapshot.value.aiPatches : state.adjustmentSnapshot.value.masks;
   if (siblingFamily.some((container) => container.id === key.containerId)) reject('cross_family_container_collision');
 
   let matchedSubMaskCount = 0;
@@ -56,6 +59,6 @@ export const buildAiMaskBoxEditTransaction = (
   if (matchedSubMaskCount !== 1) reject(matchedSubMaskCount === 0 ? 'missing_mask' : 'duplicate_mask_in_container');
   if (siblingFamily.some((container) => container.subMasks.some((subMask) => subMask.id === key.maskId)))
     reject('cross_family_mask_collision');
-  const adjustments: Adjustments = { ...state.adjustments, [key.containerFamily]: updatedFamily };
+  const adjustments: Adjustments = { ...state.adjustmentSnapshot.value, [key.containerFamily]: updatedFamily };
   return buildLayerEditTransactionRequest(state, adjustments, transactionId);
 };

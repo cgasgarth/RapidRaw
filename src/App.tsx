@@ -193,7 +193,8 @@ function App() {
       : 520;
 
   const getDynamicCompactPanelHeight = () => {
-    const { originalSize, adjustments } = useEditorStore.getState();
+    const { originalSize, adjustmentSnapshot } = useEditorStore.getState();
+    const adjustments = adjustmentSnapshot.value;
     const halfScreenHeight = viewportSize.height > 0 ? Math.round(viewportSize.height * 0.5) : 340;
 
     if (!selectedImage || originalSize.width === 0 || originalSize.height === 0 || viewportSize.width === 0) {

@@ -327,26 +327,30 @@ async function rerenderFooter(
 
 function setProofState(isConsistent: boolean) {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     exportSoftProofRecipeId: isConsistent ? proofPreset.id : null,
     exportSoftProofTransform: isConsistent ? consistentProofTransform : null,
     gamutWarningOverlay: null,
     isExportSoftProofEnabled: isConsistent,
     isGamutWarningOverlayVisible: false,
     selectedImage,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
+    historyIndex: 0,
   });
   useProcessStore.setState({ thumbnailSmartPreviews: {} });
 }
 
 function resetEditorState() {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     exportSoftProofRecipeId: null,
     exportSoftProofTransform: null,
     gamutWarningOverlay: null,
     isExportSoftProofEnabled: false,
     isGamutWarningOverlayVisible: false,
     selectedImage: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
+    historyIndex: 0,
   });
   useProcessStore.setState({ thumbnailSmartPreviews: {} });
 }

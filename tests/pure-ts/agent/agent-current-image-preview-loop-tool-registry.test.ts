@@ -27,13 +27,14 @@ import {
   buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../src/utils/agent/tools/agentAdjustmentApplyTool';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/pure-ts/agent-selected-image-preview-loop/DSC_4843.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-preview-loop-4843',
     hasRenderedFirstFrame: true,
@@ -43,7 +44,6 @@ const seedEditor = () => {
       [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
       [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
     },
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -57,6 +57,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2,
+    history: [editDocumentV2],
   });
 };
 

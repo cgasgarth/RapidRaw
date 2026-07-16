@@ -18,10 +18,12 @@ const image = (path: string): SelectedImage => ({
 describe('editor before-after compare state', () => {
   beforeEach(() => {
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: INITIAL_ADJUSTMENTS,
       compare: DEFAULT_EDITOR_COMPARE_STATE,
       selectedImage: null,
       transformedOriginalUrl: null,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
     });
   });
 

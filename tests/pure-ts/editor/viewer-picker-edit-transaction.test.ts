@@ -95,17 +95,15 @@ describe('viewer picker edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:picker-before',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       imageSessionId: 17,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -145,9 +143,9 @@ describe('viewer picker edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.pointColor.points).toEqual([]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.points).toEqual([]);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.pointColor.points[0]?.id).toBe('point-id');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.points[0]?.id).toBe('point-id');
   });
 
   test('commits Tone Equalizer through fallback session authority and keeps an exact no-op inert', () => {
@@ -168,7 +166,7 @@ describe('viewer picker edit transaction', () => {
 
     const state = currentTransactionState();
     const noOpCommand = {
-      ...toneCommand(structuredClone(state.adjustments), {
+      ...toneCommand(structuredClone(state.adjustmentSnapshot.value), {
         adjustmentRevision: 1,
         imageSessionId: fallbackSessionId,
         operationGeneration: 5,

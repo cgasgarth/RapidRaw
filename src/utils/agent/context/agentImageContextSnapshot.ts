@@ -143,17 +143,21 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
       editor.selectedImage.originalUrl,
     ].find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0) ??
     editor.selectedImage.path;
-  const crop = normalizePreviewCrop(editor.adjustments.crop);
+  const crop = normalizePreviewCrop(editor.adjustmentSnapshot.value.crop);
   const recipeHash = `recipe:${stableAgentPreviewHash(
     JSON.stringify({
-      adjustments: summarizeAdjustment(editor.adjustments),
-      color: buildAgentColorRecipeHashInput(editor.adjustments),
-      curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustments),
-      detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.adjustments),
-      geometry: buildAgentGeometryRecipeHashInput(editor.adjustments),
+      adjustments: summarizeAdjustment(editor.adjustmentSnapshot.value),
+      color: buildAgentColorRecipeHashInput(editor.adjustmentSnapshot.value),
+      curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustmentSnapshot.value),
+      detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.adjustmentSnapshot.value),
+      geometry: buildAgentGeometryRecipeHashInput(editor.adjustmentSnapshot.value),
       graphRevision,
-      lensProfile: buildAgentLensProfileRecipeHashInput(editor.adjustments),
-      masks: editor.adjustments.masks.map((mask) => ({ id: mask.id, name: mask.name, visible: mask.visible })),
+      lensProfile: buildAgentLensProfileRecipeHashInput(editor.adjustmentSnapshot.value),
+      masks: editor.adjustmentSnapshot.value.masks.map((mask) => ({
+        id: mask.id,
+        name: mask.name,
+        visible: mask.visible,
+      })),
     }),
   )}`;
   const renderHash = `render:${stableAgentPreviewHash(
@@ -181,9 +185,12 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
 
   return agentImageContextSnapshotSchema.parse({
     activeImagePath: editor.selectedImage.path,
-    adjustmentSummary: summarizeAdjustment(editor.adjustments),
+    adjustmentSummary: summarizeAdjustment(editor.adjustmentSnapshot.value),
     clipping: summarizeClipping(histogramSummary),
-    cropHint: { active: editor.adjustments.crop !== null, aspectRatio: editor.adjustments.aspectRatio },
+    cropHint: {
+      active: editor.adjustmentSnapshot.value.crop !== null,
+      aspectRatio: editor.adjustmentSnapshot.value.aspectRatio,
+    },
     graphRevision,
     histogramSummary,
     initialPreview,
@@ -191,7 +198,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
     previewIdentity: previewRef,
     subjectHint: {
       hasActiveMask: editor.activeMaskContainerId !== null,
-      maskCount: editor.adjustments.masks.length,
+      maskCount: editor.adjustmentSnapshot.value.masks.length,
     },
   });
 };

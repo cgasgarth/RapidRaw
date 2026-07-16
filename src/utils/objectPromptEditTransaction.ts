@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerObjectPromptKey } from '../components/panel/editor/viewerObjectPromptInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
 import type { Adjustments } from './adjustments';
@@ -7,7 +8,8 @@ import { readObjectPromptCanvasState } from './mask/objectMaskPromptCanvas';
 
 export interface ObjectPromptEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
   readonly imageSession: { readonly id: string } | null;
@@ -41,9 +43,12 @@ export const buildObjectPromptEditTransaction = (
       return { ...subMask, parameters: { ...parameters } };
     });
   const adjustments: Adjustments = {
-    ...state.adjustments,
-    aiPatches: state.adjustments.aiPatches.map((patch) => ({ ...patch, subMasks: update(patch.subMasks) })),
-    masks: state.adjustments.masks.map((mask) => ({ ...mask, subMasks: update(mask.subMasks) })),
+    ...state.adjustmentSnapshot.value,
+    aiPatches: state.adjustmentSnapshot.value.aiPatches.map((patch) => ({
+      ...patch,
+      subMasks: update(patch.subMasks),
+    })),
+    masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, subMasks: update(mask.subMasks) })),
   };
   if (!matched) reject('missing_mask');
   return buildLayerEditTransactionRequest(state, adjustments, transactionId);
