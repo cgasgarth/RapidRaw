@@ -84,8 +84,10 @@ if (!resource || !label || separator < 0 || separator === args.length - 1) {
   process.exit(1);
 }
 const command = args.slice(separator + 1);
+const coordinateHostBudget = Bun.env.RAWENGINE_DISABLE_VALIDATION_HOST_BUDGET !== '1';
 const lease = await acquireResourceLease({
-  hostBudgetCapacity: resource === 'native-heavy' ? await resolveValidationHostBudgetCapacity() : undefined,
+  hostBudgetCapacity:
+    resource === 'native-heavy' && coordinateHostBudget ? await resolveValidationHostBudgetCapacity() : undefined,
   label,
   resource,
 });

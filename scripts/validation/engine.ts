@@ -326,7 +326,7 @@ export const readCacheRecord = async (
   }
 };
 
-const capacities: Record<ResourceClass, number> = {
+const standardCapacities: Record<ResourceClass, number> = {
   light: 4,
   'cpu-heavy': 2,
   'suite-exclusive': 1,
@@ -335,7 +335,18 @@ const capacities: Record<ResourceClass, number> = {
   network: 1,
 };
 
+const commitCapacities: Record<ResourceClass, number> = {
+  light: 8,
+  'cpu-heavy': 4,
+  'suite-exclusive': 1,
+  'native-heavy': 1,
+  browser: 1,
+  network: 2,
+};
+
 export const runValidation = async (manifest: readonly ValidationNode[], options: RunOptions): Promise<number> => {
+  const capacities = options.mode === 'commit' ? commitCapacities : standardCapacities;
+  const coordinateHeavyResources = options.mode !== 'commit';
   const resourceCoordinatorRoot = resolveResourceCoordinatorRoot(options.resourceCoordinatorRoot);
   const inheritedOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID;
   const inheritedOwnerRoot = Bun.env.RAWENGINE_RESOURCE_OWNER_ROOT;
@@ -446,9 +457,9 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
     const dependencyKeys = node.dependencies.map((id) => completed.get(id)?.key ?? 'missing');
     const key = await nodeCacheKey(node, options.root, dependencyKeys, undefined, snapshot);
     const recordPath = join(cacheDirectory, `${node.id}-${key}.json`);
-    const coordinatedClass = ['cpu-heavy', 'suite-exclusive', 'native-heavy', 'browser', 'network'].includes(
-      node.resourceClass,
-    );
+    const coordinatedClass =
+      coordinateHeavyResources &&
+      ['cpu-heavy', 'suite-exclusive', 'native-heavy', 'browser', 'network'].includes(node.resourceClass);
     let executionLease: ResourceLease | undefined;
     let cacheLease: ResourceLease | undefined;
     try {
@@ -489,7 +500,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
               },
             ]
           : []),
-        ...[...(node.queueResources ?? [])].sort().map((resource) => ({
+        ...(coordinateHeavyResources ? [...(node.queueResources ?? [])] : []).sort().map((resource) => ({
           label: `validation-resource-${resource}:${node.id}`,
           hostBudgetCapacity: options.hostBudgetCapacity,
           hostBudgetOwnerId: nodeHostBudgetOwnerId,
@@ -525,6 +536,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
           RAWENGINE_RESOURCE_OWNER_ROOT: resourceCoordinatorRoot,
           RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID: nodeHostBudgetOwnerId,
           RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT: resourceCoordinatorRoot,
+          RAWENGINE_DISABLE_VALIDATION_HOST_BUDGET: options.mode === 'commit' ? '1' : '0',
         },
         detached: true,
       });
