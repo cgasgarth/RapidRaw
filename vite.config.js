@@ -17,6 +17,7 @@ const hmrPort =
 
 // https://vitejs.dev/config/
 export default defineConfig(async ({ command }) => ({
+  ...(process.env.RAWENGINE_VITE_CACHE_DIR === undefined ? {} : { cacheDir: process.env.RAWENGINE_VITE_CACHE_DIR }),
   plugins: [
     createViteProductBundleGuardPlugin(),
     startupPrebootOrderingPlugin(),
