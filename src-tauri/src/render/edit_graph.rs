@@ -10,7 +10,7 @@ use bytemuck::bytes_of;
 use crate::adjustments::abi::{
     AllAdjustments, BlackWhiteMixerSettings, ChannelMixerSettings, ColorBalanceRgbSettings,
     ColorCalibrationSettings, ColorGradeSettings, GpuMat3, HslColor, LevelsSettings,
-    MaskAdjustments, Point, ToneEqualizerGpuSettings,
+    MaskAdjustments, Point, SkinToneUniformitySettings, ToneEqualizerGpuSettings,
 };
 use crate::render::film_emulation::FilmEmulationParams;
 use crate::tone::curves::CompiledCurvePlanV1;
@@ -556,7 +556,8 @@ impl CompiledNodePayload {
                 "colorBalanceRgb": scene.color_balance_rgb,
                 "channelMixer": scene.channel_mixer,
                 "blackWhiteMixer": scene.black_white_mixer,
-                "levels": scene.levels, "hsl": scene.hsl, "grading": scene.grading,
+                "levels": scene.levels, "hsl": scene.hsl,
+                "skinToneUniformity": scene.skin_tone_uniformity, "grading": scene.grading,
                 "gradingBlending": scene.grading_blending,
                 "gradingBalance": scene.grading_balance,
                 "toneEqualizer": scene.tone_equalizer,
@@ -659,6 +660,7 @@ pub struct SceneGlobalPayload {
     pub black_white_mixer: BlackWhiteMixerSettings,
     pub levels: LevelsSettings,
     pub hsl: [HslColor; 8],
+    pub skin_tone_uniformity: SkinToneUniformitySettings,
     pub grading: [ColorGradeSettings; 4],
     pub grading_blending: f32,
     pub grading_balance: f32,
@@ -1541,6 +1543,7 @@ fn compile_node_payload(
                 black_white_mixer: global.black_white_mixer,
                 levels: global.levels,
                 hsl: global.hsl,
+                skin_tone_uniformity: global.skin_tone_uniformity,
                 grading: [
                     global.color_grading_shadows,
                     global.color_grading_midtones,

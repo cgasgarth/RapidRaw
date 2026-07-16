@@ -1072,25 +1072,9 @@ fn skin_tone_uniformity_adjustments(parameters: &Value) -> Result<Value, String>
     if !parameters.experimental {
         return Err("skinToneUniformity.experimental must be true.".to_string());
     }
-    let preview_hue_shift = (parameters.target_hue_degrees - 18.0).clamp(
-        -parameters.max_hue_shift_degrees,
-        parameters.max_hue_shift_degrees,
-    ) * parameters.hue_uniformity;
-    let preview_saturation =
-        (parameters.target_saturation - 0.45) * 100.0 * parameters.saturation_uniformity;
-    let preview_luminance =
-        (parameters.target_luminance - 0.5) * 100.0 * parameters.luminance_uniformity;
-
     Ok(json!({
-        "hsl": {
-            "oranges": {
-                "hue": preview_hue_shift,
-                "luminance": preview_luminance,
-                "saturation": preview_saturation,
-            }
-        },
         "skinToneUniformity": {
-            "experimental": parameters.experimental,
+            "enabled": true,
             "hueUniformity": parameters.hue_uniformity,
             "luminanceUniformity": parameters.luminance_uniformity,
             "maxHueShiftDegrees": parameters.max_hue_shift_degrees,
@@ -2081,7 +2065,8 @@ mod tests {
             adjustments["skinToneUniformity"]["maxHueShiftDegrees"],
             json!(16.0)
         );
-        assert!(adjustments["hsl"]["oranges"]["hue"].as_f64().unwrap_or(0.0) > 0.0);
+        assert_eq!(adjustments["skinToneUniformity"]["enabled"], json!(true));
+        assert!(adjustments.get("hsl").is_none());
 
         let mut invalid = sample_skin_tone_uniformity_command();
         invalid.parameters["unexpected"] = json!(true);

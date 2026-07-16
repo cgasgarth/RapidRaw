@@ -37,6 +37,10 @@ import {
   type SelectiveColorMixerSettings,
 } from '../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange } from '../../utils/selectiveColorRanges';
+import {
+  buildSkinToneUniformityEditTransaction,
+  type SkinToneUniformityCommitIdentity,
+} from '../../utils/skinToneUniformityEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import { ColorAdvancedControls } from './color/ColorAdvancedControls';
@@ -313,6 +317,15 @@ export default function ColorPanel({
     },
     [applyEditTransaction, isForMask, setAdjustments],
   );
+  const skinToneUniformityCommitIdentity = useMemo<SkinToneUniformityCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const skinToneUniformityCommitIdentityRef = useRef(skinToneUniformityCommitIdentity);
+  skinToneUniformityCommitIdentityRef.current = skinToneUniformityCommitIdentity;
   const isCurrentGamutWarningOverlay = isCurrentExportSoftProofGamutWarningOverlay(gamutWarningOverlay, {
     exportSoftProofRecipeId,
     exportSoftProofTransform,
@@ -400,12 +413,24 @@ export default function ColorPanel({
     });
   };
 
-  const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
-    setAdjustments((prev) => ({
-      ...prev,
-      skinToneUniformity: nextSettings,
-    }));
-  };
+  const syncSkinToneUniformity = useCallback(
+    (nextSettings: Adjustments['skinToneUniformity']) => {
+      const identity = skinToneUniformityCommitIdentityRef.current;
+      if (isForMask) {
+        setAdjustments((previous) => ({ ...previous, skinToneUniformity: nextSettings }));
+        return;
+      }
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildSkinToneUniformityEditTransaction(useEditorStore.getState(), identity, nextSettings, crypto.randomUUID()),
+      );
+      skinToneUniformityCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    },
+    [applyEditTransaction, isForMask, setAdjustments],
+  );
 
   const workspaceTabs = useMemo<Array<ColorWorkspaceTab>>(() => {
     const tabs: Array<ColorWorkspaceTab> = [

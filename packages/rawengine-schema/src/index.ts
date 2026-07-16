@@ -81,6 +81,7 @@ export * from './rawEngineSchemas.js';
 export * from './rawProcessingModeSchemas.js';
 export * from './referenceMatchRuntime.js';
 export * from './retouchRemoveRuntime.js';
+export * from './skinToneUniformitySchemas.js';
 export * from './super-resolution/superResolutionAlignmentDiagnostics.js';
 export * from './super-resolution/superResolutionAppServerRuntime.js';
 export * from './super-resolution/superResolutionNativeCfaPreview.js';

@@ -24,6 +24,19 @@ pub struct HslColor {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
 #[repr(C)]
+pub struct SkinToneUniformitySettings {
+    pub(crate) enabled: u32,
+    pub(crate) hue_uniformity: f32,
+    pub(crate) luminance_uniformity: f32,
+    pub(crate) max_hue_shift_degrees: f32,
+    pub(crate) saturation_uniformity: f32,
+    pub(crate) target_hue_degrees: f32,
+    pub(crate) target_luminance: f32,
+    pub(crate) target_saturation: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
 pub struct ColorGradeSettings {
     pub hue: f32,
     pub saturation: f32,
@@ -304,6 +317,7 @@ pub struct GlobalAdjustments {
     pub black_white_mixer: BlackWhiteMixerSettings,
     pub levels: LevelsSettings,
     pub hsl: [HslColor; 8],
+    pub skin_tone_uniformity: SkinToneUniformitySettings,
     pub luma_curve: [Point; 16],
     pub red_curve: [Point; 16],
     pub green_curve: [Point; 16],

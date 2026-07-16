@@ -121,6 +121,15 @@ pub(crate) const COLOR_NODE_REGISTRY: &[ColorNodeContract] = &[
         tolerance: 2.0e-3,
     },
     ColorNodeContract {
+        id: "skin_tone_uniformity",
+        version: 1,
+        order: 275,
+        input_domain: SCENE_LINEAR,
+        output_domain: SCENE_LINEAR,
+        backend: ColorNodeBackend::Wgpu,
+        tolerance: 3.0e-3,
+    },
+    ColorNodeContract {
         id: "rgb_curves",
         version: 1,
         order: 280,

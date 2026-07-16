@@ -336,6 +336,7 @@ pub(crate) fn execute_cpu_edit_graph(
         }
         color = apply_color_calibration(color, adjustments.global.color_calibration);
         color = apply_hsl_panel(color, effective.hsl);
+        color = apply_skin_tone_uniformity(color, adjustments.global.skin_tone_uniformity);
         color = Vec3::from_array(apply_gpu_plan_ap1(color.to_array(), &effective.point_color));
         for (mask_index, mask) in mask_bitmaps.iter().take(active_masks.len()).enumerate() {
             let influence = f32::from(mask.get_pixel(x, y).0[0]) / 255.0;
@@ -2013,6 +2014,72 @@ pub(crate) fn apply_hsl_panel(color: Vec3, settings: [HslColor; 8]) -> Vec3 {
     } else {
         shifted * (target / new_luma) + negative_residual
     }
+}
+
+pub(crate) fn apply_skin_tone_uniformity(
+    color: Vec3,
+    settings: crate::adjustments::abi::SkinToneUniformitySettings,
+) -> Vec3 {
+    if settings.enabled == 0 {
+        return color;
+    }
+    let negative_residual = color.min(Vec3::ZERO);
+    let ap1 = color.max(Vec3::ZERO);
+    let linear_srgb = Vec3::new(
+        1.705_051_5 * ap1.x - 0.621_790_7 * ap1.y - 0.083_258_4 * ap1.z,
+        -0.130_257_1 * ap1.x + 1.140_802_9 * ap1.y - 0.010_548_5 * ap1.z,
+        -0.024_003_3 * ap1.x - 0.128_968_8 * ap1.y + 1.152_971_7 * ap1.z,
+    );
+    let srgb = linear_to_srgb_extended(linear_srgb);
+    if srgb.min_element() < 0.0 || srgb.max_element() > 1.0 {
+        return color;
+    }
+    let maximum = srgb.max_element();
+    let minimum = srgb.min_element();
+    let luminance = (maximum + minimum) * 0.5;
+    let chroma = maximum - minimum;
+    let (hue, saturation) = if chroma <= f32::EPSILON {
+        (0.0, 0.0)
+    } else {
+        let saturation = chroma / (1.0 - (2.0 * luminance - 1.0).abs()).max(f32::EPSILON);
+        let hue = if maximum == srgb.x {
+            60.0 * ((srgb.y - srgb.z) / chroma).rem_euclid(6.0)
+        } else if maximum == srgb.y {
+            60.0 * ((srgb.z - srgb.x) / chroma + 2.0)
+        } else {
+            60.0 * ((srgb.x - srgb.y) / chroma + 4.0)
+        };
+        (hue, saturation)
+    };
+    let hue_delta = ((settings.target_hue_degrees - hue + 540.0).rem_euclid(360.0) - 180.0).clamp(
+        -settings.max_hue_shift_degrees,
+        settings.max_hue_shift_degrees,
+    ) * settings.hue_uniformity;
+    let adjusted_hue = (hue + hue_delta).rem_euclid(360.0);
+    let adjusted_saturation = (saturation
+        + (settings.target_saturation - saturation) * settings.saturation_uniformity)
+        .clamp(0.0, 1.0);
+    let adjusted_luminance = (luminance
+        + (settings.target_luminance - luminance) * settings.luminance_uniformity)
+        .clamp(0.0, 1.0);
+    let chroma = (1.0 - (2.0 * adjusted_luminance - 1.0).abs()) * adjusted_saturation;
+    let hue_sector = adjusted_hue / 60.0;
+    let secondary = chroma * (1.0 - (hue_sector.rem_euclid(2.0) - 1.0).abs());
+    let rgb = match hue_sector.floor() as u32 {
+        0 => Vec3::new(chroma, secondary, 0.0),
+        1 => Vec3::new(secondary, chroma, 0.0),
+        2 => Vec3::new(0.0, chroma, secondary),
+        3 => Vec3::new(0.0, secondary, chroma),
+        4 => Vec3::new(secondary, 0.0, chroma),
+        _ => Vec3::new(chroma, 0.0, secondary),
+    };
+    let offset = adjusted_luminance - chroma * 0.5;
+    let linear_srgb = srgb_to_linear(rgb + Vec3::splat(offset));
+    Vec3::new(
+        0.613_097_4 * linear_srgb.x + 0.339_523_1 * linear_srgb.y + 0.047_379_5 * linear_srgb.z,
+        0.070_193_7 * linear_srgb.x + 0.916_353_9 * linear_srgb.y + 0.013_452_4 * linear_srgb.z,
+        0.020_615_6 * linear_srgb.x + 0.109_569_8 * linear_srgb.y + 0.869_814_6 * linear_srgb.z,
+    ) + negative_residual
 }
 
 pub(crate) fn apply_luma_levels(
