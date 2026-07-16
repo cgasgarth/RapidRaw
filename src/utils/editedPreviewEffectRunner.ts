@@ -244,6 +244,7 @@ const executeNativeEditedPreview = async (
           'point_color',
           'scene_curve',
           'scene_global_color_tone',
+          'scene_to_view_transform',
           'source_decode',
           'source_artifacts',
           'tone_equalizer',
