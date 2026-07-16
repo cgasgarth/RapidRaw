@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import type { SubMask } from '../../../src/components/panel/right/layers/Masks';
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
+import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments';
 import {
   resolveMaskSelection,
   selectionAfterContainerDeletion,
@@ -11,15 +15,17 @@ import {
 const subMask = (id: string): SubMask => ({
   id,
   invert: false,
-  mode: 'additive',
+  mode: SubMaskMode.Additive,
   name: id,
   opacity: 100,
   parameters: {},
-  type: 'Brush',
+  type: Mask.Brush,
   visible: true,
 });
 const container = (id: string, subMaskIds: string[] = []): MaskContainer => ({
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id,
   invert: false,
   name: id,

@@ -15,6 +15,7 @@
     "../edit-document/camera-detail-migrations.test.ts",
     "../edit-document/creative-curves-geometry.test.ts",
     "../edit-document/render-preparation.test.ts",
+    "../edit-document/batch-reset-clipboard.test.ts",
     "../editor/black-white-mixer-edit-transaction.test.ts",
     "../editor/camera-input-edit-transaction.test.ts",
     "../editor/channel-mixer-edit-transaction.test.ts",
@@ -32,7 +33,12 @@
     "../negative-lab/negative-lab-measured-profile-library.test.ts",
     "../negative-lab/negative-lab-preview-proof.test.ts",
     "../negative-lab/negative-lab-roll-batch-contact-sheet.test.ts",
-    "../negative-lab/negative-lab-runtime-dry-run-adapter.test.ts"
+    "../negative-lab/negative-lab-runtime-dry-run-adapter.test.ts",
+    "../masks/brush-mask-command-receipt.test.ts",
+    "../masks/layer-sidecar-output-runtime.test.ts",
+    "../masks/mask-list-helpers.test.ts",
+    "../masks/mask-overlay-runtime.test.ts",
+    "../masks/mask-selection-commands.test.ts"
   ],
   "exclude": ["../../../node_modules"]
 }
