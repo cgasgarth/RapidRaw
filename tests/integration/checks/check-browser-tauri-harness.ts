@@ -3867,7 +3867,6 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     { timeout: 10_000 },
   );
-  await page.waitForTimeout(500);
   const baseline = await counts();
   const exposure = page.getByTestId('basic-control-exposure-value');
   await exposure.click();
@@ -3877,13 +3876,21 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   const standardActivePath = await page.getByTestId('editor-workspace').getAttribute('data-selected-image-path');
   if (!standardActivePath) throw new Error('Batch Auto Adjust proof requires an active path.');
   await page.evaluate(() => {
-    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__) {
-      window.__RAWENGINE_BROWSER_TAURI_HARNESS__.batchAutoAdjustCommitDelayMs = 1_000;
-    }
+    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.holdNextBatchAutoAdjustCommitCompletion();
   });
   await invokeFromContextMenu();
   await waitForSingleAutoAdjustInvocation(baseline.autoAdjust);
-  await page.waitForTimeout(500);
+  await page.waitForFunction(
+    (expectedCommitCount) => {
+      const commits =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'commit_batch_auto_adjustment',
+        ) ?? [];
+      return commits.length === expectedCommitCount && commits.at(-1)?.endedAtMs === null;
+    },
+    baseline.commit + 1,
+    { timeout: 10_000 },
+  );
   const afterPrepare = await counts();
   if (afterPrepare.commit !== baseline.commit + 1) {
     const applyArgs = await page.evaluate(
@@ -3895,21 +3902,30 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     throw new Error(`Batch Auto Adjust did not reach selected-path commit: ${JSON.stringify(applyArgs)}`);
   }
   await switchAwayAndBack(standardActivePath);
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.releaseHeldBatchAutoAdjustCommitCompletion() !== true) {
+      throw new Error('Batch Auto Adjust commit completion was not held for successor hydration.');
+    }
+  });
 
-  await waitForPageCondition(
-    page,
-    () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
-    { timeout: 10_000 },
-  );
   await page.waitForFunction(
-    (expectedSaveCount) => {
+    ({ expectedCommitCount, expectedSaveCount }) => {
+      const commits =
+        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+          ({ command }) => command === 'commit_batch_auto_adjustment',
+        ) ?? [];
       const saves =
         window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
           ({ command }) => command === 'save_metadata_and_update_thumbnail',
         ) ?? [];
-      return saves.length >= expectedSaveCount && saves[expectedSaveCount - 1]?.endedAtMs !== null;
+      return (
+        typeof commits[expectedCommitCount - 1]?.endedAtMs === 'number' &&
+        saves.length >= expectedSaveCount &&
+        saves[expectedSaveCount - 1]?.endedAtMs !== null &&
+        document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65'
+      );
     },
-    baseline.metadataSave + 1,
+    { expectedCommitCount: baseline.commit + 1, expectedSaveCount: baseline.metadataSave + 1 },
     { timeout: 10_000 },
   );
   const afterApply = await counts();
