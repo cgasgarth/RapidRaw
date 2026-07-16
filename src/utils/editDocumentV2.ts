@@ -93,21 +93,8 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
 const hasRecordShape = (value: unknown): value is Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const normalizeLegacyGeometryCrop = (crop: unknown): unknown => {
-  if (!hasRecordShape(crop) || Object.hasOwn(crop, 'unit')) return crop;
-  const coordinates = ['x', 'y', 'width', 'height'].map((field) => crop[field]);
-  const isNormalized = coordinates.every(
-    (coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate) && coordinate <= 1,
-  );
-  return { ...crop, unit: isNormalized ? 'normalized' : 'px' };
-};
-
 const normalizeGeometryParams = (params: Readonly<Record<string, unknown>>) =>
-  editDocumentGeometryV2Schema.parse({
-    ...params,
-    // biome-ignore lint/complexity/useLiteralKeys: geometry candidates intentionally use an index signature.
-    crop: normalizeLegacyGeometryCrop(params['crop']),
-  });
+  editDocumentGeometryV2Schema.parse(params);
 
 const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
   const descriptor = EDIT_DOCUMENT_NODE_DESCRIPTORS.find((candidate) =>
@@ -585,7 +572,7 @@ export interface EditDocumentV2NodeDiagnostic {
   readonly implementationVersion: number;
   readonly nodeType: EditDocumentNodeTypeV2;
   readonly parameterKeys: readonly string[];
-  readonly process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  readonly process: 'scene_referred_v2';
   readonly renderStage: string;
   readonly status: 'active' | 'disabled';
 }
@@ -633,9 +620,7 @@ export const buildEditDocumentV2Diagnostics = (document: EditDocumentV2): EditDo
   return {
     activeNodeTypes,
     graphProcess: parsed.graphProcess,
-    legacyNodeTypes: nodeDiagnostics
-      .filter(({ process }) => process === 'legacy_pipeline_v1')
-      .map(({ nodeType }) => nodeType),
+    legacyNodeTypes: [],
     migration: parsed.migration ?? null,
     nodeDiagnostics,
     quarantinedNodeTypes,

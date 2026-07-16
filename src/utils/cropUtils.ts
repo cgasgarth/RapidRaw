@@ -1,4 +1,5 @@
 import type { Crop, PercentCrop } from 'react-image-crop';
+import type { EditDocumentGeometryCropV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 
 export type CropInteraction =
   | { kind: 'idle' }
@@ -162,6 +163,34 @@ export function pixelCropFromPercentCrop(percentCrop: PercentCrop, imageWidth: n
   };
 }
 
+export function pixelCropFromNormalizedCrop(
+  crop: EditDocumentGeometryCropV2,
+  imageWidth: number,
+  imageHeight: number,
+): Crop {
+  return {
+    unit: 'px',
+    x: Math.ceil(crop.x * imageWidth - 1e-9),
+    y: Math.ceil(crop.y * imageHeight - 1e-9),
+    width: Math.floor(crop.width * imageWidth),
+    height: Math.floor(crop.height * imageHeight),
+  };
+}
+
+export function normalizedCropFromPixelCrop(
+  crop: Crop,
+  imageWidth: number,
+  imageHeight: number,
+): EditDocumentGeometryCropV2 {
+  return {
+    unit: 'normalized',
+    x: crop.x / imageWidth,
+    y: crop.y / imageHeight,
+    width: crop.width / imageWidth,
+    height: crop.height / imageHeight,
+  };
+}
+
 export function cropGeometryIdentity(
   imagePath: string,
   imageWidth: number,
@@ -179,15 +208,25 @@ export function cropGeometryIdentity(
 }
 
 export function resolveCropForGeometryTransaction(
-  currentCrop: Crop | null,
+  currentCrop: EditDocumentGeometryCropV2 | null,
   imageWidth: number,
   imageHeight: number,
   previousParams: CropGeometryParams,
   nextParams: CropGeometryParams,
-): Crop | null {
-  return resolveNextCropForGeometryChange({
+): EditDocumentGeometryCropV2 | null {
+  const { width: currentWidth, height: currentHeight } = getOrientedDimensions(
+    imageWidth,
+    imageHeight,
+    previousParams.orientationSteps,
+  );
+  const { width: nextWidth, height: nextHeight } = getOrientedDimensions(
+    imageWidth,
+    imageHeight,
+    nextParams.orientationSteps,
+  );
+  const nextCrop = resolveNextCropForGeometryChange({
     aspectRatio: nextParams.aspectRatio,
-    currentCrop,
+    currentCrop: currentCrop ? pixelCropFromNormalizedCrop(currentCrop, currentWidth, currentHeight) : null,
     effectiveRotation: nextParams.rotation,
     imageHeight,
     imageWidth,
@@ -196,6 +235,7 @@ export function resolveCropForGeometryTransaction(
     previousParams,
     rotation: nextParams.rotation,
   }).nextPixelCrop;
+  return nextCrop ? normalizedCropFromPixelCrop(nextCrop, nextWidth, nextHeight) : null;
 }
 
 export function isCropChangeMeaningful(currentCrop: Crop | null, nextCrop: Crop | null): boolean {

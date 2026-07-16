@@ -48,7 +48,7 @@ impl EditNodeTypeV2 {
     fn contract(self) -> (&'static str, &'static str, u32) {
         match self {
             Self::SourceDecode => ("source_decode", "scene_referred_v2", 1),
-            Self::Geometry => ("geometry", "legacy_pipeline_v1", 1),
+            Self::Geometry => ("geometry", "scene_referred_v2", 1),
             Self::SceneGlobalColorTone => ("scene_global_color_tone", "scene_referred_v2", 1),
             Self::SceneToViewTransform => ("scene_to_view_transform", "scene_referred_v2", 1),
             Self::ColorPresence => ("color_presence", "scene_referred_v2", 1),
@@ -66,7 +66,7 @@ impl EditNodeTypeV2 {
             Self::LumaLevels => ("luma_levels", "scene_referred_v2", 1),
             Self::PerceptualGrading => ("perceptual_grading", "scene_referred_v2", 1),
             Self::CameraInput => ("camera_input", "scene_referred_v2", 1),
-            Self::LensCorrection => ("lens_correction", "legacy_pipeline_v1", 1),
+            Self::LensCorrection => ("lens_correction", "scene_referred_v2", 1),
             Self::ColorCalibration => ("color_calibration", "scene_referred_v2", 1),
             Self::Layers => ("layers", "scene_referred_v2", 1),
             Self::SourceArtifacts => ("source_artifacts", "scene_referred_v2", 1),
@@ -247,12 +247,8 @@ fn validate_color_presence_parameter(
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 enum GeometryCropUnitV2 {
-    #[serde(rename = "%")]
-    Percent,
     #[serde(rename = "normalized")]
     Normalized,
-    #[serde(rename = "px")]
-    Pixels,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -281,13 +277,7 @@ impl GeometryCropV2 {
                     .to_string(),
             );
         }
-        let maximum = match self.unit {
-            GeometryCropUnitV2::Percent => Some(100.0),
-            GeometryCropUnitV2::Normalized => Some(1.0),
-            GeometryCropUnitV2::Pixels => None,
-        };
-        if maximum.is_some_and(|limit| self.x + self.width > limit || self.y + self.height > limit)
-        {
+        if self.x + self.width > 1.0 || self.y + self.height > 1.0 {
             return Err("EditDocumentV2 geometry crop exceeds its unit bounds".to_string());
         }
         Ok(())
@@ -3310,7 +3300,7 @@ mod tests {
             "extensions": { "legacyAdjustments": legacy },
             "geometry": {
                 "aspectRatio": null,
-                "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
+                "crop": { "height": 0.8, "unit": "normalized", "width": 0.9, "x": 0.04, "y": 0.06 },
                 "flipHorizontal": false,
                 "flipVertical": true,
                 "orientationSteps": 1,
@@ -3435,13 +3425,13 @@ mod tests {
                     "implementationVersion": 1,
                     "params": {
                         "aspectRatio": null,
-                        "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
+                        "crop": { "height": 0.8, "unit": "normalized", "width": 0.9, "x": 0.04, "y": 0.06 },
                         "flipHorizontal": false,
                         "flipVertical": true,
                         "orientationSteps": 1,
                         "rotation": 0.5
                     },
-                    "process": "legacy_pipeline_v1",
+                    "process": "scene_referred_v2",
                     "type": "geometry"
                 },
                 "lens_correction": {
@@ -3461,7 +3451,7 @@ mod tests {
                         "lensVignetteAmount": 100,
                         "lensVignetteEnabled": true
                     },
-                    "process": "legacy_pipeline_v1",
+                    "process": "scene_referred_v2",
                     "type": "lens_correction"
                 },
                 "layers": {
@@ -3705,7 +3695,7 @@ mod tests {
             "colorNoiseReduction": 0,
             "colorCalibration": color_calibration_params()["colorCalibration"].clone(),
             "contrast": 18,
-            "crop": { "height": 80, "unit": "%", "width": 90, "x": 4, "y": 6 },
+            "crop": { "height": 0.8, "unit": "normalized", "width": 0.9, "x": 0.04, "y": 0.06 },
             "deblurEnabled": true,
             "deblurSigmaPx": 0.8,
             "deblurStrength": 32,
@@ -3875,7 +3865,7 @@ mod tests {
         assert!(error.contains("unsupported implementationVersion 2"));
 
         let mut incompatible = document_with_legacy(json!({}));
-        incompatible["nodes"]["geometry"]["process"] = json!("scene_referred_v2");
+        incompatible["nodes"]["geometry"]["process"] = json!("legacy_pipeline_v1");
         let error = serde_json::from_value::<EditDocumentV2>(incompatible)
             .expect("deserializes before semantic validation")
             .into_render_adjustments()
@@ -5285,7 +5275,8 @@ mod tests {
             .into_render_adjustments()
             .expect("current transform geometry remains compilable");
 
-        let valid_crop = json!({ "height": 1800, "unit": "px", "width": 2400, "x": 400, "y": 300 });
+        let valid_crop =
+            json!({ "height": 0.6, "unit": "normalized", "width": 0.6, "x": 0.1, "y": 0.1 });
         let mut valid = document_with_legacy(json!({}));
         valid["nodes"]["geometry"]["params"]["crop"] = valid_crop.clone();
         valid["nodes"]["geometry"]["params"]["rotation"] = json!(-5.5);

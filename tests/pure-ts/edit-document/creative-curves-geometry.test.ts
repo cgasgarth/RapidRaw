@@ -409,20 +409,33 @@ describe('EditDocumentV2 creative curves and geometry', () => {
   });
 
   test('geometry is strict, bounded, unit-explicit, and atomically mirrored into its domain', () => {
-    const legacyPixelCrop = { height: 1800, width: 2400, x: 400, y: 300 };
+    const currentCrop = { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.1, y: 0.1 };
     const document = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
-      crop: legacyPixelCrop,
+      crop: currentCrop,
     });
-    expect(document.geometry.crop).toEqual({ ...legacyPixelCrop, unit: 'px' });
-    expect(document.migration?.defaulted).toContain('geometry.crop.unit');
+    expect(document.geometry.crop).toEqual(currentCrop);
+    expect(document.migration?.defaulted).not.toContain('geometry.crop.unit');
+    for (const crop of [
+      { height: 0.6, width: 0.6, x: 0.1, y: 0.1 },
+      { ...currentCrop, unit: 'px' },
+      { ...currentCrop, unit: '%' },
+      { ...currentCrop, width: 0.95 },
+    ]) {
+      expect(() =>
+        legacyAdjustmentsToEditDocumentV2({
+          ...structuredClone(INITIAL_ADJUSTMENTS),
+          crop,
+        }),
+      ).toThrow();
+    }
     const reopened = legacyAdjustmentsToEditDocumentV2(editDocumentV2ToLegacyAdjustments(document));
     expect(reopened.geometry).toEqual(document.geometry);
     expect(requireNode(reopened, 'geometry')).toEqual(requireNode(document, 'geometry'));
 
     const next = updateEditDocumentV2Node(document, 'geometry', (params) => ({
       ...params,
-      crop: { height: 0.7, width: 0.8, x: 0.1, y: 0.2 },
+      crop: { height: 0.7, unit: 'normalized', width: 0.8, x: 0.1, y: 0.2 },
       rotation: 2.5,
     }));
     expect(next.geometry).toEqual(editDocumentGeometryV2Schema.parse(requireNode(next, 'geometry').params));

@@ -59,7 +59,7 @@ describe('preview viewport quality controller', () => {
     const controller = new PreviewViewportQualityController();
     const cropped = controller.snapshot(
       input({
-        crop: { height: 1800, unit: 'px', width: 2400, x: 0, y: 0 },
+        crop: { height: 0.45, unit: 'normalized', width: 0.4, x: 0, y: 0 },
         zoomMode: { devicePixelsPerImagePixel: 2, kind: 'ratio' },
       }),
     );

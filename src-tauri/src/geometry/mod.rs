@@ -36,12 +36,53 @@ impl<'a> IntoCowImage<'a> for &'a std::sync::Arc<DynamicImage> {
         Cow::Borrowed(self.as_ref())
     }
 }
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CropUnit {
+    #[serde(rename = "normalized")]
+    Normalized,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(deny_unknown_fields)]
 pub struct Crop {
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    pub unit: CropUnit,
+}
+
+impl Crop {
+    pub fn pixel_bounds(self, image_width: u32, image_height: u32) -> Option<(u32, u32, u32, u32)> {
+        if image_width == 0
+            || image_height == 0
+            || !self.x.is_finite()
+            || !self.y.is_finite()
+            || !self.width.is_finite()
+            || !self.height.is_finite()
+            || self.x < 0.0
+            || self.y < 0.0
+            || self.width <= 0.0
+            || self.height <= 0.0
+            || self.x + self.width > 1.0
+            || self.y + self.height > 1.0
+        {
+            return None;
+        }
+
+        let x = (self.x.mul_add(f64::from(image_width), -1.0e-9)).ceil() as u32;
+        let y = (self.y.mul_add(f64::from(image_height), -1.0e-9)).ceil() as u32;
+        if x >= image_width || y >= image_height {
+            return None;
+        }
+        let width = ((self.width * f64::from(image_width)).floor() as u32)
+            .max(1)
+            .min(image_width - x);
+        let height = ((self.height * f64::from(image_height)).floor() as u32)
+            .max(1)
+            .min(image_height - y);
+        Some((x, y, width, height))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -1112,24 +1153,12 @@ pub fn apply_crop<'a>(image: impl IntoCowImage<'a>, crop_value: &Value) -> Cow<'
     }
 
     if let Ok(crop) = serde_json::from_value::<Crop>(crop_value.clone()) {
-        let x = crop.x.round() as u32;
-        let y = crop.y.round() as u32;
-        let width = crop.width.round() as u32;
-        let height = crop.height.round() as u32;
-
-        if width > 0 && height > 0 {
-            let (img_w, img_h) = image.dimensions();
-            if x < img_w && y < img_h {
-                let new_width = (img_w - x).min(width);
-                let new_height = (img_h - y).min(height);
-
-                if new_width > 0 && new_height > 0 {
-                    if x == 0 && y == 0 && new_width == img_w && new_height == img_h {
-                        return image;
-                    }
-                    return Cow::Owned(image.crop_imm(x, y, new_width, new_height));
-                }
+        let (img_w, img_h) = image.dimensions();
+        if let Some((x, y, width, height)) = crop.pixel_bounds(img_w, img_h) {
+            if x == 0 && y == 0 && width == img_w && height == img_h {
+                return image;
             }
+            return Cow::Owned(image.crop_imm(x, y, width, height));
         }
     }
     image
@@ -1190,6 +1219,37 @@ pub fn is_geometry_identity(params: &GeometryParams) -> bool {
 #[cfg(test)]
 mod preview_geometry_tests {
     use super::*;
+
+    #[test]
+    fn normalized_crop_maps_to_exact_pixel_bounds_and_preserves_pixels() {
+        let source = DynamicImage::ImageRgb32F(Rgb32FImage::from_fn(100, 80, |x, y| {
+            image::Rgb([x as f32 / 99.0, y as f32 / 79.0, 0.25])
+        }));
+        let crop = serde_json::json!({
+            "unit": "normalized", "x": 0.1, "y": 0.25, "width": 0.5, "height": 0.5
+        });
+        let output = apply_crop(&source, &crop).into_owned().to_rgb32f();
+
+        assert_eq!(output.dimensions(), (50, 40));
+        assert_eq!(output.get_pixel(0, 0), source.to_rgb32f().get_pixel(10, 20));
+        assert_eq!(
+            output.get_pixel(49, 39),
+            source.to_rgb32f().get_pixel(59, 59)
+        );
+    }
+
+    #[test]
+    fn obsolete_and_out_of_bounds_crop_contracts_do_not_render() {
+        let source = DynamicImage::new_rgb32f(100, 80);
+        for crop in [
+            serde_json::json!({ "unit": "px", "x": 10, "y": 20, "width": 50, "height": 40 }),
+            serde_json::json!({ "unit": "%", "x": 10, "y": 25, "width": 50, "height": 50 }),
+            serde_json::json!({ "x": 0.1, "y": 0.25, "width": 0.5, "height": 0.5 }),
+            serde_json::json!({ "unit": "normalized", "x": 0.75, "y": 0.25, "width": 0.5, "height": 0.5 }),
+        ] {
+            assert_eq!(apply_crop(&source, &crop).dimensions(), source.dimensions());
+        }
+    }
 
     #[test]
     fn mapped_geometry_is_bitwise_independent_of_band_partition() {

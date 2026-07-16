@@ -37,7 +37,7 @@ describe('EditDocumentV2 owned node migrations', () => {
     const document = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
       exposure: 0.75,
-      crop: { unit: '%', x: 1, y: 2, width: 95, height: 90 },
+      crop: { unit: 'normalized', x: 0.01, y: 0.02, width: 0.95, height: 0.9 },
     });
 
     expect(document.schemaVersion).toBe(2);
@@ -69,7 +69,7 @@ describe('EditDocumentV2 owned node migrations', () => {
     expect(
       sceneGlobalColorToneParamsV2Schema.parse(requireNode(document, 'scene_global_color_tone').params).exposure,
     ).toBe(0.75);
-    expect(document.geometry.crop).toEqual({ unit: '%', x: 1, y: 2, width: 95, height: 90 });
+    expect(document.geometry.crop).toEqual({ unit: 'normalized', x: 0.01, y: 0.02, width: 0.95, height: 0.9 });
     expect(document.migration?.mapped).toContain('scene_global_color_tone.exposure');
     expect(document.migration?.quarantined).not.toContain('sectionVisibility');
     expect(document.extensions['legacyAdjustments']).not.toHaveProperty('sectionVisibility');
