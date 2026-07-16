@@ -175,7 +175,7 @@ const readLegacySectionEnabled = (
   return hasRecordShape(visibility) && typeof visibility[section] === 'boolean' ? visibility[section] : true;
 };
 
-const normalizeLegacyLayers = (params: Readonly<Record<string, unknown>>) =>
+const parseCurrentLayers = (params: Readonly<Record<string, unknown>>) =>
   editDocumentLayersV2Schema.parse({
     ...params,
     masks: Array.isArray(params['masks']) ? params['masks'] : [],
@@ -210,7 +210,7 @@ const normalizeMappedNodeParams = (
 ): Record<string, unknown> => {
   const candidate = { ...defaults, ...mappedParams };
   if (nodeType === 'geometry') return normalizeGeometryParams(candidate);
-  if (nodeType === 'layers') return normalizeLegacyLayers({ masks: [], ...mappedParams });
+  if (nodeType === 'layers') return parseCurrentLayers({ masks: [], ...mappedParams });
   const schema = STRICT_LEGACY_NODE_PARAM_SCHEMAS[nodeType];
   if (schema === undefined) return { ...mappedParams };
   const parsed = schema.parse(candidate);

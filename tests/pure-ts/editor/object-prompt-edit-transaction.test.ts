@@ -3,7 +3,7 @@ import type { ViewerObjectPromptKey } from '../../../src/components/panel/editor
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildObjectPromptEditTransaction } from '../../../src/utils/objectPromptEditTransaction';
 
@@ -46,6 +46,8 @@ describe('Object Prompt edit transaction', () => {
         {
           adjustments: {},
           blendMode: 'normal' as const,
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer:1',
           invert: false,
           name: 'Object layer',

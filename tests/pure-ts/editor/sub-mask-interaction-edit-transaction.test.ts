@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildSubMaskInteractionEditTransaction,
@@ -47,6 +47,8 @@ describe('sub-mask interaction edit transaction', () => {
         {
           adjustments: {},
           blendMode: 'normal' as const,
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer:1',
           invert: false,
           name: 'Radial layer',

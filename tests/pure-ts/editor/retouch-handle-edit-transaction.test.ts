@@ -6,7 +6,7 @@ import {
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildRetouchHandleEditTransaction,
@@ -21,6 +21,8 @@ const imageSize = { height: 3000, width: 4000 };
 const layer = (): MaskContainer => ({
   adjustments: {},
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: 'layer:retouch',
   invert: false,
   name: 'Retouch layer',
