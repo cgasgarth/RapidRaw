@@ -31,6 +31,7 @@ describe('viewer parametric mask target interaction controller', () => {
   test('publishes a declarative target then emits one exact source-bound semantic command on owned release', () => {
     const controller = createViewerParametricMaskTargetInteractionController();
     const overlay = controller.begin(context(), mouse, settings);
+    if (overlay === null) throw new Error('Expected parametric mask target overlay.');
     expect(overlay).toEqual({
       id: 'parametric-mask-target:image-session:12:a:1',
       imagePoint: { x: 812, y: 614 },

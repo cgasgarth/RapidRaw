@@ -171,11 +171,11 @@ describe('white balance picker runtime command path', () => {
     expect(state.historyIndex).toBe(1);
     expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.kelvin).toBe(command.receipt.resultingKelvin);
     expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.duv).toBe(command.receipt.resultingDuv);
-    expect(result.afterEditDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['camera_input']?.params['whiteBalanceTechnical']).toMatchObject({
       mode: 'chromaticity',
       source: 'picker',
     });
-    expect(result.afterEditDocumentV2.nodes.geometry).toBe(result.beforeEditDocumentV2.nodes.geometry);
+    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(result.beforeEditDocumentV2.nodes['geometry']);
     expect(state.finalPreviewUrl).toBeNull();
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
