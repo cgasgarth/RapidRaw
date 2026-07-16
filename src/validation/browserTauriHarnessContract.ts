@@ -85,9 +85,11 @@ declare global {
       revokedObjectUrls: Array<string>;
       batchAutoAdjustCommitDelayMs: number;
       batchAutoAdjustPrepareDelayMs: number;
+      holdNextBatchAutoAdjustCommitCompletion: () => void;
       imageOpenDelayMs: number;
       holdNextImageOpenCompletion: () => void;
       releaseHeldImageOpenCompletion: () => boolean;
+      releaseHeldBatchAutoAdjustCommitCompletion: () => boolean;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       aiSubjectMaskResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;

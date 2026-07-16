@@ -30,6 +30,7 @@ const browserHarnessRoot = '/tmp/rawengine-browser-harness';
 const agentAuditE2eEnabled = import.meta.env.VITE_RAWENGINE_AGENT_AUDIT_E2E === '1';
 const browserHarnessSettingsStorageKey = 'rawengine-browser-tauri-harness-settings-v1';
 let imageOpenCompletionGate = createBrowserHarnessReleaseGate();
+let batchAutoAdjustCommitCompletionGate = createBrowserHarnessReleaseGate();
 const commandNames: Record<
   | 'analyzeAutoEdit'
   | 'analyzePerspectiveCorrection'
@@ -324,6 +325,7 @@ export const installBrowserTauriHarness = (): void => {
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });
   };
   imageOpenCompletionGate = createBrowserHarnessReleaseGate();
+  batchAutoAdjustCommitCompletionGate = createBrowserHarnessReleaseGate();
   window.__RAWENGINE_BROWSER_TAURI_HARNESS__ = {
     aiSubjectMaskResponses: [],
     applyAdjustmentsToPathsDelayMs: 0,
@@ -337,12 +339,14 @@ export const installBrowserTauriHarness = (): void => {
     failNextSettingsSave: false,
     imageOpenDelayMs: 250,
     holdNextImageOpenCompletion: imageOpenCompletionGate.holdNext,
+    holdNextBatchAutoAdjustCommitCompletion: batchAutoAdjustCommitCompletionGate.holdNext,
     lensDistortionResponses: [],
     metadataSaveResponses: [],
     originalPreviewResponses: [],
     resetAdjustmentsResponses: [],
     perspectiveAnalysisResponses: [],
     releaseHeldImageOpenCompletion: imageOpenCompletionGate.releaseHeld,
+    releaseHeldBatchAutoAdjustCommitCompletion: batchAutoAdjustCommitCompletionGate.releaseHeld,
     revokedObjectUrls: [],
     tonePlacementResponses: [],
     viewerSampleResponses: [],
@@ -584,21 +588,19 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
     case commandNames.commitBatchAutoAdjustment: {
       const request = args?.['request'] as { path?: string; receipt?: Record<string, unknown> } | undefined;
       const delayMs = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.batchAutoAdjustCommitDelayMs ?? 0;
-      return new Promise((resolve) => {
-        window.setTimeout(() => {
-          if (request?.path && request.receipt?.['editDocumentV2']) {
-            harnessEditDocumentsByPath.set(request.path, structuredClone(request.receipt['editDocumentV2']));
-          }
-          resolve({
-            contract: 'rapidraw.batch_auto_adjust.v1',
-            path: request?.path,
-            receipt: {
-              ...request?.receipt,
-              adjustmentDocumentRevision: `sha256:${'b'.repeat(64)}`,
-            },
-            status: 'applied',
-          });
-        }, delayMs);
+      return batchAutoAdjustCommitCompletionGate.wait(delayMs).then(() => {
+        if (request?.path && request.receipt?.['editDocumentV2']) {
+          harnessEditDocumentsByPath.set(request.path, structuredClone(request.receipt['editDocumentV2']));
+        }
+        return {
+          contract: 'rapidraw.batch_auto_adjust.v1',
+          path: request?.path,
+          receipt: {
+            ...request?.receipt,
+            adjustmentDocumentRevision: `sha256:${'b'.repeat(64)}`,
+          },
+          status: 'applied',
+        };
       });
     }
     case commandNames.previewAutoEditProposal: {
