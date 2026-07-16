@@ -1,5 +1,45 @@
 import { z } from 'zod';
 
+export const denoiseAlgorithmV1Schema = z.enum([
+  'collaborative_transform_filter_v1',
+  'nind_rgb_raised_cosine_tiled_v2',
+]);
+
+export type DenoiseAlgorithmV1 = z.infer<typeof denoiseAlgorithmV1Schema>;
+
+export const denoiseParametersV1Schema = z
+  .object({
+    strength: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
+export const denoiseRequestV1Schema = z
+  .object({
+    algorithm: denoiseAlgorithmV1Schema,
+    parameters: denoiseParametersV1Schema,
+    schemaVersion: z.literal(1),
+    sourceIdentity: z.string().min(1),
+  })
+  .strict();
+
+export type DenoiseRequestV1 = z.infer<typeof denoiseRequestV1Schema>;
+
+export const denoiseBatchRequestV1Schema = z
+  .object({
+    requests: z.array(denoiseRequestV1Schema).min(1).max(512),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
+export type DenoiseBatchRequestV1 = z.infer<typeof denoiseBatchRequestV1Schema>;
+
+export const createDenoiseRequestV1 = (
+  sourceIdentity: string,
+  algorithm: DenoiseAlgorithmV1,
+  strength: number,
+): DenoiseRequestV1 =>
+  denoiseRequestV1Schema.parse({ algorithm, parameters: { strength }, schemaVersion: 1, sourceIdentity });
+
 export const denoiseOperationHandleSchema = z
   .object({
     imageGeneration: z.number().int().positive(),
