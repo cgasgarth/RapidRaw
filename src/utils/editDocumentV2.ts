@@ -8,6 +8,7 @@ import {
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
+  EDIT_DOCUMENT_SOURCE_DECODE_FIELDS,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
@@ -36,6 +37,7 @@ import {
   editDocumentSelectiveColorMixerV2Schema,
   editDocumentSharpnessThresholdV2Schema,
   editDocumentSourceArtifactsV2Schema,
+  editDocumentSourceDecodeV2Schema,
   editDocumentToneEqualizerV2Schema,
   editDocumentV2Schema,
   getEditDocumentNodeDescriptor,
@@ -53,6 +55,7 @@ const COLOR_PRESENCE_FIELDS = new Set<string>(EDIT_DOCUMENT_COLOR_PRESENCE_FIELD
 const SHARPNESS_THRESHOLD_FIELDS = new Set<string>(EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS);
 const FILM_EMULATION_FIELDS = new Set<string>(EDIT_DOCUMENT_FILM_EMULATION_FIELDS);
 const FILM_LOOK_FIELDS = new Set<string>(EDIT_DOCUMENT_FILM_LOOK_FIELDS);
+const SOURCE_DECODE_FIELDS = new Set<string>(EDIT_DOCUMENT_SOURCE_DECODE_FIELDS);
 
 const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (COLOR_PRESENCE_FIELDS.has(key)) {
@@ -62,6 +65,7 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
   if (FILM_LOOK_FIELDS.has(key)) {
     return editDocumentFilmLookV2Schema.shape[key as (typeof EDIT_DOCUMENT_FILM_LOOK_FIELDS)[number]];
   }
+  if (SOURCE_DECODE_FIELDS.has(key)) return editDocumentSourceDecodeV2Schema.shape.rawProcessingModeOverride;
   if (LOCAL_CONTRAST_FIELDS.has(key)) {
     return editDocumentLocalContrastV2Schema.shape[key as (typeof EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS)[number]];
   }
@@ -154,6 +158,7 @@ const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z
   scene_global_color_tone: sceneGlobalColorToneParamsV2Schema,
   scene_curve: editDocumentSceneCurveV2Schema,
   selective_color_mixer: editDocumentSelectiveColorMixerV2Schema,
+  source_decode: editDocumentSourceDecodeV2Schema,
   tone_equalizer: editDocumentToneEqualizerV2Schema,
 };
 
@@ -238,6 +243,7 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'point_color',
       'scene_curve',
       'selective_color_mixer',
+      'source_decode',
       'tone_equalizer',
     ] as const
   ).flatMap((nodeType) => {
@@ -286,6 +292,8 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
     provenance,
     schemaVersion: 2,
     // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
+    sourceDecode: nodes['source_decode']?.params ?? {},
+    // biome-ignore lint/complexity/useLiteralKeys: Object.fromEntries returns an index-signature map.
     sourceArtifacts: nodes['source_artifacts']?.params ?? {},
   });
 };
@@ -331,6 +339,8 @@ export const updateEditDocumentV2Node = (
     ...document,
     layers: nodeType === 'layers' ? editDocumentLayersV2Schema.parse(nextNode.params) : document.layers,
     nodes: { ...document.nodes, [nodeType]: nextNode },
+    sourceDecode:
+      nodeType === 'source_decode' ? editDocumentSourceDecodeV2Schema.parse(nextNode.params) : document.sourceDecode,
     sourceArtifacts:
       nodeType === 'source_artifacts'
         ? editDocumentSourceArtifactsV2Schema.parse(nextNode.params)
@@ -368,6 +378,7 @@ export const prepareEditDocumentV2ForRender = (
   let geometry = prepared.geometry;
   let layers = prepared.layers;
   let sourceArtifacts = prepared.sourceArtifacts;
+  let sourceDecode = prepared.sourceDecode;
   for (const nodeType of authoritativeNodeTypes) {
     const authoritativeNode = authoritativeDocument.nodes[nodeType];
     if (authoritativeNode === undefined) continue;
@@ -377,6 +388,7 @@ export const prepareEditDocumentV2ForRender = (
     if (nodeType === 'source_artifacts') {
       sourceArtifacts = editDocumentSourceArtifactsV2Schema.parse(authoritativeNode.params);
     }
+    if (nodeType === 'source_decode') sourceDecode = editDocumentSourceDecodeV2Schema.parse(authoritativeNode.params);
   }
   // Explicit domains travel with their authoritative nodes; publishing only the
   // envelope would create an ambiguous render document rejected by native code.
@@ -385,6 +397,7 @@ export const prepareEditDocumentV2ForRender = (
     geometry,
     layers,
     nodes,
+    sourceDecode,
     sourceArtifacts,
   };
   editDocumentV2Schema.parse(next);
@@ -597,6 +610,8 @@ export const resetEditDocumentV2Node = (document: EditDocumentV2, nodeType: Edit
     ...parsed,
     geometry: nodeType === 'geometry' ? editDocumentGeometryV2Schema.parse(nextNode.params) : parsed.geometry,
     nodes: { ...parsed.nodes, [nodeType]: nextNode },
+    sourceDecode:
+      nodeType === 'source_decode' ? editDocumentSourceDecodeV2Schema.parse(nextNode.params) : parsed.sourceDecode,
   });
 };
 

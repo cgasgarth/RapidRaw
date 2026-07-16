@@ -16,6 +16,7 @@ const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 enum EditNodeTypeV2 {
+    SourceDecode,
     SceneGlobalColorTone,
     ColorPresence,
     SceneCurve,
@@ -42,6 +43,7 @@ enum EditNodeTypeV2 {
 impl EditNodeTypeV2 {
     fn contract(self) -> (&'static str, &'static str, u32) {
         match self {
+            Self::SourceDecode => ("source_decode", "scene_referred_v2", 1),
             Self::Geometry => ("geometry", "legacy_pipeline_v1", 1),
             Self::SceneGlobalColorTone => ("scene_global_color_tone", "scene_referred_v2", 1),
             Self::ColorPresence => ("color_presence", "scene_referred_v2", 1),
@@ -82,7 +84,8 @@ impl EditNodeTypeV2 {
             | Self::PerceptualGrading
             | Self::CameraInput
             | Self::ColorCalibration => Some("color"),
-            Self::FilmEmulation
+            Self::SourceDecode
+            | Self::FilmEmulation
             | Self::FilmLook
             | Self::LensCorrection
             | Self::Geometry
@@ -90,6 +93,20 @@ impl EditNodeTypeV2 {
             | Self::SourceArtifacts => None,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum RawProcessingModeV1 {
+    Fast,
+    Balanced,
+    Maximum,
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourceDecodeV2 {
+    raw_processing_mode_override: Option<RawProcessingModeV1>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2171,6 +2188,8 @@ pub(crate) struct EditDocumentV2 {
     nodes: BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
     provenance: EditDocumentProvenanceV2,
     schema_version: u8,
+    #[serde(default)]
+    source_decode: SourceDecodeV2,
     source_artifacts: SourceArtifactsV2,
 }
 
@@ -2282,6 +2301,7 @@ impl EditDocumentV2 {
         }
         validate_geometry_domain(&self.nodes, &self.geometry)?;
         validate_layers_domain(&self.nodes, &self.layers)?;
+        validate_source_decode_domain(&self.nodes, &self.source_decode)?;
         validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
         if self
             .provenance
@@ -2303,11 +2323,58 @@ pub(crate) fn validate_edit_document_v2(value: &Value) -> Result<(), String> {
     document.validate_document_contract()
 }
 
+/// Resolve the single source-decode projection persisted beside a V2 document.
+/// Mixed flat/node authority fails closed instead of silently decoding different
+/// pixels on preview, reopen, and export paths.
+pub(crate) fn resolve_source_decode_adjustments(
+    adjustments: &Value,
+    edit_document_v2: Option<&Value>,
+) -> Result<Value, String> {
+    let mut resolved = adjustments
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "Source-decode adjustments must be an object".to_string())?;
+    let Some(value) = edit_document_v2 else {
+        return Ok(Value::Object(resolved));
+    };
+    let document: EditDocumentV2 = serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 source-decode authority is invalid: {error}"))?;
+    document.validate_document_contract()?;
+    let Some(node) = document.nodes.get(&EditNodeTypeV2::SourceDecode) else {
+        return Ok(Value::Object(resolved));
+    };
+    validate_node_contract(EditNodeTypeV2::SourceDecode, node)?;
+    let source_decode = parse_source_decode(&node.params)?;
+    let authoritative = serde_json::to_value(source_decode.raw_processing_mode_override)
+        .map_err(|error| format!("Source-decode authority cannot serialize: {error}"))?;
+    match resolved.get("rawProcessingModeOverride") {
+        Some(legacy) if legacy != &authoritative => {
+            return Err(
+                "Source-decode node conflicts with flat rawProcessingModeOverride authority"
+                    .to_string(),
+            );
+        }
+        None if !authoritative.is_null() => {
+            return Err(
+                "Source-decode node is missing its flat rawProcessingModeOverride projection"
+                    .to_string(),
+            );
+        }
+        _ => {}
+    }
+    resolved.insert("rawProcessingModeOverride".to_string(), authoritative);
+    Ok(Value::Object(resolved))
+}
+
 fn compile_node_params(
     node_key: EditNodeTypeV2,
     node: &EditNodeEnvelopeV2,
 ) -> Result<Map<String, Value>, String> {
     match node_key {
+        EditNodeTypeV2::SourceDecode => {
+            parse_source_decode(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::CameraInput => {
             parse_camera_input(&node.params)?;
             Ok(node.params.clone())
@@ -2588,7 +2655,28 @@ fn validate_node_contract(
             node.implementation_version
         ));
     }
+    if node_key == EditNodeTypeV2::SourceDecode && !node.enabled {
+        return Err("EditDocumentV2 node 'source_decode' cannot be disabled".to_string());
+    }
     Ok(())
+}
+
+fn parse_source_decode(params: &Map<String, Value>) -> Result<SourceDecodeV2, String> {
+    serde_json::from_value(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 source_decode is invalid: {error}"))
+}
+
+fn validate_source_decode_domain(
+    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    domain: &SourceDecodeV2,
+) -> Result<(), String> {
+    let Some(node) = nodes.get(&EditNodeTypeV2::SourceDecode) else {
+        return Ok(());
+    };
+    if &parse_source_decode(&node.params)? == domain {
+        return Ok(());
+    }
+    Err("EditDocumentV2 source_decode domain disagrees with its node params".to_string())
 }
 
 fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifactsV2, String> {
@@ -2743,7 +2831,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::super::parse::get_all_adjustments_from_json;
-    use super::EditDocumentV2;
+    use super::{EditDocumentV2, resolve_source_decode_adjustments};
     use crate::color::mixer_render::{
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
@@ -3306,6 +3394,19 @@ mod tests {
         })
     }
 
+    fn document_with_source_decode(mode: Value) -> Value {
+        let mut document = document_with_legacy(json!({}));
+        document["sourceDecode"] = json!({ "rawProcessingModeOverride": mode });
+        document["nodes"]["source_decode"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": { "rawProcessingModeOverride": mode },
+            "process": "scene_referred_v2",
+            "type": "source_decode"
+        });
+        document
+    }
+
     fn layer() -> Value {
         json!({
             "adjustments": { "exposure": 0.4 },
@@ -3325,6 +3426,66 @@ mod tests {
             }],
             "visible": true
         })
+    }
+
+    #[test]
+    fn source_decode_compiler_and_flat_projection_fail_closed() {
+        for mode in [
+            json!(null),
+            json!("fast"),
+            json!("balanced"),
+            json!("maximum"),
+        ] {
+            let document = document_with_source_decode(mode.clone());
+            let compiled = serde_json::from_value::<EditDocumentV2>(document.clone())
+                .expect("source-decode document")
+                .into_render_adjustments()
+                .expect("source-decode compiles");
+            assert_eq!(compiled["rawProcessingModeOverride"], mode);
+            let resolved = resolve_source_decode_adjustments(
+                &json!({ "rawProcessingModeOverride": mode }),
+                Some(&document),
+            )
+            .expect("matching projection resolves");
+            assert_eq!(resolved["rawProcessingModeOverride"], mode);
+        }
+
+        let document = document_with_source_decode(json!("maximum"));
+        assert!(
+            resolve_source_decode_adjustments(
+                &json!({ "rawProcessingModeOverride": "fast" }),
+                Some(&document),
+            )
+            .unwrap_err()
+            .contains("conflicts")
+        );
+        assert!(
+            resolve_source_decode_adjustments(&json!({}), Some(&document))
+                .unwrap_err()
+                .contains("missing")
+        );
+
+        let mut invalid = document_with_source_decode(json!("ultra"));
+        assert!(serde_json::from_value::<EditDocumentV2>(invalid.clone()).is_err());
+        invalid = document_with_source_decode(json!("fast"));
+        invalid["nodes"]["source_decode"]["enabled"] = json!(false);
+        assert!(
+            serde_json::from_value::<EditDocumentV2>(invalid)
+                .expect("envelope deserializes")
+                .into_render_adjustments()
+                .unwrap_err()
+                .contains("cannot be disabled")
+        );
+
+        let mut split = document_with_source_decode(json!("fast"));
+        split["sourceDecode"]["rawProcessingModeOverride"] = json!("maximum");
+        assert!(
+            serde_json::from_value::<EditDocumentV2>(split)
+                .expect("split authority deserializes")
+                .into_render_adjustments()
+                .unwrap_err()
+                .contains("domain disagrees")
+        );
     }
 
     #[test]

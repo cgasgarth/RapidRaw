@@ -452,6 +452,78 @@ fn technical_white_balance_plan_from_adjustments(
     compile_white_balance_plan(input).ok()
 }
 
+/// Return decoded pixels whose identity matches the requested source-decode
+/// authority. This prevents a mode edit from rendering against the active
+/// image's previous decode while retaining the native decoded-frame cache.
+pub(crate) fn resolve_loaded_image_for_adjustments(
+    loaded: LoadedImage,
+    adjustments: &Value,
+    state: &AppState,
+    app_handle: &tauri::AppHandle,
+) -> Result<LoadedImage, String> {
+    if !loaded.is_raw {
+        return Ok(loaded);
+    }
+    let (source_path, _) = parse_virtual_path(&loaded.path);
+    let source_path_str = source_path.to_string_lossy().into_owned();
+    let settings =
+        raw_processing_settings_for_adjustments(&load_settings_or_default(app_handle), adjustments);
+    let technical_plans = RawTechnicalPlansV1 {
+        white_balance: technical_white_balance_plan_from_adjustments(adjustments),
+        camera_profile: camera_profile_selection_from_adjustments(adjustments).map(
+            |mut selection| {
+                selection.managed_root =
+                    crate::color::camera_profile::registry::managed_profile_root(app_handle)
+                        .unwrap_or_default();
+                selection
+            },
+        ),
+    };
+    let key = raw_processing_mode_cache_key_with_plans(&source_path, &settings, &technical_plans)
+        .map_err(|error| error.to_string())?;
+    let artifact_source =
+        crate::render::artifact_identity::SourceArtifactIdentity::from_decoded_key(
+            loaded.path.clone(),
+            &key,
+        );
+    if loaded.artifact_source == artifact_source {
+        return Ok(loaded);
+    }
+    if let Some((image, _, _)) = state.render().native_caches().decoded(&key) {
+        return Ok(LoadedImage {
+            artifact_source,
+            image,
+            ..loaded
+        });
+    }
+    let bytes = read_file_mapped(&source_path)
+        .map_err(|error| format!("Failed to read source-decode image: {error}"))?;
+    let (image, report) = load_base_image_from_bytes_with_report_and_plan(
+        &bytes,
+        &source_path_str,
+        false,
+        &settings,
+        None,
+        technical_plans,
+    )
+    .map_err(|error| error.to_string())?;
+    if SourceRevision::from_path(&source_path).map_err(|error| error.to_string())?
+        != key.source_revision
+    {
+        return Err("source_changed_during_source_decode_resolution".to_string());
+    }
+    let image = Arc::new(image);
+    state
+        .render()
+        .native_caches()
+        .insert_decoded(key, Arc::clone(&image), HashMap::new(), report);
+    Ok(LoadedImage {
+        artifact_source,
+        image,
+        ..loaded
+    })
+}
+
 pub fn load_base_image_from_bytes(
     bytes: &[u8],
     path_for_ext_check: &str,
@@ -1117,11 +1189,16 @@ pub(crate) async fn load_image_prepared(
     let source_path_str = source_path.to_string_lossy().to_string();
 
     let settings = load_settings_or_default(&app_handle);
+    let authoritative_adjustments =
+        crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
+            &metadata.adjustments,
+            metadata.edit_document_v2.as_ref(),
+        )?;
     let effective_settings =
-        raw_processing_settings_for_adjustments(&settings, &metadata.adjustments);
+        raw_processing_settings_for_adjustments(&settings, &authoritative_adjustments);
     let technical_plans = RawTechnicalPlansV1 {
-        white_balance: technical_white_balance_plan_from_adjustments(&metadata.adjustments),
-        camera_profile: camera_profile_selection_from_adjustments(&metadata.adjustments).map(
+        white_balance: technical_white_balance_plan_from_adjustments(&authoritative_adjustments),
+        camera_profile: camera_profile_selection_from_adjustments(&authoritative_adjustments).map(
             |mut selection| {
                 selection.managed_root =
                     crate::color::camera_profile::registry::managed_profile_root(&app_handle)
@@ -1903,21 +1980,69 @@ mod tests {
             let adjustments = serde_json::json!({
                 "rawProcessingModeOverride": mode,
             });
+            let edit_document_v2 = serde_json::json!({
+                "extensions": {},
+                "geometry": {
+                    "aspectRatio": null,
+                    "crop": null,
+                    "flipHorizontal": false,
+                    "flipVertical": false,
+                    "orientationSteps": 0,
+                    "perspectiveCorrection": {
+                        "amount": 100,
+                        "cropPolicy": "auto_crop",
+                        "guides": [],
+                        "mode": "off",
+                        "resolvedPlan": null
+                    },
+                    "rotation": 0,
+                    "transformAspect": 0,
+                    "transformDistortion": 0,
+                    "transformHorizontal": 0,
+                    "transformRotate": 0,
+                    "transformScale": 100,
+                    "transformVertical": 0,
+                    "transformXOffset": 0,
+                    "transformYOffset": 0
+                },
+                "graphProcess": "scene_referred_v2",
+                "layers": { "masks": [] },
+                "nodes": {
+                    "source_decode": {
+                        "enabled": true,
+                        "implementationVersion": 1,
+                        "params": { "rawProcessingModeOverride": mode },
+                        "process": "scene_referred_v2",
+                        "type": "source_decode"
+                    }
+                },
+                "provenance": {},
+                "schemaVersion": 2,
+                "sourceDecode": { "rawProcessingModeOverride": mode },
+                "sourceArtifacts": { "aiPatches": [] }
+            });
             let sidecar_path = report_dir.join(format!("override-{}.rrdata", mode));
             let sidecar = ImageMetadata {
                 adjustments: adjustments.clone(),
+                edit_document_v2: Some(edit_document_v2),
                 ..ImageMetadata::default()
             };
             crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &sidecar)
                 .expect("write override sidecar");
             let reloaded = crate::exif_processing::load_sidecar(&sidecar_path);
+            let authoritative_adjustments =
+                crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
+                    &reloaded.adjustments,
+                    reloaded.edit_document_v2.as_ref(),
+                )
+                .expect("resolve source-decode node after sidecar reopen");
             assert_eq!(
-                raw_processing_mode_override_from_adjustments(&reloaded.adjustments),
+                raw_processing_mode_override_from_adjustments(&authoritative_adjustments),
                 Some(mode)
             );
 
             let settings =
-                raw_processing_settings_for_adjustments(&base_settings, &reloaded.adjustments);
+                raw_processing_settings_for_adjustments(&base_settings, &authoritative_adjustments);
             let image =
                 load_base_image_from_bytes(&source_bytes, &source_path, false, &settings, None)
                     .expect("decode private RAW with sidecar override");
@@ -1961,8 +2086,8 @@ mod tests {
         assert_ne!(export_hashes[0], export_hashes[1]);
 
         let report = serde_json::json!({
-            "issue": 3294,
-            "proofBoundary": "private_raw_sidecar_override_export_runtime",
+            "issue": 5536,
+            "proofBoundary": "private_raw_source_decode_node_sidecar_override_export_runtime",
             "outputs": reports,
         });
         fs::write(

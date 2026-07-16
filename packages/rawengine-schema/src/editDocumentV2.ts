@@ -14,10 +14,19 @@ import {
   lensProfileDistortionParamsV1Schema,
   lensProfilePatchV1Schema,
 } from './rawEngineSchemas.js';
+import {
+  SOURCE_DECODE_PARAMS_V1_DEFAULTS,
+  SOURCE_DECODE_PARAMS_V1_FIELDS,
+  sourceDecodeParamsV1Schema,
+} from './rawProcessingModeSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
+
+export const editDocumentSourceDecodeV2Schema = sourceDecodeParamsV1Schema;
+export const EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS = SOURCE_DECODE_PARAMS_V1_DEFAULTS;
+export const EDIT_DOCUMENT_SOURCE_DECODE_FIELDS = SOURCE_DECODE_PARAMS_V1_FIELDS;
 
 export const EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS = {
   hue: 0,
@@ -540,6 +549,23 @@ export const editDocumentLensCorrectionV2Schema = z
   });
 
 export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
+  {
+    capabilities: {
+      batch: true,
+      copy: false,
+      paste: false,
+      preset: 'exclude',
+      provenance: 'preserve',
+      reset: true,
+    },
+    defaultParams: EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS,
+    editorSection: null,
+    legacyFields: EDIT_DOCUMENT_SOURCE_DECODE_FIELDS,
+    nodeType: 'source_decode',
+    process: 'scene_referred_v2',
+    renderStage: 'source_decode',
+    implementationVersion: 1,
+  },
   {
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
@@ -1353,6 +1379,17 @@ const editDocumentNodesV2Schema = z
       if (!hasFiniteJsonValues(node.params)) {
         context.addIssue({ code: z.ZodIssueCode.custom, message: `Node '${nodeType}' contains a non-finite value.` });
       }
+      if (nodeType === 'source_decode') {
+        const sourceDecode = editDocumentSourceDecodeV2Schema.safeParse(node.params);
+        if (!sourceDecode.success) {
+          for (const issue of sourceDecode.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+        if (!node.enabled) {
+          context.addIssue({ code: 'custom', message: "Node 'source_decode' cannot be disabled." });
+        }
+      }
       if (nodeType === 'scene_global_color_tone') {
         const parsed = sceneGlobalColorToneParamsV2Schema.safeParse(node.params);
         if (!parsed.success) {
@@ -1534,10 +1571,16 @@ const editDocumentV2ObjectSchema = z
     nodes: editDocumentNodesV2Schema,
     provenance: editDocumentProvenanceV2Schema,
     schemaVersion: z.literal(EDIT_DOCUMENT_V2_SCHEMA_VERSION),
+    sourceDecode: editDocumentSourceDecodeV2Schema,
     sourceArtifacts: editDocumentSourceArtifactsV2Schema,
   })
   .strict()
   .superRefine((document, context) => {
+    // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
+    const sourceDecodeNode = document.nodes['source_decode'];
+    if (sourceDecodeNode !== undefined && !sameJsonValue(sourceDecodeNode.params, document.sourceDecode)) {
+      context.addIssue({ code: 'custom', message: 'Source-decode domain disagrees with its node params.' });
+    }
     // biome-ignore lint/complexity/useLiteralKeys: node records intentionally use an index signature.
     const sourceNode = document.nodes['source_artifacts'];
     if (sourceNode !== undefined && !sameJsonValue(sourceNode.params, document.sourceArtifacts)) {
@@ -1710,6 +1753,19 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     }
   }
   document = normalizeLegacyNodeOwnership(document, {
+    createNode: { implementationVersion: 1, process: 'scene_referred_v2' },
+    defaults: EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS,
+    fields: EDIT_DOCUMENT_SOURCE_DECODE_FIELDS,
+    nodeType: 'source_decode',
+    schemas: editDocumentSourceDecodeV2Schema.shape,
+  });
+  const sourceDecodeNodes = document['nodes'];
+  const sourceDecodeNode = isEditDocumentRecord(sourceDecodeNodes) ? sourceDecodeNodes['source_decode'] : undefined;
+  const sourceDecodeParams = isEditDocumentRecord(sourceDecodeNode) ? sourceDecodeNode['params'] : undefined;
+  if (isEditDocumentRecord(sourceDecodeParams) && !Object.hasOwn(document, 'sourceDecode')) {
+    document = { ...document, sourceDecode: sourceDecodeParams };
+  }
+  document = normalizeLegacyNodeOwnership(document, {
     createNode: {
       enabledFromNodeType: 'channel_mixer',
       implementationVersion: 1,
@@ -1815,6 +1871,7 @@ export type EditDocumentV2CopyPayload = z.infer<typeof editDocumentV2CopyPayload
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
+export type EditDocumentSourceDecodeV2 = z.infer<typeof editDocumentSourceDecodeV2Schema>;
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentFilmEmulationV2 = z.infer<typeof editDocumentFilmEmulationV2Schema>;
@@ -1851,6 +1908,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.implementationVersion !== descriptor.implementationVersion) {
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
+  if (envelope.type === 'source_decode') editDocumentSourceDecodeV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
@@ -1902,6 +1960,7 @@ const editDocumentV2QuarantineInputSchema = z
     nodes: z.record(z.string(), z.unknown()),
     provenance: z.record(z.string(), z.unknown()),
     schemaVersion: z.literal(EDIT_DOCUMENT_V2_SCHEMA_VERSION),
+    sourceDecode: z.record(z.string(), z.unknown()).optional(),
     sourceArtifacts: z.record(z.string(), z.unknown()),
   })
   .strict();

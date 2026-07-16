@@ -2342,6 +2342,11 @@ pub fn save_metadata_and_update_thumbnail(
         if let Some(document) = edit_document_v2.as_ref() {
             crate::adjustments::edit_document_v2::validate_edit_document_v2(document)?;
         }
+        final_adjustments =
+            crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
+                &final_adjustments,
+                edit_document_v2.as_ref(),
+            )?;
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
             &metadata.exif,

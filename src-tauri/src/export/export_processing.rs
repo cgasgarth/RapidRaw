@@ -59,8 +59,11 @@ use crate::image_processing::{
     process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
 
-fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Value {
-    let mut adjustments = metadata.adjustments;
+fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Result<Value, String> {
+    let mut adjustments = crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
+        &metadata.adjustments,
+        metadata.edit_document_v2.as_ref(),
+    )?;
     if let Some(artifacts) = metadata.raw_engine_artifacts {
         if !adjustments.is_object() {
             adjustments = serde_json::json!({});
@@ -68,7 +71,7 @@ fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Value {
         adjustments["rawEngineArtifacts"] =
             serde_json::to_value(artifacts).expect("RawEngine artifacts must serialize");
     }
-    adjustments
+    Ok(adjustments)
 }
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
@@ -525,7 +528,7 @@ fn decode_export_item(
         (Some(adjustments), true) => adjustments.as_ref().clone(),
         _ => adjustments_with_raw_engine_artifacts(crate::exif_processing::load_sidecar(
             &plan.sidecar_path,
-        )),
+        ))?,
     };
     hydrate_adjustments(&state, &mut adjustments);
     if plan.extension == "cube" {
@@ -548,14 +551,22 @@ fn decode_export_item(
         Some(plan.source_revision.clone())
     };
     let (base_image, raw_development_report) = if plan.is_current_edit {
-        match state.editor().clone_image_pixels() {
-            Ok((orig_data, _)) => (
-                composite_patches_on_image(&orig_data, &adjustments)
-                    .map_err(|error| format!("Failed to composite AI patches: {error}"))?
-                    .into_owned(),
-                None,
-            ),
-            Err(_) => {
+        match state.editor().image_snapshot() {
+            Some(loaded) => {
+                let loaded = crate::image_loader::resolve_loaded_image_for_adjustments(
+                    loaded,
+                    &adjustments,
+                    &state,
+                    app_handle,
+                )?;
+                (
+                    composite_patches_on_image(loaded.image.as_ref(), &adjustments)
+                        .map_err(|error| format!("Failed to composite AI patches: {error}"))?
+                        .into_owned(),
+                    None,
+                )
+            }
+            None => {
                 let bytes = fs::read(&plan.source_path).map_err(|error| error.to_string())?;
                 let revision = SourceRevision::from_path(Path::new(&plan.source_path))
                     .map_err(|error| error.to_string())?;
@@ -2983,7 +2994,7 @@ pub async fn estimate_export_sizes(
         (preview_byte_size as f64 * pixel_ratio) as usize
     } else {
         let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        let mut js_adjustments = adjustments_with_raw_engine_artifacts(metadata);
+        let mut js_adjustments = adjustments_with_raw_engine_artifacts(metadata)?;
 
         const ESTIMATE_DIM: u32 = 1280;
 
