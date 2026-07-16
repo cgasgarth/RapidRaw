@@ -46,6 +46,8 @@ afterEach(() => {
 
 afterAll(async () => {
   if (!GlobalRegistrator.isRegistered) return;
+  // Drain queued React scheduler work while Window still exists, then let
+  // Happy DOM close every timer and restore the worker global.
   await act(async () => {});
   await GlobalRegistrator.unregister();
 });
