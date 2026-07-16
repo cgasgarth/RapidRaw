@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { editDocumentDisplayCreativeV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { CreativeAdjustment, Effect, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -69,11 +70,14 @@ describe('display creative edit transaction', () => {
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes.geometry).toEqual(result.beforeEditDocumentV2.nodes.geometry);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toEqual(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
+      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
     );
-    expect(result.afterEditDocumentV2.nodes.display_creative.params.vignetteAmount).toBe(-32);
+    expect(
+      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
+        .vignetteAmount,
+    ).toBe(-32);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -95,7 +99,10 @@ describe('display creative edit transaction', () => {
 
     expect(result.changedKeys).toEqual(['lutIntensity']);
     expect(result.after.lutIntensity).toBe(0);
-    expect(result.afterEditDocumentV2.nodes.display_creative.params.lutIntensity).toBe(0);
+    expect(
+      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
+        .lutIntensity,
+    ).toBe(0);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -178,7 +185,9 @@ describe('display creative edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result.afterEditDocumentV2.nodes.display_creative.params).toMatchObject({
+    expect(
+      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params),
+    ).toMatchObject({
       grainAmount: 28,
       grainRoughness: 50,
       grainSize: 34,
