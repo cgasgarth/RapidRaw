@@ -75,8 +75,8 @@ describe('raw processing mode override edit transaction', () => {
     expect(result.after.rawProcessingModeOverride).toBe('maximum');
     expect(result.afterEditDocumentV2.sourceDecode.rawProcessingModeOverride).toBe('maximum');
     expect(selectRawProcessingModeOverride(result.afterEditDocumentV2)).toBe('maximum');
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
+      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
     );
 
     useEditorStore.getState().undo();
@@ -112,7 +112,7 @@ describe('raw processing mode override edit transaction', () => {
     expect(() =>
       editDocumentV2Schema.parse({
         ...document,
-        nodes: { ...document.nodes, source_decode: { ...document.nodes.source_decode, enabled: false } },
+        nodes: { ...document.nodes, source_decode: { ...document.nodes['source_decode'], enabled: false } },
       }),
     ).toThrow();
     expect(() =>
