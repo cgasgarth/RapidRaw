@@ -2713,6 +2713,26 @@ async function stopServer(server: ReturnType<typeof spawn>): Promise<void> {
   ]);
 }
 
+async function verifyNoArgumentWaitTimeoutOptions(page: Page): Promise<void> {
+  page.setDefaultTimeout(800);
+  const startedAt = performance.now();
+  let rejected = false;
+  try {
+    await waitForPageCondition(page, () => false, { polling: 10, timeout: 75 });
+  } catch {
+    rejected = true;
+  } finally {
+    page.setDefaultTimeout(30_000);
+  }
+  const elapsedMs = performance.now() - startedAt;
+  if (!rejected) throw new Error('Unsatisfied Playwright page condition did not reject.');
+  if (elapsedMs < 50 || elapsedMs >= 400) {
+    throw new Error(
+      `No-argument Playwright wait ignored its 75ms options-slot timeout (elapsed ${elapsedMs.toFixed(1)}ms).`,
+    );
+  }
+}
+
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: {
     ...process.env,
@@ -2743,6 +2763,7 @@ try {
       browserScenario === 'retouch-controller',
     viewport,
   });
+  await verifyNoArgumentWaitTimeoutOptions(page);
   const consoleErrors: string[] = [];
   const consoleWarnings: string[] = [];
   page.on('console', (message) => {
