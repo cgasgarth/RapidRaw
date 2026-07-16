@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use image::DynamicImage;
 use serde_json::Value;
@@ -18,20 +19,19 @@ pub(crate) struct PreGpuDetailStageResult<'a> {
 /// Global denoise is authoritative in the source-aware CPU detail stage. Mask
 /// denoise remains in WGPU because it is spatially local and is not represented
 /// by the full-frame pre-stage.
-pub(crate) fn suppress_legacy_global_denoise(adjustments: &mut AllAdjustments) {
-    adjustments.global.luma_noise_reduction = 0.0;
-    adjustments.global.color_noise_reduction = 0.0;
-}
-
-pub(crate) fn suppress_legacy_global_detail(
-    adjustments: &mut AllAdjustments,
-    owns_legacy_global_detail: bool,
-) {
-    if owns_legacy_global_detail {
-        adjustments.global.sharpness = 0.0;
-        adjustments.global.clarity = 0.0;
-        adjustments.global.structure = 0.0;
-    }
+pub(crate) fn bind_pre_gpu_execution(
+    graph: &Arc<crate::edit_graph::CompiledEditGraph>,
+    owns_global_detail: bool,
+    has_lut: bool,
+) -> (AllAdjustments, Arc<crate::edit_graph::CompiledEditGraph>) {
+    let graph = Arc::new(graph.bind_pre_gpu_execution_abi(owns_global_detail, has_lut));
+    let adjustments = graph.shader_abi();
+    debug_assert!(
+        graph
+            .validate_gpu_execution(&adjustments, has_lut, adjustments.mask_count as usize)
+            .is_ok()
+    );
+    (adjustments, graph)
 }
 
 pub(crate) fn apply_pre_gpu_detail_stages<'a>(
@@ -198,15 +198,6 @@ mod tests {
         let result = apply_pre_gpu_detail_stages(&image, 42, &adjustments_json, true);
         assert!(matches!(result.image, Cow::Owned(_)));
         assert!(result.owns_legacy_global_detail);
-
-        let mut gpu = AllAdjustments::default();
-        gpu.global.sharpness = 0.7;
-        gpu.global.clarity = 0.45;
-        gpu.global.structure = 0.3;
-        suppress_legacy_global_detail(&mut gpu, result.owns_legacy_global_detail);
-        assert_eq!(gpu.global.sharpness, 0.0);
-        assert_eq!(gpu.global.clarity, 0.0);
-        assert_eq!(gpu.global.structure, 0.0);
     }
 
     #[test]
@@ -239,16 +230,102 @@ mod tests {
     }
 
     #[test]
-    fn authoritative_pre_stage_suppresses_only_duplicate_global_shader_denoise() {
-        let mut adjustments = AllAdjustments::default();
-        adjustments.global.luma_noise_reduction = 0.7;
-        adjustments.global.color_noise_reduction = 0.6;
-        adjustments.mask_adjustments[0].luma_noise_reduction = 0.4;
-        adjustments.mask_adjustments[0].color_noise_reduction = 0.3;
-        suppress_legacy_global_denoise(&mut adjustments);
+    fn pre_gpu_execution_binding_suppresses_only_owned_global_shader_controls() {
+        let raw = crate::render_plan::current_render_adjustments(json!({
+            "sharpness": 70,
+            "clarity": 45,
+            "structure": 30,
+            "lumaNoiseReduction": 60,
+            "colorNoiseReduction": 50,
+            "sceneCurveV1": {
+                "middleGrey": 0.18,
+                "channelMode": "luminance_preserving",
+                "points": [
+                    {"xEv": -16.0, "yEv": -16.0},
+                    {"xEv": 0.0, "yEv": 0.5},
+                    {"xEv": 16.0, "yEv": 16.0}
+                ]
+            },
+            "masks": [{
+                "id": "local-detail",
+                "name": "Local detail",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "blendMode": "normal",
+                "adjustments": {
+                    "sharpness": 30,
+                    "clarity": 20,
+                    "lumaNoiseReduction": 40,
+                    "colorNoiseReduction": 25
+                },
+                "subMasks": []
+            }]
+        }));
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: true,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .unwrap();
+        let local_detail_before = (
+            plan.adjustments.mask_adjustments[0].sharpness,
+            plan.adjustments.mask_adjustments[0].clarity,
+            plan.adjustments.mask_adjustments[0].luma_noise_reduction,
+            plan.adjustments.mask_adjustments[0].color_noise_reduction,
+        );
+        assert!(local_detail_before.0 != 0.0);
+        assert!(local_detail_before.1 != 0.0);
+        assert!(local_detail_before.2 != 0.0);
+        assert!(local_detail_before.3 != 0.0);
+        let original_fingerprint = plan.edit_graph.fingerprint;
+        let original_execution_fingerprint = plan.edit_graph.execution_abi_fingerprint;
+        let (adjustments, graph) = bind_pre_gpu_execution(&plan.edit_graph, true, false);
+
+        assert_eq!(adjustments.global.sharpness, 0.0);
+        assert_eq!(adjustments.global.clarity, 0.0);
+        assert_eq!(adjustments.global.structure, 0.0);
         assert_eq!(adjustments.global.luma_noise_reduction, 0.0);
         assert_eq!(adjustments.global.color_noise_reduction, 0.0);
-        assert_eq!(adjustments.mask_adjustments[0].luma_noise_reduction, 0.4);
-        assert_eq!(adjustments.mask_adjustments[0].color_noise_reduction, 0.3);
+        assert_eq!(
+            (
+                adjustments.mask_adjustments[0].sharpness,
+                adjustments.mask_adjustments[0].clarity,
+                adjustments.mask_adjustments[0].luma_noise_reduction,
+                adjustments.mask_adjustments[0].color_noise_reduction,
+            ),
+            local_detail_before,
+            "pre-GPU ownership must not suppress mask-local controls"
+        );
+        assert_eq!(graph.fingerprint, original_fingerprint);
+        assert_ne!(
+            graph.execution_abi_fingerprint,
+            original_execution_fingerprint
+        );
+        assert!(graph.validate_gpu_execution(&adjustments, false, 1).is_ok());
+        assert_eq!(
+            graph.validate_gpu_execution(&plan.adjustments, false, 1),
+            Err("edit_graph.stale_gpu_execution_abi")
+        );
+        let lut_bound = plan.edit_graph.bind_pre_gpu_execution_abi(true, true);
+        assert_ne!(
+            graph.execution_abi_fingerprint, lut_bound.execution_abi_fingerprint,
+            "LUT resource ownership participates in the bound ABI identity"
+        );
+
+        let mask = ImageBuffer::from_pixel(8, 8, image::Luma([255]));
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &test_image(),
+            &adjustments,
+            &[mask],
+            None,
+            &graph,
+        )
+        .expect("bound current graph remains valid for CPU fallback");
+        assert_eq!((cpu.width(), cpu.height()), (8, 8));
     }
 }

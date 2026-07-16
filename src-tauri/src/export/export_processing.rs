@@ -1268,11 +1268,10 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
         retouch_layers,
         mask_bitmaps,
     );
-    let mut gpu_adjustments = render_inputs.adjustments;
-    crate::render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    crate::render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
+    let (gpu_adjustments, execution_graph) = crate::render_pipeline::bind_pre_gpu_execution(
+        &render_inputs.edit_graph,
         detail_stage.owns_legacy_global_detail,
+        render_inputs.lut.is_some(),
     );
 
     let identity = crate::gpu_processing::PreGpuImageIdentity::for_stage(
@@ -1286,9 +1285,7 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
         mask_bitmaps,
         lut: render_inputs.lut,
         roi: None,
-        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-            render_inputs.edit_graph,
-        ),
+        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(execution_graph),
     };
     if capture_film_tap {
         crate::gpu_processing::process_and_get_unclamped_dynamic_image_with_film_tap(
@@ -3375,12 +3372,44 @@ mod tests {
             preview_plan.adjustments,
             Arc::clone(&preview_plan.edit_graph),
         );
-        let exported = render(export_plan.adjustments, export_plan.edit_graph);
+        let preview_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("preview publishes an inspectable GPU execution receipt");
+        let exported = render(export_plan.adjustments, Arc::clone(&export_plan.edit_graph));
+        let export_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("export publishes an inspectable GPU execution receipt");
         assert_eq!(
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
         );
-        assert_eq!(preview_plan.edit_graph.pipeline_version, 2);
+        assert_eq!(
+            preview_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
+        assert_eq!(
+            export_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            preview_plan.edit_graph.fingerprint
+        );
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            export_receipt.compiled_edit_graph_fingerprint
+        );
+        assert_eq!(
+            preview_receipt.execution_abi_fingerprint,
+            export_receipt.execution_abi_fingerprint
+        );
+        assert_ne!(preview_receipt.execution_abi_fingerprint, 0);
     }
 
     #[test]
@@ -3485,6 +3514,12 @@ mod tests {
             &masks,
         )
         .expect("typed current preview render succeeds");
+        let preview_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("real RAW preview publishes an inspectable GPU execution receipt");
         let export = super::process_image_for_export_pipeline_with_tonemapper_override(
             &source_path,
             transformed.as_ref(),
@@ -3498,19 +3533,29 @@ mod tests {
             &masks,
         )
         .expect("typed current export render succeeds");
-        let v2_receipt = state
+        let export_receipt = state
             .gpu()
             .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
-            .expect("real RAW v2 render publishes a GPU execution receipt");
+            .expect("real RAW export publishes an inspectable GPU execution receipt");
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
         assert_eq!(preview.dimensions(), edited_base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            export_receipt.compiled_edit_graph_fingerprint
+        );
+        assert_eq!(
+            preview_receipt.execution_abi_fingerprint,
+            export_receipt.execution_abi_fingerprint
+        );
+        assert_ne!(export_receipt.compiled_edit_graph_fingerprint, 0);
+        assert_ne!(export_receipt.execution_abi_fingerprint, 0);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "current_document_private_raw_proof dimensions={}x{} wb_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "current_document_private_raw_proof dimensions={}x{} wb_changed_channels={} pipeline_version={} compiled_graph_fingerprint={:016x} execution_abi_fingerprint={:016x} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
             neutral_decode_pixels
@@ -3518,14 +3563,17 @@ mod tests {
                 .zip(&edited_decode_pixels)
                 .filter(|(neutral, edited)| neutral != edited)
                 .count(),
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+            export_receipt.compiled_edit_graph_fingerprint,
+            export_receipt.execution_abi_fingerprint,
             hex::encode(digest),
-            v2_receipt.phase_dispatch_count,
-            v2_receipt.command_buffer_count,
-            v2_receipt.queue_submit_count,
-            v2_receipt.cache_hits,
-            v2_receipt.cache_misses,
-            v2_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
-            v2_receipt.wall_time.as_secs_f64() * 1000.0,
+            export_receipt.phase_dispatch_count,
+            export_receipt.command_buffer_count,
+            export_receipt.queue_submit_count,
+            export_receipt.cache_hits,
+            export_receipt.cache_misses,
+            export_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
+            export_receipt.wall_time.as_secs_f64() * 1000.0,
         );
     }
 

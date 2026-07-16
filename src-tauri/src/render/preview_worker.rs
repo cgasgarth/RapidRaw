@@ -465,21 +465,18 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         None
     };
 
+    let (execution_adjustments, execution_graph) = render_pipeline::bind_pre_gpu_execution(
+        &render_plan.edit_graph,
+        pre_gpu_detail_stage.owns_legacy_global_detail,
+        render_plan.lut.is_some(),
+    );
     let render_request = || RenderRequest {
-        adjustments: {
-            let mut adjustments = render_plan.adjustments;
-            render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
-            render_pipeline::suppress_legacy_global_detail(
-                &mut adjustments,
-                pre_gpu_detail_stage.owns_legacy_global_detail,
-            );
-            adjustments
-        },
+        adjustments: execution_adjustments,
         mask_bitmaps: &mask_bitmaps,
         lut: render_plan.lut.clone(),
         roi: pixel_roi,
         edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-            &render_plan.edit_graph,
+            &execution_graph,
         )),
     };
     let presentation_identity =
