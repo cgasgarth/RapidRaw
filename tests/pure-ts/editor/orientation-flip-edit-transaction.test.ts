@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -60,9 +61,11 @@ describe('orientation flip edit transaction', () => {
       noOp: false,
       source: 'geometry-tool',
     });
-    expect(result.afterEditDocumentV2.nodes.geometry.params.flipHorizontal).toBe(true);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toEqual(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    expect(
+      editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params).flipHorizontal,
+    ).toBe(true);
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
+      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
     );
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);

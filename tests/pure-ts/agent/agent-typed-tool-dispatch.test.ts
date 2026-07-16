@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
-import { RawEngineAppServerHostToolName } from '../../../src/schemas/agent/agentRuntimeSchemas';
+import {
+  type RawEngineAppServerHostResponse,
+  RawEngineAppServerHostToolName,
+  type RawEngineAppServerToolDispatchResponse,
+} from '../../../src/schemas/agent/agentRuntimeSchemas';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
@@ -43,7 +47,15 @@ const seedEditor = () => {
   });
 };
 
-const dispatch = (request: unknown) => handleRawEngineAppServerHostRequestAsync(request);
+const requireToolDispatchResponse = (
+  response: RawEngineAppServerHostResponse,
+): RawEngineAppServerToolDispatchResponse => {
+  if (!('runtimeToolName' in response)) throw new Error('Expected a typed tool dispatch response.');
+  return response;
+};
+
+const dispatch = async (request: unknown): Promise<RawEngineAppServerToolDispatchResponse> =>
+  requireToolDispatchResponse(await handleRawEngineAppServerHostRequestAsync(request));
 
 const buildDryRunArguments = (requestId: string) => {
   const snapshot = buildAgentImageContextSnapshot();
@@ -184,7 +196,7 @@ describe('typed selected-image app-server dispatch', () => {
       }),
       idempotencyKey: 'typed-apply-concurrent-idempotency',
     };
-    const [first, concurrent] = await Promise.all([
+    const [firstResponse, concurrentResponse] = await Promise.all([
       dispatch({
         arguments: applyArguments,
         executionContext: firstContext,
@@ -200,6 +212,8 @@ describe('typed selected-image app-server dispatch', () => {
         toolName: RawEngineAppServerHostToolName.DispatchTool,
       }),
     ]);
+    const first = firstResponse;
+    const concurrent = concurrentResponse;
     expect(first.execution?.outcome).toBe('completed');
     expect(concurrent.execution?.outcome).toBe('rejected');
     expect(concurrent.message).toContain('busy');

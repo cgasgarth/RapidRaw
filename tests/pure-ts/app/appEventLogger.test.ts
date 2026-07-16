@@ -37,7 +37,7 @@ describe('app event logger', () => {
       traceId: 'trace_42',
       v: 1,
     });
-    expect(entry.details?.filePath).toBe('.../image.nef');
+    expect(entry.details?.['filePath']).toBe('.../image.nef');
     expect(formatAppEventLogLine(entry)).toStartWith('[app-event] {"action":"render_editor_preview.start"');
   });
 

@@ -130,7 +130,7 @@ describe('agent app-server live read queries', () => {
     });
     if (!secondMetadataResult.ok) throw new Error(secondMetadataResult.message);
     const secondMetadata = rawEngineLocalAppServerImageMetadataResultV1Schema.parse(secondMetadataResult.result);
-    expect(secondMetadata.image.exif?.ISO).toBe('640');
+    expect(secondMetadata.image.exif?.['ISO']).toBe('640');
     expect(secondMetadata.image.rating).toBe(5);
   });
 
