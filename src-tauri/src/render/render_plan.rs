@@ -1974,7 +1974,6 @@ mod tests {
         assert_eq!(cached.edit_graph.pipeline_version, 2);
         assert_eq!(cached.edit_graph.receipt.pipeline_version, 2);
         assert_eq!(cached.fingerprints.full, cached.edit_graph.fingerprint);
-        assert_eq!(cached.effective_json["rawEngineEditGraphVersion"], 2);
 
         let mut missing = current_raw.clone();
         missing

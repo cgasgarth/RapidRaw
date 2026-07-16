@@ -1602,6 +1602,28 @@ fn graph_fingerprint(nodes: &[CompiledEditNode]) -> u64 {
 mod runtime_registry_tests {
     use super::*;
 
+    fn compiled_current_graph() -> CompiledEditGraph {
+        let adjustments = AllAdjustments::default();
+        CompiledEditGraph::compile(EditGraphCompileInputs {
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &adjustments,
+            neutral_adjustments: &adjustments,
+            scene_curve: None,
+            film_emulation: None,
+            output_curve: None,
+            has_geometry_or_retouch: false,
+            has_detail: false,
+            has_masks: false,
+            has_lut: false,
+            show_clipping: false,
+        })
+    }
+
     #[test]
     fn every_edit_node_kind_has_one_stable_runtime_descriptor_and_backend_owner() {
         validate_runtime_registry(EDIT_NODE_RUNTIME_REGISTRY).expect("runtime registry is valid");
@@ -1663,25 +1685,7 @@ mod runtime_registry_tests {
 
     #[test]
     fn compiled_graph_uses_registry_ownership_and_fused_resource_receipts() {
-        let adjustments = AllAdjustments::default();
-        let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
-            source_fingerprint: 1,
-            geometry_fingerprint: 2,
-            retouch_fingerprint: 3,
-            detail_fingerprint: 4,
-            color_fingerprint: 5,
-            output_fingerprint: 6,
-            adjustments: &adjustments,
-            neutral_adjustments: &adjustments,
-            scene_curve: None,
-            film_emulation: None,
-            output_curve: None,
-            has_geometry_or_retouch: false,
-            has_detail: false,
-            has_masks: false,
-            has_lut: false,
-            show_clipping: false,
-        });
+        let graph = compiled_current_graph();
         graph
             .validate_contract()
             .expect("registry-backed graph is valid");
@@ -1701,5 +1705,54 @@ mod runtime_registry_tests {
             binding["id"] == EditNodeKind::SceneToViewTransform.stable_id()
                 && binding["typedExecutor"] == false
         }));
+    }
+
+    #[test]
+    fn compiled_graph_contract_accepts_only_exact_current_versions() {
+        let current = compiled_current_graph();
+        current.validate_contract().unwrap();
+        assert_eq!(current.schema_version, EDIT_GRAPH_SCHEMA_VERSION);
+        assert_eq!(current.pipeline_version, SCENE_REFERRED_PIPELINE_VERSION);
+        assert_eq!(current.receipt.schema_version, EDIT_GRAPH_SCHEMA_VERSION);
+        assert_eq!(
+            current.receipt.pipeline_version,
+            SCENE_REFERRED_PIPELINE_VERSION
+        );
+        assert_eq!(
+            current.diagnostic_receipt()["pipelineVersion"],
+            SCENE_REFERRED_PIPELINE_VERSION
+        );
+
+        for pipeline_version in [1, SCENE_REFERRED_PIPELINE_VERSION + 1] {
+            let mut graph = current.clone();
+            graph.pipeline_version = pipeline_version;
+            assert_eq!(
+                graph.validate_contract(),
+                Err("edit_graph.unsupported_contract_version")
+            );
+
+            let mut graph = current.clone();
+            graph.receipt.pipeline_version = pipeline_version;
+            assert_eq!(
+                graph.validate_contract(),
+                Err("edit_graph.unsupported_contract_version")
+            );
+        }
+
+        for schema_version in [0, EDIT_GRAPH_SCHEMA_VERSION + 1] {
+            let mut graph = current.clone();
+            graph.schema_version = schema_version;
+            assert_eq!(
+                graph.validate_contract(),
+                Err("edit_graph.unsupported_contract_version")
+            );
+
+            let mut graph = current.clone();
+            graph.receipt.schema_version = schema_version;
+            assert_eq!(
+                graph.validate_contract(),
+                Err("edit_graph.unsupported_contract_version")
+            );
+        }
     }
 }

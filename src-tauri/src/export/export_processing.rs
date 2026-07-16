@@ -3375,17 +3375,24 @@ mod tests {
             preview_plan.adjustments,
             Arc::clone(&preview_plan.edit_graph),
         );
-        let exported = render(export_plan.adjustments, export_plan.edit_graph);
+        let exported = render(export_plan.adjustments, Arc::clone(&export_plan.edit_graph));
         assert_eq!(
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
         );
-        assert_eq!(preview_plan.edit_graph.pipeline_version, 2);
+        assert_eq!(
+            preview_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
+        assert_eq!(
+            export_plan.edit_graph.pipeline_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
+        );
     }
 
     #[test]
     #[cfg(feature = "tauri-test")]
-    fn private_real_raw_current_document_wb_decode_and_preview_export_parity_when_enabled() {
+    fn private_real_raw_current_document_graph_preview_export_parity_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
             return;
         }
@@ -3498,34 +3505,35 @@ mod tests {
             &masks,
         )
         .expect("typed current export render succeeds");
-        let v2_receipt = state
+        let current_receipt = state
             .gpu()
             .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
-            .expect("real RAW v2 render publishes a GPU execution receipt");
+            .expect("real RAW current-graph render publishes a GPU execution receipt");
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
         assert_eq!(preview.dimensions(), edited_base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "current_document_private_raw_proof dimensions={}x{} wb_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "current_document_private_raw_proof dimensions={}x{} pipeline_version={} wb_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             neutral_decode_pixels
                 .iter()
                 .zip(&edited_decode_pixels)
                 .filter(|(neutral, edited)| neutral != edited)
                 .count(),
             hex::encode(digest),
-            v2_receipt.phase_dispatch_count,
-            v2_receipt.command_buffer_count,
-            v2_receipt.queue_submit_count,
-            v2_receipt.cache_hits,
-            v2_receipt.cache_misses,
-            v2_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
-            v2_receipt.wall_time.as_secs_f64() * 1000.0,
+            current_receipt.phase_dispatch_count,
+            current_receipt.command_buffer_count,
+            current_receipt.queue_submit_count,
+            current_receipt.cache_hits,
+            current_receipt.cache_misses,
+            current_receipt.cpu_encode_time.as_secs_f64() * 1000.0,
+            current_receipt.wall_time.as_secs_f64() * 1000.0,
         );
     }
 
