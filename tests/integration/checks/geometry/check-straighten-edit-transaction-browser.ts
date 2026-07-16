@@ -112,6 +112,7 @@ try {
   const input = page.getByTestId('crop-straighten-input-surface');
   await input.waitFor({ timeout: 10_000 });
   const inputIdentity = await input.evaluate((element) => ({
+    geometryEpoch: element.dataset.controllerGeometryEpoch,
     imageSessionId: element.dataset.controllerImageSession,
     operationGeneration: element.dataset.controllerOperationGeneration,
     sourceIdentity: element.dataset.controllerSourceIdentity,
@@ -119,12 +120,21 @@ try {
   }));
   if (
     inputIdentity.sourceIdentity !== sourcePath ||
+    inputIdentity.geometryEpoch === undefined ||
     inputIdentity.imageSessionId === undefined ||
     inputIdentity.operationGeneration === undefined ||
     inputIdentity.sourceRevision === undefined
   ) {
     throw new Error(
       `Straighten input did not expose complete source/session identity: ${JSON.stringify(inputIdentity)}`,
+    );
+  }
+  const cropSurfaceGeometryEpoch = await input
+    .locator('xpath=ancestor::*[@data-overlay-geometry-epoch][1]')
+    .getAttribute('data-overlay-geometry-epoch');
+  if (inputIdentity.geometryEpoch !== cropSurfaceGeometryEpoch) {
+    throw new Error(
+      `Straighten input geometry epoch did not match its crop surface: ${inputIdentity.geometryEpoch ?? 'missing'} != ${cropSurfaceGeometryEpoch ?? 'missing'}`,
     );
   }
   const bounds = await input.boundingBox();
