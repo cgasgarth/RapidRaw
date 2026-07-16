@@ -184,6 +184,14 @@ pub fn load_sidecar_recovering(
             &mut reasons,
             source_dimensions,
         );
+        if meta.edit_document_v2.as_ref().is_some_and(|document| {
+            crate::adjustments::edit_document_v2::validate_edit_document_v2(document).is_err()
+        }) {
+            reasons.push("edit_document_v2_invalid".to_string());
+            disabled_fields.push("editDocumentV2".to_string());
+            quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
+            outcome = PersistedStateOutcome::Quarantined;
+        }
         if !migrated_fields.is_empty() && outcome == PersistedStateOutcome::Current {
             outcome = PersistedStateOutcome::Migrated;
         }
@@ -287,6 +295,9 @@ fn render_state_revision(
 }
 
 fn quarantine_all_render_state(meta: &mut ImageMetadata, extensions: &mut Map<String, JsonValue>) {
+    if let Some(edit_document_v2) = meta.edit_document_v2.take() {
+        extensions.insert("rejectedEditDocumentV2".to_string(), edit_document_v2);
+    }
     if !meta.adjustments.is_null() && meta.adjustments != serde_json::json!({}) {
         extensions.insert(
             "rejectedAdjustments".to_string(),
@@ -2599,6 +2610,16 @@ pub fn save_sidecar_metadata_atomic(
         &mut reasons,
         dimensions,
     );
+    if let Some(document) = normalized.edit_document_v2.as_ref() {
+        crate::adjustments::edit_document_v2::validate_edit_document_v2(document).map_err(
+            |error| {
+                format!(
+                    "Refusing to persist invalid render state in {}: editDocumentV2 ({error})",
+                    sidecar_path.display()
+                )
+            },
+        )?;
+    }
     validate_artifacts(&mut normalized, None, &mut disabled, &mut reasons);
     if !disabled.is_empty() {
         return Err(format!(

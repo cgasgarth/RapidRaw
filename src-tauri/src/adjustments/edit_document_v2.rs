@@ -2152,11 +2152,7 @@ enum LayerBlendModeV2 {
 struct LayerV2 {
     adjustments: BTreeMap<String, Value>,
     blend_mode: Option<LayerBlendModeV2>,
-    #[serde(default = "default_mask_edit_nodes")]
     edit_nodes: BTreeMap<MaskEditNodeTypeV2, MaskEditNodeEnvelopeV2>,
-    #[serde(default)]
-    edit_node_quarantine: BTreeMap<String, Value>,
-    #[serde(default = "mask_edit_node_schema_version")]
     edit_node_schema_version: u8,
     id: String,
     invert: bool,
@@ -2184,22 +2180,6 @@ enum MaskEditNodeTypeV2 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct MaskEditNodeEnvelopeV2 {
     enabled: bool,
-}
-
-fn mask_edit_node_schema_version() -> u8 {
-    1
-}
-
-fn default_mask_edit_nodes() -> BTreeMap<MaskEditNodeTypeV2, MaskEditNodeEnvelopeV2> {
-    [
-        MaskEditNodeTypeV2::Basic,
-        MaskEditNodeTypeV2::Color,
-        MaskEditNodeTypeV2::Curves,
-        MaskEditNodeTypeV2::Details,
-    ]
-    .into_iter()
-    .map(|node_type| (node_type, MaskEditNodeEnvelopeV2 { enabled: true }))
-    .collect()
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -2558,29 +2538,11 @@ fn compile_layers_legacy_projection(
             return Err("EditDocumentV2 layer must be an object".to_string());
         };
         let edit_nodes = mask_object
-            .remove("editNodes")
-            .and_then(|nodes| nodes.as_object().cloned())
-            .unwrap_or_else(|| {
-                let legacy_visibility = mask_object
-                    .get("adjustments")
-                    .and_then(|adjustments| adjustments.get("sectionVisibility"))
-                    .and_then(Value::as_object);
-                ["basic", "color", "curves", "details"]
-                    .into_iter()
-                    .map(|node_type| {
-                        let enabled = legacy_visibility
-                            .and_then(|visibility| visibility.get(node_type))
-                            .and_then(Value::as_bool)
-                            .unwrap_or(true);
-                        (
-                            node_type.to_string(),
-                            serde_json::json!({ "enabled": enabled }),
-                        )
-                    })
-                    .collect()
-            });
+            .get("editNodes")
+            .and_then(Value::as_object)
+            .ok_or_else(|| "EditDocumentV2 layer editNodes must be an object".to_string())?;
         let visibility = edit_nodes
-            .into_iter()
+            .iter()
             .map(|(node_type, envelope)| {
                 let enabled = envelope
                     .get("enabled")
@@ -2588,7 +2550,7 @@ fn compile_layers_legacy_projection(
                     .ok_or_else(|| {
                         format!("EditDocumentV2 layer node '{node_type}' enabled must be boolean")
                     })?;
-                Ok((node_type, Value::Bool(enabled)))
+                Ok((node_type.clone(), Value::Bool(enabled)))
             })
             .collect::<Result<Map<String, Value>, String>>()?;
         let adjustments = mask_object
@@ -2596,8 +2558,6 @@ fn compile_layers_legacy_projection(
             .and_then(Value::as_object_mut)
             .ok_or_else(|| "EditDocumentV2 layer adjustments must be an object".to_string())?;
         adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
-        mask_object.remove("editNodeQuarantine");
-        mask_object.remove("editNodeSchemaVersion");
     }
     Ok(compiled)
 }
@@ -2832,7 +2792,11 @@ fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
         if layer.edit_node_schema_version != 1 {
             return Err("EditDocumentV2 layer editNodeSchemaVersion must be 1".to_string());
         }
-        let _ = &layer.edit_node_quarantine;
+        if layer.adjustments.contains_key("sectionVisibility") {
+            return Err(
+                "EditDocumentV2 layer adjustments must not contain sectionVisibility".to_string(),
+            );
+        }
         if layer
             .layer_group_id
             .as_ref()
@@ -3493,6 +3457,13 @@ mod tests {
         json!({
             "adjustments": { "exposure": 0.4 },
             "blendMode": "overlay",
+            "editNodes": {
+                "basic": { "enabled": false },
+                "color": { "enabled": true },
+                "curves": { "enabled": false },
+                "details": { "enabled": true }
+            },
+            "editNodeSchemaVersion": 1,
             "id": "layer-1",
             "invert": false,
             "name": "Local sky",
@@ -3838,37 +3809,138 @@ mod tests {
     }
 
     #[test]
-    fn pre_envelope_layer_visibility_compiles_without_losing_the_mask() {
-        let legacy_layer = json!({
-            "adjustments": {
-                "exposure": 0.4,
-                "sectionVisibility": { "basic": false, "color": true, "curves": false, "details": true }
-            },
-            "id": "legacy-layer",
-            "invert": false,
-            "name": "Legacy layer",
-            "opacity": 72,
-            "subMasks": [],
-            "visible": true
-        });
+    fn current_layer_envelope_compiles_without_losing_render_or_document_authority() {
+        let current_layer = layer();
         let mut value = document_with_legacy(json!({}));
-        value["layers"] = json!({ "masks": [legacy_layer] });
-        value["nodes"]["layers"]["params"] = json!({ "masks": [legacy_layer] });
+        value["layers"] = json!({ "masks": [current_layer] });
+        value["nodes"]["layers"]["params"] = json!({ "masks": [current_layer] });
         let document: EditDocumentV2 =
-            serde_json::from_value(value).expect("valid legacy document");
+            serde_json::from_value(value).expect("valid current document");
         let compiled = document
             .into_render_adjustments()
-            .expect("compiled legacy layer");
+            .expect("compiled current layer");
         let layer = &compiled["masks"][0];
 
-        assert_eq!(layer["id"], "legacy-layer");
+        assert_eq!(layer["id"], "layer-1");
         assert_eq!(layer["adjustments"]["exposure"], 0.4);
         assert_eq!(
             layer["adjustments"]["sectionVisibility"],
             json!({ "basic": false, "color": true, "curves": false, "details": true })
         );
-        assert!(layer.get("editNodes").is_none());
-        assert!(layer.get("editNodeSchemaVersion").is_none());
+        assert_eq!(layer["editNodes"]["basic"]["enabled"], false);
+        assert_eq!(layer["editNodeSchemaVersion"], 1);
+    }
+
+    #[test]
+    fn rejects_missing_malformed_wrong_version_and_legacy_layer_envelopes() {
+        let current = layer();
+        let assert_rejected = |candidate: Value| {
+            let mut value = document_with_legacy(json!({}));
+            value["layers"] = json!({ "masks": [candidate] });
+            value["nodes"]["layers"]["params"] = value["layers"].clone();
+            let error = serde_json::from_value::<EditDocumentV2>(value)
+                .expect("document envelope remains structurally parseable")
+                .into_render_adjustments()
+                .expect_err("invalid layer envelope must fail before render");
+            assert!(error.contains("EditDocumentV2 layers are invalid"));
+        };
+
+        let mut missing_nodes = current.clone();
+        missing_nodes.as_object_mut().unwrap().remove("editNodes");
+        assert_rejected(missing_nodes);
+
+        let mut missing_version = current.clone();
+        missing_version
+            .as_object_mut()
+            .unwrap()
+            .remove("editNodeSchemaVersion");
+        assert_rejected(missing_version);
+
+        let mut malformed = current.clone();
+        malformed["editNodes"]["basic"]["enabled"] = json!("not-boolean");
+        assert_rejected(malformed);
+
+        let mut wrong_version = current.clone();
+        wrong_version["editNodeSchemaVersion"] = json!(0);
+        let mut value = document_with_legacy(json!({}));
+        value["layers"] = json!({ "masks": [wrong_version] });
+        value["nodes"]["layers"]["params"] = value["layers"].clone();
+        let error = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("wrong version remains structurally parseable")
+            .into_render_adjustments()
+            .expect_err("wrong layer envelope version must fail");
+        assert!(error.contains("editNodeSchemaVersion must be 1"));
+
+        let mut legacy_visibility = current;
+        legacy_visibility["adjustments"]["sectionVisibility"] =
+            json!({ "basic": false, "color": true, "curves": true, "details": true });
+        let mut value = document_with_legacy(json!({}));
+        value["layers"] = json!({ "masks": [legacy_visibility] });
+        value["nodes"]["layers"]["params"] = value["layers"].clone();
+        let error = serde_json::from_value::<EditDocumentV2>(value)
+            .expect("legacy visibility remains structurally parseable")
+            .into_render_adjustments()
+            .expect_err("legacy layer visibility must fail");
+        assert!(error.contains("must not contain sectionVisibility"));
+    }
+
+    #[test]
+    fn invalid_layer_sidecar_is_byte_preserved_and_quarantined_as_one_render_authority() {
+        let mut invalid_layer = layer();
+        invalid_layer.as_object_mut().unwrap().remove("editNodes");
+        let mut document = document_with_legacy(json!({}));
+        document["layers"] = json!({ "masks": [invalid_layer] });
+        document["nodes"]["layers"]["params"] = document["layers"].clone();
+
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("head-project.arw.rrdata");
+        let invalid_document = document.clone();
+        let sidecar = json!({
+            "adjustments": { "exposure": 0.4, "masks": [layer()] },
+            "editDocumentV2": document,
+            "rating": 5,
+            "version": 2
+        });
+        let original_bytes = serde_json::to_vec_pretty(&sidecar).expect("serialize sidecar");
+
+        let invalid_save_path = temp_dir.path().join("invalid-save.arw.rrdata");
+        let invalid_metadata = crate::image_processing::ImageMetadata {
+            adjustments: json!({ "exposure": 0.4, "masks": [layer()] }),
+            edit_document_v2: Some(invalid_document),
+            ..Default::default()
+        };
+        let save_error = crate::exif_processing::save_sidecar_metadata_atomic(
+            &invalid_save_path,
+            &invalid_metadata,
+        )
+        .expect_err("invalid layer authority must not be persisted");
+        assert!(save_error.contains("editDocumentV2"));
+        assert!(!invalid_save_path.exists());
+
+        std::fs::write(&sidecar_path, &original_bytes).expect("write sidecar");
+
+        let loaded = crate::exif_processing::load_sidecar_recovering(
+            &sidecar_path,
+            Some("/photos/head-project.arw"),
+        )
+        .expect("quarantine invalid current layer authority");
+        assert_eq!(
+            loaded.outcome,
+            crate::exif_processing::PersistedStateOutcome::Quarantined
+        );
+        assert_eq!(loaded.metadata.adjustments, json!({}));
+        assert!(loaded.metadata.edit_document_v2.is_none());
+        assert_eq!(
+            std::fs::read(loaded.backup_path.expect("byte-preserving backup")).unwrap(),
+            original_bytes
+        );
+        let quarantined = loaded
+            .metadata
+            .persisted_render_state
+            .expect("recovery state")
+            .quarantined_extensions;
+        assert!(quarantined.contains_key("rejectedAdjustments"));
+        assert!(quarantined.contains_key("rejectedEditDocumentV2"));
     }
 
     #[test]

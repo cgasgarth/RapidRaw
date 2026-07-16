@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { filmRuntimeProofReceiptV1Schema } from '../../packages/rawengine-schema/src/film/filmRuntimeProofReceiptSchemas';
+
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
 const privatePathSchema = z
@@ -255,6 +257,7 @@ const privateRunReportSchema = z
     editCommandId: z.string().trim().min(1),
     editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
     finalFile: finalFileProofSchema,
+    filmRuntimeProofReceipt: filmRuntimeProofReceiptV1Schema.optional(),
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     generatedAt: z.iso.datetime(),
     metrics: z.array(qualityMetricSchema).min(4),
@@ -299,7 +302,6 @@ const privateRunReportSchema = z
 
 /** Strict parser for the single workflow report emitted by the native RAW smoke harness. */
 export const rawOpenEditExportRunReportSchema = privateRunReportSchema;
-type RawOpenEditExportRunReport = z.infer<typeof rawOpenEditExportRunReportSchema>;
 
 const rawOpenEditExportRunReportCollectionSchema = z
   .object({

@@ -9,6 +9,7 @@ export const filmPreviewExportMetricsV1Schema = z
     changedPixelRatio: z.number().finite().positive().max(1),
     previewExportMeanAbsDelta: z.number().finite().nonnegative().max(0.015),
     postFilmPreViewHashEqual: z.literal(true),
+    saveReopenFilmNodeHashEqual: z.literal(true),
     sourceHashUnchanged: z.literal(true),
   })
   .strict();
@@ -46,6 +47,15 @@ export const filmRuntimeProofReceiptV1Schema = z
         code: 'custom',
         message: 'Film profile ref/content hashes must agree.',
         path: ['filmProfileRef'],
+      });
+    if (
+      receipt.colorSyncDisplayProfileSha256 === undefined &&
+      !receipt.limitationCodes.includes('display_transform_unverified')
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'An unavailable ColorSync profile requires display_transform_unverified.',
+        path: ['limitationCodes'],
       });
   });
 

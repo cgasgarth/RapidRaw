@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   bindTypedCurveGraphVersion,
   INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  INITIAL_MASK_CONTAINER,
   normalizeLoadedAdjustments,
 } from '../../../src/utils/adjustments';
 
@@ -40,6 +42,43 @@ describe('persisted edit graph version', () => {
       effectsEnabled: false,
       grainAmount: 37,
     });
+  });
+
+  test('requires current layer envelopes and rejects legacy visibility', () => {
+    const currentLayer = {
+      ...structuredClone(INITIAL_MASK_CONTAINER),
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      editNodes: {
+        basic: { enabled: false },
+        color: { enabled: true },
+        curves: { enabled: false },
+        details: { enabled: true },
+      },
+      id: 'current-layer',
+    };
+    const reopened = normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, masks: [currentLayer] });
+    expect(reopened.masks[0]?.editNodes).toEqual(currentLayer.editNodes);
+
+    const legacyVisibility = structuredClone(currentLayer);
+    Reflect.set(legacyVisibility.adjustments, 'sectionVisibility', {
+      basic: true,
+      color: false,
+      curves: true,
+      details: false,
+    });
+    expect(() => normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, masks: [legacyVisibility] })).toThrow(
+      'sectionVisibility',
+    );
+
+    const missingEnvelope = structuredClone(currentLayer);
+    Reflect.deleteProperty(missingEnvelope, 'editNodes');
+    expect(() => normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, masks: [missingEnvelope] })).toThrow();
+
+    const wrongVersion = structuredClone(currentLayer);
+    Reflect.set(wrongVersion, 'editNodeSchemaVersion', 0);
+    expect(() => normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, masks: [wrongVersion] })).toThrow(
+      'editNodeSchemaVersion',
+    );
   });
 
   test('round-trips typed curve domains without retaining mutable sidecar aliases', () => {

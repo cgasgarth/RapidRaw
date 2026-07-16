@@ -2,12 +2,19 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments';
 import { applyMaskContainerAdjustmentCandidate } from '../../../src/utils/mask/maskContainerAdjustmentTransaction';
 
 const layer: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: 'tone-equalizer-layer',
   invert: false,
   name: 'Tone Equalizer layer',
