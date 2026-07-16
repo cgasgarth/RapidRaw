@@ -23,6 +23,7 @@ const seedEditor = () => {
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
+      exif: null,
       height: 4000,
       isRaw: true,
       isReady: true,
