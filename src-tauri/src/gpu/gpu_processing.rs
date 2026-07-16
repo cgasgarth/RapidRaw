@@ -3966,7 +3966,7 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let recipe = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 2,
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             "channelMixer": {
                 "enabled": true,
                 "preserveLuminance": false,
@@ -3987,7 +3987,12 @@ mod blur_pass_tests {
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, 2),
+                    revision: crate::render_plan::content_revision(
+                        &raw,
+                        1,
+                        2,
+                        u64::from(crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION),
+                    ),
                     is_raw: false,
                     tonemapper_override: Some(0),
                 },
@@ -4062,7 +4067,7 @@ mod blur_pass_tests {
             .expect("compute-only GPU context initializes");
         let render = || {
             let raw = crate::render_plan::current_render_adjustments(json!({
-                "rawEngineEditGraphVersion": 2,
+                "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
                 "blackWhiteMixer": {
                     "enabled": true,
                     "process": "neutral_panchromatic_v1",
@@ -4075,7 +4080,12 @@ mod blur_pass_tests {
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, 2),
+                    revision: crate::render_plan::content_revision(
+                        &raw,
+                        1,
+                        2,
+                        u64::from(crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION),
+                    ),
                     is_raw: false,
                     tonemapper_override: Some(0),
                 },
