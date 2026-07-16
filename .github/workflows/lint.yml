@@ -305,6 +305,6 @@ jobs:
           PLAN_JSON: ${{ needs.plan.outputs.plan_json }}
         run: |
           set -euo pipefail
-          JOBS_CONTEXT="$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=latest&per_page=100")"
+          JOBS_CONTEXT="$(bun scripts/ci/pr-ci-contract.ts --fetch-jobs)"
           export JOBS_CONTEXT
           bun scripts/ci/pr-ci-contract.ts --verify

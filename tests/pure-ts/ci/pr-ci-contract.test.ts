@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  fetchWorkflowJobsJson,
   PR_REQUIRED_BUDGET_SECONDS,
   PR_REQUIRED_JOBS,
   parseWorkflowJobTimings,
@@ -9,6 +10,58 @@ import {
 } from '../../../scripts/ci/pr-ci-contract';
 
 describe('four-minute PR CI contract', () => {
+  test('retries transient GitHub API responses with bounded deterministic backoff', async () => {
+    const responses = [503, 429, 502, 200].map(
+      (status) => new Response(status === 200 ? '{"jobs":[]}' : '{"message":"transient"}', { status }),
+    );
+    const delays: number[] = [];
+    const diagnostics: string[] = [];
+    const body = await fetchWorkflowJobsJson('owner/repo', '123', 'token', {
+      fetchImpl: async () => responses.shift() ?? new Response('missing', { status: 500 }),
+      jitter: () => 0,
+      onDiagnostic: (message) => diagnostics.push(message),
+      sleep: async (delayMs) => {
+        delays.push(delayMs);
+      },
+    });
+    expect(body).toBe('{"jobs":[]}');
+    expect(delays).toEqual([250, 500, 1_000]);
+    expect(diagnostics).toEqual([
+      'GitHub API jobs request HTTP 503; retry 1/5 in 250ms',
+      'GitHub API jobs request HTTP 429; retry 2/5 in 500ms',
+      'GitHub API jobs request HTTP 502; retry 3/5 in 1000ms',
+    ]);
+  });
+
+  test('fails immediately for authentication and other client errors', async () => {
+    const calls: number[] = [];
+    await expect(
+      fetchWorkflowJobsJson('owner/repo', '123', 'token', {
+        fetchImpl: async () => {
+          calls.push(1);
+          return new Response('{"message":"bad credentials"}', { status: 401 });
+        },
+        sleep: async () => undefined,
+      }),
+    ).rejects.toThrow('GitHub API jobs request failed HTTP 401: {"message":"bad credentials"}');
+    expect(calls).toHaveLength(1);
+  });
+
+  test('fails closed after exhausting transient retries', async () => {
+    const delays: number[] = [];
+    await expect(
+      fetchWorkflowJobsJson('owner/repo', '123', 'token', {
+        fetchImpl: async () => new Response('{"message":"unavailable"}', { status: 503 }),
+        jitter: () => 1,
+        onDiagnostic: () => undefined,
+        sleep: async (delayMs) => {
+          delays.push(delayMs);
+        },
+      }),
+    ).rejects.toThrow('GitHub API jobs request failed HTTP 503 after 6 attempts');
+    expect(delays).toEqual([500, 750, 1_250, 2_250, 4_000]);
+  });
+
   test.each([
     [
       ['src/components/Editor.tsx'],
