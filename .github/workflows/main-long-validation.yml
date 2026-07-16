@@ -86,7 +86,7 @@ jobs:
       - name: Repeat the Bun suite in a reproducible random order
         env:
           RAWENGINE_BUN_TEST_SEED: ${{ inputs.randomized_seed || github.run_id }}
-        run: bun run test:randomized -- --target tests/pure-ts/validation-dag.test.ts
+        run: bun run test:randomized
 
   frontend-browser:
     name: 'frontend: browser and visual runtime'

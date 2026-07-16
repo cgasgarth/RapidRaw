@@ -50,7 +50,7 @@ const expectedCommands: Readonly<Record<(typeof MAIN_FRONTEND_LANES)[number], re
   ],
   'frontend-unit': ['bun run test:unit'],
   'frontend-coverage': ['bun run test:coverage'],
-  'frontend-randomized': ['bun run test:randomized -- --target tests/pure-ts/validation-dag.test.ts'],
+  'frontend-randomized': ['bun run test:randomized'],
   'frontend-browser': [
     'bunx playwright install chromium',
     'bun run check:browser-harness',

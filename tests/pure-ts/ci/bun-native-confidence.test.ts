@@ -72,7 +72,6 @@ describe('Bun native confidence gates', () => {
     expect(buildRandomizedTestArgs(seed)).toEqual([
       'test',
       '--no-orphans',
-      '--dots',
       '--parallel',
       '--bail=1',
       '--randomize',
