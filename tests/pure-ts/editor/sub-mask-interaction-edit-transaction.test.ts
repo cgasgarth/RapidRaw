@@ -280,9 +280,11 @@ describe('sub-mask interaction edit transaction', () => {
   test('treats an exact patch as a no-op without history or output invalidation', () => {
     const identity = captureIdentity('radial-drag:no-op');
     const before = useEditorStore.getState();
+    const currentParameters = before.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters;
+    if (currentParameters === undefined) throw new Error('Expected current sub-mask parameters.');
     const result = before.applyEditTransaction(
       buildSubMaskInteractionEditTransaction(before, identity, maskSubId, {
-        parameters: before.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters,
+        parameters: currentParameters,
       }),
     );
     const after = useEditorStore.getState();
