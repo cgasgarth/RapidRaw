@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
+import { sceneGlobalColorToneParamsV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { createDefaultEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
 
@@ -99,13 +100,21 @@ describe('editor render-authority boundary', () => {
     expect(Object.isFrozen(committed.adjustmentSnapshot.value)).toBeTrue();
     expect(Reflect.set(committed.adjustmentSnapshot.value, 'exposure', 99)).toBeFalse();
     expect(committed.adjustmentSnapshot.value.exposure).toBe(1.25);
-    expect(useEditorStore.getState().editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
+    expect(
+      sceneGlobalColorToneParamsV2Schema.parse(
+        useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params,
+      ).exposure,
+    ).toBe(1.25);
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2).toEqual(original);
     expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
+    expect(
+      sceneGlobalColorToneParamsV2Schema.parse(
+        useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params,
+      ).exposure,
+    ).toBe(1.25);
   });
 
   test('generic non-render UI updates remain available', () => {
