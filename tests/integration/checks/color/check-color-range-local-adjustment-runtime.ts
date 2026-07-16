@@ -2,6 +2,7 @@
 
 import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../src/utils/colorStackPreviewExportParityReceipt.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
   buildColorRangeProposalSourcePixels,
@@ -106,7 +107,7 @@ if (replayResult.receipt.replayKey !== receipt.replayKey) {
 }
 
 const parityReceipt = buildColorStackPreviewExportParityReceipt({
-  adjustments: {
+  editDocumentV2: legacyAdjustmentsToEditDocumentV2({
     ...INITIAL_ADJUSTMENTS,
     hsl: {
       ...INITIAL_ADJUSTMENTS.hsl,
@@ -120,7 +121,7 @@ const parityReceipt = buildColorStackPreviewExportParityReceipt({
         widthDegrees: 48,
       },
     },
-  },
+  }),
   exportOutput: {
     byteSize: 24_576,
     colorProfile: 'sRGB IEC61966-2.1',

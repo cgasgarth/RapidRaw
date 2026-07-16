@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { ExportColorCapabilityCatalogV1 } from '../../../packages/rawengine-schema/src/exportColorCapabilities';
 import {
   ExportColorProfile,
@@ -19,7 +20,7 @@ export type ExportSoftProofProfileCompareSideId = 'srgb' | 'displayP3';
 export interface ExportSoftProofProfileCompareRequest extends Record<string, unknown> {
   blackPointCompensation: boolean;
   colorProfile: ExportColorProfile;
-  jsAdjustments: unknown;
+  editDocumentV2: EditDocumentV2;
   renderingIntent: ExportRenderingIntent;
   targetResolution: number;
 }
@@ -107,12 +108,12 @@ export const createInitialSoftProofProfileCompareState = (): Record<
 
 export const buildSoftProofProfileCompareRequests = ({
   blackPointCompensation,
-  jsAdjustments,
+  editDocumentV2,
   renderingIntent,
   targetResolution = EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
 }: {
   blackPointCompensation: boolean;
-  jsAdjustments: unknown;
+  editDocumentV2: EditDocumentV2;
   renderingIntent: ExportRenderingIntent;
   targetResolution?: number;
 }): ExportSoftProofProfileCompareSideRequest[] => [
@@ -121,7 +122,7 @@ export const buildSoftProofProfileCompareRequests = ({
     request: {
       blackPointCompensation,
       colorProfile: ExportColorProfile.Srgb,
-      jsAdjustments,
+      editDocumentV2,
       renderingIntent,
       targetResolution,
     },
@@ -132,7 +133,7 @@ export const buildSoftProofProfileCompareRequests = ({
     request: {
       blackPointCompensation,
       colorProfile: ExportColorProfile.DisplayP3,
-      jsAdjustments,
+      editDocumentV2,
       renderingIntent,
       targetResolution,
     },

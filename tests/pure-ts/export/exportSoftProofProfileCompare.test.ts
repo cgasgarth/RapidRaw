@@ -8,6 +8,7 @@ import {
 } from '../../../src/components/ui/ExportImportProperties';
 import { type ExportRecipeSettings, exportRecipeSchema } from '../../../src/schemas/export/exportRecipeSchemas';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildSoftProofProfileCompareInvokeRequest,
   buildSoftProofProfileCompareRequests,
@@ -21,7 +22,7 @@ describe('export soft-proof profile compare', () => {
   test('wraps the preview payload under the required request key', () => {
     const [srgbRequest] = buildSoftProofProfileCompareRequests({
       blackPointCompensation: false,
-      jsAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
       renderingIntent: ExportRenderingIntent.Perceptual,
       targetResolution: 1024,
     });

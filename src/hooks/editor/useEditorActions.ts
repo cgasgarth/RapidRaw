@@ -11,13 +11,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
-import {
-  type Adjustments,
-  bindTypedCurveGraphVersion,
-  INITIAL_ADJUSTMENTS,
-  normalizeLoadedAdjustments,
-  PasteMode,
-} from '../../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS, PasteMode } from '../../utils/adjustments';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from '../../utils/appEventLogger';
 import {
   BASIC_TONE_ADJUSTMENT_KEYS,
@@ -38,11 +32,7 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../utils/copyPasteEditTransaction';
-import {
-  copyEditDocumentV2Nodes,
-  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
-  selectEditDocumentV2CopyPayload,
-} from '../../utils/editDocumentV2';
+import { copyEditDocumentV2Nodes, selectEditDocumentV2CopyPayload } from '../../utils/editDocumentV2';
 import {
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
@@ -68,16 +58,12 @@ import {
 } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
-import { hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
 import { buildLutLoadEditTransaction, captureLutCommitIdentity } from '../../utils/lutEditTransaction';
 import {
   buildOrientationRotateEditTransaction,
   captureOrientationRotateCommitIdentity,
 } from '../../utils/orientationRotateEditTransaction';
-import {
-  acceptReferenceMatchAdjustmentTransfer,
-  reconcileReferenceMatchReceiptsAfterEdit,
-} from '../../utils/referenceMatchTransfer';
+import { reconcileReferenceMatchReceiptsAfterEdit } from '../../utils/referenceMatchTransfer';
 import { resolveResetTargetPaths } from '../../utils/resetAdjustments';
 import {
   assertResetAdjustmentsResultCoverage,
@@ -99,12 +85,13 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
 
 export const debouncedSave = debounce(
   (path: string, adjustmentsToSave: Adjustments, transaction?: EditTransactionPersistenceContext) => {
+    const editDocumentV2 = useEditorStore.getState().editDocumentV2;
     void trackEditorPersistence(
       path,
       adjustmentsToSave,
       invokeWithSchema(
         Invokes.SaveMetadataAndUpdateThumbnail,
-        { path, adjustments: adjustmentsToSave, transaction },
+        { path, editDocumentV2, transaction },
         editorPersistenceReceiptSchema,
       ),
     ).catch((err: unknown) => {
@@ -335,24 +322,20 @@ export function useEditorActions() {
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
-    const { selectedImage, adjustmentSnapshot, editDocumentV2 } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2 } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
-    let sourceAdjustments: Adjustments | null = null;
     let sourceDocument = selectedImage ? editDocumentV2 : null;
 
-    if (selectedImage) {
-      sourceAdjustments = adjustmentSnapshot.value;
-    } else {
+    if (!selectedImage) {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
         try {
           const meta = await invokeWithSchema(Invokes.LoadMetadata, { path: pathToCopyFrom }, loadedMetadataSchema);
-          if (meta.adjustments && !meta.adjustments.is_null) {
-            sourceAdjustments = normalizeLoadedAdjustments(meta.adjustments);
-          } else {
-            sourceAdjustments = INITIAL_ADJUSTMENTS;
+          if (meta.editDocumentV2 === null || meta.editDocumentV2 === undefined) {
+            toast.error('The selected image does not have a current edit document to copy.');
+            return;
           }
-          sourceDocument = hydrateImageOpenEditDocumentV2(meta, sourceAdjustments);
+          sourceDocument = meta.editDocumentV2;
         } catch (err) {
           toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
@@ -360,7 +343,7 @@ export function useEditorActions() {
       }
     }
 
-    if (!sourceAdjustments || sourceDocument === null) return;
+    if (sourceDocument === null) return;
 
     const copiedEditDocumentV2 = copyEditDocumentV2Nodes(sourceDocument);
     useEditorStore.getState().setEditor({
@@ -384,13 +367,6 @@ export function useEditorActions() {
         selectedNodeIds,
         pasteMode === PasteMode.Merge,
       );
-      const adjustmentsToApply = bindTypedCurveGraphVersion(
-        acceptReferenceMatchAdjustmentTransfer({
-          adjustments: lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selectedPayload),
-          transferMode: 'copy-paste',
-        }).adjustments,
-      );
-
       if (Object.keys(selectedPayload.nodes).length === 0) {
         setProcess({ isPasted: true });
         return;
@@ -431,12 +407,12 @@ export function useEditorActions() {
 
       invokeWithSchema(
         Invokes.ApplyAdjustmentsToPaths,
-        { adjustments: adjustmentsToApply, paths: pathsToUpdate, transaction },
+        { editDocumentV2: selectedPayload, paths: pathsToUpdate, transaction },
         editorPersistenceReceiptArraySchema,
       )
         .then((receipts) => {
           const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
-          if (selectedReceipt?.adjustments && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+          if (selectedReceipt && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
             const completion = classifyCopyPasteNativeCompletion(
               useEditorStore.getState(),
               selectedImage.path,

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, Rgba};
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
 use serde_json::Value;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -19,6 +20,7 @@ pub(crate) struct CurrentRetouchLayer {
 
 /// Flat compatibility projection for the legacy adjustment bag. Current
 /// EditDocumentV2 compilation never deserializes or stores this DTO.
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LegacyRetouchLayer {
@@ -78,6 +80,7 @@ enum RetouchOperation<'a> {
     Remove(&'a CurrentRetouchRemoveSource),
 }
 
+#[cfg(test)]
 pub(crate) fn apply_clone_retouch_layers<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,

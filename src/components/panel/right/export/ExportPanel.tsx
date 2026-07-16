@@ -27,7 +27,6 @@ import {
 } from '../../../../../packages/rawengine-schema/src/exportColorCapabilities';
 import { useExportSettings } from '../../../../hooks/export/useExportSettings';
 import { useOsPlatform } from '../../../../hooks/ui/useOsPlatform';
-import { prepareAdjustmentPayloadForBackend } from '../../../../schemas/adjustmentPayloadSchemas';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../../schemas/export/exportRecipeIds';
 import {
   buildCurrentExportRecipe,
@@ -43,7 +42,6 @@ import { Invokes } from '../../../../tauri/commands';
 import { thumbnailCache } from '../../../../thumbnails/thumbnailCacheInstance';
 import { useThumbnailCacheRevision } from '../../../../thumbnails/useThumbnail';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
-import type { Adjustments } from '../../../../utils/adjustments';
 import {
   type AppOperationContext,
   beginAppOperation,
@@ -55,6 +53,7 @@ import {
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
+import { prepareCurrentEditDocumentV2ForBackend } from '../../../../utils/editDocumentV2';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
   type ExportCancellationAck,
@@ -400,7 +399,6 @@ export default function ExportPanel({
   }, [availableFileFormats, fileFormat, setFileFormat]);
 
   const {
-    adjustments,
     editDocumentV2,
     exportSoftProofTransform,
     exportSoftProofRecipeId,
@@ -411,7 +409,6 @@ export default function ExportPanel({
     setEditor,
   } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustmentSnapshot.value,
       editDocumentV2: state.editDocumentV2,
       exportSoftProofTransform: state.exportSoftProofTransform,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
@@ -546,13 +543,13 @@ export default function ExportPanel({
     () =>
       firstReceiptOutput
         ? buildColorStackPreviewExportParityReceipt({
-            adjustments,
+            editDocumentV2,
             exportOutput: firstReceiptOutput,
             exportSoftProofTransform,
             isExportSoftProofEnabled,
           })
         : null,
-    [adjustments, exportSoftProofTransform, firstReceiptOutput, isExportSoftProofEnabled],
+    [editDocumentV2, exportSoftProofTransform, firstReceiptOutput, isExportSoftProofEnabled],
   );
   const colorStackParitySummary =
     colorStackParityReceipt === null
@@ -1015,13 +1012,13 @@ export default function ExportPanel({
 
     const { patchResidency } = useEditorStore.getState();
     const residency = patchResidency.snapshot();
-    const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
-      structuredClone(adjustments),
+    const { editDocumentV2: preparedEditDocumentV2, newlySentPatchIds } = prepareCurrentEditDocumentV2ForBackend(
+      editDocumentV2,
       residency.residentIds,
     );
     const compareRequests = buildSoftProofProfileCompareRequests({
       blackPointCompensation,
-      jsAdjustments: payload,
+      editDocumentV2: preparedEditDocumentV2,
       renderingIntent,
       targetResolution: EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
     });
@@ -1091,7 +1088,7 @@ export default function ExportPanel({
       >,
     );
   }, [
-    adjustments,
+    editDocumentV2,
     blackPointCompensation,
     renderingIntent,
     revokeSoftProofProfileCompareUrls,
@@ -1170,7 +1167,6 @@ export default function ExportPanel({
     };
   }, [
     pathsToExport,
-    adjustments,
     editDocumentV2,
     selectedImage?.path,
     availableFileFormats,

@@ -1,5 +1,4 @@
 use memmap2::{Mmap, MmapOptions};
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
@@ -11,8 +10,10 @@ use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+#[cfg(test)]
+use image::ImageBuffer;
 use image::codecs::{jpeg::JpegEncoder, tiff::TiffDecoder};
-use image::{ColorType, DynamicImage, GenericImageView, ImageBuffer, ImageDecoder, Luma};
+use image::{ColorType, DynamicImage, GenericImageView, ImageDecoder};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,11 +23,12 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 use crate::AppState;
+use crate::adjustments::edit_document_v2::{EditDocumentV2, EditDocumentV2CopyPayload};
 use crate::album_management::{add_to_album, sync_album_path_changes};
 #[cfg(target_os = "android")]
 use crate::android_integration::*;
 use crate::app_settings::*;
-use crate::auto_adjust::{auto_results_to_json, perform_auto_analysis};
+use crate::auto_adjust::{AutoAdjustmentResults, perform_auto_analysis};
 use crate::delete_plan::{
     associated_files_for_source, plan_stem_associated_deletes, plan_virtual_path_deletes,
     rrdata_sidecar_path, rrexif_sidecar_path, trash_or_remove_paths,
@@ -36,17 +38,13 @@ use crate::formats::{is_raw_file, is_supported_image_file};
 use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
-use crate::image_processing::{
-    ImageMetadata, RawEngineArtifacts, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
-};
+use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use crate::library::thumbnail_generation_service::{
     ThumbnailLifecycleEmission, ThumbnailOperationAuthority, ThumbnailServiceJob,
 };
 use crate::library_identity::{
     LibraryRelinkIdentity, read_exif_for_paths_blocking, read_library_relink_identity_blocking,
 };
-use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
 use crate::smart_preview_cache::{
     SMART_PREVIEW_TARGET_WIDTH, ThumbnailSmartPreviewPayload, compute_source_revision,
     enforce_smart_preview_cache_budget, read_smart_preview_artifact,
@@ -344,10 +342,9 @@ fn virtual_path_for_copy(source_path: &Path, copy_id: Option<&str>) -> (String, 
 pub(crate) fn expand_image_file_rows(
     path_buf: PathBuf,
     sidecars: Vec<Option<String>>,
-    settings: &AppSettings,
+    _settings: &AppSettings,
     enable_xmp_sync: bool,
 ) -> Vec<ImageFile> {
-    let path_str = path_buf.to_string_lossy().into_owned();
     let modified = fs::metadata(&path_buf)
         .ok()
         .and_then(|m| m.modified().ok())
@@ -369,14 +366,11 @@ pub(crate) fn expand_image_file_rows(
                 save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "XMP import");
             }
 
-            let is_raw = crate::formats::is_raw_file(&path_str);
-            let tm_override =
-                crate::image_processing::resolve_tonemapper_override(settings, is_raw);
-            let edited = crate::image_processing::is_image_edited(
-                &metadata.adjustments,
-                is_raw,
-                tm_override,
-            );
+            let neutral = crate::exif_processing::neutral_current_edit_document();
+            let edited = metadata
+                .edit_document_v2
+                .as_ref()
+                .is_some_and(|document| document != &neutral);
             (edited, metadata.tags, metadata.rating)
         };
 
@@ -640,14 +634,11 @@ pub fn get_album_images(
                     save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "XMP import");
                 }
 
-                let is_raw = crate::formats::is_raw_file(&source_path);
-                let tm_override =
-                    crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-                let edited = crate::image_processing::is_image_edited(
-                    &metadata.adjustments,
-                    is_raw,
-                    tm_override,
-                );
+                let neutral = crate::exif_processing::neutral_current_edit_document();
+                let edited = metadata
+                    .edit_document_v2
+                    .as_ref()
+                    .is_some_and(|document| document != &neutral);
                 (edited, metadata.tags, metadata.rating)
             };
 
@@ -1046,310 +1037,87 @@ fn generate_thumbnail_data_with_target(
 ) -> anyhow::Result<DynamicImage> {
     let (source_path, sidecar_path) = parse_virtual_path(path_str);
     let source_path_str = source_path.to_string_lossy().to_string();
-    let is_raw = is_raw_file(&source_path_str);
-
     let metadata = crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path_str))
-        .ok()
-        .map(|loaded| loaded.metadata);
-
-    let adjustments = metadata
-        .as_ref()
-        .map_or(serde_json::Value::Null, |m| m.adjustments.clone());
-
-    if let (Some(context), Some(meta)) = (gpu_context, metadata)
-        && !meta.adjustments.is_null()
-    {
-        let state = app_handle.state::<AppState>();
-        let settings = load_settings_or_default(app_handle);
-        let target_res =
-            target_resolution.unwrap_or_else(|| settings.thumbnail_resolution.unwrap_or(720));
-        let source_revision = crate::render::artifact_identity::stable_hash(&(
-            gpu_processing::PreGpuImageIdentity::source_revision(path_str),
-            image_loader::raw_processing_profile_key(&settings),
-        ));
-
-        let tm_override = crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-        let lut = meta.adjustments["lutPath"]
-            .as_str()
-            .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
-        let revision = content_revision(
-            &meta.adjustments,
-            0,
-            crate::render::artifact_identity::source_fingerprint_for_path(path_str),
-            u64::from(tm_override.unwrap_or(0)),
-        );
-        let render_plan = compile_render_plan_cached(
-            &meta.adjustments,
-            CompileRenderPlanContext {
-                revision,
-                is_raw,
-                tonemapper_override: tm_override,
-            },
-            lut,
-        )
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        let geometry_hash = render_plan.fingerprints.geometry;
-        let geometry_cache_hash =
-            crate::render::artifact_identity::stable_hash(&(geometry_hash, source_revision));
-        let crop_data = render_plan.crop;
-
-        let cached_base: Option<(DynamicImage, f32)> = {
-            if let Some(entry) = state.render().native_caches().thumbnail_geometry(path_str) {
-                let (cached_hash, img, scale) = entry.as_ref();
-                let mut sufficient_resolution = true;
-                if let Some(c) = &crop_data
-                    && c.width > 0.0
-                    && c.height > 0.0
-                {
-                    let final_crop_max_dim = (c.width as f32 * img.width() as f32)
-                        .max(c.height as f32 * img.height() as f32);
-                    if final_crop_max_dim < (target_res as f32 * 0.95) {
-                        sufficient_resolution = false;
-                    }
-                }
-
-                if *cached_hash == geometry_cache_hash && sufficient_resolution {
-                    Some((img.as_ref().clone(), *scale))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
-        let (processing_base, total_scale) = if let Some(hit) = cached_base {
-            hit
-        } else {
-            let mut raw_scale_factor = 1.0f32;
-
-            let composite_image = if let Some(img) = preloaded_image {
-                image_loader::composite_patches_on_image(img, &adjustments)?.into_owned()
-            } else {
-                let mmap_guard;
-                let vec_guard;
-
-                let file_slice: &[u8] = match read_file_mapped(&source_path) {
-                    Ok(mmap) => {
-                        mmap_guard = Some(mmap);
-                        mmap_guard.as_ref().unwrap()
-                    }
-                    Err(e) => {
-                        if preloaded_image.is_none() {
-                            log::warn!("Fallback read for {}: {}", source_path_str, e);
-                        }
-                        let bytes = fs::read(&source_path).map_err(|io_err| {
-                            anyhow::anyhow!(
-                                "Fallback read failed for {}: {}",
-                                source_path_str,
-                                io_err
-                            )
-                        })?;
-                        vec_guard = Some(bytes);
-                        vec_guard.as_ref().unwrap()
-                    }
-                };
-
-                let img = image_loader::load_and_composite(
-                    file_slice,
-                    &source_path_str,
-                    &adjustments,
-                    true,
-                    &settings,
-                    None,
-                )?;
-
-                if is_raw {
-                    raw_scale_factor = crate::raw_processing::get_fast_demosaic_scale_factor(
-                        file_slice,
-                        img.width(),
-                        img.height(),
-                    );
-                }
-                img
-            };
-
-            let warped_image =
-                apply_geometry_warp(Cow::Borrowed(&composite_image), &meta.adjustments);
-            let orientation_steps =
-                meta.adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-            let coarse_rotated_image = apply_coarse_rotation(warped_image, orientation_steps);
-
-            let (full_w, full_h) = coarse_rotated_image.dimensions();
-
-            let mut processing_dim = target_res;
-            if let Some(c) = &crop_data
-                && c.width > 0.0
-                && c.height > 0.0
-            {
-                let crop_max_dim_loaded = c
-                    .pixel_bounds(full_w, full_h)
-                    .map_or(0.0, |(_, _, width, height)| width.max(height) as f64);
-                let full_max_dim = full_w.max(full_h) as f64;
-                if crop_max_dim_loaded > 0.0 {
-                    processing_dim = ((target_res as f64 * full_max_dim / crop_max_dim_loaded)
-                        .round() as u32)
-                        .min(full_w.max(full_h));
-                }
-            }
-
-            let (base, gpu_scale) = if full_w > processing_dim || full_h > processing_dim {
-                let base = crate::image_processing::downscale_f32_image(
-                    &coarse_rotated_image,
-                    processing_dim,
-                    processing_dim,
-                );
-                let scale = if full_w > 0 {
-                    base.width() as f32 / full_w as f32
-                } else {
-                    1.0
-                };
-                (base, scale)
-            } else {
-                (coarse_rotated_image.into_owned(), 1.0)
-            };
-
-            let total_scale = gpu_scale * raw_scale_factor;
-
-            state.render().native_caches().insert_thumbnail_geometry(
-                path_str.to_string(),
-                Arc::new((geometry_cache_hash, Arc::new(base.clone()), total_scale)),
-            );
-
-            (base, total_scale)
-        };
-
-        let rotation_degrees = meta.adjustments["rotation"].as_f64().unwrap_or(0.0) as f32;
-        let flip_horizontal = meta.adjustments["flipHorizontal"]
-            .as_bool()
-            .unwrap_or(false);
-        let flip_vertical = meta.adjustments["flipVertical"].as_bool().unwrap_or(false);
-
-        let flipped_image = apply_flip(Cow::Owned(processing_base), flip_horizontal, flip_vertical);
-        let rotated_image = apply_rotation(flipped_image, rotation_degrees);
-
-        let unscaled_crop_offset = crop_data
-            .and_then(|crop| {
-                crop.pixel_bounds(rotated_image.width(), rotated_image.height())
-                    .map(|(x, y, _, _)| {
-                        (
-                            x as f32 / total_scale.max(f32::EPSILON),
-                            y as f32 / total_scale.max(f32::EPSILON),
-                        )
-                    })
-            })
-            .unwrap_or((0.0, 0.0));
-        let scaled_crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
-
-        let cropped_preview = apply_crop(rotated_image, &scaled_crop_json);
-        let (preview_w, preview_h) = cropped_preview.dimensions();
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = render_plan
-            .masks
-            .iter()
-            .filter_map(|def| {
-                crate::mask_generation::get_cached_or_generate_mask(
-                    &state,
-                    def,
-                    preview_w,
-                    preview_h,
-                    total_scale,
-                    (
-                        unscaled_crop_offset.0 * total_scale,
-                        unscaled_crop_offset.1 * total_scale,
-                    ),
-                    &meta.adjustments,
-                )
-            })
-            .collect();
-
-        if let Ok(processed_image) = gpu_processing::process_and_get_dynamic_image(
-            context,
-            &state,
-            cropped_preview.as_ref(),
-            gpu_processing::PreGpuImageIdentity::for_stage(
-                cropped_preview.as_ref(),
-                source_revision,
-                render_plan.fingerprints.pre_gpu_base,
-                render_plan.fingerprints.pre_gpu_base,
-            ),
-            gpu_processing::RenderRequest {
-                adjustments: render_plan.adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut: render_plan.lut.clone(),
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    Arc::clone(&render_plan.edit_graph),
-                ),
-            },
-            "generate_thumbnail_data",
-        ) {
-            return Ok(processed_image);
-        } else {
-            return Ok(cropped_preview.into_owned());
-        }
-    }
-
+        .map_err(anyhow::Error::msg)?
+        .metadata;
+    let document = metadata
+        .edit_document_v2
+        .ok_or_else(|| anyhow::anyhow!("thumbnail_current_document_missing"))?;
+    let document =
+        serde_json::from_value::<crate::adjustments::edit_document_v2::EditDocumentV2>(document)
+            .map_err(|error| anyhow::anyhow!("thumbnail_current_document_invalid:{error}"))?
+            .compile()
+            .map_err(anyhow::Error::msg)?;
     let settings = load_settings_or_default(app_handle);
-
-    let mut final_image = if let Some(img) = preloaded_image {
-        image_loader::composite_patches_on_image(img, &adjustments)?.into_owned()
+    let effective_settings =
+        image_loader::raw_processing_settings_for_current_document(&settings, &document);
+    let is_raw = crate::formats::is_raw_file(&source_path_str);
+    let source_image = if let Some(image) = preloaded_image.filter(|_| !is_raw) {
+        image_loader::composite_current_source_artifacts(image, &document)
+            .map_err(anyhow::Error::msg)?
+            .into_owned()
     } else {
-        match read_file_mapped(&source_path) {
-            Ok(mmap) => image_loader::load_and_composite(
-                &mmap,
-                &source_path_str,
-                &adjustments,
-                true,
-                &settings,
-                None,
-            )?,
-            Err(e) => {
-                log::warn!("Fallback read for {}: {}", source_path_str, e);
-                let bytes = fs::read(&source_path)?;
-                image_loader::load_and_composite(
-                    &bytes,
-                    &source_path_str,
-                    &adjustments,
-                    true,
-                    &settings,
-                    None,
-                )?
+        let mapped;
+        let owned;
+        let bytes: &[u8] = match read_file_mapped(&source_path) {
+            Ok(value) => {
+                mapped = Some(value);
+                mapped.as_ref().expect("mapped source")
             }
-        }
-    };
-
-    if adjustments.is_null() {
-        let default_tm = if is_raw {
-            settings
-                .default_raw_tonemapper
-                .as_deref()
-                .unwrap_or("rapidView")
-        } else {
-            settings
-                .default_non_raw_tonemapper
-                .as_deref()
-                .unwrap_or("basic")
+            Err(error) => {
+                log::warn!("Fallback read for {}: {}", source_path_str, error);
+                owned = Some(fs::read(&source_path)?);
+                owned.as_ref().expect("owned source")
+            }
         };
-        if default_tm == "rapidView" {
-            if !is_raw {
-                final_image = crate::image_processing::apply_srgb_to_linear(final_image);
-            }
-            crate::image_processing::apply_cpu_rapid_view(&mut final_image);
-        } else if default_tm == "agx" {
-            if !is_raw {
-                final_image = crate::image_processing::apply_srgb_to_linear(final_image);
-            }
-            crate::image_processing::apply_cpu_agx_tonemap(&mut final_image);
-        } else if is_raw {
-            apply_cpu_default_raw_processing(&mut final_image);
-        }
+        image_loader::load_and_composite_current_document_with_report(
+            bytes,
+            &source_path_str,
+            &document,
+            true,
+            &effective_settings,
+            None,
+            crate::color::camera_profile::registry::managed_profile_root(app_handle)
+                .unwrap_or_default(),
+        )
+        .map_err(anyhow::Error::msg)?
+        .0
+    };
+    let target = target_resolution
+        .unwrap_or_else(|| settings.thumbnail_resolution.unwrap_or(720))
+        .max(1);
+    if gpu_context.is_some() {
+        let source_fingerprint = crate::render::artifact_identity::stable_hash(&(
+            gpu_processing::PreGpuImageIdentity::source_revision(path_str),
+            image_loader::raw_processing_profile_key_for_current_document(
+                &effective_settings,
+                &document,
+            )
+            .map_err(anyhow::Error::msg)?,
+        ));
+        return crate::export::export_processing::render_current_export_preview(
+            &app_handle.state::<AppState>(),
+            app_handle,
+            path_str,
+            source_fingerprint,
+            &source_image,
+            is_raw,
+            &document,
+            target,
+            "generate_thumbnail_data",
+        )
+        .map_err(anyhow::Error::msg);
     }
-
-    let fallback_orientation_steps = adjustments["orientationSteps"].as_u64().unwrap_or(0) as u8;
-    Ok(apply_coarse_rotation(Cow::Owned(final_image), fallback_orientation_steps).into_owned())
+    let (transformed, _) = crate::export::export_processing::apply_current_export_transformations(
+        &source_image,
+        &document,
+    );
+    Ok(crate::image_processing::downscale_f32_image(
+        transformed.as_ref(),
+        target,
+        target,
+    ))
 }
-
 fn encode_thumbnail(
     image: &DynamicImage,
     target_width: u32,
@@ -1393,14 +1161,17 @@ fn generate_single_thumbnail_and_cache(
         crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path_str))
             .map(|loaded| {
                 let meta = loaded.metadata;
-                let is_raw = crate::formats::is_raw_file(path_str);
-                let tm = crate::image_processing::resolve_tonemapper_override(settings, is_raw);
+                let neutral = crate::exif_processing::neutral_current_edit_document();
+                let is_edited = meta
+                    .edit_document_v2
+                    .as_ref()
+                    .is_some_and(|document| document != &neutral);
                 (
                     meta.rating,
-                    crate::image_processing::is_image_edited(&meta.adjustments, is_raw, tm),
+                    is_edited,
                     serde_json::to_vec(&(
                         (!meta.edit_revision.is_empty()).then_some(meta.edit_revision.as_str()),
-                        &meta.adjustments,
+                        &meta.edit_document_v2,
                     ))
                     .unwrap_or_default(),
                 )
@@ -1771,101 +1542,6 @@ pub fn update_thumbnail_queue(
     Ok(authority)
 }
 
-pub fn resolve_lens_params_in_adjustments(
-    adjustments: &mut Value,
-    exif_data: &Option<HashMap<String, String>>,
-    lens_db: Option<&crate::lens_correction::LensDatabase>,
-) {
-    if let Some(map) = adjustments.as_object_mut() {
-        let mode = map
-            .get("lensCorrectionMode")
-            .and_then(|v| v.as_str())
-            .unwrap_or("manual");
-
-        if mode == "auto" {
-            if let Some(exif) = exif_data {
-                let exif_maker = exif.get("Make").map(|s| s.as_str()).unwrap_or("");
-                let exif_model = exif.get("LensModel").map(|s| s.as_str()).unwrap_or("");
-                if let Some(db) = lens_db {
-                    if let Some((detected_maker, detected_model)) =
-                        crate::lens_correction::find_best_lens_match(db, exif_maker, exif_model)
-                    {
-                        map.insert(
-                            "lensMaker".to_string(),
-                            serde_json::to_value(&detected_maker).unwrap(),
-                        );
-                        map.insert(
-                            "lensModel".to_string(),
-                            serde_json::to_value(&detected_model).unwrap(),
-                        );
-                    } else {
-                        map.remove("lensMaker");
-                        map.remove("lensModel");
-                    }
-                }
-            } else {
-                map.remove("lensMaker");
-                map.remove("lensModel");
-            }
-        }
-
-        if let Some(db) = lens_db {
-            let has_valid_lens = match (
-                map.get("lensMaker").and_then(|v| v.as_str()),
-                map.get("lensModel").and_then(|v| v.as_str()),
-            ) {
-                (Some(maker), Some(model)) if !maker.is_empty() && !model.is_empty() => {
-                    let mut focal_length = 50.0;
-                    let mut aperture = None;
-                    let mut distance = None;
-
-                    if let Some(exif) = exif_data {
-                        if let Some(fl_str) = exif
-                            .get("FocalLength")
-                            .or(exif.get("FocalLengthIn35mmFilm"))
-                            && let Ok(fl) = fl_str.replace(" mm", "").trim().parse::<f32>()
-                        {
-                            focal_length = fl;
-                        }
-                        if let Some(ap_str) = exif.get("ApertureValue").or(exif.get("FNumber"))
-                            && let Ok(ap) = ap_str.replace("f/", "").trim().parse::<f32>()
-                        {
-                            aperture = Some(ap);
-                        }
-                        if let Some(dist_str) = exif.get("SubjectDistance")
-                            && let Ok(dist) = dist_str.replace(" m", "").trim().parse::<f32>()
-                        {
-                            distance = Some(dist);
-                        }
-                    }
-
-                    if let Some(params) = crate::lens_correction::resolve_lens_params(
-                        db,
-                        maker,
-                        model,
-                        focal_length,
-                        aperture,
-                        distance,
-                    ) {
-                        map.insert(
-                            "lensDistortionParams".to_string(),
-                            serde_json::to_value(params).unwrap(),
-                        );
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
-
-            if !has_valid_lens {
-                map.remove("lensDistortionParams");
-            }
-        }
-    }
-}
-
 #[tauri::command]
 pub fn get_supported_file_types() -> Result<serde_json::Value, String> {
     let raw_extensions: Vec<&str> = crate::formats::RAW_EXTENSIONS
@@ -2226,9 +1902,6 @@ pub struct MetadataSaveReceipt {
     pub image_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_revision: Option<u64>,
-    /// Canonical persisted adjustments for receipt-driven client state updates.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub adjustments: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -2280,7 +1953,6 @@ fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveRe
         transaction_id: None,
         image_session_id: None,
         adjustment_revision: None,
-        adjustments: None,
     }
 }
 
@@ -2293,7 +1965,6 @@ fn metadata_save_receipt_for_transaction(
     receipt.transaction_id = Some(transaction.transaction_id.clone());
     receipt.image_session_id = Some(transaction.image_session_id.clone());
     receipt.adjustment_revision = Some(transaction.next_adjustment_revision);
-    receipt.adjustments = Some(metadata.adjustments.clone());
     receipt
 }
 
@@ -2334,8 +2005,7 @@ fn submit_thumbnail_invalidation(
 #[tauri::command]
 pub fn save_metadata_and_update_thumbnail(
     path: String,
-    adjustments: Value,
-    edit_document_v2: Option<Value>,
+    edit_document_v2: EditDocumentV2,
     transaction: Option<EditTransactionPersistenceContext>,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
@@ -2343,43 +2013,20 @@ pub fn save_metadata_and_update_thumbnail(
     if let Some(transaction) = transaction.as_ref() {
         transaction.validate()?;
     }
-    let lens_database = state.services.lens_database.snapshot();
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let metadata = {
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        let mut final_adjustments = adjustments;
-        let edit_document_v2 = edit_document_v2.ok_or_else(|| {
-            "Current EditDocumentV2 is required for sidecar persistence".to_string()
-        })?;
-        crate::adjustments::edit_document_v2::validate_edit_document_v2(&edit_document_v2)?;
-        final_adjustments =
-            crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
-                &final_adjustments,
-                Some(&edit_document_v2),
-            )?;
-        resolve_lens_params_in_adjustments(
-            &mut final_adjustments,
-            &metadata.exif,
-            lens_database.as_deref(),
-        );
-
-        if let Some(adjustments_map) = final_adjustments.as_object_mut()
-            && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
-        {
-            metadata.raw_engine_artifacts = Some(
-                serde_json::from_value::<RawEngineArtifacts>(raw_engine_artifacts)
-                    .map_err(|err| format!("Invalid RawEngine artifact envelope: {}", err))?,
-            );
-        }
-
-        metadata.adjustments = final_adjustments;
+        let persisted_document = serde_json::to_value(&edit_document_v2)
+            .map_err(|error| format!("Current EditDocumentV2 cannot serialize: {error}"))?;
+        edit_document_v2.compile()?;
+        metadata.adjustments = Value::Null;
         metadata.edit_revision = crate::exif_processing::render_state_revision(
-            &edit_document_v2,
+            &persisted_document,
             metadata.raw_engine_artifacts.as_ref(),
         )?;
         metadata.source_identity = path.clone();
-        metadata.edit_document_v2 = Some(edit_document_v2);
+        metadata.edit_document_v2 = Some(persisted_document);
         save_metadata_sidecar(&sidecar_path, &metadata)?;
         metadata
     };
@@ -2402,7 +2049,7 @@ pub fn save_metadata_and_update_thumbnail(
 #[tauri::command]
 pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
-    adjustments: Value,
+    edit_document_v2: EditDocumentV2CopyPayload,
     app_handle: AppHandle,
     transaction: Option<EditTransactionPersistenceContext>,
 ) -> Result<Vec<MetadataSaveReceipt>, String> {
@@ -2414,12 +2061,6 @@ pub async fn apply_adjustments_to_paths(
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
-        let lens_db = app_handle
-            .state::<AppState>()
-            .services
-            .lens_database
-            .snapshot();
-
         let mut backups = Vec::with_capacity(paths.len());
         let mut receipts = Vec::with_capacity(paths.len());
         for path in &paths {
@@ -2427,14 +2068,21 @@ pub async fn apply_adjustments_to_paths(
             backups.push((sidecar_path.clone(), fs::read(&sidecar_path).ok()));
 
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-            let mut new_adjustments =
-                merge_adjustments_for_batch_target(existing_metadata.adjustments, &adjustments);
-            resolve_lens_params_in_adjustments(
-                &mut new_adjustments,
-                &existing_metadata.exif,
-                lens_db.as_deref(),
-            );
-            existing_metadata.adjustments = new_adjustments;
+            let target_document = existing_metadata
+                .edit_document_v2
+                .take()
+                .ok_or_else(|| "batch_target_current_document_missing".to_string())?;
+            let target_document = serde_json::from_value::<EditDocumentV2>(target_document)
+                .map_err(|error| format!("batch_target_current_document_invalid:{error}"))?
+                .merge_copy_payload(edit_document_v2.clone())?;
+            let target_document = serde_json::to_value(target_document)
+                .map_err(|error| format!("batch_target_current_document_unserializable:{error}"))?;
+            existing_metadata.adjustments = Value::Null;
+            existing_metadata.edit_revision = crate::exif_processing::render_state_revision(
+                &target_document,
+                existing_metadata.raw_engine_artifacts.as_ref(),
+            )?;
+            existing_metadata.edit_document_v2 = Some(target_document);
 
             if let Err(error) = save_metadata_sidecar(&sidecar_path, &existing_metadata) {
                 for (backup_path, bytes) in backups.iter().rev() {
@@ -2473,44 +2121,6 @@ pub async fn apply_adjustments_to_paths(
     })
     .await
     .map_err(|error| format!("Adjustment paste worker failed: {error}"))?
-}
-
-/// Per-image As Shot/Auto estimates belong to the target source and must not be
-/// copied as if they were a fixed illuminant. A locked reference explicitly
-/// opts into copying the resolved physical coordinates to every target.
-fn white_balance_adjustments_for_batch_target(adjustments: &Value) -> Value {
-    let mut prepared = adjustments.clone();
-    let should_retain_target = prepared
-        .get("whiteBalanceTechnical")
-        .and_then(Value::as_object)
-        .is_some_and(|white_balance| {
-            matches!(
-                white_balance.get("mode").and_then(Value::as_str),
-                Some("as_shot" | "auto")
-            ) && white_balance
-                .get("synchronization")
-                .and_then(|value| value.get("mode"))
-                .and_then(Value::as_str)
-                .unwrap_or("per_image")
-                == "per_image"
-        });
-    if should_retain_target && let Some(map) = prepared.as_object_mut() {
-        map.remove("whiteBalanceTechnical");
-    }
-    prepared
-}
-
-fn merge_adjustments_for_batch_target(mut existing: Value, adjustments: &Value) -> Value {
-    if existing.is_null() {
-        existing = serde_json::json!({});
-    }
-    let prepared = white_balance_adjustments_for_batch_target(adjustments);
-    if let (Some(existing), Some(prepared)) = (existing.as_object_mut(), prepared.as_object()) {
-        for (key, value) in prepared {
-            existing.insert(key.clone(), value.clone());
-        }
-    }
-    existing
 }
 
 #[tauri::command]
@@ -2679,9 +2289,9 @@ fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
 
 fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
     let document = crate::exif_processing::neutral_current_edit_document();
-    metadata.adjustments =
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(&document)
-            .expect("native neutral EditDocumentV2 must remain valid");
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(&document)
+        .expect("native neutral EditDocumentV2 must remain valid");
+    metadata.adjustments = Value::Null;
     metadata.edit_document_v2 = Some(document);
     if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
         artifacts.hdr_merge_artifacts.clear();
@@ -2707,7 +2317,7 @@ const AUTO_ADJUST_ENGINE_V1: &str = "rapidraw.auto_adjust.v1";
 pub struct BatchAutoAdjustReceiptV1 {
     pub base_adjustment_document_revision: String,
     pub adjustment_document_revision: String,
-    pub adjustments: Value,
+    pub edit_document_v2: EditDocumentV2,
     pub engine: String,
     pub render_fingerprint: String,
     pub source_identity: String,
@@ -2739,57 +2349,25 @@ pub struct BatchAutoAdjustPathResultV1 {
 
 fn merge_auto_adjustment_document(
     metadata: &mut ImageMetadata,
-    auto_adjustments: &Value,
+    auto_adjustments: &AutoAdjustmentResults,
 ) -> Result<(), String> {
-    let auto_map = auto_adjustments
-        .as_object()
-        .ok_or_else(|| "auto_adjust_invalid_analysis_document".to_string())?;
     let document = metadata
         .edit_document_v2
-        .as_mut()
+        .take()
         .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
-    crate::adjustments::edit_document_v2::validate_edit_document_v2(document)
+    let mut document = serde_json::from_value::<EditDocumentV2>(document)
         .map_err(|_| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
-    let nodes = document
-        .get_mut("nodes")
-        .and_then(Value::as_object_mut)
-        .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
-
-    for (adjustment, node_type) in [
-        ("exposure", "scene_global_color_tone"),
-        ("brightness", "scene_global_color_tone"),
-        ("contrast", "scene_global_color_tone"),
-        ("highlights", "scene_global_color_tone"),
-        ("shadows", "scene_global_color_tone"),
-        ("whites", "scene_global_color_tone"),
-        ("blacks", "scene_global_color_tone"),
-        ("vibrance", "color_presence"),
-        ("vignetteAmount", "display_creative"),
-        ("clarity", "detail_denoise_dehaze"),
-        ("centré", "detail_denoise_dehaze"),
-        ("dehaze", "detail_denoise_dehaze"),
-        ("whiteBalanceTechnical", "camera_input"),
-    ] {
-        let Some(value) = auto_map.get(adjustment) else {
-            continue;
-        };
-        let params = nodes
-            .get_mut(node_type)
-            .and_then(Value::as_object_mut)
-            .and_then(|node| node.get_mut("params"))
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
-        params.insert(adjustment.to_string(), value.clone());
-    }
-
-    crate::adjustments::edit_document_v2::validate_edit_document_v2(document)
+    document
+        .apply_auto_adjustment_results(auto_adjustments)
         .map_err(|_| "auto_adjust_invalid_analysis_document".to_string())?;
-    metadata.adjustments =
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(document)?;
+    let document = serde_json::to_value(document)
+        .map_err(|_| "auto_adjust_invalid_analysis_document".to_string())?;
+    metadata.adjustments = Value::Null;
     metadata.edit_revision = crate::exif_processing::render_state_revision(
-        document,
+        &document,
         metadata.raw_engine_artifacts.as_ref(),
     )?;
+    metadata.edit_document_v2 = Some(document);
     Ok(())
 }
 
@@ -2837,7 +2415,13 @@ fn batch_auto_adjust_receipt(
         BatchAutoAdjustReceiptV1 {
             base_adjustment_document_revision,
             adjustment_document_revision: persisted.sidecar_revision.clone(),
-            adjustments: metadata.adjustments.clone(),
+            edit_document_v2: serde_json::from_value(
+                metadata
+                    .edit_document_v2
+                    .clone()
+                    .ok_or_else(|| "auto_adjust_current_document_missing".to_string())?,
+            )
+            .map_err(|error| format!("auto_adjust_current_document_invalid:{error}"))?,
             engine: AUTO_ADJUST_ENGINE_V1.to_string(),
             render_fingerprint: persisted.render_fingerprint.clone(),
             source_identity: source_path.to_string_lossy().to_string(),
@@ -2879,9 +2463,11 @@ fn validate_batch_auto_adjust_commit(
     current_revision: &str,
     receipt: &BatchAutoAdjustReceiptV1,
 ) -> Result<(), &'static str> {
-    if !receipt.adjustments.is_object() {
-        return Err("invalid_prepared_adjustment_document");
-    }
+    receipt
+        .edit_document_v2
+        .clone()
+        .compile()
+        .map_err(|_| "invalid_prepared_adjustment_document")?;
     if current_revision != receipt.base_adjustment_document_revision {
         return Err("stale_adjustment_document");
     }
@@ -2900,12 +2486,15 @@ fn validate_prepared_batch_auto_adjust_receipt(
 
 fn is_exact_batch_auto_adjust_retry(
     current_revision: &str,
-    current_adjustments: &Value,
+    current_document: Option<&Value>,
     expected: &BatchAutoAdjustReceiptV1,
     received: &BatchAutoAdjustReceiptV1,
 ) -> bool {
     current_revision == received.adjustment_document_revision
-        && current_adjustments == &received.adjustments
+        && current_document
+            .and_then(|document| serde_json::from_value::<EditDocumentV2>(document.clone()).ok())
+            .as_ref()
+            == Some(&received.edit_document_v2)
         && validate_prepared_batch_auto_adjust_receipt(expected, received).is_ok()
 }
 
@@ -2931,21 +2520,50 @@ pub async fn apply_auto_adjustments_to_paths(
                         let source_path_str = source_path.to_string_lossy().to_string();
                         let file_bytes =
                             fs::read(&source_path).map_err(|error| error.to_string())?;
-                        let image = image_loader::load_base_image_from_bytes(
+                        let analysis_metadata = load_auto_adjust_metadata(path, &sidecar_path)?;
+                        let analysis_base_revision =
+                            metadata_save_receipt(path, &analysis_metadata).sidecar_revision;
+                        let analysis_document = serde_json::from_value::<
+                            crate::adjustments::edit_document_v2::EditDocumentV2,
+                        >(
+                            analysis_metadata.edit_document_v2.ok_or_else(|| {
+                                "auto_adjust_current_document_missing".to_string()
+                            })?,
+                        )
+                        .map_err(|error| format!("auto_adjust_current_document_invalid:{error}"))?
+                        .compile()?;
+                        let effective_settings =
+                            image_loader::raw_processing_settings_for_current_document(
+                                &settings,
+                                &analysis_document,
+                            );
+                        let image = image_loader::load_and_composite_current_document_with_report(
                             &file_bytes,
                             &source_path_str,
+                            &analysis_document,
                             true,
-                            &settings,
+                            &effective_settings,
                             None,
+                            crate::color::camera_profile::registry::managed_profile_root(
+                                &app_handle,
+                            )
+                            .unwrap_or_default(),
                         )
-                        .map_err(|error| error.to_string())?;
-                        let auto_adjustments = auto_results_to_json(&perform_auto_analysis(&image));
+                        .map_err(|error| error.to_string())?
+                        .0;
+                        let auto_adjustments = perform_auto_analysis(&image);
                         let is_deferred = defer_path.as_deref() == Some(path.as_str());
                         let (result, committed) = {
                             let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
                             let mut metadata = load_auto_adjust_metadata(path, &sidecar_path)?;
                             let base_revision =
                                 metadata_save_receipt(path, &metadata).sidecar_revision;
+                            if base_revision != analysis_base_revision {
+                                return Err(format!(
+                                    "stale_adjustment_document:analysis used {} but found {}",
+                                    analysis_base_revision, base_revision
+                                ));
+                            }
                             if is_deferred
                                 && expected_base_revision.as_deref() != Some(base_revision.as_str())
                             {
@@ -3040,7 +2658,7 @@ pub async fn commit_batch_auto_adjustment(
             )?;
             if is_exact_batch_auto_adjust_retry(
                 &current_revision,
-                &metadata.adjustments,
+                metadata.edit_document_v2.as_ref(),
                 &retry_receipt,
                 &receipt,
             ) {
@@ -3070,7 +2688,19 @@ pub async fn commit_batch_auto_adjustment(
                 ));
             }
             let mut prepared_metadata = metadata.clone();
-            merge_auto_adjustment_document(&mut prepared_metadata, &receipt.adjustments)?;
+            prepared_metadata.edit_document_v2 = Some(
+                serde_json::to_value(&receipt.edit_document_v2).map_err(|error| {
+                    format!("Prepared current document cannot serialize: {error}")
+                })?,
+            );
+            prepared_metadata.adjustments = Value::Null;
+            prepared_metadata.edit_revision = crate::exif_processing::render_state_revision(
+                prepared_metadata
+                    .edit_document_v2
+                    .as_ref()
+                    .expect("validated prepared current document is present"),
+                prepared_metadata.raw_engine_artifacts.as_ref(),
+            )?;
             let (expected_receipt, _) = batch_auto_adjust_receipt(
                 &path,
                 &source_path,
@@ -3424,7 +3054,7 @@ pub fn get_cache_key_hash(path_str: &str) -> Option<String> {
                 serde_json::to_vec(&(
                     (!loaded.metadata.edit_revision.is_empty())
                         .then_some(loaded.metadata.edit_revision.as_str()),
-                    &loaded.metadata.adjustments,
+                    &loaded.metadata.edit_document_v2,
                 ))
                 .ok()
             })
@@ -3932,9 +3562,9 @@ fn write_external_editor_variant_sidecar(
     }
 
     let mut sidecar = crate::exif_processing::load_sidecar(&source_sidecar_path);
-    let source_adjustments =
-        serde_json::to_vec(&sidecar.adjustments).map_err(|err| err.to_string())?;
-    let source_revision = compute_source_revision(source_virtual_path, &source_adjustments);
+    let source_document = serde_json::to_vec(&(&sidecar.edit_revision, &sidecar.edit_document_v2))
+        .map_err(|err| err.to_string())?;
+    let source_revision = compute_source_revision(source_virtual_path, &source_document);
     let content_hash = hash_file_sha256(output_path)?;
     let tiff_inspection =
         inspect_external_editor_tiff(output_path, bit_depth, color_profile.as_deref())?;
@@ -4529,13 +4159,19 @@ mod tests {
 
     fn current_test_metadata() -> ImageMetadata {
         let document = crate::exif_processing::neutral_current_edit_document();
-        let adjustments =
-            crate::adjustments::edit_document_v2::compile_edit_document_v2(&document).unwrap();
         ImageMetadata {
-            adjustments,
+            adjustments: Value::Null,
             edit_document_v2: Some(document),
             ..ImageMetadata::default()
         }
+    }
+
+    fn auto_adjustment_fixture() -> AutoAdjustmentResults {
+        perform_auto_analysis(&DynamicImage::ImageRgb8(ImageBuffer::from_pixel(
+            8,
+            8,
+            image::Rgb([128, 128, 128]),
+        )))
     }
 
     #[test]
@@ -4566,20 +4202,16 @@ mod tests {
 
     #[test]
     fn batch_auto_adjust_merge_is_idempotent_and_discards_disclosure_metadata() {
-        let auto = serde_json::json!({
-            "exposure": 0.5,
-            "sectionVisibility": {"basic": true}
-        });
+        let mut auto = auto_adjustment_fixture();
+        auto.exposure = 0.5;
+        auto.contrast = 8.0;
         let mut metadata = current_test_metadata();
-        merge_auto_adjustment_document(&mut metadata, &serde_json::json!({"contrast": 8})).unwrap();
-
         merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
         let accepted = metadata.edit_document_v2.clone();
         merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
 
         assert_eq!(metadata.edit_document_v2, accepted);
-        assert_eq!(metadata.adjustments["contrast"], 8);
-        assert_eq!(metadata.adjustments["exposure"], 0.5);
+        assert!(metadata.adjustments.is_null());
         assert_eq!(
             metadata.edit_document_v2.as_ref().unwrap()["nodes"]["scene_global_color_tone"]["params"]
                 ["exposure"],
@@ -4589,19 +4221,12 @@ mod tests {
 
     #[test]
     fn batch_auto_adjust_rejects_malformed_adjustment_documents() {
-        let auto = serde_json::json!({"exposure": 0.5});
+        let auto = auto_adjustment_fixture();
         let mut malformed = ImageMetadata::default();
         assert_eq!(
             merge_auto_adjustment_document(&mut malformed, &auto),
             Err("auto_adjust_invalid_adjustment_document_quarantined".into())
         );
-
-        let mut existing = current_test_metadata();
-        assert_eq!(
-            merge_auto_adjustment_document(&mut existing, &serde_json::json!(0.5)),
-            Err("auto_adjust_invalid_analysis_document".into())
-        );
-
         let failure = failed_batch_auto_adjust_result(
             "/fixtures/malformed.raw",
             "auto_adjust_invalid_adjustment_document_quarantined:/tmp/quarantine.json".into(),
@@ -4617,13 +4242,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("source.raw");
         fs::write(&source, b"raw-source").unwrap();
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "exposure": 0.5,
-                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
-            }),
-            ..ImageMetadata::default()
-        };
+        let mut metadata = current_test_metadata();
+        let mut auto = auto_adjustment_fixture();
+        auto.exposure = 0.5;
+        merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
 
         let base_revision = format!("sha256:{}", "0".repeat(64));
         let (receipt, thumbnail) = batch_auto_adjust_receipt(
@@ -4634,7 +4256,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(receipt.adjustments, metadata.adjustments);
+        assert_eq!(
+            serde_json::to_value(&receipt.edit_document_v2).unwrap(),
+            metadata.edit_document_v2.clone().unwrap()
+        );
         assert_eq!(receipt.base_adjustment_document_revision, base_revision);
         assert_eq!(receipt.engine, AUTO_ADJUST_ENGINE_V1);
         assert!(receipt.adjustment_document_revision.starts_with("sha256:"));
@@ -4644,15 +4269,12 @@ mod tests {
         assert_eq!(receipt.thumbnail_revision, thumbnail.thumbnail_revision);
         assert!(is_exact_batch_auto_adjust_retry(
             &receipt.adjustment_document_revision,
-            &metadata.adjustments,
+            metadata.edit_document_v2.as_ref(),
             &receipt,
             &receipt,
         ));
 
         let mut mutants = Vec::new();
-        let mut mutant = receipt.clone();
-        mutant.adjustments = serde_json::json!({"exposure": 0.8});
-        mutants.push(mutant);
         let mut mutant = receipt.clone();
         mutant.adjustment_document_revision = format!("sha256:{}", "9".repeat(64));
         mutants.push(mutant);
@@ -4681,7 +4303,7 @@ mod tests {
         for mutant in mutants {
             assert!(!is_exact_batch_auto_adjust_retry(
                 &receipt.adjustment_document_revision,
-                &metadata.adjustments,
+                metadata.edit_document_v2.as_ref(),
                 &receipt,
                 &mutant,
             ));
@@ -4697,10 +4319,10 @@ mod tests {
         let base_revision = format!("sha256:{}", "0".repeat(64));
         let receipt = BatchAutoAdjustReceiptV1 {
             adjustment_document_revision: format!("sha256:{}", "1".repeat(64)),
-            adjustments: serde_json::json!({
-                "exposure": 0.65,
-                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
-            }),
+            edit_document_v2: serde_json::from_value(
+                crate::exif_processing::neutral_current_edit_document(),
+            )
+            .unwrap(),
             base_adjustment_document_revision: base_revision.clone(),
             engine: AUTO_ADJUST_ENGINE_V1.into(),
             render_fingerprint: "u64:1111111111111111".into(),
@@ -4718,16 +4340,9 @@ mod tests {
             validate_batch_auto_adjust_commit(&format!("sha256:{}", "3".repeat(64)), &receipt),
             Err("stale_adjustment_document")
         );
-        assert_eq!(
-            validate_batch_auto_adjust_commit(
-                &base_revision,
-                &BatchAutoAdjustReceiptV1 {
-                    adjustments: serde_json::json!([0.65]),
-                    ..receipt
-                },
-            ),
-            Err("invalid_prepared_adjustment_document")
-        );
+        let mut malformed = serde_json::to_value(&receipt).unwrap();
+        malformed["editDocumentV2"] = serde_json::json!([0.65]);
+        assert!(serde_json::from_value::<BatchAutoAdjustReceiptV1>(malformed).is_err());
     }
 
     #[test]
@@ -4760,11 +4375,9 @@ mod tests {
         assert_eq!(receipt.transaction_id.as_deref(), Some("tx-2"));
         assert_eq!(receipt.image_session_id.as_deref(), Some("session-2"));
         assert_eq!(receipt.adjustment_revision, Some(8));
-        assert_eq!(receipt.adjustments, Some(metadata.adjustments.clone()));
         let legacy = metadata_save_receipt("image.raf", &metadata);
         assert!(legacy.transaction_id.is_none());
         assert!(legacy.adjustment_revision.is_none());
-        assert!(legacy.adjustments.is_none());
     }
 
     #[test]
@@ -4860,44 +4473,70 @@ mod tests {
 
     #[test]
     fn batch_white_balance_respects_per_image_and_locked_reference_modes() {
-        let per_image = serde_json::json!({
-            "exposure": 0.5,
-            "whiteBalanceTechnical": {
-                "mode": "auto",
-                "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
-            }
-        });
-        let prepared = white_balance_adjustments_for_batch_target(&per_image);
-        assert_eq!(prepared["exposure"], 0.5);
-        assert!(prepared.get("whiteBalanceTechnical").is_none());
+        let mut target = crate::exif_processing::neutral_current_edit_document();
+        target["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"] =
+            serde_json::json!(6100);
+        let target: EditDocumentV2 = serde_json::from_value(target).unwrap();
 
-        let locked = serde_json::json!({
-            "whiteBalanceTechnical": {
-                "mode": "auto",
-                "kelvin": 4870,
-                "duv": -0.003,
-                "synchronization": {
-                    "mode": "locked_reference",
-                    "referenceSourceIdentity": "blake3:reference"
-                }
-            }
+        let mut source = crate::exif_processing::neutral_current_edit_document();
+        let incoming = &mut source["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"];
+        incoming["mode"] = serde_json::json!("auto");
+        incoming["source"] = serde_json::json!("auto");
+        incoming["kelvin"] = serde_json::json!(4870);
+        let payload = serde_json::json!({
+            "schemaVersion": 2,
+            "nodes": { "camera_input": source["nodes"]["camera_input"].clone() }
         });
-        assert_eq!(white_balance_adjustments_for_batch_target(&locked), locked);
+        let per_image = target
+            .clone()
+            .merge_copy_payload(serde_json::from_value(payload.clone()).unwrap())
+            .unwrap();
+        let per_image = serde_json::to_value(per_image).unwrap();
+        assert_eq!(
+            per_image["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"]
+                .as_f64(),
+            Some(6100.0)
+        );
+
+        let mut locked = payload;
+        locked["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["synchronization"] = serde_json::json!({
+            "mode": "locked_reference",
+            "referenceSourceIdentity": "blake3:reference"
+        });
+        let locked = target
+            .merge_copy_payload(serde_json::from_value(locked).unwrap())
+            .unwrap();
+        let locked = serde_json::to_value(locked).unwrap();
+        assert_eq!(
+            locked["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"].as_f64(),
+            Some(4870.0)
+        );
     }
 
     #[test]
     fn batch_adjustment_merge_clears_stale_reference_match_provenance() {
-        let existing = serde_json::json!({
-            "exposure": 0.5,
-            "referenceMatchApplicationReceipt": { "proposalFingerprint": "stale" }
-        });
-        let patch = serde_json::json!({
-            "exposure": 1.25,
-            "referenceMatchApplicationReceipt": null
-        });
-        let merged = merge_adjustments_for_batch_target(existing, &patch);
-        assert_eq!(merged["exposure"], 1.25);
-        assert!(merged["referenceMatchApplicationReceipt"].is_null());
+        let mut existing = crate::exif_processing::neutral_current_edit_document();
+        existing["provenance"]["referenceMatchApplicationReceipt"] =
+            serde_json::json!({"schemaVersion": 1, "proposalFingerprint": "stale"});
+        let mut source = crate::exif_processing::neutral_current_edit_document();
+        source["nodes"]["scene_global_color_tone"]["params"]["exposure"] = serde_json::json!(1.25);
+        let payload: EditDocumentV2CopyPayload = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 2,
+            "nodes": {
+                "scene_global_color_tone": source["nodes"]["scene_global_color_tone"].clone()
+            }
+        }))
+        .unwrap();
+        let merged = serde_json::from_value::<EditDocumentV2>(existing)
+            .unwrap()
+            .merge_copy_payload(payload)
+            .unwrap();
+        let merged = serde_json::to_value(merged).unwrap();
+        assert_eq!(
+            merged["nodes"]["scene_global_color_tone"]["params"]["exposure"],
+            1.25
+        );
+        assert!(merged["provenance"]["referenceMatchApplicationReceipt"].is_null());
     }
 
     #[test]
@@ -5416,10 +5055,7 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
     clear_render_authority_for_reset(&mut metadata);
 
     let neutral_document = crate::exif_processing::neutral_current_edit_document();
-    assert_eq!(
-        metadata.adjustments,
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(&neutral_document).unwrap()
-    );
+    assert!(metadata.adjustments.is_null());
     assert_eq!(metadata.edit_document_v2, Some(neutral_document));
     assert_eq!(metadata.rating, 4);
     assert_eq!(
@@ -5455,10 +5091,8 @@ fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
         .to_string();
     let mut document = crate::exif_processing::neutral_current_edit_document();
     document["nodes"]["scene_global_color_tone"]["params"]["exposure"] = serde_json::json!(2);
-    let adjustments =
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(&document).unwrap();
     let original = ImageMetadata {
-        adjustments,
+        adjustments: Value::Null,
         edit_revision: crate::exif_processing::render_state_revision(
             &document,
             Some(&RawEngineArtifacts {
@@ -5488,13 +5122,7 @@ fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
     save_metadata_sidecar(&sidecar, &reset).unwrap();
 
     let reopened = load_sidecar_strict_for_reset(&sidecar, Some(&source_identity)).unwrap();
-    assert_eq!(
-        reopened.adjustments,
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(
-            &crate::exif_processing::neutral_current_edit_document()
-        )
-        .unwrap()
-    );
+    assert!(reopened.adjustments.is_null());
     assert!(
         reopened
             .raw_engine_artifacts

@@ -5,6 +5,7 @@ import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/ut
 import {
   editDocumentV2ToLegacyAdjustments,
   legacyAdjustmentsToEditDocumentV2,
+  prepareCurrentEditDocumentV2ForBackend,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
 import { referenceMatchReceipt, sourcePatch } from './authority-fixtures';
@@ -65,6 +66,51 @@ describe('EditDocumentV2 source and layer authority', () => {
     expect(first.provenance.referenceMatchApplicationReceipt).toEqual(referenceMatchReceipt);
     expect(first.extensions['legacyAdjustments']).toMatchObject({ generatedProfile: { obsolete: true } });
     expect(reopened).toEqual(first);
+  });
+
+  test('current-document preparation strips only resident artifact bytes and keeps explicit domains synchronized', () => {
+    const layerMask = {
+      adjustments: {},
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1 as const,
+      id: 'layer-with-resident-mask',
+      invert: false,
+      name: 'Resident layer mask',
+      opacity: 100,
+      subMasks: [
+        {
+          id: 'layer-mask-1',
+          invert: false,
+          mode: 'additive' as const,
+          opacity: 100,
+          parameters: { maskDataBase64: 'encoded-layer-mask' },
+          type: 'brush' as const,
+          visible: true,
+        },
+      ],
+      visible: true,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aiPatches: [sourcePatch],
+      masks: [layerMask],
+    });
+
+    const resident = prepareCurrentEditDocumentV2ForBackend(document, new Set(['patch-1', 'mask-1', 'layer-mask-1']));
+    expect(resident.editDocumentV2.sourceArtifacts.aiPatches[0]?.patchData).toBeNull();
+    expect(resident.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks[0]?.parameters).toMatchObject({
+      mask_data_base64: null,
+    });
+    expect(resident.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toMatchObject({
+      maskDataBase64: null,
+    });
+    expect(resident.editDocumentV2.nodes['source_artifacts']?.params).toEqual(resident.editDocumentV2.sourceArtifacts);
+    expect(resident.editDocumentV2.nodes['layers']?.params).toEqual(resident.editDocumentV2.layers);
+    expect(resident.newlySentPatchIds).toEqual(new Set());
+
+    const firstSend = prepareCurrentEditDocumentV2ForBackend(document, new Set());
+    expect(firstSend.editDocumentV2.sourceArtifacts.aiPatches[0]?.patchData).toEqual(sourcePatch.patchData);
+    expect(firstSend.newlySentPatchIds).toEqual(new Set(['layer-mask-1', 'patch-1', 'mask-1']));
   });
 
   test('defaults and strictly validates the render-authoritative layers domain', () => {

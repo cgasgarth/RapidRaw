@@ -1,20 +1,19 @@
 import { z } from 'zod';
-import {
-  EDIT_DOCUMENT_NODE_DESCRIPTORS,
-  type EditDocumentNodeTypeV2,
-  type EditDocumentV2,
+import type {
+  EditDocumentNodeTypeV2,
+  EditDocumentV2,
+  EditDocumentV2CopyPayload,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
+import { copyEditDocumentV2Nodes } from './editDocumentV2';
 import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
-import { acceptReferenceMatchAdjustmentTransfer } from './referenceMatchTransfer';
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
 export const editorPersistenceReceiptSchema = z
   .object({
-    adjustments: z.record(z.string(), z.json()).nullable().optional(),
     adjustmentRevision: z.number().int().nonnegative().nullish(),
     catalogRevision: z.number().int().nonnegative().nullish(),
     imageId: z.string().min(1),
@@ -61,7 +60,7 @@ export interface EditorPersistenceExecution {
   authorityKey: string;
   imageSessionId: string;
   multiSelection: {
-    adjustments: Partial<Adjustments>;
+    editDocumentV2: EditDocumentV2CopyPayload;
     paths: readonly string[];
   } | null;
   path: string;
@@ -95,7 +94,6 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
     invokeWithSchema(
       Invokes.SaveMetadataAndUpdateThumbnail,
       {
-        adjustments: input.adjustments,
         editDocumentV2: input.editDocumentV2,
         path: input.path,
         ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
@@ -109,7 +107,7 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
   if (!signal.aborted && input.multiSelection !== null && input.multiSelection.paths.length > 0) {
     await invokeWithSchema(
       Invokes.ApplyAdjustmentsToPaths,
-      { adjustments: input.multiSelection.adjustments, paths: input.multiSelection.paths },
+      { editDocumentV2: input.multiSelection.editDocumentV2, paths: input.multiSelection.paths },
       editorPersistenceReceiptArraySchema,
     );
   }
@@ -279,28 +277,14 @@ export class EditorPersistenceEffectRunner {
   private resolveMultiSelection(input: EditorPersistenceInput): EditorPersistenceExecution['multiSelection'] {
     const request = input.multiSelection;
     if (request === null || this.baseline?.path !== input.path || request.paths.length === 0) return null;
-    const selectedNodeIds = new Set(request.selectedNodeIds);
-    // The multi-image persistence command still consumes the flat adjustment projection; #5945 removes this boundary.
-    const selectedAdjustmentKeys = new Set<string>(
-      EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
-        selectedNodeIds.has(descriptor.nodeType) ? descriptor.legacyFields : [],
-      ),
+    const changedNodeIds = request.selectedNodeIds.filter(
+      (nodeType) =>
+        JSON.stringify(input.editDocumentV2.nodes[nodeType]) !==
+        JSON.stringify(this.baseline?.editDocumentV2.nodes[nodeType]),
     );
-    const delta: Partial<Adjustments> = {};
-    for (const key of Object.keys(input.adjustments) as Array<keyof Adjustments>) {
-      if (
-        selectedAdjustmentKeys.has(key as string) &&
-        JSON.stringify(input.adjustments[key]) !== JSON.stringify(this.baseline.adjustments[key])
-      ) {
-        Object.assign(delta, { [key]: input.adjustments[key] });
-      }
-    }
-    if (Object.keys(delta).length === 0) return null;
+    if (changedNodeIds.length === 0) return null;
     return {
-      adjustments: acceptReferenceMatchAdjustmentTransfer({
-        adjustments: delta,
-        transferMode: 'batch-sync',
-      }).adjustments,
+      editDocumentV2: copyEditDocumentV2Nodes(input.editDocumentV2, changedNodeIds),
       paths: request.paths,
     };
   }

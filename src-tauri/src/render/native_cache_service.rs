@@ -164,6 +164,7 @@ impl NativeCacheService {
         self.geometry.insert(key, image, weight);
     }
 
+    #[cfg(test)]
     pub(crate) fn thumbnail_geometry(
         &self,
         path: &str,
@@ -171,6 +172,7 @@ impl NativeCacheService {
         self.thumbnail_geometry.get(&path.to_string())
     }
 
+    #[cfg(test)]
     pub(crate) fn insert_thumbnail_geometry(
         &self,
         path: String,
