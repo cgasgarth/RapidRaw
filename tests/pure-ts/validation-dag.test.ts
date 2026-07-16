@@ -840,14 +840,22 @@ await lease.release();`;
         runValidation([producer], options(sameWorktree)),
       ]),
     ).toEqual([0, 0]);
-    const startedAt = performance.now();
+    const parallelProducer: ValidationNode = {
+      ...producer,
+      command: [
+        'bun',
+        '-e',
+        "import {mkdir,readdir} from 'node:fs/promises';const rendezvous='../parallel-rendezvous';await mkdir(`${rendezvous}/${process.pid}`,{recursive:true});for(let attempt=0;;attempt+=1){if((await readdir(rendezvous)).length>=3)break;if(attempt===250)process.exit(10);await Bun.sleep(20)}const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.file(path).delete()",
+      ],
+      timeoutMs: 8_000,
+    };
     expect(
-      await Promise.all(parallelWorktrees.map((worktree) => runValidation([producer], options(worktree)))),
+      await Promise.all(parallelWorktrees.map((worktree) => runValidation([parallelProducer], options(worktree)))),
     ).toEqual([0, 0, 0]);
     expect(validationOutputResource(parallelWorktrees[0], 'dist')).not.toBe(
       validationOutputResource(parallelWorktrees[1], 'dist'),
     );
-    expect(performance.now() - startedAt).toBeLessThan(1_200);
+    expect(await readdir(join(root, 'parallel-rendezvous'))).toHaveLength(3);
   });
 
   test('programmatic nested validation inherits its active output-lease owner without self-queueing', async () => {
