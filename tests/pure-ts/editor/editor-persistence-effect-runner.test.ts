@@ -166,6 +166,37 @@ describe('editor persistence effect runner', () => {
     expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
   });
 
+  test('preserves validated current layer artifacts while rejecting arbitrary render extensions', () => {
+    const withArtifacts = document(0.5);
+    withArtifacts.extensions['rawEngineArtifacts'] = { layerStackSidecars: [], schemaVersion: 1 };
+    withArtifacts.extensions['browserHarnessTransport'] = { schemaVersion: 1 };
+
+    const request = buildEditorPersistenceRequest({ editDocumentV2: withArtifacts, path: '/fixtures/a.raw' });
+
+    expect(request.editDocumentV2.extensions).toEqual({
+      rawEngineArtifacts: { layerStackSidecars: [], schemaVersion: 1 },
+    });
+    expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
+    expect(
+      editorPersistenceRequestSchema.safeParse({
+        ...request,
+        editDocumentV2: {
+          ...request.editDocumentV2,
+          extensions: { browserHarnessTransport: { schemaVersion: 1 } },
+        },
+      }).success,
+    ).toBeFalse();
+    expect(
+      editorPersistenceRequestSchema.safeParse({
+        ...request,
+        editDocumentV2: {
+          ...request.editDocumentV2,
+          extensions: { rawEngineArtifacts: { layerStackSidecars: 'invalid', schemaVersion: 1 } },
+        },
+      }).success,
+    ).toBeFalse();
+  });
+
   test('rejects malformed, flat legacy, and unquarantined future authority without replacing the last valid request', () => {
     const valid = buildEditorPersistenceRequest({ editDocumentV2: document(0.4), path: '/fixtures/a.raw' });
     let persisted = { catalogRevision: 7, request: structuredClone(valid), sidecarRevision: 'sha256:last-valid' };

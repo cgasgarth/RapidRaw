@@ -9,6 +9,7 @@ import { selectiveColorMixerSettingsSchema } from './color/selectiveColorMixerSc
 import { technicalWhiteBalanceV1Schema } from './color/whiteBalanceSchemas.js';
 import { filmEmulationNodeV1Schema } from './film/filmEmulationSchemas.js';
 import { perspectiveCorrectionSettingsSchema } from './geometry/perspective/perspectiveSchemas.js';
+import { layerStackSidecarPersistenceEnvelopeV1Schema } from './layerStackSidecarPersistence.js';
 import {
   detailDeblurUiControlsV1Schema,
   lensProfileDistortionParamsV1Schema,
@@ -1510,11 +1511,14 @@ const editDocumentV2ObjectSchema = z
 
 export const editDocumentV2Schema = editDocumentV2ObjectSchema;
 
-/** Strict current render/persistence boundary; only future-node quarantine may cross it. */
+/** Strict current render/persistence boundary; only current artifacts and future-node quarantine may cross it. */
 export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
   const extensionKeys = Object.keys(document.extensions);
-  if (extensionKeys.some((key) => key !== 'quarantinedNodes')) {
-    context.addIssue({ code: 'custom', message: 'Current render documents may only carry quarantinedNodes.' });
+  if (extensionKeys.some((key) => key !== 'quarantinedNodes' && key !== 'rawEngineArtifacts')) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Current render documents may only carry rawEngineArtifacts and quarantinedNodes.',
+    });
   }
   const quarantinedNodes = document.extensions['quarantinedNodes'];
   if (
@@ -1522,6 +1526,13 @@ export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefin
     (quarantinedNodes === null || Array.isArray(quarantinedNodes) || typeof quarantinedNodes !== 'object')
   ) {
     context.addIssue({ code: 'custom', message: 'quarantinedNodes must be an object when present.' });
+  }
+  const rawEngineArtifacts = document.extensions['rawEngineArtifacts'];
+  if (
+    rawEngineArtifacts !== undefined &&
+    !layerStackSidecarPersistenceEnvelopeV1Schema.safeParse({ rawEngineArtifacts }).success
+  ) {
+    context.addIssue({ code: 'custom', message: 'rawEngineArtifacts must satisfy the current artifact contract.' });
   }
 });
 

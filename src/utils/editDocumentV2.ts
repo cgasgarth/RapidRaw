@@ -129,9 +129,13 @@ export const setEditDocumentV2NodeEnabled = (
 /** Seal current typed authority before crossing the native persistence boundary. */
 export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
   const quarantinedNodes = document.extensions['quarantinedNodes'];
+  const rawEngineArtifacts = document.extensions['rawEngineArtifacts'];
   const current = currentRenderEditDocumentV2Schema.parse({
     ...document,
-    extensions: quarantinedNodes === undefined ? {} : { quarantinedNodes },
+    extensions: {
+      ...(quarantinedNodes === undefined ? {} : { quarantinedNodes }),
+      ...(rawEngineArtifacts === undefined ? {} : { rawEngineArtifacts }),
+    },
   });
   const jsonSafe: unknown = JSON.parse(JSON.stringify(current));
   return currentRenderEditDocumentV2Schema.parse(jsonSafe);

@@ -124,17 +124,9 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
     ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
   });
   const receipt = await trackEditorPersistence(
-    input.path,
-    input.editDocumentV2,
-    invokeWithSchema(
-      Invokes.SaveMetadataAndUpdateThumbnail,
-      {
-        editDocumentV2: input.editDocumentV2,
-        path: input.path,
-        ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
-      },
-      editorPersistenceReceiptSchema,
-    ),
+    request.path,
+    request.editDocumentV2,
+    invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
   );
   if (receipt.path !== input.path) {
     throw new Error(`editor_persistence.receipt_path_mismatch:${receipt.path}:${input.path}`);
