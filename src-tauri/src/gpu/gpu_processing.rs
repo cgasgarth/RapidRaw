@@ -6137,7 +6137,6 @@ fn process_and_get_dynamic_image_inner(
                             ),
                             image: std::sync::Arc::new(dynamic_img),
                             products: analytics.products,
-                            active_waveform_channel: analytics.active_waveform_channel,
                             policy: crate::AnalyticsSamplingPolicy::default(),
                         });
                     }
@@ -6155,7 +6154,6 @@ fn process_and_get_dynamic_image_inner(
                         preview_operation_identity: Box::new(analytics.preview_operation_identity),
                         image: std::sync::Arc::new(dynamic_img),
                         products: analytics.products,
-                        active_waveform_channel: analytics.active_waveform_channel,
                         policy: crate::AnalyticsSamplingPolicy::default(),
                     });
                 }

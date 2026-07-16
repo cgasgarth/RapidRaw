@@ -108,7 +108,6 @@ mod tests {
             },
             image: Arc::new(DynamicImage::new_rgb8(1, 1)),
             products: AnalyticsProducts::HISTOGRAM,
-            active_waveform_channel: None,
             policy: AnalyticsSamplingPolicy::default(),
         }
     }

@@ -105,7 +105,6 @@ pub struct PreviewJob {
     pub target_resolution: Option<u32>,
     pub roi: Option<(f32, f32, f32, f32)>,
     pub compute_waveform: bool,
-    pub active_waveform_channel: Option<String>,
     pub viewer_sample_graph_revision: Option<String>,
     pub responder: tokio::sync::oneshot::Sender<crate::preview_scheduler::PreviewCompletion>,
 }
@@ -141,7 +140,6 @@ pub struct AnalyticsJob {
     pub frame_id: AnalyticsFrameId,
     pub image: Arc<DynamicImage>,
     pub products: AnalyticsProducts,
-    pub active_waveform_channel: Option<String>,
     pub policy: AnalyticsSamplingPolicy,
 }
 
@@ -166,7 +164,6 @@ pub struct AnalyticsConfig {
     pub frame_id: AnalyticsFrameId,
     pub preview_operation_identity: FrontendPreviewOperationIdentity,
     pub products: AnalyticsProducts,
-    pub active_waveform_channel: Option<String>,
     pub(crate) service: Arc<crate::render::analytics_service::AnalyticsRuntimeService>,
 }
 

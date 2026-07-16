@@ -77,7 +77,6 @@ pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) target_resolution: Option<u32>,
     pub(crate) roi: Option<(f32, f32, f32, f32)>,
     pub(crate) compute_waveform: bool,
-    pub(crate) active_waveform_channel: Option<&'a str>,
     pub(crate) viewer_sample_graph_revision: Option<&'a str>,
     pub(crate) cancellation: Option<&'a PreviewCancellation>,
     pub(crate) preview_id: crate::preview_scheduler::PreviewRequestId,
@@ -144,19 +143,13 @@ fn hash_revision(revision: &str) -> u64 {
     u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
 }
 
-fn requested_products(compute_scopes: bool, active: Option<&str>) -> AnalyticsProducts {
+fn requested_products(compute_scopes: bool) -> AnalyticsProducts {
     let mut products = AnalyticsProducts::HISTOGRAM | AnalyticsProducts::GAMUT_MASK;
     if !compute_scopes {
         return products;
     }
-    products |= match active {
-        Some("parade") => AnalyticsProducts::PARADE,
-        Some("vectorscope") => AnalyticsProducts::VECTORSCOPE,
-        Some("luma") | Some("rgb") => AnalyticsProducts::WAVEFORM,
-        _ => {
-            AnalyticsProducts::WAVEFORM | AnalyticsProducts::PARADE | AnalyticsProducts::VECTORSCOPE
-        }
-    };
+    products |=
+        AnalyticsProducts::WAVEFORM | AnalyticsProducts::PARADE | AnalyticsProducts::VECTORSCOPE;
     products
 }
 
@@ -171,7 +164,6 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         target_resolution,
         roi,
         compute_waveform,
-        active_waveform_channel,
         viewer_sample_graph_revision,
         cancellation,
         preview_id,
@@ -441,29 +433,17 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         retouched_processing_image.as_ref(),
         final_revision,
     );
-    let wants_analytics = pixel_roi.is_none();
-    let channel_filter = if is_interactive {
-        active_waveform_channel.map(str::to_string)
-    } else {
-        None
-    };
-
-    let analytics_config = if wants_analytics {
-        Some(AnalyticsConfig {
-            path: loaded_image.path.clone(),
-            frame_id: AnalyticsFrameId {
-                image_session: preview_id.image_session,
-                preview_generation: preview_id.generation,
-                graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
-            },
-            preview_operation_identity: preview_operation_identity.clone(),
-            products: requested_products(compute_waveform, active_waveform_channel),
-            active_waveform_channel: channel_filter,
-            service: Arc::clone(state.render().analytics()),
-        })
-    } else {
-        None
-    };
+    let analytics_config = Some(AnalyticsConfig {
+        path: loaded_image.path.clone(),
+        frame_id: AnalyticsFrameId {
+            image_session: preview_id.image_session,
+            preview_generation: preview_id.generation,
+            graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
+        },
+        preview_operation_identity: preview_operation_identity.clone(),
+        products: requested_products(compute_waveform),
+        service: Arc::clone(state.render().analytics()),
+    });
 
     let render_request = || RenderRequest {
         adjustments: {
@@ -878,7 +858,6 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                     target_resolution: job.target_resolution,
                     roi: job.roi,
                     compute_waveform: job.compute_waveform,
-                    active_waveform_channel: job.active_waveform_channel.as_deref(),
                     viewer_sample_graph_revision: job.viewer_sample_graph_revision.as_deref(),
                     cancellation: Some(&cancellation),
                     preview_id: id,
@@ -964,6 +943,20 @@ mod tests {
         let response = b"WGPU_RENDER";
         assert_eq!(response.len(), 11);
         assert_ne!(&response[..2], &[0xff, 0xd8]);
+    }
+
+    #[test]
+    fn visible_scopes_request_every_product_from_one_rendered_frame() {
+        let products = requested_products(true);
+        assert!(products.contains(AnalyticsProducts::HISTOGRAM));
+        assert!(products.contains(AnalyticsProducts::GAMUT_MASK));
+        assert!(products.contains(AnalyticsProducts::WAVEFORM));
+        assert!(products.contains(AnalyticsProducts::PARADE));
+        assert!(products.contains(AnalyticsProducts::VECTORSCOPE));
+        assert_eq!(
+            requested_products(false),
+            AnalyticsProducts::HISTOGRAM | AnalyticsProducts::GAMUT_MASK
+        );
     }
 
     #[test]

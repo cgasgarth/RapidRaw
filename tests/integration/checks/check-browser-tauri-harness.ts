@@ -260,8 +260,66 @@ async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void
       'true',
   );
   await page.waitForTimeout(250);
-  const acceptedAt = await status.getAttribute('data-preview-scope-updated-at');
+  let acceptedAt = await status.getAttribute('data-preview-scope-updated-at');
   if (!acceptedAt) throw new Error('Exact presented preview analytics did not publish scope status.');
+
+  const completeProducts = await page.evaluate(async () => {
+    const module = await import('/src/store/useEditorStore.ts');
+    const state = module.useEditorStore.getState();
+    return {
+      histogram: ['blue', 'green', 'luma', 'red'].every(
+        (channel) => (state.histogram?.[channel as keyof typeof state.histogram]?.data.length ?? 0) > 0,
+      ),
+      luma: state.waveform?.luma ?? '',
+      parade: state.waveform?.parade ?? '',
+      rgb: state.waveform?.rgb ?? '',
+      vectorscope: state.waveform?.vectorscope ?? '',
+    };
+  });
+  if (
+    !completeProducts.histogram ||
+    [completeProducts.luma, completeProducts.rgb, completeProducts.parade, completeProducts.vectorscope].some(
+      (url) => !url,
+    )
+  ) {
+    throw new Error(
+      `Accepted preview did not publish every nonempty scope product: ${JSON.stringify(completeProducts)}`,
+    );
+  }
+
+  const analyticsHeader = page.locator('[data-testid$="-analytics-header"]').first();
+  for (const mode of ['luma', 'rgb', 'parade', 'vectorscope', 'histogram']) {
+    await page.locator(`[data-testid$="-analytics-header-mode-${mode}"]`).first().click();
+    if ((await status.getAttribute('data-preview-scope-ready')) !== 'true') {
+      throw new Error(`Scope mode ${mode} lost the accepted ready receipt.`);
+    }
+  }
+
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('2');
+  await page.waitForFunction((previous) => {
+    const status = document.querySelector('[data-testid="preview-scope-status"]');
+    const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
+    return (
+      status?.getAttribute('data-preview-scope-ready') === 'true' &&
+      status.getAttribute('data-preview-scope-updated-at') !== previous &&
+      calls.some(
+        ({ args, command }) => command === 'apply_adjustments' && Reflect.get(args?.['request'] ?? {}, 'roi') !== null,
+      )
+    );
+  }, acceptedAt);
+  if ((await analyticsHeader.getAttribute('data-preview-scope-freshness')) !== 'current') {
+    throw new Error('Zoom ROI analytics did not converge on the displayed preview identity.');
+  }
+  const zoomAcceptedAt = await status.getAttribute('data-preview-scope-updated-at');
+  await page.getByTestId('viewer-footer-zoom-select').selectOption('fit');
+  await page.waitForFunction(
+    (previous) =>
+      document.querySelector('[data-testid="preview-scope-status"]')?.getAttribute('data-preview-scope-updated-at') !==
+      previous,
+    zoomAcceptedAt,
+  );
+  acceptedAt = await status.getAttribute('data-preview-scope-updated-at');
+  if (!acceptedAt) throw new Error('Fit reset did not publish current scope status.');
 
   await page.evaluate(() => {
     const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
@@ -297,7 +355,11 @@ async function verifyPreviewAnalyticsArtifactAuthority(page: Page): Promise<void
     });
   });
   await page.waitForTimeout(150);
-  if ((await status.getAttribute('data-preview-scope-updated-at')) !== acceptedAt) {
+  const staleMutation = await page.evaluate(async () => {
+    const module = await import('/src/store/useEditorStore.ts');
+    return module.useEditorStore.getState().histogram?.luma?.data.every((value) => value === 9) ?? false;
+  });
+  if (staleMutation) {
     throw new Error('A non-presented preview operation replaced exact-current scope output.');
   }
 

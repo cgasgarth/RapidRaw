@@ -568,6 +568,33 @@ test('early analytics publishes only when its exact artifact is presented and du
   ]);
 });
 
+test('native presentation without a URL publishes only exact current analytics', () => {
+  let state = createPreviewCoordinatorState();
+  const queued = transition(state, { identity: session(), kind: 'settled', type: 'render-inputs-changed' });
+  const identity = required(queued.state.settled.identity);
+  state = transition(queued.state, { identity, type: 'operation-started' }).state;
+  state = transition(state, { identity, receiptId: 1, type: 'analytics-result-received' }).state;
+
+  const presented = transition(state, { identity, type: 'operation-completed' });
+  expect(presented.effects).toContainEqual({ identity, reason: 'operation-presented', type: 'present' });
+  expect(presented.effects).toContainEqual({
+    identity,
+    reason: 'buffered-analytics-presented',
+    receiptId: 1,
+    type: 'publish-analytics',
+  });
+  expect(presented.state.visibleArtifact).toBeNull();
+  expect(presented.state.visibleIdentity).toEqual(identity);
+
+  const switched = transition(presented.state, {
+    session: session({ imageSessionId: 2, sourceImagePath: '/fixtures/b.raw', sourceRevision: 2 }),
+    type: 'image-session-installed',
+  });
+  expect(switched.state.visibleIdentity).toBeNull();
+  const stale = transition(switched.state, { identity, receiptId: 2, type: 'analytics-result-received' });
+  expect(stale.effects).toEqual([{ reason: 'stale-analytics-result', receiptId: 2, type: 'discard-analytics' }]);
+});
+
 test('analytics rejects A to B to successor-A reordering and keeps bounded transition receipts', () => {
   let state = createPreviewCoordinatorState();
   const firstA = transition(state, {
