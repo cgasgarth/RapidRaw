@@ -12,18 +12,29 @@
   },
   "executionIdentity": {
     "backendAbiVersion": "film_backend_abi_v1",
-    "modelAbiVersion": "film_model_abi_v1"
+    "modelAbiVersion": "film_model_abi_v1",
+    "planSha256": "sha256:plan:sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef:sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef"
+  },
+  "validationIdentity": {
+    "viewTransforms": ["AgX v1"],
+    "outputProfiles": ["srgb", "display_p3"],
+    "bitDepths": [16, 32],
+    "proofCrops": [[0, 0, 1, 1]]
   },
   "approvedBaselines": {
     "grainHash": "sha256:70cfd798c9bb81646dbdc184a76af363ed73466dced1e62f636bf77d685f8519",
-    "postFilmHash": "sha256:16260994fb7505296208b35303b385030c29556f32e72aa2a9fd66f2eb4b2a7f"
+    "postFilmHash": "sha256:16260994fb7505296208b35303b385030c29556f32e72aa2a9fd66f2eb4b2a7f",
+    "outputGamutHashes": {
+      "displayP3": "sha256:2ea04354a351cb2f11c38eb40ecad1e6336c239b7575d6b21750ee906f5e994b",
+      "srgb": "sha256:a34d6f59319fd4bdc7eaee0d4a96aa6cc8f61656af3852565936521d2917b86e"
+    }
   },
   "approval": {
-    "approvedAt": "2026-07-14T22:44:18Z",
-    "approvalCommit": "5601121e377b9b10098b95ac7a27a5d8d7cee2a1",
+    "approvedAt": "2026-07-16T03:13:19Z",
+    "approvalCommit": "850af6fe72256d0f87c97098de463ba319858ffb",
     "issueUrl": "https://github.com/cgasgarth/RapidRaw/issues/5024",
-    "prUrl": "https://github.com/cgasgarth/RapidRaw/pull/5734",
-    "reason": "Initial governed analytic, deterministic grain, and optical release baselines approved with production-path evidence.",
+    "prUrl": "https://github.com/cgasgarth/RapidRaw/pull/6003",
+    "reason": "Approved governed analytic, deterministic grain, optical, preview/export parity, and sRGB/Display-P3 output baselines with production-path evidence.",
     "reviewer": "repository-owner:cgasgarth"
   },
   "releasePolicy": {

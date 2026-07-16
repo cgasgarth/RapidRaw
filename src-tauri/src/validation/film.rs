@@ -108,6 +108,8 @@ struct FilmValidationThresholdsV1 {
     identity_delta_e00: f32,
     model_reference_max_abs: f32,
     model_reference_rmse: f32,
+    preview_export_max_abs: f32,
+    preview_export_rmse: f32,
     reference_delta_e00_mean: f32,
     reference_delta_e00_max: f32,
     neutral_chroma_max: f32,
@@ -214,6 +216,10 @@ struct FilmNativeAnalyticReportV1 {
     execution_plan: FilmNativeExecutionPlanReportV1,
     model_reference_max_abs: f32,
     model_reference_rmse: f32,
+    preview_export_max_abs: f32,
+    preview_export_rmse: f32,
+    preview_post_film_hash: String,
+    export_post_film_hash: String,
     samples: Vec<FilmNativeAnalyticSampleReportV1>,
     passed: bool,
     failures: Vec<String>,
@@ -346,6 +352,8 @@ fn validate_governance(
             fixture.thresholds.identity_delta_e00,
             fixture.thresholds.model_reference_max_abs,
             fixture.thresholds.model_reference_rmse,
+            fixture.thresholds.preview_export_max_abs,
+            fixture.thresholds.preview_export_rmse,
             fixture.thresholds.reference_delta_e00_mean,
             fixture.thresholds.reference_delta_e00_max,
             fixture.thresholds.neutral_chroma_max,
@@ -415,6 +423,7 @@ fn validate_governance(
 fn render_analytic_samples(
     samples: &[FilmAnalyticSampleV1],
     params: FilmEmulationParams,
+    quality: &str,
     revision: &str,
 ) -> Result<(Vec<Vec3>, FilmExecutionReceiptV1, FilmExecutionPlanV1), &'static str> {
     let width = u32::try_from(samples.len()).map_err(|_| "film_validation_sample_count_invalid")?;
@@ -428,7 +437,7 @@ fn render_analytic_samples(
         source_dimensions: [width, 1],
         full_resolution_origin: [0, 0],
         render_scale_milli: 1000,
-        quality: "settled_preview_v1".to_string(),
+        quality: quality.to_string(),
         deterministic_seed_inputs: "film-validation:analytic:seed-v1".to_string(),
         revision: revision.to_string(),
     };
@@ -441,6 +450,20 @@ fn render_analytic_samples(
         receipt,
         plan,
     ))
+}
+
+fn comparison_metrics(left: &[Vec3], right: &[Vec3]) -> Result<(f32, f32), &'static str> {
+    if left.len() != right.len() || left.is_empty() {
+        return Err("film_validation_comparison_length_mismatch");
+    }
+    let deltas = left
+        .iter()
+        .zip(right)
+        .flat_map(|(left, right)| (*left - *right).abs().to_array())
+        .collect::<Vec<_>>();
+    let max_abs = deltas.iter().copied().fold(0.0_f32, f32::max);
+    let rmse = (deltas.iter().map(|delta| delta * delta).sum::<f32>() / deltas.len() as f32).sqrt();
+    Ok((max_abs, rmse))
 }
 
 fn run_reference_analytic_gate(
@@ -469,12 +492,32 @@ fn run_reference_analytic_gate(
         mix: 1.0,
         ..disabled
     };
-    let (disabled_outputs, _, _) =
-        render_analytic_samples(&vectors.samples, disabled, "analytic-disabled-v1")?;
-    let (mix_zero_outputs, _, _) =
-        render_analytic_samples(&vectors.samples, mix_zero, "analytic-mix-zero-v1")?;
-    let (full_mix_outputs, full_mix_receipt, execution_plan) =
-        render_analytic_samples(&vectors.samples, full_mix, "analytic-full-mix-v1")?;
+    let (disabled_outputs, _, _) = render_analytic_samples(
+        &vectors.samples,
+        disabled,
+        "settled_preview_v1",
+        "analytic-disabled-v1",
+    )?;
+    let (mix_zero_outputs, _, _) = render_analytic_samples(
+        &vectors.samples,
+        mix_zero,
+        "settled_preview_v1",
+        "analytic-mix-zero-v1",
+    )?;
+    let (full_mix_outputs, full_mix_receipt, execution_plan) = render_analytic_samples(
+        &vectors.samples,
+        full_mix,
+        "settled_preview_v1",
+        "analytic-full-mix-v1",
+    )?;
+    let (export_outputs, export_receipt, _) = render_analytic_samples(
+        &vectors.samples,
+        full_mix,
+        "final_export_v1",
+        "analytic-full-mix-v1",
+    )?;
+    let (preview_export_max_abs, preview_export_rmse) =
+        comparison_metrics(&full_mix_outputs, &export_outputs)?;
     let mut identity_deltas = Vec::new();
     let mut model_reference_deltas = Vec::new();
     let mut neutral_axis_drift = 0.0_f32;
@@ -576,6 +619,12 @@ fn run_reference_analytic_gate(
     if model_reference_rmse > fixture.thresholds.model_reference_rmse {
         failures.push("model_reference_rmse_failed".to_string());
     }
+    if preview_export_max_abs > fixture.thresholds.preview_export_max_abs {
+        failures.push("preview_export_max_abs_failed".to_string());
+    }
+    if preview_export_rmse > fixture.thresholds.preview_export_rmse {
+        failures.push("preview_export_rmse_failed".to_string());
+    }
 
     let mut monotonic_violation_count = 0_u32;
     let mut previous_luminance = f32::NEG_INFINITY;
@@ -590,8 +639,12 @@ fn run_reference_analytic_gate(
             assertions: BTreeSet::new(),
         })
         .collect::<Vec<_>>();
-    let (neutral_outputs, _, _) =
-        render_analytic_samples(&neutral_samples, full_mix, "analytic-neutral-ramp-v1")?;
+    let (neutral_outputs, _, _) = render_analytic_samples(
+        &neutral_samples,
+        full_mix,
+        "settled_preview_v1",
+        "analytic-neutral-ramp-v1",
+    )?;
     for output in neutral_outputs {
         if !output.is_finite() {
             failures.push(format!(
@@ -647,11 +700,15 @@ fn run_reference_analytic_gate(
             backend_abi_version: execution_plan.backend_abi_version,
             model_abi_version: execution_plan.model_abi_version,
             plan_sha256: execution_plan.plan_sha256,
-            post_film_hash: full_mix_receipt.post_film_hash,
+            post_film_hash: full_mix_receipt.post_film_hash.clone(),
             stage_order: full_mix_receipt.stage_order,
         },
         model_reference_max_abs,
         model_reference_rmse,
+        preview_export_max_abs,
+        preview_export_rmse,
+        preview_post_film_hash: full_mix_receipt.post_film_hash,
+        export_post_film_hash: export_receipt.post_film_hash,
         samples,
         passed: failures.is_empty(),
         failures,
@@ -1060,6 +1117,9 @@ mod tests {
         assert_eq!(report.rmse, 0.0);
         assert_eq!(report.model_reference_max_abs, 0.0);
         assert_eq!(report.model_reference_rmse, 0.0);
+        assert_eq!(report.preview_export_max_abs, 0.0);
+        assert_eq!(report.preview_export_rmse, 0.0);
+        assert_eq!(report.preview_post_film_hash, report.export_post_film_hash);
         assert_eq!(report.monotonic_violation_count, 0);
         assert!(report.negative_component_count > 0);
         assert!(report.high_component_count > 0);

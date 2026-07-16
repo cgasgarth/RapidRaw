@@ -45,6 +45,8 @@ export const filmValidationThresholdsV1Schema = z
     identityDeltaE00: z.number().finite().nonnegative().max(1),
     modelReferenceMaxAbs: z.number().finite().nonnegative().max(0.1),
     modelReferenceRmse: z.number().finite().nonnegative().max(0.1),
+    previewExportMaxAbs: z.number().finite().nonnegative().max(0.1),
+    previewExportRmse: z.number().finite().nonnegative().max(0.1),
     referenceDeltaE00Mean: z.number().finite().nonnegative().max(5),
     referenceDeltaE00Max: z.number().finite().nonnegative().max(10),
     neutralChromaMax: z.number().finite().nonnegative().max(5),
@@ -209,6 +211,10 @@ export const filmNativeAnalyticReportV1Schema = z
       .strict(),
     modelReferenceMaxAbs: z.number().finite().nonnegative(),
     modelReferenceRmse: z.number().finite().nonnegative(),
+    previewExportMaxAbs: z.number().finite().nonnegative(),
+    previewExportRmse: z.number().finite().nonnegative(),
+    previewPostFilmHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    exportPostFilmHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
     samples: z.array(filmNativeAnalyticSampleReportV1Schema).min(1),
     passed: z.boolean(),
     failures: z.array(z.string().trim().min(1)),
@@ -276,12 +282,27 @@ export const filmReleaseApprovalV1Schema = z
       .object({
         backendAbiVersion: z.string().trim().min(1),
         modelAbiVersion: z.string().trim().min(1),
+        planSha256: z.string().trim().min(1),
+      })
+      .strict(),
+    validationIdentity: z
+      .object({
+        viewTransforms: z.tuple([z.literal('AgX v1')]),
+        outputProfiles: z.tuple([z.literal('srgb'), z.literal('display_p3')]),
+        bitDepths: z.array(z.union([z.literal(8), z.literal(16), z.literal(32)])).min(1),
+        proofCrops: z.array(cropSchema).min(1),
       })
       .strict(),
     approvedBaselines: z
       .object({
         grainHash: sha256Schema,
         postFilmHash: sha256Schema,
+        outputGamutHashes: z
+          .object({
+            displayP3: sha256Schema,
+            srgb: sha256Schema,
+          })
+          .strict(),
       })
       .strict(),
     approval: z

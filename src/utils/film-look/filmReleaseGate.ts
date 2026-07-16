@@ -6,6 +6,7 @@ import {
   type FilmOutputGamutReportV1,
   type FilmReleaseApprovalV1,
   type FilmValidationFixtureV1,
+  filmAnalyticVectorSetV1Schema,
   filmNativeAnalyticReportV1Schema,
   filmNativeStochasticOpticalReportV1Schema,
   filmOutputGamutReportV1Schema,
@@ -81,8 +82,13 @@ const countComponents = (samples: FilmNativeAnalyticReportV1['samples'], predica
   samples.reduce((count, sample) => count + sample.fullMixOutput.filter(predicate).length, 0);
 const isNormalizedRgb = (rgb: readonly number[]) => rgb.every((value) => value >= 0 && value <= 1);
 
-export const evaluateFilmNativeReleaseGate = (rawFixture: unknown, rawReport: unknown): FilmReleaseGateResult => {
+export const evaluateFilmNativeReleaseGate = (
+  rawFixture: unknown,
+  rawVectors: unknown,
+  rawReport: unknown,
+): FilmReleaseGateResult => {
   const fixture: FilmValidationFixtureV1 = filmValidationFixtureV1Schema.parse(rawFixture);
+  const vectors = filmAnalyticVectorSetV1Schema.parse(rawVectors);
   const report: FilmNativeAnalyticReportV1 = filmNativeAnalyticReportV1Schema.parse(rawReport);
   const failures = [...report.failures];
   const profileRef = fixture.render.profileRefs[0];
@@ -95,6 +101,20 @@ export const evaluateFilmNativeReleaseGate = (rawFixture: unknown, rawReport: un
     failures.push('film_release_identity_mismatch');
   }
   if (report.postFilmDomain !== fixture.input.domain) failures.push('film_release_comparison_domain_mismatch');
+  if (
+    vectors.workingSpace !== fixture.input.domain ||
+    JSON.stringify(vectors.profileRef) !== JSON.stringify(profileRef) ||
+    vectors.samples.length !== report.samples.length ||
+    vectors.samples.some((sample, index) => {
+      const observed = report.samples[index];
+      return (
+        observed === undefined ||
+        observed.id !== sample.id ||
+        JSON.stringify(observed.input) !== JSON.stringify(sample.input)
+      );
+    })
+  )
+    failures.push('film_release_vector_set_mismatch');
   if (report.maxAbs > fixture.thresholds.maxAbs) failures.push('max_abs_threshold_failed');
   if (report.rmse > fixture.thresholds.rmse) failures.push('rmse_threshold_failed');
   if (report.neutralAxisDrift > fixture.thresholds.neutralAxisDrift) failures.push('neutral_axis_threshold_failed');
@@ -102,6 +122,10 @@ export const evaluateFilmNativeReleaseGate = (rawFixture: unknown, rawReport: un
   if (report.modelReferenceMaxAbs > fixture.thresholds.modelReferenceMaxAbs)
     failures.push('model_reference_max_abs_failed');
   if (report.modelReferenceRmse > fixture.thresholds.modelReferenceRmse) failures.push('model_reference_rmse_failed');
+  if (report.previewExportMaxAbs > fixture.thresholds.previewExportMaxAbs)
+    failures.push('preview_export_max_abs_failed');
+  if (report.previewExportRmse > fixture.thresholds.previewExportRmse) failures.push('preview_export_rmse_failed');
+  if (report.previewPostFilmHash !== report.exportPostFilmHash) failures.push('preview_export_post_film_hash_mismatch');
   if (
     report.executionPlan.modelAbiVersion.trim() === '' ||
     report.executionPlan.backendAbiVersion.trim() === '' ||
@@ -358,11 +382,13 @@ export const evaluateFilmBaselineApprovalGate = (
   rawFixture: unknown,
   rawAnalyticReport: unknown,
   rawStochasticOpticalReport: unknown,
+  rawOutputGamutReport: unknown,
   rawApproval: unknown,
 ): FilmBaselineApprovalGateResult => {
   const fixture = filmValidationFixtureV1Schema.parse(rawFixture);
   const analytic = filmNativeAnalyticReportV1Schema.parse(rawAnalyticReport);
   const stochastic = filmNativeStochasticOpticalReportV1Schema.parse(rawStochasticOpticalReport);
+  const output = filmOutputGamutReportV1Schema.parse(rawOutputGamutReport);
   const approval: FilmReleaseApprovalV1 = filmReleaseApprovalV1Schema.parse(rawApproval);
   const failures: string[] = [];
   if (
@@ -373,12 +399,26 @@ export const evaluateFilmBaselineApprovalGate = (
     failures.push('film_baseline_approval_identity_mismatch');
   if (
     approval.executionIdentity.modelAbiVersion !== analytic.executionPlan.modelAbiVersion ||
-    approval.executionIdentity.backendAbiVersion !== analytic.executionPlan.backendAbiVersion
+    approval.executionIdentity.backendAbiVersion !== analytic.executionPlan.backendAbiVersion ||
+    approval.executionIdentity.planSha256 !== analytic.executionPlan.planSha256
   )
     failures.push('film_baseline_execution_identity_mismatch');
+  if (
+    JSON.stringify(approval.validationIdentity.viewTransforms) !== JSON.stringify(fixture.render.viewTransforms) ||
+    JSON.stringify(approval.validationIdentity.outputProfiles) !== JSON.stringify(fixture.render.outputProfiles) ||
+    JSON.stringify(approval.validationIdentity.bitDepths) !== JSON.stringify(fixture.render.bitDepths) ||
+    JSON.stringify(approval.validationIdentity.proofCrops) !== JSON.stringify(fixture.render.proofCrops)
+  )
+    failures.push('film_baseline_validation_identity_mismatch');
   if (approval.approvedBaselines.postFilmHash !== analytic.deterministicHash)
     failures.push('film_post_film_baseline_unapproved');
   if (approval.approvedBaselines.grainHash !== stochastic.grain.deterministicHash)
     failures.push('film_grain_baseline_unapproved');
+  const outputHashes = Object.fromEntries(output.targets.map(({ outputHash, target }) => [target, outputHash]));
+  if (
+    approval.approvedBaselines.outputGamutHashes.srgb !== outputHashes['srgb'] ||
+    approval.approvedBaselines.outputGamutHashes.displayP3 !== outputHashes['display_p3']
+  )
+    failures.push('film_output_gamut_baseline_unapproved');
   return { failures, passed: failures.length === 0 };
 };
