@@ -5,8 +5,10 @@ import { join, resolve } from 'node:path';
 import { BUN_COVERAGE_FLOORS, enforceCoverageFloors, summarizeLcov } from '../../../scripts/ci/check-bun-coverage.ts';
 import {
   buildRandomizedTestArgs,
+  DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS,
   RANDOMIZED_SUITE_RUN_COUNT,
   randomizedTestReproduction,
+  resolveRandomizedPassTimeout,
   resolveRandomizedTestSeed,
 } from '../../../scripts/ci/run-bun-randomized-tests.ts';
 
@@ -62,6 +64,8 @@ describe('Bun native confidence gates', () => {
       'tests/pure-ts',
     ]);
     expect(RANDOMIZED_SUITE_RUN_COUNT).toBe(2);
+    expect(resolveRandomizedPassTimeout(undefined)).toBe(DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS);
+    expect(resolveRandomizedPassTimeout('750')).toBe(750);
     expect(randomizedTestReproduction(seed)).toBe('RAWENGINE_BUN_TEST_SEED=424242 bun run test:randomized');
   });
 
@@ -112,22 +116,60 @@ describe('Bun native confidence gates', () => {
     expect(result.output).toContain('2 pass');
   });
 
-  test('prints the seed and exact reproduction command before a randomized failure', async () => {
+  test('prints reproduction and exits bounded while killing a failed worker descendant', async () => {
     const directory = await temporaryDirectory('rapidraw-bun-randomized-gate-');
+    const readyFile = join(directory, 'descendant-ready');
+    const pidFile = join(directory, 'descendant-pid');
     const failingTest = join(directory, 'failure.test.ts');
     await Bun.write(
       failingTest,
-      'import { expect, test } from "bun:test";\ntest("intentional failure", () => expect(1).toBe(2));\n',
+      `import { expect, test } from "bun:test";\ntest("intentional failure", async () => { for (let attempt = 0; attempt < 200 && !(await Bun.file(${JSON.stringify(readyFile)}).exists()); attempt += 1) await Bun.sleep(10); expect(1).toBe(2); }, 3_000);\n`,
+    );
+    await Bun.write(
+      join(directory, 'descendant.test.ts'),
+      `import { test } from "bun:test";\ntest("owns a descendant", async () => { const child = Bun.spawn(["bun", "-e", "await Bun.sleep(60_000)"], { stderr: "ignore", stdout: "ignore" }); await Bun.write(${JSON.stringify(pidFile)}, String(child.pid)); await Bun.write(${JSON.stringify(readyFile)}, "ready"); await Bun.sleep(60_000); }, 65_000);\n`,
     );
     const runner = resolve('scripts/ci/run-bun-randomized-tests.ts');
-    const result = await captured(['bun', runner, '--target', failingTest], {
+    const startedAt = performance.now();
+    const result = await captured(['bun', runner, '--target', directory], {
       cwd: process.cwd(),
-      env: { RAWENGINE_BUN_TEST_SEED: '314159' },
+      env: { RAWENGINE_BUN_TEST_SEED: '314159', RAWENGINE_BUN_TEST_TIMEOUT_MS: '750' },
+      timeoutMs: 5_000,
     });
+    expect(result.timedOut, result.output).toBeFalse();
     expect(result.exitCode).not.toBe(0);
+    expect(performance.now() - startedAt).toBeLessThan(5_000);
     expect(result.output).toContain('Bun randomized isolation seed: 314159');
     expect(result.output).toContain('Reproduce: RAWENGINE_BUN_TEST_SEED=314159 bun run test:randomized');
-  });
+    const descendantPid = Number(await Bun.file(pidFile).text());
+    let descendantAlive = true;
+    for (let attempt = 0; attempt < 100 && descendantAlive; attempt += 1) {
+      try {
+        process.kill(descendantPid, 0);
+        await Bun.sleep(10);
+      } catch {
+        descendantAlive = false;
+      }
+    }
+    expect(descendantAlive).toBeFalse();
+  }, 8_000);
+
+  test('clears the pass watchdog after a successful native run', async () => {
+    const directory = await temporaryDirectory('rapidraw-bun-randomized-success-');
+    await Bun.write(
+      join(directory, 'success.test.ts'),
+      'import { expect, test } from "bun:test";\ntest("passes", () => expect(true).toBeTrue());\n',
+    );
+    const runner = resolve('scripts/ci/run-bun-randomized-tests.ts');
+    const result = await captured(['bun', runner, '--target', directory], {
+      cwd: process.cwd(),
+      env: { RAWENGINE_BUN_TEST_SEED: '271828' },
+      timeoutMs: 5_000,
+    });
+    expect(result.timedOut, result.output).toBeFalse();
+    expect(result.exitCode, result.output).toBe(0);
+    expect(result.output.match(/1 pass/gu)).toHaveLength(RANDOMIZED_SUITE_RUN_COUNT);
+  }, 8_000);
 
   test('summarizes LCOV function and line totals', () => {
     const summary = summarizeLcov(['TN:', 'SF:src/a.ts', 'FNF:2', 'FNH:1', 'LF:4', 'LH:3', 'end_of_record'].join('\n'));

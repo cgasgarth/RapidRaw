@@ -6,8 +6,14 @@ import { z } from 'zod';
 
 export const DEFAULT_RANDOMIZED_TEST_TARGET = 'tests/pure-ts';
 export const RANDOMIZED_SUITE_RUN_COUNT = 2;
+export const DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS = 180_000;
 
 const explicitSeedSchema = z.coerce.number().int().min(0).max(0xffff_ffff);
+const passTimeoutSchema = z.coerce.number().int().min(100).max(900_000);
+
+export function resolveRandomizedPassTimeout(value: string | undefined): number {
+  return value === undefined ? DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS : passTimeoutSchema.parse(value);
+}
 
 export function resolveRandomizedTestSeed(value: string | undefined): number {
   if (value !== undefined && /^\d+$/u.test(value)) {
@@ -34,6 +40,21 @@ export function randomizedTestReproduction(seed: number): string {
   return `RAWENGINE_BUN_TEST_SEED=${seed} bun run test:randomized`;
 }
 
+async function waitForChildExit(
+  child: ReturnType<typeof Bun.spawn>,
+  timeoutMs: number,
+): Promise<{ exitCode: number; timedOut: boolean }> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<{ exitCode: 124; timedOut: true }>((resolve) => {
+    timeout = setTimeout(() => resolve({ exitCode: 124, timedOut: true }), timeoutMs);
+  });
+  try {
+    return await Promise.race([child.exited.then((exitCode) => ({ exitCode, timedOut: false as const })), timedOut]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
 function parseTarget(args: string[]): string {
   if (args.length === 0) return DEFAULT_RANDOMIZED_TEST_TARGET;
   if (args.length === 2 && args[0] === '--target' && args[1] !== undefined) return args[1];
@@ -42,6 +63,7 @@ function parseTarget(args: string[]): string {
 
 if (import.meta.main) {
   const seed = resolveRandomizedTestSeed(process.env['RAWENGINE_BUN_TEST_SEED'] ?? process.env['GITHUB_RUN_ID']);
+  const passTimeoutMs = resolveRandomizedPassTimeout(process.env['RAWENGINE_BUN_TEST_TIMEOUT_MS']);
   const target = parseTarget(process.argv.slice(2));
   console.log(`Bun randomized isolation seed: ${seed}`);
   console.log(`Reproduce: ${randomizedTestReproduction(seed)}`);
@@ -56,7 +78,15 @@ if (import.meta.main) {
       stdin: 'inherit',
       stdout: 'inherit',
     });
-    const exitCode = await child.exited;
+    const result = await waitForChildExit(child, passTimeoutMs);
+    if (result.timedOut) {
+      child.kill('SIGTERM');
+      const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(1_000).then(() => false)]);
+      if (!exited) child.kill('SIGKILL');
+      await child.exited;
+      console.error(`Bun randomized isolation pass ${run} exceeded ${String(passTimeoutMs)}ms and was terminated.`);
+    }
+    const exitCode = result.exitCode;
     if (exitCode !== 0) process.exit(exitCode);
   }
 }
