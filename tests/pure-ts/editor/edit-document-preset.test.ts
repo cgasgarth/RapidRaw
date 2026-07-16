@@ -28,6 +28,7 @@ import {
   replaceEditDocumentV2SourceArtifacts,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
+import { classifyPresetLibraryLoadState } from '../../../src/utils/presetLibraryLoadState';
 
 const targetPath = '/fixture/preset-target.ARW';
 const session = createEditorImageSession({ generation: 41, path: targetPath, source: 'cache' });
@@ -162,6 +163,27 @@ describe('current RapidRaw preset envelope', () => {
     const flatOnly = { ...current, adjustments: { exposure: -1.75 } };
     const parsed = parsePresetLibrary([{ preset: flatOnly }]);
     expect(parsed).toEqual({ items: [], quarantinedCount: 1 });
+  });
+
+  test('mixed current and obsolete native values retain current presets and quarantine obsolete entries', () => {
+    const current = envelope(
+      createEditDocumentPresetPayload(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), false, 'style'),
+      { id: 'current', name: 'Current' },
+    );
+    const obsolete = { preset: { adjustments: { exposure: 0.75 }, id: 'obsolete', name: 'Alaska Proof Look' } };
+
+    const parsed = parsePresetLibrary([{ preset: current }, obsolete]);
+
+    expect(parsed.items).toEqual([{ preset: current }]);
+    expect(parsed.quarantinedCount).toBe(1);
+    expect(classifyPresetLibraryLoadState('Quarantined 1 invalid preset entries.')).toEqual({
+      fatalLoadError: null,
+      quarantineNotice: 'Quarantined 1 invalid preset entries.',
+    });
+    expect(classifyPresetLibraryLoadState('native preset storage unavailable')).toEqual({
+      fatalLoadError: 'native preset storage unavailable',
+      quarantineNotice: null,
+    });
   });
 
   test('compiles every built-in color style into the same strict current envelope', () => {

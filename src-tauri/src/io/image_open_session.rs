@@ -81,7 +81,11 @@ pub struct BeginImageOpenResult {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(tag = "phase", rename_all = "camelCase")]
+#[serde(
+    tag = "phase",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 enum ImageOpenUpdate {
     MetadataReady {
         session_id: ImageOpenSessionId,
@@ -1125,6 +1129,57 @@ mod tests {
         });
         release_tx.send(()).unwrap();
         assert_eq!(settled.join().unwrap(), Some(2));
+    }
+
+    #[test]
+    fn image_open_updates_serialize_the_exact_camel_case_ipc_contract() {
+        let session_id = ImageOpenSessionId {
+            selection_generation: 7,
+            image_session: 9,
+        };
+        let receipt = ProgressiveImageFrameReceipt {
+            image_session: 9,
+            selection_generation: 7,
+            source_revision: "source-revision-v1:fixture".to_string(),
+            frame_generation: 1,
+            quality: ImageFrameQuality::SettledDeveloped,
+            width: 640,
+            height: 480,
+            orientation_applied: true,
+            source_kind: "raw_developed".to_string(),
+            color_assumption: "acescg_linear_v1".to_string(),
+            provisional_reason: None,
+        };
+        let decode = serde_json::to_value(ImageOpenUpdate::DecodeReady {
+            session_id: session_id.clone(),
+            image_id: "image-9".to_string(),
+            path: "/fixture/image.arw".to_string(),
+            width: 640,
+            height: 480,
+            is_raw: true,
+            receipt: receipt.clone(),
+        })
+        .expect("serialize decode update");
+        assert_eq!(decode["phase"], "decodeReady");
+        assert_eq!(decode["imageId"], "image-9");
+        assert_eq!(decode["sessionId"]["imageSession"], 9);
+        assert_eq!(decode["sessionId"]["selectionGeneration"], 7);
+        assert_eq!(decode["isRaw"], true);
+        assert!(decode.get("image_id").is_none());
+        assert!(decode.get("session_id").is_none());
+        assert!(decode.get("is_raw").is_none());
+
+        let frame = serde_json::to_value(ImageOpenUpdate::FrameReady {
+            session_id,
+            image_id: "image-9".to_string(),
+            path: "/fixture/image.arw".to_string(),
+            data_url: "data:image/jpeg;base64,AAAA".to_string(),
+            receipt,
+        })
+        .expect("serialize frame update");
+        assert_eq!(frame["phase"], "frameReady");
+        assert_eq!(frame["dataUrl"], "data:image/jpeg;base64,AAAA");
+        assert!(frame.get("data_url").is_none());
     }
 
     #[test]

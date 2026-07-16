@@ -87,6 +87,19 @@ describe('EditDocumentV2 render preparation', () => {
     );
     expect(requireNode(renderDocument, 'scene_global_color_tone').params['exposure']).toBe(1.25);
     expect(requireNode(renderDocument, 'source_artifacts').params['aiPatches']).toEqual([]);
+    expect(renderDocument.extensions).toEqual({});
+    expect(renderDocument).not.toHaveProperty('migration');
+  });
+
+  test('render preparation removes legacy extension authority and retains only current quarantine data', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
+    authoritative.extensions['quarantinedNodes'] = { future_node: { implementationVersion: 3 } };
+    const renderDocument = prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, authoritative, []);
+
+    expect(renderDocument.extensions).toEqual({
+      quarantinedNodes: { future_node: { implementationVersion: 3 } },
+    });
+    expect(renderDocument.extensions).not.toHaveProperty('legacyAdjustments');
   });
 
   test('render preparation overlays the authoritative camera-input envelope', () => {

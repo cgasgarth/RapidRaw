@@ -142,15 +142,17 @@ export const editDocumentDetailDenoiseDehazeV2Schema = z
   .object({
     clarity: z.number().finite().min(-100).max(100),
     colorNoiseReduction: z.number().finite().min(0).max(100),
-    // Optional only for already-persisted v2 Detail nodes created before Deblur ownership.
-    deblurEnabled: detailDeblurUiControlsV1Schema.shape.deblurEnabled.optional(),
-    deblurSigmaPx: detailDeblurUiControlsV1Schema.shape.deblurSigmaPx.optional(),
-    deblurStrength: detailDeblurUiControlsV1Schema.shape.deblurStrength.optional(),
+    deblurEnabled: detailDeblurUiControlsV1Schema.shape.deblurEnabled,
+    deblurSigmaPx: detailDeblurUiControlsV1Schema.shape.deblurSigmaPx,
+    deblurStrength: detailDeblurUiControlsV1Schema.shape.deblurStrength,
     dehaze: z.number().finite().min(-100).max(100),
     denoiseContrastProtection: z.number().finite().min(0).max(100),
     denoiseDetail: z.number().finite().min(0).max(100),
     denoiseNaturalGrain: z.number().finite().min(0).max(100),
     denoiseShadowBias: z.number().finite().min(-100).max(100),
+    dustSpotMinRadiusPx: z.number().int().min(1).max(12),
+    dustSpotOverlayEnabled: z.boolean(),
+    dustSpotSensitivity: z.number().int().min(0).max(100),
     lumaNoiseReduction: z.number().finite().min(0).max(100),
     sharpness: z.number().finite().min(-100).max(100),
     ...editDocumentSharpnessThresholdV2Schema.shape,
@@ -754,6 +756,9 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       denoiseDetail: 50,
       denoiseNaturalGrain: 0,
       denoiseShadowBias: 0,
+      dustSpotMinRadiusPx: 2,
+      dustSpotOverlayEnabled: false,
+      dustSpotSensitivity: 50,
       lumaNoiseReduction: 0,
       sharpness: 0,
       ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS,
@@ -770,6 +775,9 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'denoiseDetail',
       'denoiseNaturalGrain',
       'denoiseShadowBias',
+      'dustSpotMinRadiusPx',
+      'dustSpotOverlayEnabled',
+      'dustSpotSensitivity',
       'lumaNoiseReduction',
       'sharpness',
       ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
@@ -1834,6 +1842,23 @@ export const editDocumentV2Schema = z.preprocess((value) => {
   }
   return document;
 }, editDocumentV2ObjectSchema);
+
+export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
+  if (document.migration !== undefined) {
+    context.addIssue({ code: 'custom', message: 'Current render documents must not carry migration metadata.' });
+  }
+  const extensionKeys = Object.keys(document.extensions);
+  if (extensionKeys.some((key) => key !== 'quarantinedNodes')) {
+    context.addIssue({ code: 'custom', message: 'Current render documents may only carry quarantinedNodes.' });
+  }
+  const quarantinedNodes = document.extensions['quarantinedNodes'];
+  if (
+    quarantinedNodes !== undefined &&
+    (quarantinedNodes === null || Array.isArray(quarantinedNodes) || typeof quarantinedNodes !== 'object')
+  ) {
+    context.addIssue({ code: 'custom', message: 'quarantinedNodes must be an object when present.' });
+  }
+});
 
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;

@@ -256,10 +256,17 @@ fn validate_preset_items(presets: &[PresetItem]) -> Result<(), String> {
 }
 
 fn decode_presets(content: &str) -> Result<Vec<PresetItem>, String> {
-    let presets: Vec<PresetItem> =
+    let candidates: Vec<Value> =
         serde_json::from_str(content).map_err(|error| error.to_string())?;
-    validate_preset_items(&presets)?;
-    Ok(presets)
+    Ok(candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let item = serde_json::from_value::<PresetItem>(candidate).ok()?;
+            validate_preset_items(std::slice::from_ref(&item))
+                .ok()
+                .map(|()| item)
+        })
+        .collect())
 }
 
 fn encode_presets(presets: &[PresetItem]) -> Result<String, String> {
@@ -270,6 +277,11 @@ fn encode_presets(presets: &[PresetItem]) -> Result<String, String> {
 fn read_presets_from_path(path: &Path) -> Result<Vec<PresetItem>, String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
     decode_presets(&content)
+}
+
+fn read_preset_values_from_path(path: &Path) -> Result<Vec<Value>, String> {
+    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    serde_json::from_str(&content).map_err(|error| error.to_string())
 }
 
 fn write_content_atomically(path: &Path, content: &[u8]) -> Result<(), String> {
@@ -293,8 +305,16 @@ fn write_presets_to_path(path: &Path, presets: &[PresetItem]) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn load_presets(app_handle: AppHandle) -> Result<Vec<PresetItem>, String> {
+pub fn load_presets(app_handle: AppHandle) -> Result<Vec<Value>, String> {
     let path = get_presets_path(&app_handle)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    read_preset_values_from_path(&path)
+}
+
+fn load_current_presets(app_handle: &AppHandle) -> Result<Vec<PresetItem>, String> {
+    let path = get_presets_path(app_handle)?;
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -317,7 +337,7 @@ pub fn handle_import_presets_from_file(
     let imported_preset_file: PresetFile = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse preset file: {}", e))?;
 
-    let mut current_presets = load_presets(app_handle.clone())?;
+    let mut current_presets = load_current_presets(&app_handle)?;
     let mut current_names = collect_preset_names(&current_presets);
 
     for mut imported_item in imported_preset_file.presets {
@@ -344,7 +364,7 @@ pub fn handle_import_external_presets_from_file(
 
     let converted = preset_converter::convert_xmp_to_preset(&xmp_content)?;
 
-    let mut current_presets = load_presets(app_handle.clone())?;
+    let mut current_presets = load_current_presets(&app_handle)?;
     let current_names = collect_preset_names(&current_presets);
     let mut final_preset = converted.preset;
     final_preset.name = unique_preset_name(&final_preset.name, &current_names);
@@ -394,7 +414,7 @@ pub fn handle_export_presets_to_file(
 #[tauri::command]
 pub fn save_community_preset(mut preset: Preset, app_handle: AppHandle) -> Result<(), String> {
     validate_preset(&preset)?;
-    let mut current_presets = load_presets(app_handle.clone())?;
+    let mut current_presets = load_current_presets(&app_handle)?;
     let community_folder_id = find_or_create_community_folder(&mut current_presets);
     preset.id = Uuid::new_v4().to_string();
     preset.color_style_provenance = None;
@@ -415,7 +435,10 @@ pub fn save_community_preset(mut preset: Preset, app_handle: AppHandle) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{PresetItem, extract_external_xmp, read_presets_from_path, write_presets_to_path};
+    use super::{
+        PresetItem, extract_external_xmp, read_preset_values_from_path, read_presets_from_path,
+        write_presets_to_path,
+    };
     use serde_json::json;
     use std::fs;
 
@@ -448,7 +471,7 @@ mod tests {
             r#"[{"preset":{"id":"legacy","name":"Legacy","adjustments":{"exposure":0.5}}}]"#,
         )
         .expect("flat-only fixture must write");
-        assert!(read_presets_from_path(&path).is_err());
+        assert!(read_presets_from_path(&path).unwrap().is_empty());
 
         let mut provenance_leak =
             serde_json::to_value(reopened).expect("serialized current preset");
@@ -481,6 +504,42 @@ mod tests {
             "schemaVersion": 2
         });
         assert!(write_presets_to_path(&path, &[PresetItem::Preset(disallowed)]).is_err());
+    }
+
+    #[test]
+    fn mixed_current_and_obsolete_presets_load_current_without_rewriting_source_bytes() {
+        let mut current = crate::preset_converter::convert_xmp_to_preset(
+            r#"<rdf:Description crs:Name="Current" crs:Exposure2012="0.5" />"#,
+        )
+        .expect("current preset")
+        .preset;
+        current.id = "current".to_string();
+        let obsolete = json!({
+            "preset": {
+                "id": "obsolete",
+                "name": "Alaska Proof Look",
+                "adjustments": { "exposure": 0.75 }
+            }
+        });
+        let source = serde_json::to_vec_pretty(&json!([
+            serde_json::to_value(PresetItem::Preset(current)).expect("serialize current preset"),
+            obsolete
+        ]))
+        .expect("mixed preset source");
+        let directory = tempfile::tempdir().expect("temporary preset directory");
+        let path = directory.path().join("presets.json");
+        fs::write(&path, &source).expect("write mixed presets");
+
+        let boundary_values = read_preset_values_from_path(&path).expect("raw quarantine boundary");
+        let current_items = read_presets_from_path(&path).expect("skip obsolete preset");
+
+        assert_eq!(boundary_values.len(), 2);
+        assert_eq!(current_items.len(), 1);
+        let PresetItem::Preset(loaded) = &current_items[0] else {
+            panic!("expected current preset");
+        };
+        assert_eq!(loaded.id, "current");
+        assert_eq!(fs::read(&path).expect("source bytes remain"), source);
     }
 
     #[test]

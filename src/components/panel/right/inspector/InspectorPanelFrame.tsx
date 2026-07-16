@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { CircleAlert, ImageOff, LoaderCircle, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CircleAlert, ImageOff, LoaderCircle, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { TextVariants } from '../../../../types/typography';
@@ -13,7 +13,7 @@ export interface InspectorPanelStatus {
 }
 
 export interface InspectorPanelNotice {
-  kind: 'empty' | 'error' | 'loading';
+  kind: 'empty' | 'error' | 'loading' | 'warning';
   label: string;
 }
 
@@ -32,6 +32,7 @@ const noticePresentation: Record<InspectorPanelNotice['kind'], { icon: LucideIco
   empty: { icon: ImageOff, toneClassName: 'text-text-secondary' },
   error: { icon: CircleAlert, toneClassName: 'text-editor-danger' },
   loading: { icon: LoaderCircle, toneClassName: 'text-editor-info' },
+  warning: { icon: AlertTriangle, toneClassName: 'text-editor-warning' },
 };
 
 const statusDotClassName: Record<EditorChromeStatus, string> = {

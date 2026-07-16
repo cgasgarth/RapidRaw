@@ -130,6 +130,48 @@ struct SmartPreviewRequest {
     source_revision: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SmartPreviewStorageReceipt {
+    artifact_count: usize,
+    retained_bytes: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SmartPreviewGeneratedPayload {
+    path: String,
+    generation: u64,
+    source_revision: String,
+    resource: ThumbnailResourceDescriptor,
+    smart_preview: ThumbnailSmartPreviewPayload,
+    state: &'static str,
+    storage: SmartPreviewStorageReceipt,
+}
+
+fn smart_preview_generated_payload(
+    path: String,
+    generation: u64,
+    source_revision: String,
+    resource: ThumbnailResourceDescriptor,
+    smart_preview: ThumbnailSmartPreviewPayload,
+    artifact_count: usize,
+    retained_bytes: u64,
+) -> SmartPreviewGeneratedPayload {
+    SmartPreviewGeneratedPayload {
+        path,
+        generation,
+        source_revision,
+        resource,
+        smart_preview,
+        state: "current",
+        storage: SmartPreviewStorageReceipt {
+            artifact_count,
+            retained_bytes,
+        },
+    }
+}
+
 fn generate_smart_preview_data(
     path_str: &str,
     gpu_context: Option<&GpuContext>,
@@ -1729,15 +1771,15 @@ pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
                 resource.generation = next_descriptor_generation();
                 let _ = smart_app.emit(
                     "smart-preview-generated",
-                    serde_json::json!({
-                        "path": job.path,
-                        "generation": job.generation,
-                        "sourceRevision": job.source_revision,
-                        "resource": resource,
-                        "smartPreview": payload,
-                        "state": "current",
-                        "storage": { "artifactCount": artifact_count, "retainedBytes": retained_bytes }
-                    }),
+                    smart_preview_generated_payload(
+                        job.path.to_string(),
+                        job.generation,
+                        job.source_revision.clone(),
+                        resource,
+                        payload,
+                        artifact_count,
+                        retained_bytes,
+                    ),
                 );
             } else {
                 let state = if job.cancellation.is_cancelled() {
@@ -4536,6 +4578,69 @@ mod tests {
             edit_document_v2: Some(document),
             ..ImageMetadata::default()
         }
+    }
+
+    #[test]
+    fn smart_preview_completion_serializes_the_exact_storage_contract() {
+        let payload = smart_preview_generated_payload(
+            "/fixtures/image.raw".into(),
+            7,
+            "source-revision-7".into(),
+            ThumbnailResourceDescriptor {
+                resource_id: "a".repeat(64),
+                revision: "b".repeat(64),
+                mime_type: "image/jpeg".into(),
+                width: 2560,
+                height: 1707,
+                byte_len: 4096,
+                generation: 9,
+                source: ThumbnailResourceSource::SmartPreview,
+            },
+            ThumbnailSmartPreviewPayload {
+                color_profile: "srgb".into(),
+                height: 1707,
+                source: "rendered".into(),
+                source_available: true,
+                source_revision: "source-revision-7".into(),
+                stale: false,
+                width: 2560,
+            },
+            12,
+            8192,
+        );
+
+        assert_eq!(
+            serde_json::to_value(payload).expect("serialize smart preview completion"),
+            serde_json::json!({
+                "path": "/fixtures/image.raw",
+                "generation": 7,
+                "sourceRevision": "source-revision-7",
+                "resource": {
+                    "resourceId": "a".repeat(64),
+                    "revision": "b".repeat(64),
+                    "mimeType": "image/jpeg",
+                    "width": 2560,
+                    "height": 1707,
+                    "byteLen": 4096,
+                    "generation": 9,
+                    "source": "smartPreview",
+                },
+                "smartPreview": {
+                    "colorProfile": "srgb",
+                    "height": 1707,
+                    "source": "rendered",
+                    "sourceAvailable": true,
+                    "sourceRevision": "source-revision-7",
+                    "stale": false,
+                    "width": 2560,
+                },
+                "state": "current",
+                "storage": {
+                    "artifactCount": 12,
+                    "retainedBytes": 8192,
+                },
+            })
+        );
     }
 
     #[test]

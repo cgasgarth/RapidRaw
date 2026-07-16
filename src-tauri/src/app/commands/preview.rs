@@ -52,10 +52,10 @@ pub(crate) async fn apply_adjustments(
         .preview_session()
         .validate_active_source(&request.expected_image_path)
         .map_err(|error| error.to_string())?;
-    let render_adjustments = request.edit_document_v2.into_render_adjustments()?;
+    let edit_document = request.edit_document_v2.compile()?;
     let (tx, rx) = tokio::sync::oneshot::channel();
     let job = PreviewJob {
-        adjustments: Arc::new(render_adjustments),
+        edit_document: Arc::new(edit_document),
         expected_image_path: request.expected_image_path,
         is_interactive: request.is_interactive,
         preview_operation_identity: Box::new(request.preview_operation_identity),

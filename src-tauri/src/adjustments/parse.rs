@@ -13,34 +13,64 @@ use crate::color::view_transform::{
 use crate::color::white_balance::compile_current_technical_white_balance;
 use crate::image_processing::calculate_agx_matrices;
 use crate::mask_generation::MaskDefinition;
+use crate::render::film_emulation::FilmEmulationParams;
 use crate::render::film_emulation::parse_node as parse_film_node;
 #[cfg(test)]
 use serde::Deserialize;
 
 type JsonValue = serde_json::Value;
 
-fn section_is_visible(value: &JsonValue, section: &str) -> bool {
-    if section == "effects"
-        && let Some(enabled) = value.get("effectsEnabled").and_then(JsonValue::as_bool)
-    {
-        return enabled;
+static JSON_NULL: JsonValue = JsonValue::Null;
+
+pub(crate) trait CurrentAdjustmentSource {
+    fn value(&self, key: &str) -> Option<&JsonValue>;
+
+    fn section_enabled(&self, section: &str) -> bool {
+        if section == "effects"
+            && let Some(enabled) = self.value("effectsEnabled").and_then(JsonValue::as_bool)
+        {
+            return enabled;
+        }
+        self.value("sectionVisibility")
+            .and_then(|value| value.get(section))
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(true)
     }
-    value
-        .get("sectionVisibility")
-        .and_then(|v| v.get(section))
-        .and_then(|s| s.as_bool())
-        .unwrap_or(true)
+
+    fn film_parameters(&self) -> Result<Option<FilmEmulationParams>, &'static str>;
+
+    fn value_or_null(&self, key: &str) -> &JsonValue {
+        self.value(key).unwrap_or(&JSON_NULL)
+    }
+}
+
+impl CurrentAdjustmentSource for JsonValue {
+    fn value(&self, key: &str) -> Option<&JsonValue> {
+        self.get(key)
+    }
+
+    fn film_parameters(&self) -> Result<Option<FilmEmulationParams>, &'static str> {
+        parse_film_node(self)
+    }
+}
+
+fn section_is_visible(value: &impl CurrentAdjustmentSource, section: &str) -> bool {
+    value.section_enabled(section)
 }
 
 fn scaled_section_value(
-    value: &JsonValue,
+    value: &impl CurrentAdjustmentSource,
     section: &str,
     key: &str,
     scale: f32,
     default: Option<f64>,
 ) -> f32 {
     if section_is_visible(value, section) {
-        value[key].as_f64().unwrap_or(default.unwrap_or(0.0)) as f32 / scale
+        value
+            .value(key)
+            .and_then(JsonValue::as_f64)
+            .unwrap_or(default.unwrap_or(0.0)) as f32
+            / scale
     } else if let Some(default) = default {
         default as f32 / scale
     } else {
@@ -48,11 +78,11 @@ fn scaled_section_value(
     }
 }
 
-fn technical_white_balance_from_json(value: &JsonValue) -> GpuMat3 {
+fn technical_white_balance_from_source(value: &impl CurrentAdjustmentSource) -> GpuMat3 {
     if !section_is_visible(value, "color") {
         return GpuMat3::default();
     }
-    let Some(settings) = value.get("whiteBalanceTechnical") else {
+    let Some(settings) = value.value("whiteBalanceTechnical") else {
         return GpuMat3::default();
     };
     let Ok(plan) = compile_current_technical_white_balance(settings) else {
@@ -254,8 +284,8 @@ fn convert_points_to_aligned(frontend_points: Vec<JsonValue>) -> [Point; 16] {
     aligned_points
 }
 
-fn parse_tone_equalizer(value: &JsonValue) -> ToneEqualizerGpuSettings {
-    let tone = value.get("toneEqualizer").cloned().unwrap_or_default();
+fn parse_tone_equalizer(value: &impl CurrentAdjustmentSource) -> ToneEqualizerGpuSettings {
+    let tone = value.value("toneEqualizer").cloned().unwrap_or_default();
     let bounded = |key: &str, default: f32, minimum: f32, maximum: f32| {
         (tone
             .get(key)
@@ -311,12 +341,12 @@ fn parse_tone_equalizer(value: &JsonValue) -> ToneEqualizerGpuSettings {
     }
 }
 
-fn parse_point_color(value: &JsonValue) -> PointColorGpuSettings {
+fn parse_point_color(value: &impl CurrentAdjustmentSource) -> PointColorGpuSettings {
     if !section_is_visible(value, "color") {
         return PointColorGpuSettings::default();
     }
     let Some(plan) = value
-        .get("pointColor")
+        .value("pointColor")
         .filter(|plan| plan["enabled"].as_bool() == Some(true))
     else {
         return PointColorGpuSettings::default();
@@ -409,11 +439,14 @@ fn parse_point_color(value: &JsonValue) -> PointColorGpuSettings {
     output
 }
 
-fn parse_perceptual_grading(value: &JsonValue, graph_v2: bool) -> PerceptualGradingGpuSettings {
+fn parse_perceptual_grading(
+    value: &impl CurrentAdjustmentSource,
+    graph_v2: bool,
+) -> PerceptualGradingGpuSettings {
     if !graph_v2 || !section_is_visible(value, "color") {
         return PerceptualGradingGpuSettings::default();
     }
-    let Some(settings) = value.get("perceptualGradingV1") else {
+    let Some(settings) = value.value("perceptualGradingV1") else {
         return PerceptualGradingGpuSettings::default();
     };
     let Ok(settings) = serde_json::from_value::<PerceptualGradingSettingsV1>(settings.clone())
@@ -431,7 +464,7 @@ fn parse_perceptual_grading(value: &JsonValue, graph_v2: bool) -> PerceptualGrad
 }
 
 fn curve_points(
-    value: &JsonValue,
+    value: &impl CurrentAdjustmentSource,
     curves: &JsonValue,
     name: &str,
     default_curve: &JsonValue,
@@ -448,41 +481,29 @@ fn curve_points(
     }
 }
 
-fn get_global_adjustments_from_json(
-    js_adjustments: &JsonValue,
+pub(crate) fn compile_global_adjustments(
+    source: &impl CurrentAdjustmentSource,
     is_raw: bool,
     tonemapper_override: Option<u32>,
 ) -> GlobalAdjustments {
     let default_curve = serde_json::json!([{"x": 0.0, "y": 0.0}, {"x": 255.0, "y": 255.0}]);
-    let curves_obj = js_adjustments.get("curves").cloned().unwrap_or_default();
-    let luma_points = curve_points(js_adjustments, &curves_obj, "luma", &default_curve);
-    let red_points = curve_points(js_adjustments, &curves_obj, "red", &default_curve);
-    let green_points = curve_points(js_adjustments, &curves_obj, "green", &default_curve);
-    let blue_points = curve_points(js_adjustments, &curves_obj, "blue", &default_curve);
+    let curves_obj = source.value("curves").cloned().unwrap_or_default();
+    let luma_points = curve_points(source, &curves_obj, "luma", &default_curve);
+    let red_points = curve_points(source, &curves_obj, "red", &default_curve);
+    let green_points = curve_points(source, &curves_obj, "green", &default_curve);
+    let blue_points = curve_points(source, &curves_obj, "blue", &default_curve);
 
-    let cg_obj = js_adjustments
-        .get("colorGrading")
+    let cg_obj = source.value("colorGrading").cloned().unwrap_or_default();
+    let cal_obj = source
+        .value("colorCalibration")
         .cloned()
         .unwrap_or_default();
-    let cal_obj = js_adjustments
-        .get("colorCalibration")
-        .cloned()
-        .unwrap_or_default();
-    let channel_mixer_obj = js_adjustments
-        .get("channelMixer")
-        .cloned()
-        .unwrap_or_default();
-    let black_white_mixer_obj = js_adjustments
-        .get("blackWhiteMixer")
-        .cloned()
-        .unwrap_or_default();
-    let color_balance_obj = js_adjustments
-        .get("colorBalanceRgb")
-        .cloned()
-        .unwrap_or_default();
-    let levels_obj = js_adjustments.get("levels").cloned().unwrap_or_default();
+    let channel_mixer_obj = source.value("channelMixer").cloned().unwrap_or_default();
+    let black_white_mixer_obj = source.value("blackWhiteMixer").cloned().unwrap_or_default();
+    let color_balance_obj = source.value("colorBalanceRgb").cloned().unwrap_or_default();
+    let levels_obj = source.value("levels").cloned().unwrap_or_default();
 
-    let color_cal_settings = if section_is_visible(js_adjustments, "color") {
+    let color_cal_settings = if section_is_visible(source, "color") {
         ColorCalibrationSettings {
             shadows_tint: cal_obj["shadowsTint"].as_f64().unwrap_or(0.0) as f32
                 / SCALES.color_calibration_hue,
@@ -504,10 +525,13 @@ fn get_global_adjustments_from_json(
         ColorCalibrationSettings::default()
     };
 
-    let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
+    let tone_mapper = source
+        .value_or_null("toneMapper")
+        .as_str()
+        .unwrap_or("basic");
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
     let mut rapid_view_settings = ViewTransformSettingsV1::default();
-    if let Some(view) = js_adjustments.get("viewTransform") {
+    if let Some(view) = source.value("viewTransform") {
         let number = |key: &str, fallback: f64| view[key].as_f64().unwrap_or(fallback);
         rapid_view_settings.middle_grey = number("middleGrey", rapid_view_settings.middle_grey);
         rapid_view_settings.source_black_ev =
@@ -527,147 +551,126 @@ fn get_global_adjustments_from_json(
             .expect("built-in Rapid View settings must compile")
     });
     let rapid_view_parameters = rapid_view.gpu_parameters();
-    let (has_lut, lut_intensity) = if section_is_visible(js_adjustments, "effects") {
+    let (has_lut, lut_intensity) = if section_is_visible(source, "effects") {
         (
-            u32::from(js_adjustments["lutPath"].is_string()),
-            js_adjustments["lutIntensity"].as_f64().unwrap_or(100.0) as f32 / 100.0,
+            u32::from(source.value_or_null("lutPath").is_string()),
+            source
+                .value_or_null("lutIntensity")
+                .as_f64()
+                .unwrap_or(100.0) as f32
+                / 100.0,
         )
     } else {
         (0, 1.0)
     };
 
-    let film_params = parse_film_node(js_adjustments).ok().flatten();
+    let film_params = source.film_parameters().ok().flatten();
     let mut global = GlobalAdjustments {
-        exposure: scaled_section_value(js_adjustments, "basic", "exposure", SCALES.exposure, None),
-        brightness: scaled_section_value(
-            js_adjustments,
-            "basic",
-            "brightness",
-            SCALES.brightness,
-            None,
-        ),
-        contrast: scaled_section_value(js_adjustments, "basic", "contrast", SCALES.contrast, None),
-        highlights: scaled_section_value(
-            js_adjustments,
-            "basic",
-            "highlights",
-            SCALES.highlights,
-            None,
-        ),
-        shadows: scaled_section_value(js_adjustments, "basic", "shadows", SCALES.shadows, None),
-        whites: scaled_section_value(js_adjustments, "basic", "whites", SCALES.whites, None),
-        blacks: scaled_section_value(js_adjustments, "basic", "blacks", SCALES.blacks, None),
-        saturation: scaled_section_value(
-            js_adjustments,
-            "color",
-            "saturation",
-            SCALES.saturation,
-            None,
-        ),
+        exposure: scaled_section_value(source, "basic", "exposure", SCALES.exposure, None),
+        brightness: scaled_section_value(source, "basic", "brightness", SCALES.brightness, None),
+        contrast: scaled_section_value(source, "basic", "contrast", SCALES.contrast, None),
+        highlights: scaled_section_value(source, "basic", "highlights", SCALES.highlights, None),
+        shadows: scaled_section_value(source, "basic", "shadows", SCALES.shadows, None),
+        whites: scaled_section_value(source, "basic", "whites", SCALES.whites, None),
+        blacks: scaled_section_value(source, "basic", "blacks", SCALES.blacks, None),
+        saturation: scaled_section_value(source, "color", "saturation", SCALES.saturation, None),
         temperature: 0.0,
         tint: 0.0,
-        vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
-        hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
+        vibrance: scaled_section_value(source, "color", "vibrance", SCALES.vibrance, None),
+        hue: scaled_section_value(source, "color", "hue", 1.0, None),
         edit_graph_version: 0.0,
         dehaze_atmosphere_r: 0.0,
         dehaze_atmosphere_g: 0.0,
         dehaze_atmosphere_b: 0.0,
-        technical_white_balance: technical_white_balance_from_json(js_adjustments),
-        sharpness: scaled_section_value(
-            js_adjustments,
-            "details",
-            "sharpness",
-            SCALES.sharpness,
-            None,
-        ),
+        technical_white_balance: technical_white_balance_from_source(source),
+        sharpness: scaled_section_value(source, "details", "sharpness", SCALES.sharpness, None),
         luma_noise_reduction: scaled_section_value(
-            js_adjustments,
+            source,
             "details",
             "lumaNoiseReduction",
             SCALES.luma_noise_reduction,
             None,
         ),
         color_noise_reduction: scaled_section_value(
-            js_adjustments,
+            source,
             "details",
             "colorNoiseReduction",
             SCALES.color_noise_reduction,
             None,
         ),
-        clarity: scaled_section_value(js_adjustments, "details", "clarity", SCALES.clarity, None),
-        dehaze: scaled_section_value(js_adjustments, "details", "dehaze", SCALES.dehaze, None),
-        structure: scaled_section_value(
-            js_adjustments,
-            "details",
-            "structure",
-            SCALES.structure,
-            None,
-        ),
-        centré: scaled_section_value(js_adjustments, "details", "centré", SCALES.centré, None),
+        clarity: scaled_section_value(source, "details", "clarity", SCALES.clarity, None),
+        dehaze: scaled_section_value(source, "details", "dehaze", SCALES.dehaze, None),
+        structure: scaled_section_value(source, "details", "structure", SCALES.structure, None),
+        centré: scaled_section_value(source, "details", "centré", SCALES.centré, None),
         vignette_amount: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "vignetteAmount",
             SCALES.vignette_amount,
             None,
         ),
         vignette_midpoint: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "vignetteMidpoint",
             SCALES.vignette_midpoint,
             Some(50.0),
         ),
         vignette_roundness: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "vignetteRoundness",
             SCALES.vignette_roundness,
             Some(0.0),
         ),
         vignette_feather: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "vignetteFeather",
             SCALES.vignette_feather,
             Some(50.0),
         ),
         grain_amount: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "grainAmount",
             SCALES.grain_amount,
             None,
         ),
         grain_size: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "grainSize",
             SCALES.grain_size,
             Some(25.0),
         ),
         grain_roughness: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "grainRoughness",
             SCALES.grain_roughness,
             Some(50.0),
         ),
         chromatic_aberration_red_cyan: scaled_section_value(
-            js_adjustments,
+            source,
             "details",
             "chromaticAberrationRedCyan",
             SCALES.chromatic_aberration,
             None,
         ),
         chromatic_aberration_blue_yellow: scaled_section_value(
-            js_adjustments,
+            source,
             "details",
             "chromaticAberrationBlueYellow",
             SCALES.chromatic_aberration,
             None,
         ),
-        show_clipping: u32::from(js_adjustments["showClipping"].as_bool().unwrap_or(false)),
+        show_clipping: u32::from(
+            source
+                .value("showClipping")
+                .and_then(JsonValue::as_bool)
+                .unwrap_or(false),
+        ),
         is_raw_image: u32::from(is_raw),
         dehaze_atmosphere_confidence: 0.0,
         has_lut,
@@ -696,32 +699,32 @@ fn get_global_adjustments_from_json(
         _pad_cg2: film_params.map_or(0.0, |params| params.shaper_p),
         _pad_cg3: f32::from(film_params.is_some_and(|params| params.enabled)),
         _pad_cg4: 0.0,
-        color_grading_shadows: if section_is_visible(js_adjustments, "color") {
+        color_grading_shadows: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["shadows"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_midtones: if section_is_visible(js_adjustments, "color") {
+        color_grading_midtones: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["midtones"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_highlights: if section_is_visible(js_adjustments, "color") {
+        color_grading_highlights: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["highlights"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_global: if section_is_visible(js_adjustments, "color") {
+        color_grading_global: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["global"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_blending: if section_is_visible(js_adjustments, "color") {
+        color_grading_blending: if section_is_visible(source, "color") {
             cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending
         } else {
             0.5
         },
-        color_grading_balance: if section_is_visible(js_adjustments, "color") {
+        color_grading_balance: if section_is_visible(source, "color") {
             cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance
         } else {
             0.0
@@ -729,35 +732,35 @@ fn get_global_adjustments_from_json(
         _pad2: 0.0,
         _pad3: 0.0,
         color_calibration: color_cal_settings,
-        color_balance_rgb: if section_is_visible(js_adjustments, "color") {
+        color_balance_rgb: if section_is_visible(source, "color") {
             parse_color_balance_rgb_settings(&color_balance_obj)
         } else {
             ColorBalanceRgbSettings::default()
         },
-        channel_mixer: if section_is_visible(js_adjustments, "color") {
+        channel_mixer: if section_is_visible(source, "color") {
             parse_channel_mixer_settings(&channel_mixer_obj)
         } else {
             ChannelMixerSettings::default()
         },
-        black_white_mixer: if section_is_visible(js_adjustments, "color") {
+        black_white_mixer: if section_is_visible(source, "color") {
             parse_black_white_mixer_settings(&black_white_mixer_obj)
         } else {
             BlackWhiteMixerSettings::default()
         },
-        levels: if section_is_visible(js_adjustments, "color") {
+        levels: if section_is_visible(source, "color") {
             parse_levels_settings(&levels_obj)
         } else {
             LevelsSettings::default()
         },
-        hsl: if section_is_visible(js_adjustments, "color") {
-            parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default())
+        hsl: if section_is_visible(source, "color") {
+            parse_hsl_adjustments(&source.value("hsl").cloned().unwrap_or_default())
         } else {
             [HslColor::default(); 8]
         },
-        skin_tone_uniformity: if section_is_visible(js_adjustments, "color") {
+        skin_tone_uniformity: if section_is_visible(source, "color") {
             parse_skin_tone_uniformity(
-                &js_adjustments
-                    .get("skinToneUniformity")
+                &source
+                    .value("skinToneUniformity")
                     .cloned()
                     .unwrap_or_default(),
             )
@@ -776,39 +779,28 @@ fn get_global_adjustments_from_json(
         _pad_end2: 0.0,
         _pad_end3: 0.0,
         _pad_end4: 0.0,
-        glow_amount: scaled_section_value(
-            js_adjustments,
-            "effects",
-            "glowAmount",
-            SCALES.glow,
-            None,
-        ),
+        glow_amount: scaled_section_value(source, "effects", "glowAmount", SCALES.glow, None),
         halation_amount: scaled_section_value(
-            js_adjustments,
+            source,
             "effects",
             "halationAmount",
             SCALES.halation,
             None,
         ),
-        flare_amount: scaled_section_value(
-            js_adjustments,
-            "effects",
-            "flareAmount",
-            SCALES.flares,
-            None,
-        ),
+        flare_amount: scaled_section_value(source, "effects", "flareAmount", SCALES.flares, None),
         sharpness_threshold: scaled_section_value(
-            js_adjustments,
+            source,
             "details",
             "sharpnessThreshold",
             SCALES.sharpness_threshold,
             Some(15.0),
         ),
-        tone_equalizer: parse_tone_equalizer(js_adjustments),
-        point_color: parse_point_color(js_adjustments),
+        tone_equalizer: parse_tone_equalizer(source),
+        point_color: parse_point_color(source),
         perceptual_grading: parse_perceptual_grading(
-            js_adjustments,
-            js_adjustments["rawEngineEditGraphVersion"]
+            source,
+            source
+                .value_or_null("rawEngineEditGraphVersion")
                 .as_u64()
                 .unwrap_or(1)
                 >= 2,
@@ -827,7 +819,11 @@ fn get_global_adjustments_from_json(
     global
 }
 
-fn mask_curve_points(value: &JsonValue, curves: &JsonValue, name: &str) -> Vec<JsonValue> {
+fn mask_curve_points(
+    value: &impl CurrentAdjustmentSource,
+    curves: &JsonValue,
+    name: &str,
+) -> Vec<JsonValue> {
     if section_is_visible(value, "curves") {
         curves[name].as_array().cloned().unwrap_or_default()
     } else {
@@ -843,24 +839,20 @@ fn blend_mode_to_runtime_id(blend_mode: &str) -> f32 {
     }
 }
 
-fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdjustments {
-    if adj.is_null() {
-        return MaskAdjustments {
-            blend_mode: blend_mode_to_runtime_id(blend_mode),
-            ..Default::default()
-        };
-    }
-
+pub(crate) fn compile_mask_adjustments(
+    source: &impl CurrentAdjustmentSource,
+    blend_mode: &str,
+) -> MaskAdjustments {
     let get_val = |section: &str, key: &str, scale: f32| -> f32 {
-        scaled_section_value(adj, section, key, scale, None)
+        scaled_section_value(source, section, key, scale, None)
     };
 
-    let curves_obj = adj.get("curves").cloned().unwrap_or_default();
-    let luma_points = mask_curve_points(adj, &curves_obj, "luma");
-    let red_points = mask_curve_points(adj, &curves_obj, "red");
-    let green_points = mask_curve_points(adj, &curves_obj, "green");
-    let blue_points = mask_curve_points(adj, &curves_obj, "blue");
-    let cg_obj = adj.get("colorGrading").cloned().unwrap_or_default();
+    let curves_obj = source.value("curves").cloned().unwrap_or_default();
+    let luma_points = mask_curve_points(source, &curves_obj, "luma");
+    let red_points = mask_curve_points(source, &curves_obj, "red");
+    let green_points = mask_curve_points(source, &curves_obj, "green");
+    let blue_points = mask_curve_points(source, &curves_obj, "blue");
+    let cg_obj = source.value("colorGrading").cloned().unwrap_or_default();
 
     let mut mask = MaskAdjustments {
         exposure: get_val("basic", "exposure", SCALES.exposure),
@@ -891,40 +883,40 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         hue: get_val("color", "hue", 1.0),
         blend_mode: blend_mode_to_runtime_id(blend_mode),
         _pad_cg2: 0.0,
-        color_grading_shadows: if section_is_visible(adj, "color") {
+        color_grading_shadows: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["shadows"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_midtones: if section_is_visible(adj, "color") {
+        color_grading_midtones: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["midtones"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_highlights: if section_is_visible(adj, "color") {
+        color_grading_highlights: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["highlights"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_global: if section_is_visible(adj, "color") {
+        color_grading_global: if section_is_visible(source, "color") {
             parse_color_grade_settings(&cg_obj["global"])
         } else {
             ColorGradeSettings::default()
         },
-        color_grading_blending: if section_is_visible(adj, "color") {
+        color_grading_blending: if section_is_visible(source, "color") {
             cg_obj["blending"].as_f64().unwrap_or(50.0) as f32 / SCALES.color_grading_blending
         } else {
             0.5
         },
-        color_grading_balance: if section_is_visible(adj, "color") {
+        color_grading_balance: if section_is_visible(source, "color") {
             cg_obj["balance"].as_f64().unwrap_or(0.0) as f32 / SCALES.color_grading_balance
         } else {
             0.0
         },
         _pad5: 0.0,
         _pad6: 0.0,
-        hsl: if section_is_visible(adj, "color") {
-            parse_hsl_adjustments(&adj.get("hsl").cloned().unwrap_or_default())
+        hsl: if section_is_visible(source, "color") {
+            parse_hsl_adjustments(&source.value("hsl").cloned().unwrap_or_default())
         } else {
             [HslColor::default(); 8]
         },
@@ -940,9 +932,9 @@ fn get_mask_adjustments_from_json(adj: &JsonValue, blend_mode: &str) -> MaskAdju
         _pad_end5: 0.0,
         _pad_end6: 0.0,
         _pad_end7: 0.0,
-        tone_equalizer: parse_tone_equalizer(adj),
-        point_color: parse_point_color(adj),
-        perceptual_grading: parse_perceptual_grading(adj, true),
+        tone_equalizer: parse_tone_equalizer(source),
+        point_color: parse_point_color(source),
+        perceptual_grading: parse_perceptual_grading(source, true),
     };
     if mask.perceptual_grading.policy[3] > 0.5 {
         mask.color_grading_shadows = ColorGradeSettings::default();
@@ -977,18 +969,23 @@ pub fn get_all_adjustments_from_json_with_masks(
     tonemapper_override: Option<u32>,
     mask_definitions: &[MaskDefinition],
 ) -> AllAdjustments {
-    let global = get_global_adjustments_from_json(js_adjustments, is_raw, tonemapper_override);
+    let global = compile_global_adjustments(js_adjustments, is_raw, tonemapper_override);
+    let masks = mask_definitions
+        .iter()
+        .filter(|mask| mask.visible)
+        .take(MAX_MASKS)
+        .map(|mask| compile_mask_adjustments(&mask.adjustments, &mask.blend_mode));
+    assemble_all_adjustments(global, masks)
+}
+
+pub(crate) fn assemble_all_adjustments(
+    global: GlobalAdjustments,
+    masks: impl IntoIterator<Item = MaskAdjustments>,
+) -> AllAdjustments {
     let mut mask_adjustments = [MaskAdjustments::default(); MAX_MASKS];
     let mut mask_count = 0;
-
-    for (i, mask_def) in mask_definitions
-        .iter()
-        .filter(|m| m.visible)
-        .enumerate()
-        .take(MAX_MASKS)
-    {
-        mask_adjustments[i] =
-            get_mask_adjustments_from_json(&mask_def.adjustments, &mask_def.blend_mode);
+    for (i, mask) in masks.into_iter().enumerate().take(MAX_MASKS) {
+        mask_adjustments[i] = mask;
         mask_count += 1;
     }
 

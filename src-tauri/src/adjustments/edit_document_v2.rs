@@ -3,6 +3,14 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::adjustments::abi::{
+    AllAdjustments, BlackWhiteMixerSettings, ChannelMixerRow, ChannelMixerSettings,
+    ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
+    HslColor, LevelsSettings, MAX_POINT_COLOR_POINTS, MaskAdjustments, PointColorGpuPoint,
+    PointColorGpuSettings, SkinToneUniformitySettings, ToneEqualizerGpuSettings,
+};
+use crate::adjustments::parse::assemble_all_adjustments;
+use crate::adjustments::scales::SCALES;
 use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradingSettingsV1};
 use crate::color::view_transform::{
     ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
@@ -10,13 +18,13 @@ use crate::color::view_transform::{
 use crate::geometry::perspective::{
     PERSPECTIVE_IMPLEMENTATION_VERSION_V1, PerspectiveCorrectionSettingsV1,
 };
+use crate::image_processing::calculate_agx_matrices;
 use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
 use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
 const EDIT_DOCUMENT_V2_SCHEMA_VERSION: u8 = 2;
-const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum EditNodeTypeV2 {
     SourceDecode,
@@ -110,15 +118,15 @@ enum RawProcessingModeV1 {
     Maximum,
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SourceDecodeV2 {
     raw_processing_mode_override: Option<RawProcessingModeV1>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EditNodeEnvelopeV2 {
+struct UntypedEditNodeEnvelopeV2 {
     enabled: bool,
     implementation_version: u32,
     params: Map<String, Value>,
@@ -127,7 +135,63 @@ struct EditNodeEnvelopeV2 {
     node_type: EditNodeTypeV2,
 }
 
-#[derive(Debug, Deserialize)]
+/// Exact current wire envelope. Serde owns parameter decoding, so render code
+/// never receives a string-keyed parameter bag for a current node.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EditNodeEnvelopeV2<P> {
+    enabled: bool,
+    implementation_version: u32,
+    params: P,
+    process: String,
+    #[serde(rename = "type")]
+    node_type: EditNodeTypeV2,
+}
+
+impl<P> EditNodeEnvelopeV2<P> {
+    fn validate_contract(&self, expected: EditNodeTypeV2) -> Result<(), String> {
+        let (node_name, process, implementation_version) = expected.contract();
+        if self.node_type != expected {
+            return Err(format!(
+                "EditDocumentV2 node envelope type must match '{node_name}'"
+            ));
+        }
+        if self.process != process {
+            return Err(format!(
+                "EditDocumentV2 node '{node_name}' has incompatible process '{}'",
+                self.process
+            ));
+        }
+        if self.implementation_version != implementation_version {
+            return Err(format!(
+                "EditDocumentV2 node '{node_name}' has unsupported implementationVersion {}",
+                self.implementation_version
+            ));
+        }
+        if expected == EditNodeTypeV2::SourceDecode && !self.enabled {
+            return Err("EditDocumentV2 node 'source_decode' cannot be disabled".to_string());
+        }
+        Ok(())
+    }
+
+    fn fingerprint(&self) -> u64
+    where
+        P: Serialize,
+    {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"rapidraw.edit_node.v2\0");
+        hasher.update(self.node_type.contract().0.as_bytes());
+        hasher.update(&self.implementation_version.to_le_bytes());
+        hasher.update(self.process.as_bytes());
+        hasher.update(&[u8::from(self.enabled)]);
+        hasher.update(
+            &serde_json::to_vec(&self.params).expect("typed current node params serialize"),
+        );
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneGlobalColorToneParamsV2 {
     blacks: f64,
@@ -135,17 +199,11 @@ struct SceneGlobalColorToneParamsV2 {
     contrast: f64,
     exposure: f64,
     highlights: f64,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    hue: Option<f64>,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    saturation: Option<f64>,
     shadows: f64,
-    // Optional only for V2 documents persisted before the Color Presence node.
-    vibrance: Option<f64>,
     whites: f64,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum ToneMapperV2 {
     Agx,
@@ -153,7 +211,7 @@ enum ToneMapperV2 {
     RapidView,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ViewTransformControlsV2 {
     chroma_compression: f64,
@@ -166,7 +224,7 @@ struct ViewTransformControlsV2 {
     toe: f64,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneToViewTransformV2 {
     tone_mapper: ToneMapperV2,
@@ -200,22 +258,13 @@ impl SceneGlobalColorToneParamsV2 {
         validate_scene_tone_parameter("contrast", self.contrast, -100.0, 100.0)?;
         validate_scene_tone_parameter("exposure", self.exposure, -5.0, 5.0)?;
         validate_scene_tone_parameter("highlights", self.highlights, -100.0, 100.0)?;
-        if let Some(hue) = self.hue {
-            validate_scene_tone_parameter("hue", hue, -180.0, 180.0)?;
-        }
-        if let Some(saturation) = self.saturation {
-            validate_scene_tone_parameter("saturation", saturation, -100.0, 100.0)?;
-        }
         validate_scene_tone_parameter("shadows", self.shadows, -100.0, 100.0)?;
-        if let Some(vibrance) = self.vibrance {
-            validate_scene_tone_parameter("vibrance", vibrance, -100.0, 100.0)?;
-        }
         validate_scene_tone_parameter("whites", self.whites, -100.0, 100.0)?;
         Ok(())
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ColorPresenceParamsV2 {
     hue: f64,
@@ -251,7 +300,7 @@ enum GeometryCropUnitV2 {
     Normalized,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GeometryCropV2 {
     height: f64,
@@ -284,7 +333,7 @@ impl GeometryCropV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GeometryV2 {
     aspect_ratio: Option<f64>,
@@ -292,29 +341,16 @@ struct GeometryV2 {
     flip_horizontal: bool,
     flip_vertical: bool,
     orientation_steps: u8,
-    #[serde(default)]
     perspective_correction: PerspectiveCorrectionSettingsV1,
     rotation: f64,
-    #[serde(default)]
     transform_aspect: f64,
-    #[serde(default)]
     transform_distortion: f64,
-    #[serde(default)]
     transform_horizontal: f64,
-    #[serde(default)]
     transform_rotate: f64,
-    #[serde(default = "default_transform_scale")]
     transform_scale: f64,
-    #[serde(default)]
     transform_vertical: f64,
-    #[serde(default)]
     transform_x_offset: f64,
-    #[serde(default)]
     transform_y_offset: f64,
-}
-
-fn default_transform_scale() -> f64 {
-    100.0
 }
 
 impl GeometryV2 {
@@ -454,9 +490,7 @@ fn validate_perspective_correction(
 
 fn validate_perspective_param_contract(params: &Map<String, Value>) -> Result<(), String> {
     let Some(value) = params.get("perspectiveCorrection") else {
-        // V2 documents persisted before Perspective node ownership compile through
-        // their quarantined legacy field until the frontend migration reopens them.
-        return Ok(());
+        return Err("EditDocumentV2 geometry perspectiveCorrection is required".to_string());
     };
     let object = value.as_object().ok_or_else(|| {
         "EditDocumentV2 geometry perspectiveCorrection must be an object".to_string()
@@ -478,7 +512,7 @@ fn validate_perspective_param_contract(params: &Map<String, Value>) -> Result<()
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct LensDistortionParamsV2 {
     k1: f64,
@@ -492,12 +526,11 @@ struct LensDistortionParamsV2 {
     vig_k3: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LensCorrectionV2 {
-    // Optional only for v2 documents persisted before manual CA ownership.
-    chromatic_aberration_blue_yellow: Option<f64>,
-    chromatic_aberration_red_cyan: Option<f64>,
+    chromatic_aberration_blue_yellow: f64,
+    chromatic_aberration_red_cyan: f64,
     lens_correction_mode: String,
     lens_distortion_amount: u16,
     lens_distortion_enabled: bool,
@@ -536,7 +569,7 @@ impl LensCorrectionV2 {
                 self.chromatic_aberration_red_cyan,
             ),
         ] {
-            if value.is_some_and(|value| !value.is_finite() || !(-100.0..=100.0).contains(&value)) {
+            if !value.is_finite() || !(-100.0..=100.0).contains(&value) {
                 return Err(format!(
                     "EditDocumentV2 lens_correction field '{field}' must be finite and within [-100, 100]"
                 ));
@@ -606,49 +639,55 @@ fn validate_scene_tone_parameter(
     ))
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DetailDenoiseDehazeV2 {
-    // Optional only for v2 documents persisted before local-contrast ownership.
-    centré: Option<f64>,
+    centré: f64,
     clarity: f64,
     color_noise_reduction: f64,
-    // Optional only for v2 documents persisted before Deblur joined this node.
-    deblur_enabled: Option<bool>,
-    deblur_sigma_px: Option<f64>,
-    deblur_strength: Option<f64>,
+    deblur_enabled: bool,
+    deblur_sigma_px: f64,
+    deblur_strength: f64,
     dehaze: f64,
     denoise_contrast_protection: f64,
     denoise_detail: f64,
     denoise_natural_grain: f64,
     denoise_shadow_bias: f64,
+    dust_spot_min_radius_px: u8,
+    dust_spot_overlay_enabled: bool,
+    dust_spot_sensitivity: u8,
     luma_noise_reduction: f64,
-    local_contrast_halo_guard: Option<f64>,
-    local_contrast_midtone_mask: Option<f64>,
-    local_contrast_radius_px: Option<f64>,
+    local_contrast_halo_guard: f64,
+    local_contrast_midtone_mask: f64,
+    local_contrast_radius_px: f64,
     sharpness: f64,
-    // Optional only for v2 documents persisted before Sharpness Threshold ownership.
-    sharpness_threshold: Option<f64>,
-    structure: Option<f64>,
+    sharpness_threshold: f64,
+    structure: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FilmEmulationV2 {
-    film_emulation: Value,
+    film_emulation: Option<crate::render::film_emulation::FilmEmulationNodeV1>,
 }
 
 impl FilmEmulationV2 {
+    fn compile(
+        &self,
+    ) -> Result<Option<crate::render::film_emulation::FilmEmulationParams>, String> {
+        self.film_emulation
+            .as_ref()
+            .map(crate::render::film_emulation::FilmEmulationNodeV1::validate)
+            .transpose()
+            .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))
+    }
+
     fn validate(&self) -> Result<(), String> {
-        crate::render::film_emulation::parse_node(&serde_json::json!({
-            "filmEmulation": self.film_emulation
-        }))
-        .map(|_| ())
-        .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))
+        self.compile().map(|_| ())
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ToneEqualizerSettingsV1 {
     auto_placement: bool,
@@ -714,7 +753,7 @@ fn point_color_in_range(value: f64, minimum: f64, maximum: f64) -> bool {
     value.is_finite() && (minimum..=maximum).contains(&value)
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorCoordinateV1 {
     chroma: f64,
@@ -734,7 +773,7 @@ impl PointColorCoordinateV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorSampleV1 {
     confidence: f64,
@@ -759,7 +798,7 @@ impl PointColorSampleV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorAdjustmentV1 {
     chroma_radius: f64,
@@ -815,7 +854,7 @@ impl PointColorAdjustmentV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ToneEqualizerV2 {
     tone_equalizer: ToneEqualizerSettingsV1,
@@ -827,7 +866,359 @@ impl ToneEqualizerV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+fn pack_point_color_point(point: &PointColorAdjustmentV1) -> PointColorGpuPoint {
+    let mut packed = PointColorGpuPoint::default();
+    for (index, sample) in point.samples.iter().take(4).enumerate() {
+        packed.samples[index] = [
+            sample.source_color.lightness as f32,
+            sample.source_color.chroma as f32,
+            sample.source_color.hue_degrees as f32,
+            sample.confidence as f32,
+        ];
+    }
+    packed.range = [
+        point.hue_radius_degrees as f32,
+        point.chroma_radius as f32,
+        point.lightness_radius as f32,
+        point.variance as f32,
+    ];
+    packed.edit = [
+        point.feather as f32,
+        point.hue_shift_degrees as f32,
+        point.chroma_shift as f32,
+        point.lightness_shift as f32,
+    ];
+    packed.control = [
+        point.saturation_shift as f32,
+        point.opacity as f32,
+        point.samples.len().min(4) as f32,
+        f32::from(point.enabled),
+    ];
+    packed
+}
+
+impl PointColorV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let plan = &self.point_color;
+        if !plan.enabled {
+            return;
+        }
+        let mut output = PointColorGpuSettings::default();
+        for (index, point) in plan.points.iter().take(MAX_POINT_COLOR_POINTS).enumerate() {
+            output.points[index] = pack_point_color_point(point);
+        }
+        output.control = [
+            plan.points.len().min(MAX_POINT_COLOR_POINTS) as u32,
+            match plan.visualize_mode {
+                PointColorVisualizeModeV1::Image => 0,
+                PointColorVisualizeModeV1::Range => 1,
+                PointColorVisualizeModeV1::Solo => 2,
+            },
+            1,
+            0,
+        ];
+        if plan.skin_uniformity.enabled
+            && let (Some(range), Some(target)) =
+                (&plan.skin_uniformity.range, &plan.skin_uniformity.target)
+        {
+            output.skin_range = pack_point_color_point(range);
+            output.skin_target = [
+                target.lightness as f32,
+                target.chroma as f32,
+                target.hue_degrees as f32,
+                1.0,
+            ];
+            output.skin_control = [
+                plan.skin_uniformity.hue_uniformity as f32,
+                plan.skin_uniformity.chroma_uniformity as f32,
+                plan.skin_uniformity.lightness_uniformity as f32,
+                plan.skin_uniformity.preserve_extremes as f32,
+            ];
+        }
+        global.point_color = output;
+    }
+}
+
+fn color_balance_range(range: ColorBalanceRgbRangeV2) -> [f32; 4] {
+    [range.red as f32, range.green as f32, range.blue as f32, 0.0]
+}
+
+impl ColorBalanceRgbV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let settings = &self.color_balance_rgb;
+        global.color_balance_rgb = ColorBalanceRgbSettings {
+            shadows: color_balance_range(settings.shadows),
+            midtones: color_balance_range(settings.midtones),
+            highlights: color_balance_range(settings.highlights),
+            enabled: u32::from(settings.enabled),
+            preserve_luminance: u32::from(settings.preserve_luminance),
+            _pad1: 0,
+            _pad2: 0,
+        };
+    }
+}
+
+fn hsl_value(value: SelectiveColorHslValueV2) -> HslColor {
+    HslColor {
+        hue: value.hue as f32 * SCALES.hsl_hue_multiplier,
+        saturation: value.saturation as f32 / SCALES.hsl_saturation,
+        luminance: value.luminance as f32 / SCALES.hsl_luminance,
+        _pad: 0.0,
+    }
+}
+
+impl SelectiveColorMixerV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.hsl = [
+            hsl_value(self.hsl.reds),
+            hsl_value(self.hsl.oranges),
+            hsl_value(self.hsl.yellows),
+            hsl_value(self.hsl.greens),
+            hsl_value(self.hsl.aquas),
+            hsl_value(self.hsl.blues),
+            hsl_value(self.hsl.purples),
+            hsl_value(self.hsl.magentas),
+        ];
+    }
+}
+
+impl SkinToneUniformityV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let value = self.skin_tone_uniformity;
+        global.skin_tone_uniformity = SkinToneUniformitySettings {
+            enabled: u32::from(value.enabled),
+            hue_uniformity: value.hue_uniformity as f32,
+            luminance_uniformity: value.luminance_uniformity as f32,
+            max_hue_shift_degrees: value.max_hue_shift_degrees as f32,
+            saturation_uniformity: value.saturation_uniformity as f32,
+            target_hue_degrees: value.target_hue_degrees as f32,
+            target_luminance: value.target_luminance as f32,
+            target_saturation: value.target_saturation as f32,
+        };
+    }
+}
+
+fn channel_row(value: ChannelMixerRowV2) -> ChannelMixerRow {
+    ChannelMixerRow {
+        red: value.red as f32 / 100.0,
+        green: value.green as f32 / 100.0,
+        blue: value.blue as f32 / 100.0,
+        constant: value.constant as f32 / 100.0,
+    }
+}
+
+impl ChannelMixerV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let value = &self.channel_mixer;
+        global.channel_mixer = ChannelMixerSettings {
+            red: channel_row(value.red),
+            green: channel_row(value.green),
+            blue: channel_row(value.blue),
+            enabled: u32::from(value.enabled),
+            preserve_luminance: u32::from(value.preserve_luminance),
+            _pad1: 0,
+            _pad2: 0,
+        };
+    }
+}
+
+impl LumaLevelsV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let value = &self.levels;
+        global.levels = LevelsSettings {
+            input_black: value.input_black as f32,
+            input_white: value.input_white as f32,
+            gamma: value.gamma as f32,
+            output_black: value.output_black as f32,
+            output_white: value.output_white as f32,
+            enabled: u32::from(value.enabled),
+            _pad1: 0,
+            _pad2: 0,
+        };
+    }
+}
+
+impl ColorCalibrationV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let value = &self.color_calibration;
+        global.color_calibration = ColorCalibrationSettings {
+            shadows_tint: value.shadows_tint as f32 / SCALES.color_calibration_hue,
+            red_hue: value.red_hue as f32 / SCALES.color_calibration_hue,
+            red_saturation: value.red_saturation as f32 / SCALES.color_calibration_saturation,
+            green_hue: value.green_hue as f32 / SCALES.color_calibration_hue,
+            green_saturation: value.green_saturation as f32 / SCALES.color_calibration_saturation,
+            blue_hue: value.blue_hue as f32 / SCALES.color_calibration_hue,
+            blue_saturation: value.blue_saturation as f32 / SCALES.color_calibration_saturation,
+            _pad1: 0.0,
+        };
+    }
+}
+
+impl BlackWhiteMixerV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        let value = &self.black_white_mixer;
+        global.black_white_mixer = BlackWhiteMixerSettings {
+            reds: value.weights.reds as f32 / 100.0,
+            oranges: value.weights.oranges as f32 / 100.0,
+            yellows: value.weights.yellows as f32 / 100.0,
+            greens: value.weights.greens as f32 / 100.0,
+            aquas: value.weights.aquas as f32 / 100.0,
+            blues: value.weights.blues as f32 / 100.0,
+            purples: value.weights.purples as f32 / 100.0,
+            magentas: value.weights.magentas as f32 / 100.0,
+            enabled: u32::from(value.enabled),
+            process: match value.process {
+                BlackWhiteMixerProcessV2::NeutralPanchromaticV1 => {
+                    crate::monochrome::NEUTRAL_PANCHROMATIC_V1
+                }
+                BlackWhiteMixerProcessV2::ContinuousSensitivityV1 => {
+                    crate::monochrome::CONTINUOUS_SENSITIVITY_V1
+                }
+            },
+            implementation_version: crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION,
+            source_class: match value.source_class {
+                BlackWhiteMixerSourceClassV2::ColorSource => crate::monochrome::COLOR_SOURCE,
+                BlackWhiteMixerSourceClassV2::MonochromeSensor => {
+                    crate::monochrome::MONOCHROME_SENSOR_SOURCE
+                }
+                BlackWhiteMixerSourceClassV2::EncodedGrayscale => {
+                    crate::monochrome::ENCODED_GRAYSCALE_SOURCE
+                }
+                BlackWhiteMixerSourceClassV2::AlreadyMonochromeWorking => {
+                    crate::monochrome::WORKING_MONOCHROME_SOURCE
+                }
+            },
+        };
+    }
+}
+
+fn legacy_grade(value: &LegacyColorGradingRangeV2) -> ColorGradeSettings {
+    ColorGradeSettings {
+        hue: value.hue as f32,
+        saturation: value.saturation as f32 / SCALES.color_grading_saturation,
+        luminance: value.luminance as f32 / SCALES.color_grading_luminance,
+        _pad: 0.0,
+    }
+}
+
+impl PerceptualGradingV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) -> Result<(), String> {
+        let plan = PerceptualGradingPlanV1::compile(self.perceptual_grading_v1.clone()).map_err(
+            |error| format!("EditDocumentV2 perceptual grading cannot compile: {error:?}"),
+        )?;
+        global.perceptual_grading = if plan.is_identity() {
+            Default::default()
+        } else {
+            plan.gpu_settings()
+        };
+        let legacy = &self.color_grading;
+        global.color_grading_shadows = legacy_grade(&legacy.shadows);
+        global.color_grading_midtones = legacy_grade(&legacy.midtones);
+        global.color_grading_highlights = legacy_grade(&legacy.highlights);
+        global.color_grading_global = legacy_grade(&legacy.global);
+        global.color_grading_blending = legacy.blending as f32 / SCALES.color_grading_blending;
+        global.color_grading_balance = legacy.balance as f32 / SCALES.color_grading_balance;
+        if global.perceptual_grading.policy[3] > 0.5 {
+            global.color_grading_shadows = Default::default();
+            global.color_grading_midtones = Default::default();
+            global.color_grading_highlights = Default::default();
+            global.color_grading_global = Default::default();
+        }
+        Ok(())
+    }
+}
+
+fn legacy_curve_points(
+    points: &[SceneCurveLegacyPointV2],
+) -> ([crate::adjustments::abi::Point; 16], u32) {
+    let mut output = [crate::adjustments::abi::Point::default(); 16];
+    for (target, point) in output.iter_mut().zip(points.iter()) {
+        *target = crate::adjustments::abi::Point {
+            x: point.x as f32,
+            y: point.y as f32,
+            _pad1: 0.0,
+            _pad2: 0.0,
+        };
+    }
+    (output, points.len().min(16) as u32)
+}
+
+impl SceneCurveV2 {
+    fn apply_legacy_curves(&self, global: &mut GlobalAdjustments) {
+        let (luma, luma_count) = legacy_curve_points(&self.curves.luma);
+        let (red, red_count) = legacy_curve_points(&self.curves.red);
+        let (green, green_count) = legacy_curve_points(&self.curves.green);
+        let (blue, blue_count) = legacy_curve_points(&self.curves.blue);
+        global.luma_curve = luma;
+        global.red_curve = red;
+        global.green_curve = green;
+        global.blue_curve = blue;
+        global.luma_curve_count = luma_count;
+        global.red_curve_count = red_count;
+        global.green_curve_count = green_count;
+        global.blue_curve_count = blue_count;
+    }
+
+    fn compile_curves(
+        &self,
+    ) -> Result<
+        (
+            Option<crate::tone::curves::CompiledCurvePlanV1>,
+            Option<crate::tone::output_curves::CompiledOutputCurvePlanV1>,
+        ),
+        String,
+    > {
+        let scene = self
+            .scene_curve_v1
+            .as_ref()
+            .map(|settings| {
+                let points = settings
+                    .points
+                    .iter()
+                    .map(|point| CurvePoint::new(point.x_ev, point.y_ev))
+                    .collect::<Vec<_>>();
+                let mode = match settings.channel_mode {
+                    SceneCurveChannelModeV1::LuminancePreserving => {
+                        CurveChannelMode::LuminancePreserving
+                    }
+                    SceneCurveChannelModeV1::LinkedRgb => CurveChannelMode::LinkedRgb,
+                };
+                compile_scene_curve(&points, settings.middle_grey, mode)
+                    .map_err(|error| format!("scene curve cannot compile: {error:?}"))
+            })
+            .transpose()?;
+        let output = self
+            .output_curve_v1
+            .as_ref()
+            .map(|settings| {
+                let target_fingerprint =
+                    crate::render::artifact_identity::stable_hash(&settings.target_identity);
+                let target = match settings.domain {
+                    OutputCurveDomainV1::ViewEncoded => OutputCurveTargetV1::view_encoded(
+                        target_fingerprint,
+                        settings.sdr_reference_white_nits,
+                        settings.peak_nits,
+                    ),
+                    OutputCurveDomainV1::OutputEncoded => OutputCurveTargetV1::output_encoded(
+                        target_fingerprint,
+                        settings.sdr_reference_white_nits,
+                        settings.peak_nits,
+                    ),
+                };
+                let points = settings
+                    .points
+                    .iter()
+                    .map(|point| OutputCurvePoint::new(point.input, point.output))
+                    .collect::<Vec<_>>();
+                compile_output_curve(target, &points)
+                    .map_err(|error| format!("output curve cannot compile: {error:?}"))
+            })
+            .transpose()?;
+        Ok((scene, output))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorSkinUniformityV1 {
     chroma_uniformity: f64,
@@ -864,7 +1255,7 @@ impl PointColorSkinUniformityV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum PointColorVisualizeModeV1 {
     Image,
@@ -872,7 +1263,7 @@ enum PointColorVisualizeModeV1 {
     Solo,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorPlanV1 {
     enabled: bool,
@@ -897,13 +1288,13 @@ impl PointColorPlanV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PointColorV2 {
     point_color: PointColorPlanV1,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ColorBalanceRgbRangeV2 {
     blue: f64,
@@ -932,7 +1323,7 @@ impl ColorBalanceRgbRangeV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ColorBalanceRgbSettingsV2 {
     enabled: bool,
@@ -962,7 +1353,7 @@ impl ColorBalanceRgbSettingsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ColorBalanceRgbV2 {
     color_balance_rgb: ColorBalanceRgbSettingsV2,
@@ -974,7 +1365,7 @@ impl ColorBalanceRgbV2 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SelectiveColorHslValueV2 {
     hue: f64,
@@ -999,7 +1390,7 @@ impl SelectiveColorHslValueV2 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SelectiveColorRangeControlV2 {
     center_hue_degrees: f64,
@@ -1043,7 +1434,7 @@ impl SelectiveColorRangeControlV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SelectiveColorHslV2 {
     aquas: SelectiveColorHslValueV2,
@@ -1056,7 +1447,7 @@ struct SelectiveColorHslV2 {
     yellows: SelectiveColorHslValueV2,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SelectiveColorRangeControlsV2 {
     aquas: SelectiveColorRangeControlV2,
@@ -1069,7 +1460,7 @@ struct SelectiveColorRangeControlsV2 {
     yellows: SelectiveColorRangeControlV2,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SelectiveColorMixerV2 {
     hsl: SelectiveColorHslV2,
@@ -1127,7 +1518,7 @@ impl SelectiveColorMixerV2 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SkinToneUniformitySettingsV1 {
     enabled: bool,
@@ -1192,7 +1583,7 @@ impl SkinToneUniformitySettingsV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SkinToneUniformityV2 {
     skin_tone_uniformity: SkinToneUniformitySettingsV1,
@@ -1205,7 +1596,7 @@ fn parse_skin_tone_uniformity(params: &Map<String, Value>) -> Result<SkinToneUni
     Ok(parsed)
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ChannelMixerRowV2 {
     blue: f64,
@@ -1232,7 +1623,7 @@ impl ChannelMixerRowV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ChannelMixerSettingsV2 {
     blue: ChannelMixerRowV2,
@@ -1262,7 +1653,7 @@ impl ChannelMixerSettingsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ChannelMixerV2 {
     channel_mixer: ChannelMixerSettingsV2,
@@ -1274,7 +1665,7 @@ impl ChannelMixerV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LumaLevelsSettingsV2 {
     enabled: bool,
@@ -1315,7 +1706,7 @@ impl LumaLevelsSettingsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LumaLevelsV2 {
     levels: LumaLevelsSettingsV2,
@@ -1327,14 +1718,14 @@ impl LumaLevelsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum BlackWhiteMixerProcessV2 {
     NeutralPanchromaticV1,
     ContinuousSensitivityV1,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum BlackWhiteMixerPresetV2 {
     Manual,
@@ -1346,7 +1737,7 @@ enum BlackWhiteMixerPresetV2 {
     BlueFilter,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum BlackWhiteMixerSourceClassV2 {
     ColorSource,
@@ -1355,7 +1746,7 @@ enum BlackWhiteMixerSourceClassV2 {
     AlreadyMonochromeWorking,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BlackWhiteMixerWeightsV2 {
     aquas: f64,
@@ -1368,7 +1759,7 @@ struct BlackWhiteMixerWeightsV2 {
     yellows: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BlackWhiteMixerSettingsV2 {
     enabled: bool,
@@ -1409,7 +1800,7 @@ impl BlackWhiteMixerSettingsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BlackWhiteMixerV2 {
     black_white_mixer: BlackWhiteMixerSettingsV2,
@@ -1421,7 +1812,7 @@ impl BlackWhiteMixerV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ColorCalibrationSettingsV2 {
     blue_hue: f64,
@@ -1454,7 +1845,7 @@ impl ColorCalibrationSettingsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ColorCalibrationV2 {
     color_calibration: ColorCalibrationSettingsV2,
@@ -1466,7 +1857,7 @@ impl ColorCalibrationV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LegacyColorGradingRangeV2 {
     hue: f64,
@@ -1486,7 +1877,7 @@ impl LegacyColorGradingRangeV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LegacyColorGradingV2 {
     balance: f64,
@@ -1513,7 +1904,7 @@ impl LegacyColorGradingV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PerceptualGradingV2 {
     color_grading: LegacyColorGradingV2,
@@ -1537,9 +1928,10 @@ impl PointColorV2 {
 
 impl DetailDenoiseDehazeV2 {
     fn validate(&self) -> Result<(), String> {
-        if self.deblur_strength.is_some_and(|value| {
-            !value.is_finite() || value.fract() != 0.0 || !(0.0..=100.0).contains(&value)
-        }) {
+        if !self.deblur_strength.is_finite()
+            || self.deblur_strength.fract() != 0.0
+            || !(0.0..=100.0).contains(&self.deblur_strength)
+        {
             return Err(
                 "EditDocumentV2 detail_denoise_dehaze field 'deblurStrength' must be an integer within [0, 100]"
                     .to_string(),
@@ -1570,14 +1962,6 @@ impl DetailDenoiseDehazeV2 {
             ("denoiseShadowBias", self.denoise_shadow_bias, -100.0, 100.0),
             ("lumaNoiseReduction", self.luma_noise_reduction, 0.0, 100.0),
             ("sharpness", self.sharpness, -100.0, 100.0),
-        ] {
-            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
-                return Err(format!(
-                    "EditDocumentV2 detail_denoise_dehaze field '{field}' must be finite and within [{minimum}, {maximum}]"
-                ));
-            }
-        }
-        for (field, value, minimum, maximum) in [
             ("centré", self.centré, -100.0, 100.0),
             (
                 "localContrastHaloGuard",
@@ -1600,29 +1984,30 @@ impl DetailDenoiseDehazeV2 {
             ("structure", self.structure, -100.0, 100.0),
             ("sharpnessThreshold", self.sharpness_threshold, 0.0, 80.0),
         ] {
-            if value
-                .is_some_and(|value| !value.is_finite() || !(minimum..=maximum).contains(&value))
-            {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
                 return Err(format!(
                     "EditDocumentV2 detail_denoise_dehaze field '{field}' must be finite and within [{minimum}, {maximum}]"
                 ));
             }
         }
-        if self
-            .deblur_sigma_px
-            .is_some_and(|value| !value.is_finite() || !(0.45..=1.35).contains(&value))
-        {
+        if !self.deblur_sigma_px.is_finite() || !(0.45..=1.35).contains(&self.deblur_sigma_px) {
             return Err(
                 "EditDocumentV2 detail_denoise_dehaze field 'deblurSigmaPx' must be finite and within [0.45, 1.35]"
                     .to_string(),
             );
         }
-        let _ = self.deblur_enabled;
+        if !(1..=12).contains(&self.dust_spot_min_radius_px) || self.dust_spot_sensitivity > 100 {
+            return Err(
+                "EditDocumentV2 detail_denoise_dehaze dust-spot controls are out of range"
+                    .to_string(),
+            );
+        }
+        let _ = (self.deblur_enabled, self.dust_spot_overlay_enabled);
         Ok(())
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DisplayCreativeV2 {
     flare_amount: f64,
@@ -1673,14 +2058,14 @@ impl DisplayCreativeV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum SceneCurveModeV2 {
     Point,
     Parametric,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum SceneCurveToneCurveV2 {
     AutoFilmic,
@@ -1690,14 +2075,14 @@ enum SceneCurveToneCurveV2 {
     ShadowLift,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveLegacyPointV2 {
     x: f64,
     y: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveLegacyChannelsV2 {
     blue: Vec<SceneCurveLegacyPointV2>,
@@ -1739,7 +2124,7 @@ impl SceneCurveLegacyChannelsV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveParametricChannelV2 {
     black_level: f64,
@@ -1777,7 +2162,7 @@ impl SceneCurveParametricChannelV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveParametricChannelsV2 {
     blue: SceneCurveParametricChannelV2,
@@ -1795,21 +2180,21 @@ impl SceneCurveParametricChannelsV2 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum SceneCurveChannelModeV1 {
     LuminancePreserving,
     LinkedRgb,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurvePointV1 {
     x_ev: f32,
     y_ev: f32,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveSettingsV1 {
     channel_mode: SceneCurveChannelModeV1,
@@ -1836,21 +2221,21 @@ impl SceneCurveSettingsV1 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum OutputCurveDomainV1 {
     ViewEncoded,
     OutputEncoded,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OutputCurvePointV1 {
     input: f32,
     output: f32,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OutputCurveSettingsV1 {
     domain: OutputCurveDomainV1,
@@ -1891,7 +2276,7 @@ impl OutputCurveSettingsV1 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SceneCurveV2 {
     curve_mode: SceneCurveModeV2,
@@ -1919,7 +2304,7 @@ impl SceneCurveV2 {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalanceModeV2 {
     AsShot,
@@ -1929,7 +2314,7 @@ enum CameraInputWhiteBalanceModeV2 {
     Preset,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalanceSourceV2 {
     AsShot,
@@ -1939,7 +2324,7 @@ enum CameraInputWhiteBalanceSourceV2 {
     User,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalancePresetV2 {
     Tungsten,
@@ -1949,28 +2334,28 @@ enum CameraInputWhiteBalancePresetV2 {
     Shade,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalanceSemanticsV2 {
     RawSceneLinear,
     RenderedSceneLinearApproximation,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum CameraInputWhiteBalanceSynchronizationModeV2 {
     PerImage,
     LockedReference,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CameraInputWhiteBalanceSynchronizationV2 {
     mode: CameraInputWhiteBalanceSynchronizationModeV2,
     reference_source_identity: Option<String>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CameraInputTechnicalWhiteBalanceV2 {
     adaptation: String,
@@ -1988,7 +2373,7 @@ struct CameraInputTechnicalWhiteBalanceV2 {
     y: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CameraInputV2 {
     camera_profile: String,
@@ -2141,19 +2526,9 @@ fn validate_camera_input_parameter(
     ))
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EditDocumentMigrationReceiptV2 {
-    defaulted: Vec<String>,
-    disabled: Vec<String>,
-    mapped: Vec<String>,
-    quarantined: Vec<String>,
-    source_schema_version: u8,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-enum SourceArtifactMaskTypeV2 {
+pub(crate) enum SourceArtifactMaskTypeV2 {
     AiDepth,
     AiForeground,
     AiObject,
@@ -2170,15 +2545,15 @@ enum SourceArtifactMaskTypeV2 {
     Radial,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum SourceArtifactSubMaskModeV2 {
+pub(crate) enum SourceArtifactSubMaskModeV2 {
     Additive,
     Intersect,
     Subtractive,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum LayerBlendModeV2 {
     Normal,
@@ -2192,10 +2567,329 @@ enum LayerBlendModeV2 {
     Color,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+impl LayerV2 {
+    fn mask_definition(&self) -> crate::mask_generation::MaskDefinition {
+        crate::mask_generation::MaskDefinition {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            visible: self.visible,
+            invert: self.invert,
+            blend_mode: self.blend_mode_name().to_string(),
+            opacity: self.opacity as f32,
+            adjustments: Value::Null,
+            sub_masks: self
+                .sub_masks
+                .iter()
+                .map(|mask| crate::mask_generation::SubMask {
+                    id: mask.id.clone(),
+                    mask_type: match mask.mask_type {
+                        SourceArtifactMaskTypeV2::AiDepth => "ai-depth",
+                        SourceArtifactMaskTypeV2::AiForeground => "ai-foreground",
+                        SourceArtifactMaskTypeV2::AiObject => "ai-object",
+                        SourceArtifactMaskTypeV2::AiPerson => "ai-person",
+                        SourceArtifactMaskTypeV2::AiSky => "ai-sky",
+                        SourceArtifactMaskTypeV2::AiSubject => "ai-subject",
+                        SourceArtifactMaskTypeV2::All => "all",
+                        SourceArtifactMaskTypeV2::Brush => "brush",
+                        SourceArtifactMaskTypeV2::Color => "color",
+                        SourceArtifactMaskTypeV2::Flow => "flow",
+                        SourceArtifactMaskTypeV2::Linear => "linear",
+                        SourceArtifactMaskTypeV2::Luminance => "luminance",
+                        SourceArtifactMaskTypeV2::QuickEraser => "quick-eraser",
+                        SourceArtifactMaskTypeV2::Radial => "radial",
+                    }
+                    .to_string(),
+                    visible: mask.visible,
+                    invert: mask.invert,
+                    opacity: mask.opacity as f32,
+                    mode: match mask.mode {
+                        SourceArtifactSubMaskModeV2::Additive => {
+                            crate::mask_generation::SubMaskMode::Additive
+                        }
+                        SourceArtifactSubMaskModeV2::Intersect => {
+                            crate::mask_generation::SubMaskMode::Intersect
+                        }
+                        SourceArtifactSubMaskModeV2::Subtractive => {
+                            crate::mask_generation::SubMaskMode::Subtractive
+                        }
+                    },
+                    parameters: mask
+                        .parameters
+                        .clone()
+                        .map(|parameters| Value::Object(parameters.into_iter().collect()))
+                        .unwrap_or_else(|| Value::Object(Default::default())),
+                })
+                .collect(),
+        }
+    }
+
+    fn blend_mode_name(&self) -> &'static str {
+        match self
+            .blend_mode
+            .as_ref()
+            .unwrap_or(&LayerBlendModeV2::Normal)
+        {
+            LayerBlendModeV2::Normal => "normal",
+            LayerBlendModeV2::Multiply => "multiply",
+            LayerBlendModeV2::Screen => "screen",
+            LayerBlendModeV2::Overlay => "overlay",
+            LayerBlendModeV2::SoftLight => "soft_light",
+            LayerBlendModeV2::Hue => "hue",
+            LayerBlendModeV2::Saturation => "saturation",
+            LayerBlendModeV2::Luminosity => "luminosity",
+            LayerBlendModeV2::Color => "color",
+        }
+    }
+
+    fn node_enabled(&self, node_type: MaskEditNodeTypeV2) -> bool {
+        self.edit_nodes
+            .get(&node_type)
+            .is_some_and(|node| node.enabled)
+    }
+
+    fn compile_mask(&self) -> MaskAdjustments {
+        let values = &self.adjustments;
+        let basic = self.node_enabled(MaskEditNodeTypeV2::Basic);
+        let color = self.node_enabled(MaskEditNodeTypeV2::Color);
+        let curves = self.node_enabled(MaskEditNodeTypeV2::Curves);
+        let details = self.node_enabled(MaskEditNodeTypeV2::Details);
+        let scalar = |enabled: bool, value: f64, scale: f32| {
+            if enabled { value as f32 / scale } else { 0.0 }
+        };
+        let (luma_curve, luma_curve_count) = if curves {
+            legacy_curve_points(&values.curves.luma)
+        } else {
+            Default::default()
+        };
+        let (red_curve, red_curve_count) = if curves {
+            legacy_curve_points(&values.curves.red)
+        } else {
+            Default::default()
+        };
+        let (green_curve, green_curve_count) = if curves {
+            legacy_curve_points(&values.curves.green)
+        } else {
+            Default::default()
+        };
+        let (blue_curve, blue_curve_count) = if curves {
+            legacy_curve_points(&values.curves.blue)
+        } else {
+            Default::default()
+        };
+        let grade = &values.color_grading;
+        let perceptual_grading = if color {
+            PerceptualGradingPlanV1::compile(values.perceptual_grading_v1.clone())
+                .ok()
+                .filter(|plan| !plan.is_identity())
+                .map_or(Default::default(), |plan| plan.gpu_settings())
+        } else {
+            Default::default()
+        };
+        let mut mask = MaskAdjustments {
+            exposure: scalar(basic, values.exposure, SCALES.exposure),
+            brightness: scalar(basic, values.brightness, SCALES.brightness),
+            contrast: scalar(basic, values.contrast, SCALES.contrast),
+            highlights: scalar(basic, values.highlights, SCALES.highlights),
+            shadows: scalar(basic, values.shadows, SCALES.shadows),
+            whites: scalar(basic, values.whites, SCALES.whites),
+            blacks: scalar(basic, values.blacks, SCALES.blacks),
+            saturation: scalar(color, values.saturation, SCALES.saturation),
+            temperature: scalar(color, values.temperature, SCALES.temperature),
+            tint: scalar(color, values.tint, SCALES.tint),
+            vibrance: scalar(color, values.vibrance, SCALES.vibrance),
+            sharpness: scalar(details, values.sharpness, SCALES.sharpness),
+            luma_noise_reduction: scalar(
+                details,
+                values.luma_noise_reduction,
+                SCALES.luma_noise_reduction,
+            ),
+            color_noise_reduction: scalar(
+                details,
+                values.color_noise_reduction,
+                SCALES.color_noise_reduction,
+            ),
+            clarity: scalar(details, values.clarity, SCALES.clarity),
+            dehaze: scalar(details, values.dehaze, SCALES.dehaze),
+            structure: scalar(details, values.structure, SCALES.structure),
+            glow_amount: values.glow_amount as f32 / SCALES.glow,
+            halation_amount: values.halation_amount as f32 / SCALES.halation,
+            flare_amount: values.flare_amount as f32 / SCALES.flares,
+            sharpness_threshold: scalar(
+                details,
+                values.sharpness_threshold,
+                SCALES.sharpness_threshold,
+            ),
+            hue: scalar(color, values.hue, 1.0),
+            blend_mode: match self.blend_mode_name() {
+                "multiply" => 1.0,
+                "screen" => 2.0,
+                _ => 0.0,
+            },
+            color_grading_shadows: if color {
+                legacy_grade(&grade.shadows)
+            } else {
+                Default::default()
+            },
+            color_grading_midtones: if color {
+                legacy_grade(&grade.midtones)
+            } else {
+                Default::default()
+            },
+            color_grading_highlights: if color {
+                legacy_grade(&grade.highlights)
+            } else {
+                Default::default()
+            },
+            color_grading_global: if color {
+                legacy_grade(&grade.global)
+            } else {
+                Default::default()
+            },
+            color_grading_blending: if color {
+                grade.blending as f32 / SCALES.color_grading_blending
+            } else {
+                0.5
+            },
+            color_grading_balance: if color {
+                grade.balance as f32 / SCALES.color_grading_balance
+            } else {
+                0.0
+            },
+            hsl: if color {
+                [
+                    hsl_value(values.hsl.reds),
+                    hsl_value(values.hsl.oranges),
+                    hsl_value(values.hsl.yellows),
+                    hsl_value(values.hsl.greens),
+                    hsl_value(values.hsl.aquas),
+                    hsl_value(values.hsl.blues),
+                    hsl_value(values.hsl.purples),
+                    hsl_value(values.hsl.magentas),
+                ]
+            } else {
+                [Default::default(); 8]
+            },
+            luma_curve,
+            red_curve,
+            green_curve,
+            blue_curve,
+            luma_curve_count,
+            red_curve_count,
+            green_curve_count,
+            blue_curve_count,
+            tone_equalizer: if basic {
+                tone_equalizer_gpu(&values.tone_equalizer)
+            } else {
+                Default::default()
+            },
+            perceptual_grading,
+            ..Default::default()
+        };
+        if mask.perceptual_grading.policy[3] > 0.5 {
+            mask.color_grading_shadows = Default::default();
+            mask.color_grading_midtones = Default::default();
+            mask.color_grading_highlights = Default::default();
+            mask.color_grading_global = Default::default();
+        }
+        mask
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LayerAdjustmentsV2 {
+    blacks: f64,
+    brightness: f64,
+    clarity: f64,
+    color_grading: LegacyColorGradingV2,
+    perceptual_grading_v1: PerceptualGradingSettingsV1,
+    color_noise_reduction: f64,
+    contrast: f64,
+    curves: SceneCurveLegacyChannelsV2,
+    point_curves: SceneCurveLegacyChannelsV2,
+    parametric_curve: SceneCurveParametricChannelsV2,
+    curve_mode: SceneCurveModeV2,
+    dehaze: f64,
+    effects_enabled: bool,
+    exposure: f64,
+    flare_amount: f64,
+    glow_amount: f64,
+    halation_amount: f64,
+    highlights: f64,
+    hue: f64,
+    hsl: SelectiveColorHslV2,
+    selective_color_range_controls: SelectiveColorRangeControlsV2,
+    luma_noise_reduction: f64,
+    saturation: f64,
+    shadows: f64,
+    sharpness: f64,
+    sharpness_threshold: f64,
+    structure: f64,
+    temperature: f64,
+    tint: f64,
+    tone_equalizer: ToneEqualizerSettingsV1,
+    vibrance: f64,
+    whites: f64,
+}
+
+impl LayerAdjustmentsV2 {
+    fn validate(&self) -> Result<(), String> {
+        self.color_grading.validate()?;
+        PerceptualGradingPlanV1::compile(self.perceptual_grading_v1.clone()).map_err(|error| {
+            format!("EditDocumentV2 layer perceptual grading is invalid: {error:?}")
+        })?;
+        self.curves.validate()?;
+        self.point_curves.validate()?;
+        self.parametric_curve.validate()?;
+        self.tone_equalizer.validate()?;
+        for (name, value, minimum, maximum) in [
+            ("blacks", self.blacks, -100.0, 100.0),
+            ("brightness", self.brightness, -5.0, 5.0),
+            ("clarity", self.clarity, -100.0, 100.0),
+            (
+                "colorNoiseReduction",
+                self.color_noise_reduction,
+                0.0,
+                100.0,
+            ),
+            ("contrast", self.contrast, -100.0, 100.0),
+            ("dehaze", self.dehaze, -100.0, 100.0),
+            ("exposure", self.exposure, -5.0, 5.0),
+            ("flareAmount", self.flare_amount, 0.0, 100.0),
+            ("glowAmount", self.glow_amount, 0.0, 100.0),
+            ("halationAmount", self.halation_amount, 0.0, 100.0),
+            ("highlights", self.highlights, -100.0, 100.0),
+            ("hue", self.hue, -180.0, 180.0),
+            ("lumaNoiseReduction", self.luma_noise_reduction, 0.0, 100.0),
+            ("saturation", self.saturation, -100.0, 100.0),
+            ("shadows", self.shadows, -100.0, 100.0),
+            ("sharpness", self.sharpness, -100.0, 100.0),
+            ("sharpnessThreshold", self.sharpness_threshold, 0.0, 80.0),
+            ("structure", self.structure, -100.0, 100.0),
+            ("temperature", self.temperature, -100.0, 100.0),
+            ("tint", self.tint, -100.0, 100.0),
+            ("vibrance", self.vibrance, -100.0, 100.0),
+            ("whites", self.whites, -100.0, 100.0),
+        ] {
+            if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+                return Err(format!(
+                    "EditDocumentV2 layer field '{name}' is out of range"
+                ));
+            }
+        }
+        let _ = (
+            self.effects_enabled,
+            &self.curve_mode,
+            &self.selective_color_range_controls,
+        );
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LayerV2 {
-    adjustments: BTreeMap<String, Value>,
+    adjustments: LayerAdjustmentsV2,
     blend_mode: Option<LayerBlendModeV2>,
     edit_nodes: BTreeMap<MaskEditNodeTypeV2, MaskEditNodeEnvelopeV2>,
     edit_node_schema_version: u8,
@@ -2206,13 +2900,13 @@ struct LayerV2 {
     name: String,
     opacity: f64,
     reference_match_application_receipt: Option<Map<String, Value>>,
-    retouch_clone_source: Option<Map<String, Value>>,
-    retouch_remove_source: Option<Map<String, Value>>,
+    retouch_clone_source: Option<crate::retouch_render::CurrentRetouchCloneSource>,
+    retouch_remove_source: Option<crate::retouch_render::CurrentRetouchRemoveSource>,
     sub_masks: Vec<SourceArtifactSubMaskV2>,
     visible: bool,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum MaskEditNodeTypeV2 {
     Basic,
@@ -2221,143 +2915,820 @@ enum MaskEditNodeTypeV2 {
     Details,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct MaskEditNodeEnvelopeV2 {
     enabled: bool,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LayersV2 {
     masks: Vec<LayerV2>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SourceArtifactSubMaskV2 {
-    id: String,
-    invert: bool,
-    mode: SourceArtifactSubMaskModeV2,
-    name: Option<String>,
-    opacity: f64,
-    parameters: Option<BTreeMap<String, Value>>,
+pub(crate) struct SourceArtifactSubMaskV2 {
+    pub(crate) id: String,
+    pub(crate) invert: bool,
+    pub(crate) mode: SourceArtifactSubMaskModeV2,
+    pub(crate) name: Option<String>,
+    pub(crate) opacity: f64,
+    pub(crate) parameters: Option<BTreeMap<String, Value>>,
     #[serde(rename = "type")]
-    mask_type: SourceArtifactMaskTypeV2,
-    visible: bool,
+    pub(crate) mask_type: SourceArtifactMaskTypeV2,
+    pub(crate) visible: bool,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SourceArtifactAiPatchV2 {
-    id: String,
-    invert: bool,
-    is_loading: bool,
-    name: String,
-    patch_data: Value,
-    prompt: String,
-    sub_masks: Vec<SourceArtifactSubMaskV2>,
-    visible: bool,
+pub(crate) struct SourceArtifactAiPatchV2 {
+    pub(crate) id: String,
+    pub(crate) invert: bool,
+    pub(crate) is_loading: bool,
+    pub(crate) name: String,
+    pub(crate) patch_data: Value,
+    pub(crate) prompt: String,
+    pub(crate) sub_masks: Vec<SourceArtifactSubMaskV2>,
+    pub(crate) visible: bool,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SourceArtifactsV2 {
-    ai_patches: Vec<SourceArtifactAiPatchV2>,
+pub(crate) struct SourceArtifactsV2 {
+    pub(crate) ai_patches: Vec<SourceArtifactAiPatchV2>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentProvenanceV2 {
-    #[serde(default)]
     reference_match_application_receipt: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EditDocumentExtensionsV2 {
+    quarantined_nodes: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct EditNodesV2 {
+    source_decode: EditNodeEnvelopeV2<SourceDecodeV2>,
+    scene_global_color_tone: EditNodeEnvelopeV2<SceneGlobalColorToneParamsV2>,
+    scene_to_view_transform: EditNodeEnvelopeV2<SceneToViewTransformV2>,
+    color_presence: EditNodeEnvelopeV2<ColorPresenceParamsV2>,
+    scene_curve: EditNodeEnvelopeV2<SceneCurveV2>,
+    tone_equalizer: EditNodeEnvelopeV2<ToneEqualizerV2>,
+    display_creative: EditNodeEnvelopeV2<DisplayCreativeV2>,
+    film_emulation: EditNodeEnvelopeV2<FilmEmulationV2>,
+    detail_denoise_dehaze: EditNodeEnvelopeV2<DetailDenoiseDehazeV2>,
+    point_color: EditNodeEnvelopeV2<PointColorV2>,
+    color_balance_rgb: EditNodeEnvelopeV2<ColorBalanceRgbV2>,
+    selective_color_mixer: EditNodeEnvelopeV2<SelectiveColorMixerV2>,
+    skin_tone_uniformity: EditNodeEnvelopeV2<SkinToneUniformityV2>,
+    black_white_mixer: EditNodeEnvelopeV2<BlackWhiteMixerV2>,
+    channel_mixer: EditNodeEnvelopeV2<ChannelMixerV2>,
+    luma_levels: EditNodeEnvelopeV2<LumaLevelsV2>,
+    perceptual_grading: EditNodeEnvelopeV2<PerceptualGradingV2>,
+    camera_input: EditNodeEnvelopeV2<CameraInputV2>,
+    lens_correction: EditNodeEnvelopeV2<LensCorrectionV2>,
+    color_calibration: EditNodeEnvelopeV2<ColorCalibrationV2>,
+    geometry: EditNodeEnvelopeV2<GeometryV2>,
+    layers: EditNodeEnvelopeV2<LayersV2>,
+    source_artifacts: EditNodeEnvelopeV2<SourceArtifactsV2>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct EditDocumentV2 {
-    extensions: Map<String, Value>,
+    extensions: EditDocumentExtensionsV2,
     geometry: GeometryV2,
     graph_process: String,
-    layers: Map<String, Value>,
-    migration: Option<EditDocumentMigrationReceiptV2>,
-    nodes: BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    layers: LayersV2,
+    nodes: EditNodesV2,
     provenance: EditDocumentProvenanceV2,
     schema_version: u8,
-    #[serde(default)]
     source_decode: SourceDecodeV2,
     source_artifacts: SourceArtifactsV2,
 }
 
-#[derive(Debug, Deserialize)]
+impl SceneGlobalColorToneParamsV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.blacks = self.blacks as f32 / SCALES.blacks;
+        global.brightness = self.brightness as f32 / SCALES.brightness;
+        global.contrast = self.contrast as f32 / SCALES.contrast;
+        global.exposure = self.exposure as f32 / SCALES.exposure;
+        global.highlights = self.highlights as f32 / SCALES.highlights;
+        global.shadows = self.shadows as f32 / SCALES.shadows;
+        global.whites = self.whites as f32 / SCALES.whites;
+    }
+}
+
+impl ColorPresenceParamsV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.hue = self.hue as f32;
+        global.saturation = self.saturation as f32 / SCALES.saturation;
+        global.vibrance = self.vibrance as f32 / SCALES.vibrance;
+    }
+}
+
+impl SceneToViewTransformV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) -> Result<(), String> {
+        let plan = (*self).compile()?;
+        let parameters = plan.gpu_parameters();
+        global.rapid_view_parameters0 = parameters[0];
+        global.rapid_view_parameters1 = parameters[1];
+        global.rapid_view_parameters2 = parameters[2];
+        global.tonemapper_mode = match self.tone_mapper {
+            ToneMapperV2::Basic => 0,
+            ToneMapperV2::Agx => 1,
+            ToneMapperV2::RapidView => 2,
+        };
+        Ok(())
+    }
+}
+
+impl CameraInputV2 {
+    fn technical_white_balance(
+        &self,
+    ) -> crate::color::white_balance::CurrentTechnicalWhiteBalanceV1 {
+        use crate::color::white_balance::{
+            CurrentTechnicalWhiteBalanceV1, CurrentWhiteBalancePresetV1,
+            CurrentWhiteBalanceSourceV1, CurrentWhiteBalanceSynchronizationModeV1,
+            CurrentWhiteBalanceSynchronizationV1, WhiteBalanceInputSemanticsV1, WhiteBalanceModeV1,
+        };
+        let white_balance = &self.white_balance_technical;
+        let mode = match white_balance.mode {
+            CameraInputWhiteBalanceModeV2::AsShot => WhiteBalanceModeV1::AsShot,
+            CameraInputWhiteBalanceModeV2::Auto => WhiteBalanceModeV1::Auto,
+            CameraInputWhiteBalanceModeV2::KelvinTint => WhiteBalanceModeV1::KelvinTint,
+            CameraInputWhiteBalanceModeV2::Chromaticity => WhiteBalanceModeV1::Chromaticity,
+            CameraInputWhiteBalanceModeV2::Preset => WhiteBalanceModeV1::Preset,
+        };
+        let source = match white_balance.source {
+            CameraInputWhiteBalanceSourceV2::AsShot => CurrentWhiteBalanceSourceV1::AsShot,
+            CameraInputWhiteBalanceSourceV2::Auto => CurrentWhiteBalanceSourceV1::Auto,
+            CameraInputWhiteBalanceSourceV2::Picker => CurrentWhiteBalanceSourceV1::Picker,
+            CameraInputWhiteBalanceSourceV2::Preset => CurrentWhiteBalanceSourceV1::Preset,
+            CameraInputWhiteBalanceSourceV2::User => CurrentWhiteBalanceSourceV1::User,
+        };
+        let input_semantics = match white_balance.input_semantics {
+            CameraInputWhiteBalanceSemanticsV2::RawSceneLinear => {
+                WhiteBalanceInputSemanticsV1::RawSceneLinear
+            }
+            CameraInputWhiteBalanceSemanticsV2::RenderedSceneLinearApproximation => {
+                WhiteBalanceInputSemanticsV1::RenderedSceneLinearApproximation
+            }
+        };
+        let synchronization_mode = match white_balance.synchronization.mode {
+            CameraInputWhiteBalanceSynchronizationModeV2::PerImage => {
+                CurrentWhiteBalanceSynchronizationModeV1::PerImage
+            }
+            CameraInputWhiteBalanceSynchronizationModeV2::LockedReference => {
+                CurrentWhiteBalanceSynchronizationModeV1::LockedReference
+            }
+        };
+        let preset = white_balance.preset_id.as_ref().map(|preset| match preset {
+            CameraInputWhiteBalancePresetV2::Tungsten => CurrentWhiteBalancePresetV1::Tungsten,
+            CameraInputWhiteBalancePresetV2::Daylight => CurrentWhiteBalancePresetV1::Daylight,
+            CameraInputWhiteBalancePresetV2::Flash => CurrentWhiteBalancePresetV1::Flash,
+            CameraInputWhiteBalancePresetV2::Cloudy => CurrentWhiteBalancePresetV1::Cloudy,
+            CameraInputWhiteBalancePresetV2::Shade => CurrentWhiteBalancePresetV1::Shade,
+        });
+        CurrentTechnicalWhiteBalanceV1 {
+            adaptation: white_balance.adaptation.clone(),
+            confidence: white_balance.confidence,
+            contract: white_balance.contract.clone(),
+            duv: white_balance.duv,
+            input_semantics,
+            kelvin: white_balance.kelvin,
+            mode,
+            preset_id: preset,
+            sample_count: white_balance.sample_count,
+            source,
+            synchronization: CurrentWhiteBalanceSynchronizationV1 {
+                mode: synchronization_mode,
+                reference_source_identity: white_balance
+                    .synchronization
+                    .reference_source_identity
+                    .clone(),
+            },
+            x: white_balance.x,
+            y: white_balance.y,
+        }
+    }
+
+    fn apply(&self, global: &mut GlobalAdjustments) -> Result<(), String> {
+        let rows = crate::color::white_balance::compile_current_technical_white_balance_typed(
+            &self.technical_white_balance(),
+        )
+        .map_err(|error| format!("EditDocumentV2 white balance cannot compile: {error}"))?
+        .ap1_matrix;
+        global.technical_white_balance = crate::adjustments::abi::GpuMat3 {
+            col0: [rows[0][0], rows[1][0], rows[2][0], 0.0],
+            col1: [rows[0][1], rows[1][1], rows[2][1], 0.0],
+            col2: [rows[0][2], rows[1][2], rows[2][2], 0.0],
+        };
+        Ok(())
+    }
+}
+
+impl DetailDenoiseDehazeV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.sharpness = self.sharpness as f32 / SCALES.sharpness;
+        global.luma_noise_reduction =
+            self.luma_noise_reduction as f32 / SCALES.luma_noise_reduction;
+        global.color_noise_reduction =
+            self.color_noise_reduction as f32 / SCALES.color_noise_reduction;
+        global.clarity = self.clarity as f32 / SCALES.clarity;
+        global.dehaze = self.dehaze as f32 / SCALES.dehaze;
+        global.structure = self.structure as f32 / SCALES.structure;
+        global.centré = self.centré as f32 / SCALES.centré;
+        global.sharpness_threshold = self.sharpness_threshold as f32 / SCALES.sharpness_threshold;
+    }
+}
+
+impl DisplayCreativeV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.vignette_amount = self.vignette_amount as f32 / SCALES.vignette_amount;
+        global.vignette_midpoint = self.vignette_midpoint as f32 / SCALES.vignette_midpoint;
+        global.vignette_roundness = self.vignette_roundness as f32 / SCALES.vignette_roundness;
+        global.vignette_feather = self.vignette_feather as f32 / SCALES.vignette_feather;
+        global.grain_amount = self.grain_amount as f32 / SCALES.grain_amount;
+        global.grain_size = self.grain_size as f32 / SCALES.grain_size;
+        global.grain_roughness = self.grain_roughness as f32 / SCALES.grain_roughness;
+        global.glow_amount = self.glow_amount as f32 / SCALES.glow;
+        global.halation_amount = self.halation_amount as f32 / SCALES.halation;
+        global.flare_amount = self.flare_amount as f32 / SCALES.flares;
+        global.has_lut = u32::from(self.lut_path.is_some());
+        global.lut_intensity = self.lut_intensity as f32 / 100.0;
+    }
+}
+
+impl FilmEmulationV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) -> Result<(), String> {
+        if let Some(film) = self.compile()? {
+            global._pad_cg1 = film.mix;
+            global._pad_cg2 = film.shaper_p;
+            global._pad_cg3 = f32::from(film.enabled);
+        }
+        Ok(())
+    }
+}
+
+impl ToneEqualizerV2 {
+    fn apply(&self, global: &mut GlobalAdjustments) {
+        global.tone_equalizer = tone_equalizer_gpu(&self.tone_equalizer);
+    }
+}
+
+fn tone_equalizer_gpu(tone: &ToneEqualizerSettingsV1) -> ToneEqualizerGpuSettings {
+    ToneEqualizerGpuSettings {
+        bands0: [
+            tone.band_ev[0] as f32,
+            tone.band_ev[1] as f32,
+            tone.band_ev[2] as f32,
+            tone.band_ev[3] as f32,
+        ],
+        bands1: [
+            tone.band_ev[4] as f32,
+            tone.band_ev[5] as f32,
+            tone.band_ev[6] as f32,
+            tone.band_ev[7] as f32,
+        ],
+        bands2: [tone.band_ev[8] as f32, tone.selected_band as f32, 0.0, 0.0],
+        params0: [
+            f32::from(tone.enabled),
+            tone.pivot_ev as f32,
+            tone.range_ev as f32,
+            tone.detail_preservation as f32,
+        ],
+        params1: [
+            tone.edge_refinement as f32,
+            tone.smoothing_radius as f32,
+            tone.mask_exposure_compensation as f32,
+            tone.preview_mode as f32,
+        ],
+    }
+}
+
+/// Validated, non-serializable render authority for one current EditDocumentV2.
+/// Every render-affecting field has one named typed owner; no enum map, broad
+/// value bag, or reconstructed flat adjustment document exists on this path.
+pub(crate) struct CompiledCurrentEditDocument {
+    nodes: EditNodesV2,
+    retouch_layers: Vec<crate::retouch_render::CurrentRetouchLayer>,
+}
+impl CompiledCurrentEditDocument {
+    fn camera_input(&self) -> &CameraInputV2 {
+        &self.nodes.camera_input.params
+    }
+
+    pub(crate) fn raw_processing_mode_override(&self) -> Option<&'static str> {
+        let node = &self.nodes.source_decode;
+        if !node.enabled {
+            return None;
+        }
+        node.params
+            .raw_processing_mode_override
+            .map(|mode| match mode {
+                RawProcessingModeV1::Fast => "fast",
+                RawProcessingModeV1::Balanced => "balanced",
+                RawProcessingModeV1::Maximum => "maximum",
+            })
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn source_artifacts(&self) -> &SourceArtifactsV2 {
+        &self.nodes.source_artifacts.params
+    }
+
+    pub(crate) fn camera_profile(&self) -> (&str, f32) {
+        let input = self.camera_input();
+        (
+            &input.camera_profile,
+            input.camera_profile_amount as f32 / 100.0,
+        )
+    }
+
+    pub(crate) fn technical_white_balance_plan(
+        &self,
+    ) -> Result<crate::color::white_balance::WhiteBalancePlanV1, String> {
+        crate::color::white_balance::compile_current_technical_white_balance_typed(
+            &self.camera_input().technical_white_balance(),
+        )
+        .map_err(|error| format!("EditDocumentV2 white balance cannot compile: {error}"))
+    }
+
+    pub(crate) fn lut_path(&self) -> Option<&str> {
+        let node = &self.nodes.display_creative;
+        if !node.enabled {
+            return None;
+        }
+        node.params.lut_path.as_deref()
+    }
+
+    pub(crate) fn film_parameters(
+        &self,
+    ) -> Result<Option<crate::render::film_emulation::FilmEmulationParams>, String> {
+        let node = &self.nodes.film_emulation;
+        if !node.enabled {
+            return Ok(None);
+        }
+        node.params.compile()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn film_profile_content_sha256(&self) -> Option<&str> {
+        self.nodes
+            .film_emulation
+            .params
+            .film_emulation
+            .as_ref()
+            .map(|film| film.profile_ref.content_sha256.as_str())
+    }
+
+    fn geometry_node(&self) -> &GeometryV2 {
+        &self.nodes.geometry.params
+    }
+
+    pub(crate) fn orientation_steps(&self) -> u8 {
+        self.geometry_node().orientation_steps
+    }
+
+    pub(crate) fn rotation(&self) -> f32 {
+        self.geometry_node().rotation as f32
+    }
+
+    pub(crate) fn flip_horizontal(&self) -> bool {
+        self.geometry_node().flip_horizontal
+    }
+
+    pub(crate) fn flip_vertical(&self) -> bool {
+        self.geometry_node().flip_vertical
+    }
+
+    pub(crate) fn content_fingerprint(&self) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"rapidraw.current_edit_document.v2");
+        macro_rules! hash_node {
+            ($node:expr) => {{
+                let node = $node;
+                hasher.update(node.node_type.contract().0.as_bytes());
+                hasher.update(&[u8::from(node.enabled)]);
+                hasher.update(&node.fingerprint().to_le_bytes());
+            }};
+        }
+        hash_node!(&self.nodes.source_decode);
+        hash_node!(&self.nodes.scene_global_color_tone);
+        hash_node!(&self.nodes.scene_to_view_transform);
+        hash_node!(&self.nodes.color_presence);
+        hash_node!(&self.nodes.scene_curve);
+        hash_node!(&self.nodes.tone_equalizer);
+        hash_node!(&self.nodes.display_creative);
+        hash_node!(&self.nodes.film_emulation);
+        hash_node!(&self.nodes.detail_denoise_dehaze);
+        hash_node!(&self.nodes.point_color);
+        hash_node!(&self.nodes.color_balance_rgb);
+        hash_node!(&self.nodes.selective_color_mixer);
+        hash_node!(&self.nodes.skin_tone_uniformity);
+        hash_node!(&self.nodes.black_white_mixer);
+        hash_node!(&self.nodes.channel_mixer);
+        hash_node!(&self.nodes.luma_levels);
+        hash_node!(&self.nodes.perceptual_grading);
+        hash_node!(&self.nodes.camera_input);
+        hash_node!(&self.nodes.lens_correction);
+        hash_node!(&self.nodes.color_calibration);
+        hash_node!(&self.nodes.geometry);
+        hash_node!(&self.nodes.layers);
+        hash_node!(&self.nodes.source_artifacts);
+        u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
+    }
+
+    pub(crate) fn compiled_curves(
+        &self,
+    ) -> Result<
+        (
+            Option<crate::tone::curves::CompiledCurvePlanV1>,
+            Option<crate::tone::output_curves::CompiledOutputCurvePlanV1>,
+        ),
+        String,
+    > {
+        let node = &self.nodes.scene_curve;
+        if !node.enabled {
+            return Ok((None, None));
+        }
+        node.params.compile_curves()
+    }
+
+    pub(crate) fn has_retouch(&self) -> bool {
+        self.layers().masks.iter().any(|layer| {
+            layer.visible
+                && (layer.retouch_clone_source.is_some() || layer.retouch_remove_source.is_some())
+        })
+    }
+
+    pub(crate) fn has_detail_edits(&self) -> bool {
+        let node = &self.nodes.detail_denoise_dehaze;
+        if !node.enabled {
+            return false;
+        }
+        let detail = &node.params;
+        detail.clarity != 0.0
+            || detail.color_noise_reduction != 0.0
+            || (detail.deblur_enabled && detail.deblur_strength != 0.0)
+            || detail.dehaze != 0.0
+            || detail.luma_noise_reduction != 0.0
+            || detail.sharpness != 0.0
+            || detail.structure != 0.0
+    }
+
+    fn detail_node(&self) -> Option<&DetailDenoiseDehazeV2> {
+        let node = &self.nodes.detail_denoise_dehaze;
+        if !node.enabled {
+            return None;
+        }
+        Some(&node.params)
+    }
+
+    pub(crate) fn deblur_render_controls(&self) -> crate::deblur_render::DeblurRenderControls {
+        let Some(detail) = self.detail_node() else {
+            return crate::deblur_render::DeblurRenderControls {
+                enabled: false,
+                sigma_px: 0.8,
+                strength: 0.0,
+            };
+        };
+        crate::deblur_render::DeblurRenderControls {
+            enabled: detail.deblur_enabled,
+            sigma_px: detail.deblur_sigma_px as f32,
+            strength: if detail.deblur_enabled {
+                detail.deblur_strength as f32 / 100.0
+            } else {
+                0.0
+            },
+        }
+    }
+
+    pub(crate) fn denoise_render_controls(&self) -> crate::denoise_render::DenoiseRenderControls {
+        let Some(detail) = self.detail_node() else {
+            return crate::denoise_render::DenoiseRenderControls {
+                chroma_strength: 0.0,
+                contrast_protection: 0.5,
+                detail: 0.5,
+                luma_strength: 0.0,
+                natural_grain: 0.0,
+                shadow_bias: 0.0,
+            };
+        };
+        crate::denoise_render::DenoiseRenderControls {
+            chroma_strength: detail.color_noise_reduction as f32 / 100.0,
+            contrast_protection: detail.denoise_contrast_protection as f32 / 100.0,
+            detail: detail.denoise_detail as f32 / 100.0,
+            luma_strength: detail.luma_noise_reduction as f32 / 100.0,
+            natural_grain: detail.denoise_natural_grain as f32 / 100.0,
+            shadow_bias: detail.denoise_shadow_bias as f32 / 100.0,
+        }
+    }
+
+    pub(crate) fn detail_macro_controls(&self) -> [f32; 3] {
+        self.detail_node().map_or([0.0; 3], |detail| {
+            [
+                detail.sharpness as f32 / 100.0,
+                detail.clarity as f32 / 100.0,
+                detail.structure as f32 / 100.0,
+            ]
+        })
+    }
+
+    pub(crate) fn all_adjustments(
+        &self,
+        is_raw: bool,
+        tonemapper_override: Option<u32>,
+    ) -> Result<AllAdjustments, String> {
+        let mut global = neutral_current_global_adjustments(is_raw, tonemapper_override);
+        macro_rules! apply {
+            ($field:ident) => {
+                if self.nodes.$field.enabled {
+                    self.nodes.$field.params.apply(&mut global);
+                }
+            };
+            ($field:ident ?) => {
+                if self.nodes.$field.enabled {
+                    self.nodes.$field.params.apply(&mut global)?;
+                }
+            };
+        }
+        apply!(scene_global_color_tone);
+        apply!(color_presence);
+        apply!(scene_to_view_transform?);
+        apply!(camera_input?);
+        apply!(detail_denoise_dehaze);
+        apply!(display_creative);
+        apply!(film_emulation?);
+        apply!(tone_equalizer);
+        apply!(point_color);
+        apply!(color_balance_rgb);
+        apply!(selective_color_mixer);
+        apply!(skin_tone_uniformity);
+        apply!(black_white_mixer);
+        apply!(channel_mixer);
+        apply!(luma_levels);
+        apply!(color_calibration);
+        apply!(perceptual_grading?);
+        if self.nodes.scene_curve.enabled {
+            self.nodes
+                .scene_curve
+                .params
+                .apply_legacy_curves(&mut global);
+        }
+        // Current RAW decoding applies the typed technical WB plan before the
+        // render graph. Keep the GPU stage neutral so preview/export cannot
+        // adapt the same source twice. Rendered sources still need this matrix.
+        if is_raw {
+            global.technical_white_balance = identity_gpu_mat3();
+        }
+        let masks = self
+            .layers()
+            .masks
+            .iter()
+            .filter(|layer| layer.visible)
+            .map(LayerV2::compile_mask);
+        Ok(assemble_all_adjustments(global, masks))
+    }
+
+    pub(crate) fn neutral_adjustments(
+        &self,
+        is_raw: bool,
+        tonemapper_override: Option<u32>,
+    ) -> AllAdjustments {
+        let _ = self;
+        assemble_all_adjustments(
+            neutral_current_global_adjustments(is_raw, tonemapper_override),
+            std::iter::empty(),
+        )
+    }
+
+    pub(crate) fn crop(&self) -> Option<crate::geometry::Crop> {
+        self.geometry_node()
+            .crop
+            .as_ref()
+            .map(|crop| crate::geometry::Crop {
+                x: crop.x,
+                y: crop.y,
+                width: crop.width,
+                height: crop.height,
+                unit: crate::geometry::CropUnit::Normalized,
+            })
+    }
+
+    pub(crate) fn geometry(&self) -> crate::geometry::GeometryParams {
+        let geometry = self.geometry_node();
+        let lens = &self.nodes.lens_correction.params;
+        let perspective_source_to_corrected =
+            crate::geometry::perspective::compile_perspective_plan(
+                &geometry.perspective_correction,
+            )
+            .map(|receipt| {
+                std::array::from_fn(|index| {
+                    receipt.plan.source_to_corrected[index / 3][index % 3] as f32
+                })
+            })
+            .unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+        let distortion = lens.lens_distortion_params.as_ref();
+        crate::geometry::GeometryParams {
+            distortion: geometry.transform_distortion as f32,
+            vertical: geometry.transform_vertical as f32,
+            horizontal: geometry.transform_horizontal as f32,
+            rotate: geometry.transform_rotate as f32,
+            aspect: geometry.transform_aspect as f32,
+            scale: geometry.transform_scale as f32,
+            x_offset: geometry.transform_x_offset as f32,
+            y_offset: geometry.transform_y_offset as f32,
+            lens_distortion_amount: f32::from(lens.lens_distortion_amount) / 100.0,
+            lens_vignette_amount: f32::from(lens.lens_vignette_amount) / 100.0,
+            lens_tca_amount: f32::from(lens.lens_tca_amount) / 100.0,
+            lens_distortion_enabled: lens.lens_distortion_enabled,
+            lens_tca_enabled: lens.lens_tca_enabled,
+            lens_vignette_enabled: lens.lens_vignette_enabled,
+            lens_dist_k1: distortion.map_or(0.0, |value| value.k1 as f32),
+            lens_dist_k2: distortion.map_or(0.0, |value| value.k2 as f32),
+            lens_dist_k3: distortion.map_or(0.0, |value| value.k3 as f32),
+            lens_model: distortion.map_or(0, |value| u32::from(value.model)),
+            tca_vr: distortion.map_or(1.0, |value| value.tca_vr as f32),
+            tca_vb: distortion.map_or(1.0, |value| value.tca_vb as f32),
+            vig_k1: distortion.map_or(0.0, |value| value.vig_k1 as f32),
+            vig_k2: distortion.map_or(0.0, |value| value.vig_k2 as f32),
+            vig_k3: distortion.map_or(0.0, |value| value.vig_k3 as f32),
+            perspective_source_to_corrected,
+        }
+    }
+
+    pub(crate) fn masks(&self) -> Result<Vec<crate::mask_generation::MaskDefinition>, String> {
+        Ok(self
+            .layers()
+            .masks
+            .iter()
+            .map(LayerV2::mask_definition)
+            .collect())
+    }
+
+    pub(crate) fn retouch_layers(&self) -> &[crate::retouch_render::CurrentRetouchLayer] {
+        &self.retouch_layers
+    }
+
+    fn layers(&self) -> &LayersV2 {
+        &self.nodes.layers.params
+    }
+
+    #[cfg(test)]
+    pub(crate) fn scheduler_test_stub() -> Self {
+        serde_json::from_str::<EditDocumentV2>(include_str!(
+            "../../../fixtures/edit-document/current-neutral-v2.json"
+        ))
+        .expect("neutral current document fixture parses")
+        .compile()
+        .expect("neutral current document fixture compiles")
+    }
+}
+
+fn neutral_current_global_adjustments(
+    is_raw: bool,
+    tonemapper_override: Option<u32>,
+) -> GlobalAdjustments {
+    let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
+    GlobalAdjustments {
+        edit_graph_version: 2.0,
+        technical_white_balance: identity_gpu_mat3(),
+        is_raw_image: u32::from(is_raw),
+        vignette_midpoint: 0.5,
+        vignette_feather: 0.5,
+        grain_size: 0.25,
+        grain_roughness: 0.5,
+        lut_intensity: 1.0,
+        agx_pipe_to_rendering_matrix: pipe_to_rendering,
+        agx_rendering_to_pipe_matrix: rendering_to_pipe,
+        rapid_view_parameters0: [0.18, -10.0, 6.5, 1.15],
+        rapid_view_parameters1: [0.55, 0.35, 0.5, 0.25],
+        rapid_view_parameters2: [0.0; 4],
+        levels: Default::default(),
+        tone_equalizer: Default::default(),
+        tonemapper_mode: tonemapper_override.unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
+fn identity_gpu_mat3() -> crate::adjustments::abi::GpuMat3 {
+    crate::adjustments::abi::GpuMat3 {
+        col0: [1.0, 0.0, 0.0, 0.0],
+        col1: [0.0, 1.0, 0.0, 0.0],
+        col2: [0.0, 0.0, 1.0, 0.0],
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentV2CopyPayload {
-    nodes: BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    nodes: BTreeMap<EditNodeTypeV2, UntypedEditNodeEnvelopeV2>,
     schema_version: u8,
 }
 
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
+struct FlatNodeProjectionV2 {
+    nodes: BTreeMap<EditNodeTypeV2, UntypedEditNodeEnvelopeV2>,
+}
+
+impl EditNodesV2 {
+    fn validate(&self) -> Result<(), String> {
+        macro_rules! contract {
+            ($field:ident, $kind:ident) => {
+                self.$field.validate_contract(EditNodeTypeV2::$kind)?;
+            };
+        }
+        contract!(source_decode, SourceDecode);
+        contract!(scene_global_color_tone, SceneGlobalColorTone);
+        contract!(scene_to_view_transform, SceneToViewTransform);
+        contract!(color_presence, ColorPresence);
+        contract!(scene_curve, SceneCurve);
+        contract!(tone_equalizer, ToneEqualizer);
+        contract!(display_creative, DisplayCreative);
+        contract!(film_emulation, FilmEmulation);
+        contract!(detail_denoise_dehaze, DetailDenoiseDehaze);
+        contract!(point_color, PointColor);
+        contract!(color_balance_rgb, ColorBalanceRgb);
+        contract!(selective_color_mixer, SelectiveColorMixer);
+        contract!(skin_tone_uniformity, SkinToneUniformity);
+        contract!(black_white_mixer, BlackWhiteMixer);
+        contract!(channel_mixer, ChannelMixer);
+        contract!(luma_levels, LumaLevels);
+        contract!(perceptual_grading, PerceptualGrading);
+        contract!(camera_input, CameraInput);
+        contract!(lens_correction, LensCorrection);
+        contract!(color_calibration, ColorCalibration);
+        contract!(geometry, Geometry);
+        contract!(layers, Layers);
+        contract!(source_artifacts, SourceArtifacts);
+
+        self.scene_global_color_tone.params.compile()?;
+        self.scene_to_view_transform.params.compile()?;
+        self.color_presence.params.compile()?;
+        self.scene_curve.params.validate()?;
+        self.tone_equalizer.params.validate()?;
+        self.display_creative.params.validate()?;
+        self.film_emulation.params.validate()?;
+        self.detail_denoise_dehaze.params.validate()?;
+        self.point_color.params.validate()?;
+        self.color_balance_rgb.params.validate()?;
+        self.selective_color_mixer.params.validate()?;
+        self.skin_tone_uniformity
+            .params
+            .skin_tone_uniformity
+            .validate()?;
+        self.black_white_mixer.params.validate()?;
+        self.channel_mixer.params.validate()?;
+        self.luma_levels.params.validate()?;
+        self.perceptual_grading.params.validate()?;
+        self.camera_input.params.validate()?;
+        self.lens_correction.params.validate()?;
+        self.color_calibration.params.validate()?;
+        self.geometry.params.validate()?;
+        validate_layers(&self.layers.params)?;
+        validate_source_artifacts(&self.source_artifacts.params)?;
+        Ok(())
+    }
+}
+
 impl EditDocumentV2 {
-    pub(crate) fn into_render_adjustments(self) -> Result<Value, String> {
+    #[cfg(test)]
+    fn into_render_adjustments(self) -> Result<Value, String> {
+        let mut value = serde_json::to_value(self)
+            .map_err(|error| format!("EditDocumentV2 test adapter cannot serialize: {error}"))?;
+        normalize_test_numbers(&mut value);
+        compile_edit_document_v2(&value)
+    }
+
+    pub(crate) fn compile(self) -> Result<CompiledCurrentEditDocument, String> {
         self.validate_document_contract()?;
-        let mut adjustments = match self.extensions.get("legacyAdjustments") {
-            Some(Value::Object(legacy)) => legacy.clone(),
-            Some(_) => {
-                return Err(
-                    "EditDocumentV2 extensions.legacyAdjustments must be an object".to_string(),
-                );
-            }
-            None => Map::new(),
-        };
-        if adjustments.contains_key("referenceMatchApplicationReceipt") {
-            return Err(
-                "EditDocumentV2 referenceMatchApplicationReceipt must be owned by provenance"
-                    .to_string(),
-            );
-        }
-        adjustments.remove("generatedProfile");
-
-        for (node_key, node) in &self.nodes {
-            if let Some(conflicting_key) = node
-                .params
-                .keys()
-                .find(|parameter| adjustments.contains_key(*parameter))
-            {
-                return Err(format!(
-                    "EditDocumentV2 node '{}' conflicts with quarantined legacy field '{conflicting_key}'",
-                    node_key.contract().0
-                ));
-            }
-        }
-
-        let section_visibility = ["basic", "color", "curves", "details"]
-            .into_iter()
-            .map(|section| {
-                let enabled = self
-                    .nodes
-                    .iter()
-                    .filter(|(node_type, _)| node_type.editor_section() == Some(section))
-                    .all(|(_, node)| node.enabled);
-                (section.to_string(), Value::Bool(enabled))
+        let _ = self.extensions.quarantined_nodes;
+        let retouch_layers = self
+            .nodes
+            .layers
+            .params
+            .masks
+            .iter()
+            .map(|layer| crate::retouch_render::CurrentRetouchLayer {
+                opacity: layer.opacity as f32,
+                retouch_clone_source: layer.retouch_clone_source.clone(),
+                retouch_remove_source: layer.retouch_remove_source.clone(),
+                visible: layer.visible,
             })
             .collect();
-        adjustments.insert(
-            "sectionVisibility".to_string(),
-            Value::Object(section_visibility),
-        );
-        let effects_enabled = self
-            .nodes
-            .get(&EditNodeTypeV2::DisplayCreative)
-            .is_none_or(|node| node.enabled);
-        adjustments.insert("effectsEnabled".to_string(), Value::Bool(effects_enabled));
-
-        for (node_key, node) in self.nodes {
-            validate_node_contract(node_key, &node)?;
-            let compiled_params = compile_node_params(node_key, &node)?;
-            if node.enabled {
-                adjustments.extend(compiled_params);
-            }
-        }
-        Ok(Value::Object(adjustments))
+        Ok(CompiledCurrentEditDocument {
+            nodes: self.nodes,
+            retouch_layers,
+        })
     }
 
     fn validate_document_contract(&self) -> Result<(), String> {
@@ -2373,39 +3744,25 @@ impl EditDocumentV2 {
                 self.graph_process
             ));
         }
-        if let Some(migration) = &self.migration {
-            if migration.source_schema_version != LEGACY_SOURCE_SCHEMA_VERSION {
-                return Err(format!(
-                    "Unsupported EditDocumentV2 migration sourceSchemaVersion: {}",
-                    migration.source_schema_version
-                ));
-            }
-            let _ = (
-                &migration.defaulted,
-                &migration.disabled,
-                &migration.mapped,
-                &migration.quarantined,
-            );
-        }
-        if self.nodes.contains_key(&EditNodeTypeV2::ColorPresence)
-            && self
-                .nodes
-                .get(&EditNodeTypeV2::SceneGlobalColorTone)
-                .is_some_and(|node| {
-                    ["hue", "saturation", "vibrance"]
-                        .iter()
-                        .any(|field| node.params.contains_key(*field))
-                })
-        {
+        self.nodes.validate()?;
+        if self.nodes.geometry.params != self.geometry {
             return Err(
-                "EditDocumentV2 color_presence conflicts with legacy scene-global Color Presence fields"
-                    .to_string(),
+                "EditDocumentV2 geometry domain disagrees with its node params".to_string(),
             );
         }
-        validate_geometry_domain(&self.nodes, &self.geometry)?;
-        validate_layers_domain(&self.nodes, &self.layers)?;
-        validate_source_decode_domain(&self.nodes, &self.source_decode)?;
-        validate_source_artifact_domain(&self.nodes, &self.source_artifacts)?;
+        if self.nodes.layers.params != self.layers {
+            return Err("EditDocumentV2 layers domain disagrees with its node params".to_string());
+        }
+        if self.nodes.source_decode.params != self.source_decode {
+            return Err(
+                "EditDocumentV2 source_decode domain disagrees with its node params".to_string(),
+            );
+        }
+        if self.nodes.source_artifacts.params != self.source_artifacts {
+            return Err(
+                "EditDocumentV2 source_artifacts domain disagrees with its node params".to_string(),
+            );
+        }
         if self
             .provenance
             .reference_match_application_receipt
@@ -2417,6 +3774,23 @@ impl EditDocumentV2 {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+fn normalize_test_numbers(value: &mut Value) {
+    match value {
+        Value::Array(values) => values.iter_mut().for_each(normalize_test_numbers),
+        Value::Object(values) => values.values_mut().for_each(normalize_test_numbers),
+        Value::Number(number) if number.is_f64() => {
+            let rounded = (number.as_f64().unwrap() * 1_000_000.0).round() / 1_000_000.0;
+            *number = if rounded.fract() == 0.0 {
+                serde_json::Number::from(rounded as i64)
+            } else {
+                serde_json::Number::from_f64(rounded).unwrap()
+            };
+        }
+        _ => {}
     }
 }
 
@@ -2457,7 +3831,38 @@ pub(crate) fn validate_edit_document_v2_copy_payload(value: &Value) -> Result<()
 pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {
     let document: EditDocumentV2 = serde_json::from_value(value.clone())
         .map_err(|error| format!("EditDocumentV2 render payload is invalid: {error}"))?;
-    document.into_render_adjustments()
+    document.validate_document_contract()?;
+    let projection: FlatNodeProjectionV2 = serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 flat adapter is invalid: {error}"))?;
+    let mut adjustments = Map::new();
+    let section_visibility = ["basic", "color", "curves", "details"]
+        .into_iter()
+        .map(|section| {
+            let enabled = projection
+                .nodes
+                .iter()
+                .filter(|(node_type, _)| node_type.editor_section() == Some(section))
+                .all(|(_, node)| node.enabled);
+            (section.to_string(), Value::Bool(enabled))
+        })
+        .collect();
+    adjustments.insert(
+        "sectionVisibility".to_string(),
+        Value::Object(section_visibility),
+    );
+    let effects_enabled = projection
+        .nodes
+        .get(&EditNodeTypeV2::DisplayCreative)
+        .is_none_or(|node| node.enabled);
+    adjustments.insert("effectsEnabled".to_string(), Value::Bool(effects_enabled));
+    for (node_key, node) in projection.nodes {
+        validate_node_contract(node_key, &node)?;
+        compile_node_params(node_key, &node)?;
+        if node.enabled {
+            adjustments.extend(node.params);
+        }
+    }
+    Ok(Value::Object(adjustments))
 }
 
 /// Resolve the single source-decode projection persisted beside a V2 document.
@@ -2477,11 +3882,7 @@ pub(crate) fn resolve_source_decode_adjustments(
     let document: EditDocumentV2 = serde_json::from_value(value.clone())
         .map_err(|error| format!("EditDocumentV2 source-decode authority is invalid: {error}"))?;
     document.validate_document_contract()?;
-    let Some(node) = document.nodes.get(&EditNodeTypeV2::SourceDecode) else {
-        return Ok(Value::Object(resolved));
-    };
-    validate_node_contract(EditNodeTypeV2::SourceDecode, node)?;
-    let source_decode = parse_source_decode(&node.params)?;
+    let source_decode = &document.nodes.source_decode.params;
     let authoritative = serde_json::to_value(source_decode.raw_processing_mode_override)
         .map_err(|error| format!("Source-decode authority cannot serialize: {error}"))?;
     match resolved.get("rawProcessingModeOverride") {
@@ -2503,19 +3904,46 @@ pub(crate) fn resolve_source_decode_adjustments(
     Ok(Value::Object(resolved))
 }
 
+/// Transitional adapter result used only by copy/flat compatibility APIs.
+/// Current preview and render compilation never constructs this enum.
+#[allow(dead_code)]
+enum LegacyCompiledNodeParamsV2 {
+    BlackWhiteMixer(BlackWhiteMixerV2),
+    CameraInput(CameraInputV2),
+    ChannelMixer(ChannelMixerV2),
+    ColorBalanceRgb(ColorBalanceRgbV2),
+    ColorCalibration(ColorCalibrationV2),
+    ColorPresence(ColorPresenceParamsV2),
+    DetailDenoiseDehaze(DetailDenoiseDehazeV2),
+    DisplayCreative(DisplayCreativeV2),
+    FilmEmulation(FilmEmulationV2),
+    Geometry(GeometryV2),
+    Layers(LayersV2),
+    LensCorrection(LensCorrectionV2),
+    LumaLevels(LumaLevelsV2),
+    PerceptualGrading(PerceptualGradingV2),
+    PointColor(PointColorV2),
+    SceneCurve(SceneCurveV2),
+    SceneGlobalColorTone(SceneGlobalColorToneParamsV2),
+    SceneToViewTransform(SceneToViewTransformV2),
+    SelectiveColorMixer(SelectiveColorMixerV2),
+    SkinToneUniformity(SkinToneUniformityV2),
+    SourceArtifacts(SourceArtifactsV2),
+    SourceDecode(SourceDecodeV2),
+    ToneEqualizer(ToneEqualizerV2),
+}
+
 fn compile_node_params(
     node_key: EditNodeTypeV2,
-    node: &EditNodeEnvelopeV2,
-) -> Result<Map<String, Value>, String> {
+    node: &UntypedEditNodeEnvelopeV2,
+) -> Result<LegacyCompiledNodeParamsV2, String> {
     match node_key {
-        EditNodeTypeV2::SourceDecode => {
-            parse_source_decode(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::CameraInput => {
-            parse_camera_input(&node.params)?;
-            Ok(node.params.clone())
-        }
+        EditNodeTypeV2::SourceDecode => Ok(LegacyCompiledNodeParamsV2::SourceDecode(
+            parse_source_decode(&node.params)?,
+        )),
+        EditNodeTypeV2::CameraInput => Ok(LegacyCompiledNodeParamsV2::CameraInput(
+            parse_camera_input(&node.params)?,
+        )),
         EditNodeTypeV2::SceneGlobalColorTone => {
             let params = serde_json::from_value::<SceneGlobalColorToneParamsV2>(Value::Object(
                 node.params.clone(),
@@ -2524,7 +3952,7 @@ fn compile_node_params(
                 format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
             })?;
             params.compile()?;
-            Ok(node.params.clone())
+            Ok(LegacyCompiledNodeParamsV2::SceneGlobalColorTone(params))
         }
         EditNodeTypeV2::SceneToViewTransform => {
             let params = serde_json::from_value::<SceneToViewTransformV2>(Value::Object(
@@ -2534,7 +3962,7 @@ fn compile_node_params(
                 format!("EditDocumentV2 node 'scene_to_view_transform' has invalid params: {error}")
             })?;
             params.compile()?;
-            Ok(node.params.clone())
+            Ok(LegacyCompiledNodeParamsV2::SceneToViewTransform(params))
         }
         EditNodeTypeV2::ColorPresence => {
             let params =
@@ -2543,119 +3971,66 @@ fn compile_node_params(
                         format!("EditDocumentV2 node 'color_presence' has invalid params: {error}")
                     })?;
             params.compile()?;
-            Ok(node.params.clone())
+            Ok(LegacyCompiledNodeParamsV2::ColorPresence(params))
         }
-        EditNodeTypeV2::SceneCurve => {
-            parse_scene_curve(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::ToneEqualizer => {
-            parse_tone_equalizer(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::DetailDenoiseDehaze => {
-            parse_detail_denoise_dehaze(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::PointColor => {
-            parse_point_color(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::ColorBalanceRgb => {
-            parse_color_balance_rgb(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::SelectiveColorMixer => {
-            parse_selective_color_mixer(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::SkinToneUniformity => {
-            parse_skin_tone_uniformity(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::BlackWhiteMixer => {
-            parse_black_white_mixer(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::ChannelMixer => {
-            parse_channel_mixer(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::LumaLevels => {
-            parse_luma_levels(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::PerceptualGrading => {
-            parse_perceptual_grading(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::ColorCalibration => {
-            parse_color_calibration(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::DisplayCreative => {
-            parse_display_creative(&node.params)?;
-            Ok(node.params.clone())
-        }
+        EditNodeTypeV2::SceneCurve => Ok(LegacyCompiledNodeParamsV2::SceneCurve(
+            parse_scene_curve(&node.params)?,
+        )),
+        EditNodeTypeV2::ToneEqualizer => Ok(LegacyCompiledNodeParamsV2::ToneEqualizer(
+            parse_tone_equalizer(&node.params)?,
+        )),
+        EditNodeTypeV2::DetailDenoiseDehaze => Ok(LegacyCompiledNodeParamsV2::DetailDenoiseDehaze(
+            parse_detail_denoise_dehaze(&node.params)?,
+        )),
+        EditNodeTypeV2::PointColor => Ok(LegacyCompiledNodeParamsV2::PointColor(
+            parse_point_color(&node.params)?,
+        )),
+        EditNodeTypeV2::ColorBalanceRgb => Ok(LegacyCompiledNodeParamsV2::ColorBalanceRgb(
+            parse_color_balance_rgb(&node.params)?,
+        )),
+        EditNodeTypeV2::SelectiveColorMixer => Ok(LegacyCompiledNodeParamsV2::SelectiveColorMixer(
+            parse_selective_color_mixer(&node.params)?,
+        )),
+        EditNodeTypeV2::SkinToneUniformity => Ok(LegacyCompiledNodeParamsV2::SkinToneUniformity(
+            parse_skin_tone_uniformity(&node.params)?,
+        )),
+        EditNodeTypeV2::BlackWhiteMixer => Ok(LegacyCompiledNodeParamsV2::BlackWhiteMixer(
+            parse_black_white_mixer(&node.params)?,
+        )),
+        EditNodeTypeV2::ChannelMixer => Ok(LegacyCompiledNodeParamsV2::ChannelMixer(
+            parse_channel_mixer(&node.params)?,
+        )),
+        EditNodeTypeV2::LumaLevels => Ok(LegacyCompiledNodeParamsV2::LumaLevels(
+            parse_luma_levels(&node.params)?,
+        )),
+        EditNodeTypeV2::PerceptualGrading => Ok(LegacyCompiledNodeParamsV2::PerceptualGrading(
+            parse_perceptual_grading(&node.params)?,
+        )),
+        EditNodeTypeV2::ColorCalibration => Ok(LegacyCompiledNodeParamsV2::ColorCalibration(
+            parse_color_calibration(&node.params)?,
+        )),
+        EditNodeTypeV2::DisplayCreative => Ok(LegacyCompiledNodeParamsV2::DisplayCreative(
+            parse_display_creative(&node.params)?,
+        )),
         EditNodeTypeV2::FilmEmulation => {
             let film: FilmEmulationV2 = serde_json::from_value(Value::Object(node.params.clone()))
                 .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))?;
             film.validate()?;
-            Ok(node.params.clone())
+            Ok(LegacyCompiledNodeParamsV2::FilmEmulation(film))
         }
-        EditNodeTypeV2::Geometry => {
-            parse_geometry(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::LensCorrection => {
-            parse_lens_correction(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::SourceArtifacts => {
-            parse_source_artifacts(&node.params)?;
-            Ok(node.params.clone())
-        }
-        EditNodeTypeV2::Layers => {
-            parse_layers(&node.params)?;
-            compile_layers_legacy_projection(&node.params)
-        }
+        EditNodeTypeV2::Geometry => Ok(LegacyCompiledNodeParamsV2::Geometry(parse_geometry(
+            &node.params,
+        )?)),
+        EditNodeTypeV2::LensCorrection => Ok(LegacyCompiledNodeParamsV2::LensCorrection(
+            parse_lens_correction(&node.params)?,
+        )),
+        EditNodeTypeV2::SourceArtifacts => Ok(LegacyCompiledNodeParamsV2::SourceArtifacts(
+            parse_source_artifacts(&node.params)?,
+        )),
+        EditNodeTypeV2::Layers => Ok(LegacyCompiledNodeParamsV2::Layers(parse_layers(
+            &node.params,
+        )?)),
     }
-}
-
-fn compile_layers_legacy_projection(
-    params: &Map<String, Value>,
-) -> Result<Map<String, Value>, String> {
-    let mut compiled = params.clone();
-    let Some(masks) = compiled.get_mut("masks").and_then(Value::as_array_mut) else {
-        return Err("EditDocumentV2 layers masks must be an array".to_string());
-    };
-    for mask in masks {
-        let Some(mask_object) = mask.as_object_mut() else {
-            return Err("EditDocumentV2 layer must be an object".to_string());
-        };
-        let edit_nodes = mask_object
-            .get("editNodes")
-            .and_then(Value::as_object)
-            .ok_or_else(|| "EditDocumentV2 layer editNodes must be an object".to_string())?;
-        let visibility = edit_nodes
-            .iter()
-            .map(|(node_type, envelope)| {
-                let enabled = envelope
-                    .get("enabled")
-                    .and_then(Value::as_bool)
-                    .ok_or_else(|| {
-                        format!("EditDocumentV2 layer node '{node_type}' enabled must be boolean")
-                    })?;
-                Ok((node_type.clone(), Value::Bool(enabled)))
-            })
-            .collect::<Result<Map<String, Value>, String>>()?;
-        let adjustments = mask_object
-            .get_mut("adjustments")
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| "EditDocumentV2 layer adjustments must be an object".to_string())?;
-        adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
-    }
-    Ok(compiled)
 }
 
 fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, String> {
@@ -2760,7 +4135,7 @@ fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreative
 
 fn validate_node_contract(
     node_key: EditNodeTypeV2,
-    node: &EditNodeEnvelopeV2,
+    node: &UntypedEditNodeEnvelopeV2,
 ) -> Result<(), String> {
     let (node_name, process, implementation_version) = node_key.contract();
     if node.node_type != node_key {
@@ -2791,22 +4166,14 @@ fn parse_source_decode(params: &Map<String, Value>) -> Result<SourceDecodeV2, St
         .map_err(|error| format!("EditDocumentV2 source_decode is invalid: {error}"))
 }
 
-fn validate_source_decode_domain(
-    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    domain: &SourceDecodeV2,
-) -> Result<(), String> {
-    let Some(node) = nodes.get(&EditNodeTypeV2::SourceDecode) else {
-        return Ok(());
-    };
-    if &parse_source_decode(&node.params)? == domain {
-        return Ok(());
-    }
-    Err("EditDocumentV2 source_decode domain disagrees with its node params".to_string())
-}
-
 fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifactsV2, String> {
     let artifacts: SourceArtifactsV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 source artifacts are invalid: {error}"))?;
+    validate_source_artifacts(&artifacts)?;
+    Ok(artifacts)
+}
+
+fn validate_source_artifacts(artifacts: &SourceArtifactsV2) -> Result<(), String> {
     let mut patch_ids = std::collections::BTreeSet::new();
     for patch in &artifacts.ai_patches {
         if patch.id.trim().is_empty() || !patch_ids.insert(&patch.id) {
@@ -2826,7 +4193,7 @@ fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifacts
             }
         }
     }
-    Ok(artifacts)
+    Ok(())
 }
 
 fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
@@ -2845,35 +4212,14 @@ fn parse_lens_correction(params: &Map<String, Value>) -> Result<LensCorrectionV2
     Ok(lens_correction)
 }
 
-fn validate_source_artifact_domain(
-    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    domain: &SourceArtifactsV2,
-) -> Result<(), String> {
-    let Some(node) = nodes.get(&EditNodeTypeV2::SourceArtifacts) else {
-        return Ok(());
-    };
-    if &parse_source_artifacts(&node.params)? == domain {
-        return Ok(());
-    }
-    Err("EditDocumentV2 source_artifacts domain disagrees with its node params".to_string())
-}
-
-fn validate_geometry_domain(
-    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    domain: &GeometryV2,
-) -> Result<(), String> {
-    let Some(node) = nodes.get(&EditNodeTypeV2::Geometry) else {
-        return Ok(());
-    };
-    if &parse_geometry(&node.params)? == domain {
-        return Ok(());
-    }
-    Err("EditDocumentV2 geometry domain disagrees with its node params".to_string())
-}
-
 fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
     let layers: LayersV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 layers are invalid: {error}"))?;
+    validate_layers(&layers)?;
+    Ok(layers)
+}
+
+fn validate_layers(layers: &LayersV2) -> Result<(), String> {
     let mut layer_ids = std::collections::BTreeSet::new();
     for layer in &layers.masks {
         if layer.id.trim().is_empty() || !layer_ids.insert(&layer.id) {
@@ -2888,11 +4234,7 @@ fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
         if layer.edit_node_schema_version != 1 {
             return Err("EditDocumentV2 layer editNodeSchemaVersion must be 1".to_string());
         }
-        if layer.adjustments.contains_key("sectionVisibility") {
-            return Err(
-                "EditDocumentV2 layer adjustments must not contain sectionVisibility".to_string(),
-            );
-        }
+        layer.adjustments.validate()?;
         if layer
             .layer_group_id
             .as_ref()
@@ -2937,21 +4279,7 @@ fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
             layer.visible,
         );
     }
-    Ok(layers)
-}
-
-fn validate_layers_domain(
-    nodes: &BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
-    domain: &Map<String, Value>,
-) -> Result<(), String> {
-    let domain = parse_layers(domain)?;
-    let Some(node) = nodes.get(&EditNodeTypeV2::Layers) else {
-        return Ok(());
-    };
-    if parse_layers(&node.params)? == domain {
-        return Ok(());
-    }
-    Err("EditDocumentV2 layers domain disagrees with its node params".to_string())
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2971,6 +4299,69 @@ mod tests {
     use crate::render::film_emulation::{
         apply_pixel as apply_film_pixel, parse_node as parse_film_node,
     };
+
+    fn compile_test_document(value: Value) -> Result<Value, String> {
+        super::compile_edit_document_v2(&value)
+    }
+
+    #[test]
+    fn typed_current_fingerprint_is_serialization_stable_and_parameter_sensitive() {
+        let document = current_document();
+        let compact = serde_json::to_string(&document).unwrap();
+        let pretty = serde_json::to_string_pretty(&document).unwrap();
+        let compact_fingerprint = serde_json::from_str::<EditDocumentV2>(&compact)
+            .unwrap()
+            .compile()
+            .unwrap()
+            .content_fingerprint();
+        let pretty_fingerprint = serde_json::from_str::<EditDocumentV2>(&pretty)
+            .unwrap()
+            .compile()
+            .unwrap()
+            .content_fingerprint();
+        assert_eq!(compact_fingerprint, pretty_fingerprint);
+
+        let mut changed = document;
+        changed["nodes"]["scene_global_color_tone"]["params"]["exposure"] = json!(0.25);
+        let changed_fingerprint = serde_json::from_value::<EditDocumentV2>(changed)
+            .unwrap()
+            .compile()
+            .unwrap()
+            .content_fingerprint();
+        assert_ne!(compact_fingerprint, changed_fingerprint);
+    }
+
+    #[test]
+    fn typed_raw_decode_white_balance_is_not_reapplied_by_render_graph() {
+        let mut document = current_document();
+        let technical = &mut document["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"];
+        technical["mode"] = json!("chromaticity");
+        technical["source"] = json!("user");
+        technical["x"] = json!(0.4);
+        technical["y"] = json!(0.35);
+        let compiled = serde_json::from_value::<EditDocumentV2>(document)
+            .unwrap()
+            .compile()
+            .unwrap();
+        let raw = compiled.all_adjustments(true, None).unwrap();
+        let rendered = compiled.all_adjustments(false, None).unwrap();
+        assert_eq!(
+            raw.global.technical_white_balance.col0,
+            [1.0, 0.0, 0.0, 0.0]
+        );
+        assert_eq!(
+            raw.global.technical_white_balance.col1,
+            [0.0, 1.0, 0.0, 0.0]
+        );
+        assert_eq!(
+            raw.global.technical_white_balance.col2,
+            [0.0, 0.0, 1.0, 0.0]
+        );
+        assert_ne!(
+            rendered.global.technical_white_balance.col0,
+            raw.global.technical_white_balance.col0
+        );
+    }
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -3029,6 +4420,9 @@ mod tests {
             "denoiseDetail": 50,
             "denoiseNaturalGrain": 0,
             "denoiseShadowBias": 0,
+            "dustSpotMinRadiusPx": 2,
+            "dustSpotOverlayEnabled": false,
+            "dustSpotSensitivity": 50,
             "localContrastHaloGuard": 62,
             "localContrastMidtoneMask": 44,
             "localContrastRadiusPx": 36,
@@ -3330,27 +4724,42 @@ mod tests {
         })
     }
 
-    fn document_with_legacy(legacy: Value) -> Value {
+    fn current_document() -> Value {
         let mut document = json!({
-            "extensions": { "legacyAdjustments": legacy },
+            "extensions": {},
             "geometry": {
                 "aspectRatio": null,
                 "crop": { "height": 0.8, "unit": "normalized", "width": 0.9, "x": 0.04, "y": 0.06 },
                 "flipHorizontal": false,
                 "flipVertical": true,
                 "orientationSteps": 1,
-                "rotation": 0.5
+                "perspectiveCorrection": {
+                    "amount": 100,
+                    "cropPolicy": "auto_crop",
+                    "guides": [],
+                    "mode": "off",
+                    "resolvedPlan": null
+                },
+                "rotation": 0.5,
+                "transformAspect": 0,
+                "transformDistortion": 0,
+                "transformHorizontal": 0,
+                "transformRotate": 0,
+                "transformScale": 100,
+                "transformVertical": 0,
+                "transformXOffset": 0,
+                "transformYOffset": 0
             },
             "graphProcess": "scene_referred_v2",
             "layers": { "masks": [] },
-            "migration": {
-                "defaulted": [],
-                "disabled": [],
-                "mapped": ["geometry.crop", "geometry.rotation", "layers.masks", "scene_global_color_tone.exposure"],
-                "quarantined": ["vibrance"],
-                "sourceSchemaVersion": 1
-            },
             "nodes": {
+                "source_decode": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": { "rawProcessingModeOverride": null },
+                    "process": "scene_referred_v2",
+                    "type": "source_decode"
+                },
                 "scene_global_color_tone": {
                     "enabled": true,
                     "implementationVersion": 1,
@@ -3360,12 +4769,37 @@ mod tests {
                         "contrast": 18,
                         "exposure": 0.75,
                         "highlights": -22,
-                        "saturation": 7,
                         "shadows": 14,
                         "whites": 9
                     },
                     "process": "scene_referred_v2",
                     "type": "scene_global_color_tone"
+                },
+                "scene_to_view_transform": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": {
+                        "toneMapper": "rapidView",
+                        "viewTransform": {
+                            "chromaCompression": 0.25,
+                            "contrast": 1.15,
+                            "latitude": 0.55,
+                            "middleGrey": 0.18,
+                            "shoulder": 0.5,
+                            "sourceBlackEv": -10,
+                            "sourceWhiteEv": 6.5,
+                            "toe": 0.35
+                        }
+                    },
+                    "process": "scene_referred_v2",
+                    "type": "scene_to_view_transform"
+                },
+                "color_presence": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": { "hue": 0, "saturation": 7, "vibrance": 0 },
+                    "process": "scene_referred_v2",
+                    "type": "color_presence"
                 },
                 "scene_curve": {
                     "enabled": true,
@@ -3387,6 +4821,13 @@ mod tests {
                     "params": display_creative_params(),
                     "process": "scene_referred_v2",
                     "type": "display_creative"
+                },
+                "film_emulation": {
+                    "enabled": true,
+                    "implementationVersion": 1,
+                    "params": { "filmEmulation": null },
+                    "process": "scene_referred_v2",
+                    "type": "film_emulation"
                 },
                 "detail_denoise_dehaze": {
                     "enabled": true,
@@ -3464,7 +4905,22 @@ mod tests {
                         "flipHorizontal": false,
                         "flipVertical": true,
                         "orientationSteps": 1,
-                        "rotation": 0.5
+                        "perspectiveCorrection": {
+                            "amount": 100,
+                            "cropPolicy": "auto_crop",
+                            "guides": [],
+                            "mode": "off",
+                            "resolvedPlan": null
+                        },
+                        "rotation": 0.5,
+                        "transformAspect": 0,
+                        "transformDistortion": 0,
+                        "transformHorizontal": 0,
+                        "transformRotate": 0,
+                        "transformScale": 100,
+                        "transformVertical": 0,
+                        "transformXOffset": 0,
+                        "transformYOffset": 0
                     },
                     "process": "scene_referred_v2",
                     "type": "geometry"
@@ -3504,8 +4960,9 @@ mod tests {
                     "type": "source_artifacts"
                 }
             },
-            "provenance": {},
+            "provenance": { "referenceMatchApplicationReceipt": null },
             "schemaVersion": 2,
+            "sourceDecode": { "rawProcessingModeOverride": null },
             "sourceArtifacts": { "aiPatches": [] }
         });
         document["nodes"]["color_balance_rgb"] = color_balance_rgb_node();
@@ -3537,7 +4994,7 @@ mod tests {
     }
 
     fn document_with_source_decode(mode: Value) -> Value {
-        let mut document = document_with_legacy(json!({}));
+        let mut document = current_document();
         document["sourceDecode"] = json!({ "rawProcessingModeOverride": mode });
         document["nodes"]["source_decode"] = json!({
             "enabled": true,
@@ -3550,7 +5007,7 @@ mod tests {
     }
 
     fn document_with_scene_to_view_transform(contrast: f64) -> Value {
-        let mut document = document_with_legacy(json!({ "rawEngineEditGraphVersion": 2 }));
+        let mut document = current_document();
         document["nodes"]["scene_to_view_transform"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -3574,8 +5031,50 @@ mod tests {
     }
 
     fn layer() -> Value {
+        let document = current_document();
+        let scene = &document["nodes"]["scene_global_color_tone"]["params"];
+        let presence = &document["nodes"]["color_presence"]["params"];
+        let curves = &document["nodes"]["scene_curve"]["params"];
+        let detail = &document["nodes"]["detail_denoise_dehaze"]["params"];
+        let creative = &document["nodes"]["display_creative"]["params"];
+        let selective = &document["nodes"]["selective_color_mixer"]["params"];
+        let grading = &document["nodes"]["perceptual_grading"]["params"];
+        let tone_equalizer = &document["nodes"]["tone_equalizer"]["params"];
         json!({
-            "adjustments": { "exposure": 0.4 },
+            "adjustments": {
+                "blacks": scene["blacks"],
+                "brightness": scene["brightness"],
+                "clarity": detail["clarity"],
+                "colorGrading": grading["colorGrading"],
+                "perceptualGradingV1": grading["perceptualGradingV1"],
+                "colorNoiseReduction": detail["colorNoiseReduction"],
+                "contrast": scene["contrast"],
+                "curves": curves["curves"],
+                "pointCurves": curves["pointCurves"],
+                "parametricCurve": curves["parametricCurve"],
+                "curveMode": curves["curveMode"],
+                "dehaze": detail["dehaze"],
+                "effectsEnabled": true,
+                "exposure": 0.4,
+                "flareAmount": creative["flareAmount"],
+                "glowAmount": creative["glowAmount"],
+                "halationAmount": creative["halationAmount"],
+                "highlights": scene["highlights"],
+                "hue": presence["hue"],
+                "hsl": selective["hsl"],
+                "selectiveColorRangeControls": selective["selectiveColorRangeControls"],
+                "lumaNoiseReduction": detail["lumaNoiseReduction"],
+                "saturation": presence["saturation"],
+                "shadows": scene["shadows"],
+                "sharpness": detail["sharpness"],
+                "sharpnessThreshold": detail["sharpnessThreshold"],
+                "structure": detail["structure"],
+                "temperature": 0,
+                "tint": 0,
+                "toneEqualizer": tone_equalizer["toneEqualizer"],
+                "vibrance": presence["vibrance"],
+                "whites": scene["whites"]
+            },
             "blendMode": "overlay",
             "editNodes": {
                 "basic": { "enabled": false },
@@ -3610,10 +5109,7 @@ mod tests {
             json!("maximum"),
         ] {
             let document = document_with_source_decode(mode.clone());
-            let compiled = serde_json::from_value::<EditDocumentV2>(document.clone())
-                .expect("source-decode document")
-                .into_render_adjustments()
-                .expect("source-decode compiles");
+            let compiled = compile_test_document(document.clone()).expect("source-decode compiles");
             assert_eq!(compiled["rawProcessingModeOverride"], mode);
             let resolved = resolve_source_decode_adjustments(
                 &json!({ "rawProcessingModeOverride": mode }),
@@ -3643,9 +5139,7 @@ mod tests {
         invalid = document_with_source_decode(json!("fast"));
         invalid["nodes"]["source_decode"]["enabled"] = json!(false);
         assert!(
-            serde_json::from_value::<EditDocumentV2>(invalid)
-                .expect("envelope deserializes")
-                .into_render_adjustments()
+            compile_test_document(invalid)
                 .unwrap_err()
                 .contains("cannot be disabled")
         );
@@ -3653,9 +5147,7 @@ mod tests {
         let mut split = document_with_source_decode(json!("fast"));
         split["sourceDecode"]["rawProcessingModeOverride"] = json!("maximum");
         assert!(
-            serde_json::from_value::<EditDocumentV2>(split)
-                .expect("split authority deserializes")
-                .into_render_adjustments()
+            compile_test_document(split)
                 .unwrap_err()
                 .contains("domain disagrees")
         );
@@ -3689,32 +5181,47 @@ mod tests {
             json!(-4);
         malformed["nodes"]["scene_to_view_transform"]["params"]["viewTransform"]["sourceWhiteEv"] =
             json!(1.5);
-        let malformed_error = serde_json::from_value::<EditDocumentV2>(malformed)
-            .expect("envelope deserializes before parameter validation")
-            .into_render_adjustments()
-            .expect_err("invalid EV span must fail");
+        let malformed_error =
+            compile_test_document(malformed).expect_err("invalid EV span must fail");
         assert!(malformed_error.contains("view_transform_invalid_source_ev_bounds"));
 
         let mut split_authority = document_with_scene_to_view_transform(1.6);
-        split_authority["extensions"]["legacyAdjustments"]["toneMapper"] = json!("basic");
+        split_authority["extensions"]["legacyAdjustments"] = json!({ "toneMapper": "basic" });
         let conflict = serde_json::from_value::<EditDocumentV2>(split_authority)
-            .expect("split authority deserializes")
-            .into_render_adjustments()
-            .expect_err("flat scene-to-view authority must be rejected");
-        assert!(conflict.contains("conflicts with quarantined legacy field 'toneMapper'"));
+            .expect_err("legacy extension authority must be rejected");
+        assert!(
+            conflict
+                .to_string()
+                .contains("unknown field `legacyAdjustments`")
+        );
+    }
+
+    #[test]
+    fn current_render_document_accepts_only_current_quarantine_extensions() {
+        let mut document = current_document();
+        document["extensions"] = json!({
+            "quarantinedNodes": {
+                "future_node": { "implementationVersion": 3 }
+            }
+        });
+        let parsed = serde_json::from_value::<EditDocumentV2>(document)
+            .expect("current quarantine extension must deserialize");
+        let serialized = serde_json::to_value(parsed).expect("current render document serializes");
+        assert_eq!(
+            serialized["extensions"],
+            json!({
+                "quarantinedNodes": {
+                    "future_node": { "implementationVersion": 3 }
+                }
+            })
+        );
+        assert!(serialized.get("migration").is_none());
     }
 
     #[test]
     fn compiles_node_keyed_document_to_render_parity_adjustments() {
-        let legacy = json!({
-            "futureField": { "enabled": true },
-            "rawEngineEditGraphVersion": 2,
-            "sectionVisibility": { "basic": true, "color": true, "curves": true, "details": true },
-            "toneMapper": "basic",
-            "vibrance": 11
-        });
         let document: EditDocumentV2 =
-            serde_json::from_value(document_with_legacy(legacy)).expect("valid document");
+            serde_json::from_value(current_document()).expect("valid document");
         let compiled = document
             .into_render_adjustments()
             .expect("compiled document");
@@ -3739,10 +5246,12 @@ mod tests {
             "denoiseDetail": 50,
             "denoiseNaturalGrain": 0,
             "denoiseShadowBias": 0,
+            "dustSpotMinRadiusPx": 2,
+            "dustSpotOverlayEnabled": false,
+            "dustSpotSensitivity": 50,
             "exposure": 0.75,
             "flipHorizontal": false,
             "flipVertical": true,
-            "futureField": { "enabled": true },
             "highlights": -22,
             "lumaNoiseReduction": 5,
             "masks": [],
@@ -3750,16 +5259,31 @@ mod tests {
             "colorGrading": perceptual_grading_params()["colorGrading"].clone(),
             "perceptualGradingV1": perceptual_grading_params()["perceptualGradingV1"].clone(),
             "pointColor": point_color_params()["pointColor"].clone(),
-            "rawEngineEditGraphVersion": 2,
+            "rawProcessingModeOverride": null,
             "rotation": 0.5,
             "saturation": 7,
             "effectsEnabled": true,
             "shadows": 14,
             "sharpness": 24,
-            "toneMapper": "basic",
-            "vibrance": 11,
+            "toneMapper": "rapidView",
+            "vibrance": 0,
             "whites": 9
         });
+        expected["filmEmulation"] = Value::Null;
+        expected["hue"] = json!(0);
+        expected["perspectiveCorrection"] =
+            current_document()["geometry"]["perspectiveCorrection"].clone();
+        expected["transformAspect"] = json!(0);
+        expected["transformDistortion"] = json!(0);
+        expected["transformHorizontal"] = json!(0);
+        expected["transformRotate"] = json!(0);
+        expected["transformScale"] = json!(100);
+        expected["transformVertical"] = json!(0);
+        expected["transformXOffset"] = json!(0);
+        expected["transformYOffset"] = json!(0);
+        expected["viewTransform"] =
+            current_document()["nodes"]["scene_to_view_transform"]["params"]["viewTransform"]
+                .clone();
         expected["colorBalanceRgb"] = color_balance_rgb_params()["colorBalanceRgb"].clone();
         expected["levels"] = luma_levels_params()["levels"].clone();
         expected["hsl"] = selective_color_mixer_params()["hsl"].clone();
@@ -3870,7 +5394,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_nodes_and_mismatched_envelopes() {
-        let mut unknown = document_with_legacy(json!({}));
+        let mut unknown = current_document();
         unknown["nodes"]["future_node"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -3880,45 +5404,36 @@ mod tests {
         });
         assert!(serde_json::from_value::<EditDocumentV2>(unknown).is_err());
 
-        let mut mismatch = document_with_legacy(json!({}));
+        let mut mismatch = current_document();
         mismatch["nodes"]["geometry"]["type"] = json!("layers");
-        let error = serde_json::from_value::<EditDocumentV2>(mismatch)
-            .expect("deserializes before semantic validation")
-            .into_render_adjustments()
-            .expect_err("mismatched node must fail");
+        let error = compile_test_document(mismatch).expect_err("mismatched node must fail");
         assert!(error.contains("must match 'geometry'"));
     }
 
     #[test]
     fn rejects_unsupported_versions_processes_and_ambiguous_domains() {
-        let mut unsupported = document_with_legacy(json!({}));
+        let mut unsupported = current_document();
         unsupported["nodes"]["geometry"]["implementationVersion"] = json!(2);
-        let error = serde_json::from_value::<EditDocumentV2>(unsupported)
-            .expect("deserializes before semantic validation")
-            .into_render_adjustments()
-            .expect_err("unsupported node version must fail");
+        let error =
+            compile_test_document(unsupported).expect_err("unsupported node version must fail");
         assert!(error.contains("unsupported implementationVersion 2"));
 
-        let mut incompatible = document_with_legacy(json!({}));
+        let mut incompatible = current_document();
         incompatible["nodes"]["geometry"]["process"] = json!("legacy_pipeline_v1");
-        let error = serde_json::from_value::<EditDocumentV2>(incompatible)
-            .expect("deserializes before semantic validation")
-            .into_render_adjustments()
-            .expect_err("incompatible node process must fail");
+        let error =
+            compile_test_document(incompatible).expect_err("incompatible node process must fail");
         assert!(error.contains("incompatible process"));
 
-        let mut ambiguous = document_with_legacy(json!({}));
+        let mut ambiguous = current_document();
         ambiguous["geometry"]["rotation"] = json!(90);
-        let error = serde_json::from_value::<EditDocumentV2>(ambiguous)
-            .expect("deserializes before semantic validation")
-            .into_render_adjustments()
-            .expect_err("ambiguous geometry must fail");
+        let error = compile_test_document(ambiguous).expect_err("ambiguous geometry must fail");
         assert!(error.contains("geometry domain disagrees"));
     }
 
     #[test]
     fn disabled_nodes_do_not_reenter_the_render_bag() {
-        let mut value = document_with_legacy(json!({ "vibrance": 12 }));
+        let mut value = current_document();
+        value["nodes"]["color_presence"]["params"]["vibrance"] = json!(12);
         value["nodes"]["scene_global_color_tone"]["enabled"] = json!(false);
         let document: EditDocumentV2 = serde_json::from_value(value).expect("valid document");
         let compiled = document
@@ -3930,7 +5445,7 @@ mod tests {
 
     #[test]
     fn editor_section_enablement_compiles_to_render_authority_once() {
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         for node_type in [
             "scene_global_color_tone",
             "tone_equalizer",
@@ -3974,38 +5489,39 @@ mod tests {
     #[test]
     fn current_layer_envelope_compiles_without_losing_render_or_document_authority() {
         let current_layer = layer();
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         value["layers"] = json!({ "masks": [current_layer] });
         value["nodes"]["layers"]["params"] = json!({ "masks": [current_layer] });
         let document: EditDocumentV2 =
             serde_json::from_value(value).expect("valid current document");
-        let compiled = document
-            .into_render_adjustments()
-            .expect("compiled current layer");
-        let layer = &compiled["masks"][0];
+        let compiled = document.compile().expect("compiled current layer");
+        let definitions = compiled.masks().expect("compiled current mask definitions");
+        let render = compiled
+            .all_adjustments(true, None)
+            .expect("compiled current render ABI");
 
-        assert_eq!(layer["id"], "layer-1");
-        assert_eq!(layer["adjustments"]["exposure"], 0.4);
-        assert_eq!(
-            layer["adjustments"]["sectionVisibility"],
-            json!({ "basic": false, "color": true, "curves": false, "details": true })
-        );
-        assert_eq!(layer["editNodes"]["basic"]["enabled"], false);
-        assert_eq!(layer["editNodeSchemaVersion"], 1);
+        assert_eq!(definitions[0].id, "layer-1");
+        assert_eq!(definitions[0].adjustments, Value::Null);
+        assert_eq!(render.mask_count, 1);
+        assert_eq!(render.mask_adjustments[0].exposure, 0.0);
     }
 
     #[test]
     fn rejects_missing_malformed_wrong_version_and_legacy_layer_envelopes() {
         let current = layer();
         let assert_rejected = |candidate: Value| {
-            let mut value = document_with_legacy(json!({}));
+            let mut value = current_document();
             value["layers"] = json!({ "masks": [candidate] });
             value["nodes"]["layers"]["params"] = value["layers"].clone();
-            let error = serde_json::from_value::<EditDocumentV2>(value)
-                .expect("document envelope remains structurally parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(value)
                 .expect_err("invalid layer envelope must fail before render");
-            assert!(error.contains("EditDocumentV2 layers are invalid"));
+            assert!(
+                error.contains("EditDocumentV2 layers are invalid")
+                    || error.contains("missing field")
+                    || error.contains("unknown field")
+                    || error.contains("expected a boolean"),
+                "{error}"
+            );
         };
 
         let mut missing_nodes = current.clone();
@@ -4025,33 +5541,28 @@ mod tests {
 
         let mut wrong_version = current.clone();
         wrong_version["editNodeSchemaVersion"] = json!(0);
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         value["layers"] = json!({ "masks": [wrong_version] });
         value["nodes"]["layers"]["params"] = value["layers"].clone();
-        let error = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("wrong version remains structurally parseable")
-            .into_render_adjustments()
-            .expect_err("wrong layer envelope version must fail");
+        let error =
+            compile_test_document(value).expect_err("wrong layer envelope version must fail");
         assert!(error.contains("editNodeSchemaVersion must be 1"));
 
         let mut legacy_visibility = current;
         legacy_visibility["adjustments"]["sectionVisibility"] =
             json!({ "basic": false, "color": true, "curves": true, "details": true });
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         value["layers"] = json!({ "masks": [legacy_visibility] });
         value["nodes"]["layers"]["params"] = value["layers"].clone();
-        let error = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("legacy visibility remains structurally parseable")
-            .into_render_adjustments()
-            .expect_err("legacy layer visibility must fail");
-        assert!(error.contains("must not contain sectionVisibility"));
+        let error = compile_test_document(value).expect_err("legacy layer visibility must fail");
+        assert!(error.contains("sectionVisibility"));
     }
 
     #[test]
     fn invalid_layer_sidecar_is_byte_preserved_and_quarantined_as_one_render_authority() {
         let mut invalid_layer = layer();
         invalid_layer.as_object_mut().unwrap().remove("editNodes");
-        let mut document = document_with_legacy(json!({}));
+        let mut document = current_document();
         document["layers"] = json!({ "masks": [invalid_layer] });
         document["nodes"]["layers"]["params"] = document["layers"].clone();
 
@@ -4106,31 +5617,22 @@ mod tests {
 
     #[test]
     fn scene_global_color_tone_compiler_rejects_unowned_and_out_of_range_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["scene_global_color_tone"]["params"]["futureTone"] = json!(1);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned scene-tone field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned scene-tone field must fail");
         assert!(error.contains("unknown field `futureTone`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["scene_global_color_tone"]["params"]["exposure"] = json!(6);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range exposure must fail");
+        let error =
+            compile_test_document(out_of_range).expect_err("out-of-range exposure must fail");
         assert!(error.contains("field 'exposure'"));
         assert!(error.contains("[-5, 5]"));
     }
 
     #[test]
-    fn color_presence_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
-        let mut value = document_with_legacy(json!({}));
-        value["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
+    fn color_presence_compiler_drives_native_pixel_output_and_rejects_stale_ownership() {
+        let mut value = current_document();
         value["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -4138,10 +5640,7 @@ mod tests {
             "process": "scene_referred_v2",
             "type": "color_presence"
         });
-        let compiled = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("valid Color Presence document")
-            .into_render_adjustments()
-            .expect("Color Presence node compiles");
+        let compiled = compile_test_document(value).expect("Color Presence node compiles");
         assert_eq!(compiled["hue"], json!(36));
         assert_eq!(compiled["saturation"], json!(7));
         assert_eq!(compiled["vibrance"], json!(48));
@@ -4160,43 +5659,13 @@ mod tests {
             "Color Presence node must alter a chromatic pixel: {output:?}"
         );
 
-        let legacy = serde_json::from_value::<EditDocumentV2>(document_with_legacy(json!({
-            "hue": 36,
-            "vibrance": 48
-        })))
-        .expect("pre-Color-Presence V2 document remains parseable")
-        .into_render_adjustments()
-        .expect("legacy Color Presence fields compile");
-        let legacy_adjustments = get_all_adjustments_from_json(&legacy, false, None);
-        let legacy_output = apply_creative_color(
-            apply_hue_shift(input, legacy_adjustments.global.hue),
-            legacy_adjustments.global.saturation,
-            legacy_adjustments.global.vibrance,
-        );
-        assert!(
-            output.distance(legacy_output) <= 1.0e-6,
-            "node and legacy Color Presence output must match"
-        );
-
-        let mut mixed_authority = document_with_legacy(json!({}));
-        mixed_authority["nodes"]["color_presence"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": { "hue": 0, "saturation": 0, "vibrance": 0 },
-            "process": "scene_referred_v2",
-            "type": "color_presence"
-        });
-        let error = serde_json::from_value::<EditDocumentV2>(mixed_authority)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let mut mixed_authority = current_document();
+        mixed_authority["nodes"]["scene_global_color_tone"]["params"]["saturation"] = json!(0);
+        let error = compile_test_document(mixed_authority)
             .expect_err("mixed Color Presence ownership must fail");
-        assert!(error.contains("conflicts with legacy scene-global"));
+        assert!(error.contains("unknown field `saturation`"));
 
-        let mut invalid_hue = document_with_legacy(json!({}));
-        invalid_hue["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
+        let mut invalid_hue = current_document();
         invalid_hue["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -4204,17 +5673,10 @@ mod tests {
             "process": "scene_referred_v2",
             "type": "color_presence"
         });
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_hue)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range hue must fail");
+        let error = compile_test_document(invalid_hue).expect_err("out-of-range hue must fail");
         assert!(error.contains("field 'hue'"));
 
-        let mut invalid_vibrance = document_with_legacy(json!({}));
-        invalid_vibrance["nodes"]["scene_global_color_tone"]["params"]
-            .as_object_mut()
-            .expect("scene-global params")
-            .remove("saturation");
+        let mut invalid_vibrance = current_document();
         invalid_vibrance["nodes"]["color_presence"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -4222,16 +5684,14 @@ mod tests {
             "process": "scene_referred_v2",
             "type": "color_presence"
         });
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_vibrance)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range vibrance must fail");
+        let error =
+            compile_test_document(invalid_vibrance).expect_err("out-of-range vibrance must fail");
         assert!(error.contains("field 'vibrance'"));
     }
 
     #[test]
     fn film_emulation_compiler_drives_exact_native_pixel_output_and_rejects_flat_authority() {
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         value["nodes"]["film_emulation"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -4239,10 +5699,7 @@ mod tests {
             "process": "scene_referred_v2",
             "type": "film_emulation"
         });
-        let compiled = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("valid Film Emulation document")
-            .into_render_adjustments()
-            .expect("Film Emulation node compiles");
+        let compiled = compile_test_document(value).expect("Film Emulation node compiles");
         assert_eq!(compiled["filmEmulation"]["mix"], json!(0.65));
         let params = parse_film_node(&compiled)
             .expect("compiled Film node parses")
@@ -4256,21 +5713,17 @@ mod tests {
         let repeated = apply_film_pixel(input, params);
         assert_eq!(output.to_array(), repeated.to_array());
 
-        let mut mixed = document_with_legacy(film_emulation_params());
-        mixed["nodes"]["film_emulation"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": film_emulation_params(),
-            "process": "scene_referred_v2",
-            "type": "film_emulation"
-        });
+        let mut mixed = current_document();
+        mixed["extensions"]["legacyAdjustments"] = film_emulation_params();
         let error = serde_json::from_value::<EditDocumentV2>(mixed)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("mixed Film authority must fail");
-        assert!(error.contains("conflicts with quarantined legacy field 'filmEmulation'"));
+            .expect_err("legacy Film authority must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("unknown field `legacyAdjustments`")
+        );
 
-        let mut invalid = document_with_legacy(json!({}));
+        let mut invalid = current_document();
         invalid["nodes"]["film_emulation"] = json!({
             "enabled": true,
             "implementationVersion": 1,
@@ -4278,11 +5731,8 @@ mod tests {
             "process": "scene_referred_v2",
             "type": "film_emulation"
         });
-        let error = serde_json::from_value::<EditDocumentV2>(invalid)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("invalid Film node must fail");
-        assert!(error.contains("film_emulation_invalid_node"));
+        let error = compile_test_document(invalid).expect_err("invalid Film node must fail");
+        assert!(error.contains("film_emulation_invalid_node") || error.contains("missing field"));
     }
 
     #[test]
@@ -4295,189 +5745,140 @@ mod tests {
             "whiteBalance",
             "whiteBalanceMigration",
         ] {
-            let mut obsolete = document_with_legacy(json!({}));
+            let mut obsolete = current_document();
             obsolete["nodes"]["camera_input"]["params"][field] = json!(0);
-            let error = serde_json::from_value::<EditDocumentV2>(obsolete)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(obsolete)
                 .expect_err("obsolete white-balance authority must fail");
             assert!(error.contains("unknown field"), "{field}: {error}");
         }
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["camera_input"]["params"]["futureInput"] = json!(1);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned camera-input field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned camera-input field must fail");
         assert!(error.contains("unknown field `futureInput`"));
 
-        let mut invalid_profile = document_with_legacy(json!({}));
+        let mut invalid_profile = current_document();
         invalid_profile["nodes"]["camera_input"]["params"]["cameraProfile"] =
             json!("unknown_profile");
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_profile)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unknown camera profile must fail");
+        let error =
+            compile_test_document(invalid_profile).expect_err("unknown camera profile must fail");
         assert!(error.contains("cameraProfile is invalid"));
 
-        let mut invalid_amount = document_with_legacy(json!({}));
+        let mut invalid_amount = current_document();
         invalid_amount["nodes"]["camera_input"]["params"]["cameraProfileAmount"] = json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_amount)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_amount)
             .expect_err("out-of-range camera profile amount must fail");
         assert!(error.contains("cameraProfileAmount"));
         assert!(error.contains("[0, 100]"));
 
-        let mut invalid_chromaticity = document_with_legacy(json!({}));
+        let mut invalid_chromaticity = current_document();
         invalid_chromaticity["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["x"] =
             json!(0.8);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_chromaticity)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_chromaticity)
             .expect_err("invalid white-balance chromaticity must fail");
         assert!(error.contains("chromaticity is invalid"));
 
-        let mut incompatible_source = document_with_legacy(json!({}));
+        let mut incompatible_source = current_document();
         incompatible_source["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["source"] =
             json!("auto");
-        let error = serde_json::from_value::<EditDocumentV2>(incompatible_source)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(incompatible_source)
             .expect_err("incompatible white-balance mode/source must fail");
         assert!(error.contains("mode/source is incompatible"));
 
-        let mut invalid_reference_lock = document_with_legacy(json!({}));
+        let mut invalid_reference_lock = current_document();
         invalid_reference_lock["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["synchronization"]
             ["mode"] = json!("locked_reference");
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_reference_lock)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_reference_lock)
             .expect_err("locked reference without source identity must fail");
         assert!(error.contains("mode/reference is incompatible"));
     }
 
     #[test]
     fn scene_curve_compiler_rejects_unowned_and_malformed_render_authority() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["scene_curve"]["params"]["futureCurve"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned scene-curve field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned scene-curve field must fail");
         assert!(error.contains("unknown field `futureCurve`"));
 
-        let mut too_many_points = document_with_legacy(json!({}));
+        let mut too_many_points = current_document();
         too_many_points["nodes"]["scene_curve"]["params"]["curves"]["luma"] = Value::Array(
             (0..17)
                 .map(|index| json!({ "x": index, "y": index }))
                 .collect(),
         );
-        let error = serde_json::from_value::<EditDocumentV2>(too_many_points)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("oversized legacy curve must fail");
+        let error =
+            compile_test_document(too_many_points).expect_err("oversized legacy curve must fail");
         assert!(error.contains("requires 2..=16 points"));
 
-        let mut non_monotone_scene = document_with_legacy(json!({}));
+        let mut non_monotone_scene = current_document();
         non_monotone_scene["nodes"]["scene_curve"]["params"]["sceneCurveV1"]["points"] =
             json!([{ "xEv": -1, "yEv": 1 }, { "xEv": 1, "yEv": 0 }]);
-        let error = serde_json::from_value::<EditDocumentV2>(non_monotone_scene)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(non_monotone_scene)
             .expect_err("non-monotone scene curve must fail");
         assert!(error.contains("OutputNotMonotone"));
 
-        let mut invalid_headroom = document_with_legacy(json!({}));
+        let mut invalid_headroom = current_document();
         invalid_headroom["nodes"]["scene_curve"]["params"]["outputCurveV1"]["peakNits"] =
             json!(100);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_headroom)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_headroom)
             .expect_err("output curve below reference white must fail");
         assert!(error.contains("InvalidTargetLuminance"));
     }
 
     #[test]
     fn detail_compiler_rejects_unowned_missing_and_out_of_range_params() {
-        let mut pre_local_contrast = document_with_legacy(json!({}));
-        let params = pre_local_contrast["nodes"]["detail_denoise_dehaze"]["params"]
-            .as_object_mut()
-            .expect("detail params object");
         for field in [
             "centré",
             "localContrastHaloGuard",
             "localContrastMidtoneMask",
             "localContrastRadiusPx",
             "structure",
+            "deblurEnabled",
+            "deblurSigmaPx",
+            "deblurStrength",
+            "sharpnessThreshold",
         ] {
-            params.remove(field);
+            let mut missing_current_field = current_document();
+            missing_current_field["nodes"]["detail_denoise_dehaze"]["params"]
+                .as_object_mut()
+                .expect("detail params object")
+                .remove(field);
+            let error = compile_test_document(missing_current_field)
+                .expect_err("missing current detail field must fail");
+            assert!(error.contains(&format!("missing field `{field}`")));
         }
-        serde_json::from_value::<EditDocumentV2>(pre_local_contrast)
-            .expect("pre-local-contrast v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-local-contrast v2 document remains compilable");
 
-        let mut pre_deblur = document_with_legacy(json!({}));
-        let params = pre_deblur["nodes"]["detail_denoise_dehaze"]["params"]
-            .as_object_mut()
-            .expect("detail params object");
-        params.remove("deblurEnabled");
-        params.remove("deblurSigmaPx");
-        params.remove("deblurStrength");
-        serde_json::from_value::<EditDocumentV2>(pre_deblur)
-            .expect("pre-Deblur v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-Deblur v2 document remains compilable");
-
-        let mut pre_threshold = document_with_legacy(json!({ "sharpnessThreshold": 20 }));
-        pre_threshold["nodes"]["detail_denoise_dehaze"]["params"]
-            .as_object_mut()
-            .expect("detail params object")
-            .remove("sharpnessThreshold");
-        serde_json::from_value::<EditDocumentV2>(pre_threshold)
-            .expect("pre-threshold v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-threshold v2 document remains compilable");
-
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["detail_denoise_dehaze"]["params"]["futureDetail"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned detail field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned detail field must fail");
         assert!(error.contains("unknown field `futureDetail`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["detail_denoise_dehaze"]["params"]
             .as_object_mut()
             .expect("detail params object")
             .remove("sharpness");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing detail field must fail");
+        let error = compile_test_document(missing).expect_err("missing detail field must fail");
         assert!(error.contains("missing field `sharpness`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["detail_denoise_dehaze"]["params"]["lumaNoiseReduction"] = json!(-1);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range detail field must fail");
+        let error =
+            compile_test_document(out_of_range).expect_err("out-of-range detail field must fail");
         assert!(error.contains("lumaNoiseReduction"));
 
         for invalid in [json!(-1), json!(81), json!("high")] {
-            let mut invalid_threshold = document_with_legacy(json!({}));
+            let mut invalid_threshold = current_document();
             invalid_threshold["nodes"]["detail_denoise_dehaze"]["params"]["sharpnessThreshold"] =
                 invalid;
-            let error = serde_json::from_value::<EditDocumentV2>(invalid_threshold)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(invalid_threshold)
                 .expect_err("invalid sharpness threshold must fail");
             assert!(
-                error.contains("sharpnessThreshold") || error.contains("detail_denoise_dehaze")
+                error.contains("sharpnessThreshold")
+                    || error.contains("detail_denoise_dehaze")
+                    || error.contains("invalid type")
             );
         }
 
@@ -4487,12 +5888,10 @@ mod tests {
             ("deblurStrength", json!(101)),
             ("deblurStrength", json!(32.5)),
         ] {
-            let mut invalid_deblur = document_with_legacy(json!({}));
+            let mut invalid_deblur = current_document();
             invalid_deblur["nodes"]["detail_denoise_dehaze"]["params"][field] = invalid;
-            let error = serde_json::from_value::<EditDocumentV2>(invalid_deblur)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
-                .expect_err("invalid deblur field must fail");
+            let error =
+                compile_test_document(invalid_deblur).expect_err("invalid deblur field must fail");
             assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
         }
         for (field, invalid) in [
@@ -4503,20 +5902,18 @@ mod tests {
             ("localContrastRadiusPx", json!(96.1)),
             ("structure", json!(101)),
         ] {
-            let mut invalid_local_contrast = document_with_legacy(json!({}));
+            let mut invalid_local_contrast = current_document();
             invalid_local_contrast["nodes"]["detail_denoise_dehaze"]["params"][field] = invalid;
-            let error = serde_json::from_value::<EditDocumentV2>(invalid_local_contrast)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(invalid_local_contrast)
                 .expect_err("invalid local-contrast field must fail");
             assert!(error.contains(field) || error.contains("detail_denoise_dehaze"));
         }
     }
 
     #[test]
-    fn sharpness_threshold_node_drives_native_pixel_output_with_legacy_parity() {
-        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
-            .expect("valid sharpness-threshold document");
+    fn sharpness_threshold_node_drives_native_pixel_output() {
+        let document: EditDocumentV2 =
+            serde_json::from_value(current_document()).expect("valid sharpness-threshold document");
         let compiled = document
             .into_render_adjustments()
             .expect("sharpness-threshold document compiles");
@@ -4544,134 +5941,86 @@ mod tests {
             blocked, input,
             "a higher threshold must reject the same edge"
         );
-
-        let mut legacy_document = document_with_legacy(json!({ "sharpnessThreshold": 20 }));
-        legacy_document["nodes"]["detail_denoise_dehaze"]["params"]
-            .as_object_mut()
-            .expect("detail params object")
-            .remove("sharpnessThreshold");
-        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
-            .expect("pre-threshold-node v2 document remains parseable");
-        let legacy_compiled = legacy
-            .into_render_adjustments()
-            .expect("legacy sharpness threshold compiles");
-        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
-        let legacy_output = apply_local_contrast(
-            input,
-            blurred,
-            legacy_adjustments.global.sharpness,
-            true,
-            0,
-            legacy_adjustments.global.sharpness_threshold,
-        );
-        assert!(
-            output.distance(legacy_output) <= f32::EPSILON,
-            "node and legacy threshold authority must remain pixel-identical"
-        );
     }
 
     #[test]
     fn display_creative_compiler_rejects_stale_missing_and_out_of_range_params() {
-        let mut stale = document_with_legacy(json!({}));
+        let mut stale = current_document();
         stale["nodes"]["display_creative"]["params"]["filmCurve"] = json!({ "legacy": true });
-        let error = serde_json::from_value::<EditDocumentV2>(stale)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("stale display field must fail");
+        let error = compile_test_document(stale).expect_err("stale display field must fail");
         assert!(error.contains("unknown field `filmCurve`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["display_creative"]["params"]
             .as_object_mut()
             .expect("display params object")
             .remove("lutIntensity");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing display field must fail");
+        let error = compile_test_document(missing).expect_err("missing display field must fail");
         assert!(error.contains("missing field `lutIntensity`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["display_creative"]["params"]["vignetteAmount"] = json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range display field must fail");
+        let error =
+            compile_test_document(out_of_range).expect_err("out-of-range display field must fail");
         assert!(error.contains("vignetteAmount"));
     }
 
     #[test]
     fn tone_equalizer_compiler_rejects_unowned_missing_and_malformed_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["futureBand"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned tone-equalizer field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned tone-equalizer field must fail");
         assert!(error.contains("unknown field `futureBand`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]
             .as_object_mut()
             .expect("tone-equalizer settings object")
             .remove("smoothingRadius");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing tone-equalizer field must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing tone-equalizer field must fail");
         assert!(error.contains("missing field `smoothingRadius`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["bandEv"][4] =
             json!(4.1);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range tone-equalizer band must fail");
         assert!(error.contains("bandEv"));
 
-        let mut wrong_band_count = document_with_legacy(json!({}));
+        let mut wrong_band_count = current_document();
         wrong_band_count["nodes"]["tone_equalizer"]["params"]["toneEqualizer"]["bandEv"] =
             json!([0, 0, 0, 0, 0, 0, 0, 0]);
-        let error = serde_json::from_value::<EditDocumentV2>(wrong_band_count)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(wrong_band_count)
             .expect_err("wrong tone-equalizer band count must fail");
         assert!(error.contains("array of length 9"));
     }
 
     #[test]
     fn black_white_mixer_compiler_rejects_unowned_missing_and_invalid_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["futureResponse"] =
             json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned monochrome field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned monochrome field must fail");
         assert!(error.contains("unknown field `futureResponse`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]
             .as_object_mut()
             .expect("black-and-white settings object")
             .remove("sourceClass");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing source class must fail");
+        let error = compile_test_document(missing).expect_err("missing source class must fail");
         assert!(error.contains("missing field `sourceClass`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["weights"]["reds"] =
             json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range monochrome response must fail");
         assert!(error.contains("weights must be finite"));
 
-        let mut legacy_process = document_with_legacy(json!({}));
+        let mut legacy_process = current_document();
         legacy_process["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
             "enabled": true,
             "presetId": "manual",
@@ -4682,77 +6031,63 @@ mod tests {
                 "oranges": 0, "purples": 0, "reds": 0, "yellows": 0
             }
         });
-        let error = serde_json::from_value::<EditDocumentV2>(legacy_process)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(legacy_process)
             .expect_err("legacy monochrome process must fail typed node compilation");
         assert!(error.contains("unknown variant `legacy_fixed_band_v1`"));
     }
 
     #[test]
     fn point_color_compiler_rejects_unowned_missing_oversized_and_out_of_range_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["point_color"]["params"]["pointColor"]["futureRange"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned point-color field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned point-color field must fail");
         assert!(error.contains("unknown field `futureRange`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["point_color"]["params"]["pointColor"]
             .as_object_mut()
             .expect("point-color plan object")
             .remove("process");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing point-color field must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing point-color field must fail");
         assert!(error.contains("missing field `process`"));
 
         let point = point_color_params()["pointColor"]["points"][0].clone();
-        let mut too_many_points = document_with_legacy(json!({}));
+        let mut too_many_points = current_document();
         too_many_points["nodes"]["point_color"]["params"]["pointColor"]["points"] =
             Value::Array((0..17).map(|_| point.clone()).collect());
-        let error = serde_json::from_value::<EditDocumentV2>(too_many_points)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(too_many_points)
             .expect_err("oversized point-color plan must fail");
         assert!(error.contains("point count is invalid"));
 
         let sample = point_color_params()["pointColor"]["points"][0]["samples"][0].clone();
-        let mut too_many_samples = document_with_legacy(json!({}));
+        let mut too_many_samples = current_document();
         too_many_samples["nodes"]["point_color"]["params"]["pointColor"]["points"][0]["samples"] =
             Value::Array((0..9).map(|_| sample.clone()).collect());
-        let error = serde_json::from_value::<EditDocumentV2>(too_many_samples)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(too_many_samples)
             .expect_err("oversized point-color samples must fail");
         assert!(error.contains("adjustment identity or samples are invalid"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["point_color"]["params"]["pointColor"]["points"][0]["hueRadiusDegrees"] =
             json!(181);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range point-color control must fail");
         assert!(error.contains("hueRadiusDegrees"));
 
-        let mut invalid_process = document_with_legacy(json!({}));
+        let mut invalid_process = current_document();
         invalid_process["nodes"]["point_color"]["params"]["pointColor"]["process"] =
             json!("legacy.point-color");
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_process)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_process)
             .expect_err("unknown point-color process must fail");
         assert!(error.contains("process or point count is invalid"));
     }
 
     #[test]
     fn channel_mixer_compiler_is_strict_and_drives_native_pixel_output() {
-        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
-            .expect("valid channel-mixer document");
+        let document: EditDocumentV2 =
+            serde_json::from_value(current_document()).expect("valid channel-mixer document");
         let compiled = document
             .into_render_adjustments()
             .expect("channel-mixer document compiles");
@@ -4772,35 +6107,29 @@ mod tests {
             "unexpected blue output: {output:?}"
         );
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["channel_mixer"]["params"]["channelMixer"]["futureMatrix"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned channel-mixer field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned channel-mixer field must fail");
         assert!(error.contains("unknown field `futureMatrix`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["channel_mixer"]["params"]["channelMixer"]["red"]
             .as_object_mut()
             .expect("red channel-mixer row")
             .remove("green");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(missing)
             .expect_err("missing channel-mixer coefficient must fail");
         assert!(error.contains("missing field `green`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["channel_mixer"]["params"]["channelMixer"]["red"]["green"] =
             json!(201);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range channel-mixer coefficient must fail");
         assert!(error.contains("channel_mixer field 'green'"));
 
-        let mut identity = document_with_legacy(json!({}));
+        let mut identity = current_document();
         identity["nodes"]["channel_mixer"]["params"]["channelMixer"] = json!({
             "blue": { "blue": 100, "constant": 0, "green": 0, "red": 0 },
             "enabled": true,
@@ -4808,17 +6137,15 @@ mod tests {
             "preserveLuminance": false,
             "red": { "blue": 0, "constant": 0, "green": 0, "red": 100 }
         });
-        let error = serde_json::from_value::<EditDocumentV2>(identity)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("enabled identity channel mixer must fail");
+        let error =
+            compile_test_document(identity).expect_err("enabled identity channel mixer must fail");
         assert!(error.contains("must not be identity"));
     }
 
     #[test]
     fn color_balance_rgb_compiler_is_strict_and_drives_native_pixel_output() {
-        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
-            .expect("valid color-balance document");
+        let document: EditDocumentV2 =
+            serde_json::from_value(current_document()).expect("valid color-balance document");
         let compiled = document
             .into_render_adjustments()
             .expect("color-balance document compiles");
@@ -4841,48 +6168,42 @@ mod tests {
             "unexpected blue output: {output:?}"
         );
 
-        let mut pre_color_balance_node = document_with_legacy(json!({
-            "colorBalanceRgb": color_balance_rgb_params()["colorBalanceRgb"].clone()
-        }));
-        pre_color_balance_node["nodes"]
+        let mut missing_current_node = current_document();
+        missing_current_node["nodes"]
             .as_object_mut()
             .expect("node map")
             .remove("color_balance_rgb");
-        serde_json::from_value::<EditDocumentV2>(pre_color_balance_node)
-            .expect("pre-color-balance-node v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-color-balance-node v2 document remains compilable");
+        let error = compile_test_document(missing_current_node)
+            .expect_err("missing current color-balance node must fail");
+        assert!(
+            error.contains("missing current node 'color_balance_rgb'")
+                || error.contains("missing field `color_balance_rgb`")
+        );
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["futureRange"] =
             json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned color-balance field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned color-balance field must fail");
         assert!(error.contains("unknown field `futureRange`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["midtones"]
             .as_object_mut()
             .expect("midtones object")
             .remove("green");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing color-balance channel must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing color-balance channel must fail");
         assert!(error.contains("missing field `green`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"]["highlights"]["blue"] =
             json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range color-balance channel must fail");
         assert!(error.contains("highlights.blue"));
 
-        let mut identity = document_with_legacy(json!({}));
+        let mut identity = current_document();
         identity["nodes"]["color_balance_rgb"]["params"]["colorBalanceRgb"] = json!({
             "enabled": true,
             "highlights": { "blue": 0, "green": 0, "red": 0 },
@@ -4890,17 +6211,15 @@ mod tests {
             "preserveLuminance": true,
             "shadows": { "blue": 0, "green": 0, "red": 0 }
         });
-        let error = serde_json::from_value::<EditDocumentV2>(identity)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("enabled identity color balance must fail");
+        let error =
+            compile_test_document(identity).expect_err("enabled identity color balance must fail");
         assert!(error.contains("requires a non-zero channel response"));
     }
 
     #[test]
     fn luma_levels_compiler_is_strict_and_drives_native_pixel_output() {
         let document: EditDocumentV2 =
-            serde_json::from_value(document_with_legacy(json!({}))).expect("valid levels document");
+            serde_json::from_value(current_document()).expect("valid levels document");
         let compiled = document
             .into_render_adjustments()
             .expect("levels document compiles");
@@ -4914,68 +6233,56 @@ mod tests {
             "unexpected levels output: {output:?}"
         );
 
-        let mut pre_levels_node = document_with_legacy(json!({
-            "levels": luma_levels_params()["levels"].clone()
-        }));
-        pre_levels_node["nodes"]
+        let mut missing_current_node = current_document();
+        missing_current_node["nodes"]
             .as_object_mut()
             .expect("node map")
             .remove("luma_levels");
-        serde_json::from_value::<EditDocumentV2>(pre_levels_node)
-            .expect("pre-levels-node v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-levels-node v2 document remains compilable");
+        let error = compile_test_document(missing_current_node)
+            .expect_err("missing current levels node must fail");
+        assert!(
+            error.contains("missing current node 'luma_levels'")
+                || error.contains("missing field `luma_levels`")
+        );
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["luma_levels"]["params"]["levels"]["futurePivot"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned levels field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned levels field must fail");
         assert!(error.contains("unknown field `futurePivot`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["luma_levels"]["params"]["levels"]
             .as_object_mut()
             .expect("levels object")
             .remove("gamma");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing levels field must fail");
+        let error = compile_test_document(missing).expect_err("missing levels field must fail");
         assert!(error.contains("missing field `gamma`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["luma_levels"]["params"]["levels"]["gamma"] = json!(5.1);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range levels gamma must fail");
+        let error =
+            compile_test_document(out_of_range).expect_err("out-of-range levels gamma must fail");
         assert!(error.contains("field 'gamma'"));
 
-        let mut invalid_input = document_with_legacy(json!({}));
+        let mut invalid_input = current_document();
         invalid_input["nodes"]["luma_levels"]["params"]["levels"]["inputBlack"] = json!(0.9);
         invalid_input["nodes"]["luma_levels"]["params"]["levels"]["inputWhite"] = json!(0.9);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_input)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("invalid levels input range must fail");
+        let error =
+            compile_test_document(invalid_input).expect_err("invalid levels input range must fail");
         assert!(error.contains("inputBlack must be below inputWhite"));
 
-        let mut invalid_output = document_with_legacy(json!({}));
+        let mut invalid_output = current_document();
         invalid_output["nodes"]["luma_levels"]["params"]["levels"]["outputBlack"] = json!(0.8);
         invalid_output["nodes"]["luma_levels"]["params"]["levels"]["outputWhite"] = json!(0.2);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_output)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_output)
             .expect_err("invalid levels output range must fail");
         assert!(error.contains("outputBlack must be below outputWhite"));
     }
 
     #[test]
     fn selective_color_mixer_compiler_is_strict_and_drives_native_pixel_output() {
-        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
-            .expect("valid selective-color document");
+        let document: EditDocumentV2 =
+            serde_json::from_value(current_document()).expect("valid selective-color document");
         let compiled = document
             .into_render_adjustments()
             .expect("selective-color document compiles");
@@ -4987,65 +6294,40 @@ mod tests {
             "selective-color node must alter an in-range red pixel: {output:?}"
         );
 
-        let mut legacy_document = document_with_legacy(selective_color_mixer_params());
-        legacy_document["nodes"]
-            .as_object_mut()
-            .expect("node map")
-            .remove("selective_color_mixer");
-        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
-            .expect("pre-selective-color-node v2 document remains parseable");
-        let legacy_compiled = legacy
-            .into_render_adjustments()
-            .expect("legacy selective-color fields compile");
-        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
-        let legacy_output = apply_hsl_panel(input, legacy_adjustments.global.hsl);
-        assert!(
-            output.distance(legacy_output) <= 1.0e-6,
-            "node and legacy selective-color authority must remain pixel-identical"
-        );
-
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["selective_color_mixer"]["params"]["futureMixer"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned selective-color field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned selective-color field must fail");
         assert!(error.contains("unknown field `futureMixer`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["selective_color_mixer"]["params"]["hsl"]
             .as_object_mut()
             .expect("hsl object")
             .remove("greens");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing selective-color range must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing selective-color range must fail");
         assert!(error.contains("missing field `greens`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["selective_color_mixer"]["params"]["hsl"]["reds"]["saturation"] =
             json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range selective-color value must fail");
         assert!(error.contains("hsl.reds.saturation"));
 
-        let mut invalid_control = document_with_legacy(json!({}));
+        let mut invalid_control = current_document();
         invalid_control["nodes"]["selective_color_mixer"]["params"]["selectiveColorRangeControls"]
             ["reds"]["centerHueDegrees"] = json!(360);
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_control)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(invalid_control)
             .expect_err("invalid selective-color range control must fail");
         assert!(error.contains("selectiveColorRangeControls.reds.centerHueDegrees"));
     }
 
     #[test]
     fn skin_tone_uniformity_compiler_is_strict_and_drives_native_pixel_output() {
-        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
-            .expect("valid skin-tone document");
+        let document: EditDocumentV2 =
+            serde_json::from_value(current_document()).expect("valid skin-tone document");
         let compiled = document
             .into_render_adjustments()
             .expect("skin-tone document compiles");
@@ -5057,79 +6339,52 @@ mod tests {
             "skin-tone node must alter a representative warm pixel: {output:?}"
         );
 
-        let mut legacy_document = document_with_legacy(skin_tone_uniformity_params());
-        legacy_document["nodes"]
-            .as_object_mut()
-            .expect("node map")
-            .remove("skin_tone_uniformity");
-        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
-            .expect("pre-skin-tone-node v2 document remains parseable");
-        let legacy_compiled = legacy
-            .into_render_adjustments()
-            .expect("legacy skin-tone field compiles");
-        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
-        let legacy_output =
-            apply_skin_tone_uniformity(input, legacy_adjustments.global.skin_tone_uniformity);
-        assert!(
-            output.distance(legacy_output) <= 1.0e-6,
-            "node and legacy skin-tone authority must remain pixel-identical"
-        );
-
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["skin_tone_uniformity"]["params"]["futureUniformity"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned skin-tone field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned skin-tone field must fail");
         assert!(error.contains("unknown field `futureUniformity`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["skin_tone_uniformity"]["params"]["skinToneUniformity"]["targetHueDegrees"] =
             json!(360);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range skin-tone hue must fail");
+        let error =
+            compile_test_document(out_of_range).expect_err("out-of-range skin-tone hue must fail");
         assert!(error.contains("targetHueDegrees"));
 
-        let mut conflict = document_with_legacy(skin_tone_uniformity_params());
-        conflict["nodes"]["skin_tone_uniformity"] = skin_tone_uniformity_node();
+        let mut conflict = current_document();
+        conflict["extensions"]["legacyAdjustments"] = skin_tone_uniformity_params();
         let error = serde_json::from_value::<EditDocumentV2>(conflict)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("mixed skin-tone authority must fail");
-        assert!(error.contains("conflicts with quarantined legacy field 'skinToneUniformity'"));
+            .expect_err("legacy skin-tone authority must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("unknown field `legacyAdjustments`")
+        );
     }
 
     #[test]
     fn lens_correction_compiler_rejects_unowned_malformed_and_out_of_range_params() {
-        let mut pre_manual_ca = document_with_legacy(json!({}));
+        let mut pre_manual_ca = current_document();
         let params = pre_manual_ca["nodes"]["lens_correction"]["params"]
             .as_object_mut()
             .expect("lens params object");
         params.remove("chromaticAberrationBlueYellow");
         params.remove("chromaticAberrationRedCyan");
-        serde_json::from_value::<EditDocumentV2>(pre_manual_ca)
-            .expect("pre-manual-CA v2 document remains parseable")
-            .into_render_adjustments()
-            .expect("pre-manual-CA v2 document remains compilable");
+        let error = compile_test_document(pre_manual_ca)
+            .expect_err("missing current chromatic-aberration controls must fail");
+        assert!(error.contains("missing field `chromaticAberrationBlueYellow`"));
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["lens_correction"]["params"]["futureOptic"] = json!(1);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned lens field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned lens field must fail");
         assert!(error.contains("unknown field `futureOptic`"));
 
-        let mut malformed = document_with_legacy(json!({}));
+        let mut malformed = current_document();
         malformed["nodes"]["lens_correction"]["params"]["lensDistortionParams"] =
             json!({ "k1": 0.1 });
-        let error = serde_json::from_value::<EditDocumentV2>(malformed)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("incomplete lens profile must fail");
-        assert!(error.contains("lens_correction is invalid"));
+        let error =
+            compile_test_document(malformed).expect_err("incomplete lens profile must fail");
+        assert!(error.contains("lens_correction is invalid") || error.contains("missing field"));
 
         for field in [
             "lensDistortionAmount",
@@ -5137,13 +6392,16 @@ mod tests {
             "lensVignetteAmount",
         ] {
             for invalid in [json!(201), json!(100.5)] {
-                let mut out_of_range = document_with_legacy(json!({}));
+                let mut out_of_range = current_document();
                 out_of_range["nodes"]["lens_correction"]["params"][field] = invalid;
-                let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-                    .expect("document envelope remains parseable")
-                    .into_render_adjustments()
+                let error = compile_test_document(out_of_range)
                     .expect_err("non-integer or out-of-range lens amount must fail");
-                assert!(error.contains(field) || error.contains("lens_correction is invalid"));
+                assert!(
+                    error.contains(field)
+                        || error.contains("lens_correction is invalid")
+                        || error.contains("expected u16"),
+                    "{error}"
+                );
             }
         }
 
@@ -5151,58 +6409,54 @@ mod tests {
             ("chromaticAberrationBlueYellow", json!(-101)),
             ("chromaticAberrationRedCyan", json!(101)),
         ] {
-            let mut out_of_range = document_with_legacy(json!({}));
+            let mut out_of_range = current_document();
             out_of_range["nodes"]["lens_correction"]["params"][field] = invalid;
-            let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
-                .expect_err("out-of-range manual CA must fail");
+            let error =
+                compile_test_document(out_of_range).expect_err("out-of-range manual CA must fail");
             assert!(error.contains(field));
         }
 
         for field in [
             "k1", "k2", "k3", "tca_vb", "tca_vr", "vig_k1", "vig_k2", "vig_k3",
         ] {
-            let mut coefficient = document_with_legacy(json!({}));
+            let mut coefficient = current_document();
             coefficient["nodes"]["lens_correction"]["params"]["lensDistortionParams"] = json!({
                 "k1": 0, "k2": 0, "k3": 0, "model": 1, "tca_vb": 1, "tca_vr": 1,
                 "vig_k1": 0, "vig_k2": 0, "vig_k3": 0
             });
             coefficient["nodes"]["lens_correction"]["params"]["lensDistortionParams"][field] =
                 json!(10.1);
-            let error = serde_json::from_value::<EditDocumentV2>(coefficient)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(coefficient)
                 .expect_err("out-of-range lens coefficient must fail");
             assert!(error.contains("[-10, 10]"));
         }
 
         for invalid_model in [json!(11), json!(1.5)] {
-            let mut model = document_with_legacy(json!({}));
+            let mut model = current_document();
             model["nodes"]["lens_correction"]["params"]["lensDistortionParams"] = json!({
                 "k1": 0, "k2": 0, "k3": 0, "model": invalid_model, "tca_vb": 1, "tca_vr": 1,
                 "vig_k1": 0, "vig_k2": 0, "vig_k3": 0
             });
-            let error = serde_json::from_value::<EditDocumentV2>(model)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
+            let error = compile_test_document(model)
                 .expect_err("non-integer or out-of-range lens model must fail");
-            assert!(error.contains("model") || error.contains("lens_correction is invalid"));
+            assert!(
+                error.contains("model")
+                    || error.contains("lens_correction is invalid")
+                    || error.contains("expected u8")
+            );
         }
 
         for (field, value) in [
             ("lensMaker", "x".repeat(161)),
             ("lensModel", "x".repeat(241)),
         ] {
-            let mut identity = document_with_legacy(json!({}));
+            let mut identity = current_document();
             identity["nodes"]["lens_correction"]["params"][field] = json!(value);
             if field == "lensModel" {
                 identity["nodes"]["lens_correction"]["params"]["lensMaker"] = json!("maker");
             }
-            let error = serde_json::from_value::<EditDocumentV2>(identity)
-                .expect("document envelope remains parseable")
-                .into_render_adjustments()
-                .expect_err("oversized lens identity must fail");
+            let error =
+                compile_test_document(identity).expect_err("oversized lens identity must fail");
             assert!(error.contains(if field == "lensMaker" {
                 "maker"
             } else {
@@ -5213,79 +6467,65 @@ mod tests {
 
     #[test]
     fn perceptual_grading_compiler_rejects_unowned_missing_and_invalid_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["perceptual_grading"]["params"]["futureGrading"] = json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned perceptual-grading field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned perceptual-grading field must fail");
         assert!(error.contains("unknown field `futureGrading`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["perceptual_grading"]["params"]
             .as_object_mut()
             .expect("perceptual-grading params object")
             .remove("perceptualGradingV1");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing perceptual-grading plan must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing perceptual-grading plan must fail");
         assert!(error.contains("missing field `perceptualGradingV1`"));
 
-        let mut legacy_range = document_with_legacy(json!({}));
+        let mut legacy_range = current_document();
         legacy_range["nodes"]["perceptual_grading"]["params"]["colorGrading"]["midtones"]["saturation"] =
             json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(legacy_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range legacy grading must fail");
+        let error =
+            compile_test_document(legacy_range).expect_err("out-of-range legacy grading must fail");
         assert!(error.contains("wheel range is invalid"));
 
-        let mut fulcrums = document_with_legacy(json!({}));
+        let mut fulcrums = current_document();
         fulcrums["nodes"]["perceptual_grading"]["params"]["perceptualGradingV1"]["highlightFulcrumEv"] =
             json!(-3);
-        let error = serde_json::from_value::<EditDocumentV2>(fulcrums)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("invalid perceptual fulcrums must fail");
+        let error =
+            compile_test_document(fulcrums).expect_err("invalid perceptual fulcrums must fail");
         assert!(error.contains("Fulcrums"));
     }
 
     #[test]
     fn color_calibration_compiler_rejects_unowned_missing_and_out_of_range_params() {
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["color_calibration"]["params"]["colorCalibration"]["futurePrimary"] =
             json!(true);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned color-calibration field must fail");
+        let error =
+            compile_test_document(unowned).expect_err("unowned color-calibration field must fail");
         assert!(error.contains("unknown field `futurePrimary`"));
 
-        let mut missing = document_with_legacy(json!({}));
+        let mut missing = current_document();
         missing["nodes"]["color_calibration"]["params"]["colorCalibration"]
             .as_object_mut()
             .expect("color-calibration settings object")
             .remove("blueHue");
-        let error = serde_json::from_value::<EditDocumentV2>(missing)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("missing color-calibration field must fail");
+        let error =
+            compile_test_document(missing).expect_err("missing color-calibration field must fail");
         assert!(error.contains("missing field `blueHue`"));
 
-        let mut out_of_range = document_with_legacy(json!({}));
+        let mut out_of_range = current_document();
         out_of_range["nodes"]["color_calibration"]["params"]["colorCalibration"]["redHue"] =
             json!(101);
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range)
             .expect_err("out-of-range color calibration must fail");
         assert!(error.contains("redHue"));
     }
 
     #[test]
     fn geometry_compiler_rejects_unowned_out_of_range_and_out_of_bounds_params() {
-        let mut transformed = document_with_legacy(json!({}));
+        let mut transformed = current_document();
         let transform_params = json!({
             "transformAspect": 12,
             "transformDistortion": -8,
@@ -5303,21 +6543,16 @@ mod tests {
             transformed["nodes"]["geometry"]["params"][field] = value.clone();
             transformed["geometry"][field] = value.clone();
         }
-        serde_json::from_value::<EditDocumentV2>(transformed)
-            .expect("current transform geometry remains parseable")
-            .into_render_adjustments()
-            .expect("current transform geometry remains compilable");
+        compile_test_document(transformed).expect("current transform geometry remains compilable");
 
         let valid_crop =
             json!({ "height": 0.6, "unit": "normalized", "width": 0.6, "x": 0.1, "y": 0.1 });
-        let mut valid = document_with_legacy(json!({}));
+        let mut valid = current_document();
         valid["nodes"]["geometry"]["params"]["crop"] = valid_crop.clone();
         valid["nodes"]["geometry"]["params"]["rotation"] = json!(-5.5);
         valid["geometry"]["crop"] = valid_crop.clone();
         valid["geometry"]["rotation"] = json!(-5.5);
-        let compiled = serde_json::from_value::<EditDocumentV2>(valid)
-            .expect("valid straighten geometry document")
-            .into_render_adjustments()
+        let compiled = compile_test_document(valid)
             .expect("straighten geometry compiles into native render authority");
         assert_eq!(compiled["crop"], valid_crop);
         assert_eq!(compiled["rotation"], json!(-5.5));
@@ -5334,13 +6569,11 @@ mod tests {
             "mode": "guided",
             "resolvedPlan": null
         });
-        let mut perspective_document = document_with_legacy(json!({}));
+        let mut perspective_document = current_document();
         perspective_document["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
             perspective.clone();
         perspective_document["geometry"]["perspectiveCorrection"] = perspective.clone();
-        let compiled = serde_json::from_value::<EditDocumentV2>(perspective_document)
-            .expect("valid perspective geometry document")
-            .into_render_adjustments()
+        let compiled = compile_test_document(perspective_document)
             .expect("perspective geometry compiles into native render authority");
         assert_eq!(compiled["perspectiveCorrection"], perspective);
         assert!(compiled["lensDistortionParams"].is_null());
@@ -5348,7 +6581,7 @@ mod tests {
             &crate::geometry::get_geometry_params_from_json(&compiled)
         ));
 
-        let mut missing_perspective = document_with_legacy(json!({}));
+        let mut missing_perspective = current_document();
         let incomplete = json!({
             "amount": 50,
             "guides": [],
@@ -5358,13 +6591,11 @@ mod tests {
         missing_perspective["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
             incomplete.clone();
         missing_perspective["geometry"]["perspectiveCorrection"] = incomplete;
-        let error = serde_json::from_value::<EditDocumentV2>(missing_perspective)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(missing_perspective)
             .expect_err("incomplete perspective node state must fail");
         assert!(error.contains("missing field 'cropPolicy'"));
 
-        let mut out_of_range_perspective = document_with_legacy(json!({}));
+        let mut out_of_range_perspective = current_document();
         let invalid = json!({
             "amount": 101,
             "cropPolicy": "auto_crop",
@@ -5375,140 +6606,107 @@ mod tests {
         out_of_range_perspective["nodes"]["geometry"]["params"]["perspectiveCorrection"] =
             invalid.clone();
         out_of_range_perspective["geometry"]["perspectiveCorrection"] = invalid;
-        let error = serde_json::from_value::<EditDocumentV2>(out_of_range_perspective)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(out_of_range_perspective)
             .expect_err("out-of-range perspective amount must fail");
         assert!(error.contains("amount must be within 0..=100"));
 
-        let mut unowned = document_with_legacy(json!({}));
+        let mut unowned = current_document();
         unowned["nodes"]["geometry"]["params"]["futureWarp"] = json!(1);
-        let error = serde_json::from_value::<EditDocumentV2>(unowned)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unowned geometry field must fail");
+        let error = compile_test_document(unowned).expect_err("unowned geometry field must fail");
         assert!(error.contains("unknown field `futureWarp`"));
 
-        let mut rotation = document_with_legacy(json!({}));
+        let mut rotation = current_document();
         rotation["nodes"]["geometry"]["params"]["rotation"] = json!(46);
         rotation["geometry"]["rotation"] = json!(46);
-        let error = serde_json::from_value::<EditDocumentV2>(rotation)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range rotation must fail");
+        let error = compile_test_document(rotation).expect_err("out-of-range rotation must fail");
         assert!(error.contains("rotation must be within -45..=45"));
 
-        let mut transform_scale = document_with_legacy(json!({}));
+        let mut transform_scale = current_document();
         transform_scale["nodes"]["geometry"]["params"]["transformScale"] = json!(151);
         transform_scale["geometry"]["transformScale"] = json!(151);
-        let error = serde_json::from_value::<EditDocumentV2>(transform_scale)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
+        let error = compile_test_document(transform_scale)
             .expect_err("out-of-range transform scale must fail");
         assert!(error.contains("transformScale"));
 
         let invalid_crop =
             json!({ "height": 0.8, "unit": "normalized", "width": 0.8, "x": 0.3, "y": 0.3 });
-        let mut crop = document_with_legacy(json!({}));
+        let mut crop = current_document();
         crop["nodes"]["geometry"]["params"]["crop"] = invalid_crop.clone();
         crop["geometry"]["crop"] = invalid_crop;
-        let error = serde_json::from_value::<EditDocumentV2>(crop)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-bounds crop must fail");
+        let error = compile_test_document(crop).expect_err("out-of-bounds crop must fail");
         assert!(error.contains("crop exceeds its unit bounds"));
 
-        let mut unknown_domain = document_with_legacy(json!({}));
+        let mut unknown_domain = current_document();
         unknown_domain["geometry"]["futureWarp"] = json!(1);
         assert!(serde_json::from_value::<EditDocumentV2>(unknown_domain).is_err());
     }
 
     #[test]
-    fn compiles_strict_source_artifacts_and_excludes_quarantined_profile_state() {
+    fn compiles_strict_source_artifacts_without_legacy_extension_state() {
         let patch = source_patch();
-        let mut value = document_with_legacy(json!({
-            "generatedProfile": { "obsolete": true },
-            "vibrance": 12
-        }));
+        let mut value = current_document();
+        value["nodes"]["color_presence"]["params"]["vibrance"] = json!(12);
         value["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch] });
         value["sourceArtifacts"] = json!({ "aiPatches": [patch] });
-        let compiled = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("valid source document")
-            .into_render_adjustments()
-            .expect("compiled source document");
+        let compiled = compile_test_document(value).expect("compiled source document");
 
         assert_eq!(compiled["aiPatches"][0]["id"], json!("patch-1"));
         assert_eq!(compiled["vibrance"], json!(12));
-        assert!(compiled.get("generatedProfile").is_none());
         assert!(compiled.get("referenceMatchApplicationReceipt").is_none());
     }
 
     #[test]
     fn rejects_malformed_duplicate_ambiguous_and_legacy_owned_source_state() {
         let patch = source_patch();
-        let mut malformed = document_with_legacy(json!({}));
+        let mut malformed = current_document();
         malformed["nodes"]["source_artifacts"]["params"] =
             json!({ "aiPatches": [{ "id": "patch-1", "unsupported": true }] });
-        let error = serde_json::from_value::<EditDocumentV2>(malformed)
-            .expect("top-level source domain remains valid")
-            .into_render_adjustments()
-            .expect_err("malformed source node must fail");
-        assert!(error.contains("source artifacts are invalid"));
+        let error = compile_test_document(malformed).expect_err("malformed source node must fail");
+        assert!(error.contains("source artifacts are invalid") || error.contains("unknown field"));
 
-        let mut duplicate = document_with_legacy(json!({}));
+        let mut duplicate = current_document();
         duplicate["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch, patch] });
         duplicate["sourceArtifacts"] = json!({ "aiPatches": [patch, patch] });
-        let error = serde_json::from_value::<EditDocumentV2>(duplicate)
-            .expect("duplicate IDs deserialize before semantic validation")
-            .into_render_adjustments()
-            .expect_err("duplicate source IDs must fail");
+        let error = compile_test_document(duplicate).expect_err("duplicate source IDs must fail");
         assert!(error.contains("non-empty and unique"));
 
-        let mut ambiguous = document_with_legacy(json!({}));
+        let mut ambiguous = current_document();
         ambiguous["nodes"]["source_artifacts"]["params"] = json!({ "aiPatches": [patch] });
-        let error = serde_json::from_value::<EditDocumentV2>(ambiguous)
-            .expect("mismatched domains deserialize before semantic validation")
-            .into_render_adjustments()
-            .expect_err("ambiguous source domains must fail");
+        let error =
+            compile_test_document(ambiguous).expect_err("ambiguous source domains must fail");
         assert!(error.contains("domain disagrees"));
 
-        let legacy_owned = document_with_legacy(json!({
+        let mut legacy_owned = current_document();
+        legacy_owned["extensions"]["legacyAdjustments"] = json!({
             "referenceMatchApplicationReceipt": { "schemaVersion": 1 }
-        }));
+        });
         let error = serde_json::from_value::<EditDocumentV2>(legacy_owned)
-            .expect("legacy-owned provenance deserializes before semantic validation")
-            .into_render_adjustments()
             .expect_err("legacy-owned provenance must fail");
-        assert!(error.contains("must be owned by provenance"));
+        assert!(
+            error
+                .to_string()
+                .contains("unknown field `legacyAdjustments`")
+        );
     }
 
     #[test]
     fn compiles_strict_layers_and_rejects_duplicate_or_ambiguous_layer_state() {
         let layer = layer();
-        let mut value = document_with_legacy(json!({}));
+        let mut value = current_document();
         value["nodes"]["layers"]["params"] = json!({ "masks": [layer] });
         value["layers"] = json!({ "masks": [layer] });
-        let compiled = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("valid layers document")
-            .into_render_adjustments()
-            .expect("compiled layers document");
+        let compiled = compile_test_document(value).expect("compiled layers document");
         assert_eq!(compiled["masks"][0]["id"], json!("layer-1"));
 
-        let mut duplicate = document_with_legacy(json!({}));
+        let mut duplicate = current_document();
         duplicate["nodes"]["layers"]["params"] = json!({ "masks": [layer, layer] });
         duplicate["layers"] = json!({ "masks": [layer, layer] });
-        let error = serde_json::from_value::<EditDocumentV2>(duplicate)
-            .expect("duplicate layers deserialize before semantic validation")
-            .into_render_adjustments()
-            .expect_err("duplicate layer IDs must fail");
+        let error = compile_test_document(duplicate).expect_err("duplicate layer IDs must fail");
         assert!(error.contains("non-empty and unique"));
 
-        let mut ambiguous = document_with_legacy(json!({}));
+        let mut ambiguous = current_document();
         ambiguous["nodes"]["layers"]["params"] = json!({ "masks": [layer] });
-        let error = serde_json::from_value::<EditDocumentV2>(ambiguous)
-            .expect("ambiguous layers deserialize before semantic validation")
-            .into_render_adjustments()
-            .expect_err("ambiguous layers must fail");
+        let error = compile_test_document(ambiguous).expect_err("ambiguous layers must fail");
         assert!(error.contains("layers domain disagrees"));
     }
 }

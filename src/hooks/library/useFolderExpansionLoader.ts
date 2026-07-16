@@ -1,16 +1,11 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { z } from 'zod';
-
 import { folderTreeListSchema } from '../../schemas/library/folderTreeSchemas';
+import { libraryFolderAggregateListSchema } from '../../schemas/library/libraryCatalogSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
 import { insertChildrenIntoTree } from '../../utils/folderTreeUtils';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-
-const libraryFolderAggregateListSchema = z.array(
-  z.object({ path: z.string().min(1), recursiveImageCount: z.number().int().nonnegative() }).strict(),
-);
 
 export const useFolderExpansionLoader = (showImageCounts: boolean) => {
   const setLibrary = useLibraryStore((state) => state.setLibrary);

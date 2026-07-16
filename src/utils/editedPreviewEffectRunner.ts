@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
+import { currentRenderEditDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ExportColorProfile, ExportRenderingIntent } from '../components/ui/ExportImportProperties';
 import type { ExportSoftProofTransformState } from '../store/useEditorStore';
 import { Invokes } from '../tauri/commands';
@@ -37,7 +37,7 @@ const applyAdjustmentsInvokeSchema = z
   .object({
     activeWaveformChannel: z.string().nullable().optional(),
     computeWaveform: z.boolean(),
-    editDocumentV2: editDocumentV2Schema,
+    editDocumentV2: currentRenderEditDocumentV2Schema,
     expectedImagePath: z.string().trim().min(1),
     isInteractive: z.boolean(),
     previewOperationIdentity: previewOperationIdentitySchema,

@@ -4196,6 +4196,30 @@ mod tests {
     }
 
     #[test]
+    fn terminal_sdr_export_receipt_serializes_explicit_null_hdr_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let output_path = directory.path().join("sdr.jpg");
+        fs::write(&output_path, [1_u8, 2, 3, 4]).unwrap();
+        let output = export_receipt_output(
+            &output_path,
+            "/fixtures/source.ARW",
+            "jpg",
+            ExportReceiptContext {
+                metadata: None,
+                output_commit: None,
+                source_digest: None,
+                raw_development_report: None,
+                edit_graph_revision: None,
+                export_elapsed_ms: None,
+                hdr_receipt: None,
+            },
+        )
+        .unwrap();
+        let value = serde_json::to_value(output).expect("serialize SDR export output");
+        assert_eq!(value["hdrOutput"], serde_json::Value::Null);
+    }
+
+    #[test]
     fn export_receipt_reports_semantic_applied_policy() {
         let settings = base_export_settings(None);
         let metadata = export_receipt_metadata(

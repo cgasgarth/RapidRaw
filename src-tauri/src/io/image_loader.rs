@@ -9,7 +9,7 @@ use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_processing::{ImageMetadata, apply_orientation};
 use crate::mask_generation::SubMask;
-use crate::patch_assets::{CompositeResult, composite_patches};
+use crate::patch_assets::{CompositeResult, composite_current_patches, composite_patches};
 use crate::raw_processing::{
     CameraProfileSelectionV1, RawDemosaicPath, RawDevelopmentReport, RawProcessingProfile,
     RawRuntimeReport, RawTechnicalPlansV1, develop_raw_image_with_report,
@@ -291,8 +291,47 @@ pub(crate) fn raw_processing_settings_for_adjustments(
     }
 }
 
+pub(crate) fn raw_processing_settings_for_current_document(
+    settings: &AppSettings,
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+) -> AppSettings {
+    let Some(mode) = document.raw_processing_mode_override() else {
+        return settings.clone();
+    };
+    let recipe = raw_processing_mode_recipe(Some(mode));
+    AppSettings {
+        raw_processing_mode: Some(mode.to_string()),
+        raw_highlight_compression: Some(recipe.raw_highlight_compression),
+        raw_preprocessing_color_nr: Some(recipe.raw_preprocessing_color_nr),
+        raw_preprocessing_sharpening: Some(recipe.raw_preprocessing_sharpening),
+        raw_preprocessing_sharpening_detail: Some(recipe.raw_preprocessing_sharpening_detail),
+        raw_preprocessing_sharpening_edge_masking: Some(
+            recipe.raw_preprocessing_sharpening_edge_masking,
+        ),
+        raw_preprocessing_sharpening_radius: Some(recipe.raw_preprocessing_sharpening_radius),
+        apply_preprocessing_to_non_raws: Some(false),
+        ..settings.clone()
+    }
+}
+
 pub(crate) fn raw_processing_profile_key(settings: &AppSettings) -> RawProcessingProfileKey {
     raw_processing_profile_key_with_plans(settings, &RawTechnicalPlansV1::default())
+}
+
+#[allow(dead_code)]
+pub(crate) fn raw_processing_profile_key_for_current_document(
+    settings: &AppSettings,
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+) -> Result<RawProcessingProfileKey, String> {
+    let white_balance = document.technical_white_balance_plan()?;
+    let camera_profile = camera_profile_selection_from_current_document(document);
+    Ok(raw_processing_profile_key_with_plans(
+        settings,
+        &RawTechnicalPlansV1 {
+            white_balance: Some(white_balance),
+            camera_profile,
+        },
+    ))
 }
 
 fn raw_processing_profile_key_with_plans(
@@ -423,6 +462,41 @@ pub(crate) fn load_and_composite_with_report(
     ))
 }
 
+#[allow(dead_code)]
+pub(crate) fn load_and_composite_current_document_with_report(
+    base_image: &[u8],
+    path: &str,
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+    use_fast_raw_dev: bool,
+    settings: &AppSettings,
+    cancel_token: Option<(Arc<AtomicUsize>, usize)>,
+    managed_profile_root: PathBuf,
+) -> Result<(DynamicImage, Option<RawDevelopmentReport>)> {
+    let white_balance = document
+        .technical_white_balance_plan()
+        .map_err(anyhow::Error::msg)?;
+    let camera_profile =
+        camera_profile_selection_from_current_document(document).map(|mut selection| {
+            selection.managed_root = managed_profile_root;
+            selection
+        });
+    let (base_image, raw_development_report) = load_base_image_from_bytes_with_report_and_plan(
+        base_image,
+        path,
+        use_fast_raw_dev,
+        settings,
+        cancel_token,
+        RawTechnicalPlansV1 {
+            white_balance: Some(white_balance),
+            camera_profile,
+        },
+    )?;
+    Ok((
+        composite_current_source_artifacts(&base_image, document)?.into_owned(),
+        raw_development_report,
+    ))
+}
+
 fn camera_profile_selection_from_adjustments(
     adjustments: &Value,
 ) -> Option<CameraProfileSelectionV1> {
@@ -444,6 +518,18 @@ fn camera_profile_selection_from_adjustments(
     })
 }
 
+fn camera_profile_selection_from_current_document(
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+) -> Option<CameraProfileSelectionV1> {
+    let (id, creative_amount) = document.camera_profile();
+    let digest = id.strip_prefix("dcp:")?;
+    Some(CameraProfileSelectionV1 {
+        id: format!("dcp:{digest}"),
+        creative_amount,
+        managed_root: PathBuf::new(),
+    })
+}
+
 fn technical_white_balance_plan_from_adjustments(
     adjustments: &Value,
 ) -> Option<WhiteBalancePlanV1> {
@@ -455,9 +541,9 @@ fn technical_white_balance_plan_from_adjustments(
 /// Return decoded pixels whose identity matches the requested source-decode
 /// authority. This prevents a mode edit from rendering against the active
 /// image's previous decode while retaining the native decoded-frame cache.
-pub(crate) fn resolve_loaded_image_for_adjustments(
+pub(crate) fn resolve_loaded_image_for_current_document(
     loaded: LoadedImage,
-    adjustments: &Value,
+    adjustments: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
     state: &AppState,
     app_handle: &tauri::AppHandle,
 ) -> Result<LoadedImage, String> {
@@ -466,11 +552,13 @@ pub(crate) fn resolve_loaded_image_for_adjustments(
     }
     let (source_path, _) = parse_virtual_path(&loaded.path);
     let source_path_str = source_path.to_string_lossy().into_owned();
-    let settings =
-        raw_processing_settings_for_adjustments(&load_settings_or_default(app_handle), adjustments);
+    let settings = raw_processing_settings_for_current_document(
+        &load_settings_or_default(app_handle),
+        adjustments,
+    );
     let technical_plans = RawTechnicalPlansV1 {
-        white_balance: technical_white_balance_plan_from_adjustments(adjustments),
-        camera_profile: camera_profile_selection_from_adjustments(adjustments).map(
+        white_balance: Some(adjustments.technical_white_balance_plan()?),
+        camera_profile: camera_profile_selection_from_current_document(adjustments).map(
             |mut selection| {
                 selection.managed_root =
                     crate::color::camera_profile::registry::managed_profile_root(app_handle)
@@ -479,6 +567,24 @@ pub(crate) fn resolve_loaded_image_for_adjustments(
             },
         ),
     };
+    resolve_loaded_raw_source(
+        loaded,
+        source_path,
+        source_path_str,
+        settings,
+        technical_plans,
+        state,
+    )
+}
+
+fn resolve_loaded_raw_source(
+    loaded: LoadedImage,
+    source_path: PathBuf,
+    source_path_str: String,
+    settings: AppSettings,
+    technical_plans: RawTechnicalPlansV1,
+    state: &AppState,
+) -> Result<LoadedImage, String> {
     let key = raw_processing_mode_cache_key_with_plans(&source_path, &settings, &technical_plans)
         .map_err(|error| error.to_string())?;
     let artifact_source =
@@ -522,6 +628,40 @@ pub(crate) fn resolve_loaded_image_for_adjustments(
         image,
         ..loaded
     })
+}
+
+pub(crate) fn resolve_loaded_image_for_adjustments(
+    loaded: LoadedImage,
+    adjustments: &Value,
+    state: &AppState,
+    app_handle: &tauri::AppHandle,
+) -> Result<LoadedImage, String> {
+    if !loaded.is_raw {
+        return Ok(loaded);
+    }
+    let (source_path, _) = parse_virtual_path(&loaded.path);
+    let source_path_str = source_path.to_string_lossy().into_owned();
+    let settings =
+        raw_processing_settings_for_adjustments(&load_settings_or_default(app_handle), adjustments);
+    let technical_plans = RawTechnicalPlansV1 {
+        white_balance: technical_white_balance_plan_from_adjustments(adjustments),
+        camera_profile: camera_profile_selection_from_adjustments(adjustments).map(
+            |mut selection| {
+                selection.managed_root =
+                    crate::color::camera_profile::registry::managed_profile_root(app_handle)
+                        .unwrap_or_default();
+                selection
+            },
+        ),
+    };
+    resolve_loaded_raw_source(
+        loaded,
+        source_path,
+        source_path_str,
+        settings,
+        technical_plans,
+        state,
+    )
 }
 
 pub fn load_base_image_from_bytes(
@@ -950,6 +1090,13 @@ pub fn composite_patches_on_image<'a>(
     current_adjustments: &Value,
 ) -> Result<CompositeResult<'a>> {
     composite_patches(base_image, current_adjustments)
+}
+
+pub(crate) fn composite_current_source_artifacts<'a>(
+    base_image: &'a DynamicImage,
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+) -> Result<CompositeResult<'a>> {
+    composite_current_patches(base_image, &document.source_artifacts().ai_patches)
 }
 
 #[tauri::command]

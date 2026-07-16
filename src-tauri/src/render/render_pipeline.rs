@@ -70,6 +70,49 @@ pub(crate) fn apply_pre_gpu_detail_stages<'a>(
     }
 }
 
+pub(crate) fn apply_current_pre_gpu_detail_stages<'a>(
+    image: &'a DynamicImage,
+    base_hash: u64,
+    document: &crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
+    is_raw: bool,
+) -> PreGpuDetailStageResult<'a> {
+    let source_class = if is_raw {
+        DenoiseSourceClass::LinearRaw
+    } else {
+        DenoiseSourceClass::EncodedRgb
+    };
+    let denoise = document.denoise_render_controls();
+    let deblur = document.deblur_render_controls();
+    let detail = document.detail_macro_controls();
+    let denoised_image = crate::denoise_render::apply_denoise_stage_for_source_with_controls(
+        image,
+        denoise,
+        source_class,
+    );
+    let denoise_hash =
+        crate::denoise_render::calculate_denoise_render_hash_with_controls(base_hash, denoise);
+    let deblurred_image =
+        crate::deblur_render::apply_deblur_stage_with_controls(denoised_image.as_ref(), deblur);
+    let deblur_hash =
+        crate::deblur_render::calculate_deblur_render_hash_with_controls(denoise_hash, deblur);
+    let wavelet_image =
+        crate::wavelet_render::apply_current_detail_stage(deblurred_image.image.as_ref(), detail);
+    let render_hash =
+        crate::wavelet_render::calculate_current_detail_render_hash(deblur_hash, detail);
+    let stage_changed = matches!(denoised_image, Cow::Owned(_))
+        || matches!(deblurred_image.image, Cow::Owned(_))
+        || matches!(wavelet_image, Cow::Owned(_));
+    PreGpuDetailStageResult {
+        image: if stage_changed {
+            Cow::Owned(wavelet_image.into_owned())
+        } else {
+            Cow::Borrowed(image)
+        },
+        owns_legacy_global_detail: detail.into_iter().any(|value| value.abs() > f32::EPSILON),
+        render_hash,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

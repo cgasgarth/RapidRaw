@@ -5,29 +5,28 @@ use std::thread;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbaImage};
 use tauri::{Emitter, Manager};
 
-use crate::adjustment_utils::hydrate_adjustments;
 use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app_settings::load_preview_runtime_settings_or_default;
 use crate::app_state::{
     AnalyticsConfig, AnalyticsFrameId, AnalyticsProducts, AppState,
     FrontendPreviewOperationIdentity,
 };
+use crate::editor::preview_geometry_service::generate_current_transformed_preview_cancellable;
 use crate::editor::viewer_sampling_service::{
     CachedViewerSampleFrame, SampleablePixels, ViewerSampleCacheSlot,
 };
-use crate::generate_transformed_preview_cancellable;
 use crate::image_processing::{
     RenderRequest, downscale_f32_image, get_or_init_gpu_context,
     process_and_get_dynamic_image_with_analytics, resolve_tonemapper_override_from_handle,
 };
-use crate::mask_generation::get_cached_or_generate_preview_mask;
+use crate::mask_generation::get_cached_or_generate_current_preview_mask;
 use crate::preview_scheduler::{
     PreviewAbort, PreviewCancellation, PreviewCompletion, PreviewScheduler,
     PreviewSchedulingPolicy, PreviewStage,
 };
 use crate::render::preview_frame_cache_service::CachedPreview;
 use crate::render_plan::{
-    CompileRenderPlanContext, RenderPlanRevision, compile_render_plan_cached, content_revision,
+    CompileRenderPlanContext, RenderPlanRevision, compile_current_edit_document_render_plan_cached,
 };
 use crate::{render_caches, render_pipeline};
 
@@ -71,7 +70,7 @@ fn native_preview_presentation_decision(
 pub(crate) struct PreviewJobConfig<'a> {
     pub(crate) app_handle: &'a tauri::AppHandle,
     pub(crate) state: tauri::State<'a, AppState>,
-    pub(crate) adjustments_json: serde_json::Value,
+    pub(crate) edit_document: &'a crate::adjustments::edit_document_v2::CompiledCurrentEditDocument,
     pub(crate) expected_image_path: &'a str,
     pub(crate) is_interactive: bool,
     pub(crate) preview_operation_identity: &'a FrontendPreviewOperationIdentity,
@@ -165,7 +164,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let PreviewJobConfig {
         app_handle,
         state,
-        mut adjustments_json,
+        edit_document,
         expected_image_path,
         is_interactive,
         preview_operation_identity,
@@ -182,9 +181,6 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     let fn_start = std::time::Instant::now();
     cancellation_checkpoint(cancellation, PreviewStage::Source)?;
     let context = get_or_init_gpu_context(&state, app_handle)?;
-    hydrate_adjustments(&state, &mut adjustments_json);
-    cancellation_checkpoint(cancellation, PreviewStage::Source)?;
-
     let loaded_image = state
         .editor()
         .image_snapshot()
@@ -196,51 +192,39 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         .map_err(|error| error.to_string())?;
     validate_expected_preview_image(&loaded_image.path, expected_image_path)
         .map_err(|error| error.to_string())?;
-    if let Some(plan) =
-        crate::layers::apply_authoritative_layer_stack(&mut adjustments_json, expected_image_path)?
-    {
-        log::debug!(
-            "native layer preview plan revision={} layer={:?} hash={}",
-            plan.graph_revision,
-            plan.layer_id,
-            plan.plan_hash
-        );
-    }
-    let loaded_image = crate::image_loader::resolve_loaded_image_for_adjustments(
+    let loaded_image = crate::image_loader::resolve_loaded_image_for_current_document(
         loaded_image,
-        &adjustments_json,
+        edit_document,
         &state,
         app_handle,
     )?;
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
-    let adjustments_clone = adjustments_json;
 
     let settings = load_preview_runtime_settings_or_default(app_handle);
     let is_raw = loaded_image.is_raw;
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-    let lut = adjustments_clone["lutPath"]
-        .as_str()
+    let lut = edit_document
+        .lut_path()
         .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let settings_revision = u64::from(tm_override.unwrap_or(0));
     let revision = viewer_sample_graph_revision.map_or_else(
-        || {
-            content_revision(
-                &adjustments_clone,
-                preview_id.image_session,
-                loaded_image.artifact_source.source_fingerprint(),
-                settings_revision,
-            )
+        || RenderPlanRevision {
+            image_session: preview_id.image_session,
+            source_revision: loaded_image.artifact_source.source_fingerprint(),
+            adjustment_revision: edit_document.content_fingerprint(),
+            schema_version: 2,
+            settings_revision,
         },
         |graph_revision| RenderPlanRevision {
             image_session: preview_id.image_session,
             source_revision: loaded_image.artifact_source.source_fingerprint(),
             adjustment_revision: hash_revision(graph_revision),
-            schema_version: 1,
+            schema_version: 2,
             settings_revision,
         },
     );
-    let render_plan = compile_render_plan_cached(
-        &adjustments_clone,
+    let render_plan = compile_current_edit_document_render_plan_cached(
+        edit_document,
         CompileRenderPlanContext {
             revision,
             is_raw,
@@ -250,14 +234,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     )
     .map_err(|error| error.to_string())?;
     log::debug!(
-        "render_plan revision={:?} compile_us={} geometry_scale={} effective_fields={} fingerprints={:?}",
+        "render_plan revision={:?} compile_us={} geometry_scale={} fingerprints={:?}",
         render_plan.revision,
         render_plan.compile_time.as_micros(),
         render_plan.geometry.scale,
-        render_plan
-            .effective_json
-            .as_object()
-            .map_or(0, serde_json::Map::len),
         render_plan.fingerprints,
     );
     let live_quality = settings.live_preview_quality.as_str();
@@ -313,10 +293,9 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             render_caches::RenderCaches::new(&state).clear_gpu_image_cache();
             let geometry_checkpoint =
                 || cancellation_checkpoint(cancellation, PreviewStage::Geometry);
-            let (base, scale, offset) = generate_transformed_preview_cancellable(
-                &state,
+            let (base, scale, offset) = generate_current_transformed_preview_cancellable(
                 &loaded_image,
-                &adjustments_clone,
+                edit_document,
                 preview_dim,
                 Some(&geometry_checkpoint),
             )?;
@@ -390,10 +369,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         )
     };
 
-    let pre_gpu_detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
+    let pre_gpu_detail_stage = render_pipeline::apply_current_pre_gpu_detail_stages(
         processing_image.as_ref(),
         processing_revision.construction_generation,
-        &adjustments_clone,
+        edit_document,
         is_raw,
     );
     cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
@@ -425,14 +404,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         Vec::with_capacity(render_plan.masks.len());
     for def in render_plan.masks.iter() {
         cancellation_checkpoint(cancellation, PreviewStage::Masks)?;
-        if let Some(mask) = get_cached_or_generate_preview_mask(
+        if let Some(mask) = get_cached_or_generate_current_preview_mask(
             &state,
             def,
             preview_width,
             preview_height,
             effective_scale,
             scaled_crop_offset,
-            &adjustments_clone,
+            render_plan.fingerprints.geometry,
             processing_image_ref,
         ) {
             mask_bitmaps.push(mask);
@@ -440,9 +419,10 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
     }
 
     cancellation_checkpoint(cancellation, PreviewStage::CpuDetail)?;
-    let retouched_processing_image = crate::retouch_render::apply_clone_retouch_layers(
+    let retouch_layers = edit_document.retouch_layers();
+    let retouched_processing_image = crate::retouch_render::apply_current_clone_retouch_layers(
         processing_image_ref,
-        &adjustments_clone,
+        retouch_layers,
         &mask_bitmaps,
     );
     cancellation_checkpoint(cancellation, PreviewStage::Gpu)?;
@@ -891,7 +871,7 @@ pub(crate) fn start_preview_worker(app_handle: tauri::AppHandle) {
                 process_preview_job(PreviewJobConfig {
                     app_handle: &app_handle,
                     state,
-                    adjustments_json: (*job.adjustments).clone(),
+                    edit_document: &job.edit_document,
                     expected_image_path: &job.expected_image_path,
                     is_interactive: job.is_interactive,
                     preview_operation_identity: &job.preview_operation_identity,

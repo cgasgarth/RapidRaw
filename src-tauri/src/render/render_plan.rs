@@ -16,7 +16,11 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::adjustments::abi::AllAdjustments;
-use crate::adjustments::parse::get_all_adjustments_from_json_with_masks;
+use crate::adjustments::edit_document_v2::CompiledCurrentEditDocument;
+use crate::adjustments::parse::{
+    CurrentAdjustmentSource, assemble_all_adjustments, compile_global_adjustments,
+    compile_mask_adjustments, get_all_adjustments_from_json_with_masks,
+};
 use crate::color::white_balance::{
     compile_current_technical_white_balance, default_technical_white_balance_json,
 };
@@ -96,8 +100,6 @@ pub struct CompiledRenderPlan {
     pub lut: Option<Arc<Lut>>,
     pub edit_graph: Arc<CompiledEditGraph>,
     pub fingerprints: StageFingerprints,
-    /// Compatibility input for transformation and patch executors not yet typed.
-    pub effective_json: Arc<Value>,
     pub compile_time: Duration,
 }
 
@@ -261,13 +263,202 @@ pub fn compile_render_plan_cached(
     Ok(compiled)
 }
 
+pub(crate) fn compile_current_edit_document_render_plan_cached(
+    document: &CompiledCurrentEditDocument,
+    context: CompileRenderPlanContext,
+    lut: Option<Arc<Lut>>,
+) -> Result<Arc<CompiledRenderPlan>, RenderPlanError> {
+    if let Some(plan) = cached_plan(context.revision) {
+        return Ok(plan);
+    }
+    cache().lock().unwrap().misses += 1;
+    let masks = document.masks().map_err(|message| RenderPlanError {
+        code: "render_plan.invalid_field",
+        field: "masks",
+        message,
+    })?;
+    let compiled = Arc::new(compile_current_edit_document_render_plan(
+        document, context, lut, masks,
+    )?);
+    insert_cached_plan(compiled)
+}
+
+fn compile_current_edit_document_render_plan(
+    document: &CompiledCurrentEditDocument,
+    context: CompileRenderPlanContext,
+    lut: Option<Arc<Lut>>,
+    masks: Vec<MaskDefinition>,
+) -> Result<CompiledRenderPlan, RenderPlanError> {
+    let started = Instant::now();
+    let geometry = document.geometry();
+    let crop = document.crop();
+    let adjustments = document
+        .all_adjustments(context.is_raw, context.tonemapper_override)
+        .map_err(|message| RenderPlanError {
+            code: "render_plan.invalid_node",
+            field: "nodes",
+            message,
+        })?;
+    let mut fingerprints = current_fingerprints(
+        context.revision.source_revision,
+        document.content_fingerprint(),
+        &adjustments,
+        &geometry,
+        crop,
+        &masks,
+        lut.as_deref(),
+    );
+    let (scene_curve, output_curve) =
+        document
+            .compiled_curves()
+            .map_err(|message| RenderPlanError {
+                code: "render_plan.invalid_curve",
+                field: "nodes.scene_curve",
+                message,
+            })?;
+    if let Some(curve) = &scene_curve {
+        fingerprints.color = hash_parts(&[
+            &fingerprints.color.to_le_bytes(),
+            &curve.fingerprint.to_le_bytes(),
+        ]);
+    }
+    if let Some(curve) = &output_curve {
+        fingerprints.output = hash_parts(&[
+            &fingerprints.output.to_le_bytes(),
+            &curve.fingerprint.to_le_bytes(),
+        ]);
+    }
+    let film_emulation = document
+        .film_parameters()
+        .map_err(|message| RenderPlanError {
+            code: "render_plan.invalid_film_emulation",
+            field: "nodes.film_emulation",
+            message,
+        })?;
+    let neutral_adjustments =
+        document.neutral_adjustments(context.is_raw, context.tonemapper_override);
+    let has_geometry =
+        geometry_bytes(&geometry, crop) != geometry_bytes(&GeometryParams::default(), None);
+    let edit_graph = Arc::new(CompiledEditGraph::compile(EditGraphCompileInputs {
+        pipeline_version: crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+        version_was_explicit: true,
+        source_fingerprint: fingerprints.source,
+        geometry_fingerprint: fingerprints.geometry,
+        retouch_fingerprint: fingerprints.retouch,
+        detail_fingerprint: fingerprints.detail,
+        color_fingerprint: fingerprints.color,
+        output_fingerprint: fingerprints.output,
+        adjustments: &adjustments,
+        neutral_adjustments: &neutral_adjustments,
+        scene_curve: scene_curve.as_ref(),
+        film_emulation,
+        output_curve: output_curve.as_ref(),
+        has_geometry_or_retouch: has_geometry || document.has_retouch(),
+        has_detail: document.has_detail_edits(),
+        has_masks: !masks.is_empty(),
+        has_lut: lut.is_some(),
+        show_clipping: adjustments.global.show_clipping != 0,
+    }));
+    fingerprints.full = edit_graph.fingerprint;
+    Ok(CompiledRenderPlan {
+        revision: context.revision,
+        adjustments,
+        geometry,
+        crop,
+        masks: masks.into(),
+        lut,
+        edit_graph,
+        fingerprints,
+        compile_time: started.elapsed(),
+    })
+}
+
+fn current_fingerprints(
+    source_revision: u64,
+    document_fingerprint: u64,
+    adjustments: &AllAdjustments,
+    geometry_params: &GeometryParams,
+    crop: Option<Crop>,
+    masks: &[MaskDefinition],
+    lut: Option<&Lut>,
+) -> StageFingerprints {
+    let document = document_fingerprint.to_le_bytes();
+    let source = hash_parts(&[
+        b"source-v2",
+        &FINGERPRINT_VERSION.to_le_bytes(),
+        &source_revision.to_le_bytes(),
+        &document,
+    ]);
+    let geometry = hash_parts(&[
+        b"geometry-v2",
+        &FINGERPRINT_VERSION.to_le_bytes(),
+        &geometry_bytes(geometry_params, crop),
+        &document,
+    ]);
+    let masks_json = serde_json::to_value(masks).expect("validated masks serialize");
+    let masks_fingerprint = hash_json(&masks_json);
+    let pre_gpu_base = hash_parts(&[b"pre-gpu-base-v2", &geometry.to_le_bytes(), &document]);
+    let retouch = hash_parts(&[b"retouch-v2", &masks_fingerprint.to_le_bytes(), &document]);
+    let detail = hash_parts(&[b"detail-v2", &document]);
+    let color = hash_parts(&[
+        &color_fingerprint(adjustments, lut, &Value::Null).to_le_bytes(),
+        &document,
+    ]);
+    let output = hash_parts(&[b"output-v2", &document]);
+    StageFingerprints {
+        source,
+        geometry,
+        pre_gpu_base,
+        masks: masks_fingerprint,
+        retouch,
+        detail,
+        color,
+        output,
+        full: 0,
+    }
+}
+
+fn cached_plan(revision: RenderPlanRevision) -> Option<Arc<CompiledRenderPlan>> {
+    let mut cache = cache().lock().unwrap();
+    let hit = cache
+        .entries
+        .iter()
+        .position(|(candidate, _)| *candidate == revision)?;
+    cache.hits += 1;
+    let entry = cache.entries.remove(hit).unwrap();
+    let plan = Arc::clone(&entry.1);
+    cache.entries.push_front(entry);
+    Some(plan)
+}
+
+fn insert_cached_plan(
+    compiled: Arc<CompiledRenderPlan>,
+) -> Result<Arc<CompiledRenderPlan>, RenderPlanError> {
+    let mut cache = cache().lock().unwrap();
+    if let Some((_, existing)) = cache
+        .entries
+        .iter()
+        .find(|(revision, _)| *revision == compiled.revision)
+    {
+        return Ok(Arc::clone(existing));
+    }
+    cache.compilation_count += 1;
+    cache
+        .entries
+        .push_front((compiled.revision, Arc::clone(&compiled)));
+    while cache.entries.len() > MAX_CACHED_PLANS {
+        cache.entries.pop_back();
+        cache.evictions += 1;
+    }
+    Ok(compiled)
+}
+
 pub fn compile_render_plan(
     raw: &Value,
     context: CompileRenderPlanContext,
     lut: Option<Arc<Lut>>,
 ) -> Result<CompiledRenderPlan, RenderPlanError> {
     debug_assert!(!FIELD_OWNERSHIP.is_empty());
-    let started = Instant::now();
     if !raw.is_object() {
         return Err(RenderPlanError {
             code: "render_plan.invalid_type",
@@ -276,19 +467,57 @@ pub fn compile_render_plan(
         });
     }
     validate_finite(raw, "$")?;
-    let effective = raw.clone();
-    validate_global_white_balance(&effective)?;
-    validate_monochrome_process(&effective)?;
-    let film_emulation =
-        crate::render::film_emulation::parse_node(&effective).map_err(|message| {
-            RenderPlanError {
-                code: "render_plan.invalid_film_emulation",
-                field: "filmEmulation",
-                message: message.to_string(),
-            }
+    let masks = match raw.get("masks") {
+        Some(value) => {
+            Vec::<MaskDefinition>::deserialize(value).map_err(|error| RenderPlanError {
+                code: "render_plan.invalid_field",
+                field: "masks",
+                message: error.to_string(),
+            })?
+        }
+        None => Vec::new(),
+    };
+    let crop = match raw.get("crop").filter(|value| !value.is_null()) {
+        Some(value) => Some(Crop::deserialize(value).map_err(|error| RenderPlanError {
+            code: "render_plan.invalid_field",
+            field: "crop",
+            message: error.to_string(),
+        })?),
+        None => None,
+    };
+    compile_render_plan_from_source(
+        raw,
+        context,
+        lut,
+        get_geometry_params_from_json(raw),
+        crop,
+        masks,
+        None,
+    )
+}
+
+fn compile_render_plan_from_source(
+    source: &impl CurrentAdjustmentSource,
+    context: CompileRenderPlanContext,
+    lut: Option<Arc<Lut>>,
+    geometry: GeometryParams,
+    crop: Option<Crop>,
+    masks: Vec<MaskDefinition>,
+    compiled_adjustments: Option<AllAdjustments>,
+) -> Result<CompiledRenderPlan, RenderPlanError> {
+    debug_assert!(!FIELD_OWNERSHIP.is_empty());
+    let started = Instant::now();
+    validate_global_white_balance(source)?;
+    validate_monochrome_process(source)?;
+    let film_emulation = source
+        .film_parameters()
+        .map_err(|message| RenderPlanError {
+            code: "render_plan.invalid_film_emulation",
+            field: "filmEmulation",
+            message: message.to_string(),
         })?;
-    let version_was_explicit = effective.get("rawEngineEditGraphVersion").is_some();
-    let pipeline_version = match effective.get("rawEngineEditGraphVersion") {
+    let version_was_explicit = source.value("rawEngineEditGraphVersion").is_some();
+    let pipeline_version = match source.value("rawEngineEditGraphVersion") {
         None => crate::edit_graph::LEGACY_PIPELINE_VERSION,
         Some(Value::Number(version)) => {
             u32::try_from(version.as_u64().ok_or_else(|| RenderPlanError {
@@ -317,24 +546,6 @@ pub fn compile_render_plan(
             message: format!("unsupported edit graph version {pipeline_version}"),
         });
     }
-    let masks = match effective.get("masks") {
-        Some(value) => {
-            Vec::<MaskDefinition>::deserialize(value).map_err(|error| RenderPlanError {
-                code: "render_plan.invalid_field",
-                field: "masks",
-                message: error.to_string(),
-            })?
-        }
-        None => Vec::new(),
-    };
-    let crop = match effective.get("crop").filter(|value| !value.is_null()) {
-        Some(value) => Some(Crop::deserialize(value).map_err(|error| RenderPlanError {
-            code: "render_plan.invalid_field",
-            field: "crop",
-            message: error.to_string(),
-        })?),
-        None => None,
-    };
     if let Some(crop) = crop
         && (!(0.0..=1.0).contains(&crop.x)
             || !(0.0..=1.0).contains(&crop.y)
@@ -347,29 +558,30 @@ pub fn compile_render_plan(
             message: "crop coordinates and dimensions must be in 0..=1".into(),
         });
     }
-    let mut adjustments = get_all_adjustments_from_json_with_masks(
-        &effective,
-        context.is_raw,
-        context.tonemapper_override,
-        &masks,
-    );
+    let mut adjustments = compiled_adjustments.unwrap_or_else(|| {
+        let global =
+            compile_global_adjustments(source, context.is_raw, context.tonemapper_override);
+        let local = masks
+            .iter()
+            .map(|mask| compile_mask_adjustments(&mask.adjustments, &mask.blend_mode));
+        assemble_all_adjustments(global, local)
+    });
     adjustments.global.edit_graph_version = pipeline_version as f32;
-    validate_perspective_analysis_currentness(&effective, context.revision.source_revision)?;
-    let geometry = get_geometry_params_from_json(&effective);
+    validate_perspective_analysis_currentness(source, context.revision.source_revision)?;
     let mut fingerprints = fingerprints(
         context.revision.source_revision,
-        &effective,
+        source,
         &adjustments,
         &geometry,
         crop,
         &masks,
         lut.as_deref(),
     );
-    if let Some(film) = effective.get("filmEmulation") {
+    if let Some(film) = source.value("filmEmulation") {
         let film_bytes = serde_json::to_vec(film).expect("validated Film node is serializable");
         fingerprints.color = hash_parts(&[&fingerprints.color.to_le_bytes(), &film_bytes]);
     }
-    let (scene_curve, output_curve) = compile_typed_curves(&effective, pipeline_version)?;
+    let (scene_curve, output_curve) = compile_typed_curves(source, pipeline_version)?;
     if let Some(curve) = &scene_curve {
         fingerprints.color = hash_parts(&[
             &fingerprints.color.to_le_bytes(),
@@ -393,8 +605,8 @@ pub fn compile_render_plan(
     let neutral_detail = hash_selected(&neutral_json, DETAIL_FINGERPRINT_FIELDS);
     let default_geometry = GeometryParams::default();
     let has_geometry = geometry_bytes(&geometry, crop) != geometry_bytes(&default_geometry, None);
-    let has_retouch = effective
-        .get("aiPatches")
+    let has_retouch = source
+        .value("aiPatches")
         .and_then(Value::as_array)
         .is_some_and(|patches| !patches.is_empty());
     let edit_graph = Arc::new(CompiledEditGraph::compile(EditGraphCompileInputs {
@@ -428,7 +640,6 @@ pub fn compile_render_plan(
         lut,
         edit_graph,
         fingerprints,
-        effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
     })
 }
@@ -452,10 +663,12 @@ pub(crate) fn current_render_adjustments(mut adjustments: Value) -> Value {
     adjustments
 }
 
-fn validate_global_white_balance(effective: &Value) -> Result<(), RenderPlanError> {
+fn validate_global_white_balance(
+    effective: &impl CurrentAdjustmentSource,
+) -> Result<(), RenderPlanError> {
     if let Some(field) = OBSOLETE_GLOBAL_WHITE_BALANCE_FIELDS
         .iter()
-        .find(|field| effective.get(**field).is_some())
+        .find(|field| effective.value(field).is_some())
     {
         return Err(RenderPlanError {
             code: "render_plan.obsolete_white_balance_representation",
@@ -463,7 +676,7 @@ fn validate_global_white_balance(effective: &Value) -> Result<(), RenderPlanErro
             message: "obsolete global white-balance state is not render-authoritative".into(),
         });
     }
-    let Some(technical) = effective.get("whiteBalanceTechnical") else {
+    let Some(technical) = effective.value("whiteBalanceTechnical") else {
         return Err(RenderPlanError {
             code: "render_plan.missing_white_balance_technical",
             field: "whiteBalanceTechnical",
@@ -479,7 +692,7 @@ fn validate_global_white_balance(effective: &Value) -> Result<(), RenderPlanErro
 }
 
 fn compile_typed_curves(
-    effective: &Value,
+    effective: &impl CurrentAdjustmentSource,
     pipeline_version: u32,
 ) -> Result<
     (
@@ -489,7 +702,7 @@ fn compile_typed_curves(
     RenderPlanError,
 > {
     let scene_input = effective
-        .get("sceneCurveV1")
+        .value("sceneCurveV1")
         .filter(|value| !value.is_null())
         .map(SceneCurveInputV1::deserialize)
         .transpose()
@@ -499,7 +712,7 @@ fn compile_typed_curves(
             message: error.to_string(),
         })?;
     let output_input = effective
-        .get("outputCurveV1")
+        .value("outputCurveV1")
         .filter(|value| !value.is_null())
         .map(OutputCurveInputV1::deserialize)
         .transpose()
@@ -578,11 +791,11 @@ fn compile_typed_curves(
 }
 
 fn validate_perspective_analysis_currentness(
-    effective: &Value,
+    effective: &impl CurrentAdjustmentSource,
     source_revision: u64,
 ) -> Result<(), RenderPlanError> {
     let Some(identity) = effective
-        .get("perspectiveCorrection")
+        .value("perspectiveCorrection")
         .and_then(|settings| settings.get("resolvedPlan"))
         .and_then(|plan| plan.get("analysisIdentity"))
         .filter(|identity| !identity.is_null())
@@ -590,12 +803,12 @@ fn validate_perspective_analysis_currentness(
         return Ok(());
     };
     let orientation = effective
-        .get("orientationSteps")
+        .value("orientationSteps")
         .and_then(Value::as_u64)
         .unwrap_or_default();
     let lens_contract = serde_json::to_string(
         effective
-            .get("lensDistortionParams")
+            .value("lensDistortionParams")
             .unwrap_or(&Value::Null),
     )
     .unwrap_or_default();
@@ -624,8 +837,10 @@ fn validate_perspective_analysis_currentness(
     Ok(())
 }
 
-fn validate_monochrome_process(effective: &Value) -> Result<(), RenderPlanError> {
-    let Some(settings) = effective.get("blackWhiteMixer") else {
+fn validate_monochrome_process(
+    effective: &impl CurrentAdjustmentSource,
+) -> Result<(), RenderPlanError> {
+    let Some(settings) = effective.value("blackWhiteMixer") else {
         return Ok(());
     };
     let process = settings.get("process").and_then(Value::as_str);
@@ -688,7 +903,7 @@ pub(crate) fn compile_consumer_render_plan(
 
 fn fingerprints(
     source_revision: u64,
-    effective: &Value,
+    effective: &impl CurrentAdjustmentSource,
     adjustments: &AllAdjustments,
     geometry: &GeometryParams,
     crop: Option<Crop>,
@@ -699,14 +914,14 @@ fn fingerprints(
         b"source",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &source_revision.to_le_bytes(),
-        &hash_json(effective.get("cameraProfile").unwrap_or(&Value::Null)).to_le_bytes(),
+        &hash_json(effective.value_or_null("cameraProfile")).to_le_bytes(),
     ]);
     let geometry = hash_parts(&[
         b"geometry",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &geometry_bytes(geometry, crop),
     ]);
-    let pre_gpu_color = hash_selected(
+    let pre_gpu_color = hash_selected_source(
         effective,
         crate::adjustment_fields::CPU_COLOR_RENDER_HASH_KEYS,
     );
@@ -716,20 +931,20 @@ fn fingerprints(
         &geometry.to_le_bytes(),
         &pre_gpu_color.to_le_bytes(),
     ]);
-    let masks_fingerprint = hash_json(effective.get("masks").unwrap_or(&Value::Null));
+    let masks_fingerprint = hash_json(effective.value_or_null("masks"));
     let retouch = pre_gpu_retouch_fingerprint(effective);
-    let detail = hash_selected(effective, DETAIL_FINGERPRINT_FIELDS);
+    let detail = hash_selected_source(effective, DETAIL_FINGERPRINT_FIELDS);
     let color = color_fingerprint(
         adjustments,
         lut,
-        effective.get("cameraProfileAmount").unwrap_or(&Value::Null),
+        effective.value_or_null("cameraProfileAmount"),
     );
     let output = hash_parts(&[
         b"output",
         &FINGERPRINT_VERSION.to_le_bytes(),
         &hash_json(
             effective
-                .get("effectsEnabled")
+                .value("effectsEnabled")
                 .unwrap_or(&Value::Bool(true)),
         )
         .to_le_bytes(),
@@ -759,9 +974,9 @@ fn fingerprints(
     }
 }
 
-fn pre_gpu_retouch_fingerprint(effective: &Value) -> u64 {
+fn pre_gpu_retouch_fingerprint(effective: &impl CurrentAdjustmentSource) -> u64 {
     let mut cpu_retouch_layers = effective
-        .get("masks")
+        .value("masks")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
@@ -775,7 +990,7 @@ fn pre_gpu_retouch_fingerprint(effective: &Value) -> u64 {
         })
         .cloned()
         .collect::<Vec<_>>();
-    if let Some(legacy_patches) = effective.get("aiPatches")
+    if let Some(legacy_patches) = effective.value("aiPatches")
         && !legacy_patches.is_null()
     {
         cpu_retouch_layers.push(legacy_patches.clone());
@@ -956,6 +1171,16 @@ fn hash_selected(value: &Value, keys: &[&str]) -> u64 {
     for key in keys {
         hasher.update(key.as_bytes());
         hasher.update(&hash_json(value.get(*key).unwrap_or(&Value::Null)).to_le_bytes());
+    }
+    first_u64(hasher.finalize())
+}
+
+fn hash_selected_source(value: &impl CurrentAdjustmentSource, keys: &[&str]) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&FINGERPRINT_VERSION.to_le_bytes());
+    for key in keys {
+        hasher.update(key.as_bytes());
+        hasher.update(&hash_json(value.value_or_null(key)).to_le_bytes());
     }
     first_u64(hasher.finalize())
 }
@@ -1663,7 +1888,7 @@ mod tests {
             explicit.edit_graph.receipt.migration,
             crate::edit_graph::EditGraphMigration::LegacyV1Explicit
         );
-        assert_eq!(explicit.effective_json["rawEngineEditGraphVersion"], 1);
+        assert_eq!(explicit.adjustments.global.edit_graph_version, 1.0);
 
         let implicit_dehaze =
             compile_render_plan(&json!({"dehaze": 20}), context(76), None).unwrap();

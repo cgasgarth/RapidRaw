@@ -131,6 +131,7 @@ export interface ExportReceiptOutput {
   colorProfile?: string | null | undefined;
   effectiveColorProfile?: string | null | undefined;
   format: string;
+  hdrOutput?: HdrExportReceipt | null | undefined;
   iccEmbedded?: boolean | null | undefined;
   outputPath: string;
   outputDigest?: ExportReceiptDigest | null | undefined;
@@ -150,6 +151,21 @@ export interface ExportReceiptOutput {
   transformPolicyFingerprint?: string | null | undefined;
   transformApplied?: boolean | null | undefined;
   gamutMapping?: ExportGamutMappingReceipt | null | undefined;
+}
+
+export interface HdrExportReceipt {
+  bitDepth: number;
+  byteSize: number;
+  colorPrimaries: string;
+  colorPolicyFingerprint: string;
+  fileFormat: string;
+  implementationVersion: number;
+  planFingerprint: string;
+  rendition: string;
+  sceneEditFingerprint: string;
+  target: 'sdr_companion_tiff16' | 'hdr_pq10' | 'hdr_hlg10';
+  transfer: string;
+  viewFingerprint: string;
 }
 
 export interface ExportGamutMappingReceipt {
