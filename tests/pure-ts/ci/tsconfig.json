@@ -14,7 +14,8 @@
     "../edit-document/owned-node-migrations.test.ts",
     "../edit-document/camera-detail-migrations.test.ts",
     "../edit-document/creative-curves-geometry.test.ts",
-    "../edit-document/render-preparation.test.ts"
+    "../edit-document/render-preparation.test.ts",
+    "../edit-document/batch-reset-clipboard.test.ts"
   ],
   "exclude": ["../../../node_modules"]
 }
