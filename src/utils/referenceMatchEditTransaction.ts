@@ -7,6 +7,7 @@ import {
   createReferenceMatchAdjustmentLayer,
   createReferenceMatchAppliedDiffs,
   fingerprintReferenceMatchValue,
+  getReferenceMatchAdjustmentValue,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
 } from './referenceMatch';
@@ -121,7 +122,7 @@ export const buildReferenceMatchGlobalEditTransaction = ({
     impact,
     proposalFingerprint: proposal.proposalFingerprint,
     resultingGraphFingerprint: fingerprintReferenceMatchValue(
-      JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
+      JSON.stringify(proposal.diffs.map((diff) => [diff.key, getReferenceMatchAdjustmentValue(applied, diff.key)])),
     ),
     schemaVersion: 1,
     targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,

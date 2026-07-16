@@ -802,6 +802,36 @@ fn validate_adjustments(
         *adjustments = serde_json::json!({});
         return;
     };
+    if object.is_empty() {
+        object.insert(
+            "whiteBalanceTechnical".to_string(),
+            crate::color::white_balance::default_technical_white_balance_json(),
+        );
+    } else {
+        let white_balance_error = match object.get("whiteBalanceTechnical") {
+            None => Some("white_balance_technical_missing"),
+            Some(value)
+                if crate::color::white_balance::compile_current_technical_white_balance(value)
+                    .is_err() =>
+            {
+                Some("white_balance_technical_invalid")
+            }
+            Some(_) => None,
+        };
+        if let Some(reason) = white_balance_error {
+            extensions.insert(
+                "rejectedAdjustments".to_string(),
+                JsonValue::Object(std::mem::take(object)),
+            );
+            disabled.push("adjustments".to_string());
+            reasons.push(reason.to_string());
+            object.insert(
+                "whiteBalanceTechnical".to_string(),
+                crate::color::white_balance::default_technical_white_balance_json(),
+            );
+            return;
+        }
+    }
     migrate_crop_to_normalized(
         object,
         extensions,
@@ -817,8 +847,15 @@ fn validate_adjustments(
         "outputTransform",
         "cameraToWorkingMatrix",
         "cameraWhiteBalance",
+        "temperature",
+        "tint",
+        "creativeTemperature",
+        "creativeTint",
         "legacyWhiteBalance",
         "inputTransform",
+        "whiteBalanceMigration",
+        "whiteBalanceTemperature",
+        "whiteBalanceTint",
     ];
     const KNOWN: &[&str] = &[
         "aiPatches",
@@ -838,8 +875,6 @@ fn validate_adjustments(
         "colorGrading",
         "colorNoiseReduction",
         "contrast",
-        "creativeTemperature",
-        "creativeTint",
         "crop",
         "curves",
         "pointCurves",
@@ -908,8 +943,6 @@ fn validate_adjustments(
         "showClipping",
         "skinToneUniformity",
         "structure",
-        "temperature",
-        "tint",
         "toneMapper",
         "toneEqualizer",
         "viewTransform",
@@ -935,7 +968,6 @@ fn validate_adjustments(
         "panorama",
         "hdrMerge",
         "viewTransform",
-        "whiteBalanceMigration",
         "whiteBalanceTechnical",
     ];
     for field in FORBIDDEN {
@@ -944,11 +976,7 @@ fn validate_adjustments(
             disabled.push(format!("adjustments.{field}"));
         }
     }
-    for (legacy, canonical) in [
-        ("whiteBalanceTemperature", "temperature"),
-        ("whiteBalanceTint", "tint"),
-        ("rotate", "rotation"),
-    ] {
+    for (legacy, canonical) in [("rotate", "rotation")] {
         if let Some(value) = object.remove(legacy) {
             object.entry(canonical.to_string()).or_insert(value);
             disabled.push(format!("adjustments.{legacy}->adjustments.{canonical}"));
@@ -1187,8 +1215,8 @@ fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
                                     key,
                                     "exposure"
                                         | "contrast"
-                                        | "creativeTemperature"
-                                        | "creativeTint"
+                                        | "whiteBalanceKelvin"
+                                        | "whiteBalanceDuv"
                                         | "saturation"
                                         | "vibrance"
                                 )
@@ -2764,6 +2792,19 @@ mod tests {
         bytes
     }
 
+    fn save_sidecar_metadata_atomic(
+        sidecar_path: &Path,
+        metadata: &ImageMetadata,
+    ) -> Result<(), String> {
+        let mut current = metadata.clone();
+        if let Some(adjustments) = current.adjustments.as_object_mut() {
+            adjustments
+                .entry("whiteBalanceTechnical")
+                .or_insert_with(crate::color::white_balance::default_technical_white_balance_json);
+        }
+        super::save_sidecar_metadata_atomic(sidecar_path, &current)
+    }
+
     fn point_color_fixture() -> JsonValue {
         let sample = serde_json::json!({
             "confidence": 0.95,
@@ -2849,7 +2890,11 @@ mod tests {
                 "rating": 5,
                 "tags": ["keeper"],
                 "exif": {"Artist": "RawEngine"},
-                "adjustments": {"exposure": 1.25, "displayIcc": "stale"}
+                "adjustments": {
+                    "exposure": 1.25,
+                    "displayIcc": "stale",
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+                }
             }),
         );
 
@@ -2915,7 +2960,11 @@ mod tests {
             &serde_json::json!({
                 "version": 1,
                 "rating": 3,
-                "adjustments": {"lutPath": "/missing/look.cube", "lutIntensity": 100},
+                "adjustments": {
+                    "lutPath": "/missing/look.cube",
+                    "lutIntensity": 100,
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+                },
                 "rawEngineArtifacts": {
                     "schemaVersion": 1,
                     "layerStackSidecars": [{
@@ -3072,8 +3121,6 @@ mod tests {
         let metadata = ImageMetadata {
             adjustments: serde_json::json!({
                 "cameraProfileAmount": 100,
-                "creativeTemperature": 0,
-                "creativeTint": 0,
                 "perspectiveCorrection": {
                     "amount": 62.5,
                     "cropPolicy": "auto_crop",
@@ -3099,8 +3146,21 @@ mod tests {
                     "sourceWhiteEv": 6.5,
                     "toe": 0.35
                 },
-                "whiteBalanceMigration": "native_v1",
-                "whiteBalanceTechnical": { "mode": "as_shot" }
+                "whiteBalanceTechnical": {
+                    "adaptation": "cat16_v1",
+                    "confidence": null,
+                    "contract": "rapidraw.white_balance.v1",
+                    "duv": 0,
+                    "inputSemantics": "raw_scene_linear",
+                    "kelvin": 6504,
+                    "mode": "as_shot",
+                    "presetId": null,
+                    "sampleCount": null,
+                    "source": "as_shot",
+                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                    "x": 0.32168,
+                    "y": 0.33767
+                }
             }),
             ..Default::default()
         };
@@ -3119,6 +3179,129 @@ mod tests {
             reloaded.adjustments["perceptualGradingV1"],
             perceptual_grading_fixture()
         );
+    }
+
+    #[test]
+    fn obsolete_flat_white_balance_state_is_quarantined_at_load_boundary() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("legacy.arw.rrdata");
+        let legacy = serde_json::json!({
+            "version": 2,
+            "rating": 4,
+            "adjustments": {
+                "exposure": 0.25,
+                "temperature": 18,
+                "tint": -9,
+                "creativeTemperature": 7,
+                "creativeTint": 3,
+                "whiteBalanceMigration": { "state": "legacy" },
+                "whiteBalanceTechnical": {
+                    "adaptation": "cat16_v1",
+                    "confidence": null,
+                    "contract": "rapidraw.white_balance.v1",
+                    "duv": 0,
+                    "inputSemantics": "raw_scene_linear",
+                    "kelvin": 6504,
+                    "mode": "as_shot",
+                    "presetId": null,
+                    "sampleCount": null,
+                    "source": "as_shot",
+                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                    "x": 0.32168,
+                    "y": 0.33767
+                }
+            }
+        });
+        fs::write(&sidecar_path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+
+        let recovered =
+            load_sidecar_recovering(&sidecar_path, None).expect("recover obsolete WB state");
+        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(recovered.metadata.rating, 4);
+        assert_eq!(recovered.metadata.adjustments["exposure"], 0.25);
+        for field in [
+            "temperature",
+            "tint",
+            "creativeTemperature",
+            "creativeTint",
+            "whiteBalanceMigration",
+        ] {
+            assert!(recovered.metadata.adjustments.get(field).is_none());
+        }
+        let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
+        let receipt = state.recovery_receipts.last().unwrap();
+        for field in [
+            "temperature",
+            "tint",
+            "creativeTemperature",
+            "creativeTint",
+            "whiteBalanceMigration",
+        ] {
+            assert!(state.quarantined_extensions.contains_key(field));
+            assert!(
+                receipt
+                    .disabled_fields
+                    .contains(&format!("adjustments.{field}"))
+            );
+        }
+    }
+
+    #[test]
+    fn missing_or_malformed_technical_white_balance_quarantines_render_state() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let mut malformed = crate::color::white_balance::default_technical_white_balance_json();
+        malformed["synchronization"]
+            .as_object_mut()
+            .unwrap()
+            .remove("referenceSourceIdentity");
+        for (name, adjustments, reason) in [
+            (
+                "missing",
+                serde_json::json!({ "exposure": 0.5 }),
+                "white_balance_technical_missing",
+            ),
+            (
+                "malformed",
+                serde_json::json!({
+                    "exposure": 0.5,
+                    "whiteBalanceTechnical": malformed
+                }),
+                "white_balance_technical_invalid",
+            ),
+        ] {
+            let sidecar_path = temp_dir.path().join(format!("{name}.arw.rrdata"));
+            let document = serde_json::json!({
+                "version": 2,
+                "rating": 4,
+                "adjustments": adjustments
+            });
+            fs::write(&sidecar_path, serde_json::to_vec_pretty(&document).unwrap()).unwrap();
+
+            let recovered = load_sidecar_recovering(&sidecar_path, None)
+                .expect("invalid WB state must recover without losing metadata");
+            assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
+            assert_eq!(recovered.metadata.rating, 4);
+            assert_eq!(
+                recovered.metadata.adjustments,
+                serde_json::json!({
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+                })
+            );
+            let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
+            assert_eq!(
+                state.quarantined_extensions["rejectedAdjustments"]["exposure"],
+                0.5
+            );
+            let receipt = state.recovery_receipts.last().unwrap();
+            assert!(receipt.disabled_fields.contains(&"adjustments".to_string()));
+            assert!(receipt.reason_codes.contains(&reason.to_string()));
+            assert!(
+                recovered
+                    .backup_path
+                    .as_ref()
+                    .is_some_and(|path| path.exists())
+            );
+        }
     }
 
     #[test]
@@ -3238,6 +3421,7 @@ mod tests {
         let adjustments = serde_json::json!({
             "rawEngineEditGraphVersion": 2,
             "toneMapper": "rapidView",
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
             "toneEqualizer": {
                 "autoPlacement": true,
                 "bandEv": [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0],
@@ -3480,7 +3664,11 @@ mod crop_migration_tests {
         crop: JsonValue,
         dimensions: Option<(u32, u32)>,
     ) -> (JsonValue, Vec<String>, Vec<String>) {
-        let mut adjustments = serde_json::json!({ "crop": crop, "exposure": 0.25 });
+        let mut adjustments = serde_json::json!({
+            "crop": crop,
+            "exposure": 0.25,
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+        });
         let mut extensions = Map::new();
         let mut disabled = Vec::new();
         let mut migrated = Vec::new();
@@ -3581,7 +3769,8 @@ mod crop_migration_tests {
     fn pixel_crop_without_dimensions_is_disabled_and_quarantined() {
         let mut adjustments = serde_json::json!({
             "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
-            "exposure": 0.25
+            "exposure": 0.25,
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
         });
         let mut extensions = Map::new();
         let mut disabled = Vec::new();
@@ -3616,7 +3805,8 @@ mod crop_migration_tests {
             "exif": { "Camera": "Migration Fixture" },
             "adjustments": {
                 "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
-                "exposure": 0.25
+                "exposure": 0.25,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
             },
             "persistedRenderState": {
                 "schemaVersion": 2,
@@ -3625,7 +3815,8 @@ mod crop_migration_tests {
                 "editRevision": "sha256:legacy",
                 "userEdits": {
                     "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
-                    "exposure": 0.25
+                    "exposure": 0.25,
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
                 },
                 "defaultsPolicyRevision": 1
             }
@@ -3694,7 +3885,8 @@ mod crop_migration_tests {
             "exif": { "Camera": "Unavailable Source Fixture" },
             "adjustments": {
                 "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
-                "contrast": 12
+                "contrast": 12,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
             },
             "persistedRenderState": {
                 "schemaVersion": 2,
@@ -3703,7 +3895,8 @@ mod crop_migration_tests {
                 "editRevision": "sha256:legacy",
                 "userEdits": {
                     "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
-                    "contrast": 12
+                    "contrast": 12,
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
                 },
                 "defaultsPolicyRevision": 1
             }
@@ -3763,7 +3956,8 @@ fn save_then_load_does_not_double_swap_or_renormalize_portrait_crop() {
         rating: 5,
         adjustments: serde_json::json!({
             "orientationSteps": 1,
-            "crop": { "unit": "px", "x": 0, "y": 0, "width": 400, "height": 600 }
+            "crop": { "unit": "px", "x": 0, "y": 0, "width": 400, "height": 600 },
+            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
         }),
         ..ImageMetadata::default()
     };

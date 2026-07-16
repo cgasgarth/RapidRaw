@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { hydrateImageOpenAdjustments } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 describe('image-open adjustment hydration', () => {
@@ -7,6 +7,7 @@ describe('image-open adjustment hydration', () => {
     const adjustments = hydrateImageOpenAdjustments(
       {
         adjustments: {
+          whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
           perspectiveCorrection: {
             amount: 75,
             cropPolicy: 'auto_crop',

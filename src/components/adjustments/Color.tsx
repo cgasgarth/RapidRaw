@@ -50,10 +50,10 @@ import { ColorProfileToneControls } from './color/ColorProfileToneControls';
 import { ColorProofingDiagnostics } from './color/ColorProofingDiagnostics';
 import { ColorQuickControls } from './color/ColorQuickControls';
 import { PointColorControls } from './color/PointColorControls';
-import type { AdjustmentUpdate } from './color/types';
+import type { AdjustmentUpdate, ColorPanelAdjustmentView } from './color/types';
 
 interface ColorPanelProps {
-  adjustments: Adjustments;
+  adjustments: ColorPanelAdjustmentView;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
   appSettings: AppSettings | null;
   isForMask?: boolean;
@@ -75,12 +75,12 @@ interface ColorWorkspaceTab {
 }
 
 const resolveSelectiveColorAdjustments = (
-  adjustments: Adjustments,
+  adjustments: ColorPanelAdjustmentView,
   authoritativeHsl: Adjustments['hsl'],
   authoritativeSelectiveColorRangeControls: Adjustments['selectiveColorRangeControls'],
   isForMask: boolean,
   selectedImagePath: string | null,
-): Adjustments =>
+): ColorPanelAdjustmentView =>
   isForMask || selectedImagePath === null
     ? adjustments
     : {

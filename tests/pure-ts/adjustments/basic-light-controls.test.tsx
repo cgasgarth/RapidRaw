@@ -151,9 +151,10 @@ test('mask and forced tone-mapper contexts omit only the global process selector
 });
 
 test('legacy sidecars retain Basic while explicit Rapid View settings round-trip', () => {
-  expect(normalizeLoadedAdjustments({}).toneMapper).toBe('basic');
+  expect(normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, toneMapper: 'basic' }).toneMapper).toBe('basic');
 
   const reopened = normalizeLoadedAdjustments({
+    ...INITIAL_ADJUSTMENTS,
     toneMapper: 'rapidView',
     viewTransform: {
       ...INITIAL_ADJUSTMENTS.viewTransform,

@@ -17,10 +17,11 @@ test('Rapid View request identity is replayable and rejects mixed process versio
 
 test('new recipes use Rapid View while legacy sidecars retain their process', () => {
   expect(INITIAL_ADJUSTMENTS.toneMapper).toBe('rapidView');
-  expect(normalizeLoadedAdjustments({}).toneMapper).toBe('basic');
-  expect(normalizeLoadedAdjustments({ toneMapper: 'agx' }).toneMapper).toBe('agx');
+  expect(normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, toneMapper: 'basic' }).toneMapper).toBe('basic');
+  expect(normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, toneMapper: 'agx' }).toneMapper).toBe('agx');
 
   const reopened = normalizeLoadedAdjustments({
+    ...INITIAL_ADJUSTMENTS,
     toneMapper: 'rapidView',
     viewTransform: { ...INITIAL_ADJUSTMENTS.viewTransform, contrast: 1.31 },
   });

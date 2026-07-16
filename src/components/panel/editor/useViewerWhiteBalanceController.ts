@@ -16,7 +16,6 @@ import { sampleViewerWhiteBalancePatch, type ViewerWhiteBalanceSampleService } f
 
 interface UseViewerWhiteBalanceControllerInput {
   readonly active: boolean;
-  readonly baseWhiteBalance: { readonly temperature: number; readonly tint: number };
   readonly geometry: EditorOverlayGeometry;
   readonly imageSessionId: string;
   readonly onCommit?: (command: WhiteBalancePickerAdjustmentCommand) => void;
@@ -42,7 +41,6 @@ const hoverIntervalMs = 150;
 
 export const useViewerWhiteBalanceController = ({
   active,
-  baseWhiteBalance,
   geometry,
   imageSessionId,
   onCommit,
@@ -111,10 +109,7 @@ export const useViewerWhiteBalanceController = ({
   }, [controller, onPreviewCancel, refresh]);
 
   const executeRequest = useCallback(
-    (
-      request: ViewerWhiteBalanceInteractionRequest,
-      capturedWhiteBalance: { readonly temperature: number; readonly tint: number },
-    ) => {
+    (request: ViewerWhiteBalanceInteractionRequest) => {
       void sample(request)
         .then((result) => {
           if (result === null) {
@@ -138,8 +133,6 @@ export const useViewerWhiteBalanceController = ({
           refresh();
           const command = buildWhiteBalancePickerAdjustmentCommand({
             ...result,
-            currentTemperature: capturedWhiteBalance.temperature,
-            currentTint: capturedWhiteBalance.tint,
             currentPreviewIdentity: contextRef.current.previewIdentity,
             previewIdentity: request.identity.previewIdentity,
             selectedImagePath,
@@ -190,7 +183,7 @@ export const useViewerWhiteBalanceController = ({
         const request = controller.completeGesture(contextRef.current, event.pointerId);
         setLastStatus(request === null ? 'pointerup-rejected' : 'sampling-commit');
         refresh();
-        if (request !== null) executeRequest(request, baseWhiteBalance);
+        if (request !== null) executeRequest(request);
         return;
       }
       if (event.type === 'pointerdown') {
@@ -216,10 +209,10 @@ export const useViewerWhiteBalanceController = ({
       const request = controller.beginPreview(contextRef.current, point, event.pointerId);
       if (request !== null) {
         refresh();
-        executeRequest(request, baseWhiteBalance);
+        executeRequest(request);
       }
     },
-    [active, baseWhiteBalance, cancelInteraction, controller, executeRequest, refresh, resolvePoint],
+    [active, cancelInteraction, controller, executeRequest, refresh, resolvePoint],
   );
 
   const snapshot = controller.snapshot();

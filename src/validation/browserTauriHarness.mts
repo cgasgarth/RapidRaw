@@ -1,6 +1,7 @@
 import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../components/ui/AppProperties.tsx';
 import { Invokes } from '../tauri/commands.ts';
+import { INITIAL_ADJUSTMENTS } from '../utils/adjustments.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
 
@@ -298,16 +299,18 @@ const createHarnessAutoAdjustments = (exposure: number): Record<string, unknown>
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
-  whiteBalanceMigration: 'native_v1',
   whiteBalanceTechnical: {
     adaptation: 'cat16_v1',
     confidence: 0.8,
     contract: 'rapidraw.white_balance.v1',
     duv: 0,
+    inputSemantics: 'raw_scene_linear',
     kelvin: 6504,
     mode: 'auto',
     sampleCount: 256,
     source: 'auto',
+    presetId: null,
+    synchronization: { mode: 'per_image', referenceSourceIdentity: null },
     x: 0.31271,
     y: 0.32902,
   },
@@ -595,28 +598,37 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
       const deferPath = getStringArg(args, 'deferPath');
       batchAutoAdjustInvocation += 1;
       const exposure = Number((0.6 + batchAutoAdjustInvocation * 0.05).toFixed(2));
-      const results = paths.map((path, index) => ({
-        contract: 'rapidraw.batch_auto_adjust.v1',
-        path,
-        receipt: {
-          baseAdjustmentDocumentRevision: `sha256:${'a'.repeat(64)}`,
-          adjustmentDocumentRevision: `sha256:${String(index + 1)
-            .repeat(64)
-            .slice(0, 64)}`,
-          adjustments: { contrast: 12, exposure },
-          engine: 'rapidraw.legacy_auto_adjust.v1',
-          renderFingerprint: `u64:${String(index + 1)
-            .repeat(16)
-            .slice(0, 16)}`,
-          sourceIdentity: path,
-          sourceRevision: `source-revision-v1:${String(index + 1)
-            .repeat(64)
-            .slice(0, 64)}`,
-          thumbnailRevision: `browser-harness-auto-adjust-thumbnail-${String(index + 1)}`,
-          transactionId: `blake3:browser-harness-batch-auto-adjust-${String(index + 1)}`,
-        },
-        status: path === deferPath ? 'prepared' : 'applied',
-      }));
+      const results = paths.map((path, index) => {
+        const current = harnessAdjustmentsByPath.get(path);
+        const currentObject = typeof current === 'object' && current !== null ? current : {};
+        return {
+          contract: 'rapidraw.batch_auto_adjust.v1',
+          path,
+          receipt: {
+            baseAdjustmentDocumentRevision: `sha256:${'a'.repeat(64)}`,
+            adjustmentDocumentRevision: `sha256:${String(index + 1)
+              .repeat(64)
+              .slice(0, 64)}`,
+            adjustments: {
+              ...structuredClone(currentObject),
+              contrast: 12,
+              exposure,
+              whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+            },
+            engine: 'rapidraw.legacy_auto_adjust.v1',
+            renderFingerprint: `u64:${String(index + 1)
+              .repeat(16)
+              .slice(0, 16)}`,
+            sourceIdentity: path,
+            sourceRevision: `source-revision-v1:${String(index + 1)
+              .repeat(64)
+              .slice(0, 64)}`,
+            thumbnailRevision: `browser-harness-auto-adjust-thumbnail-${String(index + 1)}`,
+            transactionId: `blake3:browser-harness-batch-auto-adjust-${String(index + 1)}`,
+          },
+          status: path === deferPath ? 'prepared' : 'applied',
+        };
+      });
       return new Promise((resolve) => {
         window.setTimeout(
           () => resolve(results),

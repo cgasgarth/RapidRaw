@@ -8,15 +8,19 @@ import {
 describe('persisted edit graph version', () => {
   test('new edits and legacy sidecars resolve to the explicit legacy graph', () => {
     expect(INITIAL_ADJUSTMENTS.rawEngineEditGraphVersion).toBe(1);
-    expect(normalizeLoadedAdjustments({ exposure: 12 }).rawEngineEditGraphVersion).toBe(1);
+    expect(normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, exposure: 12 }).rawEngineEditGraphVersion).toBe(1);
   });
 
   test('preserves the explicit scene-referred v2 opt-in for native compilation', () => {
-    expect(normalizeLoadedAdjustments({ rawEngineEditGraphVersion: 2 }).rawEngineEditGraphVersion).toBe(2);
+    expect(
+      normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, rawEngineEditGraphVersion: 2 }).rawEngineEditGraphVersion,
+    ).toBe(2);
   });
 
   test('survives the sidecar JSON round trip without reinterpretation', () => {
-    const saved = JSON.stringify(normalizeLoadedAdjustments({ exposure: 14, rawEngineEditGraphVersion: 2 }));
+    const saved = JSON.stringify(
+      normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, exposure: 14, rawEngineEditGraphVersion: 2 }),
+    );
     const reopened = normalizeLoadedAdjustments(JSON.parse(saved));
     expect(reopened.rawEngineEditGraphVersion).toBe(2);
     expect(reopened.exposure).toBe(14);
@@ -26,6 +30,7 @@ describe('persisted edit graph version', () => {
     const normalized = normalizeLoadedAdjustments({
       grainAmount: 37,
       sectionVisibility: { basic: false, color: true, curves: true, details: false, effects: false },
+      whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
     });
 
     expect(normalized.effectsEnabled).toBeFalse();
@@ -39,6 +44,7 @@ describe('persisted edit graph version', () => {
 
   test('round-trips typed curve domains without retaining mutable sidecar aliases', () => {
     const loaded = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
       rawEngineEditGraphVersion: 2,
       sceneCurveV1: {
         channelMode: 'luminance_preserving' as const,

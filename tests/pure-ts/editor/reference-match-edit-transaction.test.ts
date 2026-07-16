@@ -100,6 +100,54 @@ describe('reference match edit transaction', () => {
     });
   });
 
+  test('commits technical white balance as one camera-input patch and preserves reference lock', () => {
+    const lockedAdjustments = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      whiteBalanceTechnical: {
+        ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
+        synchronization: { mode: 'locked_reference' as const, referenceSourceIdentity: '/fixture/reference.ARW' },
+      },
+    };
+    const state = useEditorStore.getState();
+    const lockedDocument = legacyAdjustmentsToEditDocumentV2(lockedAdjustments);
+    state.hydrateEditorRenderAuthority({
+      editDocumentV2: lockedDocument,
+      history: [lockedDocument],
+    });
+    const wbProposal = matchLookProposalV1Schema.parse({
+      ...proposal,
+      diffs: [
+        { current: 6_504, group: 'color', key: 'whiteBalanceKelvin', proposed: 7_200 },
+        { current: 0, group: 'color', key: 'whiteBalanceDuv', proposed: 0.008 },
+      ],
+      proposalFingerprint: fingerprint('9'),
+    });
+    const commitIdentity = captureReferenceMatchCommitIdentity(useEditorStore.getState(), wbProposal);
+    if (commitIdentity === null) throw new Error('Expected reference-match identity');
+    const commit = buildReferenceMatchGlobalEditTransaction({
+      enabledGroups: new Set(['color']),
+      identity: commitIdentity,
+      impact: 100,
+      proposal: wbProposal,
+      state: useEditorStore.getState(),
+      transactionId: 'reference-global-white-balance',
+    });
+    if (commit === null) throw new Error('Expected white-balance transaction');
+
+    const result = useEditorStore.getState().applyEditTransaction(commit.request);
+    expect(result.after.whiteBalanceTechnical).toMatchObject({
+      duv: 0.008,
+      kelvin: 7_200,
+      mode: 'kelvin_tint',
+      source: 'user',
+      synchronization: { mode: 'locked_reference', referenceSourceIdentity: '/fixture/reference.ARW' },
+    });
+    expect(result.afterEditDocumentV2.nodes.camera_input.params.whiteBalanceTechnical).toEqual(
+      result.after.whiteBalanceTechnical,
+    );
+    expect(commit.receipt.appliedDiffs.map((diff) => diff.key)).toEqual(['whiteBalanceDuv', 'whiteBalanceKelvin']);
+  });
+
   test('commits a reference layer through the Layers node without changing global exposure', () => {
     const state = useEditorStore.getState();
     const commit = buildReferenceMatchLayerEditTransaction({

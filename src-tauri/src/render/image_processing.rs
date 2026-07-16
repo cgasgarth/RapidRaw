@@ -1006,10 +1006,18 @@ mod tests {
 
     #[test]
     fn edited_status_consumes_the_canonical_graph_and_fails_safe() {
-        assert!(!is_image_edited(&json!({}), false, None));
-        assert!(is_image_edited(&json!({"exposure": 10}), false, None));
+        let neutral = crate::render_plan::current_render_adjustments(json!({}));
+        assert!(!is_image_edited(&neutral, false, None));
+        assert!(is_image_edited(&json!({}), false, None));
         assert!(is_image_edited(
-            &json!({"rawEngineEditGraphVersion": 2}),
+            &crate::render_plan::current_render_adjustments(json!({"exposure": 10})),
+            false,
+            None
+        ));
+        assert!(is_image_edited(
+            &crate::render_plan::current_render_adjustments(
+                json!({"rawEngineEditGraphVersion": 2})
+            ),
             false,
             None
         ));

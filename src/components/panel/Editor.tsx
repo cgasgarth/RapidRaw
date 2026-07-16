@@ -2353,10 +2353,6 @@ export default function Editor({
                   onSamplerStateChange: setViewerSamplerState,
                   whiteBalance: {
                     active: isWbPickerActive,
-                    baseWhiteBalance: {
-                      temperature: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).temperature,
-                      tint: (wbPickerPreviewSessionRef.current?.baseAdjustments ?? adjustments).tint,
-                    },
                     commands: {
                       cancelPreview: handleWbPreviewCancel,
                       commit: handleWbPicked,

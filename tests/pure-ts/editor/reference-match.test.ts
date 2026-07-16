@@ -216,13 +216,13 @@ describe('color-managed reference matching', () => {
     expect(match?.diffs.map((diff) => diff.key)).toEqual([
       'exposure',
       'contrast',
-      'creativeTemperature',
-      'creativeTint',
+      'whiteBalanceKelvin',
+      'whiteBalanceDuv',
       'saturation',
       'vibrance',
     ]);
     expect(match?.residualAfter).toBeLessThan(match?.residualBefore ?? 0);
-    expect(match?.diffs.find((diff) => diff.key === 'creativeTemperature')?.proposed).toBeGreaterThan(0);
+    expect(match?.diffs.find((diff) => diff.key === 'whiteBalanceKelvin')?.proposed).toBeGreaterThan(6_504);
   });
 
   test('Impact 0 is exact no-op, Impact 100 applies exact diffs, and groups are independently gated', () => {
@@ -250,9 +250,31 @@ describe('color-managed reference matching', () => {
       proposal,
     });
     expect(toneOnly.exposure).toBe(proposal.diffs.find((diff) => diff.key === 'exposure')?.proposed);
-    expect(toneOnly.creativeTemperature).toBe(INITIAL_ADJUSTMENTS.creativeTemperature);
+    expect(toneOnly.whiteBalanceTechnical).toEqual(INITIAL_ADJUSTMENTS.whiteBalanceTechnical);
     expect(toneOnly.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
     expect(toneOnly.crop).toBe(INITIAL_ADJUSTMENTS.crop);
+
+    const locked = {
+      ...INITIAL_ADJUSTMENTS,
+      whiteBalanceTechnical: {
+        ...INITIAL_ADJUSTMENTS.whiteBalanceTechnical,
+        synchronization: { mode: 'locked_reference' as const, referenceSourceIdentity: '/reference/warm.ARW' },
+      },
+    };
+    const colorOnly = applyReferenceMatchProposal({
+      adjustments: locked,
+      enabledGroups: new Set(['color']),
+      impact: 100,
+      proposal,
+    });
+    expect(colorOnly.whiteBalanceTechnical.mode).toBe('kelvin_tint');
+    expect(colorOnly.whiteBalanceTechnical.kelvin).toBe(
+      proposal.diffs.find((diff) => diff.key === 'whiteBalanceKelvin')?.proposed,
+    );
+    expect(colorOnly.whiteBalanceTechnical.duv).toBe(
+      proposal.diffs.find((diff) => diff.key === 'whiteBalanceDuv')?.proposed,
+    );
+    expect(colorOnly.whiteBalanceTechnical.synchronization).toEqual(locked.whiteBalanceTechnical.synchronization);
   });
 
   test('creates a compatible full-frame layer with Impact encoded in nodes and provenance surviving sidecar reopen', () => {
@@ -327,7 +349,7 @@ describe('color-managed reference matching', () => {
     const allGroups = new Set<ReferenceMatchGroup>(['color', 'presence', 'tone']);
     expect(getReferenceMatchLayerCompatibility(proposal, allGroups)).toEqual({
       supported: false,
-      unsupportedKeys: ['creativeTemperature', 'creativeTint', 'vibrance'],
+      unsupportedKeys: ['whiteBalanceKelvin', 'whiteBalanceDuv', 'vibrance'],
     });
     expect(getReferenceMatchLayerCompatibility(proposal, new Set(['tone']))).toEqual({
       supported: true,

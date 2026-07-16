@@ -10,7 +10,6 @@ import {
   averageWhiteBalancePickerRgbaSample,
   buildWhiteBalancePickerAdjustmentCommand,
   buildWhiteBalancePickerEditTransaction,
-  calculateWhiteBalancePickerAdjustment,
   cancelWhiteBalancePickerPreview,
   createWhiteBalancePickerPreviewSession,
 } from '../../../src/utils/whiteBalancePicker';
@@ -60,25 +59,16 @@ describe('white balance picker runtime command path', () => {
   });
 
   test('builds an adjustment receipt tied to the sampled preview identity', () => {
-    const currentAdjustments = { ...INITIAL_ADJUSTMENTS, temperature: 8, tint: -4 };
+    const currentAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const averageRgb = { blue: 170, green: 130, red: 96 };
-    const expectedAdjustment = calculateWhiteBalancePickerAdjustment({
-      currentTemperature: currentAdjustments.temperature,
-      currentTint: currentAdjustments.tint,
-      sample: averageRgb,
-    });
 
     const command = buildWhiteBalancePickerAdjustmentCommand({
       averageRgb,
       coordinates: { imageX: 128.25, imageY: 64.5, previewPixelX: 257, previewPixelY: 129 },
-      currentTemperature: currentAdjustments.temperature,
-      currentTint: currentAdjustments.tint,
       previewIdentity: 'blob:runtime-preview-4746',
       selectedImagePath: '/Users/cgas/Pictures/Capture One/Alaska/sample.RAF',
     });
 
-    expect(command.patch.temperature).toBe(expectedAdjustment.temperature);
-    expect(command.patch.tint).toBe(expectedAdjustment.tint);
     expect(command.patch.whiteBalanceTechnical.mode).toBe('chromaticity');
     expect(command.patch.whiteBalanceTechnical.source).toBe('picker');
     expect(applyWhiteBalancePickerAdjustmentCommand(currentAdjustments, command).exposure).toBe(
@@ -89,8 +79,8 @@ describe('white balance picker runtime command path', () => {
       averageRgb,
       coordinates: { imageX: 128.25, imageY: 64.5, previewPixelX: 257, previewPixelY: 129 },
       previewIdentity: 'blob:runtime-preview-4746',
-      resultingTemperature: expectedAdjustment.temperature,
-      resultingTint: expectedAdjustment.tint,
+      resultingDuv: command.patch.whiteBalanceTechnical.duv,
+      resultingKelvin: command.patch.whiteBalanceTechnical.kelvin,
       selectedImagePath: '/Users/cgas/Pictures/Capture One/Alaska/sample.RAF',
     });
     expect(command.receipt.confidence).toBeGreaterThanOrEqual(0);
@@ -107,8 +97,6 @@ describe('white balance picker runtime command path', () => {
 
     const base = {
       coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
-      currentTemperature: INITIAL_ADJUSTMENTS.temperature,
-      currentTint: INITIAL_ADJUSTMENTS.tint,
       previewIdentity: 'preview:new',
       selectedImagePath: '/tmp/source.raw',
     };
@@ -138,7 +126,7 @@ describe('white balance picker runtime command path', () => {
   });
 
   test('commits one undoable picker adjustment and preserves receipt data for QA', () => {
-    const initial = { ...INITIAL_ADJUSTMENTS, temperature: 3, tint: -2 };
+    const initial = structuredClone(INITIAL_ADJUSTMENTS);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       finalPreviewUrl: 'blob:stale-before-picker',
@@ -153,8 +141,6 @@ describe('white balance picker runtime command path', () => {
     const command = buildWhiteBalancePickerAdjustmentCommand({
       averageRgb: { blue: 92, green: 134, red: 184 },
       coordinates: { imageX: 20, imageY: 30, previewPixelX: 40, previewPixelY: 60 },
-      currentTemperature: initial.temperature,
-      currentTint: initial.tint,
       previewIdentity: 'blob:displayed-preview-clicked',
       selectedImagePath: '/tmp/alaska-raw.NEF',
     });
@@ -165,8 +151,6 @@ describe('white balance picker runtime command path', () => {
       {
         nodeType: 'camera_input',
         patch: {
-          temperature: command.patch.temperature,
-          tint: command.patch.tint,
           whiteBalanceTechnical: command.patch.whiteBalanceTechnical,
         },
         type: 'patch-edit-document-node',
@@ -185,8 +169,8 @@ describe('white balance picker runtime command path', () => {
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustmentSnapshot.value.temperature).toBe(command.receipt.resultingTemperature);
-    expect(state.adjustmentSnapshot.value.tint).toBe(command.receipt.resultingTint);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.kelvin).toBe(command.receipt.resultingKelvin);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.duv).toBe(command.receipt.resultingDuv);
     expect(result.afterEditDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical).toMatchObject({
       mode: 'chromaticity',
       source: 'picker',
@@ -205,15 +189,14 @@ describe('white balance picker runtime command path', () => {
     state = useEditorStore.getState();
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(0);
-    expect(state.adjustmentSnapshot.value.temperature).toBe(initial.temperature);
-    expect(state.adjustmentSnapshot.value.tint).toBe(initial.tint);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical).toEqual(initial.whiteBalanceTechnical);
 
     useEditorStore.getState().redo();
     state = useEditorStore.getState();
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustmentSnapshot.value.temperature).toBe(command.receipt.resultingTemperature);
-    expect(state.adjustmentSnapshot.value.tint).toBe(command.receipt.resultingTint);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.kelvin).toBe(command.receipt.resultingKelvin);
+    expect(state.adjustmentSnapshot.value.whiteBalanceTechnical.duv).toBe(command.receipt.resultingDuv);
   });
 
   test('preserves exact no-ops and rejects stale source and revision identities', () => {
@@ -222,8 +205,6 @@ describe('white balance picker runtime command path', () => {
     const command = buildWhiteBalancePickerAdjustmentCommand({
       averageRgb: { blue: 120, green: 120, red: 120 },
       coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
-      currentTemperature: useEditorStore.getState().adjustmentSnapshot.value.temperature,
-      currentTint: useEditorStore.getState().adjustmentSnapshot.value.tint,
       previewIdentity: 'blob:picker-current',
       selectedImagePath: imagePath,
     });
@@ -286,8 +267,6 @@ describe('white balance picker runtime command path', () => {
     const previewCommand = buildWhiteBalancePickerAdjustmentCommand({
       averageRgb: { blue: 140, green: 130, red: 120 },
       coordinates: { imageX: 1, imageY: 2, previewPixelX: 3, previewPixelY: 4 },
-      currentTemperature: base.temperature,
-      currentTint: base.tint,
       previewIdentity: 'preview:1',
       selectedImagePath: 'source:a',
     });

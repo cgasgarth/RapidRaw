@@ -30,7 +30,6 @@ const patch = {
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
-  whiteBalanceMigration: 'native_v1',
   whiteBalanceTechnical: {
     ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
     confidence: 0.8,
@@ -71,7 +70,7 @@ describe('context Auto Adjust edit transaction', () => {
       buildContextAutoAdjustEditTransaction(state, base, patch, 'context-auto-adjust'),
     );
 
-    expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35, whiteBalanceMigration: 'native_v1' });
+    expect(result.after).toMatchObject({ contrast: 18, exposure: 0.35 });
     expect(result.after.whiteBalanceTechnical.inputSemantics).toBe('raw_scene_linear');
     expect(result.after).not.toHaveProperty('sectionVisibility');
     expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
@@ -138,7 +137,6 @@ describe('context Auto Adjust edit transaction', () => {
       shadows: state.adjustmentSnapshot.value.shadows,
       vibrance: state.adjustmentSnapshot.value.vibrance,
       vignetteAmount: state.adjustmentSnapshot.value.vignetteAmount,
-      whiteBalanceMigration: state.adjustmentSnapshot.value.whiteBalanceMigration,
       whiteBalanceTechnical: state.adjustmentSnapshot.value.whiteBalanceTechnical,
       whites: state.adjustmentSnapshot.value.whites,
       centré: state.adjustmentSnapshot.value.centré,

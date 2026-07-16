@@ -94,7 +94,10 @@ describe('copy/paste edit transaction', () => {
     const sourceDocument = legacyAdjustmentsToEditDocumentV2({
       ...state.adjustmentSnapshot.value,
       exposure: 1.5,
-      temperature: 40,
+      whiteBalanceTechnical: {
+        ...state.adjustmentSnapshot.value.whiteBalanceTechnical,
+        kelvin: 7_200,
+      },
     });
     const source = copyEditDocumentV2Nodes(sourceDocument, ['scene_global_color_tone']);
     const cameraInputBefore = state.editDocumentV2.nodes.camera_input;
@@ -102,10 +105,13 @@ describe('copy/paste edit transaction', () => {
       buildCopyPasteEditTransaction(state, targetPath, source, 'paste-selected-node'),
     );
 
-    expect(result.after).toMatchObject({ exposure: 1.5, temperature: state.adjustmentSnapshot.value.temperature });
+    expect(result.after).toMatchObject({
+      exposure: 1.5,
+      whiteBalanceTechnical: state.adjustmentSnapshot.value.whiteBalanceTechnical,
+    });
     expect(result.afterEditDocumentV2.nodes.camera_input).toBe(cameraInputBefore);
-    expect(result.afterEditDocumentV2.nodes.camera_input?.params.temperature).toBe(
-      state.adjustmentSnapshot.value.temperature,
+    expect(result.afterEditDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical).toEqual(
+      state.adjustmentSnapshot.value.whiteBalanceTechnical,
     );
   });
 

@@ -13,6 +13,7 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -136,8 +137,7 @@ const agentColorPatchSchema = z
     saturation: z.number().min(-100).max(100).optional(),
     selectiveColorRangeControls: selectiveRangeControlsPatchSchema.optional(),
     skinToneUniformity: skinToneUniformitySchema.optional(),
-    temperature: z.number().min(-100).max(100).optional(),
-    tint: z.number().min(-100).max(100).optional(),
+    whiteBalanceTechnical: technicalWhiteBalanceSchema.optional(),
     toneCurve: toneCurveIdSchema.optional(),
     vibrance: z.number().min(-100).max(100).optional(),
   })
@@ -214,8 +214,7 @@ const COLOR_PATCH_KEYS = [
   'saturation',
   'selectiveColorRangeControls',
   'skinToneUniformity',
-  'temperature',
-  'tint',
+  'whiteBalanceTechnical',
   'toneCurve',
   'vibrance',
 ] as const satisfies ReadonlyArray<keyof AgentColorPatch>;
@@ -247,14 +246,8 @@ const applyColorPatchToAdjustments = (
   { includeSelectiveColor }: { includeSelectiveColor: boolean } = { includeSelectiveColor: true },
 ): Adjustments => {
   const next: Adjustments = { ...base };
-  if (patch.temperature !== undefined) {
-    next.temperature = patch.temperature;
-    next.creativeTemperature = patch.temperature;
-  }
-  if (patch.tint !== undefined) {
-    next.tint = patch.tint;
-    next.creativeTint = patch.tint;
-  }
+  if (patch.whiteBalanceTechnical !== undefined)
+    next.whiteBalanceTechnical = structuredClone(patch.whiteBalanceTechnical);
   if (patch.vibrance !== undefined) next.vibrance = patch.vibrance;
   if (patch.saturation !== undefined) next.saturation = patch.saturation;
   if (patch.cameraProfile !== undefined) next.cameraProfile = patch.cameraProfile;

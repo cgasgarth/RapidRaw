@@ -151,8 +151,6 @@ pub struct RawOpenEditExportBasicToneParameters {
 pub struct RawOpenEditExportWhiteBalanceParameters {
     pub accepted_dry_run_plan_hash: String,
     pub accepted_dry_run_plan_id: String,
-    pub creative_temperature: f64,
-    pub creative_tint: f64,
     pub duv: f64,
     pub exposure_ev: f64,
     pub kelvin: f64,
@@ -995,12 +993,7 @@ fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
         crate::color::white_balance::cct_duv_to_coordinates(parameters.kelvin, parameters.duv)
             .map_err(|error| error.to_string())?;
     Ok(json!({
-        "creativeTemperature": parameters.creative_temperature,
-        "creativeTint": parameters.creative_tint,
         "exposure": parameters.exposure_ev,
-        "temperature": 0.0,
-        "tint": 0.0,
-        "whiteBalanceMigration": "native_v1",
         "whiteBalanceTechnical": {
             "contract": crate::color::white_balance::WHITE_BALANCE_CONTRACT,
             "mode": "kelvin_tint",
@@ -1011,7 +1004,10 @@ fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
             "adaptation": "cat16_v1",
             "source": "user",
             "confidence": null,
-            "sampleCount": null
+            "sampleCount": null,
+            "inputSemantics": "raw_scene_linear",
+            "presetId": null,
+            "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
         }
     }))
 }
@@ -2619,12 +2615,10 @@ mod tests {
     }
 
     #[test]
-    fn white_balance_command_compiles_physical_and_creative_gpu_parameters() {
+    fn white_balance_command_compiles_only_physical_gpu_parameters() {
         let adjustments = white_balance_adjustments(&json!({
             "acceptedDryRunPlanHash": "sha256:test",
             "acceptedDryRunPlanId": "dryrun_test",
-            "creativeTemperature": 40.0,
-            "creativeTint": -20.0,
             "duv": 0.018,
             "exposureEv": -8.0,
             "kelvin": 2856.0
@@ -2632,9 +2626,9 @@ mod tests {
         .unwrap();
         let parsed =
             crate::adjustments::parse::get_all_adjustments_from_json(&adjustments, true, None);
-        assert_eq!(parsed.global.exposure, -8.0);
-        assert_eq!(parsed.global.temperature, 1.6);
-        assert_eq!(parsed.global.tint, -0.2);
+        assert_eq!(parsed.global.exposure, -10.0);
+        assert_eq!(parsed.global.temperature, 0.0);
+        assert_eq!(parsed.global.tint, 0.0);
         assert_ne!(
             parsed.global.technical_white_balance.col0,
             [1.0, 0.0, 0.0, 0.0]

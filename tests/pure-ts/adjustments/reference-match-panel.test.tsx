@@ -153,7 +153,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     'Creative look proposal',
   );
   expect(container.querySelector('[data-testid="reference-match-proposal"]')?.textContent).toContain(
-    'creativeTemperature',
+    'whiteBalanceKelvin',
   );
   expect(container.querySelector('[data-testid="reference-match-effective-references"]')?.textContent).toContain(
     'Creative 100%',
@@ -170,7 +170,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     true,
   );
   expect(container.querySelector('[data-testid="reference-match-layer-abstention"]')?.textContent).toContain(
-    'creativeTemperature',
+    'whiteBalanceKelvin',
   );
 
   const capturedSourceRevision = useEditorStore.getState().referenceMatchReferences[0]?.sourceRevision;

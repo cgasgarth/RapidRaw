@@ -289,9 +289,11 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
             "adaptation": "cat16_v1",
             "source": "auto",
             "confidence": results.wb_confidence,
-            "sampleCount": results.wb_accepted_samples
+            "sampleCount": results.wb_accepted_samples,
+            "inputSemantics": "raw_scene_linear",
+            "presetId": null,
+            "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
         },
-        "whiteBalanceMigration": "native_v1",
         "whites": results.whites,
         "blacks": results.blacks
     })
@@ -468,9 +470,11 @@ mod tests {
                     "adaptation": "cat16_v1",
                     "source": "auto",
                     "confidence": 0.75,
-                    "sampleCount": 128
+                    "sampleCount": 128,
+                    "inputSemantics": "raw_scene_linear",
+                    "presetId": null,
+                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
                 },
-                "whiteBalanceMigration": "native_v1",
                 "whites": 1.5,
                 "blacks": -1.0
             })

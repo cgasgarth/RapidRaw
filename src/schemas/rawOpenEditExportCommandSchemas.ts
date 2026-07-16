@@ -289,8 +289,6 @@ const rawOpenEditExportWhiteBalanceCommandSchema = z
       .object({
         acceptedDryRunPlanHash: z.string().trim().min(1),
         acceptedDryRunPlanId: z.string().trim().min(1),
-        creativeTemperature: z.number().min(-100).max(100),
-        creativeTint: z.number().min(-100).max(100),
         duv: z.number().min(-0.05).max(0.05),
         exposureEv: z.number().min(-10).max(10),
         kelvin: z.number().min(1667).max(25000),

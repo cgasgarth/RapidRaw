@@ -17,6 +17,9 @@ use serde_json::Value;
 
 use crate::adjustments::abi::AllAdjustments;
 use crate::adjustments::parse::get_all_adjustments_from_json_with_masks;
+use crate::color::white_balance::{
+    compile_current_technical_white_balance, default_technical_white_balance_json,
+};
 use crate::edit_graph::{CompiledEditGraph, EditGraphCompileInputs};
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
@@ -53,6 +56,13 @@ const DETAIL_FINGERPRINT_FIELDS: &[&str] = &[
     "centré",
     "chromaticAberrationRedCyan",
     "chromaticAberrationBlueYellow",
+];
+const OBSOLETE_GLOBAL_WHITE_BALANCE_FIELDS: [&str; 5] = [
+    "temperature",
+    "tint",
+    "creativeTemperature",
+    "creativeTint",
+    "whiteBalanceMigration",
 ];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -267,6 +277,7 @@ pub fn compile_render_plan(
     }
     validate_finite(raw, "$")?;
     let effective = raw.clone();
+    validate_global_white_balance(&effective)?;
     validate_monochrome_process(&effective)?;
     let film_emulation =
         crate::render::film_emulation::parse_node(&effective).map_err(|message| {
@@ -371,7 +382,7 @@ pub fn compile_render_plan(
             &curve.fingerprint.to_le_bytes(),
         ]);
     }
-    let neutral_json = Value::Object(serde_json::Map::new());
+    let neutral_json = current_render_adjustments_for_neutral_pipeline();
     let mut neutral_adjustments = get_all_adjustments_from_json_with_masks(
         &neutral_json,
         context.is_raw,
@@ -420,6 +431,51 @@ pub fn compile_render_plan(
         effective_json: Arc::new(effective),
         compile_time: started.elapsed(),
     })
+}
+
+fn current_render_adjustments_for_neutral_pipeline() -> Value {
+    let mut adjustments = serde_json::Map::new();
+    adjustments.insert(
+        "whiteBalanceTechnical".into(),
+        default_technical_white_balance_json(),
+    );
+    Value::Object(adjustments)
+}
+
+#[cfg(test)]
+pub(crate) fn current_render_adjustments(mut adjustments: Value) -> Value {
+    adjustments
+        .as_object_mut()
+        .expect("current render adjustments must be an object")
+        .entry("whiteBalanceTechnical")
+        .or_insert_with(default_technical_white_balance_json);
+    adjustments
+}
+
+fn validate_global_white_balance(effective: &Value) -> Result<(), RenderPlanError> {
+    if let Some(field) = OBSOLETE_GLOBAL_WHITE_BALANCE_FIELDS
+        .iter()
+        .find(|field| effective.get(**field).is_some())
+    {
+        return Err(RenderPlanError {
+            code: "render_plan.obsolete_white_balance_representation",
+            field,
+            message: "obsolete global white-balance state is not render-authoritative".into(),
+        });
+    }
+    let Some(technical) = effective.get("whiteBalanceTechnical") else {
+        return Err(RenderPlanError {
+            code: "render_plan.missing_white_balance_technical",
+            field: "whiteBalanceTechnical",
+            message: "current render documents require complete technical white balance".into(),
+        });
+    };
+    compile_current_technical_white_balance(technical).map_err(|error| RenderPlanError {
+        code: "render_plan.invalid_white_balance_technical",
+        field: "whiteBalanceTechnical",
+        message: error.to_string(),
+    })?;
+    Ok(())
 }
 
 fn compile_typed_curves(
@@ -948,6 +1004,82 @@ mod tests {
             is_raw: false,
             tonemapper_override: None,
         }
+    }
+
+    fn compile_render_plan(
+        raw: &Value,
+        context: CompileRenderPlanContext,
+        lut: Option<Arc<Lut>>,
+    ) -> Result<CompiledRenderPlan, RenderPlanError> {
+        super::compile_render_plan(&current_render_adjustments(raw.clone()), context, lut)
+    }
+
+    #[test]
+    fn render_boundary_requires_current_global_white_balance_and_allows_local_creative_color() {
+        let current = current_render_adjustments(json!({
+            "masks": [{
+                "id": "local-color",
+                "name": "Local creative color",
+                "visible": true,
+                "invert": false,
+                "opacity": 100,
+                "adjustments": { "temperature": 25.0, "tint": -10.0 },
+                "subMasks": []
+            }]
+        }));
+        let plan = super::compile_render_plan(&current, context(8_001), None).unwrap();
+        assert_eq!(plan.adjustments.mask_count, 1);
+        assert_eq!(plan.adjustments.mask_adjustments[0].temperature, 1.0);
+        assert_eq!(plan.adjustments.mask_adjustments[0].tint, -0.1);
+
+        let missing = super::compile_render_plan(&json!({}), context(8_002), None)
+            .err()
+            .expect("missing technical white balance must fail");
+        assert_eq!(missing.code, "render_plan.missing_white_balance_technical");
+        assert_eq!(missing.field, "whiteBalanceTechnical");
+
+        let mut obsolete = current_render_adjustments(json!({}));
+        obsolete["temperature"] = json!(15.0);
+        let obsolete = super::compile_render_plan(&obsolete, context(8_003), None)
+            .err()
+            .expect("obsolete global white balance must fail");
+        assert_eq!(
+            obsolete.code,
+            "render_plan.obsolete_white_balance_representation"
+        );
+        assert_eq!(obsolete.field, "temperature");
+
+        let mut malformed = current_render_adjustments(json!({}));
+        malformed["whiteBalanceTechnical"]
+            .as_object_mut()
+            .unwrap()
+            .remove("confidence");
+        let malformed = super::compile_render_plan(&malformed, context(8_004), None)
+            .err()
+            .expect("malformed technical white balance must fail");
+        assert_eq!(
+            malformed.code,
+            "render_plan.invalid_white_balance_technical"
+        );
+        assert_eq!(malformed.field, "whiteBalanceTechnical");
+
+        let mut missing_nested = current_render_adjustments(json!({}));
+        missing_nested["whiteBalanceTechnical"]["synchronization"]
+            .as_object_mut()
+            .unwrap()
+            .remove("referenceSourceIdentity");
+        let missing_nested = super::compile_render_plan(&missing_nested, context(8_005), None)
+            .err()
+            .expect("incomplete synchronization identity must fail");
+        assert_eq!(
+            missing_nested.code,
+            "render_plan.invalid_white_balance_technical"
+        );
+        assert!(
+            missing_nested
+                .message
+                .contains("synchronization_must_be_complete")
+        );
     }
 
     #[test]
@@ -1664,7 +1796,7 @@ mod tests {
 
     #[test]
     fn source_fingerprint_scopes_plan_cache_and_full_fingerprint() {
-        let raw = json!({"exposure": 12});
+        let raw = current_render_adjustments(json!({"exposure": 12}));
         let first = compile_render_plan_cached(&raw, context(90), None).unwrap();
         let mut other_context = context(90);
         other_context.revision.source_revision += 1;
@@ -1676,7 +1808,7 @@ mod tests {
 
     #[test]
     fn consumer_plan_cache_identity_includes_source_and_runtime_settings() {
-        let raw = json!({"exposure": 17, "contrast": 3});
+        let raw = current_render_adjustments(json!({"exposure": 17, "contrast": 3}));
         let first =
             compile_consumer_render_plan(&raw, "/fixtures/consumer-a.raw", true, None, None)
                 .unwrap();
@@ -1781,16 +1913,16 @@ mod tests {
     }
 
     #[test]
-    fn compiled_gpu_abi_matches_legacy_parser() {
-        let raw = json!({
-            "exposure": 25, "temperature": -8, "sharpness": 12,
+    fn compiled_gpu_abi_matches_direct_parser() {
+        let raw = current_render_adjustments(json!({
+            "exposure": 25, "sharpness": 12,
             "crop":{"x":0.1,"y":0.2,"width":0.8,"height":0.7},
             "masks":[{"id":"m1","name":"Local","visible":true,"invert":false,"opacity":80,
                 "blendMode":"multiply","adjustments":{"contrast":15},"subMasks":[]}]
-        });
-        let mut legacy =
+        }));
+        let mut parsed =
             crate::adjustments::parse::get_all_adjustments_from_json(&raw, true, Some(1));
-        legacy.global.edit_graph_version = crate::edit_graph::LEGACY_PIPELINE_VERSION as f32;
+        parsed.global.edit_graph_version = crate::edit_graph::LEGACY_PIPELINE_VERSION as f32;
         let compiled = compile_render_plan(
             &raw,
             CompileRenderPlanContext {
@@ -1801,14 +1933,14 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(bytes_of(&legacy), bytes_of(&compiled.adjustments));
+        assert_eq!(bytes_of(&parsed), bytes_of(&compiled.adjustments));
         assert_eq!(compiled.masks[0].id, "m1");
         assert_eq!(compiled.crop.unwrap().width, 0.8);
     }
 
     #[test]
     fn cache_returns_same_arc_and_compiles_outside_lock() {
-        let raw = json!({"exposure": 12});
+        let raw = current_render_adjustments(json!({"exposure": 12}));
         let first = compile_render_plan_cached(&raw, context(91), None).unwrap();
         let second = compile_render_plan_cached(&raw, context(91), None).unwrap();
         assert!(Arc::ptr_eq(&first, &second));

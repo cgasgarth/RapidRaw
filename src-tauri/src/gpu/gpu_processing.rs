@@ -3073,7 +3073,10 @@ mod blur_pass_tests {
 
     #[test]
     fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
-        let raw = serde_json::json!({"rawEngineEditGraphVersion": 1, "exposure": 20});
+        let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
+            "rawEngineEditGraphVersion": 1,
+            "exposure": 20
+        }));
         let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
         let plan = crate::render_plan::compile_render_plan(
             &raw,
@@ -4316,7 +4319,6 @@ mod blur_pass_tests {
                 "reference_match_preview_export_allow_list",
                 json!({
                     "exposure": 18, "contrast": 9,
-                    "creativeTemperature": 12, "creativeTint": -7,
                     "saturation": 11, "vibrance": 7,
                     "whiteBalanceTechnical": {
                         "mode": "as_shot",
@@ -5093,7 +5095,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn production_wgpu_applies_technical_white_balance_and_creative_node() {
+    fn production_wgpu_applies_technical_white_balance() {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
@@ -5138,8 +5140,6 @@ mod blur_pass_tests {
         ));
         let adjusted = render(crate::adjustments::parse::get_all_adjustments_from_json(
             &serde_json::json!({
-                "creativeTemperature": 40.0,
-                "creativeTint": -20.0,
                 "exposure": -8.0,
                 "whiteBalanceTechnical": {
                     "mode": "kelvin_tint",

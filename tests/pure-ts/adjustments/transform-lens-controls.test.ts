@@ -29,7 +29,7 @@ const profileParams: LensDistortionParams = {
 
 describe('transform lens controls', () => {
   test('keeps loaded transform and lens defaults intact', () => {
-    const normalized = normalizeLoadedAdjustments({});
+    const normalized = normalizeLoadedAdjustments(INITIAL_ADJUSTMENTS);
 
     expect(pickAdjustmentValues(TRANSFORM_LENS_ADJUSTMENT_KEYS, normalized)).toEqual(
       pickAdjustmentValues(TRANSFORM_LENS_ADJUSTMENT_KEYS, INITIAL_ADJUSTMENTS),

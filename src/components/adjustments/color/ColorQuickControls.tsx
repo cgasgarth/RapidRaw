@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useAutoWhiteBalanceEditCommit } from '../../../hooks/editor/useAutoWhiteBalanceEditCommit';
 import { useCameraInputEditCommit } from '../../../hooks/editor/useCameraInputEditCommit';
-import { ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { ColorAdjustment, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../../utils/adjustments';
 import {
   buildTechnicalWhiteBalance,
   buildTechnicalWhiteBalancePreset,
@@ -44,10 +44,9 @@ export const ColorQuickControls = ({
   const density = professionalInspectorDensityTokens;
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
   const isWhiteBalanceModified = isForMask
-    ? adjustments.temperature !== INITIAL_ADJUSTMENTS.temperature || adjustments.tint !== INITIAL_ADJUSTMENTS.tint
-    : adjustments.whiteBalanceTechnical.mode !== 'as_shot' ||
-      adjustments.creativeTemperature !== INITIAL_ADJUSTMENTS.creativeTemperature ||
-      adjustments.creativeTint !== INITIAL_ADJUSTMENTS.creativeTint;
+    ? adjustments.temperature !== INITIAL_MASK_ADJUSTMENTS.temperature ||
+      adjustments.tint !== INITIAL_MASK_ADJUSTMENTS.tint
+    : adjustments.whiteBalanceTechnical.mode !== 'as_shot';
   const isPresenceModified =
     adjustments.vibrance !== INITIAL_ADJUSTMENTS.vibrance ||
     adjustments.saturation !== INITIAL_ADJUSTMENTS.saturation ||
@@ -65,16 +64,13 @@ export const ColorQuickControls = ({
           ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
           inputSemantics,
         },
-        creativeTemperature: INITIAL_ADJUSTMENTS.creativeTemperature,
-        creativeTint: INITIAL_ADJUSTMENTS.creativeTint,
-        whiteBalanceMigration: 'native_v1',
       });
       return;
     }
     setAdjustments((prev) => ({
       ...prev,
-      temperature: INITIAL_ADJUSTMENTS.temperature,
-      tint: INITIAL_ADJUSTMENTS.tint,
+      temperature: INITIAL_MASK_ADJUSTMENTS.temperature,
+      tint: INITIAL_MASK_ADJUSTMENTS.tint,
     }));
   };
 
@@ -88,7 +84,6 @@ export const ColorQuickControls = ({
         mode === 'preset' ? 'preset' : mode === 'auto' ? 'auto' : mode === 'as_shot' ? 'as_shot' : 'user',
         inputSemantics,
       ),
-      whiteBalanceMigration: 'native_v1',
     });
   };
 
@@ -248,7 +243,6 @@ export const ColorQuickControls = ({
                             previous.whiteBalanceTechnical.synchronization,
                             inputSemantics,
                           ),
-                          whiteBalanceMigration: 'native_v1',
                         }));
                       }}
                       value={adjustments.whiteBalanceTechnical.presetId ?? 'daylight'}
@@ -311,30 +305,6 @@ export const ColorQuickControls = ({
                 })}
               </p>
             ) : null}
-            <AdjustmentSlider
-              defaultValue={0}
-              density="compact"
-              label={t('adjustments.color.creativeWarmth', { defaultValue: 'Creative Warmth' })}
-              max={100}
-              min={-100}
-              onValueChange={(creativeTemperature) => commitCameraInput({ creativeTemperature })}
-              step={1}
-              value={adjustments.creativeTemperature}
-              trackClassName="temperature-gradient-track"
-              onDragStateChange={onDragStateChange}
-            />
-            <AdjustmentSlider
-              defaultValue={0}
-              density="compact"
-              label={t('adjustments.color.creativeTint', { defaultValue: 'Creative Tint' })}
-              max={100}
-              min={-100}
-              onValueChange={(creativeTint) => commitCameraInput({ creativeTint })}
-              step={1}
-              value={adjustments.creativeTint}
-              trackClassName="tint-gradient-track"
-              onDragStateChange={onDragStateChange}
-            />
           </>
         )}
       </section>
