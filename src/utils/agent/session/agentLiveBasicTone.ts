@@ -15,12 +15,12 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
+  type BasicToneAdjustmentPayload,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { buildBasicToneCommandEditTransaction, captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
 import { buildAdjustmentMutationOperations } from '../../editTransaction';
@@ -34,7 +34,7 @@ export interface AgentLiveBasicToneApplyOptions {
   additionalAdjustmentPatch?: Partial<Adjustments>;
   expectedGraphRevision?: string;
   operationId: string;
-  requestedAdjustments: LegacyBasicToneAdjustmentPayload;
+  requestedAdjustments: BasicToneAdjustmentPayload;
   sessionId: string;
 }
 

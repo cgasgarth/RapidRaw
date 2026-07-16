@@ -9,9 +9,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { Invokes } from '../../../tauri/commands';
 import type { Adjustments } from '../../adjustments';
 import {
+  type BasicToneAdjustmentPayload,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
 import { invokeWithSchema } from '../../tauriSchemaInvoke';
@@ -206,7 +206,7 @@ const PREVIEW_PROOF_PIXELS: readonly AgentLiveBasicTonePixel[] = Array.from(
 const buildRequestedBasicTone = (
   base: Adjustments,
   patch: z.infer<typeof agentToneAdjustmentPatchSchema>,
-): LegacyBasicToneAdjustmentPayload => ({
+): BasicToneAdjustmentPayload => ({
   blacks: patch.blacks ?? base.blacks,
   brightness: base.brightness,
   clarity: patch.clarity ?? base.clarity,

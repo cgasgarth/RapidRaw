@@ -33,8 +33,8 @@ const applied = batchAutoAdjustPathResultV1Schema.parse({
   receipt: {
     baseAdjustmentDocumentRevision: `sha256:${'0'.repeat(64)}`,
     adjustmentDocumentRevision: `sha256:${'1'.repeat(64)}`,
-    adjustments: { exposure: 0.65 },
-    engine: 'rapidraw.legacy_auto_adjust.v1',
+    adjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.65 },
+    engine: 'rapidraw.auto_adjust.v1',
     renderFingerprint: 'u64:1111111111111111',
     sourceIdentity: path,
     sourceRevision: `source-revision-v1:${'2'.repeat(64)}`,

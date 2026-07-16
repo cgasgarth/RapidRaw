@@ -7,7 +7,7 @@ const acceptedPathReceiptSchema = z
     baseAdjustmentDocumentRevision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
     adjustmentDocumentRevision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
     adjustments: z.record(z.string(), z.unknown()),
-    engine: z.literal('rapidraw.legacy_auto_adjust.v1'),
+    engine: z.literal('rapidraw.auto_adjust.v1'),
     renderFingerprint: z.string().regex(/^u64:[0-9a-f]{16}$/u),
     sourceIdentity: z.string().min(1),
     sourceRevision: z.string().startsWith('source-revision-v1:'),

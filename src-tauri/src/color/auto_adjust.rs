@@ -6,10 +6,6 @@ use crate::AppState;
 use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, estimate_cct_duv_from_xy};
 use crate::image_processing::downscale_f32_image;
 
-/// Stable identifier for the pre-scene-referred RGB8 Auto process. This process remains
-/// callable for saved automation and batch compatibility; new editor Auto uses auto_edit_v1.
-pub const LEGACY_AUTO_ADJUST_PROCESS: &str = "legacy_auto_adjust_v1";
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AutoAdjustmentResults {
     pub exposure: f64,
@@ -394,14 +390,6 @@ pub fn calculate_auto_adjustments(
     Ok(auto_results_to_json(&results))
 }
 
-#[tauri::command]
-pub fn calculate_legacy_auto_adjustments_v1(
-    state: tauri::State<AppState>,
-) -> Result<serde_json::Value, String> {
-    log::trace!("auto_adjust_process={LEGACY_AUTO_ADJUST_PROCESS}");
-    calculate_auto_adjustments(state)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,7 +467,6 @@ mod tests {
                 "blacks": -1.0
             })
         );
-        assert_eq!(LEGACY_AUTO_ADJUST_PROCESS, "legacy_auto_adjust_v1");
     }
 
     #[test]

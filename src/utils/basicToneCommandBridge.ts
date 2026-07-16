@@ -13,7 +13,7 @@ export type BasicToneApprovalClass = (typeof BasicToneApprovalClass)[keyof typeo
 export type BasicToneCommandContextActor = Record<string, unknown>;
 export type BasicToneCommandContextTarget = Record<string, unknown> & { kind: 'image' | 'virtual_copy' };
 
-export const legacyBasicToneAdjustmentPayloadSchema = z.looseObject({
+export const basicToneAdjustmentPayloadSchema = z.looseObject({
   blacks: z.number().min(-100).max(100),
   brightness: z.number().min(-100).max(100),
   clarity: z.number().min(-100).max(100),
@@ -25,7 +25,7 @@ export const legacyBasicToneAdjustmentPayloadSchema = z.looseObject({
   whites: z.number().min(-100).max(100),
 });
 
-export type LegacyBasicToneAdjustmentPayload = z.infer<typeof legacyBasicToneAdjustmentPayloadSchema>;
+export type BasicToneAdjustmentPayload = z.infer<typeof basicToneAdjustmentPayloadSchema>;
 
 export interface BasicToneCommandEnvelope {
   actor: BasicToneCommandContextActor;
@@ -141,11 +141,11 @@ export const hasBasicToneAdjustmentChange = (previous: Adjustments, next: Adjust
   BASIC_TONE_ADJUSTMENT_KEYS.some((key) => previous[key] !== next[key]);
 
 export const buildBasicToneCommandEnvelope = (
-  adjustments: LegacyBasicToneAdjustmentPayload,
+  adjustments: BasicToneAdjustmentPayload,
   context: BasicToneCommandBridgeContext,
   options: BasicToneCommandBridgeOptions,
 ): BasicToneCommandEnvelope => {
-  const typedAdjustments = legacyBasicToneAdjustmentPayloadSchema.parse(adjustments);
+  const typedAdjustments = basicToneAdjustmentPayloadSchema.parse(adjustments);
   const envelope: BasicToneCommandEnvelope = {
     actor: context.actor,
     approval: {

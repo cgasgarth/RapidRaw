@@ -9,9 +9,9 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
+  type BasicToneAdjustmentPayload,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -28,7 +28,7 @@ import {
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
 export type AgentCoreEditCommandBundleStep =
-  | { kind: 'basic_tone'; payload: LegacyBasicToneAdjustmentPayload }
+  | { kind: 'basic_tone'; payload: BasicToneAdjustmentPayload }
   | { kind: 'selective_color'; payload: SelectiveColorAdjustmentPayload };
 
 export interface AgentCoreEditCommandBundleOptions {
