@@ -615,7 +615,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
               exposure,
               whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
             },
-            engine: 'rapidraw.legacy_auto_adjust.v1',
+            engine: 'rapidraw.auto_adjust.v1',
             renderFingerprint: `u64:${String(index + 1)
               .repeat(16)
               .slice(0, 16)}`,

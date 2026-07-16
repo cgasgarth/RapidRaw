@@ -8,16 +8,16 @@ import {
   dryRunBasicToneCommandInLiveEditor,
 } from '../../../src/utils/agent/session/agentLiveBasicTone';
 import {
+  type BasicToneAdjustmentPayload,
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../../src/utils/basicToneCommandBridge';
 import { captureBasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const imagePath = '/fixtures/basic-tone-command-apply/DSC_4792.ARW';
-const requestedAdjustments: LegacyBasicToneAdjustmentPayload = {
+const requestedAdjustments: BasicToneAdjustmentPayload = {
   blacks: -12,
   brightness: 0,
   clarity: 14,
