@@ -7,14 +7,14 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import ViewerFooter from '../../../src/components/panel/editor/ViewerFooter.tsx';
 import type { ViewerActiveTool } from '../../../src/components/panel/editor/viewerInputResolver.ts';
-import type { SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
+import type { ImageFile, SelectedImage } from '../../../src/components/ui/AppProperties.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import type { PreviewQualityStatus } from '../../../src/utils/adaptivePreviewQuality.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const selectedImage: SelectedImage = {
   exif: null,
@@ -27,6 +27,15 @@ const selectedImage: SelectedImage = {
   rawDevelopmentReport: null,
   thumbnailUrl: 'data:image/jpeg;base64,AAAA',
   width: 6000,
+};
+const libraryImage: ImageFile = {
+  exif: null,
+  is_edited: false,
+  is_virtual_copy: false,
+  modified: 0,
+  path: selectedImage.path,
+  rating: 0,
+  tags: null,
 };
 const resolvedZoom = {
   cssPercent: 100,
@@ -62,7 +71,15 @@ afterEach(() => {
     rendered = null;
   }
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    compare: { dividerPosition: 0.5, isOriginalHeld: false, labelsVisible: true, mode: 'off', orientation: 'vertical' },
+    compare: {
+      dividerPosition: 0.5,
+      isOriginalHeld: false,
+      labelsVisible: true,
+      mode: 'off',
+      orientation: 'vertical',
+      source: { identity: null, kind: 'original' },
+      synchronizedTransform: 'locked',
+    },
     previewQualityStatus: null,
     selectedImage: null,
     zoomMode: { kind: 'fit' },
@@ -79,8 +96,8 @@ describe('viewer footer', () => {
     const { container } = await renderFooter({ activeTool: 'crop', isFullScreen: true });
 
     const footer = container.querySelector<HTMLElement>('[data-testid="viewer-footer"]');
-    expect(footer?.dataset.fullscreen).toBe('true');
-    expect(footer?.dataset.density).toBe('compact');
+    expect(footer?.dataset['fullscreen']).toBe('true');
+    expect(footer?.dataset['density']).toBe('compact');
     expect(container.querySelector('[data-testid="viewer-footer-left"]')?.textContent).toContain('1 of 1');
     expect(container.querySelector('[data-testid="viewer-footer-tool-hint"]')?.textContent).toContain('Enter applies');
     expect(container.querySelector('[data-testid="viewer-footer-overflow"]')).not.toBeNull();
@@ -113,17 +130,17 @@ describe('viewer footer', () => {
     const { container } = await renderFooter({ isRendering: true });
     const status = () => container.querySelector<HTMLElement>('[data-testid="viewer-footer-render-status"]');
     const live = () => container.querySelector<HTMLElement>('[data-testid="viewer-footer-live-region"]');
-    expect(status()?.dataset.phase).toBe('interactive');
+    expect(status()?.dataset['phase']).toBe('interactive');
     expect(live()?.getAttribute('aria-live')).toBeNull();
 
     act(() => useEditorStore.getState().setEditor({ previewQualityStatus: quality('final_ready') }));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 40)));
-    expect(status()?.dataset.phase).toBe('interactive');
+    expect(status()?.dataset['phase']).toBe('interactive');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 180)));
-    expect(status()?.dataset.phase).toBe('coherent');
+    expect(status()?.dataset['phase']).toBe('coherent');
 
     act(() => useEditorStore.getState().setEditor({ previewQualityStatus: quality('degraded_limited') }));
-    expect(status()?.dataset.phase).toBe('degraded');
+    expect(status()?.dataset['phase']).toBe('degraded');
     expect(live()?.getAttribute('aria-live')).toBe('assertive');
     expect(live()?.getAttribute('role')).toBe('alert');
   });
@@ -132,7 +149,7 @@ describe('viewer footer', () => {
 function prepareStores(previewQualityStatus: PreviewQualityStatus | null = null) {
   useEditorStore.getState().setEditor({ selectedImage, zoomMode: resolvedZoom.mode });
   useEditorStore.getState().setEditor({ previewQualityStatus });
-  useLibraryStore.setState({ imageList: [selectedImage], multiSelectedPaths: [selectedImage.path] });
+  useLibraryStore.setState({ imageList: [libraryImage], multiSelectedPaths: [selectedImage.path] });
 }
 
 async function renderFooter({

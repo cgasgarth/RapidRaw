@@ -29,7 +29,10 @@ class DeferredColorBridge extends RawEngineLocalAppServerBridge {
     this.releaseApplyGate();
   }
 
-  override async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
+  override async dispatch<TResult = unknown>(
+    command: unknown,
+    context?: EditCommandBusContext,
+  ): Promise<EditCommandDispatchResult<TResult>> {
     if (
       typeof command === 'object' &&
       command !== null &&
@@ -41,7 +44,7 @@ class DeferredColorBridge extends RawEngineLocalAppServerBridge {
       this.signalApplyEntered();
       await this.applyGate;
     }
-    return super.dispatch(command, context);
+    return super.dispatch<TResult>(command, context);
   }
 }
 

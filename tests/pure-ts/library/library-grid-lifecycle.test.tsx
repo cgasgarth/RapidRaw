@@ -40,6 +40,7 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
   Object.assign(globalThis, {
     window,
     document: window.document,
+    DOMRect: window.DOMRect,
     navigator: window.navigator,
     HTMLElement: window.HTMLElement,
     Node: window.Node,
@@ -48,8 +49,8 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0),
     cancelAnimationFrame: (id: number) => clearTimeout(id),
   });
-  window.HTMLElement.prototype.scrollTo = function scrollTo(options: ScrollToOptions) {
-    this.scrollTop = options.top ?? this.scrollTop;
+  window.HTMLElement.prototype.scrollTo = function scrollTo(xOrOptions, y) {
+    this.scrollTop = typeof xOrOptions === 'number' ? (y ?? this.scrollTop) : (xOrOptions.top ?? this.scrollTop);
   };
   libraryEntityRepository.replaceAll(images);
   const container = document.createElement('div');
@@ -88,9 +89,19 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     await act(async () => {
       for (const observer of observers) {
         if (!observer.target) continue;
+        const contentRect = new DOMRect(0, 0, width, height);
+        const observedSize = [{ blockSize: height, inlineSize: width }];
         observer.callback(
-          [{ contentRect: new window.DOMRect(0, 0, width, height), target: observer.target } as ResizeObserverEntry],
-          observer as ResizeObserver,
+          [
+            {
+              borderBoxSize: observedSize,
+              contentBoxSize: observedSize,
+              contentRect,
+              devicePixelContentBoxSize: observedSize,
+              target: observer.target,
+            },
+          ],
+          observer,
         );
       }
     });

@@ -18,7 +18,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -62,7 +62,9 @@ test('curve point constraints preserve ordering, endpoint snap, and output bound
 });
 
 test('parametric split constraints retain ten percent region gaps', () => {
-  const settings = { ...INITIAL_ADJUSTMENTS.parametricCurve.luma, split1: 25, split2: 50, split3: 75 };
+  const parametricCurve = INITIAL_ADJUSTMENTS.parametricCurve;
+  if (parametricCurve === undefined) throw new Error('Expected initialized parametric curve settings.');
+  const settings = { ...parametricCurve.luma, split1: 25, split2: 50, split3: 75 };
   expect(constrainParametricSplit(settings, 'split1', 48)).toBe(40);
   expect(constrainParametricSplit(settings, 'split2', 5)).toBe(35);
   expect(constrainParametricSplit(settings, 'split2', 90)).toBe(65);

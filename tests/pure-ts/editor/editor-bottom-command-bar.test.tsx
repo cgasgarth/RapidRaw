@@ -9,7 +9,7 @@ import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../../
 import en from '../../../src/i18n/locales/en.json';
 import { useLibraryStore } from '../../../src/store/useLibraryStore';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const images: ImageFile[] = [
   createImage('/library/01.NEF', 'red'),

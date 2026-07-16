@@ -42,7 +42,6 @@ describe('crop panel workflow', () => {
       overlayMode: 'thirds',
       overlayRotation: 0,
       selectedImage,
-      showOriginal: false,
       editDocumentV2: initialDocument,
       history: [initialDocument],
     });
@@ -50,7 +49,7 @@ describe('crop panel workflow', () => {
 
     const { container, user } = await renderCropPanel();
     const panel = required<HTMLElement>(container, '[data-testid="crop-panel-status"]');
-    expect(panel.dataset.cropDirty).toBe('false');
+    expect(panel.dataset['cropDirty']).toBe('false');
     expect(required<HTMLElement>(container, '[data-crop-panel-density="compact"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="crop-panel-actions"]')).not.toBeNull();
     expect(container.querySelectorAll('[data-testid="crop-panel-ratio-section"] button').length).toBeGreaterThan(10);
@@ -62,7 +61,7 @@ describe('crop panel workflow', () => {
     await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]'));
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBe(5 / 4);
-    expect(required<HTMLElement>(container, '[data-testid="crop-panel-status"]').dataset.cropDirty).toBe('true');
+    expect(required<HTMLElement>(container, '[data-testid="crop-panel-status"]').dataset['cropDirty']).toBe('true');
 
     const cancel = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'Cancel',
@@ -220,7 +219,6 @@ function resetStores() {
     overlayMode: 'thirds',
     overlayRotation: 0,
     selectedImage: null,
-    showOriginal: false,
     editDocumentV2,
     history: [editDocumentV2],
   });

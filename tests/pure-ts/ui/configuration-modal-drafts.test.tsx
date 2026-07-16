@@ -23,7 +23,7 @@ test('preset draft starts from its keyed preset and saves once after accessible 
   const runtime = installRuntime();
   unmount = runtime.unmount;
   const close = mock(() => {});
-  const save = mock(() => {});
+  const save = mock((_name: string, _includeMasks: boolean, _includeCrop: boolean, _type: 'tool' | 'style') => {});
   await runtime.render(
     createElement(ConfigurePresetDraft, {
       initialPreset: preset('a', 'Preset A', 'style'),
@@ -46,7 +46,9 @@ test('preset draft starts from its keyed preset and saves once after accessible 
 test('cancelled preset and copy/paste edits are discarded by the next keyed draft', async () => {
   const runtime = installRuntime();
   unmount = runtime.unmount;
-  const presetSave = mock(() => {});
+  const presetSave = mock(
+    (_name: string, _includeMasks: boolean, _includeCrop: boolean, _type: 'tool' | 'style') => {},
+  );
   const close = mock(() => {});
   await runtime.render(
     createElement(ConfigurePresetDraft, {
@@ -71,7 +73,7 @@ test('cancelled preset and copy/paste edits are discarded by the next keyed draf
   expect(runtime.input('configure-preset-name').value).toBe('Preset B');
   expect(runtime.selectedRadio().textContent).toContain('modals.configurePreset.typeToolLabel');
 
-  const settingsSave = mock(() => {});
+  const settingsSave = mock((_settings: CopyPasteSettings) => {});
   await runtime.render(
     createElement(CopyPasteSettingsDraft, {
       initialSettings: settings(PasteMode.Merge),
@@ -107,7 +109,9 @@ test('same-source close and reopen replaces each shell draft before it becomes v
   const runtime = installRuntime();
   unmount = runtime.unmount;
   const close = mock(() => {});
-  const presetSave = mock(() => {});
+  const presetSave = mock(
+    (_name: string, _includeMasks: boolean, _includeCrop: boolean, _type: 'tool' | 'style') => {},
+  );
   await runtime.renderModal(
     createElement(ConfigurePresetModal, {
       initialPreset: preset('same', 'Persisted', 'style'),
@@ -135,7 +139,7 @@ test('same-source close and reopen replaces each shell draft before it becomes v
   );
   expect(runtime.input('configure-preset-name').value).toBe('Current');
 
-  const copySave = mock(() => {});
+  const copySave = mock((_settings: CopyPasteSettings) => {});
   await runtime.renderModal(
     createElement(CopyPasteSettingsModal, {
       isOpen: true,

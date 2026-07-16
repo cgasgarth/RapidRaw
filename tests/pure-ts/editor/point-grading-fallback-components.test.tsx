@@ -13,7 +13,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({

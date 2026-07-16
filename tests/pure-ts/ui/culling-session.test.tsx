@@ -82,7 +82,7 @@ describe('culling decision session', () => {
 
     const current = suggestions('/new.ARW', '/new.jpg');
     await render({ isOpen: true, paths: ['/new.ARW', '/new.jpg'], suggestions: current });
-    expect(container.querySelector<HTMLElement>('[data-testid="culling-session"]')?.dataset.cullingActivePath).toBe(
+    expect(container.querySelector<HTMLElement>('[data-testid="culling-session"]')?.dataset['cullingActivePath']).toBe(
       '/new.ARW',
     );
     expect(selectedCount(container)).toContain('1 result selected');

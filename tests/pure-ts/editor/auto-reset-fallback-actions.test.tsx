@@ -47,7 +47,7 @@ const invoke = mock(async (command: string) => {
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { useEditorActions } = await import('../../../src/hooks/editor/useEditorActions');
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 let root: Root | null = null;
 
 afterEach(() => {

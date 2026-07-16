@@ -42,22 +42,22 @@ test('RAW and raster sessions synchronously render their own defaults and preser
   const runtime = installRuntime();
   cleanup = runtime.unmount;
   await runtime.render('raw:1', props({ isRaw: true, targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset.denoiseMethod).toBe('ai');
-  expect(runtime.summary().dataset.denoiseIntensity).toBe('50');
+  expect(runtime.summary().dataset['denoiseMethod']).toBe('ai');
+  expect(runtime.summary().dataset['denoiseIntensity']).toBe('50');
 
   await runtime.click(runtime.button('modals.denoise.methodAi'));
   await runtime.click(runtime.button('modals.denoise.methodBm3d'));
-  expect(runtime.summary().dataset.denoiseMethod).toBe('bm3d');
-  expect(runtime.summary().dataset.denoiseIntensity).toBe('15');
+  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
+  expect(runtime.summary().dataset['denoiseIntensity']).toBe('15');
   await runtime.render('raw:1', props({ isRaw: true, progressMessage: 'unrelated render', targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset.denoiseMethod).toBe('bm3d');
+  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
 
   await runtime.render('raster:2', props({ isRaw: false, targetPaths: ['/image.jpg'] }));
-  expect(runtime.summary().dataset.denoiseMethod).toBe('bm3d');
-  expect(runtime.summary().dataset.denoiseIntensity).toBe('15');
+  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
+  expect(runtime.summary().dataset['denoiseIntensity']).toBe('15');
   await runtime.render('raw:3', props({ isRaw: true, targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset.denoiseMethod).toBe('ai');
-  expect(runtime.summary().dataset.denoiseIntensity).toBe('50');
+  expect(runtime.summary().dataset['denoiseMethod']).toBe('ai');
+  expect(runtime.summary().dataset['denoiseIntensity']).toBe('50');
 });
 
 test('superseded batch completion and progress cannot populate the successor session', async () => {

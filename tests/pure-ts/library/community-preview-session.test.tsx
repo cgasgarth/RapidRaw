@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 
 interface Invocation {
@@ -43,8 +43,8 @@ test('rejects stale folder and preset generations, revokes their URLs, and owns 
 
   await render('folder-a', ['/a.RAW'], [preset('A')]);
   const requestA = generation(0);
-  expect(requestA.args.imagePaths).toEqual(['/a.RAW']);
-  expect((requestA.args.presets as CommunityPreset[])[0]?.adjustments).toMatchObject({ exposure: 0.5, contrast: 0 });
+  expect(requestA.args['imagePaths']).toEqual(['/a.RAW']);
+  expect(requestA.args['presets']).toMatchObject([{ adjustments: { contrast: 0, exposure: 0.5 } }]);
 
   await render('folder-b', ['/b.RAW'], [preset('A')]);
   const requestB = generation(1);
@@ -109,7 +109,7 @@ test('accepts a fallback path only in the keyed session that requested it', asyn
   await act(async () => fallbackRequests[1]?.resolve(new Response(new Uint8Array([2]))));
   const currentSave = command('save_temp_file', 1);
   await act(async () => currentSave.deferred.resolve('/tmp/current.jpg'));
-  expect(generation(0).args.imagePaths).toEqual(['/tmp/current.jpg']);
+  expect(generation(0).args['imagePaths']).toEqual(['/tmp/current.jpg']);
 });
 
 test('preserves the Save Community Preset payload contract', () => {
@@ -139,11 +139,11 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
     document: window.document,
     fetch: fetchImplementation ?? globalThis.fetch,
     HTMLElement: window.HTMLElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
     navigator: window.navigator,
     Node: window.Node,
     window,
   });
+  Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
   Object.assign(URL, {
     createObjectURL: () => `blob:${++objectUrl}`,
     revokeObjectURL: (url: string) => revoked.push(url),
@@ -158,11 +158,9 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
     render: async (sessionId: string, localPaths: string[], presets: CommunityPreset[]) => {
       await act(async () => {
         root.render(
-          createElement(
-            CommunityPreviewSession,
-            { key: sessionId, localPaths, presets, sessionId },
-            (previews: Record<string, string | null>) => JSON.stringify(previews),
-          ),
+          <CommunityPreviewSession key={sessionId} localPaths={localPaths} presets={presets} sessionId={sessionId}>
+            {(previews: Record<string, string | null>) => JSON.stringify(previews)}
+          </CommunityPreviewSession>,
         );
       });
     },
