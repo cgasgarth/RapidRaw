@@ -12,7 +12,7 @@ export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> =
   frontend: ['fast-build-i18n', 'fast-unsafe-unused', 'fast-visual'],
   schema: ['fast-schema'],
   dependencies: ['fast-js-security'],
-  rust: ['fast-rust'],
+  rust: ['fast-rust', 'fast-validation-harness'],
   workflow: ['fast-workflow'],
   docs: ['fast-docs'],
 };
@@ -26,6 +26,7 @@ export const PR_REQUIRED_JOB_NAMES: Readonly<Record<string, string>> = {
   'fast-js-security': 'pr fast: JavaScript audit',
   'fast-lint': 'pr fast: lint',
   'fast-rust': 'pr fast: affected native feedback',
+  'fast-validation-harness': 'pr fast: macOS validation harness compile',
   'fast-schema': 'pr fast: schema contracts',
   'fast-typecheck': 'pr fast: typecheck',
   'fast-unsafe-unused': 'pr fast: unsafe and unused dependency policy',

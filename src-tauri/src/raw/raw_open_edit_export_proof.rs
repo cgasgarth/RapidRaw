@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::adjustments::edit_document_v2::EditDocumentV2;
 use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::color::view_transform::{
@@ -32,7 +33,9 @@ use crate::raw::color_graph_trace::{
     ColorGraphTrace, ColorGraphTraceInputs, build_color_graph_trace,
 };
 use crate::render::film_emulation::FilmEmulationNodeV1;
-use crate::render_plan::{CompileRenderPlanContext, compile_render_plan, content_revision};
+use crate::render_plan::{
+    CompileRenderPlanContext, RenderPlanRevision, compile_current_edit_document_render_plan_cached,
+};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -379,12 +382,15 @@ fn run_raw_open_edit_export_proof_with_context(
     let source_path = resolve_private_relative(&source_root, &request.source_relative_path)?;
     let artifact_dir = resolve_private_relative(&private_root, &request.artifact_dir_relative)?;
     fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
-    let mut adjustments = edit_command_adjustments(&request.edit_command)?;
-    adjustments
-        .as_object_mut()
-        .ok_or_else(|| "proof adjustments must be an object".to_string())?
-        .entry("whiteBalanceTechnical")
-        .or_insert_with(crate::color::white_balance::default_technical_white_balance_json);
+    let current_document = edit_command_current_document(&request.edit_command)?;
+    let persisted_current_document = serde_json::to_value(&current_document)
+        .map_err(|error| format!("current proof document cannot serialize: {error}"))?;
+    let compiled_current_document = current_document.compile()?;
+    let neutral_current_document = serde_json::from_value::<EditDocumentV2>(
+        crate::exif_processing::neutral_current_edit_document(),
+    )
+    .map_err(|error| format!("neutral current proof document is invalid: {error}"))?
+    .compile()?;
 
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
@@ -400,16 +406,13 @@ fn run_raw_open_edit_export_proof_with_context(
     let raw_development = raw_development
         .ok_or_else(|| "RAW graph trace requires a RawDevelopmentReport".to_string())?;
 
-    let empty_adjustments = json!({
-        "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-    });
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = tonemapper_override_for_proof(&request.edit_command.color_pipeline)
         .or_else(|| resolve_tonemapper_override(settings, is_raw));
     let preview_before = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
-        &empty_adjustments,
+        &neutral_current_document,
         context,
         state,
         is_raw,
@@ -419,14 +422,14 @@ fn run_raw_open_edit_export_proof_with_context(
         &[],
     )?;
     let preview_started = Instant::now();
-    let film_proof_requested = adjustments
-        .get("filmEmulation")
-        .is_some_and(|node| !node.is_null());
+    let film_node =
+        persisted_current_document.pointer("/nodes/film_emulation/params/filmEmulation");
+    let film_proof_requested = film_node.is_some_and(|node| !node.is_null());
     let (preview_after, preview_film_tap) = if film_proof_requested {
         let (image, receipt) = process_image_for_export_pipeline_with_film_tap(
             &source_path_string,
             &base_image,
-            &adjustments,
+            &compiled_current_document,
             context,
             state,
             is_raw,
@@ -441,7 +444,7 @@ fn run_raw_open_edit_export_proof_with_context(
             process_image_for_export_pipeline_with_tonemapper_override(
                 &source_path_string,
                 &base_image,
-                &adjustments,
+                &compiled_current_document,
                 context,
                 state,
                 is_raw,
@@ -459,7 +462,7 @@ fn run_raw_open_edit_export_proof_with_context(
         let (image, receipt) = process_image_for_export_pipeline_with_film_tap(
             &source_path_string,
             &base_image,
-            &adjustments,
+            &compiled_current_document,
             context,
             state,
             is_raw,
@@ -474,7 +477,7 @@ fn run_raw_open_edit_export_proof_with_context(
             process_image_for_export_pipeline_with_tonemapper_override(
                 &source_path_string,
                 &base_image,
-                &adjustments,
+                &compiled_current_document,
                 context,
                 state,
                 is_raw,
@@ -489,11 +492,16 @@ fn run_raw_open_edit_export_proof_with_context(
     let export_elapsed_ms = export_started.elapsed().as_secs_f64() * 1_000.0;
     let source_revision =
         crate::render::artifact_identity::source_fingerprint_for_path(&source_path_string);
-    let plan_revision = content_revision(&adjustments, 1, source_revision, 1);
-    let cpu_plan = compile_render_plan(
-        &adjustments,
+    let cpu_plan = compile_current_edit_document_render_plan_cached(
+        &compiled_current_document,
         CompileRenderPlanContext {
-            revision: plan_revision,
+            revision: RenderPlanRevision {
+                image_session: 0,
+                source_revision,
+                adjustment_revision: compiled_current_document.content_fingerprint(),
+                schema_version: 2,
+                settings_revision: u64::from(tm_override.unwrap_or(0)),
+            },
             is_raw,
             tonemapper_override: tm_override,
         },
@@ -605,7 +613,11 @@ fn run_raw_open_edit_export_proof_with_context(
     let sidecar_path = resolve_private_relative(&private_root, &sidecar_after_relative)?;
     let color_management =
         color_management_proof(&request, &source_hash_before, &base_image, &export_receipt);
-    let sidecar_json = build_sidecar_json(&request, &adjustments, &color_management);
+    let sidecar_json = build_sidecar_json(
+        &request,
+        persisted_current_document.clone(),
+        &color_management,
+    );
     fs::write(
         &sidecar_path,
         serde_json::to_vec_pretty(&sidecar_json).map_err(|error| error.to_string())?,
@@ -667,9 +679,9 @@ fn run_raw_open_edit_export_proof_with_context(
         .pointer("/rawOpenEditExportProof/editGraphRevision")
         .and_then(Value::as_str)
         == Some(request.edit_command.expected_graph_revision.as_str());
-    let save_reopen_film_node_hash_equal = if let Some(node) = adjustments.get("filmEmulation") {
+    let save_reopen_film_node_hash_equal = if let Some(node) = film_node {
         reloaded_sidecar_json
-            .pointer("/adjustments/filmEmulation")
+            .pointer("/editDocumentV2/nodes/film_emulation/params/filmEmulation")
             .map(|saved_node| {
                 Ok::<_, String>(sha256_serialized(saved_node)? == sha256_serialized(node)?)
             })
@@ -708,7 +720,7 @@ fn run_raw_open_edit_export_proof_with_context(
 
     let film_runtime_proof_receipt = build_film_runtime_proof_receipt(
         &request,
-        &adjustments,
+        film_node,
         &raw_development,
         preview_film_tap.as_ref(),
         export_film_tap.as_ref(),
@@ -918,7 +930,7 @@ fn run_raw_open_edit_export_proof_with_context(
 #[allow(clippy::too_many_arguments)]
 fn build_film_runtime_proof_receipt(
     request: &RawOpenEditExportProofRequest,
-    adjustments: &Value,
+    film_node: Option<&Value>,
     raw_development: &crate::raw_processing::RawDevelopmentReport,
     preview_tap: Option<&crate::gpu_processing::GpuPostFilmTapReceiptV1>,
     export_tap: Option<&crate::gpu_processing::GpuPostFilmTapReceiptV1>,
@@ -931,7 +943,7 @@ fn build_film_runtime_proof_receipt(
     source_hash_unchanged: bool,
     save_reopen_film_node_hash_equal: bool,
 ) -> Result<Option<crate::render::film_runtime_proof::FilmRuntimeProofReceiptV1>, String> {
-    let Some(film_node_value) = adjustments.get("filmEmulation") else {
+    let Some(film_node_value) = film_node else {
         return Ok(None);
     };
     if film_node_value.is_null() {
@@ -989,6 +1001,7 @@ fn build_film_runtime_proof_receipt(
     } else {
         vec!["display_transform_unverified".to_string()]
     };
+    let film_profile_content_sha256 = film_node.profile_ref.content_sha256.clone();
 
     let receipt = crate::render::film_runtime_proof::FilmRuntimeProofReceiptV1 {
         contract: "rapidraw.film_runtime_proof.v1".to_string(),
@@ -998,8 +1011,8 @@ fn build_film_runtime_proof_receipt(
         input_profile_id,
         input_profile_sha256,
         working_space: "acescg_linear_v1".to_string(),
-        film_profile_ref: film_node.profile_ref.clone(),
-        film_profile_content_sha256: film_node.profile_ref.content_sha256.clone(),
+        film_profile_ref: film_node.profile_ref,
+        film_profile_content_sha256,
         film_node_sha256,
         compiled_profile_sha256: preview_tap.compiled_profile_sha256.clone(),
         execution_plan_sha256: preview_tap.execution_plan_sha256.clone(),
@@ -1142,7 +1155,9 @@ fn export_color_profile_label(color_profile: &ExportColorProfile) -> &'static st
     }
 }
 
-fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value, String> {
+fn edit_command_current_document(
+    command: &RawOpenEditExportCommand,
+) -> Result<EditDocumentV2, String> {
     if command.dry_run {
         return Err("editCommand must be an apply command, not a dry-run command.".to_string());
     }
@@ -1150,98 +1165,103 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
         return Err("editCommand requires approved edit_apply approval.".to_string());
     }
 
+    let mut document = crate::exif_processing::neutral_current_edit_document();
     match command.command_type.as_str() {
-        "toneColor.setBasicTone" => basic_tone_adjustments(&command.parameters),
-        "toneColor.setWhiteBalance" => white_balance_adjustments(&command.parameters),
-        "toneColor.adjustHsl" => selective_color_adjustments(&command.parameters),
+        "toneColor.setBasicTone" => apply_basic_tone(&mut document, &command.parameters)?,
+        "toneColor.setWhiteBalance" => apply_white_balance(&mut document, &command.parameters)?,
+        "toneColor.adjustHsl" => apply_selective_color(&mut document, &command.parameters)?,
         "toneColor.adjustSkinToneUniformity" => {
-            skin_tone_uniformity_adjustments(&command.parameters)
+            apply_skin_tone_uniformity(&mut document, &command.parameters)?
         }
-        "edit.apply_film_emulation_operation" => film_emulation_adjustments(&command.parameters),
-        _ => Err(
-            "editCommand.commandType is not supported by the RAW open/edit/export proof command."
-                .to_string(),
-        ),
+        "edit.apply_film_emulation_operation" => {
+            apply_film_emulation(&mut document, &command.parameters)?
+        }
+        _ => {
+            return Err(
+                "editCommand.commandType is not supported by the RAW open/edit/export proof command."
+                    .to_string(),
+            );
+        }
     }
+
+    serde_json::from_value(document)
+        .map_err(|error| format!("current proof EditDocumentV2 is invalid: {error}"))
 }
 
-fn film_emulation_adjustments(parameters: &Value) -> Result<Value, String> {
-    let parameters: RawOpenEditExportFilmEmulationParameters =
-        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
-    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
-        || parameters.accepted_dry_run_plan_id.trim().is_empty()
-    {
+fn require_accepted_plan(plan_hash: &str, plan_id: &str) -> Result<(), String> {
+    if plan_hash.trim().is_empty() || plan_id.trim().is_empty() {
         return Err(
             "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
         );
     }
+    Ok(())
+}
+
+fn apply_film_emulation(document: &mut Value, parameters: &Value) -> Result<(), String> {
+    let parameters: RawOpenEditExportFilmEmulationParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    require_accepted_plan(
+        &parameters.accepted_dry_run_plan_hash,
+        &parameters.accepted_dry_run_plan_id,
+    )?;
     let node = crate::render::film_emulation::apply_operation_to_node(None, &parameters.operation)
         .map_err(str::to_string)?
         .ok_or_else(|| "film proof command must produce an enabled Film node.".to_string())?;
-    Ok(json!({
-        "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
-        "filmEmulation": node,
-    }))
+    document["nodes"]["film_emulation"]["params"]["filmEmulation"] =
+        serde_json::to_value(node).map_err(|error| error.to_string())?;
+    Ok(())
 }
 
-fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
+fn apply_white_balance(document: &mut Value, parameters: &Value) -> Result<(), String> {
     let parameters: RawOpenEditExportWhiteBalanceParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
-    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
-        || parameters.accepted_dry_run_plan_id.trim().is_empty()
-    {
-        return Err(
-            "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
-        );
-    }
+    require_accepted_plan(
+        &parameters.accepted_dry_run_plan_hash,
+        &parameters.accepted_dry_run_plan_id,
+    )?;
     let coordinates =
         crate::color::white_balance::cct_duv_to_coordinates(parameters.kelvin, parameters.duv)
             .map_err(|error| error.to_string())?;
-    Ok(json!({
-        "exposure": parameters.exposure_ev,
-        "whiteBalanceTechnical": {
-            "contract": crate::color::white_balance::WHITE_BALANCE_CONTRACT,
-            "mode": "kelvin_tint",
-            "kelvin": coordinates.cct_kelvin,
-            "duv": coordinates.duv,
-            "x": coordinates.xy[0],
-            "y": coordinates.xy[1],
-            "adaptation": "cat16_v1",
-            "source": "user",
-            "confidence": null,
-            "sampleCount": null,
-            "inputSemantics": "raw_scene_linear",
-            "presetId": null,
-            "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
-        }
-    }))
+    document["nodes"]["scene_global_color_tone"]["params"]["exposure"] =
+        json!(parameters.exposure_ev);
+    document["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"] = json!({
+        "contract": crate::color::white_balance::WHITE_BALANCE_CONTRACT,
+        "mode": "kelvin_tint",
+        "kelvin": coordinates.cct_kelvin,
+        "duv": coordinates.duv,
+        "x": coordinates.xy[0],
+        "y": coordinates.xy[1],
+        "adaptation": "cat16_v1",
+        "source": "user",
+        "confidence": null,
+        "sampleCount": null,
+        "inputSemantics": "raw_scene_linear",
+        "presetId": null,
+        "synchronization": { "mode": "per_image", "referenceSourceIdentity": null }
+    });
+    Ok(())
 }
 
-fn basic_tone_adjustments(parameters: &Value) -> Result<Value, String> {
+fn apply_basic_tone(document: &mut Value, parameters: &Value) -> Result<(), String> {
     let parameters: RawOpenEditExportBasicToneParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
-
-    if parameters.accepted_dry_run_plan_hash.trim().is_empty()
-        || parameters.accepted_dry_run_plan_id.trim().is_empty()
-    {
-        return Err(
-            "editCommand.parameters accepted dry-run plan identity is required.".to_string(),
-        );
-    }
-
-    Ok(json!({
-        "blacks": parameters.black_point,
-        "clarity": parameters.clarity,
-        "contrast": parameters.contrast,
-        "exposure": parameters.exposure_ev,
-        "highlights": parameters.highlights,
-        "saturation": parameters.saturation,
-        "shadows": parameters.shadows,
-        "whites": parameters.white_point,
-    }))
+    require_accepted_plan(
+        &parameters.accepted_dry_run_plan_hash,
+        &parameters.accepted_dry_run_plan_id,
+    )?;
+    let scene = &mut document["nodes"]["scene_global_color_tone"]["params"];
+    scene["blacks"] = json!(parameters.black_point);
+    scene["contrast"] = json!(parameters.contrast);
+    scene["exposure"] = json!(parameters.exposure_ev);
+    scene["highlights"] = json!(parameters.highlights);
+    scene["shadows"] = json!(parameters.shadows);
+    scene["whites"] = json!(parameters.white_point);
+    document["nodes"]["detail_denoise_dehaze"]["params"]["clarity"] = json!(parameters.clarity);
+    document["nodes"]["color_presence"]["params"]["saturation"] = json!(parameters.saturation);
+    Ok(())
 }
 
-fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
+fn apply_selective_color(document: &mut Value, parameters: &Value) -> Result<(), String> {
     let parameters: RawOpenEditExportSelectiveColorParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
     let range_key = match parameters.band.as_str() {
@@ -1256,44 +1276,39 @@ fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
         _ => return Err("editCommand.parameters.band is not a supported HSL band.".to_string()),
     };
 
-    Ok(json!({
-        "hsl": {
-            range_key: {
-                "hue": parameters.hue_shift_degrees,
-                "luminance": parameters.luminance,
-                "saturation": parameters.saturation,
-            }
-        }
-    }))
+    let band = &mut document["nodes"]["selective_color_mixer"]["params"]["hsl"][range_key];
+    band["hue"] = json!(parameters.hue_shift_degrees);
+    band["luminance"] = json!(parameters.luminance);
+    band["saturation"] = json!(parameters.saturation);
+    Ok(())
 }
 
-fn skin_tone_uniformity_adjustments(parameters: &Value) -> Result<Value, String> {
+fn apply_skin_tone_uniformity(document: &mut Value, parameters: &Value) -> Result<(), String> {
     let parameters: RawOpenEditExportSkinToneUniformityParameters =
         serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
     if !parameters.experimental {
         return Err("skinToneUniformity.experimental must be true.".to_string());
     }
-    Ok(json!({
-        "skinToneUniformity": {
-            "enabled": true,
-            "hueUniformity": parameters.hue_uniformity,
-            "luminanceUniformity": parameters.luminance_uniformity,
-            "maxHueShiftDegrees": parameters.max_hue_shift_degrees,
-            "saturationUniformity": parameters.saturation_uniformity,
-            "targetHueDegrees": parameters.target_hue_degrees,
-            "targetLuminance": parameters.target_luminance,
-            "targetSaturation": parameters.target_saturation,
-        }
-    }))
+    document["nodes"]["skin_tone_uniformity"]["params"]["skinToneUniformity"] = json!({
+        "enabled": true,
+        "hueUniformity": parameters.hue_uniformity,
+        "luminanceUniformity": parameters.luminance_uniformity,
+        "maxHueShiftDegrees": parameters.max_hue_shift_degrees,
+        "saturationUniformity": parameters.saturation_uniformity,
+        "targetHueDegrees": parameters.target_hue_degrees,
+        "targetLuminance": parameters.target_luminance,
+        "targetSaturation": parameters.target_saturation,
+    });
+    Ok(())
 }
 
 fn build_sidecar_json(
     request: &RawOpenEditExportProofRequest,
-    adjustments: &Value,
+    current_document: Value,
     color_management: &RawOpenEditExportColorManagementProof,
 ) -> Value {
     let metadata = ImageMetadata {
-        adjustments: adjustments.clone(),
+        edit_document_v2: Some(current_document),
         ..Default::default()
     };
     let mut value = serde_json::to_value(metadata).unwrap_or_else(|_| json!({}));
@@ -2088,7 +2103,9 @@ mod tests {
             .color_pipeline
             .render_target
             .view_transform = "rawengine_rapid_view_v1".to_string();
-        let adjustments = edit_command_adjustments(&request.edit_command).expect("basic tone maps");
+        let current_document = edit_command_current_document(&request.edit_command)
+            .expect("basic tone maps to current document");
+        let current_document = serde_json::to_value(current_document).expect("document serializes");
         let decoded_image = DynamicImage::new_rgba8(2, 3);
         let color_management = color_management_proof(
             &request,
@@ -2120,10 +2137,17 @@ mod tests {
             },
         );
 
-        let sidecar = build_sidecar_json(&request, &adjustments, &color_management);
+        let sidecar = build_sidecar_json(&request, current_document, &color_management);
 
-        assert_eq!(sidecar["adjustments"]["exposure"], json!(0.35));
-        assert_eq!(sidecar["adjustments"]["contrast"], json!(8.0));
+        assert_eq!(
+            sidecar["editDocumentV2"]["nodes"]["scene_global_color_tone"]["params"]["exposure"],
+            json!(0.35)
+        );
+        assert_eq!(
+            sidecar["editDocumentV2"]["nodes"]["scene_global_color_tone"]["params"]["contrast"],
+            json!(8.0)
+        );
+        assert!(sidecar["adjustments"].is_null());
         assert_eq!(
             sidecar["rawOpenEditExportProof"]["editGraphRevision"],
             json!("graph-rev.open-edit-export.edge-ringing.v1")
@@ -2219,90 +2243,116 @@ mod tests {
     }
 
     #[test]
-    fn edit_command_adjustments_require_approved_apply_command() {
+    fn edit_command_current_document_requires_approved_apply_command() {
         let valid = sample_basic_tone_command();
+        let document = serde_json::to_value(
+            edit_command_current_document(&valid).expect("valid command maps"),
+        )
+        .expect("document serializes");
         assert_eq!(
-            edit_command_adjustments(&valid).expect("valid command maps")["whites"],
+            document["nodes"]["scene_global_color_tone"]["params"]["whites"],
             json!(3.0)
         );
 
         let mut dry_run = sample_basic_tone_command();
         dry_run.dry_run = true;
-        assert!(edit_command_adjustments(&dry_run).is_err());
+        assert!(edit_command_current_document(&dry_run).is_err());
 
         let mut pending = sample_basic_tone_command();
         pending.approval.state = "pending".to_string();
-        assert!(edit_command_adjustments(&pending).is_err());
+        assert!(edit_command_current_document(&pending).is_err());
     }
 
     #[test]
-    fn selective_color_command_maps_to_hsl_adjustment() {
+    fn selective_color_command_maps_to_current_hsl_node() {
         let valid = sample_selective_color_command();
-        let adjustments = edit_command_adjustments(&valid).expect("selective color maps");
+        let document = serde_json::to_value(
+            edit_command_current_document(&valid).expect("selective color maps"),
+        )
+        .expect("document serializes");
+        let band = &document["nodes"]["selective_color_mixer"]["params"]["hsl"]["oranges"];
 
-        assert_eq!(adjustments["hsl"]["oranges"]["hue"], json!(12.0));
-        assert_eq!(adjustments["hsl"]["oranges"]["saturation"], json!(28.0));
-        assert_eq!(adjustments["hsl"]["oranges"]["luminance"], json!(-8.0));
+        assert_eq!(band["hue"], json!(12.0));
+        assert_eq!(band["saturation"], json!(28.0));
+        assert_eq!(band["luminance"], json!(-8.0));
 
         let mut invalid = sample_selective_color_command();
         invalid.parameters["band"] = json!("teal");
-        assert!(edit_command_adjustments(&invalid).is_err());
+        assert!(edit_command_current_document(&invalid).is_err());
     }
 
     #[test]
-    fn skin_tone_uniformity_command_maps_to_adjustment_state() {
+    fn skin_tone_uniformity_command_maps_to_current_node() {
         let valid = sample_skin_tone_uniformity_command();
-        let adjustments = edit_command_adjustments(&valid).expect("skin-tone uniformity maps");
+        let document = serde_json::to_value(
+            edit_command_current_document(&valid).expect("skin-tone uniformity maps"),
+        )
+        .expect("document serializes");
+        let skin = &document["nodes"]["skin_tone_uniformity"]["params"]["skinToneUniformity"];
 
-        assert_eq!(
-            adjustments["skinToneUniformity"]["targetHueDegrees"],
-            json!(24.0)
-        );
-        assert_eq!(
-            adjustments["skinToneUniformity"]["hueUniformity"],
-            json!(0.42)
-        );
-        assert_eq!(
-            adjustments["skinToneUniformity"]["maxHueShiftDegrees"],
-            json!(16.0)
-        );
-        assert_eq!(adjustments["skinToneUniformity"]["enabled"], json!(true));
-        assert!(adjustments.get("hsl").is_none());
+        assert_eq!(skin["targetHueDegrees"], json!(24.0));
+        assert_eq!(skin["hueUniformity"], json!(0.42));
+        assert_eq!(skin["maxHueShiftDegrees"], json!(16.0));
+        assert_eq!(skin["enabled"], json!(true));
 
         let mut invalid = sample_skin_tone_uniformity_command();
         invalid.parameters["unexpected"] = json!(true);
-        assert!(edit_command_adjustments(&invalid).is_err());
+        assert!(edit_command_current_document(&invalid).is_err());
     }
 
     #[test]
     fn film_command_compiles_canonical_node_and_changes_scene_pixels() {
         let command = sample_film_emulation_command();
-        let adjustments = edit_command_adjustments(&command).expect("Film operation maps");
-        let params = crate::render::film_emulation::parse_node(&adjustments)
+        let current_document = edit_command_current_document(&command)
+            .expect("Film operation maps to current document");
+        let persisted = serde_json::to_value(&current_document).expect("document serializes");
+        let film_node = persisted
+            .pointer("/nodes/film_emulation/params/filmEmulation")
+            .expect("Film node persists");
+        let params = serde_json::from_value::<FilmEmulationNodeV1>(film_node.clone())
             .expect("Film node parses")
-            .expect("Film node is enabled");
+            .validate()
+            .expect("Film node validates");
         assert_eq!(params.mix, 0.7);
 
         let film_pixel =
             crate::render::film_emulation::apply_pixel(glam::Vec3::new(0.18, 0.36, 0.08), params);
         assert_ne!(film_pixel, glam::Vec3::new(0.18, 0.36, 0.08));
 
-        let source_revision = 17;
-        let film_plan = compile_render_plan(
-            &adjustments,
+        let compiled = current_document.compile().expect("Film document compiles");
+        let source_revision = 17_u64;
+        let film_plan = compile_current_edit_document_render_plan_cached(
+            &compiled,
             CompileRenderPlanContext {
-                revision: content_revision(&adjustments, 1, source_revision, 1),
+                revision: RenderPlanRevision {
+                    image_session: 0,
+                    source_revision,
+                    adjustment_revision: compiled.content_fingerprint(),
+                    schema_version: 2,
+                    settings_revision: 1,
+                },
                 is_raw: true,
                 tonemapper_override: Some(1),
             },
             None,
         )
         .expect("Film command compiles through production render planning");
-        let neutral = json!({});
-        let neutral_plan = compile_render_plan(
+        let neutral = serde_json::from_value::<EditDocumentV2>(
+            crate::exif_processing::neutral_current_edit_document(),
+        )
+        .expect("neutral document parses")
+        .compile()
+        .expect("neutral document compiles");
+        let neutral_plan = compile_current_edit_document_render_plan_cached(
             &neutral,
             CompileRenderPlanContext {
-                revision: content_revision(&neutral, 1, source_revision, 1),
+                revision: RenderPlanRevision {
+                    image_session: 0,
+                    source_revision,
+                    adjustment_revision: neutral.content_fingerprint(),
+                    schema_version: 2,
+                    settings_revision: 1,
+                },
                 is_raw: true,
                 tonemapper_override: Some(1),
             },
@@ -2334,15 +2384,17 @@ mod tests {
                 1.0,
             ])
         }));
-        let adjustments = edit_command_adjustments(&sample_film_emulation_command())
-            .expect("current Film operation maps to a pinned node");
+        let current_document = edit_command_current_document(&sample_film_emulation_command())
+            .expect("current Film operation maps to a pinned node")
+            .compile()
+            .expect("current Film document compiles");
         let source_revision = crate::gpu_processing::PreGpuImageIdentity::source_revision(
             "synthetic-current-film.ARW",
         );
         let preview = process_image_for_export_pipeline_with_tonemapper_override(
             "synthetic-current-film.ARW",
             &source,
-            &adjustments,
+            &current_document,
             &context,
             &state,
             true,
@@ -2355,7 +2407,7 @@ mod tests {
         let export = process_image_for_export_pipeline_with_tonemapper_override(
             "synthetic-current-film.ARW",
             &source,
-            &adjustments,
+            &current_document,
             &context,
             &state,
             true,
@@ -2381,12 +2433,12 @@ mod tests {
                 "contentSha256": "sha256:invalid"
             }
         });
-        assert!(edit_command_adjustments(&invalid_profile).is_err());
+        assert!(edit_command_current_document(&invalid_profile).is_err());
 
         let mut remove = sample_film_emulation_command();
         remove.parameters["operation"] = json!({ "kind": "remove_node" });
         assert_eq!(
-            edit_command_adjustments(&remove),
+            edit_command_current_document(&remove).map(|_| ()),
             Err("film proof command must produce an enabled Film node.".to_string())
         );
     }
@@ -2571,17 +2623,21 @@ mod tests {
                 1.0,
             ])
         }));
-        let adjustments = json!({
-            "exposure": 0.35,
-            "contrast": 8.0,
-            "highlights": -12.0,
-            "shadows": 9.0,
-            "saturation": 5.0,
-        });
+        let mut current_document = crate::exif_processing::neutral_current_edit_document();
+        let scene = &mut current_document["nodes"]["scene_global_color_tone"]["params"];
+        scene["exposure"] = json!(0.35);
+        scene["contrast"] = json!(8.0);
+        scene["highlights"] = json!(-12.0);
+        scene["shadows"] = json!(9.0);
+        current_document["nodes"]["color_presence"]["params"]["saturation"] = json!(5.0);
+        let current_document = serde_json::from_value::<EditDocumentV2>(current_document)
+            .expect("synthetic current document parses")
+            .compile()
+            .expect("synthetic current document compiles");
         let preview = process_image_for_export_pipeline_with_tonemapper_override(
             "synthetic-extended-range.ARW",
             &source,
-            &adjustments,
+            &current_document,
             &context,
             &state,
             true,
@@ -2596,7 +2652,7 @@ mod tests {
         let export = process_image_for_export_pipeline_with_tonemapper_override(
             "synthetic-extended-range.ARW",
             &source,
-            &adjustments,
+            &current_document,
             &context,
             &state,
             true,
@@ -2649,11 +2705,16 @@ mod tests {
         .expect("synthetic committed bytes reopen and match soft proof");
         assert_eq!(committed.pixel_max_abs_delta, 0.0);
 
-        let revision = content_revision(&adjustments, 1, 99, 1);
-        let cpu_plan = compile_render_plan(
-            &adjustments,
+        let cpu_plan = compile_current_edit_document_render_plan_cached(
+            &current_document,
             CompileRenderPlanContext {
-                revision,
+                revision: RenderPlanRevision {
+                    image_session: 0,
+                    source_revision: 99,
+                    adjustment_revision: current_document.content_fingerprint(),
+                    schema_version: 2,
+                    settings_revision: 2,
+                },
                 is_raw: true,
                 tonemapper_override: Some(2),
             },
@@ -2821,21 +2882,50 @@ mod tests {
 
     #[test]
     fn white_balance_command_compiles_only_physical_gpu_parameters() {
-        let adjustments = white_balance_adjustments(&json!({
-            "acceptedDryRunPlanHash": "sha256:test",
-            "acceptedDryRunPlanId": "dryrun_test",
-            "duv": 0.018,
-            "exposureEv": -8.0,
-            "kelvin": 2856.0
-        }))
+        let mut document = crate::exif_processing::neutral_current_edit_document();
+        apply_white_balance(
+            &mut document,
+            &json!({
+                "acceptedDryRunPlanHash": "sha256:test",
+                "acceptedDryRunPlanId": "dryrun_test",
+                "duv": 0.018,
+                "exposureEv": -4.0,
+                "kelvin": 2856.0
+            }),
+        )
         .unwrap();
-        let parsed =
-            crate::adjustments::parse::get_all_adjustments_from_json(&adjustments, true, None);
-        assert_eq!(parsed.global.exposure, -10.0);
-        assert_eq!(parsed.global.temperature, 0.0);
-        assert_eq!(parsed.global.tint, 0.0);
+        let compiled = serde_json::from_value::<EditDocumentV2>(document)
+            .expect("white balance current document parses")
+            .compile()
+            .expect("white balance current document compiles");
+        let decode_white_balance = compiled
+            .technical_white_balance_plan()
+            .expect("current RAW decode white balance compiles");
         assert_ne!(
-            parsed.global.technical_white_balance.col0,
+            decode_white_balance.ap1_matrix,
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        );
+        let parsed = compile_current_edit_document_render_plan_cached(
+            &compiled,
+            CompileRenderPlanContext {
+                revision: RenderPlanRevision {
+                    image_session: 0,
+                    source_revision: 1,
+                    adjustment_revision: compiled.content_fingerprint(),
+                    schema_version: 2,
+                    settings_revision: 0,
+                },
+                is_raw: true,
+                tonemapper_override: None,
+            },
+            None,
+        )
+        .expect("white balance current render plan compiles");
+        assert_eq!(parsed.adjustments.global.exposure, -5.0);
+        assert_eq!(parsed.adjustments.global.temperature, 0.0);
+        assert_eq!(parsed.adjustments.global.tint, 0.0);
+        assert_eq!(
+            parsed.adjustments.global.technical_white_balance.col0,
             [1.0, 0.0, 0.0, 0.0]
         );
     }
