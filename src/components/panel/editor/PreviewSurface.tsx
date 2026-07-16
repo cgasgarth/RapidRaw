@@ -82,6 +82,8 @@ export function PreviewSurface({
   return (
     <div
       className="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity duration-200"
+      data-editor-compare-axis={compareOrientation}
+      data-editor-compare-layout={compareMode}
       style={{ opacity: isCropViewVisible ? 0 : 1, pointerEvents: isCropViewVisible ? 'none' : 'auto' }}
     >
       <div className="relative h-full w-full opacity-100">
@@ -101,7 +103,10 @@ export function PreviewSurface({
             />
           ))}
           <svg
+            aria-label={t('editor.canvas.compare.after')}
             className="pointer-events-none"
+            data-compare-pane="edited"
+            data-testid="editor-compare-pane-edited"
             preserveAspectRatio={hasSizedImage ? 'none' : 'xMidYMid meet'}
             style={
               hasSizedImage
@@ -115,6 +120,8 @@ export function PreviewSurface({
             <svg
               aria-label={t('editor.canvas.originalAlt')}
               className={hasSizedImage ? 'pointer-events-none' : 'absolute inset-0 h-full w-full object-contain'}
+              data-compare-pane="original"
+              data-testid="editor-compare-pane-original"
               preserveAspectRatio="none"
               role="img"
               style={hasSizedImage ? originalStyle : { ...originalStyle, inset: '0px', objectFit: 'contain' }}
