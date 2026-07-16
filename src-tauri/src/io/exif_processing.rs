@@ -1,13 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::{BufReader, Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use crate::formats::is_raw_file;
-use crate::image_processing::{
-    ImageMetadata, PERSISTED_RENDER_STATE_SCHEMA_VERSION, PersistedRenderState,
-    PersistedStateRecoveryReceipt,
-};
+use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use exif::{Exif, In, Value};
 use little_exif::exif_tag::ExifTag;
@@ -15,8 +12,8 @@ use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
 use little_exif::rational::{iR64, uR64};
 use rawler::decoders::RawMetadata;
-use serde::Serialize;
-use serde_json::{Map, Value as JsonValue};
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
 
 pub fn truncate_large_exif(value: &str) -> String {
@@ -48,8 +45,6 @@ pub fn truncate_large_exif(value: &str) -> String {
 pub enum PersistedStateOutcome {
     Absent,
     Current,
-    Migrated,
-    Recovered,
     Quarantined,
     Unsupported,
 }
@@ -62,26 +57,53 @@ pub struct PersistedStateLoad {
     pub reason_codes: Vec<String>,
 }
 
-const PERSISTED_STATE_IMPLEMENTATION_REVISION: u32 = 2;
+const CURRENT_SIDECAR_CONTRACT: &str = "rapidraw.sidecar.v1";
+const CURRENT_SIDECAR_SCHEMA_VERSION: u32 = 1;
 const MAX_QUARANTINE_BACKUPS: usize = 3;
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CurrentSidecarEnvelope {
+    contract: String,
+    schema_version: u32,
+    source_identity: String,
+    edit_revision: String,
+    #[serde(rename = "editDocumentV2")]
+    edit_document_v2: JsonValue,
+    rating: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tags: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    exif: Option<HashMap<String, String>>,
+    #[serde(
+        default,
+        rename = "rawEngineArtifacts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    raw_engine_artifacts: Option<RawEngineArtifacts>,
+}
+
 pub fn load_sidecar(sidecar_path: &Path) -> ImageMetadata {
-    load_sidecar_recovering(sidecar_path, None)
+    let source_identity = source_identity_from_sidecar_path(sidecar_path);
+    load_sidecar_recovering(sidecar_path, Some(&source_identity))
         .map(|loaded| loaded.metadata)
-        .unwrap_or_default()
+        .unwrap_or_else(|_| neutral_current_metadata(source_identity))
 }
 
 pub fn load_sidecar_recovering(
     sidecar_path: &Path,
     expected_source_identity: Option<&str>,
 ) -> Result<PersistedStateLoad, String> {
+    let source_identity = expected_source_identity
+        .map(str::to_string)
+        .unwrap_or_else(|| source_identity_from_sidecar_path(sidecar_path));
     if !sidecar_path.exists() {
         log::debug!(
             "persisted_state_outcome=absent sidecar={}",
             sidecar_path.display()
         );
         return Ok(PersistedStateLoad {
-            metadata: ImageMetadata::default(),
+            metadata: neutral_current_metadata(source_identity),
             outcome: PersistedStateOutcome::Absent,
             backup_path: None,
             reason_codes: Vec::new(),
@@ -90,176 +112,74 @@ pub fn load_sidecar_recovering(
 
     let bytes = fs::read(sidecar_path)
         .map_err(|error| format!("Failed to read sidecar {}: {error}", sidecar_path.display()))?;
-    let content = String::from_utf8(bytes.clone())
-        .map_err(|error| format!("Sidecar {} is not UTF-8: {error}", sidecar_path.display()));
-
+    let parsed = serde_json::from_slice::<JsonValue>(&bytes);
     let mut reasons = Vec::new();
-    let mut disabled_fields = Vec::new();
-    let migrated_fields = Vec::new();
-    let mut quarantined_extensions = Map::new();
-    let mut outcome = PersistedStateOutcome::Current;
-    let parsed = content
-        .as_deref()
-        .ok()
-        .and_then(|text| serde_json::from_str::<JsonValue>(text).ok());
-    let mut meta = match parsed {
-        Some(document) => match serde_json::from_value::<ImageMetadata>(document) {
-            Ok(metadata) => metadata,
-            Err(_) => {
-                reasons.push("sidecar_shape_invalid".to_string());
-                outcome = PersistedStateOutcome::Quarantined;
-                ImageMetadata::default()
-            }
-        },
-        None => {
-            reasons.push(if content.is_err() {
-                "sidecar_encoding_invalid".to_string()
+    let mut outcome = PersistedStateOutcome::Quarantined;
+    let envelope = match parsed {
+        Ok(value) => {
+            let object = value.as_object();
+            let contract = object
+                .and_then(|value| value.get("contract"))
+                .and_then(JsonValue::as_str);
+            let schema_version = object
+                .and_then(|value| value.get("schemaVersion"))
+                .and_then(JsonValue::as_u64);
+            if contract != Some(CURRENT_SIDECAR_CONTRACT)
+                || schema_version != Some(u64::from(CURRENT_SIDECAR_SCHEMA_VERSION))
+            {
+                outcome = PersistedStateOutcome::Unsupported;
+                reasons.push("sidecar_contract_unsupported".to_string());
+                None
             } else {
-                "sidecar_json_malformed".to_string()
-            });
-            outcome = PersistedStateOutcome::Quarantined;
-            ImageMetadata::default()
+                match serde_json::from_value::<CurrentSidecarEnvelope>(value) {
+                    Ok(envelope) => Some(envelope),
+                    Err(_) => {
+                        reasons.push("sidecar_shape_invalid".to_string());
+                        None
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            reasons.push("sidecar_json_malformed".to_string());
+            None
         }
     };
-    if heal_large_exif(&mut meta) {
-        reasons.push("oversized_exif_trimmed".to_string());
-        disabled_fields.push("exif.oversizedValues".to_string());
-        if outcome == PersistedStateOutcome::Current {
-            outcome = PersistedStateOutcome::Recovered;
-        }
-    }
 
-    if meta.version > PERSISTED_RENDER_STATE_SCHEMA_VERSION
-        || meta
-            .persisted_render_state
-            .as_ref()
-            .is_some_and(|state| state.schema_version > PERSISTED_RENDER_STATE_SCHEMA_VERSION)
-    {
-        reasons.push("unsupported_future_document".to_string());
-        outcome = PersistedStateOutcome::Unsupported;
-        quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
-    } else {
-        if let Some(user_edits) = meta
-            .persisted_render_state
-            .as_ref()
-            .and_then(|state| state.user_edits.clone())
-        {
-            meta.adjustments = JsonValue::Object(user_edits);
-        }
-        let legacy = meta.version < PERSISTED_RENDER_STATE_SCHEMA_VERSION
-            || meta.persisted_render_state.is_none()
-            || meta
-                .persisted_render_state
-                .as_ref()
-                .is_some_and(|state| state.schema_version < PERSISTED_RENDER_STATE_SCHEMA_VERSION)
-            || meta
-                .persisted_render_state
-                .as_ref()
-                .is_some_and(|state| state.user_edits.is_none())
-            || meta.persisted_render_state.as_ref().is_some_and(|state| {
-                state.implementation_revision < PERSISTED_STATE_IMPLEMENTATION_REVISION
-            })
-            || expected_source_identity.is_some_and(|_| {
-                meta.persisted_render_state
-                    .as_ref()
-                    .is_some_and(|state| state.source_identity.is_empty())
-            });
-        if legacy && outcome == PersistedStateOutcome::Current {
-            outcome = PersistedStateOutcome::Migrated;
-            reasons.push("legacy_render_state_migrated".to_string());
-        }
-        validate_adjustments(
-            &mut meta.adjustments,
-            &mut quarantined_extensions,
-            &mut disabled_fields,
-            &mut reasons,
-        );
-        if meta.edit_document_v2.as_ref().is_some_and(|document| {
-            crate::adjustments::edit_document_v2::validate_edit_document_v2(document).is_err()
-        }) {
-            reasons.push("edit_document_v2_invalid".to_string());
-            disabled_fields.push("editDocumentV2".to_string());
-            quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
-            outcome = PersistedStateOutcome::Quarantined;
-        }
-        if !migrated_fields.is_empty() && outcome == PersistedStateOutcome::Current {
-            outcome = PersistedStateOutcome::Migrated;
-        }
-        validate_artifacts(
-            &mut meta,
-            expected_source_identity,
-            &mut disabled_fields,
-            &mut reasons,
-        );
-        if !disabled_fields.is_empty() && outcome != PersistedStateOutcome::Quarantined {
-            outcome = PersistedStateOutcome::Recovered;
+    if let Some(envelope) = envelope {
+        let validation = validate_current_envelope(&envelope, &source_identity);
+        match validation {
+            Ok(()) => {
+                let adjustments = crate::adjustments::edit_document_v2::compile_edit_document_v2(
+                    &envelope.edit_document_v2,
+                )?;
+                return Ok(PersistedStateLoad {
+                    metadata: ImageMetadata {
+                        rating: envelope.rating,
+                        adjustments,
+                        edit_document_v2: Some(envelope.edit_document_v2),
+                        tags: envelope.tags,
+                        exif: envelope.exif,
+                        raw_engine_artifacts: envelope.raw_engine_artifacts,
+                        source_identity: envelope.source_identity,
+                        edit_revision: envelope.edit_revision,
+                    },
+                    outcome: PersistedStateOutcome::Current,
+                    backup_path: None,
+                    reason_codes: Vec::new(),
+                });
+            }
+            Err(reason) => reasons.push(reason),
         }
     }
-
-    let previous_revision = meta
-        .persisted_render_state
-        .as_ref()
-        .map(|state| state.edit_revision.clone());
-    if let (Some(expected), Some(state)) = (expected_source_identity, &meta.persisted_render_state)
-        && !state.source_identity.is_empty()
-        && state.source_identity != expected
-    {
-        reasons.push("source_identity_mismatch".to_string());
-        disabled_fields.push("adjustments".to_string());
-        quarantine_all_render_state(&mut meta, &mut quarantined_extensions);
-        outcome = PersistedStateOutcome::Quarantined;
-    }
-
-    if outcome == PersistedStateOutcome::Current {
-        log::debug!(
-            "persisted_state_outcome=current sidecar={}",
-            sidecar_path.display()
-        );
-        return Ok(PersistedStateLoad {
-            metadata: meta,
-            outcome,
-            backup_path: None,
-            reason_codes: reasons,
-        });
-    }
-
-    let source_identity = expected_source_identity.unwrap_or_default().to_string();
-    let from_version = meta.version;
-    meta.version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
-    let edit_revision =
-        render_state_revision(&meta.adjustments, meta.raw_engine_artifacts.as_ref())?;
-    let receipt = PersistedStateRecoveryReceipt {
-        from_version,
-        to_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
-        source_identity: source_identity.clone(),
-        previous_edit_revision: previous_revision,
-        disabled_fields,
-        migrated_fields,
-        reason_codes: reasons.clone(),
-    };
-    let mut receipts = meta
-        .persisted_render_state
-        .take()
-        .map(|state| state.recovery_receipts)
-        .unwrap_or_default();
-    if receipts.last() != Some(&receipt) {
-        receipts.push(receipt);
-    }
-    meta.persisted_render_state = Some(PersistedRenderState {
-        schema_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
-        implementation_revision: PERSISTED_STATE_IMPLEMENTATION_REVISION,
-        source_identity,
-        edit_revision,
-        user_edits: meta.adjustments.as_object().cloned(),
-        defaults_policy_revision: 1,
-        camera_input_transform_receipt: None,
-        xmp_revision: None,
-        recovery_receipts: receipts,
-        quarantined_extensions,
-    });
 
     let backup_path = quarantine_original_bytes(sidecar_path, &bytes)?;
-    save_sidecar_metadata_atomic(sidecar_path, &meta)?;
+    fs::remove_file(sidecar_path).map_err(|error| {
+        format!(
+            "Failed to retire quarantined sidecar {}: {error}",
+            sidecar_path.display()
+        )
+    })?;
     log::warn!(
         "persisted_state_outcome={:?} sidecar={} backup={} reasons={}",
         outcome,
@@ -268,937 +188,135 @@ pub fn load_sidecar_recovering(
         reasons.join(",")
     );
     Ok(PersistedStateLoad {
-        metadata: meta,
+        metadata: neutral_current_metadata(source_identity),
         outcome,
         backup_path: Some(backup_path),
         reason_codes: reasons,
     })
 }
 
-fn render_state_revision(
+fn validate_current_envelope(
+    envelope: &CurrentSidecarEnvelope,
+    expected_source_identity: &str,
+) -> Result<(), String> {
+    if envelope.contract != CURRENT_SIDECAR_CONTRACT
+        || envelope.schema_version != CURRENT_SIDECAR_SCHEMA_VERSION
+    {
+        return Err("sidecar_contract_unsupported".to_string());
+    }
+    if envelope.source_identity.is_empty() || envelope.source_identity != expected_source_identity {
+        return Err("source_identity_mismatch".to_string());
+    }
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(&envelope.edit_document_v2)
+        .map_err(|_| "edit_document_v2_invalid".to_string())?;
+    validate_current_artifacts(
+        envelope.raw_engine_artifacts.as_ref(),
+        &envelope.source_identity,
+    )?;
+    let expected_revision = render_state_revision(
+        &envelope.edit_document_v2,
+        envelope.raw_engine_artifacts.as_ref(),
+    )?;
+    if envelope.edit_revision != expected_revision {
+        return Err("edit_revision_mismatch".to_string());
+    }
+    Ok(())
+}
+
+fn source_identity_from_sidecar_path(sidecar_path: &Path) -> String {
+    let display = sidecar_path.to_string_lossy();
+    display
+        .strip_suffix(".rrdata")
+        .unwrap_or(display.as_ref())
+        .to_string()
+}
+
+pub(crate) fn neutral_current_edit_document() -> JsonValue {
+    serde_json::from_str(include_str!(
+        "../../../fixtures/edit-document/current-neutral-v2.json"
+    ))
+    .expect("checked-in neutral current EditDocumentV2 fixture must be valid JSON")
+}
+
+fn neutral_current_metadata(source_identity: String) -> ImageMetadata {
+    let document = neutral_current_edit_document();
+    let adjustments = crate::adjustments::edit_document_v2::compile_edit_document_v2(&document)
+        .expect("native neutral EditDocumentV2 must remain valid");
+    let edit_revision = render_state_revision(&document, None)
+        .expect("native neutral EditDocumentV2 must remain serializable");
+    ImageMetadata {
+        rating: 0,
+        adjustments,
+        edit_document_v2: Some(document),
+        tags: None,
+        exif: None,
+        raw_engine_artifacts: None,
+        source_identity,
+        edit_revision,
+    }
+}
+
+fn validate_current_artifacts(
+    artifacts: Option<&RawEngineArtifacts>,
+    source_identity: &str,
+) -> Result<(), String> {
+    let Some(artifacts) = artifacts else {
+        return Ok(());
+    };
+    if artifacts.schema_version != 1 {
+        return Err("artifact_schema_unsupported".to_string());
+    }
+    if artifacts.layer_stack_sidecars.iter().any(|sidecar| {
+        sidecar.get("schemaVersion").and_then(JsonValue::as_u64) != Some(1)
+            || sidecar
+                .get("sourceImagePath")
+                .and_then(JsonValue::as_str)
+                .is_none_or(|source| source != source_identity)
+    }) {
+        return Err("layer_authority_source_mismatch".to_string());
+    }
+    Ok(())
+}
+
+pub(crate) fn render_state_revision(
     adjustments: &JsonValue,
     artifacts: Option<&crate::image_processing::RawEngineArtifacts>,
 ) -> Result<String, String> {
-    let bytes = serde_json::to_vec(&(adjustments, artifacts))
+    fn canonical_json(value: &JsonValue) -> String {
+        match value {
+            JsonValue::Object(map) => {
+                let sorted = map.iter().collect::<BTreeMap<_, _>>();
+                format!(
+                    "{{{}}}",
+                    sorted
+                        .into_iter()
+                        .map(|(key, value)| format!(
+                            "{}:{}",
+                            serde_json::to_string(key).expect("JSON object key"),
+                            canonical_json(value)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            JsonValue::Array(items) => format!(
+                "[{}]",
+                items
+                    .iter()
+                    .map(canonical_json)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            _ => serde_json::to_string(value).expect("JSON scalar"),
+        }
+    }
+
+    let value = serde_json::to_value((adjustments, artifacts))
         .map_err(|error| format!("Failed to hash persisted render state: {error}"))?;
-    Ok(format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
-}
-
-fn quarantine_all_render_state(meta: &mut ImageMetadata, extensions: &mut Map<String, JsonValue>) {
-    if let Some(edit_document_v2) = meta.edit_document_v2.take() {
-        extensions.insert("rejectedEditDocumentV2".to_string(), edit_document_v2);
-    }
-    if !meta.adjustments.is_null() && meta.adjustments != serde_json::json!({}) {
-        extensions.insert(
-            "rejectedAdjustments".to_string(),
-            std::mem::take(&mut meta.adjustments),
-        );
-    }
-    meta.adjustments = serde_json::json!({});
-    if let Some(artifacts) = meta.raw_engine_artifacts.take()
-        && let Ok(value) = serde_json::to_value(artifacts)
-    {
-        extensions.insert("rejectedRawEngineArtifacts".to_string(), value);
-    }
-}
-
-fn validate_current_crop(
-    adjustments: &mut Map<String, JsonValue>,
-    extensions: &mut Map<String, JsonValue>,
-    disabled: &mut Vec<String>,
-    reasons: &mut Vec<String>,
-) {
-    let Some(crop_value) = adjustments.get("crop").cloned() else {
-        return;
-    };
-    if crop_value.is_null() {
-        return;
-    }
-    let Some(crop) = crop_value.as_object() else {
-        quarantine_crop(
-            adjustments,
-            extensions,
-            disabled,
-            reasons,
-            crop_value,
-            "crop_shape_invalid",
-        );
-        return;
-    };
-    let current_shape = crop.len() == 5
-        && crop.get("unit").and_then(JsonValue::as_str) == Some("normalized")
-        && ["height", "unit", "width", "x", "y"]
-            .iter()
-            .all(|field| crop.contains_key(*field));
-    if !current_shape {
-        quarantine_crop(
-            adjustments,
-            extensions,
-            disabled,
-            reasons,
-            crop_value,
-            "crop_contract_unsupported",
-        );
-        return;
-    }
-    let values =
-        ["x", "y", "width", "height"].map(|field| crop.get(field).and_then(JsonValue::as_f64));
-    let [Some(x), Some(y), Some(width), Some(height)] = values else {
-        quarantine_crop(
-            adjustments,
-            extensions,
-            disabled,
-            reasons,
-            crop_value,
-            "crop_shape_invalid",
-        );
-        return;
-    };
-    let valid = [x, y, width, height]
-        .iter()
-        .all(|value| value.is_finite() && (0.0..=1.0).contains(value))
-        && width > 0.0
-        && height > 0.0
-        && x + width <= 1.0 + 1.0e-9
-        && y + height <= 1.0 + 1.0e-9;
-    if !valid {
-        quarantine_crop(
-            adjustments,
-            extensions,
-            disabled,
-            reasons,
-            crop_value,
-            "crop_bounds_invalid",
-        );
-    }
-}
-
-fn quarantine_crop(
-    adjustments: &mut Map<String, JsonValue>,
-    extensions: &mut Map<String, JsonValue>,
-    disabled: &mut Vec<String>,
-    reasons: &mut Vec<String>,
-    crop: JsonValue,
-    reason: &str,
-) {
-    adjustments.remove("crop");
-    extensions.insert("rejectedCrop".to_string(), crop);
-    disabled.push("adjustments.crop".to_string());
-    reasons.push(reason.to_string());
-}
-
-fn number_in_range(value: Option<&JsonValue>, min: f64, max: f64) -> bool {
-    value
-        .and_then(JsonValue::as_f64)
-        .is_some_and(|value| value.is_finite() && (min..=max).contains(&value))
-}
-
-fn is_valid_view_transform(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    const FIELDS: &[&str] = &[
-        "chromaCompression",
-        "contrast",
-        "latitude",
-        "middleGrey",
-        "shoulder",
-        "sourceBlackEv",
-        "sourceWhiteEv",
-        "toe",
-    ];
-    object.len() == FIELDS.len()
-        && object.keys().all(|key| FIELDS.contains(&key.as_str()))
-        && number_in_range(object.get("chromaCompression"), 0.0, 1.0)
-        && number_in_range(object.get("contrast"), 0.5, 2.0)
-        && number_in_range(object.get("latitude"), 0.0, 1.0)
-        && number_in_range(object.get("middleGrey"), 0.08, 0.3)
-        && number_in_range(object.get("shoulder"), 0.0, 1.0)
-        && number_in_range(object.get("sourceBlackEv"), -32.0, 32.0)
-        && object["sourceBlackEv"]
-            .as_f64()
-            .is_some_and(|value| value < -1.0)
-        && number_in_range(object.get("sourceWhiteEv"), -32.0, 32.0)
-        && object["sourceWhiteEv"]
-            .as_f64()
-            .is_some_and(|value| value > 1.0)
-        && number_in_range(object.get("toe"), 0.0, 1.0)
-        && object["sourceWhiteEv"].as_f64().unwrap_or_default()
-            - object["sourceBlackEv"].as_f64().unwrap_or_default()
-            >= 6.0
-}
-
-fn is_valid_tone_equalizer(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    const FIELDS: &[&str] = &[
-        "autoPlacement",
-        "bandEv",
-        "detailPreservation",
-        "edgeRefinement",
-        "enabled",
-        "maskExposureCompensation",
-        "pivotEv",
-        "previewMode",
-        "rangeEv",
-        "selectedBand",
-        "smoothingRadius",
-    ];
-    let valid_bands = object
-        .get("bandEv")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|bands| {
-            bands.len() == 9
-                && bands
-                    .iter()
-                    .all(|band| number_in_range(Some(band), -4.0, 4.0))
-        });
-    object.len() == FIELDS.len()
-        && object.keys().all(|key| FIELDS.contains(&key.as_str()))
-        && object
-            .get("autoPlacement")
-            .is_some_and(JsonValue::is_boolean)
-        && valid_bands
-        && number_in_range(object.get("detailPreservation"), 0.0, 1.0)
-        && number_in_range(object.get("edgeRefinement"), 0.0, 8.0)
-        && object.get("enabled").is_some_and(JsonValue::is_boolean)
-        && number_in_range(object.get("maskExposureCompensation"), -4.0, 4.0)
-        && number_in_range(object.get("pivotEv"), -8.0, 8.0)
-        && object
-            .get("previewMode")
-            .and_then(JsonValue::as_u64)
-            .is_some_and(|value| value <= 4)
-        && number_in_range(object.get("rangeEv"), 4.0, 24.0)
-        && object
-            .get("selectedBand")
-            .and_then(JsonValue::as_u64)
-            .is_some_and(|value| value < 9)
-        && number_in_range(object.get("smoothingRadius"), 4.0, 64.0)
-}
-
-fn non_empty_string(value: Option<&JsonValue>) -> bool {
-    value
-        .and_then(JsonValue::as_str)
-        .is_some_and(|value| !value.is_empty())
-}
-
-fn has_only_fields(object: &Map<String, JsonValue>, fields: &[&str]) -> bool {
-    object.len() == fields.len() && object.keys().all(|key| fields.contains(&key.as_str()))
-}
-
-fn is_valid_perceptual_color(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    has_only_fields(object, &["chroma", "hueDegrees", "lightness"])
-        && number_in_range(object.get("chroma"), 0.0, 2.0)
-        && number_in_range(object.get("hueDegrees"), 0.0, 360.0)
-        && number_in_range(object.get("lightness"), -1.0, 4.0)
-}
-
-fn is_valid_perceptual_grading(value: &JsonValue) -> bool {
-    let Ok(settings) = serde_json::from_value::<
-        crate::color::perceptual_grading::PerceptualGradingSettingsV1,
-    >(value.clone()) else {
-        return false;
-    };
-    crate::color::perceptual_grading::PerceptualGradingPlanV1::compile(settings).is_ok()
-}
-
-fn is_valid_point_color_sample(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    has_only_fields(
-        object,
-        &[
-            "confidence",
-            "graphRevision",
-            "id",
-            "sampleRadiusPx",
-            "sourceColor",
-            "sourceSceneRevision",
-        ],
-    ) && number_in_range(object.get("confidence"), 0.0, 1.0)
-        && non_empty_string(object.get("graphRevision"))
-        && non_empty_string(object.get("id"))
-        && number_in_range(object.get("sampleRadiusPx"), 1.0, 128.0)
-        && object
-            .get("sourceColor")
-            .is_some_and(is_valid_perceptual_color)
-        && non_empty_string(object.get("sourceSceneRevision"))
-}
-
-fn is_valid_point_color_adjustment(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    let valid_samples = object
-        .get("samples")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|samples| {
-            (1..=8).contains(&samples.len()) && samples.iter().all(is_valid_point_color_sample)
-        });
-    has_only_fields(
-        object,
-        &[
-            "chromaRadius",
-            "chromaShift",
-            "enabled",
-            "feather",
-            "hueRadiusDegrees",
-            "hueShiftDegrees",
-            "id",
-            "lightnessRadius",
-            "lightnessShift",
-            "name",
-            "opacity",
-            "samples",
-            "saturationShift",
-            "variance",
-        ],
-    ) && number_in_range(object.get("chromaRadius"), 0.001, 1.0)
-        && number_in_range(object.get("chromaShift"), -1.0, 1.0)
-        && object.get("enabled").is_some_and(JsonValue::is_boolean)
-        && number_in_range(object.get("feather"), 0.0, 1.0)
-        && number_in_range(object.get("hueRadiusDegrees"), 0.1, 180.0)
-        && number_in_range(object.get("hueShiftDegrees"), -180.0, 180.0)
-        && non_empty_string(object.get("id"))
-        && number_in_range(object.get("lightnessRadius"), 0.001, 2.0)
-        && number_in_range(object.get("lightnessShift"), -1.0, 1.0)
-        && object
-            .get("name")
-            .and_then(JsonValue::as_str)
-            .is_some_and(|name| !name.is_empty() && name.len() <= 80)
-        && number_in_range(object.get("opacity"), 0.0, 1.0)
-        && valid_samples
-        && number_in_range(object.get("saturationShift"), -1.0, 4.0)
-        && number_in_range(object.get("variance"), 0.25, 4.0)
-}
-
-fn is_valid_point_color(value: &JsonValue) -> bool {
-    let Some(object) = value.as_object() else {
-        return false;
-    };
-    let valid_points = object
-        .get("points")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|points| {
-            points.len() <= 16 && points.iter().all(is_valid_point_color_adjustment)
-        });
-    let valid_skin = object
-        .get("skinUniformity")
-        .and_then(JsonValue::as_object)
-        .is_some_and(|skin| {
-            has_only_fields(
-                skin,
-                &[
-                    "chromaUniformity",
-                    "enabled",
-                    "hueUniformity",
-                    "lightnessUniformity",
-                    "preserveExtremes",
-                    "range",
-                    "target",
-                ],
-            ) && number_in_range(skin.get("chromaUniformity"), 0.0, 1.0)
-                && skin.get("enabled").is_some_and(JsonValue::is_boolean)
-                && number_in_range(skin.get("hueUniformity"), 0.0, 1.0)
-                && number_in_range(skin.get("lightnessUniformity"), 0.0, 1.0)
-                && number_in_range(skin.get("preserveExtremes"), 0.0, 1.0)
-                && skin
-                    .get("range")
-                    .is_some_and(|range| range.is_null() || is_valid_point_color_adjustment(range))
-                && skin
-                    .get("target")
-                    .is_some_and(|target| target.is_null() || is_valid_perceptual_color(target))
-        });
-    has_only_fields(
-        object,
-        &[
-            "enabled",
-            "points",
-            "process",
-            "selectedPointId",
-            "skinUniformity",
-            "visualizeMode",
-        ],
-    ) && object.get("enabled").is_some_and(JsonValue::is_boolean)
-        && valid_points
-        && object.get("process").and_then(JsonValue::as_str)
-            == Some("rawengine.point-color.oklab-ap1.v1")
-        && object
-            .get("selectedPointId")
-            .is_some_and(|selected| selected.is_null() || non_empty_string(Some(selected)))
-        && valid_skin
-        && object
-            .get("visualizeMode")
-            .and_then(JsonValue::as_str)
-            .is_some_and(|mode| matches!(mode, "image" | "range" | "solo"))
-}
-
-fn validate_adjustments(
-    adjustments: &mut JsonValue,
-    extensions: &mut Map<String, JsonValue>,
-    disabled: &mut Vec<String>,
-    reasons: &mut Vec<String>,
-) {
-    let Some(object) = adjustments.as_object_mut() else {
-        if !adjustments.is_null() {
-            extensions.insert(
-                "invalidAdjustments".to_string(),
-                std::mem::take(adjustments),
-            );
-            disabled.push("adjustments".to_string());
-        }
-        *adjustments = serde_json::json!({});
-        return;
-    };
-    if object.is_empty() {
-        object.insert(
-            "whiteBalanceTechnical".to_string(),
-            crate::color::white_balance::default_technical_white_balance_json(),
-        );
-    } else {
-        let white_balance_error = match object.get("whiteBalanceTechnical") {
-            None => Some("white_balance_technical_missing"),
-            Some(value)
-                if crate::color::white_balance::compile_current_technical_white_balance(value)
-                    .is_err() =>
-            {
-                Some("white_balance_technical_invalid")
-            }
-            Some(_) => None,
-        };
-        if let Some(reason) = white_balance_error {
-            extensions.insert(
-                "rejectedAdjustments".to_string(),
-                JsonValue::Object(std::mem::take(object)),
-            );
-            disabled.push("adjustments".to_string());
-            reasons.push(reason.to_string());
-            object.insert(
-                "whiteBalanceTechnical".to_string(),
-                crate::color::white_balance::default_technical_white_balance_json(),
-            );
-            return;
-        }
-    }
-    validate_current_crop(object, extensions, disabled, reasons);
-    const FORBIDDEN: &[&str] = &[
-        "displayIcc",
-        "displayLut",
-        "displayProfile",
-        "outputTransform",
-        "cameraToWorkingMatrix",
-        "cameraWhiteBalance",
-        "temperature",
-        "tint",
-        "creativeTemperature",
-        "creativeTint",
-        "legacyWhiteBalance",
-        "inputTransform",
-        "whiteBalanceMigration",
-        "whiteBalanceTemperature",
-        "whiteBalanceTint",
-    ];
-    const KNOWN: &[&str] = &[
-        "aiPatches",
-        "aspectRatio",
-        "blacks",
-        "brightness",
-        "centré",
-        "clarity",
-        "chromaticAberrationBlueYellow",
-        "chromaticAberrationRedCyan",
-        "blackWhiteMixer",
-        "cameraProfile",
-        "cameraProfileAmount",
-        "colorBalanceRgb",
-        "channelMixer",
-        "colorCalibration",
-        "colorGrading",
-        "colorNoiseReduction",
-        "contrast",
-        "crop",
-        "curves",
-        "pointCurves",
-        "pointColor",
-        "parametricCurve",
-        "perceptualGradingV1",
-        "curveMode",
-        "rawProcessingModeOverride",
-        "rawEngineEditGraphVersion",
-        "referenceMatchApplicationReceipt",
-        "deblurEnabled",
-        "deblurSigmaPx",
-        "deblurStrength",
-        "denoiseContrastProtection",
-        "denoiseDetail",
-        "denoiseNaturalGrain",
-        "denoiseShadowBias",
-        "dustSpotMinRadiusPx",
-        "dustSpotOverlayEnabled",
-        "dustSpotSensitivity",
-        "dehaze",
-        "effectsEnabled",
-        "exposure",
-        "flipHorizontal",
-        "flipVertical",
-        "flareAmount",
-        "filmEmulation",
-        "glowAmount",
-        "grainAmount",
-        "grainRoughness",
-        "grainSize",
-        "halationAmount",
-        "highlights",
-        "hue",
-        "hsl",
-        "selectiveColorRangeControls",
-        "levels",
-        "lensCorrectionMode",
-        "lensDistortionAmount",
-        "lensVignetteAmount",
-        "lensTcaAmount",
-        "lensDistortionEnabled",
-        "lensTcaEnabled",
-        "lensVignetteEnabled",
-        "lensDistortionParams",
-        "lensMaker",
-        "lensModel",
-        "localContrastHaloGuard",
-        "localContrastMidtoneMask",
-        "localContrastRadiusPx",
-        "lumaNoiseReduction",
-        "lutData",
-        "lutIntensity",
-        "lutName",
-        "lutPath",
-        "lutSize",
-        "masks",
-        "orientationSteps",
-        "perspectiveCorrection",
-        "rotation",
-        "saturation",
-        "sectionVisibility",
-        "shadows",
-        "sharpness",
-        "sharpnessThreshold",
-        "showClipping",
-        "skinToneUniformity",
-        "structure",
-        "toneMapper",
-        "toneEqualizer",
-        "viewTransform",
-        "toneCurve",
-        "transformDistortion",
-        "transformVertical",
-        "transformHorizontal",
-        "transformRotate",
-        "transformAspect",
-        "transformScale",
-        "transformXOffset",
-        "transformYOffset",
-        "vibrance",
-        "vignetteAmount",
-        "vignetteFeather",
-        "vignetteMidpoint",
-        "vignetteRoundness",
-        "whites",
-        "capturePreSharpening",
-        "lutContentIdentity",
-        "negativeLab",
-        "softProof",
-        "panorama",
-        "hdrMerge",
-        "viewTransform",
-        "whiteBalanceTechnical",
-    ];
-    for field in FORBIDDEN {
-        if let Some(value) = object.remove(*field) {
-            extensions.insert((*field).to_string(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    for (legacy, canonical) in [("rotate", "rotation")] {
-        if let Some(value) = object.remove(legacy) {
-            object.entry(canonical.to_string()).or_insert(value);
-            disabled.push(format!("adjustments.{legacy}->adjustments.{canonical}"));
-        }
-    }
-    let unknown: Vec<String> = object
-        .keys()
-        .filter(|key| !KNOWN.contains(&key.as_str()))
-        .cloned()
-        .collect();
-    for field in unknown {
-        if let Some(value) = object.remove(&field) {
-            extensions.insert(field.clone(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    for (field, supported) in [
-        (
-            "cameraProfile",
-            &[
-                "camera_standard",
-                "camera_neutral",
-                "camera_portrait",
-                "camera_landscape",
-                "linear_raw",
-            ][..],
-        ),
-        (
-            "rawProcessingModeOverride",
-            &["fast", "balanced", "maximum"][..],
-        ),
-        ("toneMapper", &["agx", "basic", "rapidView"][..]),
-    ] {
-        let invalid = object.get(field).is_some_and(|value| {
-            !value.is_null()
-                && value
-                    .as_str()
-                    .is_none_or(|value| !supported.contains(&value))
-        });
-        if invalid && let Some(value) = object.remove(field) {
-            extensions.insert(field.to_string(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    for (field, valid) in [
-        (
-            "rawEngineEditGraphVersion",
-            object.get("rawEngineEditGraphVersion").is_none_or(|value| {
-                value
-                    .as_u64()
-                    .is_some_and(|version| matches!(version, 1 | 2))
-            }),
-        ),
-        (
-            "toneEqualizer",
-            object
-                .get("toneEqualizer")
-                .is_none_or(is_valid_tone_equalizer),
-        ),
-        (
-            "pointColor",
-            object.get("pointColor").is_none_or(is_valid_point_color),
-        ),
-        (
-            "perceptualGradingV1",
-            object
-                .get("perceptualGradingV1")
-                .is_none_or(is_valid_perceptual_grading),
-        ),
-        (
-            "viewTransform",
-            object
-                .get("viewTransform")
-                .is_none_or(is_valid_view_transform),
-        ),
-    ] {
-        if !valid && let Some(value) = object.remove(field) {
-            extensions.insert(field.to_string(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    for (field, min, max) in [
-        ("exposure", -20.0, 20.0),
-        ("temperature", -250.0, 250.0),
-        ("tint", -250.0, 250.0),
-        ("rotation", -360.0, 360.0),
-        ("orientationSteps", -4.0, 4.0),
-        ("lutIntensity", 0.0, 100.0),
-        ("transformScale", 1.0, 1000.0),
-    ] {
-        let invalid = object
-            .get(field)
-            .and_then(JsonValue::as_f64)
-            .is_some_and(|value| !(min..=max).contains(&value));
-        if invalid && let Some(value) = object.remove(field) {
-            extensions.insert(field.to_string(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    let invalid_perspective = object.get("perspectiveCorrection").is_some_and(|value| {
-        serde_json::from_value::<crate::geometry::perspective::PerspectiveCorrectionSettingsV1>(
-            value.clone(),
-        )
-        .is_err()
-    });
-    if invalid_perspective && let Some(value) = object.remove("perspectiveCorrection") {
-        extensions.insert("perspectiveCorrection".to_string(), value);
-        disabled.push("adjustments.perspectiveCorrection".to_string());
-        reasons.push("perspective_correction_contract_invalid".to_string());
-    }
-    let invalid_reference_match_receipt = object
-        .get("referenceMatchApplicationReceipt")
-        .is_some_and(|value| !value.is_null() && !valid_reference_match_application_receipt(value));
-    if invalid_reference_match_receipt
-        && let Some(value) = object.remove("referenceMatchApplicationReceipt")
-    {
-        extensions.insert("referenceMatchApplicationReceipt".to_string(), value);
-        disabled.push("adjustments.referenceMatchApplicationReceipt".to_string());
-        reasons.push("reference_match_application_receipt_invalid".to_string());
-    }
-    let invalid_film_emulation = object.get("filmEmulation").is_some_and(|value| {
-        crate::film_emulation::parse_node(&serde_json::json!({ "filmEmulation": value })).is_err()
-    });
-    if invalid_film_emulation && let Some(value) = object.remove("filmEmulation") {
-        extensions.insert("filmEmulation".to_string(), value);
-        disabled.push("adjustments.filmEmulation".to_string());
-        reasons.push("film_emulation_contract_invalid".to_string());
-    }
-    let invalid_numeric: Vec<String> = object
-        .iter()
-        .filter(|(_, value)| contains_extreme_number(value))
-        .map(|(key, _)| key.clone())
-        .collect();
-    for field in invalid_numeric {
-        if let Some(value) = object.remove(&field) {
-            extensions.insert(field.clone(), value);
-            disabled.push(format!("adjustments.{field}"));
-        }
-    }
-    if object
-        .get("lutPath")
-        .and_then(JsonValue::as_str)
-        .is_some_and(|path| !Path::new(path).is_file())
-    {
-        for field in ["lutPath", "lutData", "lutName", "lutSize"] {
-            if let Some(value) = object.remove(field) {
-                extensions.insert(field.to_string(), value);
-            }
-        }
-        object.insert("lutIntensity".to_string(), JsonValue::from(0));
-        disabled.push("adjustments.lut".to_string());
-    } else if let (Some(path), Some(expected_hash)) = (
-        object.get("lutPath").and_then(JsonValue::as_str),
-        object.get("lutContentIdentity").and_then(JsonValue::as_str),
-    ) && fs::read(path)
-        .ok()
-        .map(|bytes| format!("sha256:{}", hex::encode(Sha256::digest(bytes))))
-        .as_deref()
-        != Some(expected_hash)
-    {
-        for field in [
-            "lutPath",
-            "lutData",
-            "lutName",
-            "lutSize",
-            "lutContentIdentity",
-        ] {
-            if let Some(value) = object.remove(field) {
-                extensions.insert(field.to_string(), value);
-            }
-        }
-        object.insert("lutIntensity".to_string(), JsonValue::from(0));
-        disabled.push("adjustments.lutContentIdentity".to_string());
-    }
-}
-
-fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
-    const REQUIRED: &[&str] = &[
-        "appliedDiffs",
-        "appliedAt",
-        "baseGraphFingerprint",
-        "destination",
-        "effectiveReferences",
-        "enabledGroups",
-        "historyEntriesAdded",
-        "impact",
-        "proposalFingerprint",
-        "resultingGraphFingerprint",
-        "schemaVersion",
-        "targetAnalysisFingerprint",
-    ];
-    const OPTIONAL: &[&str] = &["layerId"];
-    let Some(receipt) = value.as_object() else {
-        return false;
-    };
-    if REQUIRED.iter().any(|field| !receipt.contains_key(*field))
-        || receipt
-            .keys()
-            .any(|field| !REQUIRED.contains(&field.as_str()) && !OPTIONAL.contains(&field.as_str()))
-    {
-        return false;
-    }
-    let valid_fingerprint_value = |value: &JsonValue| {
-        value.as_str().is_some_and(|value| {
-            value.len() == 24
-                && value.starts_with("fnv1a64:")
-                && value[8..]
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        })
-    };
-    let valid_fingerprint = |field: &str| receipt.get(field).is_some_and(valid_fingerprint_value);
-    let valid_applied_diffs = receipt
-        .get("appliedDiffs")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|diffs| {
-            (1..=6).contains(&diffs.len())
-                && diffs.iter().all(|diff| {
-                    let Some(diff) = diff.as_object() else {
-                        return false;
-                    };
-                    diff.len() == 3
-                        && diff
-                            .keys()
-                            .all(|key| matches!(key.as_str(), "after" | "before" | "key"))
-                        && ["after", "before"].iter().all(|key| {
-                            diff.get(*key)
-                                .and_then(JsonValue::as_f64)
-                                .is_some_and(f64::is_finite)
-                        })
-                        && diff
-                            .get("key")
-                            .and_then(JsonValue::as_str)
-                            .is_some_and(|key| {
-                                matches!(
-                                    key,
-                                    "exposure"
-                                        | "contrast"
-                                        | "whiteBalanceKelvin"
-                                        | "whiteBalanceDuv"
-                                        | "saturation"
-                                        | "vibrance"
-                                )
-                            })
-                })
-                && diffs
-                    .iter()
-                    .filter_map(|diff| diff.get("key").and_then(JsonValue::as_str))
-                    .collect::<std::collections::HashSet<_>>()
-                    .len()
-                    == diffs.len()
-        });
-    let valid_effective_references = receipt
-        .get("effectiveReferences")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|references| {
-            (1..=8).contains(&references.len())
-                && references.iter().all(|reference| {
-                    let Some(reference) = reference.as_object() else {
-                        return false;
-                    };
-                    reference.len() == 3
-                        && reference.keys().all(|key| {
-                            matches!(key.as_str(), "role" | "sourceFingerprint" | "weight")
-                        })
-                        && reference
-                            .get("role")
-                            .and_then(JsonValue::as_str)
-                            .is_some_and(|role| matches!(role, "creative" | "technical"))
-                        && reference
-                            .get("sourceFingerprint")
-                            .is_some_and(valid_fingerprint_value)
-                        && reference
-                            .get("weight")
-                            .and_then(JsonValue::as_f64)
-                            .is_some_and(|weight| {
-                                weight.is_finite() && weight > 0.0 && weight <= 1.0
-                            })
-                })
-                && (references
-                    .iter()
-                    .filter_map(|reference| reference.get("weight").and_then(JsonValue::as_f64))
-                    .sum::<f64>()
-                    - 1.0)
-                    .abs()
-                    < 1e-6
-        });
-    let valid_groups = receipt
-        .get("enabledGroups")
-        .and_then(JsonValue::as_array)
-        .is_some_and(|groups| {
-            !groups.is_empty()
-                && groups.iter().all(|group| {
-                    group
-                        .as_str()
-                        .is_some_and(|group| matches!(group, "tone" | "color" | "presence"))
-                })
-        });
-    let destination = receipt.get("destination").and_then(JsonValue::as_str);
-    let layer_id = receipt.get("layerId").and_then(JsonValue::as_str);
-    let valid_destination = match destination {
-        Some("global-adjustments") => layer_id.is_none(),
-        Some("adjustment-layer") => layer_id.is_some_and(|value| !value.trim().is_empty()),
-        _ => false,
-    };
-    receipt.get("schemaVersion").and_then(JsonValue::as_u64) == Some(1)
-        && receipt
-            .get("historyEntriesAdded")
-            .and_then(JsonValue::as_u64)
-            == Some(1)
-        && receipt
-            .get("impact")
-            .and_then(JsonValue::as_f64)
-            .is_some_and(|impact| (0.0..=100.0).contains(&impact))
-        && receipt
-            .get("appliedAt")
-            .and_then(JsonValue::as_str)
-            .is_some_and(|value| chrono::DateTime::parse_from_rfc3339(value).is_ok())
-        && valid_groups
-        && valid_applied_diffs
-        && valid_effective_references
-        && valid_destination
-        && valid_fingerprint("baseGraphFingerprint")
-        && valid_fingerprint("proposalFingerprint")
-        && valid_fingerprint("resultingGraphFingerprint")
-        && valid_fingerprint("targetAnalysisFingerprint")
-}
-
-fn contains_extreme_number(value: &JsonValue) -> bool {
-    match value {
-        JsonValue::Number(number) => number
-            .as_f64()
-            .is_none_or(|number| !number.is_finite() || number.abs() > 1_000_000.0),
-        JsonValue::Array(values) => values.iter().any(contains_extreme_number),
-        JsonValue::Object(values) => values.values().any(contains_extreme_number),
-        _ => false,
-    }
-}
-
-fn validate_artifacts(
-    meta: &mut ImageMetadata,
-    expected_source: Option<&str>,
-    disabled: &mut Vec<String>,
-    reasons: &mut Vec<String>,
-) {
-    let Some(artifacts) = meta.raw_engine_artifacts.as_mut() else {
-        return;
-    };
-    if artifacts.schema_version != 1 {
-        meta.raw_engine_artifacts = None;
-        disabled.push("rawEngineArtifacts".to_string());
-        reasons.push("artifact_schema_unsupported".to_string());
-        return;
-    }
-    if let Some(expected) = expected_source {
-        let before = artifacts.layer_stack_sidecars.len();
-        artifacts.layer_stack_sidecars.retain(|sidecar| {
-            sidecar.get("schemaVersion").and_then(JsonValue::as_u64) == Some(1)
-                && sidecar
-                    .get("sourceImagePath")
-                    .and_then(JsonValue::as_str)
-                    .is_some_and(|source| render_sources_match(source, expected))
-        });
-        if before != artifacts.layer_stack_sidecars.len() {
-            disabled.push("rawEngineArtifacts.layerStackSidecars".to_string());
-            reasons.push("layer_authority_source_mismatch".to_string());
-        }
-    }
-}
-
-fn render_sources_match(left: &str, right: &str) -> bool {
-    if left == right {
-        return true;
-    }
-    crate::file_management::parse_virtual_path(left).0
-        == crate::file_management::parse_virtual_path(right).0
+    Ok(format!(
+        "sha256:{}",
+        hex::encode(Sha256::digest(canonical_json(&value).as_bytes()))
+    ))
 }
 
 fn quarantine_original_bytes(sidecar_path: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
@@ -1233,21 +351,6 @@ fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
             error.error
         )
     })
-}
-
-fn heal_large_exif(meta: &mut ImageMetadata) -> bool {
-    let mut healed = false;
-
-    if let Some(ref mut exif_map) = meta.exif {
-        for val in exif_map.values_mut() {
-            if val.len() > 500 {
-                *val = truncate_large_exif(val);
-                healed = true;
-            }
-        }
-    }
-
-    healed
 }
 
 fn to_ur64(val: &exif::Rational) -> uR64 {
@@ -2426,75 +1529,83 @@ pub fn save_sidecar_metadata_atomic(
     sidecar_path: &Path,
     metadata: &ImageMetadata,
 ) -> Result<(), String> {
-    let mut normalized = metadata.clone();
-    let mut extensions = normalized
-        .persisted_render_state
-        .as_mut()
-        .map(|state| std::mem::take(&mut state.quarantined_extensions))
-        .unwrap_or_default();
-    let mut disabled = Vec::new();
-    let mut reasons = Vec::new();
-    validate_adjustments(
-        &mut normalized.adjustments,
-        &mut extensions,
-        &mut disabled,
-        &mut reasons,
-    );
-    if let Some(document) = normalized.edit_document_v2.as_ref() {
-        crate::adjustments::edit_document_v2::validate_edit_document_v2(document).map_err(
-            |error| {
-                format!(
-                    "Refusing to persist invalid render state in {}: editDocumentV2 ({error})",
-                    sidecar_path.display()
-                )
-            },
-        )?;
-    }
-    validate_artifacts(&mut normalized, None, &mut disabled, &mut reasons);
-    if !disabled.is_empty() {
-        return Err(format!(
-            "Refusing to persist invalid render state in {}: {}",
-            sidecar_path.display(),
-            disabled.join(", ")
-        ));
-    }
-    normalized.version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
-    let revision = render_state_revision(
-        &normalized.adjustments,
-        normalized.raw_engine_artifacts.as_ref(),
-    )?;
-    let state = normalized
-        .persisted_render_state
-        .get_or_insert_with(|| PersistedRenderState {
-            schema_version: PERSISTED_RENDER_STATE_SCHEMA_VERSION,
-            implementation_revision: PERSISTED_STATE_IMPLEMENTATION_REVISION,
-            source_identity: String::new(),
-            edit_revision: revision.clone(),
-            user_edits: normalized.adjustments.as_object().cloned(),
-            defaults_policy_revision: 1,
-            camera_input_transform_receipt: None,
-            xmp_revision: None,
-            recovery_receipts: Vec::new(),
-            quarantined_extensions: Map::new(),
-        });
-    state.schema_version = PERSISTED_RENDER_STATE_SCHEMA_VERSION;
-    state.implementation_revision = PERSISTED_STATE_IMPLEMENTATION_REVISION;
-    state.edit_revision = revision;
-    state.user_edits = normalized.adjustments.as_object().cloned();
-    state.defaults_policy_revision = 1;
-    state.quarantined_extensions = extensions;
-
-    let json = serde_json::to_string_pretty(&normalized).map_err(|e| {
+    let neutral_document;
+    let document = match metadata.edit_document_v2.as_ref() {
+        Some(document) => document,
+        None if metadata.adjustments.is_null() || metadata.adjustments == serde_json::json!({}) => {
+            neutral_document = neutral_current_edit_document();
+            &neutral_document
+        }
+        None => {
+            return Err(format!(
+                "Refusing flat-only render authority without current EditDocumentV2 in {}",
+                sidecar_path.display()
+            ));
+        }
+    };
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(document).map_err(|error| {
         format!(
-            "Failed to serialize sidecar {}: {}",
-            sidecar_path.display(),
-            e
+            "Refusing to persist invalid render state in {}: editDocumentV2 ({error})",
+            sidecar_path.display()
         )
     })?;
-    write_text_file_atomic(sidecar_path, &json)
-        .map_err(|e| format!("Failed to write sidecar {}: {}", sidecar_path.display(), e))
+    let source_identity = if metadata.source_identity.is_empty() {
+        source_identity_from_sidecar_path(sidecar_path)
+    } else {
+        metadata.source_identity.clone()
+    };
+    validate_current_artifacts(metadata.raw_engine_artifacts.as_ref(), &source_identity).map_err(
+        |reason| {
+            format!(
+                "Refusing to persist invalid artifacts in {}: {reason}",
+                sidecar_path.display()
+            )
+        },
+    )?;
+    let mut envelope = CurrentSidecarEnvelope {
+        contract: CURRENT_SIDECAR_CONTRACT.to_string(),
+        schema_version: CURRENT_SIDECAR_SCHEMA_VERSION,
+        source_identity,
+        edit_revision: String::new(),
+        edit_document_v2: document.clone(),
+        rating: metadata.rating,
+        tags: metadata.tags.clone(),
+        exif: metadata.exif.clone(),
+        raw_engine_artifacts: metadata.raw_engine_artifacts.clone(),
+    };
+    // Hash the exact typed representation that will reopen from disk. Some artifact
+    // payloads contain values whose Serde roundtrip normalization is significant.
+    let normalized_json = serde_json::to_string(&envelope).map_err(|error| {
+        format!(
+            "Failed to normalize sidecar {} before hashing: {error}",
+            sidecar_path.display()
+        )
+    })?;
+    let normalized =
+        serde_json::from_str::<CurrentSidecarEnvelope>(&normalized_json).map_err(|error| {
+            format!(
+                "Failed to normalize sidecar {} before hashing: {error}",
+                sidecar_path.display()
+            )
+        })?;
+    envelope = normalized;
+    envelope.edit_revision = render_state_revision(
+        &envelope.edit_document_v2,
+        envelope.raw_engine_artifacts.as_ref(),
+    )?;
+    let json = serde_json::to_string_pretty(&envelope).map_err(|error| {
+        format!(
+            "Failed to serialize sidecar {}: {error}",
+            sidecar_path.display()
+        )
+    })?;
+    write_text_file_atomic(sidecar_path, &json).map_err(|error| {
+        format!(
+            "Failed to write sidecar {}: {error}",
+            sidecar_path.display()
+        )
+    })
 }
-
 pub fn write_text_file_atomic(path: &Path, content: &str) -> Result<(), String> {
     write_text_atomic(path, content)
         .map_err(|e| format!("Failed to write {}: {}", path.display(), e))
@@ -2635,1084 +1746,209 @@ pub fn write_rrexif_sidecar(source_path_str: &str, target_image_path: &Path) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
 
-    fn write_sidecar(path: &Path, value: &JsonValue) -> Vec<u8> {
-        let bytes = serde_json::to_vec_pretty(value).expect("fixture json");
-        fs::write(path, &bytes).expect("write fixture");
-        bytes
-    }
-
-    fn save_sidecar_metadata_atomic(
-        sidecar_path: &Path,
-        metadata: &ImageMetadata,
-    ) -> Result<(), String> {
-        let mut current = metadata.clone();
-        if let Some(adjustments) = current.adjustments.as_object_mut() {
-            adjustments
-                .entry("whiteBalanceTechnical")
-                .or_insert_with(crate::color::white_balance::default_technical_white_balance_json);
-        }
-        super::save_sidecar_metadata_atomic(sidecar_path, &current)
-    }
-
-    fn point_color_fixture() -> JsonValue {
-        let sample = serde_json::json!({
-            "confidence": 0.95,
-            "graphRevision": "graph:1",
-            "id": "sample-1",
-            "sampleRadiusPx": 2,
-            "sourceColor": { "chroma": 0.12, "hueDegrees": 114, "lightness": 0.64 },
-            "sourceSceneRevision": "source:1"
-        });
-        let point = serde_json::json!({
-            "chromaRadius": 0.08,
-            "chromaShift": 0,
-            "enabled": true,
-            "feather": 0.4,
-            "hueRadiusDegrees": 25,
-            "hueShiftDegrees": 0,
-            "id": "point-1",
-            "lightnessRadius": 0.2,
-            "lightnessShift": 0,
-            "name": "Point 1",
-            "opacity": 1,
-            "samples": [sample],
-            "saturationShift": 0,
-            "variance": 1
-        });
-        serde_json::json!({
-            "enabled": true,
-            "points": [point],
-            "process": "rawengine.point-color.oklab-ap1.v1",
-            "selectedPointId": "point-1",
-            "skinUniformity": {
-                "chromaUniformity": 0,
-                "enabled": false,
-                "hueUniformity": 0,
-                "lightnessUniformity": 0,
-                "preserveExtremes": 0.5,
-                "range": point,
-                "target": { "chroma": 0.12, "hueDegrees": 114, "lightness": 0.64 }
-            },
-            "visualizeMode": "image"
-        })
-    }
-
-    fn perceptual_grading_fixture() -> JsonValue {
-        serde_json::json!({
-            "balance": 0,
-            "blending": 0.5,
-            "falloff": 1,
-            "global": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
-            "highlightFulcrumEv": 2,
-            "highlights": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
-            "midtones": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
-            "neutralProtection": 0.7,
-            "perceptualModel": "oklab_d65_from_acescg_v1",
-            "shadowFulcrumEv": -2,
-            "shadows": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
-            "skinProtection": 0.2
-        })
+    fn metadata_for(source: &Path) -> ImageMetadata {
+        let mut metadata = neutral_current_metadata(source.to_string_lossy().into_owned());
+        metadata.rating = 4;
+        metadata.tags = Some(vec!["user:current".to_string()]);
+        metadata.exif = Some(HashMap::from([(
+            "Artist".to_string(),
+            "RawEngine".to_string(),
+        )]));
+        metadata
     }
 
     #[test]
-    fn point_color_persistence_contract_accepts_current_plan_and_rejects_drift() {
-        let valid = point_color_fixture();
-        assert!(is_valid_point_color(&valid));
+    fn current_sidecar_roundtrip_is_deterministic_and_has_one_pixel_authority() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("current.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let metadata = metadata_for(&source);
 
-        let mut invalid = valid.clone();
-        invalid["points"][0]["samples"][0]["confidence"] = JsonValue::from(2);
-        assert!(!is_valid_point_color(&invalid));
-
-        let mut unknown = valid;
-        unknown["unversionedField"] = JsonValue::Bool(true);
-        assert!(!is_valid_point_color(&unknown));
-    }
-
-    #[test]
-    fn legacy_recovery_is_byte_preserving_and_idempotent() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar = temp_dir.path().join("landscape.arw.rrdata");
-        let original = write_sidecar(
-            &sidecar,
-            &serde_json::json!({
-                "version": 1,
-                "rating": 5,
-                "tags": ["keeper"],
-                "exif": {"Artist": "RawEngine"},
-                "adjustments": {
-                    "exposure": 1.25,
-                    "displayIcc": "stale",
-                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-                }
-            }),
-        );
-
-        let first = load_sidecar_recovering(&sidecar, Some("/photos/landscape.arw"))
-            .expect("recover legacy sidecar");
-        assert_eq!(first.outcome, PersistedStateOutcome::Recovered);
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+        let first_bytes = fs::read(&sidecar).unwrap();
+        let persisted: JsonValue = serde_json::from_slice(&first_bytes).unwrap();
+        let object = persisted.as_object().unwrap();
+        assert_eq!(object["contract"], CURRENT_SIDECAR_CONTRACT);
         assert_eq!(
-            fs::read(first.backup_path.expect("backup")).unwrap(),
-            original
+            object["schemaVersion"],
+            JsonValue::from(CURRENT_SIDECAR_SCHEMA_VERSION)
         );
-        assert_eq!(first.metadata.rating, 5);
-        assert_eq!(first.metadata.tags, Some(vec!["keeper".to_string()]));
-        assert_eq!(first.metadata.adjustments["exposure"], 1.25);
-        assert!(first.metadata.adjustments.get("displayIcc").is_none());
-        let repaired_bytes = fs::read(&sidecar).unwrap();
-
-        let second = load_sidecar_recovering(&sidecar, Some("/photos/landscape.arw"))
-            .expect("reopen repaired sidecar");
-        assert_eq!(second.outcome, PersistedStateOutcome::Current);
-        assert!(second.backup_path.is_none());
-        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
-    }
-
-    #[test]
-    fn malformed_and_future_sidecars_quarantine_render_state() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let malformed = temp_dir.path().join("bad.arw.rrdata");
-        let malformed_bytes = br#"{"version":1,"adjustments":{"exposure":2"#;
-        fs::write(&malformed, malformed_bytes).unwrap();
-        let loaded = load_sidecar_recovering(&malformed, Some("/photos/bad.arw"))
-            .expect("quarantine malformed");
-        assert_eq!(loaded.outcome, PersistedStateOutcome::Quarantined);
-        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
+        assert_eq!(object["sourceIdentity"], source.to_string_lossy().as_ref());
+        assert!(object.contains_key("editDocumentV2"));
+        assert!(!object.contains_key("adjustments"));
+        assert!(!object.contains_key("persistedRenderState"));
         assert_eq!(
-            fs::read(loaded.backup_path.unwrap()).unwrap(),
-            malformed_bytes
+            object
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            [
+                "contract",
+                "editDocumentV2",
+                "editRevision",
+                "exif",
+                "rating",
+                "schemaVersion",
+                "sourceIdentity",
+                "tags",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect()
         );
 
-        let future = temp_dir.path().join("future.arw.rrdata");
-        write_sidecar(
-            &future,
-            &serde_json::json!({
-                "version": 99,
-                "rating": 4,
-                "tags": ["preserve"],
-                "adjustments": {"temperature": 9000}
-            }),
-        );
-        let loaded = load_sidecar_recovering(&future, Some("/photos/future.arw"))
-            .expect("quarantine future");
-        assert_eq!(loaded.outcome, PersistedStateOutcome::Unsupported);
+        let loaded =
+            load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref())).unwrap();
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Current);
+        assert_eq!(loaded.metadata.edit_document_v2, metadata.edit_document_v2);
         assert_eq!(loaded.metadata.rating, 4);
-        assert_eq!(loaded.metadata.tags, Some(vec!["preserve".to_string()]));
-        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
+        assert_eq!(loaded.metadata.tags, metadata.tags);
+        assert_eq!(loaded.metadata.exif, metadata.exif);
+
+        save_sidecar_metadata_atomic(&sidecar, &loaded.metadata).unwrap();
+        assert_eq!(fs::read(&sidecar).unwrap(), first_bytes);
     }
 
     #[test]
-    fn mismatched_authority_and_missing_lut_cannot_reach_render_state() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar = temp_dir.path().join("owned.arw.rrdata");
-        write_sidecar(
-            &sidecar,
-            &serde_json::json!({
-                "version": 1,
-                "rating": 3,
-                "adjustments": {
-                    "lutPath": "/missing/look.cube",
-                    "lutIntensity": 100,
-                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-                },
-                "rawEngineArtifacts": {
-                    "schemaVersion": 1,
-                    "layerStackSidecars": [{
-                        "schemaVersion": 1,
-                        "sourceImagePath": "/photos/other.arw"
-                    }]
-                }
-            }),
-        );
-
-        let loaded = load_sidecar_recovering(&sidecar, Some("/photos/owned.arw"))
-            .expect("recover mismatched authority");
-        assert_eq!(loaded.outcome, PersistedStateOutcome::Recovered);
-        assert_eq!(loaded.metadata.rating, 3);
-        assert_eq!(loaded.metadata.adjustments["lutIntensity"], 0);
-        assert!(loaded.metadata.adjustments.get("lutPath").is_none());
-        assert!(
-            loaded
-                .metadata
-                .raw_engine_artifacts
-                .unwrap()
-                .layer_stack_sidecars
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn source_identity_mismatch_quarantines_all_pixel_authority() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar = temp_dir.path().join("copy.arw.rrdata");
-        let state = PersistedRenderState {
-            schema_version: 2,
-            implementation_revision: 1,
-            source_identity: "/photos/original.arw".to_string(),
-            edit_revision: "sha256:old".to_string(),
-            user_edits: Some(Map::from_iter([(
-                "exposure".to_string(),
-                JsonValue::from(4),
-            )])),
-            defaults_policy_revision: 1,
-            camera_input_transform_receipt: None,
-            xmp_revision: None,
-            recovery_receipts: Vec::new(),
-            quarantined_extensions: Map::new(),
-        };
-        write_sidecar(
-            &sidecar,
-            &serde_json::json!({
-                "version": 2,
-                "rating": 2,
-                "adjustments": {"exposure": 4},
-                "persistedRenderState": state
-            }),
-        );
-        let loaded = load_sidecar_recovering(&sidecar, Some("/photos/copy.arw"))
-            .expect("quarantine identity mismatch");
-        assert_eq!(loaded.outcome, PersistedStateOutcome::Quarantined);
-        assert_eq!(loaded.metadata.adjustments, serde_json::json!({}));
-        assert_eq!(loaded.metadata.rating, 2);
-    }
-
-    #[test]
-    fn private_alaska_raw_recovery_reopen_and_decode_lifecycle() {
-        if std::env::var_os("RAPIDRAW_RUN_PRIVATE_SIDECAR_PROOF").is_none() {
-            eprintln!("skipping private persisted-state RAW lifecycle proof");
-            return;
-        }
-        let source = Path::new("/Users/cgas/Pictures/Capture One/Alaska/_DSC8786.ARW");
-        assert!(source.is_file(), "private Alaska RAW fixture must exist");
-        let source_bytes = fs::read(source).expect("read private RAW");
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar = temp_dir.path().join("_DSC8786.ARW.rrdata");
-        write_sidecar(
-            &sidecar,
-            &serde_json::json!({
-                "version": 1,
-                "rating": 5,
-                "tags": ["private-proof"],
-                "adjustments": {
-                    "displayIcc": "stale-profile",
-                    "cameraProfile": "obsolete-double-transform",
-                    "exposure": 0.25
-                }
-            }),
-        );
-        let source_identity = source.to_string_lossy();
-        let recovered = load_sidecar_recovering(&sidecar, Some(source_identity.as_ref()))
-            .expect("recover private RAW sidecar");
-        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
-        assert_eq!(recovered.metadata.rating, 5);
-        assert_eq!(
-            recovered.metadata.tags,
-            Some(vec!["private-proof".to_string()])
-        );
-        assert!(recovered.metadata.adjustments.get("displayIcc").is_none());
-        assert!(
-            recovered
-                .metadata
-                .adjustments
-                .get("cameraProfile")
-                .is_none()
-        );
-
-        let settings = crate::app_settings::AppSettings::default();
-        let decoded = crate::image_loader::load_base_image_from_bytes(
-            &source_bytes,
-            source_identity.as_ref(),
-            false,
-            &settings,
-            None,
-        )
-        .expect("decode recovered private RAW");
-        assert!(decoded.width() > 1000 && decoded.height() > 1000);
-        assert!(
-            decoded
-                .to_rgb32f()
-                .pixels()
-                .take(4096)
-                .all(|pixel| { pixel.0.into_iter().all(f32::is_finite) })
-        );
-
-        let repaired_bytes = fs::read(&sidecar).expect("read repaired sidecar");
-        let reopened = load_sidecar_recovering(&sidecar, Some(source_identity.as_ref()))
-            .expect("reopen repaired private RAW sidecar");
-        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
-        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
-    }
-
-    #[test]
-    fn save_sidecar_metadata_atomic_roundtrips_json() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.raf.rrdata");
-        let metadata = ImageMetadata {
-            exif: Some(HashMap::from([(
-                "Artist".to_string(),
-                "RawEngine".to_string(),
-            )])),
-            ..Default::default()
-        };
-
-        save_sidecar_metadata_atomic(&sidecar_path, &metadata).expect("atomic sidecar write");
-
-        let reloaded = load_sidecar(&sidecar_path);
-        assert_eq!(
-            reloaded.exif.as_ref().and_then(|exif| exif.get("Artist")),
-            Some(&"RawEngine".to_string())
-        );
-    }
-
-    #[test]
-    fn save_sidecar_accepts_current_color_and_perspective_contracts() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "cameraProfileAmount": 100,
-                "perspectiveCorrection": {
-                    "amount": 62.5,
-                    "cropPolicy": "auto_crop",
-                    "guides": [{
-                        "id": "vertical-1",
-                        "class": "vertical",
-                        "endpointsSourceNormalized": [[0.2, 0.1], [0.3, 0.9]],
-                        "weight": 1.0
-                    }],
-                    "mode": "guided",
-                    "resolvedPlan": null
-                },
-                "perceptualGradingV1": perceptual_grading_fixture(),
-                "rawEngineEditGraphVersion": 1,
-                "toneMapper": "rapidView",
-                "viewTransform": {
-                    "chromaCompression": 0.25,
-                    "contrast": 1.15,
-                    "latitude": 0.55,
-                    "middleGrey": 0.18,
-                    "shoulder": 0.5,
-                    "sourceBlackEv": -10.0,
-                    "sourceWhiteEv": 6.5,
-                    "toe": 0.35
-                },
-                "whiteBalanceTechnical": {
-                    "adaptation": "cat16_v1",
-                    "confidence": null,
-                    "contract": "rapidraw.white_balance.v1",
-                    "duv": 0,
-                    "inputSemantics": "raw_scene_linear",
-                    "kelvin": 6504,
-                    "mode": "as_shot",
-                    "presetId": null,
-                    "sampleCount": null,
-                    "source": "as_shot",
-                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
-                    "x": 0.32168,
-                    "y": 0.33767
-                }
-            }),
-            ..Default::default()
-        };
-
-        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect("current render contracts should persist atomically");
-
-        let reloaded = load_sidecar(&sidecar_path);
-        assert_eq!(
-            reloaded.adjustments["perspectiveCorrection"]["mode"],
-            "guided"
-        );
-        assert_eq!(reloaded.adjustments["toneMapper"], "rapidView");
-        assert_eq!(reloaded.adjustments["viewTransform"]["contrast"], 1.15);
-        assert_eq!(
-            reloaded.adjustments["perceptualGradingV1"],
-            perceptual_grading_fixture()
-        );
-    }
-
-    #[test]
-    fn obsolete_flat_white_balance_state_is_quarantined_at_load_boundary() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("legacy.arw.rrdata");
-        let legacy = serde_json::json!({
-            "version": 2,
-            "rating": 4,
-            "adjustments": {
-                "exposure": 0.25,
-                "temperature": 18,
-                "tint": -9,
-                "creativeTemperature": 7,
-                "creativeTint": 3,
-                "whiteBalanceMigration": { "state": "legacy" },
-                "whiteBalanceTechnical": {
-                    "adaptation": "cat16_v1",
-                    "confidence": null,
-                    "contract": "rapidraw.white_balance.v1",
-                    "duv": 0,
-                    "inputSemantics": "raw_scene_linear",
-                    "kelvin": 6504,
-                    "mode": "as_shot",
-                    "presetId": null,
-                    "sampleCount": null,
-                    "source": "as_shot",
-                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
-                    "x": 0.32168,
-                    "y": 0.33767
-                }
-            }
-        });
-        fs::write(&sidecar_path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
-
-        let recovered =
-            load_sidecar_recovering(&sidecar_path, None).expect("recover obsolete WB state");
-        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
-        assert_eq!(recovered.metadata.rating, 4);
-        assert_eq!(recovered.metadata.adjustments["exposure"], 0.25);
-        for field in [
-            "temperature",
-            "tint",
-            "creativeTemperature",
-            "creativeTint",
-            "whiteBalanceMigration",
-        ] {
-            assert!(recovered.metadata.adjustments.get(field).is_none());
-        }
-        let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
-        let receipt = state.recovery_receipts.last().unwrap();
-        for field in [
-            "temperature",
-            "tint",
-            "creativeTemperature",
-            "creativeTint",
-            "whiteBalanceMigration",
-        ] {
-            assert!(state.quarantined_extensions.contains_key(field));
-            assert!(
-                receipt
-                    .disabled_fields
-                    .contains(&format!("adjustments.{field}"))
-            );
-        }
-    }
-
-    #[test]
-    fn missing_or_malformed_technical_white_balance_quarantines_render_state() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let mut malformed = crate::color::white_balance::default_technical_white_balance_json();
-        malformed["synchronization"]
-            .as_object_mut()
-            .unwrap()
-            .remove("referenceSourceIdentity");
-        for (name, adjustments, reason) in [
+    fn unsupported_and_malformed_sidecars_are_backed_up_then_retired() {
+        let cases = [
             (
-                "missing",
-                serde_json::json!({ "exposure": 0.5 }),
-                "white_balance_technical_missing",
+                "old",
+                br#"{"version":2,"adjustments":{"exposure":1}}"#.as_slice(),
+                PersistedStateOutcome::Unsupported,
+                "sidecar_contract_unsupported",
+            ),
+            (
+                "future",
+                br#"{"contract":"rapidraw.sidecar.v1","schemaVersion":2}"#.as_slice(),
+                PersistedStateOutcome::Unsupported,
+                "sidecar_contract_unsupported",
             ),
             (
                 "malformed",
-                serde_json::json!({
-                    "exposure": 0.5,
-                    "whiteBalanceTechnical": malformed
-                }),
-                "white_balance_technical_invalid",
+                br#"{"contract":"#.as_slice(),
+                PersistedStateOutcome::Quarantined,
+                "sidecar_json_malformed",
             ),
-        ] {
-            let sidecar_path = temp_dir.path().join(format!("{name}.arw.rrdata"));
-            let document = serde_json::json!({
-                "version": 2,
-                "rating": 4,
-                "adjustments": adjustments
-            });
-            fs::write(&sidecar_path, serde_json::to_vec_pretty(&document).unwrap()).unwrap();
+        ];
+        for (name, bytes, expected_outcome, expected_reason) in cases {
+            let temp = tempfile::tempdir().unwrap();
+            let source = temp.path().join(format!("{name}.arw"));
+            let sidecar = get_primary_sidecar_path(&source);
+            fs::write(&sidecar, bytes).unwrap();
 
-            let recovered = load_sidecar_recovering(&sidecar_path, None)
-                .expect("invalid WB state must recover without losing metadata");
-            assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
-            assert_eq!(recovered.metadata.rating, 4);
+            let loaded =
+                load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref())).unwrap();
+            assert_eq!(loaded.outcome, expected_outcome);
+            assert_eq!(loaded.reason_codes, [expected_reason]);
+            assert!(loaded.metadata.edit_document_v2.is_some());
             assert_eq!(
-                recovered.metadata.adjustments,
-                serde_json::json!({
-                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-                })
+                fs::read(loaded.backup_path.unwrap()).unwrap(),
+                bytes,
+                "{name} original bytes"
             );
-            let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
-            assert_eq!(
-                state.quarantined_extensions["rejectedAdjustments"]["exposure"],
-                0.5
-            );
-            let receipt = state.recovery_receipts.last().unwrap();
-            assert!(receipt.disabled_fields.contains(&"adjustments".to_string()));
-            assert!(receipt.reason_codes.contains(&reason.to_string()));
-            assert!(
-                recovered
-                    .backup_path
-                    .as_ref()
-                    .is_some_and(|path| path.exists())
-            );
+            assert!(!sidecar.exists(), "{name} unsupported sidecar retired");
         }
     }
 
     #[test]
-    fn save_sidecar_rejects_invalid_perceptual_grading_contract() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let mut grading = perceptual_grading_fixture();
-        grading["falloff"] = serde_json::json!(0);
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({ "perceptualGradingV1": grading }),
-            ..Default::default()
-        };
+    fn source_and_revision_mismatch_never_become_active_authority() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        save_sidecar_metadata_atomic(&sidecar, &metadata_for(&source)).unwrap();
+        let current_bytes = fs::read(&sidecar).unwrap();
 
-        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect_err("invalid perceptual grading state must fail closed");
-        assert!(error.contains("adjustments.perceptualGradingV1"));
-        assert!(!sidecar_path.exists());
-    }
+        let wrong_source = temp.path().join("other.arw");
+        let wrong =
+            load_sidecar_recovering(&sidecar, Some(wrong_source.to_string_lossy().as_ref()))
+                .unwrap();
+        assert_eq!(wrong.outcome, PersistedStateOutcome::Quarantined);
+        assert_eq!(wrong.reason_codes, ["source_identity_mismatch"]);
+        assert_eq!(fs::read(wrong.backup_path.unwrap()).unwrap(), current_bytes);
+        assert!(!sidecar.exists());
 
-    #[test]
-    fn save_sidecar_roundtrips_disabled_film_emulation_contract() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "exposure": 0.6,
-                "filmEmulation": null
-            }),
-            ..Default::default()
-        };
-
-        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect("disabled Film node should remain valid persisted render state");
-
-        let reloaded = load_sidecar(&sidecar_path);
-        assert_eq!(reloaded.adjustments["exposure"], 0.6);
-        assert!(reloaded.adjustments["filmEmulation"].is_null());
-    }
-
-    #[test]
-    fn save_sidecar_rejects_invalid_film_emulation_contract() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({ "filmEmulation": { "mix": 1 } }),
-            ..Default::default()
-        };
-
-        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect_err("invalid Film node must fail closed");
-        assert!(error.contains("adjustments.filmEmulation"));
-        assert!(!sidecar_path.exists());
-    }
-
-    #[test]
-    fn save_sidecar_rejects_retired_flat_film_authority() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "filmLookId": "film_look.generic.warm_print.v1",
-                "filmLookStrength": 65
-            }),
-            ..Default::default()
-        };
-
-        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect_err("retired flat Film authority must fail closed");
-        assert!(error.contains("adjustments.filmLookId"));
-        assert!(error.contains("adjustments.filmLookStrength"));
-        assert!(!sidecar_path.exists());
-    }
-
-    #[test]
-    fn save_sidecar_roundtrips_reference_match_application_receipt() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let receipt = serde_json::json!({
-            "appliedDiffs": [{ "after": 0.5, "before": 0.0, "key": "exposure" }],
-            "appliedAt": "2026-07-13T21:30:00Z",
-            "baseGraphFingerprint": "fnv1a64:0000000000000000",
-            "destination": "global-adjustments",
-            "effectiveReferences": [{
-                "role": "creative",
-                "sourceFingerprint": "fnv1a64:2222222222222222",
-                "weight": 1.0
-            }],
-            "enabledGroups": ["tone", "color"],
-            "historyEntriesAdded": 1,
-            "impact": 80,
-            "proposalFingerprint": "fnv1a64:0123456789abcdef",
-            "resultingGraphFingerprint": "fnv1a64:1111111111111111",
-            "schemaVersion": 1,
-            "targetAnalysisFingerprint": "fnv1a64:fedcba9876543210"
-        });
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "exposure": 0.5,
-                "referenceMatchApplicationReceipt": receipt
-            }),
-            ..Default::default()
-        };
-
-        save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect("current reference-match receipt should persist atomically");
-        let reloaded = load_sidecar(&sidecar_path);
+        save_sidecar_metadata_atomic(&sidecar, &metadata_for(&source)).unwrap();
+        let mut tampered: JsonValue = serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
+        tampered["editRevision"] = JsonValue::String("sha256:tampered".to_string());
+        let tampered_bytes = serde_json::to_vec_pretty(&tampered).unwrap();
+        fs::write(&sidecar, &tampered_bytes).unwrap();
+        let rejected =
+            load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref())).unwrap();
+        assert_eq!(rejected.outcome, PersistedStateOutcome::Quarantined);
+        assert_eq!(rejected.reason_codes, ["edit_revision_mismatch"]);
         assert_eq!(
-            reloaded.adjustments["referenceMatchApplicationReceipt"],
-            receipt
+            fs::read(rejected.backup_path.unwrap()).unwrap(),
+            tampered_bytes
+        );
+        assert!(!sidecar.exists());
+    }
+
+    #[test]
+    fn save_rejects_flat_only_or_invalid_current_authority() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("invalid.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let flat_only = ImageMetadata {
+            adjustments: serde_json::json!({"exposure": 1}),
+            source_identity: source.to_string_lossy().into_owned(),
+            ..ImageMetadata::default()
+        };
+        let error = save_sidecar_metadata_atomic(&sidecar, &flat_only).unwrap_err();
+        assert!(error.contains("flat-only"));
+        assert!(!sidecar.exists());
+
+        let mut invalid = metadata_for(&source);
+        invalid.edit_document_v2.as_mut().unwrap()["schemaVersion"] = JsonValue::from(1);
+        let error = save_sidecar_metadata_atomic(&sidecar, &invalid).unwrap_err();
+        assert!(error.contains("editDocumentV2"));
+        assert!(!sidecar.exists());
+    }
+
+    #[test]
+    fn missing_sidecar_returns_explicit_current_neutral_document() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("new.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let loaded =
+            load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref())).unwrap();
+        assert_eq!(loaded.outcome, PersistedStateOutcome::Absent);
+        assert_eq!(loaded.metadata.source_identity, source.to_string_lossy());
+        let document = loaded.metadata.edit_document_v2.as_ref().unwrap();
+        crate::adjustments::edit_document_v2::validate_edit_document_v2(document).unwrap();
+        assert_eq!(
+            loaded.metadata.adjustments,
+            crate::adjustments::edit_document_v2::compile_edit_document_v2(document).unwrap()
         );
     }
 
     #[test]
-    fn save_sidecar_roundtrips_versioned_tone_and_view_authority() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let adjustments = serde_json::json!({
-            "rawEngineEditGraphVersion": 2,
-            "toneMapper": "rapidView",
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
-            "toneEqualizer": {
-                "autoPlacement": true,
-                "bandEv": [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0],
-                "detailPreservation": 0.65,
-                "edgeRefinement": 2.0,
-                "enabled": true,
-                "maskExposureCompensation": 0.25,
-                "pivotEv": -0.5,
-                "previewMode": 3,
-                "rangeEv": 16.0,
-                "selectedBand": 6,
-                "smoothingRadius": 32.0
-            },
-            "viewTransform": {
-                "chromaCompression": 0.25,
-                "contrast": 1.15,
-                "latitude": 0.55,
-                "middleGrey": 0.18,
-                "shoulder": 0.5,
-                "sourceBlackEv": -10.0,
-                "sourceWhiteEv": 6.5,
-                "toe": 0.35
-            }
+    fn current_artifact_source_is_strict() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("artifact.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let mut metadata = metadata_for(&source);
+        metadata.raw_engine_artifacts = Some(RawEngineArtifacts {
+            layer_stack_sidecars: vec![serde_json::json!({
+                "schemaVersion": 1,
+                "sourceImagePath": "/wrong/source.arw"
+            })],
+            ..RawEngineArtifacts::new_v1()
         });
-        let metadata = ImageMetadata {
-            adjustments: adjustments.clone(),
-            ..Default::default()
-        };
-
-        save_sidecar_metadata_atomic(&sidecar_path, &metadata).expect("persist render authority");
-
-        let reloaded = load_sidecar(&sidecar_path);
-        assert_eq!(reloaded.adjustments, adjustments);
-        assert_eq!(
-            reloaded
-                .persisted_render_state
-                .and_then(|state| state.user_edits),
-            adjustments.as_object().cloned()
-        );
-    }
-
-    #[test]
-    fn save_sidecar_rejects_invalid_reference_match_application_receipt() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "referenceMatchApplicationReceipt": {
-                    "appliedDiffs": [],
-                    "appliedAt": "not-a-timestamp",
-                    "baseGraphFingerprint": "invalid",
-                    "destination": "global-adjustments",
-                    "effectiveReferences": [],
-                    "enabledGroups": [],
-                    "historyEntriesAdded": 2,
-                    "impact": 101,
-                    "proposalFingerprint": "invalid",
-                    "resultingGraphFingerprint": "fnv1a64:1111111111111111",
-                    "schemaVersion": 2,
-                    "targetAnalysisFingerprint": "fnv1a64:fedcba9876543210"
-                }
-            }),
-            ..Default::default()
-        };
-
-        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect_err("invalid reference-match receipt must fail closed");
-        assert!(error.contains("adjustments.referenceMatchApplicationReceipt"));
-        assert!(!sidecar_path.exists());
-    }
-
-    #[test]
-    fn save_sidecar_rejects_invalid_perspective_contract() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-        let metadata = ImageMetadata {
-            adjustments: serde_json::json!({
-                "perspectiveCorrection": {
-                    "amount": 100,
-                    "cropPolicy": "auto_crop",
-                    "guides": [],
-                    "mode": "not_a_mode"
-                }
-            }),
-            ..Default::default()
-        };
-
-        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-            .expect_err("invalid perspective state must fail closed");
-        assert!(error.contains("adjustments.perspectiveCorrection"));
-        assert!(!sidecar_path.exists());
-    }
-
-    #[test]
-    fn save_sidecar_rejects_corrupt_tone_or_view_authority() {
-        for (field, corrupt) in [
-            ("rawEngineEditGraphVersion", serde_json::json!(99)),
-            (
-                "toneEqualizer",
-                serde_json::json!({
-                    "autoPlacement": false,
-                    "bandEv": [0.0, 0.0],
-                    "detailPreservation": 0.65,
-                    "edgeRefinement": 2.0,
-                    "enabled": true,
-                    "maskExposureCompensation": 0.0,
-                    "pivotEv": 0.0,
-                    "previewMode": 0,
-                    "rangeEv": 16.0,
-                    "selectedBand": 4,
-                    "smoothingRadius": 32.0
-                }),
-            ),
-            (
-                "viewTransform",
-                serde_json::json!({
-                    "chromaCompression": 0.25,
-                    "contrast": 1.15,
-                    "latitude": 0.55,
-                    "middleGrey": 0.18,
-                    "shoulder": 0.5,
-                    "sourceBlackEv": -2.0,
-                    "sourceWhiteEv": 2.0,
-                    "toe": 0.35
-                }),
-            ),
-        ] {
-            let temp_dir = tempfile::tempdir().expect("tempdir");
-            let sidecar_path = temp_dir.path().join("image.arw.rrdata");
-            let metadata = ImageMetadata {
-                adjustments: JsonValue::Object(Map::from_iter([(field.to_string(), corrupt)])),
-                ..Default::default()
-            };
-
-            let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
-                .expect_err("corrupt render authority must not persist");
-            assert!(error.contains(&format!("adjustments.{field}")));
-            assert!(!sidecar_path.exists());
-        }
+        let error = save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap_err();
+        assert!(error.contains("layer_authority_source_mismatch"));
+        assert!(!sidecar.exists());
     }
 
     #[test]
     fn save_sidecar_metadata_atomic_reports_missing_parent() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let sidecar_path = temp_dir.path().join("missing").join("image.raf.rrdata");
-        let err = save_sidecar_metadata_atomic(&sidecar_path, &ImageMetadata::default())
-            .expect_err("missing parent should fail");
-
-        assert!(err.contains("Failed to write sidecar"));
-        assert!(!sidecar_path.exists());
-    }
-
-    #[test]
-    fn write_text_file_atomic_preserves_existing_directory_on_replace_failure() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let directory_path = temp_dir.path().join("image.raf.rrdata");
-        fs::create_dir(&directory_path).expect("target directory");
-
-        let err = write_text_file_atomic(&directory_path, "replacement")
-            .expect_err("persisting over a directory should fail");
-
-        assert!(err.contains("Failed to write"));
-        assert!(directory_path.is_dir());
-    }
-
-    #[test]
-    fn repair_raw_camera_metadata_replaces_or_removes_zero_placeholders() {
-        let mut sidecar = HashMap::new();
-        sidecar.insert("Make".to_string(), "Sony".to_string());
-        sidecar.insert("FNumber".to_string(), "f/0".to_string());
-        sidecar.insert("ApertureValue".to_string(), "0".to_string());
-        sidecar.insert("FocalLength".to_string(), "0".to_string());
-        sidecar.insert(
-            "FocalLengthIn35mmFilm".to_string(),
-            "unknown mm".to_string(),
-        );
-
-        let mut extracted = HashMap::new();
-        extracted.insert("FNumber".to_string(), "f/8".to_string());
-        extracted.insert("FocalLength".to_string(), "105".to_string());
-
-        let (repaired, changed) = repair_raw_camera_metadata(sidecar, &extracted);
-
-        assert!(changed);
-        assert_eq!(repaired.get("Make").map(String::as_str), Some("Sony"));
-        assert_eq!(repaired.get("FNumber").map(String::as_str), Some("f/8"));
-        assert_eq!(repaired.get("FocalLength").map(String::as_str), Some("105"));
-        assert!(!repaired.contains_key("ApertureValue"));
-        assert!(!repaired.contains_key("FocalLengthIn35mmFilm"));
-    }
-
-    #[test]
-    fn alaska_sony_arw_metadata_omits_zero_placeholders() {
-        let path = Path::new("/Users/cgas/Pictures/Capture One/Alaska/_DSC7513.ARW");
-        if !path.exists() {
-            eprintln!(
-                "skipping Alaska Sony ARW metadata regression: missing {}",
-                path.display()
-            );
-            return;
-        }
-
-        let bytes = fs::read(path).expect("read private Alaska ARW");
-        let metadata = read_exif_data(path.to_string_lossy().as_ref(), &bytes);
-
-        assert_ne!(metadata.get("FNumber").map(String::as_str), Some("f/0"));
-        assert_ne!(metadata.get("FocalLength").map(String::as_str), Some("0"));
-        assert_ne!(
-            metadata.get("FocalLengthIn35mmFilm").map(String::as_str),
-            Some("unknown mm")
-        );
-
-        if let Some(f_number) = metadata.get("FNumber") {
-            let parsed_f_number = f_number
-                .trim_start_matches("f/")
-                .parse::<f32>()
-                .expect("FNumber should parse as a positive number");
-            assert!(parsed_f_number > 0.0);
-        }
-        if let Some(focal_length) = metadata.get("FocalLength") {
-            let parsed_focal_length = focal_length
-                .parse::<f32>()
-                .expect("FocalLength should parse as a positive number");
-            assert!(parsed_focal_length > 0.0);
-        }
-        if let Some(focal_length_35mm) = metadata.get("FocalLengthIn35mmFilm") {
-            let parsed_focal_length_35mm = focal_length_35mm
-                .parse::<f32>()
-                .expect("FocalLengthIn35mmFilm should parse as a positive number");
-            assert!(parsed_focal_length_35mm > 0.0);
-        }
-    }
-}
-
-#[cfg(test)]
-mod current_crop_contract_tests {
-    use super::*;
-
-    fn validate_crop_fixture(
-        crop: JsonValue,
-    ) -> (JsonValue, Map<String, JsonValue>, Vec<String>, Vec<String>) {
-        let mut adjustments = serde_json::json!({
-            "crop": crop,
-            "exposure": 0.25,
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        });
-        let mut extensions = Map::new();
-        let mut disabled = Vec::new();
-        let mut reasons = Vec::new();
-        validate_adjustments(
-            &mut adjustments,
-            &mut extensions,
-            &mut disabled,
-            &mut reasons,
-        );
-        (adjustments, extensions, disabled, reasons)
-    }
-
-    #[test]
-    fn obsolete_pixel_and_percent_crops_are_quarantined_without_reinterpretation() {
-        for crop in [
-            serde_json::json!({ "unit": "px", "x": 600, "y": 400, "width": 3000, "height": 2000 }),
-            serde_json::json!({ "unit": "%", "x": 10, "y": 20, "width": 50, "height": 60 }),
-            serde_json::json!({ "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6 }),
-        ] {
-            let original = crop.clone();
-            let (adjustments, extensions, disabled, reasons) = validate_crop_fixture(crop);
-            assert!(adjustments.get("crop").is_none());
-            assert_eq!(adjustments["exposure"], 0.25);
-            assert_eq!(extensions["rejectedCrop"], original);
-            assert_eq!(disabled, ["adjustments.crop"]);
-            assert_eq!(reasons, ["crop_contract_unsupported"]);
-        }
-    }
-
-    #[test]
-    fn normalized_crop_is_current_and_idempotent() {
-        let crop = serde_json::json!({
-            "unit": "normalized", "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6
-        });
-        let (adjustments, extensions, disabled, reasons) = validate_crop_fixture(crop.clone());
-        assert_eq!(adjustments["crop"], crop);
-        assert!(extensions.is_empty());
-        assert!(disabled.is_empty());
-        assert!(reasons.is_empty());
-    }
-
-    #[test]
-    fn null_and_normalized_full_frame_crops_are_valid_no_ops() {
-        let (adjustments, extensions, disabled, reasons) = validate_crop_fixture(JsonValue::Null);
-        assert!(adjustments["crop"].is_null());
-        assert!(extensions.is_empty());
-        assert!(disabled.is_empty());
-        assert!(reasons.is_empty());
-
-        let crop = serde_json::json!({
-            "unit": "normalized", "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0
-        });
-        let (adjustments, extensions, disabled, reasons) = validate_crop_fixture(crop.clone());
-        assert_eq!(adjustments["crop"], crop);
-        assert!(extensions.is_empty());
-        assert!(disabled.is_empty());
-        assert!(reasons.is_empty());
-    }
-
-    #[test]
-    fn out_of_range_current_crop_is_disabled_and_quarantined() {
-        let mut adjustments = serde_json::json!({
-            "crop": { "unit": "normalized", "x": 0.7, "y": 0, "width": 0.4, "height": 1.0 },
-            "exposure": 0.25,
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        });
-        let mut extensions = Map::new();
-        let mut disabled = Vec::new();
-        let mut reasons = Vec::new();
-        validate_adjustments(
-            &mut adjustments,
-            &mut extensions,
-            &mut disabled,
-            &mut reasons,
-        );
-        assert!(adjustments.get("crop").is_none());
-        assert_eq!(adjustments["exposure"], 0.25);
-        assert_eq!(extensions["rejectedCrop"]["unit"], "normalized");
-        assert_eq!(disabled, ["adjustments.crop"]);
-        assert_eq!(reasons, ["crop_bounds_invalid"]);
-    }
-
-    #[test]
-    fn obsolete_pixel_crop_recovers_at_production_boundary_without_reinterpretation() {
         let temp = tempfile::tempdir().unwrap();
-        let source = temp.path().join("landscape.png");
-        image::RgbImage::new(600, 400).save(&source).unwrap();
+        let source = temp.path().join("missing").join("image.arw");
         let sidecar = get_primary_sidecar_path(&source);
-        let source_identity = source.to_string_lossy().into_owned();
-        let legacy = serde_json::json!({
-            "version": 2,
-            "rating": 4,
-            "tags": ["user:alaska"],
-            "exif": { "Camera": "Migration Fixture" },
-            "adjustments": {
-                "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
-                "exposure": 0.25,
-                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-            },
-            "persistedRenderState": {
-                "schemaVersion": 2,
-                "implementationRevision": 2,
-                "sourceIdentity": source_identity,
-                "editRevision": "sha256:legacy",
-                "userEdits": {
-                    "crop": { "unit": "px", "x": 60, "y": 40, "width": 300, "height": 200 },
-                    "exposure": 0.25,
-                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-                },
-                "defaultsPolicyRevision": 1
-            }
-        });
-        fs::write(&sidecar, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
-
-        let first = load_sidecar_recovering(&sidecar, None).unwrap();
-        assert_eq!(first.outcome, PersistedStateOutcome::Recovered);
-        assert_eq!(first.metadata.rating, 4);
-        assert_eq!(
-            first.metadata.tags.as_deref(),
-            Some(["user:alaska".to_string()].as_slice())
-        );
-        assert_eq!(
-            first.metadata.exif.as_ref().unwrap()["Camera"],
-            "Migration Fixture"
-        );
-        assert!(first.metadata.adjustments.get("crop").is_none());
-        let state = first.metadata.persisted_render_state.as_ref().unwrap();
-        assert_eq!(state.quarantined_extensions["rejectedCrop"]["unit"], "px");
-        assert_eq!(state.implementation_revision, 2);
-        assert_eq!(
-            state.recovery_receipts.last().unwrap().disabled_fields,
-            ["adjustments.crop"]
-        );
-        assert!(first.backup_path.as_ref().is_some_and(|path| path.exists()));
-
-        let repaired_bytes = fs::read(&sidecar).unwrap();
-        let second = load_sidecar_recovering(&sidecar, None).unwrap();
-        assert_eq!(second.outcome, PersistedStateOutcome::Current);
-        assert!(second.backup_path.is_none());
-        assert_eq!(fs::read(&sidecar).unwrap(), repaired_bytes);
-    }
-
-    #[test]
-    fn obsolete_pixel_crop_is_quarantined_without_reading_source_or_losing_metadata() {
-        let temp = tempfile::tempdir().unwrap();
-        let source = temp.path().join("missing.arw");
-        let sidecar = get_primary_sidecar_path(&source);
-        let source_identity = source.to_string_lossy().into_owned();
-        let legacy = serde_json::json!({
-            "version": 2,
-            "rating": 5,
-            "tags": ["user:keeper"],
-            "exif": { "Camera": "Unavailable Source Fixture" },
-            "adjustments": {
-                "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
-                "contrast": 12,
-                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-            },
-            "persistedRenderState": {
-                "schemaVersion": 2,
-                "implementationRevision": 1,
-                "sourceIdentity": source_identity,
-                "editRevision": "sha256:legacy",
-                "userEdits": {
-                    "crop": { "unit": "px", "x": 0, "y": 0, "width": 6000, "height": 4000 },
-                    "contrast": 12,
-                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-                },
-                "defaultsPolicyRevision": 1
-            }
-        });
-        fs::write(&sidecar, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
-
-        let recovered = load_sidecar_recovering(&sidecar, Some(&source_identity)).unwrap();
-        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
-        assert_eq!(recovered.metadata.rating, 5);
-        assert_eq!(recovered.metadata.adjustments["contrast"], 12);
-        assert!(recovered.metadata.adjustments.get("crop").is_none());
-        let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
-        assert_eq!(state.quarantined_extensions["rejectedCrop"]["unit"], "px");
-        let receipt = state.recovery_receipts.last().unwrap();
-        assert_eq!(receipt.disabled_fields, ["adjustments.crop"]);
-        assert!(
-            receipt
-                .reason_codes
-                .iter()
-                .any(|reason| reason == "crop_contract_unsupported")
-        );
-        assert!(
-            recovered
-                .backup_path
-                .as_ref()
-                .is_some_and(|path| path.exists())
-        );
+        let error = save_sidecar_metadata_atomic(&sidecar, &metadata_for(&source)).unwrap_err();
+        assert!(error.contains("Failed to write sidecar"));
+        assert!(!sidecar.exists());
     }
 }
 
@@ -3734,15 +1970,20 @@ fn save_then_load_preserves_normalized_portrait_crop_exactly() {
     let source = temp.path().join("portrait.png");
     image::RgbImage::new(600, 400).save(&source).unwrap();
     let sidecar = get_primary_sidecar_path(&source);
-    let metadata = ImageMetadata {
-        rating: 5,
-        adjustments: serde_json::json!({
-            "orientationSteps": 1,
-            "crop": { "unit": "normalized", "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6 },
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        }),
-        ..ImageMetadata::default()
-    };
+    let mut metadata = neutral_current_metadata(source.to_string_lossy().into_owned());
+    metadata.rating = 5;
+    let document = metadata.edit_document_v2.as_mut().unwrap();
+    document["geometry"]["orientationSteps"] = JsonValue::from(1);
+    document["geometry"]["crop"] = serde_json::json!({
+        "unit": "normalized", "x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6
+    });
+    document["nodes"]["geometry"] = serde_json::json!({
+        "enabled": true,
+        "implementationVersion": 1,
+        "params": document["geometry"].clone(),
+        "process": "scene_referred_v2",
+        "type": "geometry"
+    });
 
     save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
     let first_bytes = fs::read(&sidecar).unwrap();

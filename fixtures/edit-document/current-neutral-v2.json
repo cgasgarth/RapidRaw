@@ -1,0 +1,738 @@
+{
+  "extensions": {},
+  "geometry": {
+    "aspectRatio": null,
+    "crop": null,
+    "flipHorizontal": false,
+    "flipVertical": false,
+    "orientationSteps": 0,
+    "perspectiveCorrection": {
+      "amount": 100,
+      "cropPolicy": "auto_crop",
+      "guides": [],
+      "mode": "off",
+      "resolvedPlan": null
+    },
+    "rotation": 0,
+    "transformAspect": 0,
+    "transformDistortion": 0,
+    "transformHorizontal": 0,
+    "transformRotate": 0,
+    "transformScale": 100,
+    "transformVertical": 0,
+    "transformXOffset": 0,
+    "transformYOffset": 0
+  },
+  "graphProcess": "scene_referred_v2",
+  "layers": {
+    "masks": []
+  },
+  "nodes": {
+    "source_decode": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "rawProcessingModeOverride": null
+      },
+      "process": "scene_referred_v2",
+      "type": "source_decode"
+    },
+    "scene_global_color_tone": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "blacks": 0,
+        "brightness": 0,
+        "contrast": 0,
+        "exposure": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0
+      },
+      "process": "scene_referred_v2",
+      "type": "scene_global_color_tone"
+    },
+    "color_presence": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "hue": 0,
+        "saturation": 0,
+        "vibrance": 0
+      },
+      "process": "scene_referred_v2",
+      "type": "color_presence"
+    },
+    "scene_curve": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "curveMode": "point",
+        "curves": {
+          "blue": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "green": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "luma": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "red": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ]
+        },
+        "parametricCurve": {
+          "blue": {
+            "blackLevel": 0,
+            "darks": 0,
+            "highlights": 0,
+            "lights": 0,
+            "shadows": 0,
+            "split1": 25,
+            "split2": 50,
+            "split3": 75,
+            "whiteLevel": 0
+          },
+          "green": {
+            "blackLevel": 0,
+            "darks": 0,
+            "highlights": 0,
+            "lights": 0,
+            "shadows": 0,
+            "split1": 25,
+            "split2": 50,
+            "split3": 75,
+            "whiteLevel": 0
+          },
+          "luma": {
+            "blackLevel": 0,
+            "darks": 0,
+            "highlights": 0,
+            "lights": 0,
+            "shadows": 0,
+            "split1": 25,
+            "split2": 50,
+            "split3": 75,
+            "whiteLevel": 0
+          },
+          "red": {
+            "blackLevel": 0,
+            "darks": 0,
+            "highlights": 0,
+            "lights": 0,
+            "shadows": 0,
+            "split1": 25,
+            "split2": 50,
+            "split3": 75,
+            "whiteLevel": 0
+          }
+        },
+        "pointCurves": {
+          "blue": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "green": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "luma": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ],
+          "red": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 255,
+              "y": 255
+            }
+          ]
+        },
+        "toneCurve": "auto_filmic"
+      },
+      "process": "scene_referred_v2",
+      "type": "scene_curve"
+    },
+    "tone_equalizer": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "toneEqualizer": {
+          "autoPlacement": false,
+          "bandEv": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "detailPreservation": 0.65,
+          "edgeRefinement": 2,
+          "enabled": false,
+          "maskExposureCompensation": 0,
+          "pivotEv": 0,
+          "previewMode": 0,
+          "rangeEv": 16,
+          "selectedBand": 4,
+          "smoothingRadius": 32
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "tone_equalizer"
+    },
+    "scene_to_view_transform": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "toneMapper": "rapidView",
+        "viewTransform": {
+          "chromaCompression": 0.25,
+          "contrast": 1.15,
+          "latitude": 0.55,
+          "middleGrey": 0.18,
+          "shoulder": 0.5,
+          "sourceBlackEv": -10,
+          "sourceWhiteEv": 6.5,
+          "toe": 0.35
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "scene_to_view_transform"
+    },
+    "display_creative": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "flareAmount": 0,
+        "glowAmount": 0,
+        "grainAmount": 0,
+        "grainRoughness": 50,
+        "grainSize": 25,
+        "halationAmount": 0,
+        "lutData": null,
+        "lutIntensity": 100,
+        "lutName": null,
+        "lutPath": null,
+        "lutSize": 0,
+        "vignetteAmount": 0,
+        "vignetteFeather": 50,
+        "vignetteMidpoint": 50,
+        "vignetteRoundness": 0
+      },
+      "process": "scene_referred_v2",
+      "type": "display_creative"
+    },
+    "film_emulation": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "filmEmulation": null
+      },
+      "process": "scene_referred_v2",
+      "type": "film_emulation"
+    },
+    "detail_denoise_dehaze": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "centré": 0,
+        "localContrastHaloGuard": 50,
+        "localContrastMidtoneMask": 50,
+        "localContrastRadiusPx": 24,
+        "structure": 0,
+        "clarity": 0,
+        "colorNoiseReduction": 0,
+        "deblurEnabled": false,
+        "deblurSigmaPx": 0.8,
+        "deblurStrength": 0,
+        "dehaze": 0,
+        "denoiseContrastProtection": 50,
+        "denoiseDetail": 50,
+        "denoiseNaturalGrain": 0,
+        "denoiseShadowBias": 0,
+        "lumaNoiseReduction": 0,
+        "sharpness": 0,
+        "sharpnessThreshold": 15
+      },
+      "process": "scene_referred_v2",
+      "type": "detail_denoise_dehaze"
+    },
+    "point_color": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "pointColor": {
+          "enabled": false,
+          "points": [],
+          "process": "rawengine.point-color.oklab-ap1.v1",
+          "selectedPointId": null,
+          "skinUniformity": {
+            "chromaUniformity": 0,
+            "enabled": false,
+            "hueUniformity": 0,
+            "lightnessUniformity": 0,
+            "preserveExtremes": 0.5,
+            "range": null,
+            "target": null
+          },
+          "visualizeMode": "image"
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "point_color"
+    },
+    "color_balance_rgb": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "colorBalanceRgb": {
+          "enabled": false,
+          "highlights": {
+            "blue": 0,
+            "green": 0,
+            "red": 0
+          },
+          "midtones": {
+            "blue": 0,
+            "green": 0,
+            "red": 0
+          },
+          "preserveLuminance": true,
+          "shadows": {
+            "blue": 0,
+            "green": 0,
+            "red": 0
+          }
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "color_balance_rgb"
+    },
+    "selective_color_mixer": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "hsl": {
+          "aquas": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "blues": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "greens": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "magentas": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "oranges": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "purples": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "reds": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "yellows": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          }
+        },
+        "selectiveColorRangeControls": {
+          "aquas": {
+            "centerHueDegrees": 180,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 60
+          },
+          "blues": {
+            "centerHueDegrees": 225,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 60
+          },
+          "greens": {
+            "centerHueDegrees": 115,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 90
+          },
+          "magentas": {
+            "centerHueDegrees": 330,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 50
+          },
+          "oranges": {
+            "centerHueDegrees": 25,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 45
+          },
+          "purples": {
+            "centerHueDegrees": 280,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 55
+          },
+          "reds": {
+            "centerHueDegrees": 358,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 35
+          },
+          "yellows": {
+            "centerHueDegrees": 60,
+            "falloffSmoothness": 1.5,
+            "widthDegrees": 40
+          }
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "selective_color_mixer"
+    },
+    "skin_tone_uniformity": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "skinToneUniformity": {
+          "enabled": false,
+          "hueUniformity": 0.42,
+          "luminanceUniformity": 0.18,
+          "maxHueShiftDegrees": 16,
+          "saturationUniformity": 0.31,
+          "targetHueDegrees": 24,
+          "targetLuminance": 0.56,
+          "targetSaturation": 0.38
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "skin_tone_uniformity"
+    },
+    "black_white_mixer": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "blackWhiteMixer": {
+          "enabled": false,
+          "presetId": "manual",
+          "process": "continuous_sensitivity_v1",
+          "sourceClass": "color_source",
+          "weights": {
+            "aquas": 0,
+            "blues": 0,
+            "greens": 0,
+            "magentas": 0,
+            "oranges": 0,
+            "purples": 0,
+            "reds": 0,
+            "yellows": 0
+          }
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "black_white_mixer"
+    },
+    "channel_mixer": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "channelMixer": {
+          "blue": {
+            "blue": 100,
+            "constant": 0,
+            "green": 0,
+            "red": 0
+          },
+          "enabled": false,
+          "green": {
+            "blue": 0,
+            "constant": 0,
+            "green": 100,
+            "red": 0
+          },
+          "preserveLuminance": false,
+          "red": {
+            "blue": 0,
+            "constant": 0,
+            "green": 0,
+            "red": 100
+          }
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "channel_mixer"
+    },
+    "luma_levels": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "levels": {
+          "enabled": false,
+          "gamma": 1,
+          "inputBlack": 0,
+          "inputWhite": 1,
+          "outputBlack": 0,
+          "outputWhite": 1
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "luma_levels"
+    },
+    "perceptual_grading": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "colorGrading": {
+          "balance": 0,
+          "blending": 50,
+          "global": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "highlights": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "midtones": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          },
+          "shadows": {
+            "hue": 0,
+            "luminance": 0,
+            "saturation": 0
+          }
+        },
+        "perceptualGradingV1": {
+          "balance": 0,
+          "blending": 0.5,
+          "falloff": 1,
+          "global": {
+            "brilliance": 0,
+            "chroma": 0,
+            "hueDegrees": 0,
+            "luminanceEv": 0,
+            "saturation": 0
+          },
+          "highlightFulcrumEv": 2,
+          "highlights": {
+            "brilliance": 0,
+            "chroma": 0,
+            "hueDegrees": 0,
+            "luminanceEv": 0,
+            "saturation": 0
+          },
+          "midtones": {
+            "brilliance": 0,
+            "chroma": 0,
+            "hueDegrees": 0,
+            "luminanceEv": 0,
+            "saturation": 0
+          },
+          "neutralProtection": 0.5,
+          "perceptualModel": "oklab_d65_from_acescg_v1",
+          "shadowFulcrumEv": -2,
+          "shadows": {
+            "brilliance": 0,
+            "chroma": 0,
+            "hueDegrees": 0,
+            "luminanceEv": 0,
+            "saturation": 0
+          },
+          "skinProtection": 0
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "perceptual_grading"
+    },
+    "camera_input": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "cameraProfile": "camera_standard",
+        "cameraProfileAmount": 100,
+        "whiteBalanceTechnical": {
+          "adaptation": "cat16_v1",
+          "confidence": null,
+          "contract": "rapidraw.white_balance.v1",
+          "duv": 0,
+          "inputSemantics": "raw_scene_linear",
+          "kelvin": 6504,
+          "mode": "as_shot",
+          "presetId": null,
+          "sampleCount": null,
+          "source": "as_shot",
+          "synchronization": {
+            "mode": "per_image",
+            "referenceSourceIdentity": null
+          },
+          "x": 0.32168,
+          "y": 0.33767
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "camera_input"
+    },
+    "lens_correction": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "chromaticAberrationBlueYellow": 0,
+        "chromaticAberrationRedCyan": 0,
+        "lensCorrectionMode": "manual",
+        "lensDistortionAmount": 100,
+        "lensDistortionEnabled": true,
+        "lensDistortionParams": null,
+        "lensMaker": null,
+        "lensModel": null,
+        "lensTcaAmount": 100,
+        "lensTcaEnabled": true,
+        "lensVignetteAmount": 100,
+        "lensVignetteEnabled": true
+      },
+      "process": "scene_referred_v2",
+      "type": "lens_correction"
+    },
+    "color_calibration": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "colorCalibration": {
+          "blueHue": 0,
+          "blueSaturation": 0,
+          "greenHue": 0,
+          "greenSaturation": 0,
+          "redHue": 0,
+          "redSaturation": 0,
+          "shadowsTint": 0
+        }
+      },
+      "process": "scene_referred_v2",
+      "type": "color_calibration"
+    },
+    "geometry": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "aspectRatio": null,
+        "crop": null,
+        "flipHorizontal": false,
+        "flipVertical": false,
+        "orientationSteps": 0,
+        "perspectiveCorrection": {
+          "amount": 100,
+          "cropPolicy": "auto_crop",
+          "guides": [],
+          "mode": "off",
+          "resolvedPlan": null
+        },
+        "rotation": 0,
+        "transformAspect": 0,
+        "transformDistortion": 0,
+        "transformHorizontal": 0,
+        "transformRotate": 0,
+        "transformScale": 100,
+        "transformVertical": 0,
+        "transformXOffset": 0,
+        "transformYOffset": 0
+      },
+      "process": "scene_referred_v2",
+      "type": "geometry"
+    },
+    "layers": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "masks": []
+      },
+      "process": "scene_referred_v2",
+      "type": "layers"
+    },
+    "source_artifacts": {
+      "enabled": true,
+      "implementationVersion": 1,
+      "params": {
+        "aiPatches": []
+      },
+      "process": "scene_referred_v2",
+      "type": "source_artifacts"
+    }
+  },
+  "provenance": {
+    "referenceMatchApplicationReceipt": null
+  },
+  "schemaVersion": 2,
+  "sourceDecode": {
+    "rawProcessingModeOverride": null
+  },
+  "sourceArtifacts": {
+    "aiPatches": []
+  }
+}

@@ -16,7 +16,6 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 #[cfg(feature = "ai")]
 use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 #[cfg(feature = "ai")]
 use std::sync::Mutex;
@@ -279,8 +278,8 @@ fn modify_tags_for_path(
         metadata.tags = Some(tags);
     }
 
-    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    fs::write(sidecar_path, json_string).map_err(|e| e.to_string())
+    metadata.source_identity = path_str.to_string();
+    crate::exif_processing::save_sidecar_metadata_atomic(&sidecar_path, &metadata)
 }
 
 #[tauri::command]

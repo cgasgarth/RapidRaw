@@ -322,10 +322,11 @@ fn copy_primary_sidecars(
     source_sidecar_path: &Path,
     destination_path: &Path,
 ) -> Result<(), String> {
-    copy_existing_file(
-        source_sidecar_path,
-        &rrdata_sidecar_path(destination_path, None),
-    )?;
+    if source_sidecar_path.exists() {
+        let mut metadata = crate::exif_processing::load_sidecar(source_sidecar_path);
+        metadata.source_identity = destination_path.to_string_lossy().into_owned();
+        save_metadata_sidecar(&rrdata_sidecar_path(destination_path, None), &metadata)?;
+    }
     copy_existing_file(
         &rrexif_sidecar_path(source_path),
         &rrexif_sidecar_path(destination_path),
@@ -1398,9 +1399,7 @@ fn generate_single_thumbnail_and_cache(
                     meta.rating,
                     crate::image_processing::is_image_edited(&meta.adjustments, is_raw, tm),
                     serde_json::to_vec(&(
-                        meta.persisted_render_state
-                            .as_ref()
-                            .map(|state| state.edit_revision.as_str()),
+                        (!meta.edit_revision.is_empty()).then_some(meta.edit_revision.as_str()),
                         &meta.adjustments,
                     ))
                     .unwrap_or_default(),
@@ -2256,7 +2255,16 @@ impl EditTransactionPersistenceContext {
 }
 
 fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveReceipt {
-    let serialized = serde_json::to_vec(metadata).unwrap_or_default();
+    let serialized = serde_json::to_vec(&(
+        &metadata.source_identity,
+        &metadata.edit_revision,
+        &metadata.edit_document_v2,
+        metadata.rating,
+        &metadata.tags,
+        &metadata.exif,
+        &metadata.raw_engine_artifacts,
+    ))
+    .unwrap_or_default();
     let sidecar_revision = format!("sha256:{}", hex::encode(Sha256::digest(&serialized)));
     let thumbnail_revision = compute_source_revision(path, &serialized);
     let fingerprint = blake3::hash(&serialized);
@@ -2341,13 +2349,14 @@ pub fn save_metadata_and_update_thumbnail(
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
         let mut final_adjustments = adjustments;
-        if let Some(document) = edit_document_v2.as_ref() {
-            crate::adjustments::edit_document_v2::validate_edit_document_v2(document)?;
-        }
+        let edit_document_v2 = edit_document_v2.ok_or_else(|| {
+            "Current EditDocumentV2 is required for sidecar persistence".to_string()
+        })?;
+        crate::adjustments::edit_document_v2::validate_edit_document_v2(&edit_document_v2)?;
         final_adjustments =
             crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
                 &final_adjustments,
-                edit_document_v2.as_ref(),
+                Some(&edit_document_v2),
             )?;
         resolve_lens_params_in_adjustments(
             &mut final_adjustments,
@@ -2365,7 +2374,12 @@ pub fn save_metadata_and_update_thumbnail(
         }
 
         metadata.adjustments = final_adjustments;
-        metadata.edit_document_v2 = edit_document_v2;
+        metadata.edit_revision = crate::exif_processing::render_state_revision(
+            &edit_document_v2,
+            metadata.raw_engine_artifacts.as_ref(),
+        )?;
+        metadata.source_identity = path.clone();
+        metadata.edit_document_v2 = Some(edit_document_v2);
         save_metadata_sidecar(&sidecar_path, &metadata)?;
         metadata
     };
@@ -2535,7 +2549,7 @@ pub async fn reset_adjustments_for_paths(
                     create_xmp_if_missing,
                 )?;
             }
-            let persisted = load_sidecar_strict_for_reset(&sidecar_path)?;
+            let persisted = load_sidecar_strict_for_reset(&sidecar_path, Some(path))?;
             let persisted_json = serde_json::to_vec(&persisted)
                 .map_err(|error| format!("Failed to serialize Reset readback: {error}"))?;
             results.push(ResetAdjustmentsResult {
@@ -2619,18 +2633,25 @@ pub struct ResetAdjustmentsResult {
     pub render_generation: u64,
 }
 
-fn load_sidecar_strict_for_reset(sidecar_path: &Path) -> Result<ImageMetadata, String> {
-    if !sidecar_path.exists() {
-        return Ok(ImageMetadata::default());
+fn load_sidecar_strict_for_reset(
+    sidecar_path: &Path,
+    expected_source_identity: Option<&str>,
+) -> Result<ImageMetadata, String> {
+    let loaded =
+        crate::exif_processing::load_sidecar_recovering(sidecar_path, expected_source_identity)?;
+    match loaded.outcome {
+        crate::exif_processing::PersistedStateOutcome::Absent
+        | crate::exif_processing::PersistedStateOutcome::Current => Ok(loaded.metadata),
+        crate::exif_processing::PersistedStateOutcome::Quarantined
+        | crate::exif_processing::PersistedStateOutcome::Unsupported => Err(format!(
+            "Refusing to Reset invalid sidecar {}; recovery copy: {}",
+            sidecar_path.display(),
+            loaded.backup_path.as_ref().map_or_else(
+                || "unavailable".to_string(),
+                |path| path.display().to_string()
+            )
+        )),
     }
-    let content = fs::read_to_string(sidecar_path)
-        .map_err(|error| format!("Failed to read sidecar {}: {error}", sidecar_path.display()))?;
-    serde_json::from_str(&content).map_err(|error| {
-        format!(
-            "Refusing to Reset corrupt sidecar {}: {error}",
-            sidecar_path.display()
-        )
-    })
 }
 
 fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
@@ -2657,42 +2678,11 @@ fn backup_sidecar_before_reset(sidecar_path: &Path) -> Result<(), String> {
 }
 
 fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
-    let section_visibility = metadata
-        .adjustments
-        .get("sectionVisibility")
-        .and_then(Value::as_object)
-        .map(|visibility| {
-            visibility
-                .iter()
-                .filter(|(section, value)| section.as_str() != "effects" && value.is_boolean())
-                .map(|(section, value)| (section.clone(), value.clone()))
-                .collect::<serde_json::Map<String, Value>>()
-        })
-        .filter(|visibility| !visibility.is_empty());
-    let effects_enabled = metadata
-        .adjustments
-        .get("effectsEnabled")
-        .and_then(Value::as_bool)
-        .or_else(|| {
-            metadata
-                .adjustments
-                .get("sectionVisibility")
-                .and_then(|visibility| visibility.get("effects"))
-                .and_then(Value::as_bool)
-        });
-    let mut reset_adjustments = serde_json::Map::new();
-    reset_adjustments.insert(
-        "whiteBalanceTechnical".to_string(),
-        crate::color::white_balance::default_technical_white_balance_json(),
-    );
-    if let Some(enabled) = effects_enabled {
-        reset_adjustments.insert("effectsEnabled".to_string(), Value::Bool(enabled));
-    }
-    if let Some(visibility) = section_visibility {
-        reset_adjustments.insert("sectionVisibility".to_string(), Value::Object(visibility));
-    }
-    metadata.adjustments = Value::Object(reset_adjustments);
-    metadata.edit_document_v2 = None;
+    let document = crate::exif_processing::neutral_current_edit_document();
+    metadata.adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&document)
+            .expect("native neutral EditDocumentV2 must remain valid");
+    metadata.edit_document_v2 = Some(document);
     if let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() {
         artifacts.hdr_merge_artifacts.clear();
         artifacts.negative_lab_artifacts.clear();
@@ -2702,6 +2692,11 @@ fn clear_render_authority_for_reset(metadata: &mut ImageMetadata) {
         artifacts.stale_artifact_ids.clear();
         // Provenance, capture receipts, and XMP conflict receipts do not feed render input.
     }
+    metadata.edit_revision = crate::exif_processing::render_state_revision(
+        metadata.edit_document_v2.as_ref().unwrap(),
+        metadata.raw_engine_artifacts.as_ref(),
+    )
+    .expect("native neutral EditDocumentV2 must remain serializable");
 }
 
 const BATCH_AUTO_ADJUST_CONTRACT_V1: &str = "rapidraw.batch_auto_adjust.v1";
@@ -2743,38 +2738,68 @@ pub struct BatchAutoAdjustPathResultV1 {
 }
 
 fn merge_auto_adjustment_document(
-    existing: &mut Value,
+    metadata: &mut ImageMetadata,
     auto_adjustments: &Value,
 ) -> Result<(), String> {
-    if existing.is_null() {
-        *existing = serde_json::json!({});
-    }
-    let existing_map = existing
-        .as_object_mut()
-        .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
     let auto_map = auto_adjustments
         .as_object()
         .ok_or_else(|| "auto_adjust_invalid_analysis_document".to_string())?;
-    existing_map.remove("sectionVisibility");
-    for (key, value) in auto_map {
-        if key != "sectionVisibility" {
-            existing_map.insert(key.clone(), value.clone());
-        }
+    let document = metadata
+        .edit_document_v2
+        .as_mut()
+        .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(document)
+        .map_err(|_| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
+    let nodes = document
+        .get_mut("nodes")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
+
+    for (adjustment, node_type) in [
+        ("exposure", "scene_global_color_tone"),
+        ("brightness", "scene_global_color_tone"),
+        ("contrast", "scene_global_color_tone"),
+        ("highlights", "scene_global_color_tone"),
+        ("shadows", "scene_global_color_tone"),
+        ("whites", "scene_global_color_tone"),
+        ("blacks", "scene_global_color_tone"),
+        ("vibrance", "color_presence"),
+        ("vignetteAmount", "display_creative"),
+        ("clarity", "detail_denoise_dehaze"),
+        ("centré", "detail_denoise_dehaze"),
+        ("dehaze", "detail_denoise_dehaze"),
+        ("whiteBalanceTechnical", "camera_input"),
+    ] {
+        let Some(value) = auto_map.get(adjustment) else {
+            continue;
+        };
+        let params = nodes
+            .get_mut(node_type)
+            .and_then(Value::as_object_mut)
+            .and_then(|node| node.get_mut("params"))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| "auto_adjust_invalid_adjustment_document_quarantined".to_string())?;
+        params.insert(adjustment.to_string(), value.clone());
     }
+
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(document)
+        .map_err(|_| "auto_adjust_invalid_analysis_document".to_string())?;
+    metadata.adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(document)?;
+    metadata.edit_revision = crate::exif_processing::render_state_revision(
+        document,
+        metadata.raw_engine_artifacts.as_ref(),
+    )?;
     Ok(())
 }
 
 fn load_auto_adjust_metadata(path: &str, sidecar_path: &Path) -> Result<ImageMetadata, String> {
     let loaded = crate::exif_processing::load_sidecar_recovering(sidecar_path, Some(path))?;
-    let invalid_adjustments_quarantined = loaded
-        .metadata
-        .persisted_render_state
-        .as_ref()
-        .is_some_and(|state| {
-            state
-                .quarantined_extensions
-                .contains_key("invalidAdjustments")
-        });
+    let invalid_adjustments_quarantined = matches!(
+        loaded.outcome,
+        crate::exif_processing::PersistedStateOutcome::Quarantined
+            | crate::exif_processing::PersistedStateOutcome::Unsupported
+    );
     if invalid_adjustments_quarantined {
         return Err(format!(
             "auto_adjust_invalid_adjustment_document_quarantined:{}",
@@ -2930,12 +2955,9 @@ pub async fn apply_auto_adjustments_to_paths(
                                     base_revision
                                 ));
                             }
-                            let before = metadata.adjustments.clone();
-                            merge_auto_adjustment_document(
-                                &mut metadata.adjustments,
-                                &auto_adjustments,
-                            )?;
-                            let changed = before != metadata.adjustments;
+                            let before = metadata.edit_document_v2.clone();
+                            merge_auto_adjustment_document(&mut metadata, &auto_adjustments)?;
+                            let changed = before != metadata.edit_document_v2;
 
                             if changed && !is_deferred {
                                 save_metadata_sidecar(&sidecar_path, &metadata)?;
@@ -3048,7 +3070,7 @@ pub async fn commit_batch_auto_adjustment(
                 ));
             }
             let mut prepared_metadata = metadata.clone();
-            prepared_metadata.adjustments = receipt.adjustments.clone();
+            merge_auto_adjustment_document(&mut prepared_metadata, &receipt.adjustments)?;
             let (expected_receipt, _) = batch_auto_adjust_receipt(
                 &path,
                 &source_path,
@@ -3064,7 +3086,7 @@ pub async fn commit_batch_auto_adjustment(
                     "Batch Auto Adjust prepared receipt seal is invalid".into(),
                 ));
             }
-            if metadata.adjustments == receipt.adjustments {
+            if metadata.edit_document_v2 == prepared_metadata.edit_document_v2 {
                 let (current_receipt, _) =
                     batch_auto_adjust_receipt(&path, &source_path, current_revision, &metadata)?;
                 return Ok(BatchAutoAdjustPathResultV1 {
@@ -3076,7 +3098,7 @@ pub async fn commit_batch_auto_adjustment(
                     error_message: None,
                 });
             }
-            metadata.adjustments = receipt.adjustments;
+            metadata = prepared_metadata;
             save_metadata_sidecar(&sidecar_path, &metadata)?;
             let (committed_receipt, thumbnail_receipt) =
                 batch_auto_adjust_receipt(&path, &source_path, current_revision, &metadata)?;
@@ -3400,11 +3422,8 @@ pub fn get_cache_key_hash(path_str: &str) -> Option<String> {
             .ok()
             .and_then(|loaded| {
                 serde_json::to_vec(&(
-                    loaded
-                        .metadata
-                        .persisted_render_state
-                        .as_ref()
-                        .map(|state| state.edit_revision.as_str()),
+                    (!loaded.metadata.edit_revision.is_empty())
+                        .then_some(loaded.metadata.edit_revision.as_str()),
                     &loaded.metadata.adjustments,
                 ))
                 .ok()
@@ -3957,6 +3976,7 @@ fn write_external_editor_variant_sidecar(
         "schemaVersion": 1,
     }));
 
+    sidecar.source_identity = output_path.to_string_lossy().into_owned();
     save_metadata_sidecar(sidecar_path, &sidecar)?;
 
     Ok(ExternalEditorVariantReceipt {
@@ -4141,15 +4161,9 @@ pub fn create_virtual_copy(
     .to_serialized();
     let (_, new_sidecar_path) = parse_virtual_path(&new_virtual_path);
 
-    if source_sidecar_path.exists() {
-        fs::copy(&source_sidecar_path, &new_sidecar_path)
-            .map_err(|e| format!("Failed to copy sidecar file: {}", e))?;
-    } else {
-        let default_metadata = ImageMetadata::default();
-        let json_string =
-            serde_json::to_string_pretty(&default_metadata).map_err(|e| e.to_string())?;
-        fs::write(new_sidecar_path, json_string).map_err(|e| e.to_string())?;
-    }
+    let mut metadata = crate::exif_processing::load_sidecar(&source_sidecar_path);
+    metadata.source_identity = new_virtual_path.clone();
+    save_metadata_sidecar(&new_sidecar_path, &metadata)?;
 
     if let Some(album_id) = target_album_id {
         let _ = add_to_album(album_id, vec![new_virtual_path.clone()], app_handle);
@@ -4513,6 +4527,17 @@ mod tests {
     use super::*;
     use image::{ImageEncoder, codecs::tiff::TiffEncoder};
 
+    fn current_test_metadata() -> ImageMetadata {
+        let document = crate::exif_processing::neutral_current_edit_document();
+        let adjustments =
+            crate::adjustments::edit_document_v2::compile_edit_document_v2(&document).unwrap();
+        ImageMetadata {
+            adjustments,
+            edit_document_v2: Some(document),
+            ..ImageMetadata::default()
+        }
+    }
+
     #[test]
     fn metadata_save_receipt_serializes_lossless_render_and_thumbnail_identities() {
         let receipt = metadata_save_receipt("/fixtures/image.raw", &ImageMetadata::default());
@@ -4545,31 +4570,33 @@ mod tests {
             "exposure": 0.5,
             "sectionVisibility": {"basic": true}
         });
-        let mut existing = serde_json::json!({
-            "contrast": 8,
-            "sectionVisibility": {"details": false}
-        });
+        let mut metadata = current_test_metadata();
+        merge_auto_adjustment_document(&mut metadata, &serde_json::json!({"contrast": 8})).unwrap();
 
-        merge_auto_adjustment_document(&mut existing, &auto).unwrap();
-        let accepted = existing.clone();
-        merge_auto_adjustment_document(&mut existing, &auto).unwrap();
+        merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
+        let accepted = metadata.edit_document_v2.clone();
+        merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
 
-        assert_eq!(existing, accepted);
-        assert_eq!(existing["contrast"], 8);
-        assert_eq!(existing["exposure"], 0.5);
-        assert!(existing.get("sectionVisibility").is_none());
+        assert_eq!(metadata.edit_document_v2, accepted);
+        assert_eq!(metadata.adjustments["contrast"], 8);
+        assert_eq!(metadata.adjustments["exposure"], 0.5);
+        assert_eq!(
+            metadata.edit_document_v2.as_ref().unwrap()["nodes"]["scene_global_color_tone"]["params"]
+                ["exposure"],
+            0.5
+        );
     }
 
     #[test]
     fn batch_auto_adjust_rejects_malformed_adjustment_documents() {
         let auto = serde_json::json!({"exposure": 0.5});
-        let mut malformed = serde_json::json!([{"exposure": 0.1}]);
+        let mut malformed = ImageMetadata::default();
         assert_eq!(
             merge_auto_adjustment_document(&mut malformed, &auto),
             Err("auto_adjust_invalid_adjustment_document_quarantined".into())
         );
 
-        let mut existing = serde_json::json!({});
+        let mut existing = current_test_metadata();
         assert_eq!(
             merge_auto_adjustment_document(&mut existing, &serde_json::json!(0.5)),
             Err("auto_adjust_invalid_analysis_document".into())
@@ -5016,16 +5043,10 @@ mod tests {
         write_external_editor_test_tiff(&output_path, Some(b"test-icc-profile"));
 
         let source_sidecar_path = crate::exif_processing::get_primary_sidecar_path(&source_path);
-        let source_metadata = ImageMetadata {
-            adjustments: serde_json::json!({ "exposure": 0.4 }),
-            rating: 4,
-            ..ImageMetadata::default()
-        };
-        fs::write(
-            &source_sidecar_path,
-            serde_json::to_string_pretty(&source_metadata).expect("source metadata json"),
-        )
-        .expect("source sidecar");
+        let mut source_metadata = crate::exif_processing::load_sidecar(&source_sidecar_path);
+        source_metadata.rating = 4;
+        source_metadata.source_identity = source_path.to_string_lossy().into_owned();
+        save_metadata_sidecar(&source_sidecar_path, &source_metadata).expect("source sidecar");
 
         let receipt = write_external_editor_variant_sidecar(
             &source_path.to_string_lossy(),
@@ -5394,14 +5415,12 @@ fn reset_clears_render_authority_and_preserves_library_metadata_and_provenance()
 
     clear_render_authority_for_reset(&mut metadata);
 
+    let neutral_document = crate::exif_processing::neutral_current_edit_document();
     assert_eq!(
         metadata.adjustments,
-        serde_json::json!({
-            "effectsEnabled": false,
-            "sectionVisibility": { "basic": false },
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        })
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&neutral_document).unwrap()
     );
+    assert_eq!(metadata.edit_document_v2, Some(neutral_document));
     assert_eq!(metadata.rating, 4);
     assert_eq!(
         metadata.tags.as_deref(),
@@ -5420,37 +5439,61 @@ fn reset_strict_load_refuses_corrupt_sidecar() {
     let temp = tempfile::tempdir().unwrap();
     let sidecar = temp.path().join("broken.rrdata");
     fs::write(&sidecar, "{not json").unwrap();
-    let error = load_sidecar_strict_for_reset(&sidecar).unwrap_err();
-    assert!(error.contains("Refusing to Reset corrupt sidecar"));
+    let error = load_sidecar_strict_for_reset(&sidecar, None).unwrap_err();
+    assert!(error.contains("Refusing to Reset invalid sidecar"));
+    assert!(sidecar.with_extension("rrdata.quarantine").exists());
 }
 
 #[test]
 fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
     let temp = tempfile::tempdir().unwrap();
     let sidecar = temp.path().join("image.rrdata");
+    let source_identity = sidecar
+        .to_string_lossy()
+        .strip_suffix(".rrdata")
+        .unwrap()
+        .to_string();
+    let mut document = crate::exif_processing::neutral_current_edit_document();
+    document["nodes"]["scene_global_color_tone"]["params"]["exposure"] = serde_json::json!(2);
+    let adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&document).unwrap();
     let original = ImageMetadata {
-        adjustments: serde_json::json!({
-            "exposure": 2,
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        }),
+        adjustments,
+        edit_revision: crate::exif_processing::render_state_revision(
+            &document,
+            Some(&RawEngineArtifacts {
+                layer_stack_sidecars: vec![serde_json::json!({
+                    "schemaVersion": 1,
+                    "sourceImagePath": source_identity
+                })],
+                ..RawEngineArtifacts::default()
+            }),
+        )
+        .unwrap(),
+        edit_document_v2: Some(document),
+        source_identity: source_identity.clone(),
         raw_engine_artifacts: Some(RawEngineArtifacts {
-            layer_stack_sidecars: vec![serde_json::json!({"layers": [1]})],
+            layer_stack_sidecars: vec![serde_json::json!({
+                "schemaVersion": 1,
+                "sourceImagePath": source_identity
+            })],
             ..RawEngineArtifacts::default()
         }),
         ..ImageMetadata::default()
     };
     save_metadata_sidecar(&sidecar, &original).unwrap();
     backup_sidecar_before_reset(&sidecar).unwrap();
-    let mut reset = load_sidecar_strict_for_reset(&sidecar).unwrap();
+    let mut reset = load_sidecar_strict_for_reset(&sidecar, Some(&source_identity)).unwrap();
     clear_render_authority_for_reset(&mut reset);
     save_metadata_sidecar(&sidecar, &reset).unwrap();
 
-    let reopened = load_sidecar_strict_for_reset(&sidecar).unwrap();
+    let reopened = load_sidecar_strict_for_reset(&sidecar, Some(&source_identity)).unwrap();
     assert_eq!(
         reopened.adjustments,
-        serde_json::json!({
-            "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
-        })
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(
+            &crate::exif_processing::neutral_current_edit_document()
+        )
+        .unwrap()
     );
     assert!(
         reopened
@@ -5461,7 +5504,9 @@ fn reset_atomic_write_survives_reopen_and_keeps_pre_reset_recovery_copy() {
     );
     let backup = sidecar.with_extension("rrdata.pre-reset");
     assert_eq!(
-        load_sidecar_strict_for_reset(&backup).unwrap().adjustments,
+        load_sidecar_strict_for_reset(&backup, Some(&source_identity))
+            .unwrap()
+            .adjustments,
         original.adjustments
     );
 }
