@@ -4,6 +4,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { BUN_COVERAGE_FLOORS, enforceCoverageFloors, summarizeLcov } from '../../../scripts/ci/check-bun-coverage.ts';
 import {
+  buildCoverageTestArgs,
+  COVERAGE_MEMORY_RESERVE_BYTES,
+  COVERAGE_WORKER_MEMORY_BYTES,
+  MAX_COVERAGE_FILES_PER_WORKER,
+  resolveCoverageWorkerCount,
+} from '../../../scripts/ci/run-bun-coverage.ts';
+import {
   buildRandomizedTestArgs,
   RANDOMIZED_SUITE_RUN_COUNT,
   randomizedTestReproduction,
@@ -47,6 +54,28 @@ async function captured(command: string[], options: { cwd: string; env?: Record<
 }
 
 describe('Bun native confidence gates', () => {
+  test('bounds coverage isolates per native worker within measured memory', () => {
+    const fileCount = 396;
+    const workers = resolveCoverageWorkerCount(
+      fileCount,
+      18,
+      COVERAGE_MEMORY_RESERVE_BYTES + 40 * COVERAGE_WORKER_MEMORY_BYTES,
+    );
+    expect(workers).toBe(33);
+    expect(Math.ceil(fileCount / workers)).toBeLessThanOrEqual(MAX_COVERAGE_FILES_PER_WORKER);
+    expect(buildCoverageTestArgs(workers, 'tests/pure-ts')).toEqual([
+      'test',
+      '--no-orphans',
+      '--dots',
+      '--parallel=33',
+      '--coverage',
+      'tests/pure-ts',
+    ]);
+    expect(() =>
+      resolveCoverageWorkerCount(fileCount, 18, COVERAGE_MEMORY_RESERVE_BYTES + 32 * COVERAGE_WORKER_MEMORY_BYTES),
+    ).toThrow('memory safely permits 32');
+  });
+
   test('uses native parallel randomization with a stable exact reproduction command', () => {
     const seed = resolveRandomizedTestSeed('424242');
     expect(seed).toBe(424242);

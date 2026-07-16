@@ -90,12 +90,13 @@ for (const token of ["['bun', 'test'", "'--only-failures'", "'--parallel'"]) {
 }
 if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitRunner))
   throw new Error('The Bun unit boundary introduced a scheduler, shard, or forced serial execution.');
-if (
-  !packageScripts['test:coverage']?.startsWith('bun test ') ||
-  !packageScripts['test:coverage'].includes('--coverage') ||
-  !packageScripts['test:coverage'].includes('bun scripts/ci/check-bun-coverage.ts')
-)
-  throw new Error('The coverage lane must delegate directly to Bun native coverage.');
+if (packageScripts['test:coverage'] !== 'bun scripts/ci/run-bun-coverage.ts && bun scripts/ci/check-bun-coverage.ts')
+  throw new Error('The coverage lane must use the maintained Bun native worker policy and global LCOV gate.');
+const coverageRunner = readFileSync('scripts/ci/run-bun-coverage.ts', 'utf8');
+if (!coverageRunner.includes("Bun.spawn(['bun', ...buildCoverageTestArgs(workerCount, target)]"))
+  throw new Error('The coverage lane must execute the complete suite through one native Bun invocation.');
+if (/--shard|--retry|--parallel=1|run-resource-coordinated|turbo/u.test(coverageRunner))
+  throw new Error('The coverage lane introduced shards, retries, serial execution, or a third-party scheduler.');
 if (packageScripts['test:coverage']?.includes('turbo') || unitRunner.includes('turbo'))
   throw new Error('Bun unit and coverage suites must not use a third-party scheduler.');
 if (packageScripts['test:randomized'] !== 'bun scripts/ci/run-bun-randomized-tests.ts')
