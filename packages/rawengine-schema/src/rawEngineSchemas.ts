@@ -7252,7 +7252,7 @@ export const negativeLabPresetMetadataPolicyCatalogV1Schema = z
     });
   });
 
-const filmLookRecipeIdSchema = z
+export const filmLookRecipeIdSchema = z
   .string()
   .trim()
   .regex(/^film_look\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u);

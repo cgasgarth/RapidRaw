@@ -81,6 +81,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'tone_equalizer',
       'display_creative',
       'film_emulation',
+      'film_look',
       'detail_denoise_dehaze',
       'point_color',
       'color_balance_rgb',
@@ -148,6 +149,61 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(corruptFlat.nodes.film_emulation.params.filmEmulation).toBeNull();
     expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ filmEmulation: { mix: 1 } });
+  });
+
+  test('owns strict Film Look identity and migrates old V2 authority idempotently', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 65,
+    });
+    expect(document.nodes.film_look.params).toEqual({
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 65,
+    });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('filmLookStrength');
+    expect(document.migration?.mapped).toContain('film_look.filmLookId');
+    expect(document.migration?.mapped).toContain('film_look.filmLookStrength');
+    const reset = resetEditDocumentV2Node(document, 'film_look');
+    expect(reset.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
+    expect(reset.nodes.scene_global_color_tone).toEqual(document.nodes.scene_global_color_tone);
+
+    const oldV2 = structuredClone(document);
+    delete (oldV2.nodes as Partial<typeof oldV2.nodes>).film_look;
+    Object.assign(oldV2.extensions.legacyAdjustments as Record<string, unknown>, {
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 65,
+    });
+    if (oldV2.migration === undefined) throw new Error('fixture migration receipt is required');
+    oldV2.migration.mapped = oldV2.migration.mapped.filter((path) => !path.startsWith('film_look.'));
+    const reopened = editDocumentV2Schema.parse(oldV2);
+    expect(reopened.nodes.film_look.params).toEqual(document.nodes.film_look.params);
+    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
+    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
+
+    const corruptOldV2 = structuredClone(oldV2);
+    Object.assign(corruptOldV2.extensions.legacyAdjustments as Record<string, unknown>, {
+      filmLookId: 'unknown-look',
+      filmLookStrength: Number.NaN,
+    });
+    const quarantined = editDocumentV2Schema.parse(corruptOldV2);
+    expect(quarantined.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
+    expect(quarantined.extensions.quarantinedLegacyAdjustments).toMatchObject({ filmLookId: 'unknown-look' });
+    expect(quarantined.extensions.quarantinedLegacyAdjustments?.filmLookStrength).toBeNaN();
+    expect(quarantined.migration?.quarantined).toEqual(expect.arrayContaining(['filmLookId', 'filmLookStrength']));
+
+    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 101,
+    });
+    expect(corruptFlat.nodes.film_look.params).toEqual({
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 100,
+    });
+    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toMatchObject({ filmLookStrength: 101 });
+    expect(corruptFlat.migration?.defaulted).toContain('film_look.filmLookStrength');
   });
 
   test('owns strict Color Presence state and migrates old scene-node fields idempotently', () => {
@@ -1758,6 +1814,28 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     expect(renderDocument.nodes.detail_denoise_dehaze).toEqual(preparedDocument.nodes.detail_denoise_dehaze);
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
+  });
+
+  test('render preparation overlays independent Film Emulation and Film Look authority', () => {
+    const authoritative = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 65,
+    });
+    const prepared = {
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      filmLookId: 'film_look.generic.clean_color.v1',
+      filmLookStrength: 25,
+    };
+    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['film_emulation', 'film_look']);
+
+    expect(renderDocument.nodes.film_emulation).toBe(authoritative.nodes.film_emulation);
+    expect(renderDocument.nodes.film_look).toBe(authoritative.nodes.film_look);
+    expect(renderDocument.nodes.film_look.params).toEqual({
+      filmLookId: 'film_look.generic.warm_print.v1',
+      filmLookStrength: 65,
+    });
+    expect(renderDocument.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
   });
 
   test('render preparation overlays the authoritative tone-equalizer envelope', () => {

@@ -125,7 +125,13 @@ describe('display creative edit transaction', () => {
       const expectedFilmInvalidation = DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS.includes(
         field as (typeof DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS)[number],
       )
-        ? [{ patch: { filmLookId: null, filmLookStrength: 100 }, type: 'patch-adjustments' }]
+        ? [
+            {
+              nodeType: 'film_look',
+              patch: { filmLookId: null, filmLookStrength: 100 },
+              type: 'patch-edit-document-node',
+            },
+          ]
         : [];
       expect(buildDisplayCreativeEditTransaction(state, identity(), field, 37, `field-${field}`).operations).toEqual([
         { nodeType: 'display_creative', patch: { [field]: 37 }, type: 'patch-edit-document-node' },
@@ -198,6 +204,11 @@ describe('display creative edit transaction', () => {
       );
     expect(halation.after).toMatchObject({ filmLookId: null, filmLookStrength: 100, halationAmount: 24 });
     expect(halation.afterEditDocumentV2.nodes.display_creative.params.halationAmount).toBe(24);
+    expect(halation.afterEditDocumentV2.nodes.film_look.params).toEqual({
+      filmLookId: null,
+      filmLookStrength: 100,
+    });
+    expect(halation.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -224,7 +235,11 @@ describe('display creative edit transaction', () => {
         patch: { grainAmount: 28, grainRoughness: 50, grainSize: 34 },
         type: 'patch-edit-document-node',
       },
-      { patch: { filmLookId: null, filmLookStrength: 100 }, type: 'patch-adjustments' },
+      {
+        nodeType: 'film_look',
+        patch: { filmLookId: null, filmLookStrength: 100 },
+        type: 'patch-edit-document-node',
+      },
     ]);
     expect(result.afterEditDocumentV2.nodes.display_creative.params).toMatchObject({
       grainAmount: 28,

@@ -29,7 +29,13 @@ export const buildFilmWorkspaceEditTransactionRequest = (
       ? {}
       : { referenceMatchApplicationReceipt: next.referenceMatchApplicationReceipt };
   const ownsFilmEmulation = Object.hasOwn(patch, 'filmEmulation');
-  const { filmEmulation: _filmEmulation, ...legacyPatch } = structuredClone(patch);
+  const ownsFilmLookId = Object.hasOwn(patch, 'filmLookId');
+  const ownsFilmLookStrength = Object.hasOwn(patch, 'filmLookStrength');
+  const { filmEmulation: _filmEmulation, filmLookId, filmLookStrength, ...legacyPatch } = structuredClone(patch);
+  const filmLookPatch = {
+    ...(ownsFilmLookId ? { filmLookId: filmLookId ?? null } : {}),
+    ...(ownsFilmLookStrength ? { filmLookStrength: filmLookStrength ?? 100 } : {}),
+  };
   const compatibilityPatch = { ...legacyPatch, ...provenancePatch };
 
   return {
@@ -43,6 +49,15 @@ export const buildFilmWorkspaceEditTransactionRequest = (
             {
               nodeType: 'film_emulation' as const,
               patch: { filmEmulation: patch.filmEmulation ?? null },
+              type: 'patch-edit-document-node' as const,
+            },
+          ]
+        : []),
+      ...(ownsFilmLookId || ownsFilmLookStrength
+        ? [
+            {
+              nodeType: 'film_look' as const,
+              patch: filmLookPatch,
               type: 'patch-edit-document-node' as const,
             },
           ]

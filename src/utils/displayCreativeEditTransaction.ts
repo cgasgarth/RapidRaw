@@ -98,8 +98,9 @@ export const buildDisplayCreativePatchEditTransaction = (
       ...(invalidatesFilmLook
         ? ([
             {
+              nodeType: 'film_look',
               patch: { filmLookId: null, filmLookStrength: 100 },
-              type: 'patch-adjustments',
+              type: 'patch-edit-document-node',
             },
           ] as const)
         : []),
