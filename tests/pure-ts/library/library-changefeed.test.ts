@@ -3,6 +3,7 @@ import type { ImageFile } from '../../../src/components/ui/AppProperties';
 import {
   applyFolderCountDeltas,
   applyLibraryChangeRows,
+  catalogChangeAppliedSchema,
   libraryChangeBatchSchema,
 } from '../../../src/hooks/library/useSelectedFolderRefreshWatcher';
 
@@ -17,6 +18,29 @@ const row = (path: string, rating = 0): ImageFile => ({
 });
 
 describe('library filesystem changefeed', () => {
+  test('accepts and retains the exact revisioned native catalog projection', () => {
+    const parsed = catalogChangeAppliedSchema.parse({
+      catalogRevision: 12,
+      removedImageIds: [],
+      upserted: [
+        {
+          entityRevision: 4,
+          exif: null,
+          imageId: '/library/alaska/image.arw',
+          is_edited: false,
+          is_virtual_copy: false,
+          modified: 1,
+          path: '/library/alaska/image.arw',
+          rating: 0,
+          tags: null,
+        },
+      ],
+    });
+
+    expect(parsed.upserted[0]?.imageId).toBe('/library/alaska/image.arw');
+    expect(parsed.upserted[0]?.entityRevision).toBe(4);
+  });
+
   test('patches only changed physical identities while preserving unrelated rows and selection identities', () => {
     const current = [row('/library/a.raw'), row('/library/a.raw?vc=one'), row('/library/b.raw')];
     const result = applyLibraryChangeRows(current, new Set(), [

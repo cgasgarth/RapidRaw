@@ -45,10 +45,17 @@ const imageFileSchema = z
   })
   .strict();
 
-const catalogChangeAppliedSchema = z
+export const catalogImageProjectionSchema = imageFileSchema
+  .extend({
+    entityRevision: z.number().int().positive(),
+    imageId: z.string().min(1),
+  })
+  .strict();
+
+export const catalogChangeAppliedSchema = z
   .object({
     catalogRevision: z.number().int().nonnegative(),
-    upserted: z.array(imageFileSchema),
+    upserted: z.array(catalogImageProjectionSchema),
     removedImageIds: z.array(z.string().min(1)),
   })
   .strict();

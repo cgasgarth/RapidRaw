@@ -1182,6 +1182,22 @@ mod tests {
     }
 
     #[test]
+    fn catalog_projection_serializes_the_exact_frontend_revision_contract() {
+        let projection = CatalogImageProjection {
+            image_id: "/library/alaska/image.arw".to_string(),
+            entity_revision: 4,
+            image: image("/library/alaska/image.arw".to_string()),
+        };
+        let value = serde_json::to_value(projection).expect("serialize projection");
+        assert_eq!(value["imageId"], "/library/alaska/image.arw");
+        assert_eq!(value["entityRevision"], 4);
+        assert_eq!(value["is_edited"], false);
+        assert_eq!(value["is_virtual_copy"], false);
+        assert!(value.get("image_id").is_none());
+        assert!(value.get("entity_revision").is_none());
+    }
+
+    #[test]
     fn image_open_uses_entity_revision_across_unrelated_catalog_deltas() {
         let connection = Connection::open_in_memory().expect("memory catalog");
         connection.execute_batch(schema_sql()).expect("schema");
