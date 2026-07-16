@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: '37 8 * * *'
   workflow_dispatch:
+    inputs:
+      randomized_seed:
+        description: 'Optional exact Bun randomized-isolation seed to replay'
+        required: false
+        type: string
 
 permissions:
   actions: read
@@ -80,7 +85,7 @@ jobs:
       - uses: ./.github/actions/setup-bun-deps
       - name: Repeat the Bun suite in a reproducible random order
         env:
-          RAWENGINE_BUN_TEST_SEED: ${{ github.run_id }}
+          RAWENGINE_BUN_TEST_SEED: ${{ inputs.randomized_seed || github.run_id }}
         run: bun run test:randomized
 
   frontend-browser:
