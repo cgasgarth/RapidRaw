@@ -118,16 +118,11 @@ describe('Bun native confidence gates', () => {
 
   test('prints reproduction and exits bounded while killing a failed worker descendant', async () => {
     const directory = await temporaryDirectory('rapidraw-bun-randomized-gate-');
-    const readyFile = join(directory, 'descendant-ready');
     const pidFile = join(directory, 'descendant-pid');
     const failingTest = join(directory, 'failure.test.ts');
     await Bun.write(
       failingTest,
-      `import { expect, test } from "bun:test";\ntest("intentional failure", async () => { for (let attempt = 0; attempt < 200 && !(await Bun.file(${JSON.stringify(readyFile)}).exists()); attempt += 1) await Bun.sleep(10); expect(1).toBe(2); }, 3_000);\n`,
-    );
-    await Bun.write(
-      join(directory, 'descendant.test.ts'),
-      `import { test } from "bun:test";\ntest("owns a descendant", async () => { const child = Bun.spawn(["bun", "-e", "await Bun.sleep(60_000)"], { stderr: "ignore", stdout: "ignore" }); await Bun.write(${JSON.stringify(pidFile)}, String(child.pid)); await Bun.write(${JSON.stringify(readyFile)}, "ready"); await Bun.sleep(60_000); }, 65_000);\n`,
+      `import { expect, test } from "bun:test";\ntest("fails with a live descendant", async () => { const child = Bun.spawn(["bun", "-e", "await Bun.sleep(60_000)"], { stderr: "ignore", stdout: "ignore" }); await Bun.write(${JSON.stringify(pidFile)}, String(child.pid)); expect(1).toBe(2); }, 3_000);\n`,
     );
     const runner = resolve('scripts/ci/run-bun-randomized-tests.ts');
     const startedAt = performance.now();
