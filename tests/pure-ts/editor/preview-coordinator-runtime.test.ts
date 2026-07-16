@@ -115,4 +115,34 @@ describe('preview coordinator runtime', () => {
     expect(published.map((update) => update.finalPreviewUrl)).toEqual(['blob:first-surface', 'blob:second-surface']);
     expect(released).toEqual([]);
   });
+
+  test('publishes an interactive successor when the settled artifact belongs to older exact render inputs', () => {
+    const published: PreviewSurfaceUpdate[] = [];
+    const released: string[] = [];
+    const runtime = new PreviewCoordinatorRuntime({
+      publishSurface: (update) => published.push(update),
+      releaseUrl: (url) => released.push(url),
+    });
+    const complete = (kind: 'interactive' | 'settled', identity: PreviewSessionIdentity, url: string) => {
+      const queued = runtime.dispatch({ identity, kind, type: 'render-inputs-changed' });
+      const operation = requiredIdentity(queued.state[kind].identity);
+      runtime.dispatch({ identity: operation, type: 'operation-started' });
+      runtime.dispatch({ artifact: artifact(operation, url), identity: operation, type: 'operation-completed' });
+      return operation;
+    };
+
+    const settled = complete('settled', session(), 'blob:settled-base');
+    const interactive = complete(
+      'interactive',
+      session({ adjustmentRevision: 2, graphRevision: 'graph-interactive' }),
+      'blob:interactive-successor',
+    );
+
+    expect(runtime.snapshot().visibleArtifact).toEqual(artifact(interactive, 'blob:interactive-successor'));
+    expect(published).toEqual([
+      { finalPreviewUrl: 'blob:settled-base', presentedPreviewArtifact: artifact(settled, 'blob:settled-base') },
+      { presentedPreviewArtifact: artifact(interactive, 'blob:interactive-successor') },
+    ]);
+    expect(released).toEqual([]);
+  });
 });
