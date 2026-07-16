@@ -149,6 +149,47 @@ describe('scoped precommit autofix', () => {
     expect(await readFile(join(root, 'intended.ts'), 'utf8')).toBe(git(root, 'show', ':intended.ts').stdout);
   });
 
+  test('formats the staged snapshot without recreating an unstaged working-tree deletion', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-deleted-'));
+    roots.push(root);
+    expect(git(root, 'init', '-q').status).toBe(0);
+    expect(git(root, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(
+      join(root, 'biome.json'),
+      JSON.stringify({
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
+        formatter: { enabled: true },
+        linter: { enabled: false },
+      }),
+    );
+    const fixturePath = join(root, 'fixture.ts');
+    await writeFile(fixturePath, 'export const fixture = { value: 1 };\n');
+    expect(git(root, 'add', '.').status).toBe(0);
+    expect(
+      git(root, '-c', 'user.email=test@example.invalid', '-c', 'user.name=RapidRaw-test', 'commit', '-qm', 'fixture')
+        .status,
+    ).toBe(0);
+
+    await writeFile(fixturePath, 'export const fixture={value:2}\n');
+    expect(git(root, 'add', 'fixture.ts').status).toBe(0);
+    await rm(fixturePath);
+
+    const gitEnvironment = isolatedGitEnvironment(process.env);
+    expect(
+      runScopedAutofix(
+        root,
+        ['fixture.ts'],
+        ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')],
+        gitEnvironment,
+      ),
+    ).toBe(0);
+
+    expect(git(root, 'show', ':fixture.ts').stdout).toBe('export const fixture = { value: 2 };\n');
+    expect(await Bun.file(fixturePath).exists()).toBe(false);
+    expect(git(root, 'diff', '--cached', '--name-status').stdout.trim()).toBe('M\tfixture.ts');
+    expect(git(root, 'diff', '--name-status').stdout.trim()).toBe('D\tfixture.ts');
+  });
+
   test('leaves an already formatted staged path unchanged', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-noop-'));
     roots.push(root);

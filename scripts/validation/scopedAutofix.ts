@@ -1,8 +1,44 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, ftruncateSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 
 export type GitSpawnEnvironment = Readonly<Record<string, string | undefined>>;
+
+const readRegularWorkingCopy = (path: string): Buffer | null => {
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    if (!fstatSync(descriptor).isFile()) return null;
+    return readFileSync(descriptor);
+  } catch {
+    return null;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+};
+
+const synchronizeWorkingCopy = (path: string, stagedContent: Buffer, formattedContent: Buffer): void => {
+  let descriptor: number | undefined;
+  let mutationStarted = false;
+  try {
+    descriptor = openSync(path, constants.O_RDWR | constants.O_NOFOLLOW);
+    if (!fstatSync(descriptor).isFile()) return;
+    if (!readFileSync(descriptor).equals(stagedContent)) return;
+    ftruncateSync(descriptor, 0);
+    mutationStarted = true;
+    let written = 0;
+    while (written < formattedContent.length) {
+      const byteCount = writeSync(descriptor, formattedContent, written, formattedContent.length - written, written);
+      if (byteCount === 0) throw new Error(`Formatter made no progress synchronizing ${path}.`);
+      written += byteCount;
+    }
+  } catch (error) {
+    if (mutationStarted) throw error;
+    // A missing, replaced, or unreadable working copy remains untouched; the staged snapshot is still authoritative.
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+};
 
 export const readStagedAutofixPaths = (root: string, gitEnvironment: GitSpawnEnvironment = process.env): string[] => {
   const result = spawnSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], {
@@ -68,14 +104,14 @@ export const runScopedAutofix = (
     });
     if (nextBlob.status !== 0) return nextBlob.status ?? 1;
     const workingPath = join(root, path);
-    const workingContent = readFileSync(workingPath);
+    const workingContent = readRegularWorkingCopy(workingPath);
     formatted.push({
       blob: nextBlob.stdout.trim(),
       formattedContent: fix.stdout,
       mode: match[1],
       path,
       stagedContent: staged.stdout,
-      synchronizeWorkingCopy: workingContent.equals(staged.stdout),
+      synchronizeWorkingCopy: workingContent?.equals(staged.stdout) ?? false,
     });
   }
   for (const entry of formatted) {
@@ -89,8 +125,7 @@ export const runScopedAutofix = (
   for (const entry of formatted) {
     if (!entry.synchronizeWorkingCopy) continue;
     const workingPath = join(root, entry.path);
-    if (!readFileSync(workingPath).equals(entry.stagedContent)) continue;
-    writeFileSync(workingPath, entry.formattedContent);
+    synchronizeWorkingCopy(workingPath, entry.stagedContent, entry.formattedContent);
   }
   return 0;
 };
