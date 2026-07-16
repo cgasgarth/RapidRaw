@@ -45,7 +45,7 @@ describe('scoped precommit autofix', () => {
     expect(git(root, 'add', '.').status).toBe(0);
 
     const gitEnvironment = isolatedGitEnvironment(process.env);
-    const biomeCommand = ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')];
+    const biomeCommand: [string, string] = ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')];
     expect(runScopedAutofix(root, readStagedAutofixPaths(root, gitEnvironment), biomeCommand, gitEnvironment)).toBe(0);
     const formatted = git(root, 'show', ':fixture.ts').stdout;
     expect(formatted.indexOf('node:fs/promises')).toBeLessThan(formatted.indexOf('node:path'));
@@ -236,7 +236,7 @@ describe('scoped precommit autofix', () => {
 
     const hookEnvironment = { ...process.env, GIT_INDEX_FILE: parentIndexPath };
     const gitEnvironment = isolatedGitEnvironment(hookEnvironment);
-    expect(gitEnvironment.GIT_INDEX_FILE).toBeUndefined();
+    expect(gitEnvironment['GIT_INDEX_FILE']).toBeUndefined();
     expect(git(fixtureRoot, 'init', '-q').status).toBe(0);
     expect(git(fixtureRoot, 'config', 'core.fsmonitor', 'false').status).toBe(0);
     await writeFile(
