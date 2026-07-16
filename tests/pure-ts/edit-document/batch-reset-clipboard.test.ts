@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'bun:test';
+import type {
+  EditDocumentNodeEnvelopeV2,
+  EditDocumentNodeTypeV2,
+  EditDocumentV2,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   compileEditDocumentNodeV2,
   compileEditDocumentV2,
+  editDocumentSourceArtifactsV2Schema,
   editDocumentV2Schema,
-  getEditDocumentNodeDescriptor,
-  parseEditDocumentV2WithQuarantine,
-} from '../../packages/rawengine-schema/src/editDocumentV2';
-import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
-import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   batchUpdateEditDocumentV2Nodes,
   buildEditDocumentV2Diagnostics,
@@ -15,8 +18,6 @@ import {
   copyEditDocumentV2Nodes,
   EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS,
   editDocumentV2NodeInventory,
-  editDocumentV2ToLegacyAdjustments,
-  getEditDocumentV2NodeCapabilities,
   legacyAdjustmentsToEditDocumentV2,
   lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   pasteEditDocumentV2Node,
@@ -26,11 +27,16 @@ import {
   selectEditDocumentV2CopyPayload,
   setEditDocumentV2NodeEnabled,
   updateEditDocumentV2Node,
-} from '../../src/utils/editDocumentV2';
+} from '../../../src/utils/editDocumentV2';
+import { referenceMatchReceipt, sourcePatch } from './authority-fixtures';
 
-import { referenceMatchReceipt, sourcePatch } from './edit-document/authority-fixtures';
+const requireNode = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2): EditDocumentNodeEnvelopeV2 => {
+  const node = document.nodes[nodeType];
+  if (node === undefined) throw new Error(`expected ${nodeType} fixture`);
+  return node;
+};
 
-describe('EditDocumentV2 legacy adapter', () => {
+describe('EditDocumentV2 batch reset and clipboard', () => {
   test('batch edits honor descriptor capability and preserve each document domain', () => {
     const documents = [
       legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.1 }),
@@ -40,8 +46,10 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...params,
       exposure: index + 1,
     }));
-    expect(updated?.map((document) => document.nodes.scene_global_color_tone?.params.exposure)).toEqual([1, 2]);
-    expect(updated?.[0]?.nodes.geometry).toEqual(documents[0]?.nodes.geometry);
+    expect(updated?.map((document) => requireNode(document, 'scene_global_color_tone').params['exposure'])).toEqual([
+      1, 2,
+    ]);
+    expect(updated?.[0]?.nodes['geometry']).toEqual(documents[0]?.nodes['geometry']);
     expect(batchUpdateEditDocumentV2Nodes(documents, 'layers', () => ({}))).toBeNull();
     expect(batchUpdateEditDocumentV2Nodes(documents, 'source_artifacts', () => ({}))).toBeNull();
   });
@@ -53,7 +61,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       extensions: { ...document.extensions, quarantinedNodes: { future_color_v9: { enabled: true } } },
       nodes: {
         ...document.nodes,
-        scene_curve: { ...document.nodes.scene_curve, enabled: false },
+        scene_curve: { ...requireNode(document, 'scene_curve'), enabled: false },
       },
     });
 
@@ -73,7 +81,7 @@ describe('EditDocumentV2 legacy adapter', () => {
     });
     const reset = resetEditDocumentV2Node(document, 'scene_global_color_tone');
 
-    expect(reset.nodes.scene_global_color_tone?.params).toEqual({
+    expect(requireNode(reset, 'scene_global_color_tone').params).toEqual({
       blacks: 0,
       brightness: 0,
       contrast: 0,
@@ -82,7 +90,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       shadows: 0,
       whites: 0,
     });
-    expect(reset.nodes.geometry).toEqual(document.nodes.geometry);
+    expect(requireNode(reset, 'geometry')).toEqual(requireNode(document, 'geometry'));
     expect(reset.provenance).toEqual(document.provenance);
   });
 
@@ -96,9 +104,9 @@ describe('EditDocumentV2 legacy adapter', () => {
     const next = replaceEditDocumentV2SourceArtifacts(document, { aiPatches: [sourcePatch] });
 
     expect(next.sourceArtifacts.aiPatches).toEqual([sourcePatch]);
-    expect(next.nodes.source_artifacts?.params).toEqual(next.sourceArtifacts);
-    expect(next.nodes.scene_global_color_tone).toBe(document.nodes.scene_global_color_tone);
-    expect(next.nodes.geometry).toBe(document.nodes.geometry);
+    expect(requireNode(next, 'source_artifacts').params).toEqual(next.sourceArtifacts);
+    expect(requireNode(next, 'scene_global_color_tone')).toBe(requireNode(document, 'scene_global_color_tone'));
+    expect(requireNode(next, 'geometry')).toBe(requireNode(document, 'geometry'));
     expect(next.provenance).toEqual(document.provenance);
   });
 
@@ -108,10 +116,12 @@ describe('EditDocumentV2 legacy adapter', () => {
       ...params,
       aiPatches: [sourcePatch],
     }));
-    expect(authoritative.sourceArtifacts).toEqual(authoritative.nodes.source_artifacts?.params);
+    expect(authoritative.sourceArtifacts).toEqual(
+      editDocumentSourceArtifactsV2Schema.parse(requireNode(authoritative, 'source_artifacts').params),
+    );
 
     const rendered = prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, authoritative, ['source_artifacts']);
-    expect(rendered.nodes.source_artifacts).toBe(authoritative.nodes.source_artifacts);
+    expect(requireNode(rendered, 'source_artifacts')).toBe(requireNode(authoritative, 'source_artifacts'));
     expect(rendered.sourceArtifacts).toEqual(authoritative.sourceArtifacts);
     expect(rendered.sourceArtifacts.aiPatches).toEqual([sourcePatch]);
   });
@@ -119,13 +129,15 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('copy and paste derive eligibility from descriptors and isolate node state', () => {
     const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.5 });
     const clipboard = copyEditDocumentV2Node(document, 'scene_global_color_tone');
-    expect(clipboard?.params.exposure).toBe(0.5);
-    if (clipboard) clipboard.params.exposure = 2;
-    expect(document.nodes.scene_global_color_tone?.params.exposure).toBe(0.5);
+    expect(clipboard).not.toBeNull();
+    if (clipboard === null) throw new Error('expected scene tone clipboard fixture');
+    expect(clipboard.params['exposure']).toBe(0.5);
+    clipboard.params['exposure'] = 2;
+    expect(requireNode(document, 'scene_global_color_tone').params['exposure']).toBe(0.5);
 
     const pasted = pasteEditDocumentV2Node(document, 'scene_global_color_tone', clipboard);
-    expect(pasted.nodes.scene_global_color_tone?.params.exposure).toBe(2);
-    expect(pasted.nodes.geometry).toBe(document.nodes.geometry);
+    expect(requireNode(pasted, 'scene_global_color_tone').params['exposure']).toBe(2);
+    expect(requireNode(pasted, 'geometry')).toBe(requireNode(document, 'geometry'));
     expect(pasted.provenance).toBe(document.provenance);
     expect(copyEditDocumentV2Node(document, 'source_artifacts')).toBeNull();
   });
@@ -143,7 +155,7 @@ describe('EditDocumentV2 legacy adapter', () => {
     const clipboard = copyEditDocumentV2Nodes(source);
 
     expect(Object.keys(clipboard.nodes)).toContain('scene_global_color_tone');
-    expect(clipboard.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
+    expect(clipboard.nodes['scene_global_color_tone']).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
     expect(clipboard.nodes).not.toHaveProperty('layers');
     expect(clipboard.nodes).not.toHaveProperty('source_artifacts');
     expect(clipboard).not.toHaveProperty('provenance');
@@ -153,7 +165,7 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     const selected = selectEditDocumentV2CopyPayload(clipboard, ['exposure'], true);
     expect(Object.keys(selected.nodes)).toEqual(['scene_global_color_tone']);
-    expect(selected.nodes.scene_global_color_tone?.enabled).toBeFalse();
+    expect(selected.nodes['scene_global_color_tone']?.enabled).toBeFalse();
     expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).toMatchObject({ exposure: 1.25 });
     expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).not.toHaveProperty(
       'referenceMatchApplicationReceipt',
@@ -174,13 +186,13 @@ describe('EditDocumentV2 legacy adapter', () => {
     const pasted = pasteEditDocumentV2Node(
       destination,
       'scene_global_color_tone',
-      clipboard.nodes.scene_global_color_tone,
+      clipboard.nodes['scene_global_color_tone'],
     );
 
-    expect(pasted.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 2 } });
-    expect(pasted.nodes.geometry).toBe(destination.nodes.geometry);
-    expect(pasted.nodes.layers).toBe(destination.nodes.layers);
-    expect(pasted.nodes.source_artifacts).toBe(destination.nodes.source_artifacts);
+    expect(requireNode(pasted, 'scene_global_color_tone')).toMatchObject({ enabled: false, params: { exposure: 2 } });
+    expect(requireNode(pasted, 'geometry')).toBe(requireNode(destination, 'geometry'));
+    expect(requireNode(pasted, 'layers')).toBe(requireNode(destination, 'layers'));
+    expect(requireNode(pasted, 'source_artifacts')).toBe(requireNode(destination, 'source_artifacts'));
     expect(pasted.sourceArtifacts).toBe(destination.sourceArtifacts);
     expect(editDocumentV2Schema.parse(structuredClone(pasted))).toEqual(pasted);
     expect(
@@ -205,7 +217,7 @@ describe('EditDocumentV2 legacy adapter', () => {
   test('compiles graph nodes in descriptor order with render-stage authority', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     const compiled = compileEditDocumentV2(document);
-    expect(compiled.map(({ nodeType }) => nodeType)).toEqual(editDocumentV2NodeInventory(document));
+    expect(compiled.map(({ nodeType }) => nodeType)).toEqual([...editDocumentV2NodeInventory(document)]);
     expect(compiled.find(({ nodeType }) => nodeType === 'geometry')).toMatchObject({
       nodeType: 'geometry',
       process: 'legacy_pipeline_v1',
@@ -217,20 +229,20 @@ describe('EditDocumentV2 legacy adapter', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
     expect(() =>
       compileEditDocumentNodeV2({
-        ...document.nodes.geometry,
+        ...requireNode(document, 'geometry'),
         process: 'scene_referred_v2',
       }),
     ).toThrow('incompatible process');
     expect(() =>
       compileEditDocumentNodeV2({
-        ...document.nodes.geometry,
+        ...requireNode(document, 'geometry'),
         implementationVersion: 2,
       }),
     ).toThrow('unsupported version');
     expect(() =>
       compileEditDocumentNodeV2({
-        ...document.nodes.scene_global_color_tone,
-        params: { ...document.nodes.scene_global_color_tone?.params, exposure: 6 },
+        ...requireNode(document, 'scene_global_color_tone'),
+        params: { ...requireNode(document, 'scene_global_color_tone').params, exposure: 6 },
       }),
     ).toThrow();
   });
