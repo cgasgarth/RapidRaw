@@ -1738,6 +1738,16 @@ mod tests {
                 captured_progress.lock().unwrap().push(payload);
             }
         });
+        let resume_change_batches = Arc::new(Mutex::new(Vec::<serde_json::Value>::new()));
+        let captured_change_batches = Arc::clone(&resume_change_batches);
+        restarted_handle.listen(
+            super::super::changefeed::LIBRARY_CHANGE_BATCH_EVENT,
+            move |event| {
+                if let Ok(payload) = serde_json::from_str(event.payload()) {
+                    captured_change_batches.lock().unwrap().push(payload);
+                }
+            },
+        );
 
         let validation = validate_job_resume(&restarted_handle, &job_id).unwrap();
         assert_eq!(
@@ -1812,15 +1822,63 @@ mod tests {
         let report =
             super::super::changefeed::get_library_changefeed_report(restarted_handle.state())
                 .unwrap();
+        let expected_resumed_destinations = completed
+            .completed
+            .iter()
+            .filter(|receipt| cancelled.cancelled.contains(&receipt.item_id))
+            .map(|receipt| receipt.destination.clone())
+            .collect::<HashSet<_>>();
+        let published_resumed_images = resume_change_batches
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|batch| {
+                batch["changes"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|change| {
+                        let path = change["path"].as_str()?;
+                        (Path::new(path)
+                            .extension()
+                            .and_then(|extension| extension.to_str())
+                            == Some("bmp"))
+                        .then(|| {
+                            (
+                                path.to_string(),
+                                change["kind"].as_str().map(str::to_string),
+                            )
+                        })
+                    })
+            })
+            .collect::<Vec<_>>();
+        let published_resumed_destinations = published_resumed_images
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            published_resumed_destinations, expected_resumed_destinations,
+            "the restarted watcher epoch must publish exactly the resumed image destinations: {published_resumed_images:?}"
+        );
+        assert_eq!(
+            published_resumed_images.len(),
+            expected_resumed_destinations.len(),
+            "no resumed image destination may be published more than once: {published_resumed_images:?}"
+        );
+        assert!(
+            published_resumed_images
+                .iter()
+                .all(|(_, kind)| kind.as_deref() == Some("added")),
+            "resumed image destinations must publish as typed additions: {published_resumed_images:?}"
+        );
         assert_eq!(
             pre_restart_report.coalesced_operations,
             cancelled.completed.len() as u64,
             "the first watcher epoch must publish each committed pre-cancel item once: {pre_restart_report:?}"
         );
         assert!(
-            report.coalesced_operations >= cancelled.cancelled.len() as u64
-                && report.coalesced_operations <= source_paths.len() as u64,
-            "the restarted watcher epoch must cover every resumed item without exceeding the final library cardinality: {report:?}"
+            report.coalesced_operations >= cancelled.cancelled.len() as u64,
+            "the restarted watcher epoch must cover every resumed item: {report:?}"
         );
         assert_eq!(pre_restart_report.full_recursive_fallback_scans, 0);
         assert_eq!(report.full_recursive_fallback_scans, 0);
