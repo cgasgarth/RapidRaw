@@ -19,9 +19,9 @@ export const editorChromeTokens = {
     viewerStatusFooter: 'shrink-0 border-t border-editor-border bg-editor-panel px-2 py-1',
   },
   density: {
-    topToolbar: 'min-h-10',
+    topToolbar: 'min-h-9',
     bottomToolbar: 'min-h-8',
-    filmstripHeader: 'min-h-8',
+    filmstripHeader: 'min-h-7',
     leftPanelHeader: 'min-h-9',
     rightPanelHeader: 'min-h-9',
     rightRail: 'w-[42px]',

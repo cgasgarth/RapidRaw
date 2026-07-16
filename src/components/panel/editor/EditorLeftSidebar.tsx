@@ -1,6 +1,7 @@
 import cx from 'clsx';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type PointerEventHandler, type ReactNode, useEffect, useRef } from 'react';
+import { DEVELOP_SHELL_RESIZER_SIZE } from '../../../utils/developShellGeometry';
 import { Orientation } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
@@ -10,7 +11,7 @@ import Resizer from '../../ui/Resizer';
 export const EDITOR_LEFT_SECTION_IDS = ['navigator', 'focusSources', 'presets', 'snapshots', 'history'] as const;
 export type EditorLeftSectionId = (typeof EDITOR_LEFT_SECTION_IDS)[number];
 type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
-const EDITOR_LEFT_RESIZER_WIDTH = 8;
+const EDITOR_LEFT_RESIZER_WIDTH = DEVELOP_SHELL_RESIZER_SIZE;
 
 interface EditorLeftSidebarProps {
   expandedSections: readonly string[];
@@ -87,7 +88,11 @@ export default function EditorLeftSidebar({
         {isVisible ? (
           <>
             <header
-              className={cx(professionalInspectorDensityTokens.frame.header, hasMacWindowOverlay && 'pl-20')}
+              className={cx(
+                professionalInspectorDensityTokens.frame.header,
+                '!min-h-9',
+                hasMacWindowOverlay && 'pl-20',
+              )}
               data-tauri-drag-region={hasMacWindowOverlay ? 'true' : undefined}
             >
               {/* i18next-instrument-ignore */}
@@ -165,7 +170,7 @@ export default function EditorLeftSidebar({
       {isVisible && !isFullScreen ? (
         <Resizer
           ariaLabel="Resize Develop workflow"
-          className="editor-shell-resizer editor-shell-resizer-vertical"
+          className="editor-shell-resizer editor-shell-resizer-vertical !w-1"
           direction={Orientation.Vertical}
           onMouseDown={onResizeStart}
           testId="editor-left-resizer"

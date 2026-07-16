@@ -4170,14 +4170,17 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   }
 
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 445, label: 'reset-to-fit', width: 593.33 });
+  await assertRenderedImageGeometry(page, { ...(await readExpectedFitGeometry(previewPanel)), label: 'reset-to-fit' });
   samples.push(await collectBoundsSample(page, 'reset-to-fit'));
   await assertLatestBoundsSample(samples);
 
   await zoomSelector.selectOption('2');
   await assertRenderedImageGeometry(page, { height: 1536, label: 'repeated-selector-zoom-200', width: 2048 });
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 445, label: 'repeated-reset-to-fit', width: 593.33 });
+  await assertRenderedImageGeometry(page, {
+    ...(await readExpectedFitGeometry(previewPanel)),
+    label: 'repeated-reset-to-fit',
+  });
   await assertSingleFullFrameOutput(page, sourceIdentity);
 
   await previewPanel.hover();
@@ -4200,7 +4203,10 @@ async function verifyPreviewBoundsScenario(page: Page, samples: BoundsSample[]):
   const gestureBaseHref = await readCommittedBaseHref(page, sourceIdentity);
   await assertPositionedZoomOutput(page, { canonicalBaseHref: gestureBaseHref, sourceIdentity });
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 445, label: 'wheel-reset-to-fit', width: 593.33 });
+  await assertRenderedImageGeometry(page, {
+    ...(await readExpectedFitGeometry(previewPanel)),
+    label: 'wheel-reset-to-fit',
+  });
   await assertSingleFullFrameOutput(page, sourceIdentity);
   await assertVisibleNonEmptyPreviewPixels(page, 'wheel-reset-to-fit', sourceIdentity);
 
@@ -4520,7 +4526,10 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
 
   await page.setViewportSize(viewport);
   await zoomSelector.selectOption('fit');
-  await assertRenderedImageGeometry(page, { height: 445, label: 'viewport-controller-reset-fit', width: 593.33 });
+  await assertRenderedImageGeometry(page, {
+    ...(await readExpectedFitGeometry(previewPanel)),
+    label: 'viewport-controller-reset-fit',
+  });
 }
 
 async function assertPositionedZoomOutput(
@@ -4635,6 +4644,13 @@ async function assertRenderedImageGeometry(
       `${expected.label} rendered ${actual.width}x${actual.height}; expected ${expected.width}x${expected.height}.`,
     );
   }
+}
+
+async function readExpectedFitGeometry(previewPanel: Locator): Promise<{ height: number; width: number }> {
+  const bounds = await readBounds(previewPanel);
+  const source = { height: 768, width: 1024 };
+  const scale = Math.min(bounds.width / source.width, bounds.height / source.height);
+  return { height: source.height * scale, width: source.width * scale };
 }
 
 async function waitForStablePreview(page: Page): Promise<void> {

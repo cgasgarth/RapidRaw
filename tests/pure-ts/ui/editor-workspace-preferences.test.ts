@@ -27,12 +27,12 @@ const installStorage = () => {
 afterEach(() => {
   useUIStore.setState({
     activeRightPanel: Panel.Color,
-    bottomPanelHeight: 144,
+    bottomPanelHeight: 112,
     compactEditorPanelHeightOverride: null,
     editorWorkspacePreferences: createDefaultEditorWorkspacePreferences(),
     editorWorkspaceViewport: { height: 0, isCompactPortrait: false, isPortrait: false, width: 0 },
     isCommandPaletteOpen: false,
-    leftPanelWidth: 256,
+    leftPanelWidth: 240,
     recentRightPanels: [Panel.Color],
     renderedRightPanel: Panel.Color,
     rightPanelWidth: 360,

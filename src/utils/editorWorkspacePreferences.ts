@@ -3,6 +3,11 @@ import {
   type EditorWorkspacePreferences,
   editorWorkspacePreferencesSchema,
 } from '../schemas/editorWorkspacePreferencesSchemas';
+import {
+  DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT,
+  DEVELOP_SHELL_DEFAULT_LEFT_PANEL_WIDTH,
+  DEVELOP_SHELL_DEFAULT_RIGHT_PANEL_WIDTH,
+} from './developShellGeometry';
 
 export const EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY = 'rapidraw.editorWorkspacePreferences.v1';
 
@@ -35,15 +40,19 @@ const getStorage = (): Storage | null => {
 
 export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePreferences => ({
   compact: { drawerState: 'expanded', toolsExpanded: true, toolsHeight: null },
-  filmstrip: { height: 144, visible: true },
-  leftSidebar: { expandedSections: ['navigator', 'presets'], visible: true, width: 256 },
+  filmstrip: { height: DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT, visible: true },
+  leftSidebar: {
+    expandedSections: ['navigator', 'presets'],
+    visible: true,
+    width: DEVELOP_SHELL_DEFAULT_LEFT_PANEL_WIDTH,
+  },
   rightInspector: {
     activePanel: Panel.Color,
     expandedSectionsByPanel: { [Panel.Adjustments]: ['basic', 'curves'] },
     pinnedControlIds: [],
     recentPanels: [Panel.Color],
     visible: true,
-    width: 360,
+    width: DEVELOP_SHELL_DEFAULT_RIGHT_PANEL_WIDTH,
   },
   version: 1,
   viewer: { compareMode: 'off', defaultZoomMode: 'fit', lightsOutLevel: 'off' },

@@ -22,7 +22,8 @@ test('renders one ordered Develop workflow with stable accessible slots and one 
   expect(region.querySelectorAll('[data-editor-left-slot]')).toHaveLength(5);
   expect(getRequiredElement(region, '[data-editor-left-slot="navigator"]').textContent).toBe('');
   expect(getRequiredElement(region, '[data-editor-left-slot="presets"]').textContent).toBe('');
-  expect(getRequiredElement<HTMLElement>(container, '[data-testid="editor-left-region"]').style.width).toBe('296px');
+  expect(getRequiredElement<HTMLElement>(container, '[data-testid="editor-left-region"]').style.width).toBe('292px');
+  expect(getRequiredElement(container, 'header').className).toContain('!min-h-9');
   expect(getRequiredElement(container, '[data-testid="editor-left-resizer"]').getAttribute('aria-label')).toBe(
     'Resize Develop workflow',
   );

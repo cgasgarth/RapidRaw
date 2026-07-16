@@ -21,7 +21,7 @@ describe('window chrome layout', () => {
         osPlatform: 'macos',
       }),
     ).toEqual({
-      compactTopUiHeight: 60,
+      compactTopUiHeight: 36,
       kind: 'macos-overlay',
       reserveCollapsedLeadingWidth: 80,
     });
@@ -35,7 +35,7 @@ describe('window chrome layout', () => {
           isWindowFullScreen: false,
           osPlatform,
         }),
-      ).toMatchObject({ compactTopUiHeight: 110, kind: 'custom-titlebar' });
+      ).toMatchObject({ compactTopUiHeight: 84, kind: 'custom-titlebar' });
     }
   });
 
@@ -47,7 +47,7 @@ describe('window chrome layout', () => {
         osPlatform: 'macos',
       }),
     ).toEqual({
-      compactTopUiHeight: 60,
+      compactTopUiHeight: 36,
       kind: 'native',
       reserveCollapsedLeadingWidth: 32,
     });
