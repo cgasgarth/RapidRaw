@@ -6,6 +6,7 @@ import { chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
+import { waitForPageCondition } from '../../../../scripts/lib/playwright-waits';
 
 const host = '127.0.0.1';
 const port = await allocateFreeTcpPort(host);
@@ -115,7 +116,8 @@ const waitForCompletedCall = async (page: Page, command: string, index: number) 
 };
 
 const waitForToolbarIdle = async (page: Page) => {
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     { timeout: 10_000 },
   );

@@ -21,6 +21,7 @@ import {
   VISUAL_SMOKE_PROOF_TEST_IDS,
   VISUAL_SMOKE_SCENARIO_IDS,
 } from '../../../../src/validation/visual/visualSmokeScenarios.ts';
+import { waitForPageCondition } from '../../playwright-waits.ts';
 import {
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -1562,7 +1563,8 @@ export async function prepareScenario(page, mode) {
         await page.mouse.move(box.x + middle.x, box.y + middle.y, { steps: 8 });
       }
       if (options.expectLivePreview === true) {
-        await page.waitForFunction(
+        await waitForPageCondition(
+          page,
           () => {
             const marker = document.querySelector('[data-testid="image-canvas-brush-command-capture"]');
             const pointCount = Number(marker?.getAttribute('data-brush-live-preview-point-count') ?? '0');

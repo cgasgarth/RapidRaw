@@ -6,6 +6,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort, parseTcpPort } from '../../../scripts/lib/dev-server-port';
+import { waitForPageCondition } from '../../../scripts/lib/playwright-waits';
 import { installBrowserProofNetworkBoundary } from '../../../scripts/qa/browser-network-boundary';
 import { agentSelectedImageLiveSessionAuditExportReceiptSchema } from '../../../src/schemas/agent/agentSelectedImageAuditExportSchemas';
 import { Invokes } from '../../../src/tauri/commands';
@@ -88,7 +89,8 @@ async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
   await overflow.click();
   const splitCompare = page.getByRole('menuitemcheckbox', { name: /Compare split wipe/u });
   await splitCompare.click();
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length > 0,
     { timeout: 10_000 },
   );
@@ -134,7 +136,8 @@ async function verifyPreviewUrlLifetime(page: Page): Promise<void> {
 
   await overflow.click();
   await splitCompare.click();
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelectorAll('[data-preview-source-identity^="original:"]').length === 0,
     { timeout: 10_000 },
   );
@@ -3098,7 +3101,8 @@ try {
         JSON.stringify(editedPreviewPixel),
     );
   }
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => {
       const request = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
         .filter((call) => call.command === 'apply_adjustments')
@@ -3518,7 +3522,8 @@ async function verifyAutoEditTransactionBoundary(page: Page): Promise<void> {
   await autoAdjust.click();
   const review = page.getByTestId('auto-edit-review');
   await review.waitFor({ timeout: 10_000 });
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () =>
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.some(
         ({ command }) => command === 'preview_auto_edit_proposal',
@@ -3788,7 +3793,8 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
       { timeout: 10_000 },
     );
     if (waitForHydration) {
-      await page.waitForFunction(
+      await waitForPageCondition(
+        page,
         () =>
           document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
         { timeout: 10_000 },
@@ -3796,7 +3802,8 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     }
   };
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelector('[data-testid="editor-toolbar-file-status"]')?.getAttribute('aria-busy') === 'false',
     { timeout: 10_000 },
   );
@@ -3829,7 +3836,8 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
   }
   await switchAwayAndBack(standardActivePath);
 
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
     { timeout: 10_000 },
   );
@@ -3885,14 +3893,16 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
 
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
   await undo.click();
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.55',
     { timeout: 10_000 },
   );
   const redo = page.locator('button[data-command-id="redo"]:visible').first();
   await expectEnabled(redo, 'Redo after Batch Auto Adjust undo');
   await redo.click();
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim() === '0.65',
     { timeout: 10_000 },
   );
@@ -3922,7 +3932,8 @@ async function verifyBatchAutoAdjustTransactionBoundary(page: Page): Promise<voi
     raceBaseline.commit + 1,
     { timeout: 10_000 },
   );
-  await page.waitForFunction(
+  await waitForPageCondition(
+    page,
     () => Number(document.querySelector('[data-testid="basic-control-exposure-value"]')?.textContent?.trim()) === 0.7,
     { timeout: 10_000 },
   );
