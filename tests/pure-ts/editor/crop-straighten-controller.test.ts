@@ -22,7 +22,7 @@ const straightenSession = (overrides: Partial<CropStraightenSessionIdentity> = {
 });
 
 const crop: Crop = { height: 70, unit: '%', width: 80, x: 10, y: 15 };
-const percentCrop: PercentCrop = crop;
+const percentCrop: PercentCrop = { height: 70, unit: '%', width: 80, x: 10, y: 15 };
 
 describe('crop straighten controller', () => {
   test('preserves the straighten correction for horizontal, vertical, and already-rotated pixels', () => {
