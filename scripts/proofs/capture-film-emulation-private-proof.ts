@@ -28,11 +28,7 @@ const sourceHashBefore = await sha256File(sourcePath);
 const sourceName = basename(sourcePath);
 const slug = slugify(sourceName.slice(0, -extname(sourceName).length));
 const runId = new Date().toISOString().replace(/[-:.TZ]/gu, '');
-const artifactDirRelative = `private-artifacts/film-runtime/${runId}`;
-const fixtureId = `validation.raw-open-edit-export.film-reference-${slug}.v1`;
-const requestPath = join(proofRoot, 'film-runtime-proof-request.json');
-const request = rawOpenEditExportProofRequestSchema.parse({
-  artifactDirRelative,
+const requestTemplate = {
   editCommand: {
     actor: { id: 'film-runtime-private-proof', kind: 'agent' },
     approval: {
@@ -50,13 +46,6 @@ const request = rawOpenEditExportProofRequestSchema.parse({
       },
       inputDomain: 'camera_linear_rgb',
       operationDomain: 'acescg_linear_v1',
-      renderTarget: {
-        bitDepth: 16,
-        embedIcc: true,
-        intent: 'relative_colorimetric',
-        outputProfile: 'display_p3',
-        viewTransform: 'rawengine_agx_v1',
-      },
       sceneToDisplayTransform: 'rawengine_agx_v1',
       workingSpace: 'acescg_linear_v1',
     },
@@ -74,7 +63,6 @@ const request = rawOpenEditExportProofRequestSchema.parse({
     schemaVersion: 1,
     target: { kind: 'image', variantId: `film-runtime-${slug}` },
   },
-  fixtureId,
   privateRootPath: proofRoot,
   sourceMetadata: {
     cameraMake: extname(sourceName).toLowerCase() === '.arw' ? 'Sony' : 'Unknown',
@@ -84,58 +72,134 @@ const request = rawOpenEditExportProofRequestSchema.parse({
   },
   sourceRelativePath: basename(sourcePath),
   sourceRootPath: dirname(sourcePath),
-});
+};
+
+const targets = [
+  { id: 'display-p3', outputProfile: 'display_p3' },
+  { id: 'srgb', outputProfile: 'srgb' },
+] as const;
 
 await mkdir(proofRoot, { recursive: true });
-await writeFile(requestPath, `${JSON.stringify(request, null, 2)}\n`);
-await runNativeProof(requestPath);
+const runs = [];
+for (const target of targets) {
+  const artifactDirRelative = `private-artifacts/film-runtime/${runId}/${target.id}`;
+  const fixtureId = `validation.raw-open-edit-export.film-reference-${slug}-${target.id}.v1`;
+  const requestPath = join(proofRoot, `film-runtime-proof-request-${target.id}.json`);
+  const request = rawOpenEditExportProofRequestSchema.parse({
+    ...requestTemplate,
+    artifactDirRelative,
+    editCommand: {
+      ...requestTemplate.editCommand,
+      colorPipeline: {
+        ...requestTemplate.editCommand.colorPipeline,
+        renderTarget: {
+          bitDepth: 16,
+          embedIcc: true,
+          intent: 'relative_colorimetric',
+          outputProfile: target.outputProfile,
+          viewTransform: 'rawengine_agx_v1',
+        },
+      },
+      commandId: `${requestTemplate.editCommand.commandId}-${target.id}`,
+      correlationId: `${requestTemplate.editCommand.correlationId}-${target.id}`,
+      expectedGraphRevision: `graph-rev.film-runtime-private-proof.${slug}-${target.id}.v1`,
+      idempotencyKey: `${requestTemplate.editCommand.idempotencyKey}-${target.id}`,
+    },
+    fixtureId,
+  });
+  await writeFile(requestPath, `${JSON.stringify(request, null, 2)}\n`);
+  await runNativeProof(requestPath);
+  const workflowReportPath = join(
+    proofRoot,
+    artifactDirRelative,
+    `${slugFromFixtureId(fixtureId)}-workflow-report.json`,
+  );
+  runs.push({ target, workflowReportPath, ...(await validateNativeRun(workflowReportPath)) });
+}
 
-const workflowReportPath = join(proofRoot, artifactDirRelative, `${slugFromFixtureId(fixtureId)}-workflow-report.json`);
-const nativeReport = z.record(z.string(), z.unknown()).parse(JSON.parse(await readFile(workflowReportPath, 'utf8')));
-const graphTrace = z
-  .object({
-    exportGraphFingerprint: z.string().trim().min(1),
-    previewGraphFingerprint: z.string().trim().min(1),
-    validationStatus: z.literal('passed'),
-  })
-  .passthrough()
-  .parse(nativeReport.graphTrace);
-const publicFinalFile = { ...z.record(z.string(), z.unknown()).parse(nativeReport.finalFile) };
-delete publicFinalFile.committedSamplePixels;
-const publicReport = { ...nativeReport };
-delete publicReport.graphTrace;
-const report = rawOpenEditExportRunReportSchema.parse({ ...publicReport, finalFile: publicFinalFile });
-const changedPixels = metric(report, 'changedPixelRatio');
-const previewExportDelta = metric(report, 'previewExportMeanAbsDelta');
-const sourceUnchanged = metric(report, 'sourceHashUnchanged');
-if (!changedPixels.passed || changedPixels.value <= 0)
-  throw new Error('Film operation did not change rendered pixels.');
-if (!previewExportDelta.passed) throw new Error('Film preview/export parity exceeded its production threshold.');
-if (!sourceUnchanged.passed || (await sha256File(sourcePath)) !== sourceHashBefore)
-  throw new Error('Private RAW source changed during Film proof.');
-if (report.finalFile.bitDepth !== 16 || report.finalFile.embeddedIccProfileHash.length === 0)
-  throw new Error('Film proof export did not reopen as ICC-tagged RGB16 TIFF.');
-if (graphTrace.previewGraphFingerprint !== graphTrace.exportGraphFingerprint)
-  throw new Error('Film preview and export render graph fingerprints diverged.');
+const [displayP3, srgb] = runs;
+if (displayP3 === undefined || srgb === undefined) throw new Error('Film proof did not execute both output targets.');
+if (
+  displayP3.filmReceipt.postFilmPreViewSha256 !== srgb.filmReceipt.postFilmPreViewSha256 ||
+  displayP3.filmReceipt.compiledProfileSha256 !== srgb.filmReceipt.compiledProfileSha256 ||
+  displayP3.filmReceipt.executionPlanSha256 !== srgb.filmReceipt.executionPlanSha256
+)
+  throw new Error('sRGB and Display P3 changed the scene-referred post-Film execution identity.');
+if (
+  displayP3.filmReceipt.displayOrOutputProfileSha256 === srgb.filmReceipt.displayOrOutputProfileSha256 ||
+  displayP3.report.finalFile.outputProfile !== 'display_p3' ||
+  srgb.report.finalFile.outputProfile !== 'srgb'
+)
+  throw new Error('sRGB and Display P3 did not produce distinct verified output-profile receipts.');
+if (displayP3.filmReceipt.colorSyncDisplayProfileSha256 !== srgb.filmReceipt.colorSyncDisplayProfileSha256)
+  throw new Error('ColorSync display identity changed between output-target renders.');
 
 const summaryPath = join(proofRoot, 'film-runtime-proof-summary.json');
 const summary = {
-  backend: report.colorManagement.runtimeEnvironment.wgpuBackend,
-  commandId: report.editCommandId,
-  filmProfileRef: {
-    contentSha256: 'sha256:d84121641d1318f3be759fb5705f04f01721cd35a57e1b238343590bc2b988ef',
-    id: 'rapidraw.reference_film.v1',
-    version: '1',
-  },
-  limitationCodes: ['post_film_pre_view_scene_tap_unavailable'],
-  metrics: { changedPixelRatio: changedPixels.value, previewExportMeanAbsDelta: previewExportDelta.value },
-  proofLevel: 'native_private_raw_preview_export',
-  sourceContentSha256: sourceHashBefore,
-  status: 'passed_partial_receipt',
-  workflowReportPath,
+  backend: displayP3.filmReceipt.backend,
+  colorSyncDisplayProfileSha256: displayP3.filmReceipt.colorSyncDisplayProfileSha256,
+  compiledProfileSha256: displayP3.filmReceipt.compiledProfileSha256,
+  executionPlanSha256: displayP3.filmReceipt.executionPlanSha256,
+  filmProfileRef: displayP3.filmReceipt.filmProfileRef,
+  limitationCodes: displayP3.filmReceipt.limitationCodes,
+  outputTargets: runs.map(({ filmReceipt, report, target, workflowReportPath }) => ({
+    displayOrOutputProfileSha256: filmReceipt.displayOrOutputProfileSha256,
+    metrics: filmReceipt.previewExportMetrics,
+    outputProfile: report.finalFile.outputProfile,
+    target: target.id,
+    workflowReportPath,
+  })),
+  postFilmPreViewSha256: displayP3.filmReceipt.postFilmPreViewSha256,
+  proofLevel: displayP3.filmReceipt.proofLevel,
+  sourceContentSha256: displayP3.filmReceipt.sourceContentSha256,
+  status: 'passed',
 };
 await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
-console.log(`Film private RAW proof passed (changed=${changedPixels.value}; parity=${previewExportDelta.value})`);
+console.log(
+  `Film private RAW proof passed (P3 changed=${displayP3.changedPixels.value}; P3 parity=${displayP3.previewExportDelta.value}; sRGB/P3 post-Film match)`,
+);
+
+async function validateNativeRun(workflowReportPath: string) {
+  const nativeReport = z.record(z.string(), z.unknown()).parse(JSON.parse(await readFile(workflowReportPath, 'utf8')));
+  const graphTrace = z
+    .object({
+      exportGraphFingerprint: z.string().trim().min(1),
+      previewGraphFingerprint: z.string().trim().min(1),
+      validationStatus: z.literal('passed'),
+    })
+    .passthrough()
+    .parse(nativeReport.graphTrace);
+  const publicFinalFile = { ...z.record(z.string(), z.unknown()).parse(nativeReport.finalFile) };
+  delete publicFinalFile.committedSamplePixels;
+  const publicReport = { ...nativeReport };
+  delete publicReport.graphTrace;
+  const report = rawOpenEditExportRunReportSchema.parse({ ...publicReport, finalFile: publicFinalFile });
+  const filmReceipt = report.filmRuntimeProofReceipt;
+  if (filmReceipt === undefined) throw new Error('Native Film proof report is missing its runtime receipt.');
+  const changedPixels = metric(report, 'changedPixelRatio');
+  const previewExportDelta = metric(report, 'previewExportMeanAbsDelta');
+  const sourceUnchanged = metric(report, 'sourceHashUnchanged');
+  if (!changedPixels.passed || changedPixels.value <= 0)
+    throw new Error('Film operation did not change rendered pixels.');
+  if (!previewExportDelta.passed) throw new Error('Film preview/export parity exceeded its production threshold.');
+  if (!sourceUnchanged.passed || (await sha256File(sourcePath)) !== sourceHashBefore)
+    throw new Error('Private RAW source changed during Film proof.');
+  if (report.finalFile.bitDepth !== 16 || report.finalFile.embeddedIccProfileHash.length === 0)
+    throw new Error('Film proof export did not reopen as ICC-tagged RGB16 TIFF.');
+  if (graphTrace.previewGraphFingerprint !== graphTrace.exportGraphFingerprint)
+    throw new Error('Film preview and export render graph fingerprints diverged.');
+  if (filmReceipt.backend !== 'gpu') throw new Error('Film runtime receipt did not prove production GPU execution.');
+  if (filmReceipt.sourceContentSha256 !== sourceHashBefore)
+    throw new Error('Film runtime receipt source identity diverged from the private RAW.');
+  const exportArtifact = report.artifacts.find((artifact) => artifact.kind === 'export_after_private');
+  if (exportArtifact === undefined) throw new Error('Film proof report is missing its export artifact.');
+  if (
+    filmReceipt.previewArtifactSha256 !== report.previewAfter.hash ||
+    filmReceipt.exportArtifactSha256 !== exportArtifact.hash
+  )
+    throw new Error('Film runtime receipt output hashes diverged from the production artifacts.');
+  return { changedPixels, filmReceipt, previewExportDelta, report };
+}
 
 async function runNativeProof(requestPathValue: string): Promise<void> {
   const child = Bun.spawn(
