@@ -59,10 +59,10 @@ use crate::image_processing::{
 };
 
 fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Result<Value, String> {
-    let mut adjustments = crate::adjustments::edit_document_v2::resolve_source_decode_adjustments(
-        &metadata.adjustments,
-        metadata.edit_document_v2.as_ref(),
-    )?;
+    let mut adjustments = match metadata.edit_document_v2.as_ref() {
+        Some(document) => crate::adjustments::edit_document_v2::compile_edit_document_v2(document)?,
+        None => metadata.adjustments,
+    };
     if let Some(artifacts) = metadata.raw_engine_artifacts {
         if !adjustments.is_object() {
             adjustments = serde_json::json!({});
@@ -2541,10 +2541,14 @@ pub async fn export_images(
     export_settings: ExportSettings,
     output_format: String,
     current_edit_path: Option<String>,
-    current_edit_adjustments: Option<Value>,
+    current_edit_document_v2: Option<Value>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    let current_edit_adjustments = current_edit_document_v2
+        .as_ref()
+        .map(crate::adjustments::edit_document_v2::compile_edit_document_v2)
+        .transpose()?;
     let total_paths = paths.len();
     let Some(job_identity) = admit_export_job(total_paths, state.export(), &app_handle).await?
     else {
@@ -2964,7 +2968,7 @@ pub async fn estimate_export_sizes(
     export_settings: ExportSettings,
     output_format: String,
     current_edit_path: Option<String>,
-    current_edit_adjustments: Option<Value>,
+    current_edit_document_v2: Option<Value>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<usize, String> {
@@ -2985,6 +2989,10 @@ pub async fn estimate_export_sizes(
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings_or_default(&app_handle);
 
+    let current_edit_adjustments = current_edit_document_v2
+        .as_ref()
+        .map(crate::adjustments::edit_document_v2::compile_edit_document_v2)
+        .transpose()?;
     let single_image_extrapolated_size: usize = if let (true, Some(mut adjustments_clone)) =
         (is_current_edit, current_edit_adjustments)
     {

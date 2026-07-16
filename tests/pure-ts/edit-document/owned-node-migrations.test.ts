@@ -47,6 +47,7 @@ describe('EditDocumentV2 owned node migrations', () => {
       'color_presence',
       'scene_curve',
       'tone_equalizer',
+      'scene_to_view_transform',
       'display_creative',
       'film_emulation',
       'detail_denoise_dehaze',

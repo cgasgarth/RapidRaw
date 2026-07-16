@@ -70,6 +70,44 @@ export const sceneGlobalColorToneParamsV2Schema = z
   })
   .strict();
 
+export const editDocumentViewTransformControlsV2Schema = z
+  .object({
+    chromaCompression: z.number().finite().min(0).max(1),
+    contrast: z.number().finite().min(0.5).max(2),
+    latitude: z.number().finite().min(0).max(1),
+    middleGrey: z.number().finite().min(0.08).max(0.3),
+    shoulder: z.number().finite().min(0).max(1),
+    sourceBlackEv: z.number().finite().lt(-1),
+    sourceWhiteEv: z.number().finite().gt(1),
+    toe: z.number().finite().min(0).max(1),
+  })
+  .strict()
+  .refine(({ sourceBlackEv, sourceWhiteEv }) => sourceWhiteEv - sourceBlackEv >= 6, {
+    message: 'View-transform source EV span must be at least 6 stops.',
+    path: ['sourceWhiteEv'],
+  });
+
+export const editDocumentSceneToViewTransformV2Schema = z
+  .object({
+    toneMapper: z.enum(['agx', 'basic', 'rapidView']),
+    viewTransform: editDocumentViewTransformControlsV2Schema,
+  })
+  .strict();
+
+export const EDIT_DOCUMENT_SCENE_TO_VIEW_TRANSFORM_DEFAULTS = {
+  toneMapper: 'rapidView',
+  viewTransform: {
+    chromaCompression: 0.25,
+    contrast: 1.15,
+    latitude: 0.55,
+    middleGrey: 0.18,
+    shoulder: 0.5,
+    sourceBlackEv: -10,
+    sourceWhiteEv: 6.5,
+    toe: 0.35,
+  },
+} as const;
+
 export const editDocumentLocalContrastV2Schema = z
   .object({
     centré: z.number().finite().min(-100).max(100),
@@ -642,6 +680,16 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'tone_equalizer',
     process: 'scene_referred_v2',
     renderStage: 'tone_equalizer',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_SCENE_TO_VIEW_TRANSFORM_DEFAULTS,
+    editorSection: 'basic',
+    legacyFields: ['toneMapper', 'viewTransform'],
+    nodeType: 'scene_to_view_transform',
+    process: 'scene_referred_v2',
+    renderStage: 'scene_to_view_transform',
     implementationVersion: 1,
   },
   {
@@ -1352,6 +1400,14 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
+      if (nodeType === 'scene_to_view_transform') {
+        const parsed = editDocumentSceneToViewTransformV2Schema.safeParse(node.params);
+        if (!parsed.success) {
+          for (const issue of parsed.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'scene_curve') {
         const sceneCurve = editDocumentSceneCurveV2Schema.safeParse(node.params);
         if (!sceneCurve.success) {
@@ -1821,6 +1877,7 @@ export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Sc
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
 export type EditDocumentLensCorrectionV2 = z.infer<typeof editDocumentLensCorrectionV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
+export type EditDocumentSceneToViewTransformV2 = z.infer<typeof editDocumentSceneToViewTransformV2Schema>;
 
 export interface CompiledEditDocumentNodeV2 {
   readonly enabled: boolean;
@@ -1843,6 +1900,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'source_decode') editDocumentSourceDecodeV2Schema.parse(envelope.params);
   if (envelope.type === 'skin_tone_uniformity') editDocumentSkinToneUniformityV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
+  if (envelope.type === 'scene_to_view_transform') editDocumentSceneToViewTransformV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
