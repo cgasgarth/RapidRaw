@@ -3,6 +3,7 @@
     "case": "disabled no-op",
     "input": {
       "enabled": false,
+      "process": "continuous_sensitivity_v1",
       "weights": {
         "reds": 0,
         "oranges": 0,
@@ -33,6 +34,7 @@
     "case": "portrait red lift",
     "input": {
       "enabled": true,
+      "process": "continuous_sensitivity_v1",
       "weights": {
         "reds": 24,
         "oranges": 14,
@@ -52,9 +54,9 @@
         "blue": 0.34
       },
       "expectedRgb": {
-        "red": 0.48871608000000005,
-        "green": 0.48871608000000005,
-        "blue": 0.48871608000000005
+        "red": 0.5106158392353066,
+        "green": 0.5106158392353066,
+        "blue": 0.5106158392353066
       },
       "tolerance": 1e-12
     }
@@ -63,6 +65,7 @@
     "case": "landscape sky control",
     "input": {
       "enabled": true,
+      "process": "continuous_sensitivity_v1",
       "weights": {
         "reds": 0,
         "oranges": 2,
@@ -82,9 +85,9 @@
         "blue": 0.66
       },
       "expectedRgb": {
-        "red": 0.31858872,
-        "green": 0.31858872,
-        "blue": 0.31858872
+        "red": 0.30003215783161774,
+        "green": 0.30003215783161774,
+        "blue": 0.30003215783161774
       },
       "tolerance": 1e-12
     }

@@ -2111,6 +2111,61 @@ mod tests {
         assert!(film_plan.effective_json.get("filmEmulation").is_some());
     }
 
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn current_film_node_has_exact_native_preview_export_pixels() {
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let source = DynamicImage::ImageRgba32F(image::ImageBuffer::from_fn(4, 4, |x, y| {
+            let index = (y * 4 + x) as f32;
+            Rgba([
+                0.04 + index * 0.035,
+                0.08 + index * 0.027,
+                0.12 + index * 0.019,
+                1.0,
+            ])
+        }));
+        let adjustments = edit_command_adjustments(&sample_film_emulation_command())
+            .expect("current Film operation maps to a pinned node");
+        let source_revision = crate::gpu_processing::PreGpuImageIdentity::source_revision(
+            "synthetic-current-film.ARW",
+        );
+        let preview = process_image_for_export_pipeline_with_tonemapper_override(
+            "synthetic-current-film.ARW",
+            &source,
+            &adjustments,
+            &context,
+            &state,
+            true,
+            source_revision,
+            "current_film_preview",
+            Some(2),
+            &[],
+        )
+        .expect("current Film node runs native preview graph");
+        let export = process_image_for_export_pipeline_with_tonemapper_override(
+            "synthetic-current-film.ARW",
+            &source,
+            &adjustments,
+            &context,
+            &state,
+            true,
+            source_revision,
+            "current_film_export",
+            Some(2),
+            &[],
+        )
+        .expect("current Film node runs native export graph");
+
+        assert_eq!(mean_abs_delta(&preview, &export), 0.0);
+        assert!(mean_abs_delta(&source, &preview) > 1.0e-4);
+    }
+
     #[test]
     fn film_command_fails_closed_on_profile_identity_and_remove_operation() {
         let mut invalid_profile = sample_film_emulation_command();

@@ -23,7 +23,6 @@ enum EditNodeTypeV2 {
     ToneEqualizer,
     DisplayCreative,
     FilmEmulation,
-    FilmLook,
     DetailDenoiseDehaze,
     PointColor,
     ColorBalanceRgb,
@@ -52,7 +51,6 @@ impl EditNodeTypeV2 {
             Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
             Self::DisplayCreative => ("display_creative", "scene_referred_v2", 1),
             Self::FilmEmulation => ("film_emulation", "scene_referred_v2", 1),
-            Self::FilmLook => ("film_look", "scene_referred_v2", 1),
             Self::DetailDenoiseDehaze => ("detail_denoise_dehaze", "scene_referred_v2", 1),
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
@@ -89,7 +87,6 @@ impl EditNodeTypeV2 {
             | Self::ColorCalibration => Some("color"),
             Self::SourceDecode
             | Self::FilmEmulation
-            | Self::FilmLook
             | Self::LensCorrection
             | Self::Geometry
             | Self::Layers
@@ -603,23 +600,6 @@ impl FilmEmulationV2 {
         }))
         .map(|_| ())
         .map_err(|error| format!("EditDocumentV2 film_emulation is invalid: {error}"))
-    }
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct FilmLookV2 {
-    film_look_id: Option<String>,
-    film_look_strength: f64,
-}
-
-impl FilmLookV2 {
-    fn validate(&self) -> Result<(), String> {
-        crate::render::film_look_render::validate_film_look_selection(
-            self.film_look_id.as_deref(),
-            self.film_look_strength,
-        )
-        .map_err(|error| format!("EditDocumentV2 film_look is invalid: {error}"))
     }
 }
 
@@ -1305,7 +1285,6 @@ impl LumaLevelsV2 {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum BlackWhiteMixerProcessV2 {
-    LegacyFixedBandV1,
     NeutralPanchromaticV1,
     ContinuousSensitivityV1,
 }
@@ -1375,16 +1354,12 @@ impl BlackWhiteMixerSettingsV2 {
                     .to_string(),
             );
         }
-        if self.enabled
-            && self.process == BlackWhiteMixerProcessV2::LegacyFixedBandV1
-            && weights.iter().all(|value| *value == 0.0)
-        {
-            return Err(
-                "EditDocumentV2 enabled legacy black_white_mixer requires a non-zero channel response"
-                    .to_string(),
-            );
-        }
-        let _ = (&self.preset_id, &self.source_class);
+        let _ = (
+            &self.enabled,
+            &self.preset_id,
+            &self.process,
+            &self.source_class,
+        );
         Ok(())
     }
 }
@@ -2552,12 +2527,6 @@ fn compile_node_params(
             film.validate()?;
             Ok(node.params.clone())
         }
-        EditNodeTypeV2::FilmLook => {
-            let film_look: FilmLookV2 = serde_json::from_value(Value::Object(node.params.clone()))
-                .map_err(|error| format!("EditDocumentV2 film_look is invalid: {error}"))?;
-            film_look.validate()?;
-            Ok(node.params.clone())
-        }
         EditNodeTypeV2::Geometry => {
             parse_geometry(&node.params)?;
             Ok(node.params.clone())
@@ -2942,7 +2911,6 @@ mod tests {
     use crate::render::film_emulation::{
         apply_pixel as apply_film_pixel, parse_node as parse_film_node,
     };
-    use crate::render::film_look_render::normalize_film_look_adjustments_for_render;
 
     fn scene_curve_params() -> Value {
         let identity_curves = json!({
@@ -3189,13 +3157,6 @@ mod tests {
                 "seedPolicy": "source_stable_v1",
                 "workingSpace": "acescg_linear_v1"
             }
-        })
-    }
-
-    fn film_look_params() -> Value {
-        json!({
-            "filmLookId": "film_look.generic.warm_print.v1",
-            "filmLookStrength": 65
         })
     }
 
@@ -4034,7 +3995,7 @@ mod tests {
     }
 
     #[test]
-    fn film_emulation_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
+    fn film_emulation_compiler_drives_exact_native_pixel_output_and_rejects_flat_authority() {
         let mut value = document_with_legacy(json!({}));
         value["nodes"]["film_emulation"] = json!({
             "enabled": true,
@@ -4057,20 +4018,8 @@ mod tests {
             output.distance(input) > 1.0e-4,
             "Film node must alter a representative scene-linear pixel: {output:?}"
         );
-
-        let legacy_compiled =
-            serde_json::from_value::<EditDocumentV2>(document_with_legacy(film_emulation_params()))
-                .expect("pre-Film-node V2 document remains parseable")
-                .into_render_adjustments()
-                .expect("legacy Film field compiles");
-        let legacy_params = parse_film_node(&legacy_compiled)
-            .expect("legacy Film node parses")
-            .expect("legacy Film node is active");
-        let legacy_output = apply_film_pixel(input, legacy_params);
-        assert!(
-            output.distance(legacy_output) <= f32::EPSILON,
-            "node and legacy Film authority must remain pixel-identical"
-        );
+        let repeated = apply_film_pixel(input, params);
+        assert_eq!(output.to_array(), repeated.to_array());
 
         let mut mixed = document_with_legacy(film_emulation_params());
         mixed["nodes"]["film_emulation"] = json!({
@@ -4099,98 +4048,6 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid Film node must fail");
         assert!(error.contains("film_emulation_invalid_node"));
-    }
-
-    #[test]
-    fn film_look_compiler_drives_native_pixel_output_and_preserves_legacy_parity() {
-        let mut value = document_with_legacy(json!({}));
-        value["nodes"]["film_look"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": film_look_params(),
-            "process": "scene_referred_v2",
-            "type": "film_look"
-        });
-        let compiled = serde_json::from_value::<EditDocumentV2>(value)
-            .expect("valid Film Look document")
-            .into_render_adjustments()
-            .expect("Film Look node compiles");
-        assert_eq!(compiled["filmLookId"], "film_look.generic.warm_print.v1");
-        assert_eq!(compiled["filmLookStrength"], 65);
-        let normalized = normalize_film_look_adjustments_for_render(&compiled).into_owned();
-        assert_eq!(normalized["contrast"], 7);
-        assert_eq!(normalized["grainAmount"], 7);
-        let adjustments = get_all_adjustments_from_json(&normalized, false, None);
-        let input = Vec3::new(0.78, 0.24, 0.09);
-        let output = apply_creative_color(
-            input,
-            adjustments.global.saturation,
-            adjustments.global.vibrance,
-        );
-        assert!(
-            output.distance(input) > 1.0e-4,
-            "Film Look node must alter a representative chromatic pixel: {output:?}"
-        );
-
-        let legacy_compiled =
-            serde_json::from_value::<EditDocumentV2>(document_with_legacy(film_look_params()))
-                .expect("pre-Film-Look-node V2 document remains parseable")
-                .into_render_adjustments()
-                .expect("legacy Film Look fields compile");
-        let legacy_normalized =
-            normalize_film_look_adjustments_for_render(&legacy_compiled).into_owned();
-        let legacy_adjustments = get_all_adjustments_from_json(&legacy_normalized, false, None);
-        let legacy_output = apply_creative_color(
-            input,
-            legacy_adjustments.global.saturation,
-            legacy_adjustments.global.vibrance,
-        );
-        assert!(
-            output.distance(legacy_output) <= f32::EPSILON,
-            "node and legacy Film Look output must remain pixel-identical"
-        );
-
-        let mut mixed = document_with_legacy(film_look_params());
-        mixed["nodes"]["film_look"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": film_look_params(),
-            "process": "scene_referred_v2",
-            "type": "film_look"
-        });
-        let error = serde_json::from_value::<EditDocumentV2>(mixed)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("mixed Film Look authority must fail");
-        assert!(error.contains("conflicts with quarantined legacy field 'filmLook"));
-
-        let mut unknown = document_with_legacy(json!({}));
-        unknown["nodes"]["film_look"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": { "filmLookId": "film_look.generic.unknown.v1", "filmLookStrength": 65 },
-            "process": "scene_referred_v2",
-            "type": "film_look"
-        });
-        let error = serde_json::from_value::<EditDocumentV2>(unknown)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("unsupported Film Look must fail closed");
-        assert!(error.contains("film_look_unsupported_id"));
-
-        let mut invalid_strength = document_with_legacy(json!({}));
-        invalid_strength["nodes"]["film_look"] = json!({
-            "enabled": true,
-            "implementationVersion": 1,
-            "params": { "filmLookId": null, "filmLookStrength": 101 },
-            "process": "scene_referred_v2",
-            "type": "film_look"
-        });
-        let error = serde_json::from_value::<EditDocumentV2>(invalid_strength)
-            .expect("document envelope remains parseable")
-            .into_render_adjustments()
-            .expect_err("out-of-range Film Look strength must fail");
-        assert!(error.contains("film_look_invalid_strength"));
     }
 
     #[test]
@@ -4579,8 +4436,8 @@ mod tests {
             .expect_err("out-of-range monochrome response must fail");
         assert!(error.contains("weights must be finite"));
 
-        let mut legacy_zero = document_with_legacy(json!({}));
-        legacy_zero["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
+        let mut legacy_process = document_with_legacy(json!({}));
+        legacy_process["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"] = json!({
             "enabled": true,
             "presetId": "manual",
             "process": "legacy_fixed_band_v1",
@@ -4590,11 +4447,11 @@ mod tests {
                 "oranges": 0, "purples": 0, "reds": 0, "yellows": 0
             }
         });
-        let error = serde_json::from_value::<EditDocumentV2>(legacy_zero)
+        let error = serde_json::from_value::<EditDocumentV2>(legacy_process)
             .expect("document envelope remains parseable")
             .into_render_adjustments()
-            .expect_err("enabled legacy zero response must fail");
-        assert!(error.contains("requires a non-zero channel response"));
+            .expect_err("legacy monochrome process must fail typed node compilation");
+        assert!(error.contains("unknown variant `legacy_fixed_band_v1`"));
     }
 
     #[test]

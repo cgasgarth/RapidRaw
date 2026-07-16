@@ -381,7 +381,7 @@ export const rawEngineAppServerRouteFamilySchema = z.enum([
   'ai',
   'computational_merge',
   'detail',
-  'film_look',
+  'film_emulation',
   'negative_lab',
   'tone_color',
 ]);

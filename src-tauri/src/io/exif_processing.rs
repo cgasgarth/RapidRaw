@@ -872,8 +872,6 @@ fn validate_adjustments(
         "flipVertical",
         "flareAmount",
         "filmEmulation",
-        "filmLookId",
-        "filmLookStrength",
         "glowAmount",
         "grainAmount",
         "grainRoughness",
@@ -3246,6 +3244,25 @@ mod tests {
         let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
             .expect_err("invalid Film node must fail closed");
         assert!(error.contains("adjustments.filmEmulation"));
+        assert!(!sidecar_path.exists());
+    }
+
+    #[test]
+    fn save_sidecar_rejects_retired_flat_film_authority() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.arw.rrdata");
+        let metadata = ImageMetadata {
+            adjustments: serde_json::json!({
+                "filmLookId": "film_look.generic.warm_print.v1",
+                "filmLookStrength": 65
+            }),
+            ..Default::default()
+        };
+
+        let error = save_sidecar_metadata_atomic(&sidecar_path, &metadata)
+            .expect_err("retired flat Film authority must fail closed");
+        assert!(error.contains("adjustments.filmLookId"));
+        assert!(error.contains("adjustments.filmLookStrength"));
         assert!(!sidecar_path.exists());
     }
 

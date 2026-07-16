@@ -347,17 +347,6 @@ const HSL_RANGES: array<HslRange, 8> = array<HslRange, 8>(
     HslRange(330.0, 50.0)   // Magenta
 );
 
-const BLACK_WHITE_MIXER_RANGE_CENTERS: array<f32, 8> = array<f32, 8>(
-    358.0,
-    25.0,
-    60.0,
-    115.0,
-    180.0,
-    225.0,
-    280.0,
-    330.0,
-);
-
 fn blend_mask_layer(base: vec3<f32>, layer: vec3<f32>, influence: f32, blend_mode: f32) -> vec3<f32> {
     var blended = layer;
     if (blend_mode > 0.5 && blend_mode < 1.5) {
@@ -367,17 +356,6 @@ fn blend_mask_layer(base: vec3<f32>, layer: vec3<f32>, influence: f32, blend_mod
     }
     return mix(base, blended, influence);
 }
-
-const BLACK_WHITE_MIXER_RANGE_WIDTHS: array<f32, 8> = array<f32, 8>(
-    35.0,
-    45.0,
-    40.0,
-    90.0,
-    60.0,
-    60.0,
-    55.0,
-    50.0,
-);
 
 @group(0) @binding(MAIN_BINDING_INPUT_TEXTURE) var input_texture: texture_2d<f32>;
 @group(0) @binding(MAIN_BINDING_OUTPUT_TEXTURE) var output_texture: texture_storage_2d<rgba16float, write>;
@@ -1090,28 +1068,6 @@ fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings, preserv
     return mixed;
 }
 
-fn circular_hue_distance(left: f32, right: f32) -> f32 {
-    let delta = abs(left - right) % 360.0;
-    return min(delta, 360.0 - delta);
-}
-
-fn rgb_to_hue_degrees(color: vec3<f32>) -> f32 {
-    let c_max = max(color.r, max(color.g, color.b));
-    let c_min = min(color.r, min(color.g, color.b));
-    let chroma = c_max - c_min;
-    if (chroma <= 0.0) {
-        return -1.0;
-    }
-
-    if (c_max == color.r) {
-        return ((color.g - color.b) / chroma) * 60.0 + select(0.0, 360.0, color.g < color.b);
-    }
-    if (c_max == color.g) {
-        return ((color.b - color.r) / chroma) * 60.0 + 120.0;
-    }
-    return ((color.r - color.g) / chroma) * 60.0 + 240.0;
-}
-
 fn monochrome_oklab_from_ap1(color: vec3<f32>) -> vec3<f32> {
     let linear_srgb = vec3<f32>(
         1.7050515 * color.r - 0.6217907 * color.g - 0.0832584 * color.b,
@@ -1146,7 +1102,7 @@ fn monochrome_periodic_response(hue_degrees: f32, response_ev: array<f32, 8>) ->
     return response_ev[0];
 }
 
-fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, preserve_extended: bool) -> vec3<f32> {
+fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, _preserve_extended: bool) -> vec3<f32> {
     if (settings.enabled == 0u) {
         return color;
     }
@@ -1182,43 +1138,8 @@ fn apply_black_white_mixer(color: vec3<f32>, settings: BlackWhiteMixerSettings, 
         return vec3<f32>(energy);
     }
 
-    let hue = rgb_to_hue_degrees(color);
-    let luma = scene_luminance(color);
-    if (hue < 0.0) {
-        return vec3<f32>(luma);
-    }
-
-    let weights = array<f32, 8>(
-        settings.reds,
-        settings.oranges,
-        settings.yellows,
-        settings.greens,
-        settings.aquas,
-        settings.blues,
-        settings.purples,
-        settings.magentas,
-    );
-
-    var influence_total = 0.0;
-    var weighted_adjustment = 0.0;
-    for (var i = 0u; i < 8u; i = i + 1u) {
-        let influence = clamp(
-            1.0 - circular_hue_distance(hue, BLACK_WHITE_MIXER_RANGE_CENTERS[i]) / (BLACK_WHITE_MIXER_RANGE_WIDTHS[i] * 0.5),
-            0.0,
-            1.0,
-        );
-        if (influence > 0.0) {
-            influence_total += influence;
-            weighted_adjustment += influence * weights[i];
-        }
-    }
-
-    if (influence_total > 0.0) {
-        weighted_adjustment = weighted_adjustment / influence_total;
-    }
-    let adjusted = luma * (1.0 + weighted_adjustment * 0.5);
-    let mixed = select(clamp(adjusted, 0.0, 1.0), adjusted, preserve_extended);
-    return vec3<f32>(mixed);
+    // Invalid process/version pairs are rejected before GPU dispatch.
+    return color;
 }
 
 fn color_balance_rgb_weights(luma: f32) -> vec3<f32> {
@@ -3015,7 +2936,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels, preserve_scene_extended);
 
     let scene_monochrome_toning = adjustments.global.black_white_mixer.enabled != 0u
-        && adjustments.global.black_white_mixer.process != 0u
+        && (adjustments.global.black_white_mixer.process == 1u || adjustments.global.black_white_mixer.process == 2u)
         && adjustments.global.black_white_mixer.implementation_version == 2u;
 
     if (!scene_monochrome_toning) {

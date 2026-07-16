@@ -14,6 +14,7 @@ import {
   replayAgentSelectedImageLiveSessionAudit,
   summarizeAgentSelectedImageLiveSessionAuditStore,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
+import { buildCurrentSelectedImageEvidence } from './fixtures/current-selected-image-lifecycle-receipt';
 
 const selectedPath = '/fixtures/public/agent-audit-store/DSC_4846.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 8 : 4));
@@ -47,7 +48,7 @@ const seedEditor = () => {
   });
 };
 
-const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
+const buildAuditRecord = async (): Promise<AgentSelectedImageLiveSessionAuditRecord> => {
   const snapshot = buildAgentImageContextSnapshot();
   const sessionId = 'agent-audit-store-session';
   const storageKey = buildAgentSelectedImageLiveSessionAuditStorageKey({
@@ -149,6 +150,14 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
     ],
   };
 
+  const currentEvidence = await buildCurrentSelectedImageEvidence({
+    afterPreviewHash: receipt.afterPreviewHash,
+    afterRecipeHash: receipt.finalRecipeHash,
+    beforePreviewHash: receipt.beforePreviewHash,
+    beforeRecipeHash: receipt.initialRecipeHash,
+    graphRevision: receipt.initialGraphRevision,
+    sessionId,
+  });
   return {
     auditEvents: [
       {
@@ -163,7 +172,8 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         toolName: 'rawengine.agent.adjustments.dry_run',
       },
     ],
-    receipt,
+    lifecycleReceipt: currentEvidence.lifecycleReceipt,
+    receipt: { ...receipt, proposalLineage: currentEvidence.proposalLineage },
     replayState: 'replayable',
     schemaVersion: 1,
     transcript: [
@@ -244,20 +254,23 @@ describe('agent selected-image audit store', () => {
     seedEditor();
   });
 
-  test('appends and reads receipts under selected image and session storage key', () => {
-    const record = buildAuditRecord();
+  test('appends and reads receipts under selected image and session storage key', async () => {
+    const record = await buildAuditRecord();
     const key = buildAgentSelectedImageLiveSessionAuditStorageKey({
       selectedImagePath: record.receipt.selectedImagePath,
       sessionId: record.receipt.sessionId,
     });
+    expect(key).toMatch(/^rawengine\.agent\.selectedImageLiveSessionAudit\.v2\.sha256-/u);
     const { adapter, storage } = keyedMemoryAdapter(key);
 
-    appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
+    await appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
 
     expect(storage.has(key)).toBe(true);
     expect(record.receipt.storageKey).toBe(key);
-    expect(readAgentSelectedImageLiveSessionAuditStore(adapter).records[0]?.receipt.previewLineage).toHaveLength(2);
-    expect(summarizeAgentSelectedImageLiveSessionAuditStore(adapter)).toMatchObject({
+    expect(
+      (await readAgentSelectedImageLiveSessionAuditStore(adapter)).records[0]?.receipt.previewLineage,
+    ).toHaveLength(2);
+    expect(await summarizeAgentSelectedImageLiveSessionAuditStore(adapter)).toMatchObject({
       latestSessionId: record.receipt.sessionId,
       previewCount: 2,
       recordCount: 1,
@@ -265,28 +278,37 @@ describe('agent selected-image audit store', () => {
     });
   });
 
-  test('rejects malformed receipt lineage before writing', () => {
-    const record = structuredClone(buildAuditRecord()) as AgentSelectedImageLiveSessionAuditRecord;
+  test('rejects malformed receipt lineage before writing', async () => {
+    const record = structuredClone(await buildAuditRecord()) as AgentSelectedImageLiveSessionAuditRecord;
     const key = record.receipt.storageKey ?? 'missing-key';
     const { adapter, storage } = keyedMemoryAdapter(key);
     record.receipt.previewLineage = record.receipt.previewLineage?.slice(0, 1);
 
-    expect(() => appendAgentSelectedImageLiveSessionAuditRecord(adapter, record)).toThrow(
-      'missing after-preview lineage',
-    );
+    await expect(appendAgentSelectedImageLiveSessionAuditRecord(adapter, record)).rejects.toThrow();
     expect(storage.has(key)).toBe(false);
   });
 
-  test('passes replay preflight when current selected image lineage matches', () => {
-    const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(buildAuditRecord());
+  test('reports a stable new-session recovery reason for corrupt current storage', async () => {
+    const { adapter } = keyedMemoryAdapter('corrupt-current', new Map([['corrupt-current', '{not-json']]));
+    expect(await summarizeAgentSelectedImageLiveSessionAuditStore(adapter)).toEqual({
+      previewCount: 0,
+      recordCount: 0,
+      recoveryReason: 'corrupt_current_storage',
+      recoveryStatus: 'new_session_required',
+      replayPreflightStatus: 'unchecked',
+    });
+  });
+
+  test('passes replay preflight when current selected image lineage matches', async () => {
+    const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(await buildAuditRecord());
 
     expect(preflight.status).toBe('ready');
     expect(preflight.staleReason).toBeUndefined();
     expect(preflight.replayPreviewHash).toBe('render:agent-audit-store-after');
   });
 
-  test('builds a shareable audit export receipt without image bytes or private paths', () => {
-    const record = buildAuditRecord();
+  test('builds a shareable audit export receipt without image bytes or private paths', async () => {
+    const record = await buildAuditRecord();
     const replayPreflight = preflightAgentSelectedImageLiveSessionAuditReplay(record);
     const exportReceipt = buildAgentSelectedImageLiveSessionAuditExportReceipt({
       audit: record,
@@ -323,8 +345,8 @@ describe('agent selected-image audit store', () => {
     expect(exportedText).not.toContain('blob:');
   });
 
-  test('marks replay preflight stale when selected image path mismatches', () => {
-    const record = buildAuditRecord();
+  test('marks replay preflight stale when selected image path mismatches', async () => {
+    const record = await buildAuditRecord();
     useEditorStore.setState((state) => ({
       selectedImage:
         state.selectedImage === null ? null : { ...state.selectedImage, path: '/fixtures/public/other.ARW' },

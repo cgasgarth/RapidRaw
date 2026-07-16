@@ -23,10 +23,6 @@ const ACESCG_RED: f32 = 0.272_228_72;
 const ACESCG_GREEN: f32 = 0.674_081_74;
 const ACESCG_BLUE: f32 = 0.053_689_52;
 
-const BLACK_WHITE_MIXER_RANGE_CENTERS: [f32; 8] =
-    [358.0, 25.0, 60.0, 115.0, 180.0, 225.0, 280.0, 330.0];
-const BLACK_WHITE_MIXER_RANGE_WIDTHS: [f32; 8] = [35.0, 45.0, 40.0, 90.0, 60.0, 60.0, 55.0, 50.0];
-
 #[cfg(test)]
 pub(crate) fn apply_native_color_mixer_adjustments<'a>(
     image: Cow<'a, DynamicImage>,
@@ -158,7 +154,7 @@ fn apply_channel_mixer_row(color: [f32; 3], row: ChannelMixerRow, preserve_exten
 pub(crate) fn apply_black_white_mixer(
     color: [f32; 3],
     settings: BlackWhiteMixerSettings,
-    preserve_extended: bool,
+    _preserve_extended: bool,
 ) -> [f32; 3] {
     if settings.enabled == 0 {
         return color;
@@ -193,46 +189,8 @@ pub(crate) fn apply_black_white_mixer(
         return neutral_panchromatic_v1(color);
     }
 
-    let luma = scene_luminance(color, preserve_extended);
-    let Some(hue) = rgb_to_hue_degrees(color) else {
-        return [luma; 3];
-    };
-
-    let weights = [
-        settings.reds,
-        settings.oranges,
-        settings.yellows,
-        settings.greens,
-        settings.aquas,
-        settings.blues,
-        settings.purples,
-        settings.magentas,
-    ];
-    let mut influence_total = 0.0;
-    let mut weighted_adjustment = 0.0;
-
-    for index in 0..weights.len() {
-        let influence = (1.0
-            - circular_hue_distance(hue, BLACK_WHITE_MIXER_RANGE_CENTERS[index])
-                / (BLACK_WHITE_MIXER_RANGE_WIDTHS[index] * 0.5))
-            .clamp(0.0, 1.0);
-        if influence > 0.0 {
-            influence_total += influence;
-            weighted_adjustment += influence * weights[index];
-        }
-    }
-
-    if influence_total > 0.0 {
-        weighted_adjustment /= influence_total;
-    }
-
-    let adjusted = luma * (1.0 + weighted_adjustment * 0.5);
-    let mixed = if preserve_extended {
-        adjusted
-    } else {
-        adjusted.clamp(0.0, 1.0)
-    };
-    [mixed; 3]
+    // Invalid process/version pairs are rejected at the render-plan boundary.
+    color
 }
 
 fn preserve_color_balance_luminance(
@@ -260,30 +218,6 @@ fn scene_luminance(color: [f32; 3], scene_referred_v2: bool) -> f32 {
         [REC709_RED, REC709_GREEN, REC709_BLUE]
     };
     color[0] * coefficients[0] + color[1] * coefficients[1] + color[2] * coefficients[2]
-}
-
-fn rgb_to_hue_degrees(color: [f32; 3]) -> Option<f32> {
-    let max = color[0].max(color[1]).max(color[2]);
-    let min = color[0].min(color[1]).min(color[2]);
-    let chroma = max - min;
-    if chroma <= 0.0 {
-        return None;
-    }
-
-    let hue = if max == color[0] {
-        (color[1] - color[2]) / chroma * 60.0 + if color[1] < color[2] { 360.0 } else { 0.0 }
-    } else if max == color[1] {
-        (color[2] - color[0]) / chroma * 60.0 + 120.0
-    } else {
-        (color[0] - color[1]) / chroma * 60.0 + 240.0
-    };
-
-    Some(hue)
-}
-
-fn circular_hue_distance(left: f32, right: f32) -> f32 {
-    let delta = (left - right).abs() % 360.0;
-    delta.min(360.0 - delta)
 }
 
 fn add_rgb(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
@@ -315,8 +249,8 @@ mod tests {
     };
     use crate::adjustments::parse::get_all_adjustments_from_json;
     use crate::monochrome::{
-        LEGACY_FIXED_BAND_V1, MONOCHROME_IMPLEMENTATION_VERSION, MONOCHROME_SENSOR_SOURCE,
-        NEUTRAL_PANCHROMATIC_V1,
+        MONOCHROME_IMPLEMENTATION_VERSION, MONOCHROME_SENSOR_SOURCE, NEUTRAL_PANCHROMATIC_V1,
+        continuous_sensitivity_v1,
     };
 
     fn source_image() -> DynamicImage {
@@ -349,6 +283,7 @@ mod tests {
             },
             "blackWhiteMixer": {
                 "enabled": true,
+                "process": "continuous_sensitivity_v1",
                 "weights": {
                     "reds": 100,
                     "oranges": 0,
@@ -411,6 +346,7 @@ mod tests {
             &json!({
                 "blackWhiteMixer": {
                     "enabled": true,
+                    "process": "continuous_sensitivity_v1",
                     "weights": {
                         "reds": 100,
                         "oranges": 0,
@@ -427,50 +363,11 @@ mod tests {
             None,
         );
         let source = [0.9, 0.0, 0.0];
-        let luma = 0.9 * 0.2126;
-        let expected = (luma * 1.5_f32).clamp(0.0, 1.0);
+        let expected = continuous_sensitivity_v1(source, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         let result = apply_black_white_mixer(source, adjustments.global.black_white_mixer, false);
 
-        assert!((result[0] - expected).abs() < 0.000_001);
-        assert_eq!(result, [result[0]; 3]);
-    }
-
-    #[test]
-    fn missing_process_keeps_legacy_fixed_band_v1_pixel_stable() {
-        let adjustments = get_all_adjustments_from_json(
-            &json!({
-                "blackWhiteMixer": {
-                    "enabled": true,
-                    "weights": {
-                        "reds": 35, "oranges": -12, "yellows": 18, "greens": -20,
-                        "aquas": 7, "blues": -31, "purples": 22, "magentas": 14
-                    }
-                }
-            }),
-            false,
-            None,
-        );
-        let settings = adjustments.global.black_white_mixer;
-        assert_eq!(settings.process, LEGACY_FIXED_BAND_V1);
-        assert_eq!(
-            settings.implementation_version,
-            MONOCHROME_IMPLEMENTATION_VERSION
-        );
-
-        for (source, expected) in [
-            ([0.9, 0.15, 0.05], 0.334_111_24),
-            ([0.3, 0.72, 0.18], 0.532_548),
-            ([0.12, 0.28, 0.95], 0.248_732_5),
-            ([1.4, 0.2, 0.7], 0.525_605_4),
-        ] {
-            let output = apply_black_white_mixer(source, settings, false);
-            assert!(
-                (output[0] - expected).abs() <= 2.0e-7,
-                "{source:?}: {output:?}"
-            );
-            assert_eq!(output, [output[0]; 3]);
-        }
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -614,6 +511,7 @@ mod gpu_runtime_tests {
             },
             "blackWhiteMixer": {
                 "enabled": true,
+                "process": "continuous_sensitivity_v1",
                 "weights": {
                     "reds": 100,
                     "oranges": 0,
@@ -741,7 +639,7 @@ mod gpu_runtime_tests {
                 }
             }
         });
-        let legacy_plan = crate::render_plan::compile_render_plan(
+        let legacy_error = crate::render_plan::compile_render_plan(
             &legacy_raw,
             crate::render_plan::CompileRenderPlanContext {
                 revision: crate::render_plan::content_revision(&legacy_raw, 1, 2, 3),
@@ -750,8 +648,10 @@ mod gpu_runtime_tests {
             },
             None,
         )
-        .expect("legacy monochrome plan compiles");
-        assert_ne!(plan.fingerprints.color, legacy_plan.fingerprints.color);
+        .err()
+        .expect("legacy monochrome process must be rejected");
+        assert_eq!(legacy_error.code, "render_plan.invalid_monochrome_process");
+        assert_eq!(legacy_error.field, "blackWhiteMixer.process");
 
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
@@ -942,30 +842,6 @@ mod gpu_runtime_tests {
             &plan.edit_graph,
         )
         .expect("CPU toned monochrome render succeeds");
-        let mut legacy_raw = raw.clone();
-        legacy_raw["blackWhiteMixer"]["process"] = json!("legacy_fixed_band_v1");
-        let legacy_plan = crate::render_plan::compile_render_plan(
-            &legacy_raw,
-            crate::render_plan::CompileRenderPlanContext {
-                revision: crate::render_plan::content_revision(&legacy_raw, 11, 12, 14),
-                is_raw: true,
-                tonemapper_override: Some(0),
-            },
-            None,
-        )
-        .expect("legacy toned monochrome plan compiles");
-        let legacy = crate::cpu_edit_graph::execute_cpu_edit_graph(
-            &source,
-            &legacy_plan.adjustments,
-            &[],
-            None,
-            &legacy_plan.edit_graph,
-        )
-        .expect("legacy monochrome render succeeds");
-        assert!(legacy.to_rgba32f().pixels().all(|pixel| {
-            (pixel[0] - pixel[1]).abs() <= 1.0e-6 && (pixel[1] - pixel[2]).abs() <= 1.0e-6
-        }));
-
         let _gpu_test_guard = acquire_gpu_test_lock();
         let app = tauri::test::mock_builder()
             .manage(AppState::new())

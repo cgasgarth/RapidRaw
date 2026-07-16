@@ -7,7 +7,7 @@ import { buildAgentAppServerToolReadinessSummary } from '../../../../src/utils/a
 
 const failures: Array<string> = [];
 const summary = buildAgentAppServerToolReadinessSummary();
-const expectedFamilies = ['ai', 'computational_merge', 'detail', 'film_look', 'negative_lab', 'tone_color'];
+const expectedFamilies = ['ai', 'computational_merge', 'detail', 'film_emulation', 'negative_lab', 'tone_color'];
 const localeSchema = z
   .object({
     editor: z.object({

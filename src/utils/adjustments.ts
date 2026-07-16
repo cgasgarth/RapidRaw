@@ -311,10 +311,8 @@ export interface Adjustments {
   flipHorizontal: boolean;
   flipVertical: boolean;
   flareAmount: number;
-  /** Canonical renderer-owned Film node; null keeps the legacy Film look path disabled. */
+  /** Canonical renderer-owned Film node. */
   filmEmulation: FilmEmulationNodeV1 | null;
-  filmLookId: string | null;
-  filmLookStrength: number;
   glowAmount: number;
   grainAmount: number;
   grainRoughness: number;
@@ -499,7 +497,7 @@ interface Hsl {
 
 export interface BlackWhiteMixerSettings {
   enabled: boolean;
-  process: 'continuous_sensitivity_v1' | 'legacy_fixed_band_v1' | 'neutral_panchromatic_v1';
+  process: 'continuous_sensitivity_v1' | 'neutral_panchromatic_v1';
   presetId:
     | 'manual'
     | 'neutral_panchromatic'
@@ -784,7 +782,7 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
 
 const INITIAL_BLACK_WHITE_MIXER: BlackWhiteMixerSettings = {
   enabled: false,
-  process: 'legacy_fixed_band_v1',
+  process: 'continuous_sensitivity_v1',
   presetId: 'manual',
   sourceClass: 'color_source',
   weights: {
@@ -991,8 +989,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   flipVertical: false,
   flareAmount: 0,
   filmEmulation: null,
-  filmLookId: null,
-  filmLookStrength: 100,
   glowAmount: 0,
   grainAmount: 0,
   grainRoughness: 50,
@@ -1248,8 +1244,6 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     ...loadedPixelAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     filmEmulation: parsedFilmEmulation.success ? parsedFilmEmulation.data : INITIAL_ADJUSTMENTS.filmEmulation,
-    filmLookId: loadedAdjustments.filmLookId ?? INITIAL_ADJUSTMENTS.filmLookId,
-    filmLookStrength: loadedAdjustments.filmLookStrength ?? INITIAL_ADJUSTMENTS.filmLookStrength,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     hue: loadedAdjustments.hue ?? INITIAL_ADJUSTMENTS.hue,

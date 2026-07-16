@@ -15,14 +15,6 @@ export const DISPLAY_CREATIVE_NODE_ADJUSTMENTS = [
   Effect.VignetteRoundness,
 ] as const;
 
-export const DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS = [
-  CreativeAdjustment.GlowAmount,
-  CreativeAdjustment.HalationAmount,
-  Effect.GrainAmount,
-  Effect.GrainSize,
-  Effect.GrainRoughness,
-] as const;
-
 export type DisplayCreativeNodeAdjustment = (typeof DISPLAY_CREATIVE_NODE_ADJUSTMENTS)[number];
 export type DisplayCreativeNodePatch = Partial<Record<DisplayCreativeNodeAdjustment, number>>;
 
@@ -85,26 +77,11 @@ export const buildDisplayCreativePatchEditTransaction = (
       throw new Error(`display_creative_transaction.invalid_value:${key}`);
     }
   }
-  const invalidatesFilmLook = entries.some(([key]) =>
-    DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS.some((candidate) => candidate === key),
-  );
-
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: [
-      { nodeType: 'display_creative', patch, type: 'patch-edit-document-node' },
-      ...(invalidatesFilmLook
-        ? ([
-            {
-              nodeType: 'film_look',
-              patch: { filmLookId: null, filmLookStrength: 100 },
-              type: 'patch-edit-document-node',
-            },
-          ] as const)
-        : []),
-    ],
+    operations: [{ nodeType: 'display_creative', patch, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'manual-control',
     transactionId,

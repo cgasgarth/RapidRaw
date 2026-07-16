@@ -160,7 +160,7 @@ fn parse_black_white_mixer_settings(js_black_white_mixer: &JsonValue) -> BlackWh
     let process = match js_black_white_mixer["process"].as_str() {
         Some("neutral_panchromatic_v1") => crate::monochrome::NEUTRAL_PANCHROMATIC_V1,
         Some("continuous_sensitivity_v1") => crate::monochrome::CONTINUOUS_SENSITIVITY_V1,
-        _ => crate::monochrome::LEGACY_FIXED_BAND_V1,
+        _ => crate::monochrome::CONTINUOUS_SENSITIVITY_V1,
     };
     BlackWhiteMixerSettings {
         reds: js_black_white_mixer["weights"]["reds"]

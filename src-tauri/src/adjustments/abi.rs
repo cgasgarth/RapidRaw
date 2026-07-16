@@ -132,7 +132,7 @@ impl Default for ColorBalanceRgbSettings {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct BlackWhiteMixerSettings {
     pub reds: f32,
@@ -149,6 +149,25 @@ pub struct BlackWhiteMixerSettings {
     /// Declares whether the source carries chroma that can legally drive
     /// sensitivity. Kept in the existing ABI padding slot for compatibility.
     pub(crate) source_class: u32,
+}
+
+impl Default for BlackWhiteMixerSettings {
+    fn default() -> Self {
+        Self {
+            reds: 0.0,
+            oranges: 0.0,
+            yellows: 0.0,
+            greens: 0.0,
+            aquas: 0.0,
+            blues: 0.0,
+            purples: 0.0,
+            magentas: 0.0,
+            enabled: 0,
+            process: crate::monochrome::CONTINUOUS_SENSITIVITY_V1,
+            implementation_version: crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION,
+            source_class: crate::monochrome::COLOR_SOURCE,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]

@@ -569,7 +569,7 @@ async function validateColorBalanceRgbTransaction(container: Element) {
   const rangeReset = useEditorStore.getState();
   assert.equal(rangeReset.adjustmentRevision, beforeRangeReset.adjustmentRevision + 1);
   assert.deepEqual(rangeReset.adjustments.colorBalanceRgb.midtones, INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones);
-  assert.equal(rangeReset.adjustments.colorBalanceRgb.enabled, true);
+  assert.equal(rangeReset.adjustments.colorBalanceRgb.enabled, false);
   assert.equal(rangeReset.adjustments.colorBalanceRgb.preserveLuminance, false);
 
   const beforeFullReset = useEditorStore.getState();

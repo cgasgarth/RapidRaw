@@ -68,11 +68,17 @@ describe('versioned monochrome runtime', () => {
     }
   });
 
-  test('keeps missing process values on the pixel-stable legacy process', () => {
-    const parsed = parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights });
-    expect(parsed.process).toBe('legacy_fixed_band_v1');
-    expect(parsed.sourceClass).toBe('color_source');
-    expect(parsed.presetId).toBe('manual');
+  test('rejects missing and legacy process values at the shared strict boundary', () => {
+    expect(() => parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights })).toThrow();
+    expect(() =>
+      parseBlackWhiteMixerSettings({
+        enabled: true,
+        presetId: 'manual',
+        process: 'legacy_fixed_band_v1',
+        sourceClass: 'color_source',
+        weights: { ...zeroWeights, reds: 20 },
+      }),
+    ).toThrow();
   });
 
   test('neutral panchromatic v1 uses AP1 energy without an SDR clamp', () => {
@@ -140,7 +146,11 @@ describe('versioned monochrome runtime', () => {
 
   test('project-owned filter presets compile to editable continuous responses', () => {
     expect(MONOCHROME_PRESETS).toHaveLength(6);
-    const settings = parseBlackWhiteMixerSettings({ enabled: false, weights: zeroWeights });
+    const settings = parseBlackWhiteMixerSettings({
+      enabled: false,
+      process: 'continuous_sensitivity_v1',
+      weights: zeroWeights,
+    });
     const selected = applyMonochromePreset(settings, 'orange_filter');
     expect(selected.enabled).toBe(true);
     expect(selected.process).toBe('continuous_sensitivity_v1');

@@ -57,17 +57,9 @@ const channelMixerSources: Array<ChannelMixerSource> = ['red', 'green', 'blue', 
 
 export const enableBlackWhiteMixer = (
   settings: BlackWhiteMixerSettings,
-  activeChannel: BlackWhiteMixerChannel,
+  _activeChannel: BlackWhiteMixerChannel,
 ): BlackWhiteMixerSettings => {
-  const hasAdjustment = Object.values(settings.weights).some((weight) => weight !== 0);
-  if (!hasAdjustment && settings.process === 'legacy_fixed_band_v1') {
-    return { ...settings, enabled: true, process: 'continuous_sensitivity_v1' };
-  }
-  return {
-    ...settings,
-    enabled: true,
-    weights: hasAdjustment ? settings.weights : { ...settings.weights, [activeChannel]: 20 },
-  };
+  return { ...settings, enabled: true };
 };
 
 export const isBlackWhiteMixerModified = (settings: BlackWhiteMixerSettings): boolean =>
@@ -119,10 +111,16 @@ export const formatRgbSummary = (values: { red: number; green: number; blue: num
 export const resetColorBalanceRange = (
   settings: ColorBalanceRgbSettings,
   range: ColorBalanceRgbRange,
-): ColorBalanceRgbSettings => ({
-  ...settings,
-  [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
-});
+): ColorBalanceRgbSettings => {
+  const reset = {
+    ...settings,
+    [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
+  };
+  const hasAdjustment = colorBalanceRanges.some((candidateRange) =>
+    colorBalanceChannels.some((channel) => reset[candidateRange][channel] !== 0),
+  );
+  return hasAdjustment ? reset : { ...reset, enabled: false };
+};
 
 export const resetChannelMixerOutput = (
   settings: ChannelMixerSettings,

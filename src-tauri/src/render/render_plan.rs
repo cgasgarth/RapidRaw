@@ -18,7 +18,6 @@ use serde_json::Value;
 use crate::adjustments::abi::AllAdjustments;
 use crate::adjustments::parse::get_all_adjustments_from_json_with_masks;
 use crate::edit_graph::{CompiledEditGraph, EditGraphCompileInputs};
-use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::geometry::{Crop, GeometryParams, get_geometry_params_from_json};
 use crate::lut_processing::Lut;
 use crate::mask_generation::MaskDefinition;
@@ -267,7 +266,8 @@ pub fn compile_render_plan(
         });
     }
     validate_finite(raw, "$")?;
-    let effective = normalize_film_look_adjustments_for_render(raw).into_owned();
+    let effective = raw.clone();
+    validate_monochrome_process(&effective)?;
     let film_emulation =
         crate::render::film_emulation::parse_node(&effective).map_err(|message| {
             RenderPlanError {
@@ -566,6 +566,24 @@ fn validate_perspective_analysis_currentness(
         });
     }
     Ok(())
+}
+
+fn validate_monochrome_process(effective: &Value) -> Result<(), RenderPlanError> {
+    let Some(settings) = effective.get("blackWhiteMixer") else {
+        return Ok(());
+    };
+    let process = settings.get("process").and_then(Value::as_str);
+    if matches!(
+        process,
+        Some("neutral_panchromatic_v1" | "continuous_sensitivity_v1")
+    ) {
+        return Ok(());
+    }
+    Err(RenderPlanError {
+        code: "render_plan.invalid_monochrome_process",
+        field: "blackWhiteMixer.process",
+        message: "process must be neutral_panchromatic_v1 or continuous_sensitivity_v1".into(),
+    })
 }
 
 pub fn content_revision(

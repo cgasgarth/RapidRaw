@@ -2185,7 +2185,6 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.EditorParityContract]: EditorParityContractVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace]: FilmEmulationWorkspaceVisualSmoke,
-  [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawModalReview]: FocusPrivateRawModalReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
@@ -3603,23 +3602,6 @@ const adjustmentGroups = [
   { label: 'Film Grain', value: '18', width: '46%' },
 ] as const;
 
-const filmLookParityProofCases = [
-  {
-    displayName: 'Warm Print',
-    maxDelta: '0',
-    previewHash: '9a605fdfa6fd53a9',
-  },
-  {
-    displayName: 'Mono Silver',
-    maxDelta: '0',
-    previewHash: '7e4b525fd7be754b',
-  },
-  {
-    displayName: 'Punch Color',
-    maxDelta: '0',
-    previewHash: '942aa1199eb4a1d3',
-  },
-] as const;
 interface LayerWorkflowState {
   blend: LayerWorkflowBlendMode;
   groupId?: string;
@@ -3661,8 +3643,6 @@ const layerWorkflowInitialStack = [
   },
   { blend: 'screen', mask: 'Window radial', name: 'Window lift', opacity: 36, visible: true },
 ] satisfies LayerWorkflowState[];
-const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
-const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
 const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
 const NEGATIVE_LAB_PUBLIC_EXPORT_REVIEW_TITLE = 'Public negative export review';
 const NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_LABEL = 'CC0 scan input';
@@ -3677,7 +3657,6 @@ const NEGATIVE_LAB_REAL_RAW_PRIVATE_OUTPUT_LABEL = 'Private RAW positive proof';
 const NEGATIVE_LAB_REAL_RAW_PRIVATE_METRICS_LABEL = 'Runtime metrics';
 const NEGATIVE_LAB_REAL_RAW_PRIVATE_CHANGED_PIXELS_LABEL = 'Changed pixels';
 const NEGATIVE_LAB_REAL_RAW_PRIVATE_MEAN_DELTA_LABEL = 'Mean delta';
-const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
 const libraryWorkflowAssets = [
   { color: 'green', file: 'DSC_0001.NEF', rating: 5, status: 'Keeper', tone: 'from-[#6cbf84] to-[#d9b26f]' },
@@ -5416,12 +5395,6 @@ const hdrVisualSmokeSourceMetadata: HdrBracketPreflightSourceMetadata[] = [
     path: '/tmp/rawengine-hdr-over.nef',
   },
 ];
-const filmSmokeMetricLabels = {
-  contrast: 'Contrast',
-  grain: 'Grain',
-  highlights: 'Highlights',
-} as const;
-const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
 const commandPaletteWorkflowSourcePath = '/Users/example/Pictures/CommandPalette/DSC_7853.ARW';
 
 function CommandPaletteWorkflowSmoke() {
@@ -8092,69 +8065,6 @@ function NegativeLabRealRawPrivateReviewSmoke() {
               <p className="break-all">{proof.outputPath}</p>
             </div>
           </div>
-        </aside>
-      </div>
-    </main>
-  );
-}
-
-function FilmLookVisualSmoke() {
-  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
-  const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
-    setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
-  };
-
-  return (
-    <main
-      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
-      data-visual-smoke-ready="true"
-      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser}
-    >
-      <div className="grid h-screen grid-cols-[1fr_380px] overflow-hidden">
-        <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="film-look-preview">
-          <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
-            <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-gradient-to-br from-[#293c42] via-[#52645f] to-[#d4b173] shadow-2xl">
-              <div className="h-full w-full bg-[radial-gradient(circle_at_42%_35%,rgba(255,244,215,0.45),transparent_22%),linear-gradient(170deg,transparent_42%,rgba(12,31,37,0.72)_43%)]" />
-            </div>
-            <div
-              className="grid grid-cols-3 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
-              data-testid="film-look-adjustment-proof"
-            >
-              <span>{formatSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
-              <span>{formatSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
-              <span>{formatSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
-            </div>
-            <div
-              className="rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#cdd4cc]"
-              data-testid="film-look-rendered-proof"
-            >
-              <div className="mb-2 flex items-center justify-between gap-3 text-[#f3f4f1]">
-                <span className="font-medium">{FILM_LOOK_PARITY_TITLE}</span>
-                <span>{FILM_LOOK_PARITY_FIXTURE_LABEL}</span>
-              </div>
-              <div className="grid gap-1">
-                {filmLookParityProofCases.map((proofCase) => (
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2" key={proofCase.displayName}>
-                    <span>{proofCase.displayName}</span>
-                    <span>{formatFilmLookParityDelta(proofCase.maxDelta)}</span>
-                    <span>{proofCase.previewHash}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-        <aside
-          className="overflow-y-auto border-l border-white/10 bg-[#15181c] p-3"
-          data-visual-smoke-section="film-look-browser"
-        >
-          <EffectsPanel
-            adjustments={adjustments}
-            appSettings={null}
-            handleLutSelect={() => {}}
-            isForMask={false}
-            setAdjustments={handleAdjustmentsChange}
-          />
         </aside>
       </div>
     </main>

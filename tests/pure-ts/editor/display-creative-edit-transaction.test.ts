@@ -6,7 +6,6 @@ import { CreativeAdjustment, Effect, INITIAL_ADJUSTMENTS } from '../../../src/ut
 import {
   buildDisplayCreativeEditTransaction,
   buildDisplayCreativePatchEditTransaction,
-  DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS,
   DISPLAY_CREATIVE_NODE_ADJUSTMENTS,
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
@@ -105,7 +104,7 @@ describe('display creative edit transaction', () => {
     expect(useEditorStore.getState().adjustments.lutIntensity).toBe(100);
   });
 
-  test('owns non-film-look display controls, exact no-ops, and rejects stale identity', () => {
+  test('owns display controls, exact no-ops, and rejects stale identity', () => {
     const state = useEditorStore.getState();
     expect(DISPLAY_CREATIVE_NODE_ADJUSTMENTS).toEqual([
       CreativeAdjustment.GlowAmount,
@@ -122,20 +121,8 @@ describe('display creative edit transaction', () => {
     ]);
     for (const field of DISPLAY_CREATIVE_NODE_ADJUSTMENTS) {
       expect(isDisplayCreativeNodeAdjustment(field)).toBeTrue();
-      const expectedFilmInvalidation = DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS.includes(
-        field as (typeof DISPLAY_CREATIVE_FILM_LOOK_ADJUSTMENTS)[number],
-      )
-        ? [
-            {
-              nodeType: 'film_look',
-              patch: { filmLookId: null, filmLookStrength: 100 },
-              type: 'patch-edit-document-node',
-            },
-          ]
-        : [];
       expect(buildDisplayCreativeEditTransaction(state, identity(), field, 37, `field-${field}`).operations).toEqual([
         { nodeType: 'display_creative', patch: { [field]: 37 }, type: 'patch-edit-document-node' },
-        ...expectedFilmInvalidation,
       ]);
     }
 
@@ -176,49 +163,6 @@ describe('display creative edit transaction', () => {
     ).toThrow('display_creative_transaction.stale_revision');
   });
 
-  test('atomically invalidates Film Look identity for manual creative and grain edits and restores it on Undo', () => {
-    const activeLook = {
-      ...useEditorStore.getState().adjustments,
-      filmLookId: 'film_look.generic.warm.v1',
-      filmLookStrength: 72,
-      grainAmount: 12,
-    };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(activeLook);
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, activeLook, editDocumentV2),
-      adjustments: activeLook,
-      editDocumentV2,
-      history: [activeLook],
-    });
-
-    const halation = useEditorStore
-      .getState()
-      .applyEditTransaction(
-        buildDisplayCreativeEditTransaction(
-          useEditorStore.getState(),
-          identity(),
-          CreativeAdjustment.HalationAmount,
-          24,
-          'display-creative-halation',
-        ),
-      );
-    expect(halation.after).toMatchObject({ filmLookId: null, filmLookStrength: 100, halationAmount: 24 });
-    expect(halation.afterEditDocumentV2.nodes.display_creative.params.halationAmount).toBe(24);
-    expect(halation.afterEditDocumentV2.nodes.film_look.params).toEqual({
-      filmLookId: null,
-      filmLookStrength: 100,
-    });
-    expect(halation.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
-    expect(useEditorStore.getState().history).toHaveLength(2);
-
-    useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({
-      filmLookId: 'film_look.generic.warm.v1',
-      filmLookStrength: 72,
-      halationAmount: 0,
-    });
-  });
-
   test('commits a grain preset patch as one display node revision and one history boundary', () => {
     const state = useEditorStore.getState();
     const request = buildDisplayCreativePatchEditTransaction(
@@ -233,11 +177,6 @@ describe('display creative edit transaction', () => {
       {
         nodeType: 'display_creative',
         patch: { grainAmount: 28, grainRoughness: 50, grainSize: 34 },
-        type: 'patch-edit-document-node',
-      },
-      {
-        nodeType: 'film_look',
-        patch: { filmLookId: null, filmLookStrength: 100 },
         type: 'patch-edit-document-node',
       },
     ]);

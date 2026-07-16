@@ -2444,6 +2444,7 @@
       "applyProfile": "Apply profile",
       "browserLabel": "Verified film profile browser",
       "compatiblePrint": "Compatible print",
+      "currentProfiles": "Current profiles",
       "enable": "Enable film emulation",
       "filtersLabel": "Profile filters",
       "localAb": "Local A/B",

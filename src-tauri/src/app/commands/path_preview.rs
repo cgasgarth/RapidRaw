@@ -9,7 +9,6 @@ use tauri::ipc::Response;
 use crate::app_settings::load_settings_or_default;
 use crate::cache_utils::calculate_transform_hash;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
-use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_codecs::encode_jpeg_response;
 use crate::image_loader::load_and_composite;
@@ -88,18 +87,18 @@ pub(crate) fn generate_preview_for_path(
         .collect();
 
     let tonemapper_override = resolve_tonemapper_override(&settings, is_raw);
-    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
+    let render_adjustments = &js_adjustments;
     let lut = render_adjustments["lutPath"]
         .as_str()
         .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
-        render_adjustments.as_ref(),
+        render_adjustments,
         &source_path_str,
         is_raw,
         tonemapper_override,
         lut,
     )?;
-    let pre_gpu_stage_hash = calculate_transform_hash(render_adjustments.as_ref());
+    let pre_gpu_stage_hash = calculate_transform_hash(render_adjustments);
     let source_revision = crate::render::artifact_identity::stable_hash(&(
         crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_str),
         crate::image_loader::raw_processing_profile_key(&settings),
@@ -107,7 +106,7 @@ pub(crate) fn generate_preview_for_path(
     let detail_stage = crate::render_pipeline::apply_pre_gpu_detail_stages(
         transformed_image.as_ref(),
         pre_gpu_stage_hash,
-        render_adjustments.as_ref(),
+        render_adjustments,
         is_raw,
     );
     let mut gpu_adjustments = render_plan.adjustments;

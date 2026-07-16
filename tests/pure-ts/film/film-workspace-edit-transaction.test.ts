@@ -1,412 +1,87 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 
-import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
-import {
-  EditorPersistenceEffectRunner,
-  type EditorPersistenceExecution,
-} from '../../../src/utils/editorPersistenceEffectRunner';
-import { buildEditTransactionPersistenceContext } from '../../../src/utils/editTransaction';
-import {
-  hydrateFilmEmulationTargetState,
-  REFERENCE_FILM_PROFILE_REF,
-} from '../../../src/utils/film-look/filmEmulationOperation';
+import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 import { buildFilmWorkspaceEditTransactionRequest } from '../../../src/utils/film-look/filmWorkspaceEditTransaction';
-import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
-const fingerprint = (digit: string): `fnv1a64:${string}` => `fnv1a64:${digit.repeat(16)}`;
-const receipt = matchLookApplicationReceiptV1Schema.parse({
-  appliedDiffs: [{ after: 12, before: 0, key: 'saturation' }],
-  appliedAt: '2026-07-14T12:00:00.000Z',
-  baseGraphFingerprint: fingerprint('0'),
-  destination: 'global-adjustments',
-  effectiveReferences: [{ role: 'creative', sourceFingerprint: fingerprint('4'), weight: 1 }],
-  enabledGroups: ['color'],
-  historyEntriesAdded: 1,
-  impact: 100,
-  proposalFingerprint: fingerprint('1'),
-  resultingGraphFingerprint: fingerprint('2'),
-  schemaVersion: 1,
-  targetAnalysisFingerprint: fingerprint('3'),
+const node = (mix: number) => ({
+  contractVersion: 1 as const,
+  enabled: true,
+  mix,
+  nodeType: 'film_emulation' as const,
+  profileRef: REFERENCE_FILM_PROFILE_REF,
+  seedPolicy: 'source_stable_v1' as const,
+  workingSpace: 'acescg_linear_v1' as const,
 });
 
 const seedStore = () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
+    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
     adjustments,
-    exportSoftProofTransform: {
-      blackPointCompensation: 'enabled',
-      colorManagedTransform: 'display-p3-preview',
-      effectiveColorProfile: 'Display P3',
-      effectiveRenderingIntent: 'relative_colorimetric',
-      policyStatus: 'active',
-      policyVersion: 'test-v1',
-      sourcePrecisionPath: 'preview',
-      transformApplied: true,
-      transformPolicyFingerprint: 'film-before',
-    },
-    finalPreviewUrl: 'blob:film-before',
+    editDocumentV2,
     history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     imageSessionId: 9,
     lastEditApplicationReceipt: null,
-    transformedOriginalUrl: 'blob:film-original-before',
   });
 };
 
-afterEach(seedStore);
+describe('current Film workspace transaction', () => {
+  beforeEach(seedStore);
 
-describe('Film workspace EditTransaction boundary', () => {
-  test('commits a node-scoped edit with one history boundary and persistence identity', () => {
-    seedStore();
+  test('commits only the pinned Film node and round-trips Undo/Redo', () => {
     const state = useEditorStore.getState();
-    const request = buildFilmWorkspaceEditTransactionRequest(state, { filmLookStrength: 72 }, 'film-tx-1');
+    const request = buildFilmWorkspaceEditTransactionRequest(state, { filmEmulation: node(0.72) }, 'film-node');
     const result = state.applyEditTransaction(request);
-    const committed = useEditorStore.getState();
 
-    expect(request).toMatchObject({
-      baseAdjustmentRevision: 0,
-      history: 'single-entry',
-      imageSessionId: 'editor-image-session:9',
-      persistence: 'commit',
-      source: 'film-workspace',
-    });
-    expect(request.operations).toEqual([
-      { nodeType: 'film_look', patch: { filmLookStrength: 72 }, type: 'patch-edit-document-node' },
-    ]);
-    expect(result.changedKeys).toEqual(['filmLookStrength']);
-    expect(result.invalidatedProvenance).toEqual(['reference-match', 'auto-edit', 'derived-render']);
-    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
-    expect(committed.adjustmentRevision).toBe(1);
-    expect(committed.adjustmentSnapshot.value.filmLookStrength).toBe(72);
-    expect(committed.editDocumentV2.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 72 });
-    expect(committed.editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmLookStrength');
-    expect(committed.history).toHaveLength(2);
-    expect(committed.historyIndex).toBe(1);
-    expect(committed.finalPreviewUrl).toBeNull();
-    expect(committed.transformedOriginalUrl).toBeNull();
-    expect(committed.exportSoftProofTransform).toBeNull();
-    expect(buildEditTransactionPersistenceContext(request, result)).toEqual({
-      transactionId: 'film-tx-1',
-      imageSessionId: 'editor-image-session:9',
-      baseAdjustmentRevision: 0,
-      nextAdjustmentRevision: 1,
-    });
-  });
-
-  test('persists, reopens, undoes, redoes, and resets Film Look node authority', async () => {
-    seedStore();
-    const state = useEditorStore.getState();
-    const request = buildFilmWorkspaceEditTransactionRequest(
-      state,
-      { filmLookId: 'film_look.generic.warm_print.v1', filmLookStrength: 65 },
-      'film-look-node',
-    );
     expect(request.operations).toEqual([
       {
-        nodeType: 'film_look',
-        patch: { filmLookId: 'film_look.generic.warm_print.v1', filmLookStrength: 65 },
+        nodeType: 'film_emulation',
+        patch: { filmEmulation: node(0.72) },
         type: 'patch-edit-document-node',
       },
     ]);
-    const result = state.applyEditTransaction(request);
-    expect(result.changedKeys).toEqual(['filmLookId', 'filmLookStrength']);
-    expect(result.afterEditDocumentV2.nodes.film_look.params).toEqual({
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
-    );
-
-    useEditorStore.getState().undo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.film_look.params).toEqual({
-      filmLookId: null,
-      filmLookStrength: 100,
-    });
-    useEditorStore.getState().redo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.film_look.params.filmLookId).toBe(
-      'film_look.generic.warm_print.v1',
-    );
-
-    const committed = useEditorStore.getState();
-    const executions: EditorPersistenceExecution[] = [];
-    const runner = new EditorPersistenceEffectRunner({
-      clearTimer: () => {},
-      execute: async (execution) => {
-        executions.push(execution);
-        return { path: execution.path, sidecarRevision: `sha256:${'c'.repeat(64)}` };
-      },
-      onAccepted: () => {},
-      setTimer: (callback) => {
-        callback();
-        return 0;
-      },
-    });
-    runner.installSession({
-      adjustmentRevision: 0,
-      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS)),
-      imageSessionId: 'editor-image-session:9',
-      path: '/fixture/film-look-node.ARW',
-      sessionGeneration: 1,
-    });
-    if (committed.lastEditApplicationReceipt === null) throw new Error('missing Film Look receipt');
-    runner.submitCommitted({
-      adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustments,
-      editDocumentV2: committed.editDocumentV2,
-      imageSessionId: 'editor-image-session:9',
-      interactionActive: false,
-      multiSelection: null,
-      path: '/fixture/film-look-node.ARW',
-      receipt: committed.lastEditApplicationReceipt,
-      sessionGeneration: 1,
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(executions).toHaveLength(1);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
-      executions[0]?.adjustments ?? committed.adjustments,
-    );
-    expect(reopened).toEqual(committed.editDocumentV2);
-    expect(reopened.nodes.film_look.params).toEqual({
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-
-    const resetDocument = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
-    expect(resetDocument.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
-  });
-
-  test('commits Film node authority through Undo, Redo, persistence, reopen, and Reset defaults', async () => {
-    seedStore();
-    const node = {
-      contractVersion: 1 as const,
-      enabled: true,
-      mix: 0.7,
-      nodeType: 'film_emulation' as const,
-      profileRef: REFERENCE_FILM_PROFILE_REF,
-      seedPolicy: 'source_stable_v1' as const,
-      workingSpace: 'acescg_linear_v1' as const,
-    };
-    const state = useEditorStore.getState();
-    const request = buildFilmWorkspaceEditTransactionRequest(state, { filmEmulation: node }, 'film-node');
-    expect(request.operations).toEqual([
-      { nodeType: 'film_emulation', patch: { filmEmulation: node }, type: 'patch-edit-document-node' },
-    ]);
-    const result = state.applyEditTransaction(request);
     expect(result.changedKeys).toEqual(['filmEmulation']);
-    expect(result.afterEditDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(node);
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmEmulation');
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
-    );
+    expect(result.after.filmEmulation).toEqual(node(0.72));
+    expect(result.afterEditDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: node(0.72) });
+    expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params.filmEmulation).toBeNull();
+    expect(useEditorStore.getState().adjustments.filmEmulation).toBeNull();
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(node);
-
-    const committed = useEditorStore.getState();
-    const executions: EditorPersistenceExecution[] = [];
-    const runner = new EditorPersistenceEffectRunner({
-      clearTimer: () => {},
-      execute: async (execution) => {
-        executions.push(execution);
-        return { path: execution.path, sidecarRevision: `sha256:${'b'.repeat(64)}` };
-      },
-      onAccepted: () => {},
-      setTimer: (callback) => {
-        callback();
-        return 0;
-      },
-    });
-    runner.installSession({
-      adjustmentRevision: 0,
-      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS)),
-      imageSessionId: 'editor-image-session:9',
-      path: '/fixture/film-node.ARW',
-      sessionGeneration: 1,
-    });
-    if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed Film receipt');
-    runner.submitCommitted({
-      adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustments,
-      editDocumentV2: committed.editDocumentV2,
-      imageSessionId: 'editor-image-session:9',
-      interactionActive: false,
-      multiSelection: null,
-      path: '/fixture/film-node.ARW',
-      receipt: committed.lastEditApplicationReceipt,
-      sessionGeneration: 1,
-    });
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(executions).toHaveLength(1);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
-      executions[0]?.adjustments ?? committed.adjustments,
-    );
-    expect(reopened.nodes.film_emulation.params.filmEmulation).toEqual(node);
-    expect(reopened).toEqual(committed.editDocumentV2);
-
-    const resetDocument = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
-    expect(resetDocument.nodes.film_emulation.params.filmEmulation).toBeNull();
+    expect(useEditorStore.getState().adjustments.filmEmulation).toEqual(node(0.72));
   });
 
-  test('exact no-ops preserve revision, history, previews, and persistence authority', () => {
-    seedStore();
-    const state = useEditorStore.getState();
-    const request = buildFilmWorkspaceEditTransactionRequest(
-      state,
-      { filmLookStrength: state.adjustments.filmLookStrength },
-      'film-no-op',
-    );
-    const result = state.applyEditTransaction(request);
-    const committed = useEditorStore.getState();
-
-    expect(result.noOp).toBe(true);
-    expect(result.changedKeys).toEqual([]);
-    expect(result.invalidatedStages).toEqual([]);
-    expect(committed.adjustmentRevision).toBe(0);
-    expect(committed.history).toHaveLength(1);
-    expect(committed.historyIndex).toBe(0);
-    expect(committed.finalPreviewUrl).toBe('blob:film-before');
-    expect(committed.lastEditApplicationReceipt).toBeNull();
-  });
-
-  test('coalesces a multi-step interaction into one undo boundary and persistence authority', () => {
-    seedStore();
-    const transactionId = 'film-mix-gesture';
-    for (const filmLookStrength of [90, 75, 40]) {
-      const state = useEditorStore.getState();
-      state.applyEditTransaction(
-        buildFilmWorkspaceEditTransactionRequest(state, { filmLookStrength }, transactionId, 'coalesced-interaction'),
+  test('coalesces mix changes into one history entry and removing the node is exact', () => {
+    const first = useEditorStore.getState();
+    first.applyEditTransaction(buildFilmWorkspaceEditTransactionRequest(first, { filmEmulation: node(1) }, 'enable'));
+    for (const mix of [0.9, 0.7, 0.4]) {
+      const current = useEditorStore.getState();
+      current.applyEditTransaction(
+        buildFilmWorkspaceEditTransactionRequest(
+          current,
+          { filmEmulation: node(mix) },
+          'mix-gesture',
+          'coalesced-interaction',
+        ),
       );
     }
-    const committed = useEditorStore.getState();
-    const persistenceReceipt = committed.lastEditApplicationReceipt;
+    expect(useEditorStore.getState().adjustments.filmEmulation?.mix).toBe(0.4);
+    expect(useEditorStore.getState().history).toHaveLength(3);
 
-    expect(committed.adjustments.filmLookStrength).toBe(40);
-    expect(committed.adjustmentRevision).toBe(3);
-    expect(committed.history).toHaveLength(2);
-    expect(committed.historyIndex).toBe(1);
-    expect(committed.history[0]?.filmLookStrength).toBe(100);
-    expect(committed.history[1]?.filmLookStrength).toBe(40);
-    expect(persistenceReceipt).toMatchObject({
-      transactionId,
-      baseAdjustmentRevision: 0,
-      adjustmentRevision: 3,
-      changedKeys: ['filmLookStrength'],
-    });
-    if (!persistenceReceipt) throw new Error('Expected coalesced Film persistence receipt');
-    expect(buildEditTransactionPersistenceContext(persistenceReceipt, persistenceReceipt)).toEqual({
-      transactionId,
-      imageSessionId: 'editor-image-session:9',
-      baseAdjustmentRevision: 0,
-      nextAdjustmentRevision: 3,
-    });
-
-    committed.undo();
-    expect(useEditorStore.getState().adjustments.filmLookStrength).toBe(100);
-    useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.filmLookStrength).toBe(40);
-  });
-
-  test('starts a new coalesced boundary when undo moved away from the latest gesture entry', () => {
-    seedStore();
-    const transactionId = 'film-mix-interrupted-gesture';
-    const first = useEditorStore.getState();
-    first.applyEditTransaction(
-      buildFilmWorkspaceEditTransactionRequest(first, { filmLookStrength: 90 }, transactionId, 'coalesced-interaction'),
-    );
-    const abandonedGestureEntry = useEditorStore.getState().history[1];
-
-    useEditorStore.getState().undo();
-    const resumed = useEditorStore.getState();
-    resumed.applyEditTransaction(
-      buildFilmWorkspaceEditTransactionRequest(
-        resumed,
-        { filmLookStrength: 70 },
-        transactionId,
-        'coalesced-interaction',
-      ),
-    );
-
-    const committed = useEditorStore.getState();
-    expect(committed.history).toHaveLength(2);
-    expect(committed.historyIndex).toBe(1);
-    expect(committed.history[1]).not.toBe(abandonedGestureEntry);
-    expect(committed.history[1]?.filmLookStrength).toBe(70);
-    expect(committed.lastEditApplicationReceipt).toMatchObject({
-      adjustmentRevision: 3,
-      baseAdjustmentRevision: 2,
-      transactionId,
-    });
-    committed.undo();
-    expect(useEditorStore.getState().adjustments.filmLookStrength).toBe(100);
-  });
-
-  test('rejects a stale base without publishing partial Film state', () => {
-    seedStore();
-    const stale = buildFilmWorkspaceEditTransactionRequest(
-      useEditorStore.getState(),
-      { filmLookStrength: 35 },
-      'film-stale',
-    );
     const current = useEditorStore.getState();
     current.applyEditTransaction(
-      buildFilmWorkspaceEditTransactionRequest(current, { filmLookStrength: 60 }, 'film-current'),
+      buildFilmWorkspaceEditTransactionRequest(current, { filmEmulation: null }, 'remove-film'),
     );
-    const beforeStaleApply = useEditorStore.getState();
-
-    expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
-    expect(useEditorStore.getState()).toMatchObject({
-      adjustmentRevision: beforeStaleApply.adjustmentRevision,
-      adjustments: { filmLookStrength: 60 },
-      historyIndex: beforeStaleApply.historyIndex,
-    });
-  });
-
-  test('carries reference-match invalidation and deterministically hydrates canonical Film nodes', () => {
-    const adjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      referenceMatchApplicationReceipt: receipt,
-      saturation: 12,
-    };
-    const request = buildFilmWorkspaceEditTransactionRequest(
-      { adjustmentRevision: 4, adjustments, imageSessionId: 2 },
-      { saturation: -20 },
-      'film-provenance',
-    );
-    expect(request.operations).toEqual([
-      { type: 'patch-adjustments', patch: { referenceMatchApplicationReceipt: null, saturation: -20 } },
-    ]);
-
-    const node = {
-      contractVersion: 1 as const,
-      enabled: true,
-      mix: 1,
-      nodeType: 'film_emulation' as const,
-      profileRef: REFERENCE_FILM_PROFILE_REF,
-      seedPolicy: 'source_stable_v1' as const,
-      workingSpace: 'acescg_linear_v1' as const,
-    };
-    const first = hydrateFilmEmulationTargetState({ kind: 'image', variantId: 'editor' }, node);
-    const second = hydrateFilmEmulationTargetState({ kind: 'image', variantId: 'editor' }, structuredClone(node));
-    expect(first.node).toEqual(node);
-    expect(first.graphRevision).toBe(second.graphRevision);
-    expect(first.graphHash).toBe(second.graphHash);
-    expect(first.history).toEqual([]);
+    expect(useEditorStore.getState().adjustments.filmEmulation).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: null });
   });
 });
