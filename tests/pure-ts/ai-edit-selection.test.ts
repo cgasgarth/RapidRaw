@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../src/components/panel/right/layers/Masks.tsx';
 import { createEditorImageSession, useEditorStore } from '../../src/store/useEditorStore.ts';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots.ts';
@@ -70,9 +70,8 @@ const required = <T>(value: T | null): T => {
   return value;
 };
 
-afterEach(() => {
-  seedEditor();
-});
+beforeEach(seedEditor);
+afterEach(seedEditor);
 
 describe('AI edit selection resolver', () => {
   test('validates the container and child against one patch snapshot', () => {
@@ -274,6 +273,12 @@ describe('AI edit store command', () => {
         [patch('first')],
         'stale-source',
       ),
+    ).toBeNull();
+    expect(
+      buildAiSourceArtifactEditTransaction({ ...state, imageSession: null }, [patch('first')], 'no-session'),
+    ).toBeNull();
+    expect(
+      buildAiSourceArtifactEditTransaction({ ...state, selectedImage: null }, [patch('first')], 'no-source'),
     ).toBeNull();
 
     useEditorStore.setState({
