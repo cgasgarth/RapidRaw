@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import ViewerFooter from '../../../src/components/panel/editor/ViewerFooter.tsx';
@@ -12,9 +11,6 @@ import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import type { PreviewQualityStatus } from '../../../src/utils/adaptivePreviewQuality.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const selectedImage: SelectedImage = {
   exif: null,
@@ -53,24 +49,25 @@ const quality = (phase: PreviewQualityStatus['phase']): PreviewQualityStatus => 
   tier: phase === 'detail_ready' ? 'inspection_1to1' : 'viewport_full',
 });
 
-let rendered: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (rendered) {
-    act(() => rendered?.root.unmount());
-    rendered.container.remove();
-    rendered = null;
-  }
-  useEditorStore.getState().hydrateEditorRenderAuthority({
-    compare: { dividerPosition: 0.5, isOriginalHeld: false, labelsVisible: true, mode: 'off', orientation: 'vertical' },
-    previewQualityStatus: null,
-    selectedImage: null,
-    zoomMode: { kind: 'fit' },
-    editDocumentV2: useEditorStore.getState().editDocumentV2,
-    history: [useEditorStore.getState().editDocumentV2],
-    historyIndex: 0,
+  act(() => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      compare: {
+        dividerPosition: 0.5,
+        isOriginalHeld: false,
+        labelsVisible: true,
+        mode: 'off',
+        orientation: 'vertical',
+      },
+      previewQualityStatus: null,
+      selectedImage: null,
+      zoomMode: { kind: 'fit' },
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
+    });
+    useLibraryStore.setState({ imageList: [], multiSelectedPaths: [] });
   });
-  useLibraryStore.setState({ imageList: [], multiSelectedPaths: [] });
 });
 
 describe('viewer footer', () => {
@@ -144,41 +141,26 @@ async function renderFooter({
   isFullScreen?: boolean;
   isRendering?: boolean;
 }) {
-  if (!globalThis.window) {
-    const window = new Window();
-    Object.assign(globalThis, {
-      document: window.document,
-      Event: window.Event,
-      HTMLElement: window.HTMLElement,
-      window,
-    });
-  }
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     interpolation: { escapeValue: false },
     lng: 'en',
     resources: { en: { translation: en } },
   });
-  rendered = { container, root };
-  await act(async () => {
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(ViewerFooter, {
-          activeTool,
-          isFullScreen,
-          isRendering,
-          resolvedZoom,
-          samplerState: null,
-          zoomResolutionState: 'ready',
-        }),
-      ),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-  return { container, root };
+  const view = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(ViewerFooter, {
+        activeTool,
+        isFullScreen,
+        isRendering,
+        resolvedZoom,
+        samplerState: null,
+        zoomResolutionState: 'ready',
+      }),
+    ),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  return view;
 }

@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import en from '../../../src/i18n/locales/en.json';
 
@@ -35,8 +34,6 @@ const { ImportCancellationButton, ImportResumeButton } = await import(
 const { Status } = await import('../../../src/components/ui/ExportImportProperties');
 const { useProcessStore } = await import('../../../src/store/useProcessStore');
 
-let runtime: { container: HTMLDivElement; root: Root } | null = null;
-
 beforeEach(() => {
   invocations.length = 0;
   invoke.mockClear();
@@ -57,12 +54,6 @@ beforeEach(() => {
       status: Status.Cancelled,
     },
   });
-});
-
-afterEach(() => {
-  if (runtime) act(() => runtime?.root.unmount());
-  runtime?.container.remove();
-  runtime = null;
 });
 
 describe('import command controls', () => {
@@ -148,27 +139,12 @@ describe('import command controls', () => {
 });
 
 async function renderControl(control: ReturnType<typeof createElement>) {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    Node: window.Node,
-    window,
-  });
   if (!i18next.isInitialized) {
     await i18next.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: en } } });
   }
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  runtime = { container, root };
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n: i18next }, control));
-    await Promise.resolve();
-  });
-  return { container };
+  const view = render(createElement(I18nextProvider, { i18n: i18next }, control));
+  await act(() => Promise.resolve());
+  return view;
 }
 
 async function click(container: HTMLElement, label: string) {

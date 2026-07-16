@@ -31,6 +31,10 @@ export class DecodedThumbnailReadinessCache {
       this.entries.splice(0, this.entries.length - this.capacity);
     }
   }
+
+  clear() {
+    this.entries = [];
+  }
 }
 
 export const filmstripThumbnailReadiness = new DecodedThumbnailReadinessCache(48);

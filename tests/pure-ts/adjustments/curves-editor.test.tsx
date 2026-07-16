@@ -1,8 +1,7 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, fireEvent, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import CurveGraph, {
@@ -14,23 +13,8 @@ import { Theme } from '../../../src/components/ui/AppProperties.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 test('curve graph geometry maps clients consistently and clamps outside coordinates', () => {
   expect(clientPointToCurvePoint(110, 220, { left: 10, top: 20, width: 200, height: 200 })).toEqual({
@@ -253,18 +237,24 @@ test('numeric point editing commits valid changes and Escape does not add histor
 
   const yInput = container.querySelector<HTMLInputElement>('input[aria-label="Y Axis"]');
   if (!yInput) throw new Error('Expected the selected point Y input.');
-  yInput.value = '42';
-  await act(async () => {
-    yInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-    await flushPromises();
-  });
+  fireEvent.change(yInput, { target: { value: '42' } });
+  const cancelPropsKey = Object.keys(yInput).find((key) => key.startsWith('__reactProps$'));
+  const cancelProps = cancelPropsKey === undefined ? null : Reflect.get(yInput, cancelPropsKey);
+  if (typeof cancelProps?.onKeyDown !== 'function') throw new Error('Expected numeric point keyboard handler.');
+  await act(async () =>
+    cancelProps.onKeyDown({ currentTarget: yInput, key: 'Escape', preventDefault() {}, target: yInput }),
+  );
+  await act(flushPromises);
   expect(changes).toHaveLength(0);
 
-  yInput.value = '42';
-  await act(async () => {
-    yInput.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }));
-    await flushPromises();
-  });
+  const committedYInput = container.querySelector<HTMLInputElement>('input[aria-label="Y Axis"]');
+  if (!committedYInput) throw new Error('Expected the selected point Y input after cancelling the draft.');
+  fireEvent.change(committedYInput, { target: { value: '42' } });
+  const reactPropsKey = Object.keys(committedYInput).find((key) => key.startsWith('__reactProps$'));
+  const reactProps = reactPropsKey === undefined ? null : Reflect.get(committedYInput, reactPropsKey);
+  if (typeof reactProps?.onBlur !== 'function') throw new Error('Expected numeric point blur handler.');
+  await act(async () => reactProps.onBlur({ currentTarget: committedYInput, target: committedYInput }));
+  await act(flushPromises);
   expect(changes.at(-1)?.curves.luma[0]).toEqual({ x: 0, y: 42 });
 });
 
@@ -411,15 +401,7 @@ test('parametric split pointer cancellation uses the same exact finish path', as
   expect(dragStates).toEqual([true, false]);
 });
 
-function CurveHarness({
-  changes,
-  dragStates,
-  initialAdjustments,
-}: {
-  changes: Adjustments[];
-  dragStates: boolean[];
-  initialAdjustments: Adjustments;
-}) {
+function CurveHarness({ changes, dragStates }: { changes: Adjustments[]; dragStates: boolean[] }) {
   const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   return createElement(
     'div',
@@ -471,12 +453,8 @@ async function renderCurveEditor(
   initialAdjustments = INITIAL_ADJUSTMENTS,
   dragStates: boolean[] = [],
 ) {
-  installDom();
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: en } } });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   const adjustments = structuredClone(initialAdjustments);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   const sourcePath = '/fixture/curves-editor.ARW';
@@ -503,23 +481,15 @@ async function renderCurveEditor(
     history: [editDocumentV2],
   });
 
-  await act(async () => {
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(
-          ContextMenuProvider,
-          null,
-          createElement(CurveHarness, { changes, dragStates, initialAdjustments }),
-        ),
-      ),
-    );
-    await flushPromises();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  const view = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(ContextMenuProvider, null, createElement(CurveHarness, { changes, dragStates })),
+    ),
+  );
+  await act(flushPromises);
+  return view;
 }
 
 const currentAdjustments = () => useEditorStore.getState().adjustmentSnapshot.value;
@@ -537,23 +507,6 @@ function getButton(container: Element, title: string): HTMLButtonElement {
   );
   if (!button) throw new Error(`Expected ${title} button.`);
   return button;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/' });
-  Object.assign(globalThis, {
-    document: window.document,
-    Element: window.Element,
-    Event: window.Event,
-    HTMLElement: window.HTMLElement,
-    HTMLInputElement: window.HTMLInputElement,
-    KeyboardEvent: window.KeyboardEvent,
-    MouseEvent: window.MouseEvent,
-    Node: window.Node,
-    SVGCircleElement: window.SVGCircleElement,
-    SVGElement: window.SVGElement,
-    window,
-  });
 }
 
 async function flushPromises() {

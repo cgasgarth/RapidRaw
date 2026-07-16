@@ -1,10 +1,8 @@
-import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { expect, mock, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { createElement } from 'react';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
@@ -47,16 +45,7 @@ const invoke = mock(async (command: string) => {
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { useEditorActions } = await import('../../../src/hooks/editor/useEditorActions');
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-let root: Root | null = null;
-
-afterEach(() => {
-  if (root) act(() => root?.unmount());
-  root = null;
-});
-
 test('useEditorActions routes Auto Adjust and native Reset through fallback authority', async () => {
-  installDom();
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, exposure: 0.6 };
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -87,10 +76,7 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
     actions = useEditorActions();
     return null;
   };
-  const container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-  act(() => root?.render(createElement(Harness)));
+  render(createElement(Harness));
 
   await act(async () => actions?.handleAutoAdjustments());
   expect(useEditorStore.getState()).toMatchObject({
@@ -121,11 +107,3 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
   expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
   expect(invoke).toHaveBeenCalledTimes(2);
 });
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/auto-reset-fallback-actions' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-}

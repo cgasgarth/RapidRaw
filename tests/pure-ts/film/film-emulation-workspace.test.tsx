@@ -1,8 +1,7 @@
 import { afterEach, expect, jest, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, type RenderResult, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { FilmEmulationWorkspace } from '../../../src/components/film/FilmEmulationWorkspace';
@@ -13,16 +12,10 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { getFilmBaselineProfileCatalog } from '../../../src/utils/film-look/filmBaselineProfiles';
 import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let rendered: { container: HTMLDivElement; root: Root } | null = null;
+let rendered: RenderResult | null = null;
 
 afterEach(() => {
-  if (rendered) {
-    act(() => rendered?.root.unmount());
-    rendered.container.remove();
-    rendered = null;
-  }
+  rendered = null;
   globalThis.localStorage?.clear();
   if (jest.isFakeTimers()) jest.useRealTimers();
 });
@@ -127,9 +120,8 @@ test('Film mix unmount releases only the slider interaction it owns', async () =
 
   await invokeRangeInteraction(mix, 'onPointerDown');
   expect(useEditorStore.getState().isSliderDragging).toBe(true);
-  act(() => rendered?.root.unmount());
+  act(() => rendered?.unmount());
   rendered = null;
-  container.remove();
   expect(useEditorStore.getState().isSliderDragging).toBe(false);
 
   const secondContainer = await renderWorkspace();
@@ -137,15 +129,13 @@ test('Film mix unmount releases only the slider interaction it owns', async () =
   if (!secondMix) throw new Error('Expected second Film mix range');
   useEditorStore.getState().setEditor({ isSliderDragging: true });
   await invokeRangeInteraction(secondMix, 'onPointerDown');
-  act(() => rendered?.root.unmount());
+  act(() => rendered?.unmount());
   rendered = null;
-  secondContainer.remove();
   expect(useEditorStore.getState().isSliderDragging).toBe(true);
   useEditorStore.getState().setEditor({ isSliderDragging: false });
 });
 
 async function renderWorkspace(): Promise<HTMLDivElement> {
-  installDom();
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
@@ -170,10 +160,6 @@ async function renderWorkspace(): Promise<HTMLDivElement> {
     editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
     history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
   });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  rendered = { container, root };
   const translations = i18next.createInstance();
   await translations.use(initReactI18next).init({
     interpolation: { escapeValue: false },
@@ -181,11 +167,9 @@ async function renderWorkspace(): Promise<HTMLDivElement> {
     react: { useSuspense: false },
     resources: { en: { translation: en } },
   });
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n: translations }, createElement(FilmEmulationWorkspace)));
-    await Promise.resolve();
-  });
-  return container;
+  rendered = render(createElement(I18nextProvider, { i18n: translations }, createElement(FilmEmulationWorkspace)));
+  await act(() => Promise.resolve());
+  return rendered.container;
 }
 
 async function click(container: ParentNode, selector: string): Promise<void> {
@@ -253,16 +237,4 @@ function invokeReactHandler(target: HTMLElement, handlerName: string, event: obj
   const handler: unknown = Reflect.get(props, handlerName);
   if (typeof handler !== 'function') throw new Error(`Expected React Film range ${handlerName}`);
   handler(event);
-}
-
-function installDom(): void {
-  if (globalThis.window) return;
-  const window = new Window({ url: 'http://localhost/' });
-  Object.assign(globalThis, {
-    document: window.document,
-    Event: window.Event,
-    HTMLElement: window.HTMLElement,
-    localStorage: window.localStorage,
-    window,
-  });
 }

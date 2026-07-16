@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, type RenderResult, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { type AppSettings, type SelectedImage, Theme } from '../../../src/components/ui/AppProperties.tsx';
@@ -19,13 +18,10 @@ import { EXPORT_LAST_USED_PRESET_ID } from '../../../src/schemas/export/exportRe
 import { parseExportReceiptPayload } from '../../../src/schemas/tauriEventSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useProcessStore } from '../../../src/store/useProcessStore.ts';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 const invoke = mock(async () => null);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { default: ExportPanel } = await import('../../../src/components/panel/right/export/ExportPanel.tsx');
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const imagePath = '/validation/export-footer-workflow.ARW';
 const proofPreset: ExportPreset = {
@@ -126,17 +122,11 @@ const completedReceipt = parseExportReceiptPayload({
   total: 1,
 });
 
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
+let renderedRoot: RenderResult | null = null;
 
 afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-  resetEditorState();
+  renderedRoot = null;
+  act(resetEditorState);
   invoke.mockClear();
 });
 
@@ -280,13 +270,10 @@ async function renderFooter(
   exportState: ExportState,
   options: { appSettings?: AppSettings; isVisible?: boolean } = {},
 ) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  renderedRoot = { container, root };
-  await rerenderFooter(exportState, options);
-  return { container, root };
+  const i18n = await createTestI18n();
+  renderedRoot = render(createFooterElement(i18n, exportState, options));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  return renderedRoot;
 }
 
 async function rerenderFooter(
@@ -298,31 +285,37 @@ async function rerenderFooter(
 ) {
   if (renderedRoot === null) throw new Error('Expected export footer root.');
   const i18n = await createTestI18n();
+  renderedRoot.rerender(createFooterElement(i18n, exportState, { appSettings: currentAppSettings, isVisible }));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+}
 
-  await act(async () => {
-    renderedRoot?.root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(
-          ContextMenuProvider,
-          null,
-          createElement(ExportPanel, {
-            appSettings: currentAppSettings,
-            exportState,
-            isVisible,
-            multiSelectedPaths: [imagePath],
-            onLinkedVariantImported: () => {},
-            onSettingsChange: () => {},
-            rootPaths: [],
-            selectedImage,
-            setExportState: () => {},
-          }),
-        ),
-      ),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+function createFooterElement(
+  i18n: Awaited<ReturnType<typeof createTestI18n>>,
+  exportState: ExportState,
+  {
+    appSettings: currentAppSettings = appSettings,
+    isVisible = false,
+  }: { appSettings?: AppSettings; isVisible?: boolean } = {},
+) {
+  return createElement(
+    I18nextProvider,
+    { i18n },
+    createElement(
+      ContextMenuProvider,
+      null,
+      createElement(ExportPanel, {
+        appSettings: currentAppSettings,
+        exportState,
+        isVisible,
+        multiSelectedPaths: [imagePath],
+        onLinkedVariantImported: () => {},
+        onSettingsChange: () => {},
+        rootPaths: [],
+        selectedImage,
+        setExportState: () => {},
+      }),
+    ),
+  );
 }
 
 function setProofState(isConsistent: boolean) {
@@ -367,19 +360,6 @@ function required<T extends Element>(container: Element, selector: string): T {
   const element = container.querySelector<T>(selector);
   if (element === null) throw new Error(`Expected ${selector} to render.`);
   return element;
-}
-
-function installDom() {
-  if (globalThis.window) return;
-  const window = new Window({ url: 'http://localhost/export-panel-footer-workflow' });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLDetailsElement: window.HTMLDetailsElement,
-    HTMLDivElement: window.HTMLDivElement,
-    HTMLElement: window.HTMLElement,
-    navigator: window.navigator,
-    window,
-  });
 }
 
 async function createTestI18n() {

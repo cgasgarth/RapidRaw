@@ -1,13 +1,11 @@
 import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, render as testingRender } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../../src/utils/colorWorkspaceNavigation';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -16,8 +14,6 @@ const invoke = mock(() => new Promise<unknown>(() => {}));
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { default: ColorPanel } = await import('../../../src/components/adjustments/Color');
 const { ColorAdvancedControls } = await import('../../../src/components/adjustments/color/ColorAdvancedControls');
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -41,15 +37,11 @@ const selectedImage = {
   thumbnailUrl: '',
   width: 4000,
 };
-let root: Root | null = null;
-
 afterEach(() => {
-  if (root) act(() => root?.unmount());
-  root = null;
+  window.sessionStorage.clear();
 });
 
 test('ColorPanel mixer toggles commit through fallback authority without its generic setter', () => {
-  installDom();
   window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'mixer');
   const adjustments = initializeFallbackStore(91);
   const genericSetter = mock(() => undefined);
@@ -106,7 +98,6 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
 });
 
 test('ColorAdvancedControls slider commits calibration through fallback authority', () => {
-  installDom();
   const adjustments = initializeFallbackStore(92);
   const genericSetter = mock(() => undefined);
   const container = render(
@@ -141,7 +132,6 @@ test('ColorAdvancedControls slider commits calibration through fallback authorit
 });
 
 test('ColorAdvancedControls Levels actions commit through the luma Levels node', () => {
-  installDom();
   const adjustments = initializeFallbackStore(93);
   const genericSetter = mock(() => undefined);
   const container = render(
@@ -200,37 +190,11 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
 }
 
 function render(element: React.ReactElement): HTMLDivElement {
-  const container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-  act(() => root?.render(createElement(I18nextProvider, { i18n }, element)));
-  return container;
+  return testingRender(createElement(I18nextProvider, { i18n }, element)).container;
 }
 
 function getButton(container: Element, testId: string): HTMLButtonElement {
   const button = container.querySelector(`[data-testid="${testId}"]`);
   if (!(button instanceof window.HTMLButtonElement)) throw new Error(`missing button: ${testId}`);
   return button;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/color-fallback-components' });
-  window.sessionStorage.clear();
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-  Object.defineProperty(globalThis, 'HTMLButtonElement', { configurable: true, value: window.HTMLButtonElement });
-  Object.defineProperty(globalThis, 'HTMLInputElement', { configurable: true, value: window.HTMLInputElement });
-  Object.defineProperty(globalThis, 'Event', { configurable: true, value: window.Event });
-  Object.defineProperty(globalThis, 'Node', { configurable: true, value: window.Node });
-  Object.defineProperty(globalThis, 'MutationObserver', { configurable: true, value: window.MutationObserver });
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    configurable: true,
-    value: class ResizeObserver {
-      disconnect() {}
-      observe() {}
-      unobserve() {}
-    },
-  });
 }
