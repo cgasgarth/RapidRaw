@@ -33,11 +33,15 @@ test('reference match provenance round-trips through sidecar normalization and c
   expect(reopened.referenceMatchApplicationReceipt?.effectiveReferences).toEqual(receipt.effectiveReferences);
   expect(reopened.referenceMatchApplicationReceipt?.appliedDiffs).toEqual(receipt.appliedDiffs);
 
+  const invalidHistoryReceipt = structuredClone(receipt);
+  Reflect.set(invalidHistoryReceipt, 'historyEntriesAdded', 3);
   const corrupt = normalizeLoadedAdjustments({
     ...INITIAL_ADJUSTMENTS,
-    referenceMatchApplicationReceipt: { ...receipt, historyEntriesAdded: 3 },
+    referenceMatchApplicationReceipt: invalidHistoryReceipt,
   });
   expect(corrupt.referenceMatchApplicationReceipt).toBeNull();
+  const firstDiff = receipt.appliedDiffs[0];
+  if (firstDiff === undefined) throw new Error('Expected reference-match diff fixture.');
   expect(
     normalizeLoadedAdjustments({
       ...INITIAL_ADJUSTMENTS,
@@ -49,14 +53,16 @@ test('reference match provenance round-trips through sidecar normalization and c
       ...INITIAL_ADJUSTMENTS,
       referenceMatchApplicationReceipt: {
         ...receipt,
-        appliedDiffs: [receipt.appliedDiffs[0], receipt.appliedDiffs[0]],
+        appliedDiffs: [firstDiff, firstDiff],
       },
     }).referenceMatchApplicationReceipt,
   ).toBeNull();
+  const missingFingerprintReceipt = structuredClone(receipt);
+  Reflect.deleteProperty(missingFingerprintReceipt, 'baseGraphFingerprint');
   expect(
     normalizeLoadedAdjustments({
       ...INITIAL_ADJUSTMENTS,
-      referenceMatchApplicationReceipt: { ...receipt, baseGraphFingerprint: undefined },
+      referenceMatchApplicationReceipt: missingFingerprintReceipt,
     }).referenceMatchApplicationReceipt,
   ).toBeNull();
   expect(

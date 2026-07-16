@@ -242,14 +242,14 @@ describe('preview analytics effect runner', () => {
   });
 
   test('start resolves only after the analytics subscription is installed', async () => {
-    let install: ((unlisten: () => void) => void) | null = null;
+    const subscription: { install?: (unlisten: () => void) => void } = {};
     const coordinator = new PreviewCoordinator();
     const runner = new PreviewAnalyticsEffectRunner({
       dispatch: (event) => coordinator.dispatch(event),
       publish: () => undefined,
       subscribe: () =>
         new Promise((resolve) => {
-          install = resolve;
+          subscription.install = resolve;
         }),
     });
     let ready = false;
@@ -258,8 +258,8 @@ describe('preview analytics effect runner', () => {
     });
     await tick();
     expect(ready).toBe(false);
-    if (install === null) throw new Error('Expected analytics subscription installer.');
-    install(() => undefined);
+    if (subscription.install === undefined) throw new Error('Expected analytics subscription installer.');
+    subscription.install(() => undefined);
     await started;
     expect(ready).toBe(true);
   });
