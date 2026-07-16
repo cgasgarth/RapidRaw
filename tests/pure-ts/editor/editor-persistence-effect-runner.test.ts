@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -135,7 +135,6 @@ function harness(
 describe('editor persistence effect runner', () => {
   test('accepts native receipt envelopes for primary and multi-selection saves', () => {
     const nativeReceipt = editorPersistenceReceiptSchema.parse({
-      adjustments: adjustments(1),
       adjustmentRevision: 1,
       catalogRevision: null,
       imageId: 'path:a',
@@ -196,9 +195,12 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
     prime(runner);
+    const changedAdjustments = { ...adjustments(1), contrast: 25 };
+    const changedDocument = legacyAdjustmentsToEditDocumentV2(changedAdjustments);
     runner.submitCommitted(
       input({
-        adjustments: { ...adjustments(1), contrast: 25 },
+        adjustments: changedAdjustments,
+        editDocumentV2: changedDocument,
         multiSelection: { paths: ['/fixtures/b.raw'], selectedNodeIds: ['scene_global_color_tone'] },
       }),
       0,
@@ -207,7 +209,7 @@ describe('editor persistence effect runner', () => {
     await flush();
 
     expect(executions[0]?.multiSelection).toEqual({
-      adjustments: { contrast: 25, exposure: 1, referenceMatchApplicationReceipt: null },
+      editDocumentV2: copyEditDocumentV2Nodes(changedDocument, ['scene_global_color_tone']),
       paths: ['/fixtures/b.raw'],
     });
   });

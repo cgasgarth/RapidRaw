@@ -15,7 +15,7 @@ use crate::app_settings::AppSettings;
 use crate::app_state::AppState;
 use crate::editor::image_service::LoadedImage;
 use crate::export::export_processing::{
-    prepare_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
+    prepare_current_export_masks, process_image_for_export_pipeline_with_tonemapper_override,
 };
 use crate::formats::is_raw_file;
 use crate::gpu_processing::get_or_init_compute_gpu_context_for_tests;
@@ -585,11 +585,13 @@ fn render_with_masks(
     debug_tag: &str,
     tm_override: Option<u32>,
 ) -> Result<DynamicImage, String> {
-    let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, adjustments, state);
+    let document = crate::proofs::current_document_from_mask_proof_fixture(adjustments)?;
+    let (transformed_image, mask_bitmaps) =
+        prepare_current_export_masks(base_image, &document, state)?;
     process_image_for_export_pipeline_with_tonemapper_override(
         source_path,
         transformed_image.as_ref(),
-        adjustments,
+        &document,
         context,
         state,
         is_raw,

@@ -16,12 +16,12 @@ use image::{
 use lcms2::Profile as LcmsProfile;
 use moxcms::ColorProfile;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::Emitter;
 use tauri::Manager;
 
 use crate::AppState;
+use crate::adjustments::edit_document_v2::{CompiledCurrentEditDocument, EditDocumentV2};
 use crate::color::hdr_editing::{
     HdrExportCapabilityCatalogV1, HdrExportReceiptV1, HdrExportWorkflowSettingsV1,
     SdrRenditionPlanV1, hdr_export_capabilities,
@@ -49,8 +49,7 @@ use crate::export::runtime_services::ExportRuntimeServices;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::formats::is_raw_file;
 use crate::image_loader::{
-    composite_patches_on_image, load_and_composite_with_report, load_base_image_from_bytes,
-    raw_processing_settings_for_adjustments,
+    load_and_composite_current_document_with_report, raw_processing_settings_for_current_document,
 };
 use crate::image_processing::{
     AllAdjustments, GpuContext, ImageMetadata, RenderRequest, downscale_f32_image,
@@ -58,24 +57,28 @@ use crate::image_processing::{
     process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
 
-fn adjustments_with_raw_engine_artifacts(metadata: ImageMetadata) -> Result<Value, String> {
-    let mut adjustments = match metadata.edit_document_v2.as_ref() {
-        Some(document) => crate::adjustments::edit_document_v2::compile_edit_document_v2(document)?,
-        None => metadata.adjustments,
-    };
-    if let Some(artifacts) = metadata.raw_engine_artifacts {
-        if !adjustments.is_object() {
-            adjustments = serde_json::json!({});
-        }
-        adjustments["rawEngineArtifacts"] =
-            serde_json::to_value(artifacts).expect("RawEngine artifacts must serialize");
-    }
-    Ok(adjustments)
+fn compile_export_edit_authority(
+    document: EditDocumentV2,
+) -> Result<Arc<CompiledCurrentEditDocument>, String> {
+    document.compile().map(Arc::new)
+}
+
+fn export_edit_authority_from_metadata(
+    metadata: ImageMetadata,
+) -> Result<Arc<CompiledCurrentEditDocument>, String> {
+    let document = metadata
+        .edit_document_v2
+        .ok_or_else(|| "export_current_edit_document_missing".to_string())?;
+    let document = serde_json::from_value::<EditDocumentV2>(document)
+        .map_err(|error| format!("export_current_edit_document_invalid:{error}"))?;
+    compile_export_edit_authority(document)
 }
 use crate::lut_processing::{convert_image_to_cube_lut, generate_identity_lut_image};
-use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::mask_generation::get_cached_or_generate_current_preview_mask;
 use crate::raw_processing::RawDevelopmentReport;
-use crate::render_plan::{CompileRenderPlanContext, compile_render_plan_cached, content_revision};
+use crate::render_plan::{
+    CompileRenderPlanContext, RenderPlanRevision, compile_current_edit_document_render_plan_cached,
+};
 use crate::source_revision::SourceRevision;
 
 #[cfg(test)]
@@ -451,7 +454,7 @@ fn validate_export_manifest_for_resume(
 
 struct DecodedExportItem {
     plan: ExportItemPlan,
-    adjustments: Arc<Value>,
+    edit_document: Arc<CompiledCurrentEditDocument>,
     base_image: DynamicImage,
     raw_development_report: Option<RawDevelopmentReport>,
     source_revision: Option<SourceRevision>,
@@ -514,7 +517,7 @@ fn estimate_export_work(
 
 fn decode_export_item(
     plan: ExportItemPlan,
-    current_edit_adjustments: Option<Arc<Value>>,
+    current_edit_document: Option<Arc<CompiledCurrentEditDocument>>,
     settings: &crate::AppSettings,
     app_handle: &tauri::AppHandle,
     cancellation: &AtomicBool,
@@ -523,24 +526,26 @@ fn decode_export_item(
         return Err("export_cancelled_before_decode".to_string());
     }
     let state = app_handle.state::<AppState>();
-    let mut adjustments = match (&current_edit_adjustments, plan.is_current_edit) {
-        (Some(adjustments), true) => adjustments.as_ref().clone(),
-        _ => adjustments_with_raw_engine_artifacts(crate::exif_processing::load_sidecar(
+    let edit_document = match (&current_edit_document, plan.is_current_edit) {
+        (Some(document), true) => Arc::clone(document),
+        _ => export_edit_authority_from_metadata(crate::exif_processing::load_sidecar(
             &plan.sidecar_path,
         ))?,
     };
-    hydrate_adjustments(&state, &mut adjustments);
     if plan.extension == "cube" {
         return Ok(DecodedExportItem {
             plan,
-            adjustments: Arc::new(adjustments),
+            edit_document,
             base_image: DynamicImage::new_rgb8(1, 1),
             raw_development_report: None,
             source_revision: None,
         });
     }
 
-    let effective_settings = raw_processing_settings_for_adjustments(settings, &adjustments);
+    let effective_settings = raw_processing_settings_for_current_document(settings, &edit_document);
+    let managed_profile_root =
+        crate::color::camera_profile::registry::managed_profile_root(app_handle)
+            .unwrap_or_default();
     let source_revision = if SourceRevision::from_path(Path::new(&plan.source_path))
         .map_err(|error| error.to_string())?
         != plan.source_revision
@@ -552,16 +557,19 @@ fn decode_export_item(
     let (base_image, raw_development_report) = if plan.is_current_edit {
         match state.editor().image_snapshot() {
             Some(loaded) => {
-                let loaded = crate::image_loader::resolve_loaded_image_for_adjustments(
+                let loaded = crate::image_loader::resolve_loaded_image_for_current_document(
                     loaded,
-                    &adjustments,
+                    &edit_document,
                     &state,
                     app_handle,
                 )?;
                 (
-                    composite_patches_on_image(loaded.image.as_ref(), &adjustments)
-                        .map_err(|error| format!("Failed to composite AI patches: {error}"))?
-                        .into_owned(),
+                    crate::image_loader::composite_current_source_artifacts(
+                        loaded.image.as_ref(),
+                        &edit_document,
+                    )
+                    .map_err(|error| error.to_string())?
+                    .into_owned(),
                     None,
                 )
             }
@@ -573,13 +581,14 @@ fn decode_export_item(
                     .services
                     .source_fingerprints
                     .fingerprint(&revision, &bytes);
-                load_and_composite_with_report(
+                load_and_composite_current_document_with_report(
                     &bytes,
                     &plan.source_path,
-                    &adjustments,
+                    &edit_document,
                     false,
                     &effective_settings,
                     None,
+                    managed_profile_root,
                 )
                 .map_err(|error| format!("Failed to load fallback image: {error}"))?
             }
@@ -593,13 +602,14 @@ fn decode_export_item(
                     .services
                     .source_fingerprints
                     .fingerprint(&revision, &mmap);
-                load_and_composite_with_report(
+                load_and_composite_current_document_with_report(
                     &mmap,
                     &plan.source_path,
-                    &adjustments,
+                    &edit_document,
                     false,
                     &effective_settings,
                     None,
+                    managed_profile_root,
                 )
                 .map_err(|error| format!("Failed to load from mmap: {error}"))?
             }
@@ -611,13 +621,14 @@ fn decode_export_item(
                     .services
                     .source_fingerprints
                     .fingerprint(&revision, &bytes);
-                load_and_composite_with_report(
+                load_and_composite_current_document_with_report(
                     &bytes,
                     &plan.source_path,
-                    &adjustments,
+                    &edit_document,
                     false,
                     &effective_settings,
                     None,
+                    managed_profile_root,
                 )
                 .map_err(|error| format!("Failed to load from bytes: {error}"))?
             }
@@ -625,7 +636,7 @@ fn decode_export_item(
     };
     Ok(DecodedExportItem {
         plan,
-        adjustments: Arc::new(adjustments),
+        edit_document,
         base_image,
         raw_development_report,
         source_revision,
@@ -860,12 +871,7 @@ impl<W: Write> Write for DigestingWriter<W> {
         self.inner.flush()
     }
 }
-use crate::mask_generation::{get_cached_or_generate_mask, resolve_warped_image_for_masks};
-use crate::render_pipeline::apply_pre_gpu_detail_stages;
-use crate::{
-    apply_all_transformations, generate_transformed_preview, hydrate_adjustments,
-    load_settings_or_default,
-};
+use crate::load_settings_or_default;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -915,36 +921,6 @@ fn apply_export_resize_and_watermark(
     )
 }
 
-pub(crate) fn prepare_export_masks<'a>(
-    base_image: &'a DynamicImage,
-    js_adjustments: &Value,
-    state: &tauri::State<AppState>,
-) -> (Cow<'a, DynamicImage>, Vec<GrayImage>) {
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
-    let (img_w, img_h) = transformed_image.dimensions();
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
-        .unwrap_or_default();
-    let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
-    let mask_bitmaps = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            generate_mask_bitmap(
-                def,
-                img_w,
-                img_h,
-                1.0,
-                unscaled_crop_offset,
-                warped_image.as_deref(),
-            )
-        })
-        .collect();
-
-    (transformed_image, mask_bitmaps)
-}
-
 struct ExportRenderInputs {
     adjustments: AllAdjustments,
     lut: Option<Arc<crate::lut_processing::Lut>>,
@@ -952,43 +928,33 @@ struct ExportRenderInputs {
     edit_graph: Arc<crate::edit_graph::CompiledEditGraph>,
 }
 
-fn export_execution_fingerprint(path: &str, adjustments: &Value) -> u64 {
-    let revision = content_revision(
-        adjustments,
-        0,
-        crate::render::artifact_identity::source_fingerprint_for_path(path),
-        0,
-    );
+fn export_execution_fingerprint(path: &str, document: &CompiledCurrentEditDocument) -> u64 {
     let mut hasher = blake3::Hasher::new();
     hasher.update(path.as_bytes());
-    hasher.update(&revision.adjustment_revision.to_le_bytes());
+    hasher.update(&document.content_fingerprint().to_le_bytes());
     u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 
 fn prepare_export_render_inputs(
     path: &str,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     state: &tauri::State<AppState>,
     is_raw: bool,
     tm_override: Option<u32>,
     hash_salt: u64,
 ) -> Result<ExportRenderInputs, String> {
-    let mut effective_adjustments = js_adjustments.clone();
-    effective_adjustments
-        .as_object_mut()
-        .ok_or_else(|| "export adjustments must be an object".to_string())?
-        .insert("showClipping".into(), Value::Bool(false));
-    let lut = effective_adjustments["lutPath"]
-        .as_str()
+    let lut = document
+        .lut_path()
         .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
-    let revision = content_revision(
-        &effective_adjustments,
-        0,
-        crate::render::artifact_identity::source_fingerprint_for_path(path),
-        u64::from(tm_override.unwrap_or(0)),
-    );
-    let plan = compile_render_plan_cached(
-        &effective_adjustments,
+    let revision = RenderPlanRevision {
+        image_session: 0,
+        source_revision: crate::render::artifact_identity::source_fingerprint_for_path(path),
+        adjustment_revision: document.content_fingerprint(),
+        schema_version: 2,
+        settings_revision: u64::from(tm_override.unwrap_or(0)),
+    };
+    let plan = compile_current_edit_document_render_plan_cached(
+        document,
         CompileRenderPlanContext {
             revision,
             is_raw,
@@ -1013,42 +979,181 @@ fn prepare_export_render_inputs(
     })
 }
 
+pub(crate) fn apply_current_export_transformations<'a>(
+    base_image: &'a DynamicImage,
+    document: &CompiledCurrentEditDocument,
+) -> (Cow<'a, DynamicImage>, (f32, f32)) {
+    let geometry = document.geometry();
+    let warped = if crate::geometry::is_geometry_identity(&geometry) {
+        Cow::Borrowed(base_image)
+    } else {
+        Cow::Owned(crate::geometry::warp_image_geometry(base_image, geometry))
+    };
+    let oriented =
+        crate::image_processing::apply_coarse_rotation(warped, document.orientation_steps());
+    let flipped = crate::image_processing::apply_flip(
+        oriented,
+        document.flip_horizontal(),
+        document.flip_vertical(),
+    );
+    let rotated = crate::geometry::apply_rotation(flipped, document.rotation());
+    let dimensions = rotated.dimensions();
+    let bounds = document
+        .crop()
+        .and_then(|crop| crop.pixel_bounds(dimensions.0, dimensions.1));
+    let offset = bounds.map_or((0.0, 0.0), |(x, y, _, _)| (x as f32, y as f32));
+    let image = match bounds {
+        Some((x, y, width, height)) => Cow::Owned(rotated.crop_imm(x, y, width, height)),
+        None => rotated,
+    };
+    (image, offset)
+}
+
+pub(crate) fn prepare_current_export_masks<'a>(
+    base_image: &'a DynamicImage,
+    document: &CompiledCurrentEditDocument,
+    state: &tauri::State<AppState>,
+) -> Result<(Cow<'a, DynamicImage>, Vec<GrayImage>), String> {
+    let (transformed_image, crop_offset) =
+        apply_current_export_transformations(base_image, document);
+    let (width, height) = transformed_image.dimensions();
+    let masks = document.masks()?;
+    let bitmaps = masks
+        .iter()
+        .filter_map(|definition| {
+            get_cached_or_generate_current_preview_mask(
+                state,
+                definition,
+                width,
+                height,
+                1.0,
+                crop_offset,
+                document.content_fingerprint(),
+                transformed_image.as_ref(),
+            )
+        })
+        .collect();
+    Ok((transformed_image, bitmaps))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_current_export_preview(
+    state: &tauri::State<AppState>,
+    app_handle: &tauri::AppHandle,
+    source_identity: &str,
+    source_fingerprint: u64,
+    source_image: &DynamicImage,
+    is_raw: bool,
+    document: &CompiledCurrentEditDocument,
+    preview_dim: u32,
+    debug_tag: &str,
+) -> Result<DynamicImage, String> {
+    let context = get_or_init_gpu_context(state, app_handle)?;
+    let (transformed, crop_offset) = apply_current_export_transformations(source_image, document);
+    let (transformed_width, transformed_height) = transformed.dimensions();
+    let preview = if transformed_width > preview_dim || transformed_height > preview_dim {
+        downscale_f32_image(transformed.as_ref(), preview_dim, preview_dim)
+    } else {
+        transformed.into_owned()
+    };
+    let scale = if transformed_width > 0 {
+        preview.width() as f32 / transformed_width as f32
+    } else {
+        1.0
+    };
+    let detail_stage = crate::render_pipeline::apply_current_pre_gpu_detail_stages(
+        &preview,
+        document.content_fingerprint(),
+        document,
+        is_raw,
+    );
+    let processing_image = detail_stage.image.as_ref();
+    let masks = document.masks()?;
+    let mask_bitmaps = masks
+        .iter()
+        .filter_map(|definition| {
+            get_cached_or_generate_current_preview_mask(
+                state,
+                definition,
+                processing_image.width(),
+                processing_image.height(),
+                scale,
+                (crop_offset.0 * scale, crop_offset.1 * scale),
+                document.content_fingerprint(),
+                processing_image,
+            )
+        })
+        .collect::<Vec<_>>();
+    let retouch_layers = document.retouch_layers();
+    let retouched = crate::retouch_render::apply_current_clone_retouch_layers(
+        processing_image,
+        retouch_layers,
+        &mask_bitmaps,
+    );
+    let render_inputs = prepare_export_render_inputs(
+        source_identity,
+        document,
+        state,
+        is_raw,
+        resolve_tonemapper_override_from_handle(app_handle, is_raw),
+        1,
+    )?;
+    let mut adjustments = render_inputs.adjustments;
+    crate::render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
+    crate::render_pipeline::suppress_legacy_global_detail(
+        &mut adjustments,
+        detail_stage.owns_legacy_global_detail,
+    );
+    process_and_get_dynamic_image(
+        &context,
+        state,
+        retouched.as_ref(),
+        crate::gpu_processing::PreGpuImageIdentity::for_stage(
+            retouched.as_ref(),
+            source_fingerprint,
+            detail_stage.render_hash,
+            render_inputs.pre_gpu_revision,
+        ),
+        RenderRequest {
+            adjustments,
+            mask_bitmaps: &mask_bitmaps,
+            lut: render_inputs.lut,
+            roi: None,
+            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                render_inputs.edit_graph,
+            ),
+        },
+        debug_tag,
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn process_image_for_export_pipeline(
     path: &str,
     base_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     context: &GpuContext,
     state: &tauri::State<AppState>,
     is_raw: bool,
     debug_tag: &str,
     app_handle: &tauri::AppHandle,
 ) -> Result<DynamicImage, String> {
-    let mut authoritative_adjustments = js_adjustments.clone();
-    if let Some(plan) =
-        crate::layers::apply_authoritative_layer_stack(&mut authoritative_adjustments, path)?
-    {
-        log::debug!(
-            "native layer export plan revision={} layer={:?} hash={}",
-            plan.graph_revision,
-            plan.layer_id,
-            plan.plan_hash
-        );
-    }
     let (transformed_image, mask_bitmaps) =
-        prepare_export_masks(base_image, &authoritative_adjustments, state);
+        prepare_current_export_masks(base_image, document, state)?;
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let settings = crate::load_settings_or_default(app_handle);
-    let effective_settings =
-        raw_processing_settings_for_adjustments(&settings, &authoritative_adjustments);
+    let effective_settings = raw_processing_settings_for_current_document(&settings, document);
     let source_revision = crate::render::artifact_identity::stable_hash(&(
         crate::gpu_processing::PreGpuImageIdentity::source_revision(path),
-        crate::image_loader::raw_processing_profile_key(&effective_settings),
+        crate::image_loader::raw_processing_profile_key_for_current_document(
+            &effective_settings,
+            document,
+        )?,
     ));
     process_image_for_export_pipeline_with_tonemapper_override(
         path,
         transformed_image.as_ref(),
-        &authoritative_adjustments,
+        document,
         context,
         state,
         is_raw,
@@ -1063,7 +1168,7 @@ pub(crate) fn process_image_for_export_pipeline(
 pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     path: &str,
     transformed_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     context: &GpuContext,
     state: &tauri::State<AppState>,
     is_raw: bool,
@@ -1075,7 +1180,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     process_image_for_export_pipeline_with_optional_film_tap(
         path,
         transformed_image,
-        js_adjustments,
+        document,
         context,
         state,
         is_raw,
@@ -1093,7 +1198,7 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
 pub(crate) fn process_image_for_export_pipeline_with_film_tap(
     path: &str,
     transformed_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     context: &GpuContext,
     state: &tauri::State<AppState>,
     is_raw: bool,
@@ -1105,7 +1210,7 @@ pub(crate) fn process_image_for_export_pipeline_with_film_tap(
     let (image, receipt) = process_image_for_export_pipeline_with_optional_film_tap(
         path,
         transformed_image,
-        js_adjustments,
+        document,
         context,
         state,
         is_raw,
@@ -1124,7 +1229,7 @@ pub(crate) fn process_image_for_export_pipeline_with_film_tap(
 fn process_image_for_export_pipeline_with_optional_film_tap(
     path: &str,
     transformed_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     context: &GpuContext,
     state: &tauri::State<AppState>,
     is_raw: bool,
@@ -1142,25 +1247,25 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
 > {
     let film_profile_content_sha256 = capture_film_tap
         .then(|| {
-            js_adjustments
-                .pointer("/filmEmulation/profileRef/contentSha256")
-                .and_then(Value::as_str)
+            document
+                .film_profile_content_sha256()
                 .map(str::to_owned)
                 .ok_or_else(|| "film_runtime_proof_profile_identity_missing".to_string())
         })
         .transpose()?;
     let render_inputs =
-        prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0)?;
+        prepare_export_render_inputs(path, document, state, is_raw, tm_override, 0)?;
 
-    let detail_stage = apply_pre_gpu_detail_stages(
+    let detail_stage = crate::render_pipeline::apply_current_pre_gpu_detail_stages(
         transformed_image,
         render_inputs.pre_gpu_revision,
-        js_adjustments,
+        document,
         is_raw,
     );
-    let retouched_image = crate::retouch_render::apply_clone_retouch_layers(
+    let retouch_layers = document.retouch_layers();
+    let retouched_image = crate::retouch_render::apply_current_clone_retouch_layers(
         detail_stage.image.as_ref(),
-        js_adjustments,
+        retouch_layers,
         mask_bitmaps,
     );
     let mut gpu_adjustments = render_inputs.adjustments;
@@ -1484,7 +1589,7 @@ fn read_embedded_source_icc_profile(
 fn process_image_for_export(
     path: &str,
     base_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     export_settings: &ExportSettings,
     context: &GpuContext,
     state: &tauri::State<AppState>,
@@ -1494,7 +1599,7 @@ fn process_image_for_export(
     let processed_image = process_image_for_export_pipeline(
         path,
         base_image,
-        js_adjustments,
+        document,
         context,
         state,
         is_raw,
@@ -1517,7 +1622,7 @@ fn encode_grayscale_to_png(bitmap: &GrayImage) -> Result<Vec<u8>, String> {
 #[allow(clippy::too_many_arguments)]
 fn export_masks_for_image(
     base_image: &DynamicImage,
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     export_settings: &ExportSettings,
     output_path_obj: &std::path::Path,
     source_path_str: &str,
@@ -1532,16 +1637,12 @@ fn export_masks_for_image(
         return Ok(ExportMasksResult::Cancelled(committed_paths));
     }
 
-    let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
+    let (transformed_image, mask_bitmaps) =
+        prepare_current_export_masks(base_image, document, state)?;
     let (img_w, img_h) = transformed_image.dimensions();
 
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-        let render_adjustments = js_adjustments;
-        let mask_values = render_adjustments["masks"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
         let output_dir = output_path_obj.parent().unwrap_or(output_path_obj);
         let stem = output_path_obj
             .file_stem()
@@ -1551,12 +1652,15 @@ fn export_masks_for_image(
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("jpg");
-        let pre_gpu_revision = crate::cache_utils::calculate_transform_hash(js_adjustments);
+        let pre_gpu_revision = document.content_fingerprint();
         let settings = crate::load_settings_or_default(app_handle);
-        let effective_settings = raw_processing_settings_for_adjustments(&settings, js_adjustments);
+        let effective_settings = raw_processing_settings_for_current_document(&settings, document);
         let source_revision = crate::render::artifact_identity::stable_hash(&(
             crate::gpu_processing::PreGpuImageIdentity::source_revision(source_path_str),
-            crate::image_loader::raw_processing_profile_key(&effective_settings),
+            crate::image_loader::raw_processing_profile_key_for_current_document(
+                &effective_settings,
+                document,
+            )?,
         ));
 
         for (i, _) in mask_bitmaps.iter().enumerate() {
@@ -1564,24 +1668,24 @@ fn export_masks_for_image(
                 return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
 
-            let mut single_adjustments = render_adjustments.clone();
-            single_adjustments
-                .as_object_mut()
-                .ok_or_else(|| "mask export adjustments must be an object".to_string())?
-                .insert(
-                    "masks".into(),
-                    Value::Array(mask_values.get(i).cloned().into_iter().collect()),
-                );
             let render_inputs = prepare_export_render_inputs(
                 source_path_str,
-                &single_adjustments,
+                document,
                 state,
                 is_raw,
                 tm_override,
                 i as u64,
             )?;
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
-            let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
+            let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = (0..mask_bitmaps.len())
+                .map(|index| {
+                    if index == i {
+                        full_white_mask.clone()
+                    } else {
+                        ImageBuffer::from_pixel(img_w, img_h, Luma([0u8]))
+                    }
+                })
+                .collect();
 
             let processed = process_and_get_dynamic_image(
                 context,
@@ -1678,7 +1782,7 @@ fn export_masks_for_image(
 }
 
 fn export_adjustments_as_lut(
-    js_adjustments: &Value,
+    document: &CompiledCurrentEditDocument,
     source_path_str: &str,
     context: &Arc<GpuContext>,
     state: &tauri::State<AppState>,
@@ -1688,36 +1792,26 @@ fn export_adjustments_as_lut(
     let identity_image = generate_identity_lut_image(lut_size);
 
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, false);
-    let mut lut_adjustments = js_adjustments.clone();
-    let object = lut_adjustments
-        .as_object_mut()
-        .ok_or_else(|| "LUT export adjustments must be an object".to_string())?;
-    for key in [
-        "vignetteAmount",
-        "grainAmount",
-        "sharpness",
-        "clarity",
-        "dehaze",
-        "structure",
-        "centré",
-        "glowAmount",
-        "halationAmount",
-        "flareAmount",
-        "lumaNoiseReduction",
-        "colorNoiseReduction",
-        "chromaticAberrationRedCyan",
-        "chromaticAberrationBlueYellow",
-    ] {
-        object.insert(key.into(), serde_json::json!(0));
-    }
-    let render_inputs = prepare_export_render_inputs(
-        source_path_str,
-        &lut_adjustments,
-        state,
-        false,
-        tm_override,
-        0,
-    )?;
+    let render_inputs =
+        prepare_export_render_inputs(source_path_str, document, state, false, tm_override, 0)?;
+
+    let mut lut_adjustments = render_inputs.adjustments;
+    let global = &mut lut_adjustments.global;
+    global.vignette_amount = 0.0;
+    global.grain_amount = 0.0;
+    global.sharpness = 0.0;
+    global.clarity = 0.0;
+    global.dehaze = 0.0;
+    global.structure = 0.0;
+    global.centré = 0.0;
+    global.glow_amount = 0.0;
+    global.halation_amount = 0.0;
+    global.flare_amount = 0.0;
+    global.luma_noise_reduction = 0.0;
+    global.color_noise_reduction = 0.0;
+    global.chromatic_aberration_red_cyan = 0.0;
+    global.chromatic_aberration_blue_yellow = 0.0;
+    lut_adjustments.mask_count = 0;
 
     let processed_lut = process_and_get_dynamic_image(
         context,
@@ -1730,7 +1824,7 @@ fn export_adjustments_as_lut(
             0,
         ),
         RenderRequest {
-            adjustments: render_inputs.adjustments,
+            adjustments: lut_adjustments,
             mask_bitmaps: &[],
             lut: render_inputs.lut,
             roi: None,
@@ -1757,7 +1851,7 @@ async fn run_batch_export_pipeline(
     export_settings: ExportSettings,
     output_format: String,
     current_edit_path: Option<String>,
-    current_edit_adjustments: Option<Value>,
+    current_edit_document: Option<Arc<CompiledCurrentEditDocument>>,
     context: Arc<GpuContext>,
     app_handle: tauri::AppHandle,
     cancellation: PipelineCancellation,
@@ -1957,8 +2051,6 @@ async fn run_batch_export_pipeline(
     let encoded_rx = Arc::new(tokio::sync::Mutex::new(encoded_rx));
     let settings = Arc::new(load_settings_or_default(&app_handle));
     let export_settings = Arc::new(export_settings);
-    let current_adjustments = current_edit_adjustments.map(Arc::new);
-
     let mut decode_workers = tokio::task::JoinSet::new();
     for _ in 0..budget.cpu_slots.max(1) {
         let receiver = Arc::clone(&plan_rx);
@@ -1968,7 +2060,7 @@ async fn run_batch_export_pipeline(
         let cancellation = cancellation.clone();
         let app_handle = app_handle.clone();
         let settings = Arc::clone(&settings);
-        let current_adjustments = current_adjustments.clone();
+        let current_edit_document = current_edit_document.clone();
         decode_workers.spawn(async move {
             loop {
                 let plan = tokio::select! {
@@ -1987,9 +2079,9 @@ async fn run_batch_export_pipeline(
                 let token = Arc::clone(cancellation.token());
                 let handle = app_handle.clone();
                 let settings = Arc::clone(&settings);
-                let adjustments = current_adjustments.clone();
+                let edit_document = current_edit_document.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    decode_export_item(plan, adjustments, &settings, &handle, &token)
+                    decode_export_item(plan, edit_document, &settings, &handle, &token)
                 })
                 .await;
                 match result {
@@ -2065,7 +2157,7 @@ async fn run_batch_export_pipeline(
                     let state = app_handle.state::<AppState>();
                     let output = if item.plan.extension == "cube" {
                         export_adjustments_as_lut(
-                            &item.adjustments,
+                            &item.edit_document,
                             &item.plan.source_path,
                             &context,
                             &state,
@@ -2076,16 +2168,10 @@ async fn run_batch_export_pipeline(
                         diagnostics_for_render.update(|report| {
                             report.current_stage = Some(ExportStage::Postprocessing)
                         });
-                        let mut main_adjustments = item.adjustments.as_ref().clone();
-                        if export_settings.export_masks
-                            && let Some(object) = main_adjustments.as_object_mut()
-                        {
-                            object.insert("masks".to_string(), serde_json::json!([]));
-                        }
                         process_image_for_export(
                             &item.plan.source_path,
                             &item.base_image,
-                            &main_adjustments,
+                            &item.edit_document,
                             &export_settings,
                             &context,
                             &state,
@@ -2185,7 +2271,7 @@ async fn run_batch_export_pipeline(
                                         workflow.sdr_rendition,
                                         export_execution_fingerprint(
                                             &rendered.decoded.plan.source_path,
-                                            &rendered.decoded.adjustments,
+                                            &rendered.decoded.edit_document,
                                         ),
                                     )
                                     .map(|plan| (plan, workflow.target))
@@ -2342,7 +2428,7 @@ async fn run_batch_export_pipeline(
                                 item.decoded.plan.sidecar_revision,
                                 export_execution_fingerprint(
                                     &item.decoded.plan.source_path,
-                                    &item.decoded.adjustments,
+                                    &item.decoded.edit_document,
                                 )
                             )),
                             export_elapsed_ms: Some(item.export_elapsed_ms),
@@ -2357,7 +2443,7 @@ async fn run_batch_export_pipeline(
                         let state = app_handle.state::<AppState>();
                         match export_masks_for_image(
                             &item.decoded.base_image,
-                            &item.decoded.adjustments,
+                            &item.decoded.edit_document,
                             &export_settings,
                             &item.decoded.plan.output_path,
                             &item.decoded.plan.source_path,
@@ -2541,13 +2627,12 @@ pub async fn export_images(
     export_settings: ExportSettings,
     output_format: String,
     current_edit_path: Option<String>,
-    current_edit_document_v2: Option<Value>,
+    current_edit_document_v2: Option<EditDocumentV2>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    let current_edit_adjustments = current_edit_document_v2
-        .as_ref()
-        .map(crate::adjustments::edit_document_v2::compile_edit_document_v2)
+    let current_edit_document = current_edit_document_v2
+        .map(compile_export_edit_authority)
         .transpose()?;
     let total_paths = paths.len();
     let Some(job_identity) = admit_export_job(total_paths, state.export(), &app_handle).await?
@@ -2591,7 +2676,7 @@ pub async fn export_images(
             export_settings,
             output_format,
             current_edit_path,
-            current_edit_adjustments,
+            current_edit_document,
             context,
             task_app_handle.clone(),
             task_cancellation.clone(),
@@ -2968,7 +3053,7 @@ pub async fn estimate_export_sizes(
     export_settings: ExportSettings,
     output_format: String,
     current_edit_path: Option<String>,
-    current_edit_document_v2: Option<Value>,
+    current_edit_document_v2: Option<EditDocumentV2>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<usize, String> {
@@ -2984,268 +3069,174 @@ pub async fn estimate_export_sizes(
     let (source_path, sidecar_path) = parse_virtual_path(first_path);
     let source_path_str = source_path.to_string_lossy().to_string();
 
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings_or_default(&app_handle);
 
-    let current_edit_adjustments = current_edit_document_v2
-        .as_ref()
-        .map(crate::adjustments::edit_document_v2::compile_edit_document_v2)
+    let current_edit_document = current_edit_document_v2
+        .map(compile_export_edit_authority)
         .transpose()?;
-    let single_image_extrapolated_size: usize = if let (true, Some(mut adjustments_clone)) =
-        (is_current_edit, current_edit_adjustments)
-    {
-        let loaded_image = state
-            .editor()
-            .image_snapshot()
-            .ok_or("No original image loaded")?;
-        hydrate_adjustments(&state, &mut adjustments_clone);
-
-        let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
-        // Export consumes the typed transformed-frame cache. It must never borrow the editor's
-        // presentation slot, whose output/quality contract differs from export.
-        let (preview_image, scale, unscaled_crop_offset) =
-            generate_transformed_preview(&state, &loaded_image, &adjustments_clone, preview_dim)?;
-
-        let (img_w, img_h) = preview_image.dimensions();
-        let mask_definitions: Vec<MaskDefinition> = adjustments_clone
-            .get("masks")
-            .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
-            .unwrap_or_default();
-
-        let scaled_crop_offset = (
-            unscaled_crop_offset.0 * scale,
-            unscaled_crop_offset.1 * scale,
-        );
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-            .iter()
-            .filter_map(|def| {
-                get_cached_or_generate_mask(
-                    &state,
-                    def,
-                    img_w,
-                    img_h,
-                    scale,
-                    scaled_crop_offset,
-                    &adjustments_clone,
-                )
-            })
-            .collect();
-
-        let render_inputs = prepare_export_render_inputs(
-            &loaded_image.path,
-            &adjustments_clone,
-            &state,
-            is_raw,
-            resolve_tonemapper_override_from_handle(&app_handle, is_raw),
-            1,
-        )?;
-
-        let processed_preview = process_and_get_dynamic_image(
-            &context,
-            &state,
-            &preview_image,
-            crate::gpu_processing::PreGpuImageIdentity::for_stage(
-                &preview_image,
-                loaded_image.artifact_source.source_fingerprint(),
-                render_inputs.pre_gpu_revision,
-                render_inputs.pre_gpu_revision,
-            ),
-            RenderRequest {
-                adjustments: render_inputs.adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut: render_inputs.lut,
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    render_inputs.edit_graph,
-                ),
-            },
-            "estimate_export_size",
-        )?;
-
-        let preview_bytes = encode_image_to_bytes(
-            &processed_preview,
-            &output_format,
-            export_settings.jpeg_quality,
-            &export_settings.color_profile,
-            &export_settings.rendering_intent,
-        )?;
-        let preview_byte_size = preview_bytes.len();
-
-        let (transformed_full_res, _) =
-            apply_all_transformations(&loaded_image.image, &adjustments_clone);
-        let (full_w, full_h) = transformed_full_res.dimensions();
-
-        let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
-            calculate_resize_target(full_w, full_h, resize_opts)
-        } else {
-            (full_w, full_h)
-        };
-
-        let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
-        let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
-            (final_full_w as f64 * final_full_h as f64)
-                / (processed_preview_w as f64 * processed_preview_h as f64)
-        } else {
-            1.0
-        };
-
-        (preview_byte_size as f64 * pixel_ratio) as usize
-    } else {
-        let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        let js_adjustments = adjustments_with_raw_engine_artifacts(metadata)?;
-
-        const ESTIMATE_DIM: u32 = 1280;
-
-        let file_slice: Vec<u8>;
-        let mmap_guard;
-        let file_data: &[u8] = match read_file_mapped(Path::new(&source_path_str)) {
-            Ok(mmap) => {
-                mmap_guard = Some(mmap);
-                mmap_guard.as_ref().unwrap()
-            }
-            Err(_) => {
-                file_slice = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
-                &file_slice
-            }
-        };
-
-        let effective_settings =
-            raw_processing_settings_for_adjustments(&settings, &js_adjustments);
-        let original_image = load_base_image_from_bytes(
-            file_data,
-            &source_path_str,
-            true,
-            &effective_settings,
-            None,
-        )
-        .map_err(|e| e.to_string())?;
-
-        let raw_scale_factor = if is_raw {
-            crate::raw_processing::get_fast_demosaic_scale_factor(
-                file_data,
-                original_image.width(),
-                original_image.height(),
+    let single_image_extrapolated_size: usize =
+        if let (true, Some(edit_document)) = (is_current_edit, current_edit_document) {
+            let loaded_image = state
+                .editor()
+                .image_snapshot()
+                .ok_or("No original image loaded")?;
+            let loaded_image = crate::image_loader::resolve_loaded_image_for_current_document(
+                loaded_image,
+                &edit_document,
+                &state,
+                &app_handle,
+            )?;
+            let source_image = crate::image_loader::composite_current_source_artifacts(
+                loaded_image.image.as_ref(),
+                &edit_document,
             )
+            .map_err(|error| error.to_string())?
+            .into_owned();
+            let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
+            let processed_preview = render_current_export_preview(
+                &state,
+                &app_handle,
+                &loaded_image.path,
+                loaded_image.artifact_source.source_fingerprint(),
+                &source_image,
+                loaded_image.is_raw,
+                &edit_document,
+                preview_dim,
+                "estimate_export_size",
+            )?;
+
+            let preview_bytes = encode_image_to_bytes(
+                &processed_preview,
+                &output_format,
+                export_settings.jpeg_quality,
+                &export_settings.color_profile,
+                &export_settings.rendering_intent,
+            )?;
+            let preview_byte_size = preview_bytes.len();
+
+            let (transformed_full_res, _) =
+                apply_current_export_transformations(&source_image, &edit_document);
+            let (full_w, full_h) = transformed_full_res.dimensions();
+
+            let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
+                calculate_resize_target(full_w, full_h, resize_opts)
+            } else {
+                (full_w, full_h)
+            };
+
+            let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
+            let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
+                (final_full_w as f64 * final_full_h as f64)
+                    / (processed_preview_w as f64 * processed_preview_h as f64)
+            } else {
+                1.0
+            };
+
+            (preview_byte_size as f64 * pixel_ratio) as usize
         } else {
-            1.0
-        };
+            let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+            let edit_document = export_edit_authority_from_metadata(metadata)?;
 
-        let (transformed_shrunk_res, unscaled_crop_offset) =
-            apply_all_transformations(Cow::Borrowed(&original_image), &js_adjustments);
-        let (shrunk_w, shrunk_h) = transformed_shrunk_res.dimensions();
+            const ESTIMATE_DIM: u32 = 1280;
 
-        let preview_base = if shrunk_w > ESTIMATE_DIM || shrunk_h > ESTIMATE_DIM {
-            downscale_f32_image(transformed_shrunk_res.as_ref(), ESTIMATE_DIM, ESTIMATE_DIM)
-        } else {
-            transformed_shrunk_res.into_owned()
-        };
+            let file_slice: Vec<u8>;
+            let mmap_guard;
+            let file_data: &[u8] = match read_file_mapped(Path::new(&source_path_str)) {
+                Ok(mmap) => {
+                    mmap_guard = Some(mmap);
+                    mmap_guard.as_ref().unwrap()
+                }
+                Err(_) => {
+                    file_slice = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                    &file_slice
+                }
+            };
 
-        let (preview_w, preview_h) = preview_base.dimensions();
-        let gpu_scale = if shrunk_w > 0 {
-            preview_w as f32 / shrunk_w as f32
-        } else {
-            1.0
-        };
-        let total_scale = gpu_scale * raw_scale_factor;
+            let effective_settings =
+                raw_processing_settings_for_current_document(&settings, &edit_document);
+            let original_image = load_and_composite_current_document_with_report(
+                file_data,
+                &source_path_str,
+                &edit_document,
+                true,
+                &effective_settings,
+                None,
+                crate::color::camera_profile::registry::managed_profile_root(&app_handle)
+                    .unwrap_or_default(),
+            )
+            .map_err(|e| e.to_string())?
+            .0;
 
-        let mask_definitions: Vec<MaskDefinition> = js_adjustments
-            .get("masks")
-            .and_then(|m| Vec::<MaskDefinition>::deserialize(m).ok())
-            .unwrap_or_default();
-        let scaled_crop_offset = (
-            unscaled_crop_offset.0 * gpu_scale,
-            unscaled_crop_offset.1 * gpu_scale,
-        );
-
-        let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-            .iter()
-            .filter_map(|def| {
-                get_cached_or_generate_mask(
-                    &state,
-                    def,
-                    preview_w,
-                    preview_h,
-                    total_scale,
-                    scaled_crop_offset,
-                    &js_adjustments,
+            let raw_scale_factor = if is_raw {
+                crate::raw_processing::get_fast_demosaic_scale_factor(
+                    file_data,
+                    original_image.width(),
+                    original_image.height(),
                 )
-            })
-            .collect();
+            } else {
+                1.0
+            };
 
-        let render_inputs = prepare_export_render_inputs(
-            &source_path_str,
-            &js_adjustments,
-            &state,
-            is_raw,
-            resolve_tonemapper_override_from_handle(&app_handle, is_raw),
-            1,
-        )?;
-        let source_revision = crate::render::artifact_identity::stable_hash(&(
-            crate::gpu_processing::PreGpuImageIdentity::source_revision(
-                &source_path.to_string_lossy(),
-            ),
-            crate::image_loader::raw_processing_profile_key(&effective_settings),
-        ));
+            let (transformed_shrunk_res, _) =
+                apply_current_export_transformations(&original_image, &edit_document);
+            let (shrunk_w, shrunk_h) = transformed_shrunk_res.dimensions();
+            let source_fingerprint = crate::render::artifact_identity::stable_hash(&(
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_str),
+                crate::image_loader::raw_processing_profile_key_for_current_document(
+                    &effective_settings,
+                    &edit_document,
+                )?,
+            ));
+            let processed_preview = render_current_export_preview(
+                &state,
+                &app_handle,
+                &source_path_str,
+                source_fingerprint,
+                &original_image,
+                is_raw,
+                &edit_document,
+                ESTIMATE_DIM,
+                "estimate_batch_export_size",
+            )?;
 
-        let processed_preview = process_and_get_dynamic_image(
-            &context,
-            &state,
-            &preview_base,
-            crate::gpu_processing::PreGpuImageIdentity::for_stage(
-                &preview_base,
-                source_revision,
-                render_inputs.pre_gpu_revision,
-                render_inputs.pre_gpu_revision,
-            ),
-            RenderRequest {
-                adjustments: render_inputs.adjustments,
-                mask_bitmaps: &mask_bitmaps,
-                lut: render_inputs.lut,
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    render_inputs.edit_graph,
-                ),
-            },
-            "estimate_batch_export_size",
-        )?;
+            let preview_bytes = encode_image_to_bytes(
+                &processed_preview,
+                &output_format,
+                export_settings.jpeg_quality,
+                &export_settings.color_profile,
+                &export_settings.rendering_intent,
+            )?;
+            let single_image_estimated_size = preview_bytes.len();
 
-        let preview_bytes = encode_image_to_bytes(
-            &processed_preview,
-            &output_format,
-            export_settings.jpeg_quality,
-            &export_settings.color_profile,
-            &export_settings.rendering_intent,
-        )?;
-        let single_image_estimated_size = preview_bytes.len();
+            let full_w = (shrunk_w as f32 / raw_scale_factor).round() as u32;
+            let full_h = (shrunk_h as f32 / raw_scale_factor).round() as u32;
 
-        let full_w = (shrunk_w as f32 / raw_scale_factor).round() as u32;
-        let full_h = (shrunk_h as f32 / raw_scale_factor).round() as u32;
+            let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
+                calculate_resize_target(full_w, full_h, resize_opts)
+            } else {
+                (full_w, full_h)
+            };
 
-        let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
-            calculate_resize_target(full_w, full_h, resize_opts)
-        } else {
-            (full_w, full_h)
+            let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
+            let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
+                (final_full_w as f64 * final_full_h as f64)
+                    / (processed_preview_w as f64 * processed_preview_h as f64)
+            } else {
+                1.0
+            };
+
+            (single_image_estimated_size as f64 * pixel_ratio) as usize
         };
-
-        let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
-        let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
-            (final_full_w as f64 * final_full_h as f64)
-                / (processed_preview_w as f64 * processed_preview_h as f64)
-        } else {
-            1.0
-        };
-
-        (single_image_estimated_size as f64 * pixel_ratio) as usize
-    };
 
     Ok(single_image_extrapolated_size * paths.len())
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "tauri-test")]
+    use super::EditDocumentV2;
     use super::{
         EmbeddedSourceIccProfile, ExportBlackPointCompensationStatus, ExportColorEngineId,
         ExportColorProfile, ExportCommittedArtifact, ExportJobManifest, ExportJobManifestItem,
@@ -3317,20 +3308,21 @@ mod tests {
             get_or_init_compute_gpu_context_for_tests, process_and_get_dynamic_image,
         };
         use crate::render_plan::{
-            CompileRenderPlanContext, compile_render_plan_cached, content_revision,
+            CompileRenderPlanContext, RenderPlanRevision,
+            compile_current_edit_document_render_plan_cached,
         };
-        use serde_json::json;
 
         let _gpu_test_guard = acquire_gpu_test_lock();
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
             Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
         }));
-        let adjustments = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 1,
-            "exposure": 18,
-            "contrast": 12,
-            "showClipping": false
-        }));
+        let mut document = crate::exif_processing::neutral_current_edit_document();
+        document["nodes"]["scene_global_color_tone"]["params"]["exposure"] = 1.8.into();
+        document["nodes"]["scene_global_color_tone"]["params"]["contrast"] = 12.into();
+        let document = serde_json::from_value::<EditDocumentV2>(document)
+            .expect("current document deserializes")
+            .compile()
+            .expect("current document compiles");
         let app = tauri::test::mock_builder()
             .manage(crate::AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -3339,9 +3331,15 @@ mod tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let source_id = "edit-graph-preview-export-parity.synthetic";
-        let revision = content_revision(&adjustments, 0, 17, 0);
-        let preview_plan = compile_render_plan_cached(
-            &adjustments,
+        let revision = RenderPlanRevision {
+            image_session: 0,
+            source_revision: 17,
+            adjustment_revision: document.content_fingerprint(),
+            schema_version: 2,
+            settings_revision: 0,
+        };
+        let preview_plan = compile_current_edit_document_render_plan_cached(
+            &document,
             CompileRenderPlanContext {
                 revision,
                 is_raw: false,
@@ -3351,7 +3349,7 @@ mod tests {
         )
         .expect("preview plan compiles");
         let export_plan =
-            prepare_export_render_inputs(source_id, &adjustments, &state, false, None, 0)
+            prepare_export_render_inputs(source_id, &document, &state, false, None, 0)
                 .expect("export plan compiles");
 
         let render = |adjustments, edit_graph| {
@@ -3382,19 +3380,18 @@ mod tests {
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
         );
-        assert_eq!(preview_plan.edit_graph.pipeline_version, 1);
+        assert_eq!(preview_plan.edit_graph.pipeline_version, 2);
     }
 
     #[test]
     #[cfg(feature = "tauri-test")]
-    fn private_real_raw_v2_preview_export_and_legacy_delta_proof_when_enabled() {
+    fn private_real_raw_current_document_wb_decode_and_preview_export_parity_when_enabled() {
         if std::env::var("RAWENGINE_RUN_PRIVATE_EDIT_GRAPH_REAL_RAW_PROOF").as_deref() != Ok("1") {
             return;
         }
         use crate::gpu_processing::{
             acquire_gpu_test_lock, get_or_init_compute_gpu_context_for_tests,
         };
-        use serde_json::json;
         use sha2::{Digest, Sha256};
         use tauri::Manager;
 
@@ -3402,15 +3399,6 @@ mod tests {
         let source_path = std::env::var("RAWENGINE_PRIVATE_RAW_SOURCE")
             .expect("RAWENGINE_PRIVATE_RAW_SOURCE points to a private Alaska RAW");
         let source_bytes = std::fs::read(&source_path).expect("private RAW bytes read");
-        let settings = crate::app_settings::AppSettings::default();
-        let base = crate::image_loader::load_base_image_from_bytes(
-            &source_bytes,
-            &source_path,
-            false,
-            &settings,
-            None,
-        )
-        .expect("production RAW loader decodes private source");
         let app = tauri::test::mock_builder()
             .manage(crate::AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -3418,65 +3406,118 @@ mod tests {
         let state = app.state::<crate::AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("real Metal compute context initializes");
-        let recipe = |version| {
-            json!({
-                "rawEngineEditGraphVersion": version,
-                "exposure": 16,
-                "contrast": 10,
-                "highlights": -14,
-                "vibrance": 9,
-                "channelMixer": {
-                    "enabled": true,
-                    "preserveLuminance": false,
-                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 18 },
-                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
-                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -12 }
-                }
-            })
-        };
-        let render = |adjustments: &serde_json::Value, caller: &str| {
-            super::process_image_for_export_pipeline_with_tonemapper_override(
-                &source_path,
-                &base,
-                adjustments,
-                &context,
-                &state,
-                true,
-                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
-                caller,
-                Some(0),
-                &[],
+        let settings = crate::app_settings::AppSettings::default();
+        let managed_profile_root = PathBuf::new();
+        let neutral = serde_json::from_value::<EditDocumentV2>(
+            crate::exif_processing::neutral_current_edit_document(),
+        )
+        .expect("neutral current document deserializes")
+        .compile()
+        .expect("neutral current document compiles");
+        let neutral_settings =
+            crate::image_loader::raw_processing_settings_for_current_document(&settings, &neutral);
+        let neutral_base = crate::image_loader::load_and_composite_current_document_with_report(
+            &source_bytes,
+            &source_path,
+            &neutral,
+            false,
+            &neutral_settings,
+            None,
+            managed_profile_root.clone(),
+        )
+        .expect("neutral typed RAW decode succeeds")
+        .0;
+
+        let mut edited_value = crate::exif_processing::neutral_current_edit_document();
+        edited_value["nodes"]["scene_global_color_tone"]["params"]["exposure"] = 1.8.into();
+        edited_value["nodes"]["scene_global_color_tone"]["params"]["contrast"] = 10.into();
+        let white_balance =
+            &mut edited_value["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"];
+        white_balance["mode"] = "kelvin_tint".into();
+        white_balance["source"] = "user".into();
+        white_balance["kelvin"] = 4800.into();
+        white_balance["duv"] = 0.006.into();
+        let edited = serde_json::from_value::<EditDocumentV2>(edited_value)
+            .expect("edited current document deserializes")
+            .compile()
+            .expect("edited current document compiles");
+        let edited_settings =
+            crate::image_loader::raw_processing_settings_for_current_document(&settings, &edited);
+        let edited_base = crate::image_loader::load_and_composite_current_document_with_report(
+            &source_bytes,
+            &source_path,
+            &edited,
+            false,
+            &edited_settings,
+            None,
+            managed_profile_root,
+        )
+        .expect("non-neutral typed RAW decode succeeds")
+        .0;
+        let neutral_decode_pixels = neutral_base.to_rgb16().into_raw();
+        let edited_decode_pixels = edited_base.to_rgb16().into_raw();
+        assert_ne!(
+            neutral_decode_pixels, edited_decode_pixels,
+            "non-neutral typed white balance must change developed RAW pixels"
+        );
+
+        let source_revision = crate::render::artifact_identity::stable_hash(&(
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path),
+            crate::image_loader::raw_processing_profile_key_for_current_document(
+                &edited_settings,
+                &edited,
             )
-            .expect("graph-authoritative real RAW render succeeds")
-        };
-        let v2_recipe = recipe(2);
-        let preview = render(&v2_recipe, "edit_graph_v2_private_raw_preview");
-        let export = render(&v2_recipe, "edit_graph_v2_private_raw_export");
+            .expect("typed RAW processing profile key resolves"),
+        ));
+        let (transformed, masks) =
+            super::prepare_current_export_masks(&edited_base, &edited, &state)
+                .expect("typed current export masks resolve");
+        let preview = super::process_image_for_export_pipeline_with_tonemapper_override(
+            &source_path,
+            transformed.as_ref(),
+            &edited,
+            &context,
+            &state,
+            true,
+            source_revision,
+            "current_document_private_raw_preview",
+            None,
+            &masks,
+        )
+        .expect("typed current preview render succeeds");
+        let export = super::process_image_for_export_pipeline_with_tonemapper_override(
+            &source_path,
+            transformed.as_ref(),
+            &edited,
+            &context,
+            &state,
+            true,
+            source_revision,
+            "current_document_private_raw_export",
+            None,
+            &masks,
+        )
+        .expect("typed current export render succeeds");
         let v2_receipt = state
             .gpu()
             .processing()
             .current_processor_snapshot()
             .and_then(|processor| processor.processor.last_execution_receipt())
             .expect("real RAW v2 render publishes a GPU execution receipt");
-        let legacy = render(&recipe(1), "edit_graph_v1_private_raw_migration_baseline");
         let preview_pixels = preview.to_rgba16().into_raw();
         let export_pixels = export.to_rgba16().into_raw();
-        let legacy_pixels = legacy.to_rgba16().into_raw();
-        assert_eq!(preview.dimensions(), base.dimensions());
+        assert_eq!(preview.dimensions(), edited_base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
-        assert_ne!(preview_pixels, legacy_pixels);
-        let changed = preview_pixels
-            .iter()
-            .zip(&legacy_pixels)
-            .filter(|(v2, v1)| v2 != v1)
-            .count();
-        assert!(changed > preview_pixels.len() / 100);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "edit_graph_v2_private_raw_proof dimensions={}x{} migration_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "current_document_private_raw_proof dimensions={}x{} wb_changed_channels={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
-            changed,
+            neutral_decode_pixels
+                .iter()
+                .zip(&edited_decode_pixels)
+                .filter(|(neutral, edited)| neutral != edited)
+                .count(),
             hex::encode(digest),
             v2_receipt.phase_dispatch_count,
             v2_receipt.command_buffer_count,

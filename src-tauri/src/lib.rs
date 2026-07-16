@@ -62,7 +62,6 @@ pub use app::commands::wgpu_presentation::WgpuTransformPayload;
 pub use app::runtime::register_exit_handler;
 pub use app_settings::*;
 pub use app_state::*;
-pub(crate) use editor::preview_geometry_service::generate_transformed_preview;
 pub use editor::preview_geometry_service::{
     PreviewGeometryPipeline, PreviewGeometryReceipt, PreviewGeometryRequest, PreviewGeometryResult,
     PreviewGeometryService,

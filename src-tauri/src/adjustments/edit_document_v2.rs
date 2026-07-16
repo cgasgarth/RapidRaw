@@ -81,6 +81,7 @@ impl EditNodeTypeV2 {
         }
     }
 
+    #[cfg(test)]
     fn editor_section(self) -> Option<&'static str> {
         match self {
             Self::SceneGlobalColorTone | Self::SceneToViewTransform | Self::ToneEqualizer => {
@@ -124,6 +125,7 @@ struct SourceDecodeV2 {
     raw_processing_mode_override: Option<RawProcessingModeV1>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct UntypedEditNodeEnvelopeV2 {
@@ -488,6 +490,7 @@ fn validate_perspective_correction(
         })
 }
 
+#[cfg(test)]
 fn validate_perspective_param_contract(params: &Map<String, Value>) -> Result<(), String> {
     let Some(value) = params.get("perspectiveCorrection") else {
         return Err("EditDocumentV2 geometry perspectiveCorrection is required".to_string());
@@ -1589,6 +1592,7 @@ struct SkinToneUniformityV2 {
     skin_tone_uniformity: SkinToneUniformitySettingsV1,
 }
 
+#[cfg(test)]
 fn parse_skin_tone_uniformity(params: &Map<String, Value>) -> Result<SkinToneUniformityV2, String> {
     let parsed = serde_json::from_value::<SkinToneUniformityV2>(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 skin_tone_uniformity is invalid: {error}"))?;
@@ -3630,11 +3634,154 @@ fn identity_gpu_mat3() -> crate::adjustments::abi::GpuMat3 {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EditDocumentV2CopyPayload {
-    nodes: BTreeMap<EditNodeTypeV2, UntypedEditNodeEnvelopeV2>,
+pub(crate) struct EditDocumentV2CopyPayload {
+    nodes: TransferableEditNodesV2,
     schema_version: u8,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct TransferableEditNodesV2 {
+    black_white_mixer: Option<EditNodeEnvelopeV2<BlackWhiteMixerV2>>,
+    camera_input: Option<EditNodeEnvelopeV2<CameraInputV2>>,
+    channel_mixer: Option<EditNodeEnvelopeV2<ChannelMixerV2>>,
+    color_balance_rgb: Option<EditNodeEnvelopeV2<ColorBalanceRgbV2>>,
+    color_calibration: Option<EditNodeEnvelopeV2<ColorCalibrationV2>>,
+    color_presence: Option<EditNodeEnvelopeV2<ColorPresenceParamsV2>>,
+    detail_denoise_dehaze: Option<EditNodeEnvelopeV2<DetailDenoiseDehazeV2>>,
+    display_creative: Option<EditNodeEnvelopeV2<DisplayCreativeV2>>,
+    film_emulation: Option<EditNodeEnvelopeV2<FilmEmulationV2>>,
+    geometry: Option<EditNodeEnvelopeV2<GeometryV2>>,
+    lens_correction: Option<EditNodeEnvelopeV2<LensCorrectionV2>>,
+    luma_levels: Option<EditNodeEnvelopeV2<LumaLevelsV2>>,
+    perceptual_grading: Option<EditNodeEnvelopeV2<PerceptualGradingV2>>,
+    point_color: Option<EditNodeEnvelopeV2<PointColorV2>>,
+    scene_curve: Option<EditNodeEnvelopeV2<SceneCurveV2>>,
+    scene_global_color_tone: Option<EditNodeEnvelopeV2<SceneGlobalColorToneParamsV2>>,
+    scene_to_view_transform: Option<EditNodeEnvelopeV2<SceneToViewTransformV2>>,
+    selective_color_mixer: Option<EditNodeEnvelopeV2<SelectiveColorMixerV2>>,
+    skin_tone_uniformity: Option<EditNodeEnvelopeV2<SkinToneUniformityV2>>,
+    tone_equalizer: Option<EditNodeEnvelopeV2<ToneEqualizerV2>>,
+}
+
+impl TransferableEditNodesV2 {
+    fn is_empty(&self) -> bool {
+        self.black_white_mixer.is_none()
+            && self.camera_input.is_none()
+            && self.channel_mixer.is_none()
+            && self.color_balance_rgb.is_none()
+            && self.color_calibration.is_none()
+            && self.color_presence.is_none()
+            && self.detail_denoise_dehaze.is_none()
+            && self.display_creative.is_none()
+            && self.film_emulation.is_none()
+            && self.geometry.is_none()
+            && self.lens_correction.is_none()
+            && self.luma_levels.is_none()
+            && self.perceptual_grading.is_none()
+            && self.point_color.is_none()
+            && self.scene_curve.is_none()
+            && self.scene_global_color_tone.is_none()
+            && self.scene_to_view_transform.is_none()
+            && self.selective_color_mixer.is_none()
+            && self.skin_tone_uniformity.is_none()
+            && self.tone_equalizer.is_none()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        macro_rules! contract {
+            ($field:ident, $kind:ident) => {
+                if let Some(node) = &self.$field {
+                    node.validate_contract(EditNodeTypeV2::$kind)?;
+                }
+            };
+        }
+        contract!(black_white_mixer, BlackWhiteMixer);
+        contract!(camera_input, CameraInput);
+        contract!(channel_mixer, ChannelMixer);
+        contract!(color_balance_rgb, ColorBalanceRgb);
+        contract!(color_calibration, ColorCalibration);
+        contract!(color_presence, ColorPresence);
+        contract!(detail_denoise_dehaze, DetailDenoiseDehaze);
+        contract!(display_creative, DisplayCreative);
+        contract!(film_emulation, FilmEmulation);
+        contract!(geometry, Geometry);
+        contract!(lens_correction, LensCorrection);
+        contract!(luma_levels, LumaLevels);
+        contract!(perceptual_grading, PerceptualGrading);
+        contract!(point_color, PointColor);
+        contract!(scene_curve, SceneCurve);
+        contract!(scene_global_color_tone, SceneGlobalColorTone);
+        contract!(scene_to_view_transform, SceneToViewTransform);
+        contract!(selective_color_mixer, SelectiveColorMixer);
+        contract!(skin_tone_uniformity, SkinToneUniformity);
+        contract!(tone_equalizer, ToneEqualizer);
+
+        if let Some(node) = &self.black_white_mixer {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.camera_input {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.channel_mixer {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.color_balance_rgb {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.color_calibration {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.color_presence {
+            node.params.compile()?;
+        }
+        if let Some(node) = &self.detail_denoise_dehaze {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.display_creative {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.film_emulation {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.geometry {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.lens_correction {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.luma_levels {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.perceptual_grading {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.point_color {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.scene_curve {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.scene_global_color_tone {
+            node.params.compile()?;
+        }
+        if let Some(node) = &self.scene_to_view_transform {
+            node.params.compile()?;
+        }
+        if let Some(node) = &self.selective_color_mixer {
+            node.params.validate()?;
+        }
+        if let Some(node) = &self.skin_tone_uniformity {
+            node.params.skin_tone_uniformity.validate()?;
+        }
+        if let Some(node) = &self.tone_equalizer {
+            node.params.validate()?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 struct FlatNodeProjectionV2 {
     nodes: BTreeMap<EditNodeTypeV2, UntypedEditNodeEnvelopeV2>,
@@ -3731,6 +3878,112 @@ impl EditDocumentV2 {
         })
     }
 
+    pub(crate) fn merge_copy_payload(
+        mut self,
+        payload: EditDocumentV2CopyPayload,
+    ) -> Result<Self, String> {
+        if payload.schema_version != EDIT_DOCUMENT_V2_SCHEMA_VERSION {
+            return Err(format!(
+                "Unsupported EditDocumentV2 copy schemaVersion: {}",
+                payload.schema_version
+            ));
+        }
+        if payload.nodes.is_empty() {
+            return Err("EditDocumentV2 copy payload must contain at least one node".to_string());
+        }
+        payload.nodes.validate()?;
+        let nodes = payload.nodes;
+        macro_rules! replace {
+            ($field:ident) => {
+                if let Some(node) = nodes.$field {
+                    self.nodes.$field = node;
+                }
+            };
+        }
+        replace!(black_white_mixer);
+        replace!(channel_mixer);
+        replace!(color_balance_rgb);
+        replace!(color_calibration);
+        replace!(color_presence);
+        replace!(detail_denoise_dehaze);
+        replace!(display_creative);
+        replace!(film_emulation);
+        replace!(lens_correction);
+        replace!(luma_levels);
+        replace!(perceptual_grading);
+        replace!(point_color);
+        replace!(scene_curve);
+        replace!(scene_global_color_tone);
+        replace!(scene_to_view_transform);
+        replace!(selective_color_mixer);
+        replace!(skin_tone_uniformity);
+        replace!(tone_equalizer);
+
+        if let Some(mut incoming) = nodes.camera_input {
+            let incoming_white_balance = &incoming.params.white_balance_technical;
+            let retains_target_white_balance = matches!(
+                incoming_white_balance.mode,
+                CameraInputWhiteBalanceModeV2::AsShot | CameraInputWhiteBalanceModeV2::Auto
+            ) && matches!(
+                incoming_white_balance.synchronization.mode,
+                CameraInputWhiteBalanceSynchronizationModeV2::PerImage
+            );
+            if retains_target_white_balance {
+                incoming.params.white_balance_technical = self
+                    .nodes
+                    .camera_input
+                    .params
+                    .white_balance_technical
+                    .clone();
+            }
+            self.nodes.camera_input = incoming;
+        }
+        if let Some(geometry) = nodes.geometry {
+            self.geometry = geometry.params.clone();
+            self.nodes.geometry = geometry;
+        }
+        self.provenance.reference_match_application_receipt = None;
+        self.validate_document_contract()?;
+        Ok(self)
+    }
+
+    pub(crate) fn apply_auto_adjustment_results(
+        &mut self,
+        results: &crate::auto_adjust::AutoAdjustmentResults,
+    ) -> Result<(), String> {
+        let tone = &mut self.nodes.scene_global_color_tone.params;
+        tone.exposure = results.exposure;
+        tone.brightness = results.brightness;
+        tone.contrast = results.contrast;
+        tone.highlights = results.highlights;
+        tone.shadows = results.shadows;
+        tone.whites = results.whites;
+        tone.blacks = results.blacks;
+        self.nodes.color_presence.params.vibrance = results.vibrancy;
+        self.nodes.display_creative.params.vignette_amount = results.vignette_amount;
+        let detail = &mut self.nodes.detail_denoise_dehaze.params;
+        detail.clarity = results.clarity;
+        detail.centré = results.centre;
+        detail.dehaze = results.dehaze;
+
+        let white_balance = &mut self.nodes.camera_input.params.white_balance_technical;
+        white_balance.mode = CameraInputWhiteBalanceModeV2::Auto;
+        white_balance.source = CameraInputWhiteBalanceSourceV2::Auto;
+        white_balance.kelvin = results.wb_kelvin;
+        white_balance.duv = results.wb_duv;
+        white_balance.x = results.wb_x;
+        white_balance.y = results.wb_y;
+        white_balance.confidence = Some(results.wb_confidence);
+        white_balance.sample_count = Some(results.wb_accepted_samples);
+        white_balance.input_semantics = CameraInputWhiteBalanceSemanticsV2::RawSceneLinear;
+        white_balance.preset_id = None;
+        white_balance.synchronization = CameraInputWhiteBalanceSynchronizationV2 {
+            mode: CameraInputWhiteBalanceSynchronizationModeV2::PerImage,
+            reference_source_identity: None,
+        };
+        self.validate_document_contract()
+    }
+
     fn validate_document_contract(&self) -> Result<(), String> {
         if self.schema_version != EDIT_DOCUMENT_V2_SCHEMA_VERSION {
             return Err(format!(
@@ -3812,22 +4065,10 @@ pub(crate) fn validate_edit_document_v2_copy_payload(value: &Value) -> Result<()
     if payload.nodes.is_empty() {
         return Err("EditDocumentV2 preset payload must contain at least one node".to_string());
     }
-    for (node_type, node) in payload.nodes {
-        if matches!(
-            node_type,
-            EditNodeTypeV2::SourceDecode | EditNodeTypeV2::Layers | EditNodeTypeV2::SourceArtifacts
-        ) {
-            return Err(format!(
-                "EditDocumentV2 node '{}' is not transferable in presets",
-                node_type.contract().0
-            ));
-        }
-        validate_node_contract(node_type, &node)?;
-        compile_node_params(node_type, &node)?;
-    }
-    Ok(())
+    payload.nodes.validate()
 }
 
+#[cfg(test)]
 pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {
     let document: EditDocumentV2 = serde_json::from_value(value.clone())
         .map_err(|error| format!("EditDocumentV2 render payload is invalid: {error}"))?;
@@ -3865,47 +4106,9 @@ pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {
     Ok(Value::Object(adjustments))
 }
 
-/// Resolve the single source-decode projection persisted beside a V2 document.
-/// Mixed flat/node authority fails closed instead of silently decoding different
-/// pixels on preview, reopen, and export paths.
-pub(crate) fn resolve_source_decode_adjustments(
-    adjustments: &Value,
-    edit_document_v2: Option<&Value>,
-) -> Result<Value, String> {
-    let mut resolved = adjustments
-        .as_object()
-        .cloned()
-        .ok_or_else(|| "Source-decode adjustments must be an object".to_string())?;
-    let Some(value) = edit_document_v2 else {
-        return Ok(Value::Object(resolved));
-    };
-    let document: EditDocumentV2 = serde_json::from_value(value.clone())
-        .map_err(|error| format!("EditDocumentV2 source-decode authority is invalid: {error}"))?;
-    document.validate_document_contract()?;
-    let source_decode = &document.nodes.source_decode.params;
-    let authoritative = serde_json::to_value(source_decode.raw_processing_mode_override)
-        .map_err(|error| format!("Source-decode authority cannot serialize: {error}"))?;
-    match resolved.get("rawProcessingModeOverride") {
-        Some(legacy) if legacy != &authoritative => {
-            return Err(
-                "Source-decode node conflicts with flat rawProcessingModeOverride authority"
-                    .to_string(),
-            );
-        }
-        None if !authoritative.is_null() => {
-            return Err(
-                "Source-decode node is missing its flat rawProcessingModeOverride projection"
-                    .to_string(),
-            );
-        }
-        _ => {}
-    }
-    resolved.insert("rawProcessingModeOverride".to_string(), authoritative);
-    Ok(Value::Object(resolved))
-}
-
 /// Transitional adapter result used only by copy/flat compatibility APIs.
 /// Current preview and render compilation never constructs this enum.
+#[cfg(test)]
 #[allow(dead_code)]
 enum LegacyCompiledNodeParamsV2 {
     BlackWhiteMixer(BlackWhiteMixerV2),
@@ -3933,6 +4136,7 @@ enum LegacyCompiledNodeParamsV2 {
     ToneEqualizer(ToneEqualizerV2),
 }
 
+#[cfg(test)]
 fn compile_node_params(
     node_key: EditNodeTypeV2,
     node: &UntypedEditNodeEnvelopeV2,
@@ -4033,6 +4237,7 @@ fn compile_node_params(
     }
 }
 
+#[cfg(test)]
 fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, String> {
     let camera_input: CameraInputV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 camera_input is invalid: {error}"))?;
@@ -4040,6 +4245,7 @@ fn parse_camera_input(params: &Map<String, Value>) -> Result<CameraInputV2, Stri
     Ok(camera_input)
 }
 
+#[cfg(test)]
 fn parse_scene_curve(params: &Map<String, Value>) -> Result<SceneCurveV2, String> {
     let scene_curve: SceneCurveV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 scene_curve is invalid: {error}"))?;
@@ -4047,6 +4253,7 @@ fn parse_scene_curve(params: &Map<String, Value>) -> Result<SceneCurveV2, String
     Ok(scene_curve)
 }
 
+#[cfg(test)]
 fn parse_tone_equalizer(params: &Map<String, Value>) -> Result<ToneEqualizerV2, String> {
     let tone_equalizer: ToneEqualizerV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 tone_equalizer is invalid: {error}"))?;
@@ -4054,6 +4261,7 @@ fn parse_tone_equalizer(params: &Map<String, Value>) -> Result<ToneEqualizerV2, 
     Ok(tone_equalizer)
 }
 
+#[cfg(test)]
 fn parse_detail_denoise_dehaze(
     params: &Map<String, Value>,
 ) -> Result<DetailDenoiseDehazeV2, String> {
@@ -4063,6 +4271,7 @@ fn parse_detail_denoise_dehaze(
     Ok(detail)
 }
 
+#[cfg(test)]
 fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String> {
     let point_color: PointColorV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 point_color is invalid: {error}"))?;
@@ -4070,6 +4279,7 @@ fn parse_point_color(params: &Map<String, Value>) -> Result<PointColorV2, String
     Ok(point_color)
 }
 
+#[cfg(test)]
 fn parse_color_balance_rgb(params: &Map<String, Value>) -> Result<ColorBalanceRgbV2, String> {
     let color_balance_rgb: ColorBalanceRgbV2 =
         serde_json::from_value(Value::Object(params.clone()))
@@ -4078,6 +4288,7 @@ fn parse_color_balance_rgb(params: &Map<String, Value>) -> Result<ColorBalanceRg
     Ok(color_balance_rgb)
 }
 
+#[cfg(test)]
 fn parse_selective_color_mixer(
     params: &Map<String, Value>,
 ) -> Result<SelectiveColorMixerV2, String> {
@@ -4088,6 +4299,7 @@ fn parse_selective_color_mixer(
     Ok(selective_color_mixer)
 }
 
+#[cfg(test)]
 fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixerV2, String> {
     let black_white_mixer: BlackWhiteMixerV2 =
         serde_json::from_value(Value::Object(params.clone()))
@@ -4096,6 +4308,7 @@ fn parse_black_white_mixer(params: &Map<String, Value>) -> Result<BlackWhiteMixe
     Ok(black_white_mixer)
 }
 
+#[cfg(test)]
 fn parse_channel_mixer(params: &Map<String, Value>) -> Result<ChannelMixerV2, String> {
     let channel_mixer: ChannelMixerV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 channel_mixer is invalid: {error}"))?;
@@ -4103,6 +4316,7 @@ fn parse_channel_mixer(params: &Map<String, Value>) -> Result<ChannelMixerV2, St
     Ok(channel_mixer)
 }
 
+#[cfg(test)]
 fn parse_luma_levels(params: &Map<String, Value>) -> Result<LumaLevelsV2, String> {
     let levels: LumaLevelsV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 luma_levels is invalid: {error}"))?;
@@ -4110,6 +4324,7 @@ fn parse_luma_levels(params: &Map<String, Value>) -> Result<LumaLevelsV2, String
     Ok(levels)
 }
 
+#[cfg(test)]
 fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGradingV2, String> {
     let perceptual_grading: PerceptualGradingV2 =
         serde_json::from_value(Value::Object(params.clone()))
@@ -4118,6 +4333,7 @@ fn parse_perceptual_grading(params: &Map<String, Value>) -> Result<PerceptualGra
     Ok(perceptual_grading)
 }
 
+#[cfg(test)]
 fn parse_color_calibration(params: &Map<String, Value>) -> Result<ColorCalibrationV2, String> {
     let color_calibration: ColorCalibrationV2 =
         serde_json::from_value(Value::Object(params.clone()))
@@ -4126,6 +4342,7 @@ fn parse_color_calibration(params: &Map<String, Value>) -> Result<ColorCalibrati
     Ok(color_calibration)
 }
 
+#[cfg(test)]
 fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreativeV2, String> {
     let display: DisplayCreativeV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 display_creative is invalid: {error}"))?;
@@ -4133,6 +4350,7 @@ fn parse_display_creative(params: &Map<String, Value>) -> Result<DisplayCreative
     Ok(display)
 }
 
+#[cfg(test)]
 fn validate_node_contract(
     node_key: EditNodeTypeV2,
     node: &UntypedEditNodeEnvelopeV2,
@@ -4161,11 +4379,13 @@ fn validate_node_contract(
     Ok(())
 }
 
+#[cfg(test)]
 fn parse_source_decode(params: &Map<String, Value>) -> Result<SourceDecodeV2, String> {
     serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 source_decode is invalid: {error}"))
 }
 
+#[cfg(test)]
 fn parse_source_artifacts(params: &Map<String, Value>) -> Result<SourceArtifactsV2, String> {
     let artifacts: SourceArtifactsV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 source artifacts are invalid: {error}"))?;
@@ -4196,6 +4416,7 @@ fn validate_source_artifacts(artifacts: &SourceArtifactsV2) -> Result<(), String
     Ok(())
 }
 
+#[cfg(test)]
 fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
     validate_perspective_param_contract(params)?;
     let geometry: GeometryV2 = serde_json::from_value(Value::Object(params.clone()))
@@ -4204,6 +4425,7 @@ fn parse_geometry(params: &Map<String, Value>) -> Result<GeometryV2, String> {
     Ok(geometry)
 }
 
+#[cfg(test)]
 fn parse_lens_correction(params: &Map<String, Value>) -> Result<LensCorrectionV2, String> {
     let lens_correction: LensCorrectionV2 =
         serde_json::from_value(Value::Object(params.clone()))
@@ -4212,6 +4434,7 @@ fn parse_lens_correction(params: &Map<String, Value>) -> Result<LensCorrectionV2
     Ok(lens_correction)
 }
 
+#[cfg(test)]
 fn parse_layers(params: &Map<String, Value>) -> Result<LayersV2, String> {
     let layers: LayersV2 = serde_json::from_value(Value::Object(params.clone()))
         .map_err(|error| format!("EditDocumentV2 layers are invalid: {error}"))?;
@@ -4288,7 +4511,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::super::parse::get_all_adjustments_from_json;
-    use super::{EditDocumentV2, resolve_source_decode_adjustments};
+    use super::EditDocumentV2;
     use crate::color::mixer_render::{
         apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb,
     };
@@ -5101,7 +5324,7 @@ mod tests {
     }
 
     #[test]
-    fn source_decode_compiler_and_flat_projection_fail_closed() {
+    fn source_decode_compiles_as_typed_current_authority_and_fails_closed() {
         for mode in [
             json!(null),
             json!("fast"),
@@ -5109,30 +5332,12 @@ mod tests {
             json!("maximum"),
         ] {
             let document = document_with_source_decode(mode.clone());
-            let compiled = compile_test_document(document.clone()).expect("source-decode compiles");
-            assert_eq!(compiled["rawProcessingModeOverride"], mode);
-            let resolved = resolve_source_decode_adjustments(
-                &json!({ "rawProcessingModeOverride": mode }),
-                Some(&document),
-            )
-            .expect("matching projection resolves");
-            assert_eq!(resolved["rawProcessingModeOverride"], mode);
+            let compiled = serde_json::from_value::<EditDocumentV2>(document)
+                .expect("source-decode document deserializes")
+                .compile()
+                .expect("source-decode document compiles");
+            assert_eq!(compiled.raw_processing_mode_override(), mode.as_str());
         }
-
-        let document = document_with_source_decode(json!("maximum"));
-        assert!(
-            resolve_source_decode_adjustments(
-                &json!({ "rawProcessingModeOverride": "fast" }),
-                Some(&document),
-            )
-            .unwrap_err()
-            .contains("conflicts")
-        );
-        assert!(
-            resolve_source_decode_adjustments(&json!({}), Some(&document))
-                .unwrap_err()
-                .contains("missing")
-        );
 
         let mut invalid = document_with_source_decode(json!("ultra"));
         assert!(serde_json::from_value::<EditDocumentV2>(invalid.clone()).is_err());

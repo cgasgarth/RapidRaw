@@ -21,15 +21,6 @@ use crate::image_loader::{composite_current_source_artifacts, composite_patches_
 use crate::image_processing::{apply_coarse_rotation, apply_flip, downscale_f32_image};
 use crate::patch_assets::{PreviewPatchSampler, prepare_preview_patch_sampler};
 
-pub(crate) fn generate_transformed_preview(
-    state: &tauri::State<AppState>,
-    loaded_image: &LoadedImage,
-    adjustments: &Value,
-    preview_dim: u32,
-) -> Result<(DynamicImage, f32, (f32, f32)), String> {
-    generate_transformed_preview_cancellable(state, loaded_image, adjustments, preview_dim, None)
-}
-
 pub(crate) fn generate_transformed_preview_cancellable(
     _state: &tauri::State<AppState>,
     loaded_image: &LoadedImage,

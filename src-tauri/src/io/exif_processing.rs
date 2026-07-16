@@ -150,13 +150,10 @@ pub fn load_sidecar_recovering(
         let validation = validate_current_envelope(&envelope, &source_identity);
         match validation {
             Ok(()) => {
-                let adjustments = crate::adjustments::edit_document_v2::compile_edit_document_v2(
-                    &envelope.edit_document_v2,
-                )?;
                 return Ok(PersistedStateLoad {
                     metadata: ImageMetadata {
                         rating: envelope.rating,
-                        adjustments,
+                        adjustments: JsonValue::Null,
                         edit_document_v2: Some(envelope.edit_document_v2),
                         tags: envelope.tags,
                         exif: envelope.exif,
@@ -240,13 +237,13 @@ pub(crate) fn neutral_current_edit_document() -> JsonValue {
 
 fn neutral_current_metadata(source_identity: String) -> ImageMetadata {
     let document = neutral_current_edit_document();
-    let adjustments = crate::adjustments::edit_document_v2::compile_edit_document_v2(&document)
+    crate::adjustments::edit_document_v2::validate_edit_document_v2(&document)
         .expect("native neutral EditDocumentV2 must remain valid");
     let edit_revision = render_state_revision(&document, None)
         .expect("native neutral EditDocumentV2 must remain serializable");
     ImageMetadata {
         rating: 0,
-        adjustments,
+        adjustments: JsonValue::Null,
         edit_document_v2: Some(document),
         tags: None,
         exif: None,
@@ -1917,10 +1914,7 @@ mod tests {
         assert_eq!(loaded.metadata.source_identity, source.to_string_lossy());
         let document = loaded.metadata.edit_document_v2.as_ref().unwrap();
         crate::adjustments::edit_document_v2::validate_edit_document_v2(document).unwrap();
-        assert_eq!(
-            loaded.metadata.adjustments,
-            crate::adjustments::edit_document_v2::compile_edit_document_v2(document).unwrap()
-        );
+        assert!(loaded.metadata.adjustments.is_null());
     }
 
     #[test]

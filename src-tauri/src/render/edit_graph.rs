@@ -844,6 +844,7 @@ pub struct CompiledEditGraph {
     pub nodes: Arc<[CompiledEditNode]>,
     pub fingerprint: u64,
     pub execution_abi_fingerprint: u64,
+    #[cfg(test)]
     pub has_user_edits: bool,
     pub receipt: EditGraphReceipt,
     compiled_shader_abi: AllAdjustments,
@@ -1214,6 +1215,7 @@ impl CompiledEditGraph {
                 inputs.adjustments,
                 inputs.has_lut,
             ),
+            #[cfg(test)]
             has_user_edits: inputs.has_geometry_or_retouch
                 || inputs.has_detail
                 || gpu_adjustments_active
