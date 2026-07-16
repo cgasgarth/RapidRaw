@@ -22,6 +22,7 @@ describe('viewer mask shape interaction controller', () => {
   test('publishes a declarative draft and one semantic command for the exact keyed session', () => {
     const controller = createViewerMaskShapeInteractionController();
     const key = controller.begin(context(), target, pointer, 'mask-shape:1');
+    if (key === null) throw new Error('Expected mask-shape session key.');
     expect(key).toEqual({
       ...target,
       geometryEpoch: 7,
@@ -35,12 +36,13 @@ describe('viewer mask shape interaction controller', () => {
 
     const patch = { parameters: { centerX: 180, centerY: 220 } };
     const overlay = controller.preview(context(), target.subMaskId, patch);
+    if (overlay === null) throw new Error('Expected mask-shape overlay.');
     expect(overlay).toEqual({ key, patch, pointerPolicy: 'capture', zOrder: 'tool-geometry' });
     expect(controller.overlays()).toEqual([overlay]);
     patch.parameters.centerX = 999;
     expect(controller.overlays()[0]?.patch.parameters).toEqual({ centerX: 180, centerY: 220 });
 
-    expect(controller.commit(context(), target.subMaskId, overlay?.patch ?? {})).toEqual({
+    expect(controller.commit(context(), target.subMaskId, overlay.patch)).toEqual({
       key,
       patch: { parameters: { centerX: 180, centerY: 220 } },
       subMaskId: target.subMaskId,
@@ -103,6 +105,7 @@ describe('viewer mask shape interaction controller', () => {
       { pointerId: 22, pointerType: 'touch' },
       'mask-shape:A:new',
     );
+    if (successorKey === null) throw new Error('Expected successor mask-shape session.');
     expect(successorKey?.imageSessionId).toBe('image-session:A:2');
     expect(controller.commit(successorA, target.subMaskId, { opacity: 40 })?.key).toBe(successorKey);
   });

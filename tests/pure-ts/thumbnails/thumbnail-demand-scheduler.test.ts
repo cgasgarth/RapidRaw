@@ -12,7 +12,9 @@ function createHarness(policy: Record<string, number> = {}) {
   const requests: ThumbnailBackendRequest[] = [];
   const resident = new Set<string>();
   const scheduler = new ThumbnailDemandScheduler({
-    dispatch: (request) => requests.push(request),
+    dispatch: (request) => {
+      requests.push(request);
+    },
     isResident: (path) => resident.has(path),
     now: () => now,
     requestFrame: (callback) => {

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { ThumbnailSmartPreviewState } from '../../../src/store/useProcessStore';
+import type { ThumbnailSmartPreviewState } from '../../../src/thumbnails/ThumbnailCache';
 import {
   hasStaleOrOfflineSmartPreview,
   isResolvingStaleSmartPreviewExport,

@@ -59,7 +59,11 @@ describe('ViewerSurface presentation boundary', () => {
       rotationDegrees: 0,
       semanticZoom: geometry.semanticZoom,
       sourceSize: geometry.sourceSize,
-      transform: geometry.transform,
+      transform: {
+        positionX: geometry.transform.x,
+        positionY: geometry.transform.y,
+        scale: geometry.transform.scale,
+      },
       viewportSizeCssPixels: geometry.viewportSizeCssPixels,
     });
     expect(viewerSurfaceDataAttributes(presentation, successor)['data-geometry-epoch']).toBe('20');

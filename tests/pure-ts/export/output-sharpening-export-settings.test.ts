@@ -15,7 +15,7 @@ import type { OutputSharpeningSettings } from '../../../src/schemas/outputSharpe
 
 type ExportSettingsHookState = ReturnType<typeof useExportSettings>;
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true, writable: true });
 
 let renderedHook: { container: HTMLDivElement; root: Root } | null = null;
 

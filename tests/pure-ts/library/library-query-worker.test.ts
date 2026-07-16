@@ -57,7 +57,11 @@ const files: ImageFile[] = [
     exif: null,
   },
 ];
-const ratings = { '/photos/camera.jpg': 2, '/photos/camera.raf': 5, '/photos/camera.raf?vc=1': 4 };
+const ratings: Record<string, number> = {
+  '/photos/camera.jpg': 2,
+  '/photos/camera.raf': 5,
+  '/photos/camera.raf?vc=1': 4,
+};
 const projections = files.map((file, stableOrdinal) =>
   buildLibrarySearchProjection(file, {
     entityRevision: stableOrdinal + 1,

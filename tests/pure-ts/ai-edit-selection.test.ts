@@ -159,8 +159,17 @@ describe('AI edit store command', () => {
     expect(state.brushSettings?.tool).toBe(ToolType.Brush);
     expect(state.historyIndex).toBe(1);
     expect(state.history[1]).toBe(state.editDocumentV2);
-    expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
-    expect(state.editDocumentV2.nodes.source_artifacts?.params).toEqual(state.editDocumentV2.sourceArtifacts);
+    const sourceArtifactSubMasks = state.editDocumentV2.sourceArtifacts['aiPatches']?.[0]?.subMasks;
+    expect(sourceArtifactSubMasks).toHaveLength(1);
+    expect(sourceArtifactSubMasks?.[0]).toMatchObject({
+      id: createdSubMask.id,
+      invert: createdSubMask.invert,
+      mode: createdSubMask.mode,
+      opacity: createdSubMask.opacity,
+      type: createdSubMask.type,
+      visible: createdSubMask.visible,
+    });
+    expect(state.editDocumentV2.nodes['source_artifacts']?.params).toEqual(state.editDocumentV2.sourceArtifacts);
     expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
     expect(state.adjustmentRevision).toBe(1);
     expect(state.lastEditApplicationReceipt).toMatchObject({
@@ -246,7 +255,7 @@ describe('AI edit store command', () => {
     ]);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.visible).toBeTrue();
-    expect(useEditorStore.getState().editDocumentV2.nodes.source_artifacts?.params.aiPatches).toEqual(
+    expect(useEditorStore.getState().editDocumentV2.nodes['source_artifacts']?.params['aiPatches']).toEqual(
       useEditorStore.getState().adjustmentSnapshot.value.aiPatches,
     );
   });

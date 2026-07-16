@@ -5,8 +5,7 @@ import { findAlbumById, insertChildrenIntoTree } from '../../../src/utils/folder
 
 const folderNode = (path: string, children: FolderTree[] = []): FolderTree => ({
   children,
-  isExpanded: false,
-  isLoading: false,
+  isDir: true,
   name: path.split('/').pop() ?? path,
   path,
 });
