@@ -49,11 +49,20 @@ impl AnalyticsRuntimeService {
                 let result =
                     image_analytics::calculate(&job, || worker_scheduler.is_current(&identity));
                 let current = worker_scheduler.is_current(&identity);
-                if current && let Ok(result) = result {
-                    sink(result);
-                    worker_scheduler.finish(true);
-                } else {
-                    worker_scheduler.finish(false);
+                match result {
+                    Ok(result) if current => {
+                        sink(result);
+                        worker_scheduler.finish(true);
+                    }
+                    Err(error) if current => {
+                        log::warn!(
+                            "current preview analytics failed for session={} generation={}: {error}",
+                            identity.frame_id.image_session,
+                            identity.frame_id.preview_generation
+                        );
+                        worker_scheduler.finish(false);
+                    }
+                    _ => worker_scheduler.finish(false),
                 }
             }
         });

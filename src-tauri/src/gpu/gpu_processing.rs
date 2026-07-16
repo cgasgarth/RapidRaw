@@ -5733,6 +5733,28 @@ pub fn process_and_get_dynamic_image_with_analytics(
     .map(|(image, _)| image)
 }
 
+fn submit_preview_analytics(analytics: crate::AnalyticsConfig, image: DynamicImage) {
+    let frame_id = analytics.frame_id;
+    if analytics
+        .service
+        .submit(crate::AnalyticsJob {
+            path: analytics.path,
+            frame_id,
+            preview_operation_identity: Box::new(analytics.preview_operation_identity),
+            image: std::sync::Arc::new(image),
+            products: analytics.products,
+            policy: crate::AnalyticsSamplingPolicy::default(),
+        })
+        .is_err()
+    {
+        log::warn!(
+            "current preview analytics submission rejected for session={} generation={}",
+            frame_id.image_session,
+            frame_id.preview_generation
+        );
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_and_get_dynamic_image_inner(
     context: &GpuContext,
@@ -6126,36 +6148,24 @@ fn process_and_get_dynamic_image_inner(
                         }
                     }
 
-                    if let Ok(dynamic_img) =
-                        rgba16float_readback_to_dynamic_image(out_w, out_h, unpadded_data)
-                    {
-                        let _ = analytics.service.submit(crate::AnalyticsJob {
-                            path: analytics.path,
-                            frame_id: analytics.frame_id,
-                            preview_operation_identity: Box::new(
-                                analytics.preview_operation_identity,
-                            ),
-                            image: std::sync::Arc::new(dynamic_img),
-                            products: analytics.products,
-                            policy: crate::AnalyticsSamplingPolicy::default(),
-                        });
+                    match rgba16float_readback_to_dynamic_image(out_w, out_h, unpadded_data) {
+                        Ok(dynamic_img) => submit_preview_analytics(analytics, dynamic_img),
+                        Err(error) => log::warn!(
+                            "current preview analytics readback conversion failed: {error}"
+                        ),
                     }
+                } else {
+                    log::warn!("current preview analytics buffer mapping failed");
                 }
             });
         } else {
             let pixels_clone = processed_pixels.clone();
             std::thread::spawn(move || {
-                if let Ok(dynamic_img) =
-                    rgba16float_readback_to_dynamic_image(out_w, out_h, pixels_clone)
-                {
-                    let _ = analytics.service.submit(crate::AnalyticsJob {
-                        path: analytics.path,
-                        frame_id: analytics.frame_id,
-                        preview_operation_identity: Box::new(analytics.preview_operation_identity),
-                        image: std::sync::Arc::new(dynamic_img),
-                        products: analytics.products,
-                        policy: crate::AnalyticsSamplingPolicy::default(),
-                    });
+                match rgba16float_readback_to_dynamic_image(out_w, out_h, pixels_clone) {
+                    Ok(dynamic_img) => submit_preview_analytics(analytics, dynamic_img),
+                    Err(error) => {
+                        log::warn!("current preview analytics readback conversion failed: {error}")
+                    }
                 }
             });
         }

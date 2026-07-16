@@ -143,14 +143,23 @@ fn hash_revision(revision: &str) -> u64 {
     u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
 }
 
-fn requested_products(compute_scopes: bool) -> AnalyticsProducts {
-    let mut products = AnalyticsProducts::HISTOGRAM | AnalyticsProducts::GAMUT_MASK;
-    if !compute_scopes {
-        return products;
-    }
-    products |=
-        AnalyticsProducts::WAVEFORM | AnalyticsProducts::PARADE | AnalyticsProducts::VECTORSCOPE;
-    products
+fn hash_revision_for_frontend(revision: &str) -> u64 {
+    // Tauri transports this frame id through JavaScript, whose exact integer
+    // range ends at 2^53 - 1. Keep the full graph revision string in the
+    // operation identity authoritative and bound this ancillary digest to the
+    // wire contract so the analytics receipt cannot be rejected by the
+    // frontend schema.
+    hash_revision(revision) & ((1_u64 << 53) - 1)
+}
+
+fn requested_products(compute_waveform: bool) -> Option<AnalyticsProducts> {
+    compute_waveform.then_some(
+        AnalyticsProducts::HISTOGRAM
+            | AnalyticsProducts::GAMUT_MASK
+            | AnalyticsProducts::WAVEFORM
+            | AnalyticsProducts::PARADE
+            | AnalyticsProducts::VECTORSCOPE,
+    )
 }
 
 pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8>, String> {
@@ -433,15 +442,20 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         retouched_processing_image.as_ref(),
         final_revision,
     );
-    let analytics_config = Some(AnalyticsConfig {
+    // Only a preview explicitly requesting visible analytics may enter the
+    // single-current analytics scheduler. Background/hidden-scope previews
+    // must not supersede the receipt for the frame the user is inspecting.
+    let analytics_config = requested_products(compute_waveform).map(|products| AnalyticsConfig {
         path: loaded_image.path.clone(),
         frame_id: AnalyticsFrameId {
             image_session: preview_id.image_session,
             preview_generation: preview_id.generation,
-            graph_revision: viewer_sample_graph_revision.map(hash_revision).unwrap_or(0),
+            graph_revision: viewer_sample_graph_revision
+                .map(hash_revision_for_frontend)
+                .unwrap_or(0),
         },
         preview_operation_identity: preview_operation_identity.clone(),
-        products: requested_products(compute_waveform),
+        products,
         service: Arc::clone(state.render().analytics()),
     });
 
@@ -947,16 +961,31 @@ mod tests {
 
     #[test]
     fn visible_scopes_request_every_product_from_one_rendered_frame() {
-        let products = requested_products(true);
+        let products = requested_products(true).expect("visible scope request");
         assert!(products.contains(AnalyticsProducts::HISTOGRAM));
         assert!(products.contains(AnalyticsProducts::GAMUT_MASK));
         assert!(products.contains(AnalyticsProducts::WAVEFORM));
         assert!(products.contains(AnalyticsProducts::PARADE));
         assert!(products.contains(AnalyticsProducts::VECTORSCOPE));
-        assert_eq!(
-            requested_products(false),
-            AnalyticsProducts::HISTOGRAM | AnalyticsProducts::GAMUT_MASK
+        assert_eq!(requested_products(false), None);
+    }
+
+    #[test]
+    fn analytics_frame_revision_digest_stays_in_javascript_safe_integer_range() {
+        const JAVASCRIPT_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+        let revisions = (0..32)
+            .map(|index| format!("current-edit-graph-{index}"))
+            .collect::<Vec<_>>();
+
+        assert!(
+            revisions
+                .iter()
+                .any(|revision| hash_revision(revision) > JAVASCRIPT_MAX_SAFE_INTEGER),
+            "fixture set must cover the rejected pre-fix wire value"
         );
+        assert!(revisions.iter().all(|revision| {
+            hash_revision_for_frontend(revision) <= JAVASCRIPT_MAX_SAFE_INTEGER
+        }));
     }
 
     #[test]
