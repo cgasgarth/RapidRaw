@@ -1,10 +1,16 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["esnext"],
+    "jsx": "react-jsx",
+    "lib": ["dom", "esnext"],
     "rootDir": "../../..",
     "types": ["bun"]
   },
-  "include": ["./*.test.ts", "../validation-dag.test.ts"],
+  "include": [
+    "./*.test.ts",
+    "../validation-dag.test.ts",
+    "../edit-document/source-layer-authority.test.ts",
+    "../edit-document/owned-node-migrations.test.ts"
+  ],
   "exclude": ["../../../node_modules"]
 }
