@@ -74,8 +74,8 @@ test('render document preserves source authority while honoring patch residency'
 
   expect(snapshot.editDocumentV2.sourceArtifacts.aiPatches[0]?.patchData).toEqual({ pixels: 'large' });
   expect(renderDocument.sourceArtifacts.aiPatches[0]?.patchData).toBeNull();
-  expect(renderDocument.nodes.source_artifacts?.params).toEqual(renderDocument.sourceArtifacts);
-  expect(renderDocument.nodes.source_artifacts?.params).not.toHaveProperty('referenceMatchApplicationReceipt');
+  expect(renderDocument.nodes['source_artifacts']?.params).toEqual(renderDocument.sourceArtifacts);
+  expect(renderDocument.nodes['source_artifacts']?.params).not.toHaveProperty('referenceMatchApplicationReceipt');
 });
 
 test('prepared payload cache is revision-keyed, ROI-independent, bounded, and session-safe', () => {
