@@ -9,6 +9,8 @@ use std::sync::atomic::AtomicBool;
 
 use half::f16;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Luma};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 
 use crate::AppState;
@@ -1034,6 +1036,93 @@ pub struct RenderRequest<'a> {
     pub edit_graph: EditGraphExecutionAuthority,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GpuPostFilmTapReceiptV1 {
+    pub contract: &'static str,
+    pub backend: &'static str,
+    pub post_film_sha256: String,
+    pub compiled_profile_sha256: String,
+    pub execution_plan_sha256: String,
+    pub compiled_edit_graph_fingerprint: u64,
+    pub execution_abi_fingerprint: u64,
+    pub wgpu_execution_fingerprint: u64,
+    pub graph_fingerprint: u64,
+    pub phase_dispatch_count: u32,
+    pub implementation_id: &'static str,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct GpuPostFilmTapIdentityV1 {
+    compiled_profile_sha256: String,
+    compiled_edit_graph_fingerprint: u64,
+    execution_abi_fingerprint: u64,
+}
+
+struct GpuRunOptions {
+    skip_cpu_readback: bool,
+    output_to_display: bool,
+    post_film_tap: Option<GpuPostFilmTapIdentityV1>,
+}
+
+struct GpuRunOutput {
+    pixels: Vec<u8>,
+    width: u32,
+    height: u32,
+    x: u32,
+    y: u32,
+    post_film_tap: Option<GpuPostFilmTapReceiptV1>,
+}
+
+fn sha256_parts(contract: &[u8], parts: &[&[u8]]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(contract);
+    for part in parts {
+        hasher.update((part.len() as u64).to_le_bytes());
+        hasher.update(part);
+    }
+    format!("sha256:{}", hex::encode(hasher.finalize()))
+}
+
+fn post_film_tap_identity(
+    graph: &crate::edit_graph::CompiledEditGraph,
+    profile_content_sha256: &str,
+) -> Result<GpuPostFilmTapIdentityV1, String> {
+    let film = graph
+        .film_emulation()
+        .filter(|film| film.enabled)
+        .ok_or_else(|| "film_runtime_proof_compiled_film_node_missing".to_string())?;
+    if !profile_content_sha256
+        .strip_prefix("sha256:")
+        .is_some_and(|digest| {
+            digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+    {
+        return Err("film_runtime_proof_profile_identity_invalid".to_string());
+    }
+    if profile_content_sha256 != crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256 {
+        return Err("film_runtime_proof_profile_identity_mismatch".to_string());
+    }
+    let compiled_edit_graph_fingerprint = graph.fingerprint;
+    let execution_abi_fingerprint = graph.execution_abi_fingerprint;
+    let compiled_profile_sha256 = sha256_parts(
+        b"rapidraw.compiled-film-profile.v1",
+        &[
+            profile_content_sha256.as_bytes(),
+            &[u8::from(film.enabled)],
+            &film.mix.to_le_bytes(),
+            &film.shaper_p.to_le_bytes(),
+            &film.grain_amount.to_le_bytes(),
+            b"film_emulation_wgsl_v1",
+        ],
+    );
+    Ok(GpuPostFilmTapIdentityV1 {
+        compiled_profile_sha256,
+        compiled_edit_graph_fingerprint,
+        execution_abi_fingerprint,
+    })
+}
+
 pub enum EditGraphExecutionAuthority {
     Compiled(Arc<crate::edit_graph::CompiledEditGraph>),
     #[cfg(all(test, feature = "tauri-test"))]
@@ -1777,9 +1866,13 @@ impl GpuProcessor {
         width: u32,
         height: u32,
         request: RenderRequest,
-        skip_cpu_readback: bool,
-        output_to_display: bool,
-    ) -> Result<(Vec<u8>, u32, u32, u32, u32), String> {
+        options: GpuRunOptions,
+    ) -> Result<GpuRunOutput, String> {
+        let GpuRunOptions {
+            skip_cpu_readback,
+            output_to_display,
+            post_film_tap: capture_post_film,
+        } = options;
         let execution_started = Instant::now();
         let frame_identity = GpuFrameIdentity {
             source_revision: input.identity.pixels.source_revision,
@@ -2038,6 +2131,9 @@ impl GpuProcessor {
                 )
             },
         );
+        if capture_post_film.is_some() && !split_scene_view_display {
+            return Err("film_runtime_proof_requires_split_scene_view_display".to_string());
+        }
         let shader_execution_phases = if split_scene_view_display {
             let groups = wgpu_runtime
                 .as_ref()
@@ -2163,6 +2259,9 @@ impl GpuProcessor {
                 (out_width * out_height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize
             }
         ];
+        let mut post_film_pixels = capture_post_film
+            .as_ref()
+            .map(|_| vec![0_u8; (out_width * out_height * GPU_OUTPUT_BYTES_PER_PIXEL) as usize]);
         let mut cpu_encode_time = Duration::ZERO;
         let mut command_buffer_count = 0_u32;
         let mut phase_dispatch_count = 0_u32;
@@ -2740,6 +2839,32 @@ impl GpuProcessor {
                 cpu_encode_time += encode_started.elapsed();
 
                 if !skip_cpu_readback {
+                    if let Some(post_film_pixels) = post_film_pixels.as_mut() {
+                        let post_film_tile_data = read_texture_data_roi_with_bytes_per_pixel(
+                            device,
+                            queue,
+                            &self.working_texture,
+                            wgpu::Origin3d::ZERO,
+                            input_texture_size,
+                            GPU_OUTPUT_BYTES_PER_PIXEL,
+                        )?;
+                        for row in 0..tile_height {
+                            let final_y = y_start + row - bounds.y;
+                            let final_x = x_start - bounds.x;
+                            let final_row_offset = (final_y * out_width + final_x) as usize
+                                * GPU_OUTPUT_BYTES_PER_PIXEL as usize;
+                            let source_y = crop_y_start + row;
+                            let source_row_offset = (source_y * input_width + crop_x_start)
+                                as usize
+                                * GPU_OUTPUT_BYTES_PER_PIXEL as usize;
+                            let copy_bytes = (tile_width * GPU_OUTPUT_BYTES_PER_PIXEL) as usize;
+                            post_film_pixels[final_row_offset..final_row_offset + copy_bytes]
+                                .copy_from_slice(
+                                    &post_film_tile_data
+                                        [source_row_offset..source_row_offset + copy_bytes],
+                                );
+                        }
+                    }
                     let processed_tile_data = read_texture_data_roi_with_bytes_per_pixel(
                         device,
                         queue,
@@ -2833,9 +2958,47 @@ impl GpuProcessor {
         };
         self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
         log::debug!("GPU execution receipt: {receipt:?}");
-        self.resources.lock().unwrap().last_execution_receipt = Some(receipt);
 
-        Ok((final_pixels, out_width, out_height, bounds.x, bounds.y))
+        let post_film_receipt =
+            capture_post_film
+                .zip(post_film_pixels)
+                .map(|(identity, pixels)| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(&pixels);
+                    let execution_plan_sha256 = sha256_parts(
+                        b"rapidraw.wgpu-film-execution-plan.v1",
+                        &[
+                            identity.compiled_profile_sha256.as_bytes(),
+                            &identity.compiled_edit_graph_fingerprint.to_le_bytes(),
+                            &identity.execution_abi_fingerprint.to_le_bytes(),
+                            &graph.wgpu_execution_fingerprint.to_le_bytes(),
+                            &graph.fingerprint.to_le_bytes(),
+                            b"film_emulation_wgsl_v1",
+                        ],
+                    );
+                    GpuPostFilmTapReceiptV1 {
+                        contract: "rapidraw.gpu_post_film_tap.v1",
+                        backend: "gpu",
+                        post_film_sha256: format!("sha256:{}", hex::encode(hasher.finalize())),
+                        compiled_profile_sha256: identity.compiled_profile_sha256,
+                        execution_plan_sha256,
+                        compiled_edit_graph_fingerprint: identity.compiled_edit_graph_fingerprint,
+                        execution_abi_fingerprint: identity.execution_abi_fingerprint,
+                        wgpu_execution_fingerprint: graph.wgpu_execution_fingerprint,
+                        graph_fingerprint: graph.fingerprint,
+                        phase_dispatch_count,
+                        implementation_id: "film_emulation_wgsl_v1",
+                    }
+                });
+
+        Ok(GpuRunOutput {
+            pixels: final_pixels,
+            width: out_width,
+            height: out_height,
+            x: bounds.x,
+            y: bounds.y,
+            post_film_tap: post_film_receipt,
+        })
     }
 }
 
@@ -3096,6 +3259,77 @@ mod blur_pass_tests {
             edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
         };
         assert_eq!(validate_edit_graph_request(&request), Ok(()));
+    }
+
+    #[test]
+    fn post_film_tap_identity_binds_governed_profile_and_compiled_graph() {
+        let film = |mix| {
+            serde_json::json!({
+                "rawEngineEditGraphVersion": 2,
+                "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json(),
+                "filmEmulation": {
+                    "nodeType": "film_emulation",
+                    "contractVersion": 1,
+                    "enabled": true,
+                    "profileRef": {
+                        "id": "rapidraw.reference_film.v1",
+                        "version": "1",
+                        "contentSha256": crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256
+                    },
+                    "mix": mix,
+                    "workingSpace": "acescg_linear_v1",
+                    "seedPolicy": "source_stable_v1"
+                }
+            })
+        };
+        let compile = |adjustments: serde_json::Value, generation| {
+            let revision = crate::render_plan::content_revision(&adjustments, 1, 2, generation);
+            crate::render_plan::compile_render_plan(
+                &adjustments,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision,
+                    is_raw: true,
+                    tonemapper_override: None,
+                },
+                None,
+            )
+            .unwrap()
+        };
+        let first = compile(film(0.7), 1);
+        let repeat = compile(film(0.7), 1);
+        let changed = compile(film(0.8), 2);
+        let first_identity = post_film_tap_identity(
+            &first.edit_graph,
+            crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256,
+        )
+        .unwrap();
+        let repeat_identity = post_film_tap_identity(
+            &repeat.edit_graph,
+            crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256,
+        )
+        .unwrap();
+        let changed_identity = post_film_tap_identity(
+            &changed.edit_graph,
+            crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256,
+        )
+        .unwrap();
+        assert_eq!(
+            first_identity.compiled_profile_sha256,
+            repeat_identity.compiled_profile_sha256
+        );
+        assert_ne!(
+            first_identity.compiled_profile_sha256,
+            changed_identity.compiled_profile_sha256
+        );
+        assert_eq!(
+            post_film_tap_identity(&first.edit_graph, "sha256:stale"),
+            Err("film_runtime_proof_profile_identity_invalid".to_string())
+        );
+        let wrong_profile = format!("sha256:{}", "a".repeat(64));
+        assert_eq!(
+            post_film_tap_identity(&first.edit_graph, &wrong_profile),
+            Err("film_runtime_proof_profile_identity_mismatch".to_string())
+        );
     }
 
     #[test]
@@ -5364,7 +5598,9 @@ pub fn process_and_get_dynamic_image(
         None,
         None,
         false,
+        None,
     )
+    .map(|(image, _)| image)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5388,7 +5624,47 @@ pub fn process_and_get_unclamped_dynamic_image(
         None,
         None,
         true,
+        None,
     )
+    .map(|(image, _)| image)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn process_and_get_unclamped_dynamic_image_with_film_tap(
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    base_image: &DynamicImage,
+    pre_gpu_identity: PreGpuImageIdentity,
+    request: RenderRequest,
+    caller_id: &str,
+    profile_content_sha256: &str,
+) -> Result<(DynamicImage, GpuPostFilmTapReceiptV1), String> {
+    let capture_identity = match &request.edit_graph {
+        EditGraphExecutionAuthority::Compiled(graph) => {
+            post_film_tap_identity(graph, profile_content_sha256)?
+        }
+        #[cfg(all(test, feature = "tauri-test"))]
+        EditGraphExecutionAuthority::TestOnlyLegacy => {
+            return Err("film_runtime_proof_compiled_film_node_missing".to_string());
+        }
+    };
+    let (image, receipt) = process_and_get_dynamic_image_inner(
+        context,
+        state,
+        base_image,
+        pre_gpu_identity,
+        request,
+        caller_id,
+        false,
+        None,
+        None,
+        None,
+        true,
+        Some(capture_identity),
+    )?;
+    receipt
+        .map(|receipt| (image, receipt))
+        .ok_or_else(|| "film_runtime_proof_missing_production_gpu_tap".to_string())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5416,7 +5692,9 @@ pub fn process_and_get_dynamic_image_with_analytics(
         presentation_is_current,
         analytics_config,
         false,
+        None,
     )
+    .map(|(image, _)| image)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5432,7 +5710,8 @@ fn process_and_get_dynamic_image_inner(
     presentation_is_current: Option<&dyn Fn() -> bool>,
     analytics_config: Option<crate::AnalyticsConfig>,
     preserve_unclamped_float_readback: bool,
-) -> Result<DynamicImage, String> {
+    capture_post_film: Option<GpuPostFilmTapIdentityV1>,
+) -> Result<(DynamicImage, Option<GpuPostFilmTapReceiptV1>), String> {
     let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
     let device = &context.device;
@@ -5448,6 +5727,9 @@ fn process_and_get_dynamic_image_inner(
     let max_dim = context.limits.max_texture_dimension_2d;
     validate_edit_graph_request(&request)?;
     if width > max_dim || height > max_dim {
+        if capture_post_film.is_some() {
+            return Err("film_runtime_proof_gpu_dimensions_unsupported".to_string());
+        }
         log::warn!(
             "Image dimensions ({}x{}) exceed GPU limits ({}); executing the compiled CPU reference graph",
             width,
@@ -5470,6 +5752,7 @@ fn process_and_get_dynamic_image_inner(
             request.lut.as_deref(),
             edit_graph,
         )
+        .map(|image| (image, None))
         .map_err(str::to_owned);
     }
 
@@ -5649,7 +5932,7 @@ fn process_and_get_dynamic_image_inner(
         .begin(frame_identity)
         .map_err(|error| error.to_string())?;
 
-    let (processed_pixels, out_w, out_h, out_x, out_y) = processor.run(
+    let run_output = processor.run(
         InputTextureRef {
             view: &cache.texture_view,
             identity: cache.pre_gpu_identity,
@@ -5659,9 +5942,20 @@ fn process_and_get_dynamic_image_inner(
         cache.width,
         cache.height,
         request,
-        skip_readback,
-        output_to_display,
+        GpuRunOptions {
+            skip_cpu_readback: skip_readback,
+            output_to_display,
+            post_film_tap: capture_post_film,
+        },
     )?;
+    let GpuRunOutput {
+        pixels: processed_pixels,
+        width: out_w,
+        height: out_h,
+        x: out_x,
+        y: out_y,
+        post_film_tap: post_film_receipt,
+    } = run_output;
     if !execution_lease.is_current(execution_orchestrator.runtime(), frame_identity) {
         return Err("GPU execution lease became stale before publication".to_string());
     }
@@ -5862,7 +6156,7 @@ fn process_and_get_dynamic_image_inner(
             duration,
             fps
         );
-        return Ok(DynamicImage::new_rgba8(0, 0));
+        return Ok((DynamicImage::new_rgba8(0, 0), None));
     }
 
     let duration = start_time.elapsed();
@@ -5882,9 +6176,10 @@ fn process_and_get_dynamic_image_inner(
         return Err("GPU processing lease became stale before readback publication".into());
     }
 
-    if preserve_unclamped_float_readback {
+    let image = if preserve_unclamped_float_readback {
         rgba16float_readback_to_unclamped_dynamic_image(out_w, out_h, processed_pixels)
     } else {
         rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
-    }
+    }?;
+    Ok((image, post_film_receipt))
 }
