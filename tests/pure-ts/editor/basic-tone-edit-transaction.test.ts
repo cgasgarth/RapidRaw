@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import {
+  editDocumentColorPresenceV2Schema,
+  sceneGlobalColorToneParamsV2Schema,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { BasicAdjustment, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -63,8 +67,11 @@ describe('basic tone edit transaction', () => {
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes.geometry).toEqual(result.beforeEditDocumentV2.nodes.geometry);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone.params.exposure).toBe(0.65);
+    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
+    expect(
+      sceneGlobalColorToneParamsV2Schema.parse(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params)
+        .exposure,
+    ).toBe(0.65);
     expect(result.invalidatedStages).not.toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -126,7 +133,7 @@ describe('basic tone edit transaction', () => {
 
   test('commits Color Presence as one persistent node across reopen and Undo/Redo', () => {
     const state = useEditorStore.getState();
-    const beforeGeometry = state.editDocumentV2.nodes.geometry;
+    const beforeGeometry = state.editDocumentV2.nodes['geometry'];
     const next = { ...state.adjustmentSnapshot.value, hue: 32, vibrance: 44 };
     const operations = buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, next);
     expect(operations).toEqual([
@@ -146,29 +153,39 @@ describe('basic tone edit transaction', () => {
       source: 'manual-control',
       transactionId: 'color-presence',
     });
-    expect(result.afterEditDocumentV2.nodes.color_presence.params).toMatchObject({
+    expect(
+      editDocumentColorPresenceV2Schema.parse(result.afterEditDocumentV2.nodes['color_presence']?.params),
+    ).toMatchObject({
       hue: 32,
       saturation: 0,
       vibrance: 44,
     });
-    expect(result.afterEditDocumentV2.nodes.geometry).toBe(beforeGeometry);
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hue');
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('vibrance');
+    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(beforeGeometry);
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('hue');
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('vibrance');
     const reopened = hydrateImageOpenEditDocumentV2(
       { adjustments: structuredClone(result.after), editDocumentV2: structuredClone(result.afterEditDocumentV2) },
       structuredClone(result.after),
     );
-    expect(reopened.nodes.color_presence.params).toMatchObject({ hue: 32, saturation: 0, vibrance: 44 });
+    expect(editDocumentColorPresenceV2Schema.parse(reopened.nodes['color_presence']?.params)).toMatchObject({
+      hue: 32,
+      saturation: 0,
+      vibrance: 44,
+    });
     expect(result.applicationReceipt).toMatchObject({ adjustmentRevision: 1, persistence: 'commit' });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.color_presence.params).toMatchObject({
+    expect(
+      editDocumentColorPresenceV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['color_presence']?.params),
+    ).toMatchObject({
       hue: 0,
       saturation: 0,
       vibrance: 0,
     });
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.color_presence.params).toMatchObject({
+    expect(
+      editDocumentColorPresenceV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['color_presence']?.params),
+    ).toMatchObject({
       hue: 32,
       saturation: 0,
       vibrance: 44,
