@@ -34,10 +34,13 @@ interface RunMainCommandOptions {
   command: readonly string[];
   context: MainCommandContext;
   pollIntervalMs?: number;
+  remoteCheckTimeoutMs?: number;
   readRemoteMainSha?: () => Promise<string | null>;
   spawnCommand?: (command: readonly string[]) => SupervisedChild;
   stopChild?: (child: SupervisedChild) => Promise<void>;
 }
+
+const DEFAULT_REMOTE_CHECK_TIMEOUT_MS = 10_000;
 
 const environment = (name: string): string | undefined => {
   const value = Reflect.get(process.env, name);
@@ -51,20 +54,6 @@ export const parseCommandArguments = (args: readonly string[]): string[] => {
   const separator = args.indexOf('--');
   return separator < 0 ? [...args] : args.slice(separator + 1);
 };
-
-export async function readOriginMainSha(): Promise<string | null> {
-  const child = Bun.spawn(['git', 'ls-remote', '--exit-code', 'origin', 'refs/heads/main'], {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  });
-  const [exitCode, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
-  if (exitCode !== 0) return null;
-  const sha = stdout.trim().split(/\s+/u)[0];
-  return typeof sha === 'string' && /^[a-f\d]{40}$/u.test(sha) ? sha : null;
-}
-
-const spawnCommand = (command: readonly string[]): SupervisedChild =>
-  Bun.spawn([...command], { detached: true, stderr: 'inherit', stdout: 'inherit' });
 
 async function waitForChildOrPoll(child: SupervisedChild, pollIntervalMs: number): Promise<'exited' | 'poll'> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -80,6 +69,39 @@ async function waitForChildOrPoll(child: SupervisedChild, pollIntervalMs: number
   }
 }
 
+export async function readOriginMainSha(timeoutMs = DEFAULT_REMOTE_CHECK_TIMEOUT_MS): Promise<string | null> {
+  const child = Bun.spawn(['git', 'ls-remote', '--exit-code', 'origin', 'refs/heads/main'], {
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+  if ((await waitForChildOrPoll(child, timeoutMs)) === 'poll') child.kill('SIGTERM');
+  const [exitCode, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+  if (exitCode !== 0) return null;
+  const sha = stdout.trim().split(/\s+/u)[0];
+  return typeof sha === 'string' && /^[a-f\d]{40}$/u.test(sha) ? sha : null;
+}
+
+const spawnCommand = (command: readonly string[]): SupervisedChild =>
+  Bun.spawn([...command], { detached: true, stderr: 'inherit', stdout: 'inherit' });
+
+async function readRemoteMainShaWithin(
+  readRemoteMainSha: () => Promise<string | null>,
+  timeoutMs: number,
+): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readRemoteMainSha(),
+      new Promise<null>((resolveTimeout) => {
+        timer = setTimeout(() => resolveTimeout(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 async function stopProcessGroup(child: SupervisedChild): Promise<void> {
   if (child.exitCode !== null) return;
   try {
@@ -87,7 +109,7 @@ async function stopProcessGroup(child: SupervisedChild): Promise<void> {
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) child.kill('SIGTERM');
   }
-  const stopped = await Promise.race([child.exited.then(() => true), Bun.sleep(5_000).then(() => false)]);
+  const stopped = (await waitForChildOrPoll(child, 5_000)) === 'exited';
   if (stopped || child.exitCode !== null) return;
   try {
     process.kill(-child.pid, 'SIGKILL');
@@ -101,6 +123,7 @@ export async function runLatestMainCommand({
   command,
   context,
   pollIntervalMs = 60_000,
+  remoteCheckTimeoutMs = DEFAULT_REMOTE_CHECK_TIMEOUT_MS,
   readRemoteMainSha = readOriginMainSha,
   spawnCommand: startChild = spawnCommand,
   stopChild = stopProcessGroup,
@@ -114,7 +137,7 @@ export async function runLatestMainCommand({
     if (!monitored) return false;
     let remoteSha: string | null;
     try {
-      remoteSha = await readRemoteMainSha();
+      remoteSha = await readRemoteMainShaWithin(readRemoteMainSha, remoteCheckTimeoutMs);
     } catch {
       remoteCheckFailures += 1;
       return false;
@@ -181,6 +204,10 @@ async function writeReceipt(receipt: MainCommandReceipt): Promise<void> {
   if (summaryPath !== undefined) {
     const summary = `### Main command supersession\n- Status: \`${receipt.status}\`\n- Run SHA: \`${receipt.runSha ?? 'n/a'}\`\n- Observed main: \`${receipt.observedMainSha ?? 'unknown'}\`\n`;
     await appendFile(summaryPath, summary);
+  }
+  const outputPath = environment('GITHUB_OUTPUT');
+  if (outputPath !== undefined) {
+    await appendFile(outputPath, `run-command=${receipt.status === 'superseded' ? 'false' : 'true'}\n`);
   }
 }
 
