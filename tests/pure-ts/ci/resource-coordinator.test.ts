@@ -877,8 +877,9 @@ await lease.release();`,
     );
     const killed = directLease(
       root,
-      `const lease=await acquireResourceLease({resource:'native-heavy',label:'killed-waiter'});await lease.release();`,
+      `const lease=await acquireResourceLease({resource:'native-heavy',label:'killed-waiter',onQueued:()=>process.kill(process.pid,'SIGKILL')});await lease.release();`,
     );
+    await killed.exited;
     await waitFor(async () => (await queuedLabels(root)).includes('killed-waiter'), 'killed waiter never queued');
     const follower = directLease(
       root,
@@ -891,8 +892,6 @@ await lease.release();`,
       'live follower never queued',
       10_000,
     );
-    killed.kill('SIGKILL');
-    await killed.exited;
     await writeFile(releaseHolder, 'release\n');
     expect(await holder.exited).toBe(0);
     expect(await follower.exited).toBe(0);

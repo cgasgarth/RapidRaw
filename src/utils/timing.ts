@@ -72,6 +72,13 @@ export function throttle<TArgs extends Array<unknown>>(
   };
 
   const throttled = ((...args: TArgs) => {
+    // A scheduled trailing call owns the current throttle window even if the
+    // event loop was paused past its nominal deadline. Preserve its timer and
+    // only replace the pending arguments with the latest call.
+    if (timer !== null) {
+      pendingArgs = args;
+      return;
+    }
     const remainingMs = waitMs - (Date.now() - lastInvokeAt);
 
     if (remainingMs <= 0 || lastInvokeAt === 0) {
@@ -81,9 +88,7 @@ export function throttle<TArgs extends Array<unknown>>(
     }
 
     pendingArgs = args;
-    if (timer === null) {
-      timer = setTimeout(flush, remainingMs);
-    }
+    timer = setTimeout(flush, remainingMs);
   }) as ThrottledFunction<TArgs>;
 
   throttled.cancel = cancel;

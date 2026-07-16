@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { isolatedGitEnvironment } from '../../../scripts/lib/ci/git-environment';
 
 const temporaryRoots: string[] = [];
+const gitExecutable = Bun.which('git');
+if (gitExecutable === null) throw new Error('Git is required for isolated repository proofs.');
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
@@ -25,7 +27,9 @@ test('synthetic repositories cannot inherit a global fsmonitor process hook', as
   await Bun.write(join(repository, '.keep'), 'fixture\n');
 
   const environment = isolatedGitEnvironment({ ...process.env, HOME: home });
-  expect(Bun.spawnSync(['git', 'init', '--quiet'], { cwd: repository, env: environment }).exitCode).toBe(0);
-  expect(Bun.spawnSync(['git', 'status', '--porcelain=v1'], { cwd: repository, env: environment }).exitCode).toBe(0);
+  expect(Bun.spawnSync([gitExecutable, 'init', '--quiet'], { cwd: repository, env: environment }).exitCode).toBe(0);
+  expect(
+    Bun.spawnSync([gitExecutable, 'status', '--porcelain=v1'], { cwd: repository, env: environment }).exitCode,
+  ).toBe(0);
   expect(await Bun.file(marker).exists()).toBeFalse();
 });

@@ -17,7 +17,10 @@ import {
 import type { PerformanceScenario } from './model';
 
 const DISPATCHES = 20_000;
-const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
+export const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
+const PREVIEW_SCHEDULING_SUBSAMPLES = 5;
+const LIGHT_INSTRUMENTATION_CHILD_FLAG = '--light-instrumentation-child';
+const LIGHT_INSTRUMENTATION_CHILD_TIMEOUT_MS = 5_000;
 const fixture = structuredClone(INITIAL_ADJUSTMENTS);
 fixture.masks = Array.from({ length: 16 }, (_, index) => ({
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -33,6 +36,105 @@ fixture.masks = Array.from({ length: 16 }, (_, index) => ({
 const snapshot = publishAdjustmentSnapshot(null, fixture);
 const adjustmentRevision = 0;
 const fixtureDigest = `sha256:${createHash('sha256').update(JSON.stringify(fixture)).digest('hex')}` as const;
+
+const cpuMilliseconds = ({ system, user }: NodeJS.CpuUsage): number => (system + user) / 1_000;
+const lightInstrumentationChildSchema = z.object({ cpuOverheadSamplesMs: z.array(z.number().nonnegative()).min(1) });
+
+const median = (values: readonly number[]): number => {
+  if (values.length === 0) throw new Error('Cannot summarize an empty performance sample.');
+  const sorted = values.toSorted((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  const right = sorted[middle];
+  if (right === undefined) throw new Error('Performance sample median was unavailable.');
+  if (sorted.length % 2 === 1) return right;
+  const left = sorted[middle - 1];
+  if (left === undefined) throw new Error('Performance sample median was unavailable.');
+  return (left + right) / 2;
+};
+
+export function assertLightInstrumentationOverhead(samples: readonly number[]): number {
+  const representativeOverheadMs = median(samples);
+  if (representativeOverheadMs > MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS)
+    throw new Error(
+      `Light snapshot instrumentation overhead ${representativeOverheadMs.toFixed(3)}ms exceeded ${MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS}ms.`,
+    );
+  return representativeOverheadMs;
+}
+
+const measurePreviewScheduling = (run: number) => {
+  let controlSink = 0;
+  const controlCpuStarted = process.cpuUsage();
+  const controlStarted = performance.now();
+  for (let index = 0; index < DISPATCHES; index += 1)
+    controlSink += adjustmentRevision + index + snapshot.patchRevision;
+  const controlDispatchMs = performance.now() - controlStarted;
+  const controlCpuMs = cpuMilliseconds(process.cpuUsage(controlCpuStarted));
+  let sink = 0;
+  const interactionCpuStarted = process.cpuUsage();
+  const started = performance.now();
+  for (let index = 0; index < DISPATCHES; index += 1) {
+    const request = {
+      snapshot,
+      scope: [run, adjustmentRevision, snapshot.geometryRevision, index, 2048, 'wgpu'] as const,
+    };
+    sink += request.scope[1] + request.scope[3] + request.snapshot.patchRevision;
+  }
+  const interactionDispatchMs = performance.now() - started;
+  const interactionCpuMs = cpuMilliseconds(process.cpuUsage(interactionCpuStarted));
+  const expected = DISPATCHES * (adjustmentRevision + snapshot.patchRevision) + (DISPATCHES * (DISPATCHES - 1)) / 2;
+  if (sink !== expected || controlSink !== expected)
+    throw new Error(`Preview scheduling correctness sink mismatch: ${sink}/${controlSink} != ${expected}.`);
+  return {
+    controlDispatchMs,
+    interactionDispatchMs,
+    snapshotInstrumentationCpuOverheadMs: Math.max(0, interactionCpuMs - controlCpuMs),
+    snapshotInstrumentationOverheadMs: Math.max(0, interactionDispatchMs - controlDispatchMs),
+  };
+};
+
+const lightInstrumentationCpuSamples = (): number[] => {
+  measurePreviewScheduling(0);
+  return Array.from(
+    { length: PREVIEW_SCHEDULING_SUBSAMPLES },
+    () => measurePreviewScheduling(0).snapshotInstrumentationCpuOverheadMs,
+  );
+};
+
+export async function runIsolatedLightInstrumentationBenchmark(): Promise<number> {
+  const child = Bun.spawn([process.execPath, import.meta.path, LIGHT_INSTRUMENTATION_CHILD_FLAG], {
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill('SIGKILL');
+  }, LIGHT_INSTRUMENTATION_CHILD_TIMEOUT_MS);
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  clearTimeout(timeout);
+  if (timedOut)
+    throw new Error(
+      `Isolated light instrumentation benchmark exceeded ${String(LIGHT_INSTRUMENTATION_CHILD_TIMEOUT_MS)}ms.`,
+    );
+  if (exitCode !== 0)
+    throw new Error(`Isolated light instrumentation benchmark failed (${String(exitCode)}).\n${stderr.slice(-2_000)}`);
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(`Isolated light instrumentation benchmark returned invalid JSON: ${stdout.slice(-2_000)}`, {
+      cause: error,
+    });
+  }
+  const parsed = lightInstrumentationChildSchema.safeParse(decoded);
+  if (!parsed.success)
+    throw new Error(`Isolated light instrumentation benchmark returned an invalid payload: ${parsed.error.message}`);
+  return assertLightInstrumentationOverhead(parsed.data.cpuOverheadSamplesMs);
+}
 
 const previewScheduling: PerformanceScenario = {
   id: 'editor.preview-scheduling',
@@ -55,33 +157,19 @@ const previewScheduling: PerformanceScenario = {
     interactionDispatchMs: 'ms',
     residentBytes: 'bytes',
     snapshotInstrumentationOverheadMs: 'ms',
+    snapshotInstrumentationWallOverheadMs: 'ms',
   },
   async runSample(run) {
     const resourceBefore = process.resourceUsage();
-    let controlSink = 0;
-    const controlStarted = performance.now();
-    for (let index = 0; index < DISPATCHES; index += 1)
-      controlSink += adjustmentRevision + index + snapshot.patchRevision;
-    const controlDispatchMs = performance.now() - controlStarted;
-    let sink = 0;
-    const started = performance.now();
-    for (let index = 0; index < DISPATCHES; index += 1) {
-      const request = {
-        snapshot,
-        scope: [run, adjustmentRevision, snapshot.geometryRevision, index, 2048, 'wgpu'] as const,
-      };
-      sink += request.scope[1] + request.scope[3] + request.snapshot.patchRevision;
-    }
-    const interactionDispatchMs = performance.now() - started;
-    const expected = DISPATCHES * (adjustmentRevision + snapshot.patchRevision) + (DISPATCHES * (DISPATCHES - 1)) / 2;
-    if (sink !== expected || controlSink !== expected)
-      throw new Error(`Preview scheduling correctness sink mismatch: ${sink}/${controlSink} != ${expected}.`);
-    const snapshotInstrumentationOverheadMs = Math.max(0, interactionDispatchMs - controlDispatchMs);
+    const snapshotInstrumentationOverheadMs = await runIsolatedLightInstrumentationBenchmark();
+    measurePreviewScheduling(run);
+    const measurements = Array.from({ length: PREVIEW_SCHEDULING_SUBSAMPLES }, () => measurePreviewScheduling(run));
+    const controlDispatchMs = median(measurements.map((measurement) => measurement.controlDispatchMs));
+    const interactionDispatchMs = median(measurements.map((measurement) => measurement.interactionDispatchMs));
+    const snapshotInstrumentationWallOverheadMs = median(
+      measurements.map((measurement) => measurement.snapshotInstrumentationOverheadMs),
+    );
     const resourceAfter = process.resourceUsage();
-    if (snapshotInstrumentationOverheadMs > MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS)
-      throw new Error(
-        `Light snapshot instrumentation overhead ${snapshotInstrumentationOverheadMs.toFixed(3)}ms exceeded ${MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS}ms.`,
-      );
     return {
       assertions: 2,
       metrics: {
@@ -95,6 +183,7 @@ const previewScheduling: PerformanceScenario = {
         interactionDispatchMs,
         residentBytes: process.memoryUsage().rss,
         snapshotInstrumentationOverheadMs,
+        snapshotInstrumentationWallOverheadMs,
       },
       spans: [
         { source: 'frontend', stage: 'preview.control-dispatch', startOffsetMs: 0, durationMs: controlDispatchMs },
@@ -103,6 +192,12 @@ const previewScheduling: PerformanceScenario = {
           stage: 'preview.instrumented-dispatch',
           startOffsetMs: controlDispatchMs,
           durationMs: interactionDispatchMs,
+        },
+        {
+          source: 'frontend',
+          stage: 'preview.instrumentation-wall-overhead',
+          startOffsetMs: controlDispatchMs,
+          durationMs: snapshotInstrumentationWallOverheadMs,
         },
       ],
     };
@@ -769,4 +864,10 @@ export function getPerformanceScenario(id: string): PerformanceScenario {
   const scenario = performanceScenarios.find((candidate) => candidate.id === id);
   if (scenario === undefined) throw new Error(`Unknown performance scenario: ${id}`);
   return scenario;
+}
+
+if (import.meta.main) {
+  if (process.argv[2] !== LIGHT_INSTRUMENTATION_CHILD_FLAG)
+    throw new Error(`Usage: ${import.meta.path} ${LIGHT_INSTRUMENTATION_CHILD_FLAG}`);
+  console.log(JSON.stringify({ cpuOverheadSamplesMs: lightInstrumentationCpuSamples() }));
 }

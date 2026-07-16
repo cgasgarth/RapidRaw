@@ -31,3 +31,22 @@ test('throttle invokes immediately and keeps the latest trailing call', async ()
   await sleep(25);
   expect(calls).toEqual(['a', 'c']);
 });
+
+test('throttle preserves a pending trailing window across event-loop delay', () => {
+  const calls: string[] = [];
+  const realNow = Date.now;
+  let now = 1_000;
+  Date.now = () => now;
+  try {
+    const throttled = throttle((value: string) => calls.push(value), 20);
+    throttled('a');
+    throttled('b');
+    now += 25;
+    throttled('c');
+    expect(calls).toEqual(['a']);
+    throttled.flush();
+    expect(calls).toEqual(['a', 'c']);
+  } finally {
+    Date.now = realNow;
+  }
+});
