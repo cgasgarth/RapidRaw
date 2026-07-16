@@ -229,7 +229,7 @@ export function LensCorrectionSession({
 
   const requestGate = useRef(createLensSessionRequestGate());
   const applySubmitted = useRef(false);
-  const detectionTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const detectionTimer = useRef<number | null>(null);
 
   const selectedExif = selectedImage?.exif as ExifData | null | undefined;
   const focalLength = useMemo(() => parseFocalLength(selectedExif), [selectedExif]);

@@ -20,7 +20,8 @@ import {
 import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 import { buildNegativeLabReopenedSavedPositiveHandoff } from '../../../src/utils/negative-lab/negativeLabSavedPositiveReopen.ts';
 
-const sourcePaths = ['/proof-roll/negative-lab/frame_001.CR3', '/proof-roll/negative-lab/frame_002.jpg'];
+const firstSourcePath = '/proof-roll/negative-lab/frame_001.CR3';
+const sourcePaths = [firstSourcePath, '/proof-roll/negative-lab/frame_002.jpg'];
 
 const buildFixture = (outputFormat: 'jpeg_proof' | 'tiff16') => {
   const frameHealthReport = buildNegativeLabFrameHealthReport({
@@ -118,6 +119,7 @@ describe('negative lab export handoff', () => {
   test('keeps source-overwrite guard behavior schema-enforced for persisted receipts', () => {
     const fixture = buildFixture('tiff16');
     const receipt = buildNegativeLabPositiveOutputReceipts(fixture).exportedPositives[0];
+    if (receipt === undefined) throw new Error('Expected a persisted positive output receipt.');
 
     expect(() =>
       negativeLabPositiveOutputReceiptSchema.parse({
@@ -157,7 +159,7 @@ describe('negative lab export handoff', () => {
               ],
               replay: { identityHash: 'fnv1a32:2f4a91bc' },
               sidecarPath: '/proof-roll/negative-lab/frame_001-Positive.jpg.rrdata',
-              sourceImageRefs: [{ imagePath: sourcePaths[0] }],
+              sourceImageRefs: [{ imagePath: firstSourcePath }],
             },
           ],
           schemaVersion: 1,
@@ -166,11 +168,10 @@ describe('negative lab export handoff', () => {
     });
 
     expect(handoff).not.toBeNull();
+    if (handoff === null) throw new Error('Expected saved positive reopen handoff.');
     expect(negativeLabSavedPositiveHandoffSchema.parse(handoff)).toEqual(handoff);
-    expect(handoff?.conversionBundlePath).toBe(
-      '/proof-roll/negative-lab/frame_001-Positive.jpg.conversion-bundle.json',
-    );
-    expect(handoff?.sourcePath).toBe(sourcePaths[0]);
-    expect(handoff?.path).toBe('/proof-roll/negative-lab/frame_001-Positive.jpg');
+    expect(handoff.conversionBundlePath).toBe('/proof-roll/negative-lab/frame_001-Positive.jpg.conversion-bundle.json');
+    expect(handoff.sourcePath).toBe(firstSourcePath);
+    expect(handoff.path).toBe('/proof-roll/negative-lab/frame_001-Positive.jpg');
   });
 });
