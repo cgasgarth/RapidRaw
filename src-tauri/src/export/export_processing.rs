@@ -1163,11 +1163,10 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
         js_adjustments,
         mask_bitmaps,
     );
-    let mut gpu_adjustments = render_inputs.adjustments;
-    crate::render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    crate::render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
+    let (gpu_adjustments, execution_graph) = crate::render_pipeline::bind_pre_gpu_execution(
+        &render_inputs.edit_graph,
         detail_stage.owns_legacy_global_detail,
+        render_inputs.lut.is_some(),
     );
 
     let identity = crate::gpu_processing::PreGpuImageIdentity::for_stage(
@@ -1181,9 +1180,7 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
         mask_bitmaps,
         lut: render_inputs.lut,
         roi: None,
-        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-            render_inputs.edit_graph,
-        ),
+        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(execution_graph),
     };
     if capture_film_tap {
         crate::gpu_processing::process_and_get_unclamped_dynamic_image_with_film_tap(
@@ -3339,7 +3336,12 @@ mod tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let source_id = "edit-graph-preview-export-parity.synthetic";
-        let revision = content_revision(&adjustments, 0, 17, 0);
+        let revision = content_revision(
+            &adjustments,
+            0,
+            crate::render::artifact_identity::source_fingerprint_for_path(source_id),
+            0,
+        );
         let preview_plan = compile_render_plan_cached(
             &adjustments,
             CompileRenderPlanContext {
@@ -3377,7 +3379,19 @@ mod tests {
             preview_plan.adjustments,
             Arc::clone(&preview_plan.edit_graph),
         );
+        let preview_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("preview publishes an inspectable GPU execution receipt");
         let exported = render(export_plan.adjustments, Arc::clone(&export_plan.edit_graph));
+        let export_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("export publishes an inspectable GPU execution receipt");
         assert_eq!(
             preview.to_rgba16().into_raw(),
             exported.to_rgba16().into_raw()
@@ -3390,6 +3404,19 @@ mod tests {
             export_plan.edit_graph.pipeline_version,
             crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION
         );
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            preview_plan.edit_graph.fingerprint
+        );
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            export_receipt.compiled_edit_graph_fingerprint
+        );
+        assert_eq!(
+            preview_receipt.execution_abi_fingerprint,
+            export_receipt.execution_abi_fingerprint
+        );
+        assert_ne!(preview_receipt.execution_abi_fingerprint, 0);
     }
 
     #[test]
@@ -3489,6 +3516,12 @@ mod tests {
             .expect("graph-authoritative real RAW render succeeds")
         };
         let preview = render(&current_recipe, "edit_graph_current_private_raw_preview");
+        let preview_receipt = state
+            .gpu()
+            .processing()
+            .current_processor_snapshot()
+            .and_then(|processor| processor.processor.last_execution_receipt())
+            .expect("real RAW preview publishes an inspectable GPU execution receipt");
         let export = render(&current_recipe, "edit_graph_current_private_raw_export");
         let current_receipt = state
             .gpu()
@@ -3500,12 +3533,24 @@ mod tests {
         let export_pixels = export.to_rgba16().into_raw();
         assert_eq!(preview.dimensions(), base.dimensions());
         assert_eq!(preview_pixels, export_pixels);
+        assert_eq!(
+            preview_receipt.compiled_edit_graph_fingerprint,
+            current_receipt.compiled_edit_graph_fingerprint
+        );
+        assert_eq!(
+            preview_receipt.execution_abi_fingerprint,
+            current_receipt.execution_abi_fingerprint
+        );
+        assert_ne!(current_receipt.compiled_edit_graph_fingerprint, 0);
+        assert_ne!(current_receipt.execution_abi_fingerprint, 0);
         let digest = Sha256::digest(bytemuck::cast_slice::<u16, u8>(&preview_pixels));
         println!(
-            "edit_graph_current_private_raw_proof dimensions={}x{} pipeline_version={} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
+            "edit_graph_current_private_raw_proof dimensions={}x{} pipeline_version={} compiled_graph_fingerprint={:016x} execution_abi_fingerprint={:016x} preview_export_sha256={} phase_dispatches={} command_buffers={} queue_submits={} cache_hits={} cache_misses={} cpu_encode_ms={:.3} wall_ms={:.3}",
             preview.width(),
             preview.height(),
             crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+            current_receipt.compiled_edit_graph_fingerprint,
+            current_receipt.execution_abi_fingerprint,
             hex::encode(digest),
             current_receipt.phase_dispatch_count,
             current_receipt.command_buffer_count,

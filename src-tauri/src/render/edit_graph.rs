@@ -1160,6 +1160,24 @@ impl CompiledEditGraph {
         abi
     }
 
+    /// Binds the compiled graph to the shader ABI that remains after the
+    /// production pre-GPU detail stage has consumed its full-frame controls.
+    /// The graph/node fingerprint stays render-authoritative for the complete
+    /// edit, while the execution fingerprint identifies the exact downstream
+    /// ABI and cannot alias the unsuppressed plan.
+    pub fn bind_pre_gpu_execution_abi(&self, owns_global_detail: bool, has_lut: bool) -> Self {
+        let mut bound = self.clone();
+        bound.compiled_shader_abi.global.luma_noise_reduction = 0.0;
+        bound.compiled_shader_abi.global.color_noise_reduction = 0.0;
+        if owns_global_detail {
+            bound.compiled_shader_abi.global.sharpness = 0.0;
+            bound.compiled_shader_abi.global.clarity = 0.0;
+            bound.compiled_shader_abi.global.structure = 0.0;
+        }
+        bound.execution_abi_fingerprint = gpu_execution_fingerprint(&bound.shader_abi(), has_lut);
+        bound
+    }
+
     pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
         self.nodes.iter().find_map(|node| match &node.payload {
             CompiledNodePayload::SceneCurve(curve) => Some(curve),

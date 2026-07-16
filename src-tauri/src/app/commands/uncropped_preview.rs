@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::sync::Arc;
 use std::thread;
 
 use image::{GenericImageView, ImageBuffer, Luma};
@@ -134,11 +133,10 @@ pub(crate) fn generate_uncropped_preview(
             render_adjustments,
             is_raw,
         );
-        let mut gpu_adjustments = render_plan.adjustments;
-        render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-        render_pipeline::suppress_legacy_global_detail(
-            &mut gpu_adjustments,
+        let (gpu_adjustments, execution_graph) = render_pipeline::bind_pre_gpu_execution(
+            &render_plan.edit_graph,
             detail_stage.owns_legacy_global_detail,
+            render_plan.lut.is_some(),
         );
         if let Ok(processed_image) = process_and_get_dynamic_image(
             &context,
@@ -156,7 +154,7 @@ pub(crate) fn generate_uncropped_preview(
                 lut: render_plan.lut.clone(),
                 roi: None,
                 edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    Arc::clone(&render_plan.edit_graph),
+                    execution_graph,
                 ),
             },
             "generate_uncropped_preview",

@@ -402,6 +402,8 @@ pub struct GpuExecutionReceipt {
     pub runtime_identity: Option<GpuRuntimeIdentity>,
     pub frame_identity: Option<GpuFrameIdentity>,
     pub execution_sequence: u64,
+    pub compiled_edit_graph_fingerprint: u64,
+    pub execution_abi_fingerprint: u64,
     pub graph_fingerprint: u64,
     pub stages: GpuStageFlags,
     pub blur_dispatch_count: u32,
@@ -1044,6 +1046,8 @@ struct GpuRunOptions {
     skip_cpu_readback: bool,
     output_to_display: bool,
     post_film_tap: Option<GpuPostFilmTapIdentityV1>,
+    compiled_edit_graph_fingerprint: u64,
+    execution_abi_fingerprint: u64,
 }
 
 struct GpuRunOutput {
@@ -1879,6 +1883,8 @@ impl GpuProcessor {
             skip_cpu_readback,
             output_to_display,
             post_film_tap: capture_post_film,
+            compiled_edit_graph_fingerprint,
+            execution_abi_fingerprint,
         } = options;
         let execution_started = Instant::now();
         let frame_identity = GpuFrameIdentity {
@@ -2845,6 +2851,8 @@ impl GpuProcessor {
             runtime_identity: Some(input.execution_lease.runtime()),
             frame_identity: Some(input.execution_lease.frame()),
             execution_sequence,
+            compiled_edit_graph_fingerprint,
+            execution_abi_fingerprint,
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
@@ -5717,6 +5725,13 @@ fn process_and_get_dynamic_image_inner(
 
     let max_dim = context.limits.max_texture_dimension_2d;
     validate_edit_graph_request(&request)?;
+    let (compiled_edit_graph_fingerprint, execution_abi_fingerprint) = match &request.edit_graph {
+        EditGraphExecutionAuthority::Compiled(graph) => {
+            (graph.fingerprint, graph.execution_abi_fingerprint)
+        }
+        #[cfg(all(test, feature = "tauri-test"))]
+        EditGraphExecutionAuthority::TestOnlyLegacy => (0, 0),
+    };
     if width > max_dim || height > max_dim {
         if capture_post_film.is_some() {
             return Err("film_runtime_proof_gpu_dimensions_unsupported".to_string());
@@ -5929,6 +5944,8 @@ fn process_and_get_dynamic_image_inner(
             skip_cpu_readback: skip_readback,
             output_to_display,
             post_film_tap: capture_post_film,
+            compiled_edit_graph_fingerprint,
+            execution_abi_fingerprint,
         },
     )?;
     let GpuRunOutput {
