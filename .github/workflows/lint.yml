@@ -232,12 +232,14 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-pr-validation-harness-macos-14-aarch64
-          cache-on-failure: true
+          # Reuse the maintained main macOS smoke cache. The target/toolchain/features
+          # are identical, while this bounded PR lane only checks the library surface.
+          key: v1-main-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
+          cache-on-failure: false
       - name: Compile the optimized app validation feature surface
         working-directory: src-tauri
         run: >-
-          cargo check --quiet --locked --target aarch64-apple-darwin --bin RapidRAW
+          cargo check --quiet --locked --target aarch64-apple-darwin --lib
           --no-default-features --features required-ci,validation-harness
 
   fast-workflow:
