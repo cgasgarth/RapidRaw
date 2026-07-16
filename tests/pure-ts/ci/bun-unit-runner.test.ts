@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { selectBunFailureContext } from '../../../scripts/ci/run-bun-unit';
+import { buildBunUnitCommand, selectBunFailureContext } from '../../../scripts/ci/run-bun-unit';
 
 const temporaryRoots: string[] = [];
 
@@ -20,6 +20,17 @@ test('selects the assertion and location instead of preceding worker noise', () 
   expect(context).toContain('at fixture.test.ts:3:14');
   expect(context).toContain('(fail) fails');
   expect(context).not.toContain('noise');
+});
+
+test('uses one bare Bun-native parallel command without staging or custom workers', () => {
+  expect(buildBunUnitCommand()).toEqual([
+    'bun',
+    'test',
+    '--no-orphans',
+    '--only-failures',
+    '--parallel',
+    'tests/pure-ts',
+  ]);
 });
 
 test('native parallel runner keeps an actionable failure through its compact boundary', async () => {
@@ -46,7 +57,7 @@ test('preserves the actionable assertion', () => {
 
   expect(exitCode).toBe(1);
   expect(output).toContain('bun unit failed (exit=1)');
-  expect(output).toContain('reproduce: bun test --no-orphans --only-failures --parallel --parallel-delay=100');
+  expect(output).toContain('reproduce: bun test --no-orphans --only-failures --parallel');
   expect(output).toContain('4 |   expect({ actual: 1 }).toEqual({ actual: 2 });');
   expect(output).toContain(`${fixture}:4:`);
   expect(output).toContain('(fail) preserves the actionable assertion');

@@ -3,6 +3,9 @@
 import { readFileSync } from 'node:fs';
 
 import { BUN_COVERAGE_FLOORS } from '../../../scripts/ci/check-bun-coverage.ts';
+import { buildBunCoverageCommand } from '../../../scripts/ci/run-bun-coverage.ts';
+import { buildRandomizedTestArgs } from '../../../scripts/ci/run-bun-randomized-tests.ts';
+import { buildBunUnitCommand } from '../../../scripts/ci/run-bun-unit.ts';
 import { MAIN_FRONTEND_LANES, mainFrontendClosureFailures } from '../../../scripts/ci/verify-main-frontend-closure.ts';
 
 type Step = {
@@ -82,26 +85,22 @@ if (allLaneCommands.filter((command) => command === 'bun run check:bundle').leng
   throw new Error('The production Vite bundle must be built and validated exactly once.');
 if (allLaneCommands.some((command) => command === 'bun scripts/ci/generate-vite-bundle-report.ts'))
   throw new Error('Bundle reporting must consume the report already produced by check:bundle.');
-if (packageScripts['test:unit'] !== 'bun scripts/ci/run-bun-unit.ts')
-  throw new Error('The unit lane must use the maintained actionable Bun failure boundary.');
-const unitRunner = readFileSync('scripts/ci/run-bun-unit.ts', 'utf8');
-for (const token of ["['bun', 'test'", "'--only-failures'", "'--parallel'"]) {
-  if (!unitRunner.includes(token)) throw new Error(`The Bun unit boundary lost native runner token ${token}.`);
+const unitCommand = buildBunUnitCommand();
+const coverageCommand = buildBunCoverageCommand();
+const randomizedCommand = ['bun', ...buildRandomizedTestArgs(42)];
+for (const [name, command] of [
+  ['unit', unitCommand],
+  ['coverage', coverageCommand],
+  ['randomized', randomizedCommand],
+] as const) {
+  if (!command.includes('--parallel')) throw new Error(`${name} lost Bun-native parallel scheduling.`);
+  if (command.some((argument) => /^--parallel=|^--parallel-delay=|^--shard|^--retry$/u.test(argument)))
+    throw new Error(`${name} introduced worker staging, shards, retries, or a forced worker count.`);
 }
-if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitRunner))
-  throw new Error('The Bun unit boundary introduced a scheduler, shard, or forced serial execution.');
-const coverageRunner = packageScripts['test:coverage'];
-if (
-  coverageRunner !==
-  'bun test --no-orphans --dots --parallel --parallel-delay=100 --coverage tests/pure-ts && bun scripts/ci/check-bun-coverage.ts'
-)
-  throw new Error('The coverage lane must use one CPU-sized native Bun run followed by the global LCOV gate.');
-if (/--shard|--retry|--parallel(?:=|\s+)\d|run-resource-coordinated|turbo/u.test(coverageRunner))
-  throw new Error('The coverage lane introduced shards, retries, forced worker counts, or a custom scheduler.');
-if (packageScripts['test:coverage']?.includes('turbo') || unitRunner.includes('turbo'))
-  throw new Error('Bun unit and coverage suites must not use a third-party scheduler.');
-if (packageScripts['test:randomized'] !== 'bun scripts/ci/run-bun-randomized-tests.ts')
-  throw new Error('The randomized lane must use the maintained seed-emitting Bun wrapper.');
+if (!unitCommand.includes('--only-failures')) throw new Error('The Bun unit boundary lost actionable failure output.');
+if (!coverageCommand.includes('--coverage')) throw new Error('The Bun coverage boundary lost native LCOV generation.');
+if (!randomizedCommand.some((argument) => argument === '--seed=42'))
+  throw new Error('The randomized boundary lost its reproducible seed.');
 
 const bunConfig = Bun.TOML.parse(readFileSync('bunfig.toml', 'utf8')) as {
   test?: {

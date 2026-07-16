@@ -96,7 +96,7 @@ async function socketRequest(socketPath: string, value: unknown): Promise<QaDaem
 }
 
 const spawnQaDaemon = (repository: string, worktree: string) => {
-  const child = Bun.spawn(['bun', 'scripts/qa/daemon.ts', '--worktree', worktree], {
+  const child = Bun.spawn([process.execPath, 'scripts/qa/daemon.ts', '--worktree', worktree], {
     cwd: repository,
     stdout: 'pipe',
     stderr: 'pipe',

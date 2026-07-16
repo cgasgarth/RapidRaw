@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { BUN_COVERAGE_FLOORS, enforceCoverageFloors, summarizeLcov } from '../../../scripts/ci/check-bun-coverage.ts';
+import { buildBunCoverageCommand } from '../../../scripts/ci/run-bun-coverage.ts';
 import {
   buildRandomizedTestArgs,
   DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS,
@@ -58,7 +59,6 @@ describe('Bun native confidence gates', () => {
       '--no-orphans',
       '--dots',
       '--parallel',
-      '--parallel-delay=100',
       '--bail=1',
       '--randomize',
       '--seed=424242',
@@ -68,6 +68,15 @@ describe('Bun native confidence gates', () => {
     expect(resolveRandomizedPassTimeout(undefined)).toBe(DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS);
     expect(resolveRandomizedPassTimeout('750')).toBe(750);
     expect(randomizedTestReproduction(seed)).toBe('RAWENGINE_BUN_TEST_SEED=424242 bun run test:randomized');
+    expect(buildBunCoverageCommand()).toEqual([
+      'bun',
+      'test',
+      '--no-orphans',
+      '--dots',
+      '--parallel',
+      '--coverage',
+      'tests/pure-ts',
+    ]);
   });
 
   test('fails closed when Bun native coverage misses its configured threshold', async () => {
