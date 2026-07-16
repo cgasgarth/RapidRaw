@@ -354,14 +354,15 @@ fn stop_slot(request: Option<PreviewRequest>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use tokio::sync::oneshot;
 
     fn job(interactive: bool) -> (PreviewJob, oneshot::Receiver<PreviewCompletion>) {
         let (tx, rx) = oneshot::channel();
         (
             PreviewJob {
-                adjustments: Arc::new(json!({"large": "payload"})),
+                edit_document: Arc::new(
+                    crate::adjustments::edit_document_v2::CompiledCurrentEditDocument::scheduler_test_stub(),
+                ),
                 expected_image_path: "a.raw".into(),
                 is_interactive: interactive,
                 preview_operation_identity: Box::new(

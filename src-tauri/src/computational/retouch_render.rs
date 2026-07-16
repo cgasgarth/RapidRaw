@@ -1,25 +1,25 @@
 use std::borrow::Cow;
 
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, Rgba};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RetouchLayer {
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CurrentRetouchLayer {
     #[serde(default = "default_layer_opacity")]
-    opacity: f32,
+    pub(crate) opacity: f32,
     #[serde(default)]
-    retouch_clone_source: Option<RetouchCloneSource>,
+    pub(crate) retouch_clone_source: Option<CurrentRetouchCloneSource>,
     #[serde(default)]
-    retouch_remove_source: Option<RetouchRemoveSource>,
+    pub(crate) retouch_remove_source: Option<CurrentRetouchRemoveSource>,
     #[serde(default = "default_visible")]
-    visible: bool,
+    pub(crate) visible: bool,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RetouchCloneSource {
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CurrentRetouchCloneSource {
     #[serde(default)]
     feather_radius_px: Option<f32>,
     #[serde(default)]
@@ -32,9 +32,9 @@ struct RetouchCloneSource {
     target_point: RetouchPoint,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RetouchRemoveSource {
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CurrentRetouchRemoveSource {
     #[serde(default)]
     feather_radius_px: Option<f32>,
     #[serde(default)]
@@ -43,7 +43,8 @@ struct RetouchRemoveSource {
     resolved_source_point: Option<RetouchPoint>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct RetouchPoint {
     x: f32,
     y: f32,
@@ -58,8 +59,8 @@ fn default_visible() -> bool {
 }
 
 enum RetouchOperation<'a> {
-    CloneOrHeal(&'a RetouchCloneSource),
-    Remove(&'a RetouchRemoveSource),
+    CloneOrHeal(&'a CurrentRetouchCloneSource),
+    Remove(&'a CurrentRetouchRemoveSource),
 }
 
 pub(crate) fn apply_clone_retouch_layers<'a>(
@@ -67,12 +68,20 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
     adjustments: &Value,
     mask_bitmaps: &[GrayImage],
 ) -> Cow<'a, DynamicImage> {
-    let layers: Vec<RetouchLayer> = adjustments
+    let layers: Vec<CurrentRetouchLayer> = adjustments
         .get("masks")
         .and_then(|masks| serde_json::from_value(masks.clone()).ok())
         .unwrap_or_default();
 
-    let retouch_layers: Vec<(usize, &RetouchLayer, RetouchOperation<'_>)> = layers
+    apply_typed_clone_retouch_layers(image, &layers, mask_bitmaps)
+}
+
+fn apply_typed_clone_retouch_layers<'a>(
+    image: &'a DynamicImage,
+    layers: &[CurrentRetouchLayer],
+    mask_bitmaps: &[GrayImage],
+) -> Cow<'a, DynamicImage> {
+    let retouch_layers: Vec<(usize, &CurrentRetouchLayer, RetouchOperation<'_>)> = layers
         .iter()
         .enumerate()
         .filter_map(|(index, layer)| {
@@ -163,6 +172,14 @@ pub(crate) fn apply_clone_retouch_layers<'a>(
     Cow::Owned(DynamicImage::ImageRgba32F(output))
 }
 
+pub(crate) fn apply_current_clone_retouch_layers<'a>(
+    image: &'a DynamicImage,
+    layers: &[CurrentRetouchLayer],
+    mask_bitmaps: &[GrayImage],
+) -> Cow<'a, DynamicImage> {
+    apply_typed_clone_retouch_layers(image, layers, mask_bitmaps)
+}
+
 struct RetouchPlan {
     feather_radius_px: Option<f32>,
     heal_anchors: Option<(Rgba<f32>, Rgba<f32>)>,
@@ -178,7 +195,7 @@ impl RetouchPlan {
         pixels: &ImageBuffer<Rgba<f32>, Vec<f32>>,
         width: u32,
         height: u32,
-        clone_source: &RetouchCloneSource,
+        clone_source: &CurrentRetouchCloneSource,
         should_heal: bool,
     ) -> Option<Self> {
         let source_point = normalized_point_to_pixel(&clone_source.source_point, width, height);
@@ -207,7 +224,7 @@ impl RetouchPlan {
         width: u32,
         height: u32,
         mask: Option<&GrayImage>,
-        remove_source: &RetouchRemoveSource,
+        remove_source: &CurrentRetouchRemoveSource,
     ) -> Option<Self> {
         let source_point =
             normalized_point_to_pixel(remove_source.resolved_source_point.as_ref()?, width, height);

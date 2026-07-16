@@ -63,7 +63,7 @@ pub(crate) enum WhiteBalanceInputSemanticsV1 {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum CurrentWhiteBalanceSourceV1 {
+pub(crate) enum CurrentWhiteBalanceSourceV1 {
     AsShot,
     Auto,
     Picker,
@@ -73,7 +73,7 @@ enum CurrentWhiteBalanceSourceV1 {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum CurrentWhiteBalancePresetV1 {
+pub(crate) enum CurrentWhiteBalancePresetV1 {
     Tungsten,
     Daylight,
     Flash,
@@ -83,34 +83,34 @@ enum CurrentWhiteBalancePresetV1 {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum CurrentWhiteBalanceSynchronizationModeV1 {
+pub(crate) enum CurrentWhiteBalanceSynchronizationModeV1 {
     PerImage,
     LockedReference,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CurrentWhiteBalanceSynchronizationV1 {
-    mode: CurrentWhiteBalanceSynchronizationModeV1,
-    reference_source_identity: Option<String>,
+pub(crate) struct CurrentWhiteBalanceSynchronizationV1 {
+    pub(crate) mode: CurrentWhiteBalanceSynchronizationModeV1,
+    pub(crate) reference_source_identity: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CurrentTechnicalWhiteBalanceV1 {
-    adaptation: String,
-    confidence: Option<f64>,
-    contract: String,
-    duv: f64,
-    input_semantics: WhiteBalanceInputSemanticsV1,
-    kelvin: f64,
-    mode: WhiteBalanceModeV1,
-    preset_id: Option<CurrentWhiteBalancePresetV1>,
-    sample_count: Option<u64>,
-    source: CurrentWhiteBalanceSourceV1,
-    synchronization: CurrentWhiteBalanceSynchronizationV1,
-    x: f64,
-    y: f64,
+pub(crate) struct CurrentTechnicalWhiteBalanceV1 {
+    pub(crate) adaptation: String,
+    pub(crate) confidence: Option<f64>,
+    pub(crate) contract: String,
+    pub(crate) duv: f64,
+    pub(crate) input_semantics: WhiteBalanceInputSemanticsV1,
+    pub(crate) kelvin: f64,
+    pub(crate) mode: WhiteBalanceModeV1,
+    pub(crate) preset_id: Option<CurrentWhiteBalancePresetV1>,
+    pub(crate) sample_count: Option<u64>,
+    pub(crate) source: CurrentWhiteBalanceSourceV1,
+    pub(crate) synchronization: CurrentWhiteBalanceSynchronizationV1,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
 }
 
 const CURRENT_TECHNICAL_WHITE_BALANCE_KEYS: [&str; 13] = [
@@ -154,6 +154,12 @@ pub(crate) fn compile_current_technical_white_balance(value: &Value) -> Result<W
     }
     let current = serde_json::from_value::<CurrentTechnicalWhiteBalanceV1>(value.clone())
         .map_err(|error| anyhow!("white_balance_technical_schema_invalid: {error}"))?;
+    compile_current_technical_white_balance_typed(&current)
+}
+
+pub(crate) fn compile_current_technical_white_balance_typed(
+    current: &CurrentTechnicalWhiteBalanceV1,
+) -> Result<WhiteBalancePlanV1> {
     if current.contract != WHITE_BALANCE_CONTRACT || current.adaptation != "cat16_v1" {
         return Err(anyhow!("white_balance_technical_contract_invalid"));
     }

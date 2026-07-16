@@ -97,7 +97,8 @@ impl FrontendPreviewOperationIdentity {
 }
 
 pub struct PreviewJob {
-    pub adjustments: Arc<serde_json::Value>,
+    pub(crate) edit_document:
+        Arc<crate::adjustments::edit_document_v2::CompiledCurrentEditDocument>,
     pub expected_image_path: String,
     pub is_interactive: bool,
     pub preview_operation_identity: Box<FrontendPreviewOperationIdentity>,

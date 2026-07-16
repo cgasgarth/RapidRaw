@@ -49,7 +49,16 @@ pub fn parse_denoise_render_controls(adjustments: &Value) -> DenoiseRenderContro
 }
 
 pub fn calculate_denoise_render_hash(base_hash: u64, adjustments: &Value) -> u64 {
-    let controls = parse_denoise_render_controls(adjustments);
+    calculate_denoise_render_hash_with_controls(
+        base_hash,
+        parse_denoise_render_controls(adjustments),
+    )
+}
+
+pub(crate) fn calculate_denoise_render_hash_with_controls(
+    base_hash: u64,
+    controls: DenoiseRenderControls,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
     DENOISE_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
@@ -75,7 +84,18 @@ pub fn apply_denoise_stage_for_source<'a>(
     adjustments: &Value,
     source_class: DenoiseSourceClass,
 ) -> Cow<'a, DynamicImage> {
-    let controls = parse_denoise_render_controls(adjustments);
+    apply_denoise_stage_for_source_with_controls(
+        image,
+        parse_denoise_render_controls(adjustments),
+        source_class,
+    )
+}
+
+pub(crate) fn apply_denoise_stage_for_source_with_controls<'a>(
+    image: &'a DynamicImage,
+    controls: DenoiseRenderControls,
+    source_class: DenoiseSourceClass,
+) -> Cow<'a, DynamicImage> {
     if controls.luma_strength <= f32::EPSILON && controls.chroma_strength <= f32::EPSILON {
         return Cow::Borrowed(image);
     }

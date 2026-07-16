@@ -89,6 +89,17 @@ pub fn calculate_wavelet_detail_render_hash(base_hash: u64, adjustments: &Value)
     hasher.finish()
 }
 
+pub(crate) fn calculate_current_detail_render_hash(base_hash: u64, controls: [f32; 3]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    WAVELET_RENDER_REVISION_ABI.hash(&mut hasher);
+    base_hash.hash(&mut hasher);
+    "current_multiscale_detail_v2".hash(&mut hasher);
+    controls
+        .into_iter()
+        .for_each(|value| value.to_bits().hash(&mut hasher));
+    hasher.finish()
+}
+
 pub fn apply_wavelet_detail_stage<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
@@ -136,6 +147,21 @@ pub fn apply_wavelet_detail_stage<'a>(
     Cow::Owned(output)
 }
 
+pub(crate) fn apply_current_detail_stage<'a>(
+    image: &'a DynamicImage,
+    controls: [f32; 3],
+) -> Cow<'a, DynamicImage> {
+    let Some(settings) = multiscale_settings_from_controls(controls) else {
+        return Cow::Borrowed(image);
+    };
+    let Ok(plan) = MultiscaleDetailPlanV1::compile(settings, image.width(), image.height()) else {
+        return Cow::Borrowed(image);
+    };
+    let mut output = image.clone();
+    apply_multiscale_detail(&mut output, &plan);
+    Cow::Owned(output)
+}
+
 pub fn multiscale_owns_legacy_global_detail(adjustments: &Value) -> bool {
     resolved_multiscale_settings(adjustments).is_some()
 }
@@ -167,9 +193,16 @@ fn macro_multiscale_settings(adjustments: &Value) -> Option<MultiscaleDetailSett
             .map(|value| (value as f32 / 100.0).clamp(-1.0, 1.0))
             .unwrap_or(0.0)
     };
-    let sharpness = control("sharpness");
-    let clarity = control("clarity");
-    let structure = control("structure");
+    multiscale_settings_from_controls([
+        control("sharpness"),
+        control("clarity"),
+        control("structure"),
+    ])
+}
+
+fn multiscale_settings_from_controls(
+    [sharpness, clarity, structure]: [f32; 3],
+) -> Option<MultiscaleDetailSettingsV1> {
     if sharpness.abs() <= f32::EPSILON
         && clarity.abs() <= f32::EPSILON
         && structure.abs() <= f32::EPSILON

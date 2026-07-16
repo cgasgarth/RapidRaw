@@ -2313,7 +2313,6 @@ mod tests {
             film_plan.fingerprints.color,
             neutral_plan.fingerprints.color
         );
-        assert!(film_plan.effective_json.get("filmEmulation").is_some());
     }
 
     #[cfg(feature = "tauri-test")]
