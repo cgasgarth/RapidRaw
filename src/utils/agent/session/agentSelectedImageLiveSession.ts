@@ -16,6 +16,7 @@ import {
   agentSelectedImageLifecycleRevertSchema,
   hashAgentSelectedImageLifecycleValue,
   sealAgentSelectedImageLifecyclePhase,
+  verifyAgentSelectedImageLifecycleReceipt,
 } from '../../../schemas/agent/agentSelectedImageLifecycleReceiptSchemas';
 import {
   type AgentSelectedImageProposalLineageV1,
@@ -304,10 +305,66 @@ const agentSelectedImageLiveSessionAuditRecordSchema = z
   })
   .strict();
 
+const persistedAgentSelectedImageLiveSessionReceiptSchema = agentSelectedImageLiveSessionReceiptSchema.extend({
+  afterPreviewHash: z.string().trim().min(1),
+  approvalId: z.string().trim().min(1),
+  applyGuard: selectedImageLiveSessionApplyGuardSchema,
+  applyReceipts: z.array(selectedImageLiveSessionApplyReceiptSchema).min(1),
+  dryRunApprovals: z.array(selectedImageLiveSessionDryRunApprovalSchema).min(1),
+  finalGraphHash: z.string().trim().min(1),
+  finalGraphRevision: z.string().trim().min(1),
+  finalRecipeHash: z.string().trim().min(1),
+  previewLineage: z.array(selectedImageLiveSessionPreviewLineageSchema).min(2),
+  proposalLineage: agentSelectedImageProposalLineageV1Schema,
+  rollbackCheckpoint: selectedImageLiveSessionRollbackCheckpointSchema,
+  state: z.enum(['applied', 'rolled_back']),
+  storageKey: z.string().trim().min(1),
+});
+
+const persistedAgentSelectedImageLiveSessionAuditRecordSchema = agentSelectedImageLiveSessionAuditRecordSchema
+  .extend({
+    lifecycleReceipt: agentSelectedImageLifecycleReceiptV2Schema,
+    receipt: persistedAgentSelectedImageLiveSessionReceiptSchema,
+  })
+  .superRefine((record, context) => {
+    if (record.lifecycleReceipt.sessionId !== record.receipt.sessionId) {
+      context.addIssue({ code: 'custom', message: 'Lifecycle receipt session identity does not match the audit.' });
+    }
+    if (record.lifecycleReceipt.commit?.status !== 'applied') {
+      context.addIssue({ code: 'custom', message: 'Persisted audit requires a sealed applied commit receipt.' });
+    }
+    if (record.receipt.state === 'rolled_back' && record.lifecycleReceipt.revert?.status !== 'reverted') {
+      context.addIssue({ code: 'custom', message: 'Rolled-back audit requires a sealed revert receipt.' });
+    }
+    const authoritativeProposal = record.receipt.proposalLineage.iterations.find(
+      (iteration) =>
+        iteration.proposalHash === record.lifecycleReceipt.proposal.proposalHash &&
+        iteration.proposalId === record.lifecycleReceipt.proposal.proposalId,
+    );
+    if (
+      authoritativeProposal === undefined ||
+      (record.receipt.state === 'applied' && authoritativeProposal.state !== 'applied') ||
+      (record.receipt.state === 'rolled_back' && authoritativeProposal.state !== 'reverted')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Lifecycle proposal identity does not match current audit lineage.',
+      });
+    }
+  });
+
+const agentSelectedImageLiveSessionAuditRecoverySchema = z
+  .object({
+    reason: z.enum(['corrupt_current_storage', 'unsupported_storage_version']),
+    status: z.literal('new_session_required'),
+  })
+  .strict();
+
 const agentSelectedImageLiveSessionAuditStoreSchema = z
   .object({
-    records: z.array(agentSelectedImageLiveSessionAuditRecordSchema),
-    schemaVersion: z.literal(1),
+    records: z.array(persistedAgentSelectedImageLiveSessionAuditRecordSchema),
+    recovery: agentSelectedImageLiveSessionAuditRecoverySchema.optional(),
+    schemaVersion: z.literal(2),
   })
   .strict();
 
@@ -429,6 +486,8 @@ export interface AgentSelectedImageLiveSessionAuditSummary {
   latestSessionId?: string;
   previewCount: number;
   recordCount: number;
+  recoveryReason?: 'corrupt_current_storage' | 'unsupported_storage_version';
+  recoveryStatus?: 'new_session_required';
   replayPreflightStatus: 'failed' | 'ready' | 'stale' | 'unchecked';
 }
 
@@ -553,70 +612,19 @@ const stableTranscriptHash = (value: unknown): string => {
   return `sha256:${(hash >>> 0).toString(16).padStart(16, '0')}`;
 };
 
-const stableLegacySha256 = (value: unknown): `sha256:${string}` => {
-  const shortHash = stableTranscriptHash(value).slice('sha256:'.length);
-  return `sha256:${shortHash.repeat(4)}`;
-};
-
-const upgradeLegacyDryRunToProposalLineage = (draft: AgentSelectedImageLiveSessionDraft): void => {
-  if (draft.proposalLineage.iterations.length > 0) return;
-  const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.parse(createdAt) + 5 * 60_000).toISOString();
-  const iterationId = `${draft.proposalLineage.lineageId}-iteration-1`;
-  const proposalId = `${draft.requestId}-legacy-proposal`;
-  const previewContentHash = stableLegacySha256({
-    artifactId: draft.snapshot.previewArtifactId,
-    renderHash: draft.snapshot.previewRenderHash,
-  });
-  draft.proposalLineage = addAgentSelectedImageProposalIteration(draft.proposalLineage, {
-    baseGraphRevision: draft.snapshot.graphRevision,
-    basePreviewArtifactId: draft.snapshot.previewArtifactId,
-    basePreviewContentHash: previewContentHash,
-    baseRecipeHash: draft.snapshot.recipeHash,
-    beforePreviewArtifactId: draft.snapshot.previewArtifactId,
-    beforePreviewContentHash: previewContentHash,
-    cleanupStatus: 'not_required',
-    createdAt,
-    expiresAt,
-    initiatingTurnId: `${draft.requestId}-dry-run`,
-    iterationId,
-    lineageId: draft.proposalLineage.lineageId,
-    ordinal: 1,
-    proposalHash: stableLegacySha256({ dryRunPlanHash: draft.dryRun.dryRunPlanHash, proposalId }),
-    proposalId,
-    proposalSchemaVersion: 1,
-    schemaVersion: 1,
-    selectedImageId: stableLegacySha256(draft.snapshot.selectedImagePath),
-    sessionId: draft.sessionId,
-    state: 'draft',
-    toolCalls: [{ callId: `${draft.requestId}-dry-run`, type: 'proposal_render' }],
-  });
-  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
-    draft.proposalLineage,
-    iterationId,
-    'rendering',
-    { expectedEpoch: draft.proposalLineage.epoch, now: createdAt },
-  );
-  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(draft.proposalLineage, iterationId, 'ready', {
-    expectedEpoch: draft.proposalLineage.epoch,
-    now: createdAt,
-  });
-};
-
 const getPathBasename = (path: string): string => {
   const cleanPath = path.split('?')[0] ?? path;
   return cleanPath.split(/[\\/]/u).pop() || cleanPath || 'selected-image';
 };
 
 export const buildAgentSelectedImageLiveSessionAuditStorageKey = ({
-  namespace = 'rawengine.agent.selectedImageLiveSessionAudit.v1',
   selectedImagePath,
   sessionId,
 }: {
-  namespace?: string;
   selectedImagePath: string;
   sessionId: string;
-}): string => `${namespace}.${stableTranscriptHash({ selectedImagePath, sessionId }).replace(':', '-')}`;
+}): string =>
+  `rawengine.agent.selectedImageLiveSessionAudit.v2.${stableTranscriptHash({ selectedImagePath, sessionId }).replace(':', '-')}`;
 
 const summarizePrompt = (prompt: string): string => {
   const normalized = prompt.replaceAll(/\s+/gu, ' ').trim();
@@ -864,62 +872,98 @@ export const validateAgentSelectedImageApplyToolEnvelope = ({
   };
 };
 
-export const parseAgentSelectedImageLiveSessionAuditStore = (
+export const parseAgentSelectedImageLiveSessionAuditStore = async (
   value: string | null,
-): AgentSelectedImageLiveSessionAuditStore => {
-  if (value === null) return { records: [], schemaVersion: 1 };
+): Promise<AgentSelectedImageLiveSessionAuditStore> => {
+  if (value === null) return { records: [], schemaVersion: 2 };
 
   let parsedValue: unknown;
   try {
     parsedValue = JSON.parse(value);
   } catch {
-    return { records: [], schemaVersion: 1 };
+    return {
+      records: [],
+      recovery: { reason: 'corrupt_current_storage', status: 'new_session_required' },
+      schemaVersion: 2,
+    };
   }
 
   const currentStore = agentSelectedImageLiveSessionAuditStoreSchema.safeParse(parsedValue);
-  if (currentStore.success) return currentStore.data;
-
-  const legacyRecords = z.array(agentSelectedImageLiveSessionAuditRecordSchema).safeParse(parsedValue);
-  if (legacyRecords.success) {
-    return agentSelectedImageLiveSessionAuditStoreSchema.parse({
-      records: legacyRecords.data,
-      schemaVersion: 1,
-    });
+  if (currentStore.success) {
+    try {
+      for (const record of currentStore.data.records) {
+        verifyAgentSelectedImageAuditReceiptLineage(record);
+        if (!(await verifyAgentSelectedImageLifecycleReceipt(record.lifecycleReceipt))) {
+          throw new Error('Selected-image audit store rejected a tampered lifecycle receipt.');
+        }
+      }
+      return currentStore.data;
+    } catch {
+      return {
+        records: [],
+        recovery: { reason: 'corrupt_current_storage', status: 'new_session_required' },
+        schemaVersion: 2,
+      };
+    }
   }
 
-  return { records: [], schemaVersion: 1 };
+  const hasUnsupportedVersion =
+    (Array.isArray(parsedValue) ||
+      (typeof parsedValue === 'object' && parsedValue !== null && 'schemaVersion' in parsedValue)) &&
+    !(
+      typeof parsedValue === 'object' &&
+      parsedValue !== null &&
+      'schemaVersion' in parsedValue &&
+      parsedValue.schemaVersion === 2
+    );
+  return {
+    records: [],
+    recovery: {
+      reason: hasUnsupportedVersion ? 'unsupported_storage_version' : 'corrupt_current_storage',
+      status: 'new_session_required',
+    },
+    schemaVersion: 2,
+  };
 };
 
-export const readAgentSelectedImageLiveSessionAuditStore = (
+export const readAgentSelectedImageLiveSessionAuditStore = async (
   adapter: AgentSelectedImageLiveSessionAuditStorageAdapter,
-): AgentSelectedImageLiveSessionAuditStore => parseAgentSelectedImageLiveSessionAuditStore(adapter.readText());
+): Promise<AgentSelectedImageLiveSessionAuditStore> => parseAgentSelectedImageLiveSessionAuditStore(adapter.readText());
 
-export const appendAgentSelectedImageLiveSessionAuditRecord = (
+export const appendAgentSelectedImageLiveSessionAuditRecord = async (
   adapter: AgentSelectedImageLiveSessionAuditStorageAdapter,
   record: AgentSelectedImageLiveSessionAuditRecord,
-): AgentSelectedImageLiveSessionAuditStore => {
-  const store = readAgentSelectedImageLiveSessionAuditStore(adapter);
-  const parsedRecord = agentSelectedImageLiveSessionAuditRecordSchema.parse(record);
+): Promise<AgentSelectedImageLiveSessionAuditStore> => {
+  const store = await readAgentSelectedImageLiveSessionAuditStore(adapter);
+  const parsedRecord = persistedAgentSelectedImageLiveSessionAuditRecordSchema.parse(record);
   verifyAgentSelectedImageAuditReceiptLineage(parsedRecord);
+  if (!(await verifyAgentSelectedImageLifecycleReceipt(parsedRecord.lifecycleReceipt))) {
+    throw new Error('Selected-image audit store rejected a tampered lifecycle receipt.');
+  }
   const nextStore = agentSelectedImageLiveSessionAuditStoreSchema.parse({
     records: [...store.records, parsedRecord],
-    schemaVersion: 1,
+    schemaVersion: 2,
   });
   adapter.writeText(JSON.stringify(nextStore));
   return nextStore;
 };
 
-export const summarizeAgentSelectedImageLiveSessionAuditStore = (
+export const summarizeAgentSelectedImageLiveSessionAuditStore = async (
   adapter: AgentSelectedImageLiveSessionAuditStorageAdapter,
-): AgentSelectedImageLiveSessionAuditSummary => {
-  const store = readAgentSelectedImageLiveSessionAuditStore(adapter);
+): Promise<AgentSelectedImageLiveSessionAuditSummary> => {
+  const store = await readAgentSelectedImageLiveSessionAuditStore(adapter);
   const latest = store.records.at(-1);
   if (latest === undefined) {
-    return {
+    const summary: AgentSelectedImageLiveSessionAuditSummary = {
       previewCount: 0,
       recordCount: 0,
       replayPreflightStatus: 'unchecked',
     };
+    if (store.recovery !== undefined) {
+      summary.recoveryReason = store.recovery.reason;
+      summary.recoveryStatus = store.recovery.status;
+    }
+    return summary;
   }
 
   let replayPreflightStatus: AgentSelectedImageLiveSessionAuditSummary['replayPreflightStatus'] = 'failed';
@@ -1216,7 +1260,6 @@ export const approveAgentSelectedImageLiveSession = (
   draft: AgentSelectedImageLiveSessionDraft,
 ): AgentSelectedImageLiveSessionDraft => {
   if (draft.state !== 'approval_required') throw new Error('Selected-image live session is not awaiting approval.');
-  upgradeLegacyDryRunToProposalLineage(draft);
   const head = draft.proposalLineage.iterations.at(-1);
   if (head === undefined || (head.state !== 'ready' && head.state !== 'sealed')) {
     throw new Error('Selected-image live session approval requires the latest ready proposal iteration.');
@@ -1680,7 +1723,7 @@ export const runAgentSelectedImageApplyTransaction = (
         lifecycleReceipt,
       });
       if (options.auditStorage !== undefined) {
-        appendAgentSelectedImageLiveSessionAuditRecord(options.auditStorage, result.audit);
+        await appendAgentSelectedImageLiveSessionAuditRecord(options.auditStorage, result.audit);
       }
       return result;
     } catch (error) {

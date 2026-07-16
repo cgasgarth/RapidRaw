@@ -11,6 +11,7 @@ import {
   preflightAgentSelectedImageLiveSessionAuditReplay,
   readAgentSelectedImageLiveSessionAuditStore,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
+import { buildCurrentSelectedImageEvidence } from './fixtures/current-selected-image-lifecycle-receipt';
 
 const selectedPath = '/fixtures/public/agent-audit-replay/DSC_4703.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 8 : 4));
@@ -44,7 +45,7 @@ const seedEditor = () => {
   });
 };
 
-const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
+const buildAuditRecord = async (): Promise<AgentSelectedImageLiveSessionAuditRecord> => {
   const snapshot = buildAgentImageContextSnapshot();
   const receipt = {
     acceptedPreviewArtifactId: snapshot.initialPreview.artifactId,
@@ -132,7 +133,7 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
     schemaVersion: 1 as const,
     selectedImagePath: snapshot.activeImagePath,
     sessionId: 'agent-audit-replay-session',
-    storageKey: 'rawengine.agent.selectedImageLiveSessionAudit.v1.sha256-agent-audit-replay',
+    storageKey: 'rawengine.agent.selectedImageLiveSessionAudit.v2.sha256-agent-audit-replay',
     state: 'applied' as const,
     toolCalls: [
       { id: 'agent-audit-replay-dry-run', name: 'rawengine.agent.adjustments.dry_run', status: 'succeeded' as const },
@@ -141,6 +142,14 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
     ],
   };
 
+  const currentEvidence = await buildCurrentSelectedImageEvidence({
+    afterPreviewHash: receipt.afterPreviewHash,
+    afterRecipeHash: receipt.finalRecipeHash,
+    beforePreviewHash: receipt.beforePreviewHash,
+    beforeRecipeHash: receipt.initialRecipeHash,
+    graphRevision: receipt.initialGraphRevision,
+    sessionId: receipt.sessionId,
+  });
   return {
     auditEvents: [
       {
@@ -155,7 +164,8 @@ const buildAuditRecord = (): AgentSelectedImageLiveSessionAuditRecord => {
         toolName: 'rawengine.agent.adjustments.dry_run',
       },
     ],
-    receipt,
+    lifecycleReceipt: currentEvidence.lifecycleReceipt,
+    receipt: { ...receipt, proposalLineage: currentEvidence.proposalLineage },
     replayState: 'replayable',
     schemaVersion: 1,
     transcript: [
@@ -226,7 +236,7 @@ describe('agent selected-image audit replay', () => {
     seedEditor();
   });
 
-  test('appends and reads replayable audit records from the versioned store', () => {
+  test('appends and reads replayable audit records from the versioned store', async () => {
     let storedText: string | null = null;
     const adapter = {
       readText: () => storedText,
@@ -235,30 +245,54 @@ describe('agent selected-image audit replay', () => {
       },
     };
 
-    const record = buildAuditRecord();
-    const written = appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
+    const record = await buildAuditRecord();
+    const written = await appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
     expect(written.records).toHaveLength(1);
-    expect(readAgentSelectedImageLiveSessionAuditStore(adapter).records[0]?.receipt.sessionId).toBe(
+    expect((await readAgentSelectedImageLiveSessionAuditStore(adapter)).records[0]?.receipt.sessionId).toBe(
       record.receipt.sessionId,
     );
   });
 
-  test('migrates legacy array storage and falls back from invalid schema', () => {
-    const record = buildAuditRecord();
-    expect(parseAgentSelectedImageLiveSessionAuditStore(JSON.stringify([record])).records).toHaveLength(1);
-    expect(parseAgentSelectedImageLiveSessionAuditStore('{"schemaVersion":0,"records":[]}').records).toHaveLength(0);
-    expect(parseAgentSelectedImageLiveSessionAuditStore('not json').records).toHaveLength(0);
+  test('rejects legacy arrays, wrong versions, and corrupt current storage without upgrading', async () => {
+    const record = await buildAuditRecord();
+    expect(await parseAgentSelectedImageLiveSessionAuditStore(JSON.stringify([record]))).toMatchObject({
+      records: [],
+      recovery: { reason: 'unsupported_storage_version', status: 'new_session_required' },
+      schemaVersion: 2,
+    });
+    expect(await parseAgentSelectedImageLiveSessionAuditStore('{"schemaVersion":0,"records":[]}')).toMatchObject({
+      records: [],
+      recovery: { reason: 'unsupported_storage_version', status: 'new_session_required' },
+    });
+    expect(await parseAgentSelectedImageLiveSessionAuditStore('not json')).toMatchObject({
+      records: [],
+      recovery: { reason: 'corrupt_current_storage', status: 'new_session_required' },
+    });
   });
 
-  test('preflights replay when source image and graph lineage match', () => {
-    const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(buildAuditRecord());
+  test('quarantines a structurally valid current envelope when its sealed lifecycle is tampered', async () => {
+    const record = await buildAuditRecord();
+    if (record.lifecycleReceipt === undefined) throw new Error('Expected a current sealed lifecycle receipt.');
+    record.lifecycleReceipt.proposal.editGraph = { tampered: true };
+
+    expect(
+      await parseAgentSelectedImageLiveSessionAuditStore(JSON.stringify({ records: [record], schemaVersion: 2 })),
+    ).toMatchObject({
+      records: [],
+      recovery: { reason: 'corrupt_current_storage', status: 'new_session_required' },
+      schemaVersion: 2,
+    });
+  });
+
+  test('preflights replay when source image and graph lineage match', async () => {
+    const preflight = preflightAgentSelectedImageLiveSessionAuditReplay(await buildAuditRecord());
     expect(preflight.status).toBe('ready');
     expect(preflight.staleReason).toBeUndefined();
     expect(preflight.replayPreviewHash).toBe('render:agent-audit-replay-after');
   });
 
-  test('blocks replay for stale source image identity', () => {
-    const record = buildAuditRecord();
+  test('blocks replay for stale source image identity', async () => {
+    const record = await buildAuditRecord();
     useEditorStore.setState((state) => ({
       selectedImage:
         state.selectedImage === null ? null : { ...state.selectedImage, path: '/fixtures/public/other.ARW' },
@@ -269,8 +303,8 @@ describe('agent selected-image audit replay', () => {
     expect(preflight.staleReason).toBe('image_changed');
   });
 
-  test('blocks replay for stale graph revision before preview reproduction', () => {
-    const record = buildAuditRecord();
+  test('blocks replay for stale graph revision before preview reproduction', async () => {
+    const record = await buildAuditRecord();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustments: useEditorStore.getState().adjustments,
       history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.3 }],

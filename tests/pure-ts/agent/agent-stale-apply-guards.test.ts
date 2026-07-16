@@ -5,6 +5,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import {
+  type AgentSelectedImageLiveSessionDraft,
   applyAgentSelectedImageLiveSession,
   approveAgentSelectedImageLiveSession,
   refreshAgentSelectedImageLiveSessionContext,
@@ -13,6 +14,14 @@ import {
   startAgentSelectedImageLiveSessionDryRun,
   validateAgentSelectedImageApplyToolEnvelope,
 } from '../../../src/utils/agent/session/agentSelectedImageLiveSession';
+import {
+  addAgentSelectedImageProposalIteration,
+  transitionAgentSelectedImageProposalIteration,
+} from '../../../src/utils/agent/session/agentSelectedImageProposalLineage';
+import {
+  agentHistoryRollbackRequestSchema,
+  createAgentSessionCheckpoint,
+} from '../../../src/utils/agent/session/agentSessionHistory';
 import {
   applyAgentGlobalAdjustments,
   buildAgentAdjustmentsApplyApproval,
@@ -51,16 +60,56 @@ const seedEditor = () => {
   });
 };
 
-const startApprovedSession = async (requestId: string) =>
-  approveAgentSelectedImageLiveSession(
-    await startAgentSelectedImageLiveSessionDryRun({
-      adjustments: { exposure: 0.18, highlights: -10, shadows: 12 },
-      operationId: `${requestId}-operation`,
-      prompt: 'Brighten the selected RAW and preserve highlight detail.',
-      requestId,
-      sessionId: 'agent-stale-apply-guards',
-    }),
+const addReadyCurrentProposal = (draft: AgentSelectedImageLiveSessionDraft): AgentSelectedImageLiveSessionDraft => {
+  const now = new Date().toISOString();
+  const iterationId = `${draft.proposalLineage.lineageId}-iteration-1`;
+  const sha256 = `sha256:${'a'.repeat(64)}`;
+  draft.proposalLineage = addAgentSelectedImageProposalIteration(draft.proposalLineage, {
+    baseGraphRevision: draft.snapshot.graphRevision,
+    basePreviewArtifactId: draft.snapshot.previewArtifactId,
+    basePreviewContentHash: sha256,
+    baseRecipeHash: draft.snapshot.recipeHash,
+    beforePreviewArtifactId: draft.snapshot.previewArtifactId,
+    beforePreviewContentHash: sha256,
+    cleanupStatus: 'not_required',
+    createdAt: now,
+    expiresAt: new Date(Date.parse(now) + 60_000).toISOString(),
+    initiatingTurnId: `${draft.requestId}-proposal-render`,
+    iterationId,
+    lineageId: draft.proposalLineage.lineageId,
+    ordinal: 1,
+    proposalHash: sha256,
+    proposalId: `${draft.requestId}-proposal`,
+    proposalSchemaVersion: 1,
+    schemaVersion: 1,
+    selectedImageId: sha256,
+    sessionId: draft.sessionId,
+    state: 'draft',
+    toolCalls: [{ callId: `${draft.requestId}-proposal-render`, type: 'proposal_render' }],
+  });
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(
+    draft.proposalLineage,
+    iterationId,
+    'rendering',
+    { expectedEpoch: draft.proposalLineage.epoch, now },
   );
+  draft.proposalLineage = transitionAgentSelectedImageProposalIteration(draft.proposalLineage, iterationId, 'ready', {
+    expectedEpoch: draft.proposalLineage.epoch,
+    now,
+  });
+  return draft;
+};
+
+const startApprovedSession = async (requestId: string) => {
+  const draft = await startAgentSelectedImageLiveSessionDryRun({
+    adjustments: { exposure: 0.18, highlights: -10, shadows: 12 },
+    operationId: `${requestId}-operation`,
+    prompt: 'Brighten the selected RAW and preserve highlight detail.',
+    requestId,
+    sessionId: 'agent-stale-apply-guards',
+  });
+  return approveAgentSelectedImageLiveSession(addReadyCurrentProposal(draft));
+};
 
 describe('agent stale apply guards', () => {
   beforeEach(() => {
@@ -139,6 +188,44 @@ describe('agent stale apply guards', () => {
     expect(result.staleReason).toBeUndefined();
     expect(result.audit.receipt.toolCalls.at(-1)).toMatchObject({ status: 'blocked' });
     expect(useEditorStore.getState().historyIndex).toBe(historyIndexBeforeApply);
+  });
+
+  test('rejects approval when a current rendered proposal lineage is missing', async () => {
+    const draft = await startAgentSelectedImageLiveSessionDryRun({
+      adjustments: { exposure: 0.18 },
+      operationId: 'issue-5953-no-legacy-lineage-operation',
+      prompt: 'Do not fabricate proposal proof.',
+      requestId: 'issue-5953-no-legacy-lineage',
+      sessionId: 'agent-stale-apply-guards',
+    });
+
+    expect(() => approveAgentSelectedImageLiveSession(draft)).toThrow('latest ready proposal iteration');
+    expect(draft.proposalLineage.iterations).toEqual([]);
+  });
+
+  test('rejects flat or incomplete rollback checkpoints instead of reconstructing typed history', () => {
+    const checkpoint = createAgentSessionCheckpoint('agent-stale-apply-guards');
+    const request = {
+      checkpoint,
+      requestId: 'issue-5953-current-checkpoint',
+      scope: 'operation' as const,
+      sessionId: checkpoint.sessionId,
+    };
+
+    expect(agentHistoryRollbackRequestSchema.safeParse(request).success).toBe(true);
+    expect(
+      agentHistoryRollbackRequestSchema.safeParse({
+        ...request,
+        checkpoint: { ...checkpoint, editDocumentHistory: [], history: [] },
+      }).success,
+    ).toBe(false);
+    const {
+      editDocumentHistory: _editDocumentHistory,
+      history: _history,
+      historyCheckpoints: _historyCheckpoints,
+      ...flat
+    } = checkpoint;
+    expect(agentHistoryRollbackRequestSchema.safeParse({ ...request, checkpoint: flat }).success).toBe(false);
   });
 
   test('validates selected-image apply tool name before dispatch', async () => {
