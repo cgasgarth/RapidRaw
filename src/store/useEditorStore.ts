@@ -35,11 +35,8 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import {
-  createDefaultEditDocumentV2,
-  type EditDocumentV2CopyPayload,
-  editDocumentV2ToLegacyAdjustments,
-} from '../utils/editDocumentV2';
+import { selectEditDocumentSourceArtifacts } from '../utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, type EditDocumentV2CopyPayload } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -382,13 +379,13 @@ const publishEditDocumentState = (state: EditorState, editDocumentV2: EditDocume
 
 const resolveAiSelectionState = (
   state: EditorState,
-  adjustments: Adjustments,
+  aiPatches: ReadonlyArray<Adjustments['aiPatches'][number]>,
   requested: AiEditSelection = {
     containerId: state.activeAiPatchContainerId,
     subMaskId: state.activeAiSubMaskId,
   },
 ) => {
-  const selection = resolveAiEditSelection(adjustments.aiPatches, requested);
+  const selection = resolveAiEditSelection(aiPatches, requested);
   return {
     activeAiPatchContainerId: selection.containerId,
     activeAiSubMaskId: selection.subMaskId,
@@ -478,7 +475,7 @@ const applyEditorStateUpdate = (
       update.lastEditApplicationReceipt = null;
       Object.assign(
         update,
-        resolveAiSelectionState(state, update.adjustmentSnapshot.value, {
+        resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(update.editDocumentV2).aiPatches, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -489,7 +486,7 @@ const applyEditorStateUpdate = (
     } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
       Object.assign(
         update,
-        resolveAiSelectionState(state, state.adjustmentSnapshot.value, {
+        resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -902,7 +899,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
-        ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
+        ...(historyTargetIndex === undefined
+          ? {}
+          : resolveAiSelectionState(
+              state,
+              selectEditDocumentSourceArtifacts(nextResult.afterEditDocumentV2).aiPatches,
+            )),
       };
     });
     if (!result) throw new Error('edit_transaction.not_applied');
@@ -968,7 +970,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   applyAiEditCommand: (command) => {
     const state = get();
     const result = command({
-      aiPatches: state.adjustmentSnapshot.value.aiPatches,
+      aiPatches: selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches,
       selection: {
         containerId: state.activeAiPatchContainerId,
         subMaskId: state.activeAiSubMaskId,
@@ -1086,7 +1088,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       historyCheckpoints: [],
       historyIndex: 0,
       ...publishEditDocumentState(state, initialState),
-      ...resolveAiSelectionState(state, editDocumentV2ToLegacyAdjustments(initialState)),
+      ...resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(initialState).aiPatches),
     }));
   },
 

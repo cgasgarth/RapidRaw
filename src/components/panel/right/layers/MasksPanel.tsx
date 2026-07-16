@@ -1619,7 +1619,9 @@ export function MasksPanel() {
     false;
   const isAiMask =
     activeSubMaskData &&
-    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
+    new Set<Mask>([Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth]).has(
+      activeSubMaskData.type,
+    );
 
   useEffect(() => {
     const timer = setTimeout(

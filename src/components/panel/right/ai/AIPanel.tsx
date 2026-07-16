@@ -512,7 +512,7 @@ export function AIPanel() {
       : (adjustments.aiPatches.findLast((patch) => patch.patchData !== null) ?? null);
   const isAiMask =
     activeSubMaskData &&
-    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky].includes(activeSubMaskData.type);
+    new Set<Mask>([Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky]).has(activeSubMaskData.type);
   const panelStatus = useMemo<InspectorPanelStatus>(() => {
     if (selectedImage === null) {
       return { label: t('editor.ai.noImageSelected'), tone: 'neutral' };
