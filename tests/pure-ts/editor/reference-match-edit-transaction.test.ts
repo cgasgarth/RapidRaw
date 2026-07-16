@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import {
+  editDocumentCameraInputV2Schema,
+  editDocumentLayersV2Schema,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookProposalV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
@@ -142,9 +146,10 @@ describe('reference match edit transaction', () => {
       source: 'user',
       synchronization: { mode: 'locked_reference', referenceSourceIdentity: '/fixture/reference.ARW' },
     });
-    expect(result.afterEditDocumentV2.nodes.camera_input.params.whiteBalanceTechnical).toEqual(
-      result.after.whiteBalanceTechnical,
-    );
+    expect(
+      editDocumentCameraInputV2Schema.parse(result.afterEditDocumentV2.nodes['camera_input']?.params)
+        .whiteBalanceTechnical,
+    ).toEqual(result.after.whiteBalanceTechnical);
     expect(commit.receipt.appliedDiffs.map((diff) => diff.key)).toEqual(['whiteBalanceDuv', 'whiteBalanceKelvin']);
   });
 
@@ -171,7 +176,7 @@ describe('reference match edit transaction', () => {
       referenceMatchApplicationReceipt: commit.receipt,
     });
     expect(result.after.masks[0]?.adjustments.exposure).toBeCloseTo(0.6, 8);
-    expect(result.afterEditDocumentV2.nodes.layers.params.masks).toHaveLength(1);
+    expect(editDocumentLayersV2Schema.parse(result.afterEditDocumentV2.nodes['layers']?.params).masks).toHaveLength(1);
     expect(result.applicationReceipt).toMatchObject({ persistence: 'commit', source: 'reference-match' });
     expect(useEditorStore.getState()).toMatchObject({ historyIndex: 1, adjustmentRevision: 1 });
   });
