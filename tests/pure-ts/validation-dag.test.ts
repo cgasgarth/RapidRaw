@@ -262,7 +262,7 @@ describe('affected validation DAG', () => {
   test.each([
     [['docs/guide.md'], ['docs', 'format'], ['rust-clippy', 'bundle-build']],
     [['src/components/Editor.tsx'], ['typecheck', 'unit', 'lint'], ['rust-clippy']],
-    [['src-tauri/src/lib.rs'], ['rustfmt', 'rust-clippy', 'native-boundaries'], ['bundle-build']],
+    [['src-tauri/src/lib.rs'], ['rustfmt', 'rust-clippy'], ['bundle-build', 'native-boundaries']],
     [['.github/workflows/lint.yml'], ['actions', 'action-pins', 'format'], ['rust-clippy']],
     [['src-tauri/Cargo.lock'], ['rust-clippy', 'license-rust', 'native-leaves'], ['docs']],
   ])('classifies %p conservatively', (paths, included, excluded) => {
@@ -270,6 +270,21 @@ describe('affected validation DAG', () => {
     const selected = new Set(plan.filter((entry) => entry.selected).map((entry) => entry.node.id));
     for (const id of included) expect(selected.has(id)).toBeTrue();
     for (const id of excluded) expect(selected.has(id)).toBeFalse();
+  });
+
+  test('commit skips exhaustive native builds while push retains them', () => {
+    const selected = (mode: 'commit' | 'push') =>
+      new Set(
+        planValidation(validationManifest, mode, ['src-tauri/src/lib.rs'])
+          .filter((entry) => entry.selected)
+          .map((entry) => entry.node.id),
+      );
+    const commit = selected('commit');
+    const push = selected('push');
+    expect(commit.has('tauri-contracts')).toBeFalse();
+    expect(commit.has('native-boundaries')).toBeFalse();
+    expect(push.has('tauri-contracts')).toBeTrue();
+    expect(push.has('native-boundaries')).toBeTrue();
   });
 
   test('manifest compile gates share the cross-worktree native lease', () => {
@@ -296,7 +311,7 @@ describe('affected validation DAG', () => {
       inputs: ['scripts'],
       resourceClass: 'light',
       cachePolicy: 'local',
-      modes: ['commit'],
+      modes: ['push'],
       timeoutMs: 1000,
     };
     expect(() => validateManifest([node])).toThrow('validation dependency missing');
@@ -322,7 +337,7 @@ describe('affected validation DAG', () => {
       inputs: ['frontend'],
       resourceClass: 'light',
       cachePolicy: 'local',
-      modes: ['commit'],
+      modes: ['push'],
       timeoutMs: 1000,
     };
     const first = await nodeCacheKey(base, root, ['dependency-a']);
@@ -488,13 +503,13 @@ describe('affected validation DAG', () => {
       inputs: ['rust'],
       resourceClass: 'native-heavy',
       cachePolicy: 'none',
-      modes: ['commit'],
+      modes: ['push'],
       queueTimeoutMs: 2_000,
       queueResources: ['native-heavy'],
       timeoutMs: 400,
     };
     const options = {
-      mode: 'commit' as const,
+      mode: 'push' as const,
       changedPaths: ['input.rs'],
       noCache: true,
       verifyCache: false,
@@ -580,12 +595,12 @@ describe('affected validation DAG', () => {
       inputs: ['frontend'],
       resourceClass: 'suite-exclusive',
       cachePolicy: 'none',
-      modes: ['commit'],
+      modes: ['push'],
       queueTimeoutMs: 2_000,
       timeoutMs: 100,
     };
     const options = {
-      mode: 'commit' as const,
+      mode: 'push' as const,
       changedPaths: ['input.ts'],
       noCache: true,
       verifyCache: false,
@@ -618,7 +633,7 @@ describe('affected validation DAG', () => {
     await rm(directory, { force: true, recursive: true });
   });
 
-  test('native validation node uses default host capacity for an exact nested clippy wrapper', async () => {
+  test('commit native wrapper bypasses weighted host pressure while retaining its native lock', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-native-'));
     const root = join(directory, 'worktree');
     const coordinator = join(directory, 'locks');
@@ -650,17 +665,29 @@ describe('affected validation DAG', () => {
         queueTimeoutMs: 2_000,
         timeoutMs: 2_000,
       };
-      expect(
-        await runValidation([nestedClippyNode], {
-          mode: 'commit',
-          changedPaths: ['input.rs'],
-          noCache: true,
-          verifyCache: false,
-          explainCache: false,
-          root,
-          resourceCoordinatorRoot: coordinator,
-        }),
-      ).toBe(0);
+      const hostPressure = await acquireResourceLease({
+        capacity: 4,
+        label: 'commit-must-bypass-host-pressure',
+        ownerId: 'commit-host-pressure-owner',
+        resource: 'validation-host-heavy',
+        root: coordinator,
+        weight: 4,
+      });
+      try {
+        expect(
+          await runValidation([nestedClippyNode], {
+            mode: 'commit',
+            changedPaths: ['input.rs'],
+            noCache: true,
+            verifyCache: false,
+            explainCache: false,
+            root,
+            resourceCoordinatorRoot: coordinator,
+          }),
+        ).toBe(0);
+      } finally {
+        await hostPressure.release();
+      }
       expect((await readdir(coordinator)).some((entry) => entry.endsWith('.lock'))).toBeFalse();
     } finally {
       await rm(directory, { force: true, recursive: true });
@@ -690,14 +717,14 @@ describe('affected validation DAG', () => {
       inputs: [input],
       resourceClass,
       cachePolicy: 'none' as const,
-      modes: ['commit' as const],
+      modes: ['push' as const],
       timeoutMs: 2_000,
     });
     expect(
       await runValidation(
         [node('same-run-native', 'rust', 'native-heavy'), node('same-run-cpu', 'frontend', 'cpu-heavy')],
         {
-          mode: 'commit',
+          mode: 'push',
           changedPaths: ['input.rs', 'input.ts'],
           noCache: true,
           verifyCache: false,
@@ -776,12 +803,12 @@ await lease.release();`;
     }
   });
 
-  test('full unit suites are exclusive across worktrees while other CPU work stays parallel', async () => {
+  test('commit suites run concurrently across isolated worktrees without a global host throttle', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-suite-exclusive-'));
     const firstWorktree = join(root, 'one');
     const secondWorktree = join(root, 'two');
     const coordinator = join(root, 'locks');
-    const sentinel = join(root, 'shared-suite-state');
+    const rendezvous = join(root, 'parallel-suite-rendezvous');
     await Promise.all([mkdir(firstWorktree), mkdir(secondWorktree)]);
     await Promise.all([
       writeFile(join(firstWorktree, 'input.ts'), 'export const input = 1;\n'),
@@ -790,7 +817,7 @@ await lease.release();`;
     const command = [
       'bun',
       '-e',
-      `import {rm} from 'node:fs/promises';const p=${JSON.stringify(sentinel)};if(await Bun.file(p).exists())process.exit(9);await Bun.write(p,String(process.pid));await Bun.sleep(180);await rm(p,{force:true})`,
+      `import {mkdir,readdir} from 'node:fs/promises';const root=${JSON.stringify(rendezvous)};await mkdir(root+'/'+process.pid,{recursive:true});for(let attempt=0;;attempt+=1){if((await readdir(root)).length>=2)break;if(attempt===200)process.exit(9);await Bun.sleep(10)}await Bun.sleep(50)`,
     ];
     const suite: ValidationNode = {
       id: 'unit-suite',
@@ -1087,9 +1114,9 @@ process.exit(code);`;
     try {
       const enginePath = join(import.meta.dir, '../../scripts/validation/engine.ts');
       const script = `import { runValidation } from ${JSON.stringify(enginePath)};
-const node={id:'queued-signal',command:['/usr/bin/true'],dependencies:[],inputs:['rust'],resourceClass:'native-heavy',cachePolicy:'none',modes:['commit'],queueResources:['native-heavy'],timeoutMs:60000};
+const node={id:'queued-signal',command:['/usr/bin/true'],dependencies:[],inputs:['rust'],resourceClass:'native-heavy',cachePolicy:'none',modes:['push'],queueResources:['native-heavy'],timeoutMs:60000};
 setTimeout(()=>process.kill(process.pid,'SIGINT'),100);
-const code=await runValidation([node],{mode:'commit',changedPaths:['input.rs'],noCache:true,verifyCache:false,explainCache:false,root:process.cwd(),resourceCoordinatorRoot:process.cwd()+'/locks'});
+const code=await runValidation([node],{mode:'push',changedPaths:['input.rs'],noCache:true,verifyCache:false,explainCache:false,root:process.cwd(),resourceCoordinatorRoot:process.cwd()+'/locks'});
 process.exit(code);`;
       const child = Bun.spawn(['bun', '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
       expect(await child.exited).toBe(130);
