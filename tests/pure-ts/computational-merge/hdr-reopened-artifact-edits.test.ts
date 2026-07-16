@@ -121,6 +121,8 @@ test('app-server reopens runtime HDR artifact and accepts a normal edit graph pa
   const mutationResult = computationalMergeMutationResultV1Schema.parse(applyPayload?.mutationResult);
   const [outputArtifact] = mutationResult.outputArtifacts;
   if (outputArtifact === undefined) throw new Error('HDR apply did not return an output artifact.');
+  const outputContentHash = outputArtifact.contentHash;
+  if (outputContentHash === undefined) throw new Error('HDR output artifact did not return a content hash.');
 
   const sidecarArtifact = applyPayload?.sidecarArtifact;
   if (sidecarArtifact === undefined) throw new Error('HDR apply did not return a sidecar artifact.');
@@ -135,7 +137,7 @@ test('app-server reopens runtime HDR artifact and accepts a normal edit graph pa
       motionCoverageRatio: sidecarArtifact.deghosting.motionCoverageRatio,
       requestedDeghosting: sidecarArtifact.deghosting.requestedDeghosting,
     },
-    outputContentHash: outputArtifact.contentHash,
+    outputContentHash,
     outputPath: hdrOutputPath,
     receiptId: 'receipt_hdr_reopen_edit',
     settingsHash: hdrSettingsHash,

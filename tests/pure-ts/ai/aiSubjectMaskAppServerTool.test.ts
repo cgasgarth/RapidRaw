@@ -37,10 +37,12 @@ describe('ai subject mask app-server tool routing', () => {
     });
 
     expect(prepared.status).toBe('prepared');
+    if (prepared.status !== 'prepared') throw new Error('Expected the subject-mask tool to prepare.');
     expect(prepared.dryRunResult.commandType).toBe('ai.mask.generateSubject');
 
     const result = await prepared.apply();
     expect(result.status).toBe('applied');
+    if (result.status !== 'applied') throw new Error('Expected the subject-mask tool to apply.');
 
     const appliedResult: AiSubjectMaskToolAppliedResult = result;
     expect(appliedResult.applyResult.commandType).toBe('ai.mask.applySubject');
@@ -64,6 +66,7 @@ describe('ai subject mask app-server tool routing', () => {
     });
 
     expect(result.status).toBe('blocked');
+    if (result.status !== 'blocked') throw new Error('Expected unavailable provider to block the tool.');
     expect(result.userVisibleMessage).toContain('unavailable');
     expect(result.provider).toMatchObject({
       providerClass: 'cloud_service',

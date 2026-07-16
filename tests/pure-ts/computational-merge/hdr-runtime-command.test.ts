@@ -58,6 +58,7 @@ test('HDR dry-run plan reports warnings, blocks, exposure spacing, and memory es
   expect(plan.accepted).toBe(false);
   expect(plan.bracketCount).toBe(3);
   expect(plan.exposureSpacing?.spanEv).toBe(3);
+  if (plan.estimatedMemory === undefined) throw new Error('Expected HDR runtime memory estimate.');
   expect(plan.estimatedMemory.totalMb).toBe(112);
   expect(plan.blockCodes).toContain('dimension_mismatch');
   expect(plan.dimensionWarnings).toContain('source_dimensions_do_not_match');

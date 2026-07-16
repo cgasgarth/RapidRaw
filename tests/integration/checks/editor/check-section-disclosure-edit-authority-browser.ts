@@ -6,6 +6,7 @@ import { chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
+import { installBrowserProofNetworkBoundary } from '../../../../scripts/qa/browser-network-boundary';
 
 const host = '127.0.0.1';
 const port = await allocateFreeTcpPort(host);
@@ -222,6 +223,7 @@ try {
   browser = await chromium.launch({ headless: true });
   page = await browser.newPage({ viewport: { height: 1000, width: 1600 } });
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  await installBrowserProofNetworkBoundary(page);
   await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', async (route) => {
     await route.fulfill({ contentType: 'application/json', json: { tag_name: 'v0.0.0-browser' }, status: 200 });
   });
@@ -230,9 +232,19 @@ try {
   await page.getByRole('button', { name: /Open Folder/u }).click();
   const thumbnail = page.getByRole('button', { name: /browser-harness\.ARW/u }).first();
   await thumbnail.waitFor({ timeout: 10_000 });
+  await page.evaluate(() => {
+    const harness = window.__RAWENGINE_BROWSER_TAURI_HARNESS__;
+    if (!harness) throw new Error('Browser Tauri harness was not installed before image open.');
+    harness.holdNextImageOpenCompletion();
+  });
   await thumbnail.dblclick();
   const provisionalBadge = page.getByTestId('embedded-preview-provisional-badge');
   await provisionalBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.evaluate(() => {
+    if (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.releaseHeldImageOpenCompletion() !== true) {
+      throw new Error('Browser Tauri harness did not hold the selected image-open completion.');
+    }
+  });
   await provisionalBadge.waitFor({ state: 'hidden', timeout: 10_000 });
   await page.getByRole('main', { name: 'Editor workspace' }).waitFor({ timeout: 10_000 });
 

@@ -6,7 +6,7 @@ import {
   ExportRenderingIntent,
   FileFormats,
 } from '../../../src/components/ui/ExportImportProperties';
-import { exportRecipeSchema } from '../../../src/schemas/export/exportRecipeSchemas';
+import { type ExportRecipeSettings, exportRecipeSchema } from '../../../src/schemas/export/exportRecipeSchemas';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildSoftProofProfileCompareInvokeRequest,
@@ -54,7 +54,7 @@ describe('export soft-proof profile compare', () => {
   });
 
   test('upserts the internal resolver preset without duplicating it', () => {
-    const currentSettings = {
+    const currentSettings: ExportRecipeSettings = {
       blackPointCompensation: true,
       colorProfile: ExportColorProfile.DisplayP3,
       dontEnlarge: true,

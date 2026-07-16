@@ -2140,8 +2140,11 @@ export class RawEngineLocalAppServerBridge {
     this.#registerHandlers();
   }
 
-  async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
-    const result = await this.#commandBus.dispatch(command, context);
+  async dispatch<TResult = unknown>(
+    command: unknown,
+    context?: EditCommandBusContext,
+  ): Promise<EditCommandDispatchResult<TResult>> {
+    const result = await this.#commandBus.dispatch<TResult>(command, context);
     this.#recordAuditEvent(command, result, context);
     return result;
   }
