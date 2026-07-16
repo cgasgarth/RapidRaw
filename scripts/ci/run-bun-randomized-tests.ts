@@ -43,6 +43,16 @@ export function randomizedTestReproduction(seed: number): string {
   return `RAWENGINE_BUN_TEST_SEED=${seed} bun run test:randomized`;
 }
 
+export function buildRandomizedChildEnv(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): Record<string, string | undefined> {
+  // picocolors treats CI as color-capable and lazily reads process.stdout while
+  // concurrent Bun test modules load. Avoid racing Bun's lazy WriteStream setup;
+  // randomized isolation does not need ANSI color because the named reporter
+  // already preserves the file and test responsible for a failure.
+  return { ...env, NO_COLOR: '1' };
+}
+
 async function waitForChildExit(
   child: ReturnType<typeof Bun.spawn>,
   timeoutMs: number,
@@ -111,7 +121,7 @@ if (import.meta.main) {
     console.log(`Bun randomized isolation pass ${run}/${RANDOMIZED_SUITE_RUN_COUNT}`);
     const child = Bun.spawn(['bun', ...buildRandomizedTestArgs(seed, target)], {
       detached: true,
-      env: process.env,
+      env: buildRandomizedChildEnv(),
       stderr: 'inherit',
       stdin: 'inherit',
       stdout: 'inherit',
