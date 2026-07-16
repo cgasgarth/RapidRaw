@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "rootDir": "../../..",
+    "types": ["bun"]
+  },
+  "include": ["./typescript-runtime-boundaries.test.ts"],
+  "exclude": ["../../../node_modules"]
+}

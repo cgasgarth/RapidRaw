@@ -2,8 +2,9 @@
 
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import ts from '@typescript/typescript6';
+import type { Argument, Expression, Node, ObjectExpression, ObjectPropertyKind } from 'oxc-parser';
 import { getExtension, walkRepoFiles } from '../../../../scripts/lib/ci/repo-files';
+import { lineAtOffset, parseSource, visitSource } from '../../../../scripts/lib/ci/source-ast';
 
 const authorityKeys = new Set([
   'adjustments',
@@ -29,150 +30,134 @@ interface BoundaryViolation {
 
 type GuardedEditorMethod = 'hydrateEditorRenderAuthority' | 'setEditor' | 'setState';
 
-const unwrap = (expression: ts.Expression): ts.Expression => {
+const unwrap = (expression: Expression): Expression => {
   let current = expression;
   while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isTypeAssertionExpression(current)
+    current.type === 'ParenthesizedExpression' ||
+    current.type === 'TSAsExpression' ||
+    current.type === 'TSSatisfiesExpression' ||
+    current.type === 'TSTypeAssertion'
   ) {
     current = current.expression;
   }
   return current;
 };
 
-const objectUpdate = (expression: ts.Expression): ts.ObjectLiteralExpression | null => {
+const asExpression = (argument: Argument | undefined): Expression | null =>
+  argument === undefined || argument.type === 'SpreadElement' ? null : argument;
+
+const objectUpdate = (expression: Expression): ObjectExpression | null => {
   const current = unwrap(expression);
-  if (ts.isObjectLiteralExpression(current)) return current;
-  if (ts.isArrowFunction(current) && !ts.isBlock(current.body)) {
+  if (current.type === 'ObjectExpression') return current;
+  if (current.type === 'ArrowFunctionExpression' && current.body.type !== 'BlockStatement') {
     const body = unwrap(current.body);
-    if (ts.isObjectLiteralExpression(body)) return body;
+    if (body.type === 'ObjectExpression') return body;
   }
   return null;
 };
 
-const objectUpdates = (expression: ts.Expression): ts.ObjectLiteralExpression[] => {
+const objectUpdates = (expression: Expression | null): ObjectExpression[] => {
+  if (expression === null) return [];
   const current = unwrap(expression);
-  if (!ts.isArrowFunction(current) || !ts.isBlock(current.body)) {
+  if (current.type !== 'ArrowFunctionExpression' || current.body.type !== 'BlockStatement') {
     const update = objectUpdate(current);
     return update === null ? [] : [update];
   }
-  const updates: ts.ObjectLiteralExpression[] = [];
-  const visit = (node: ts.Node): void => {
-    if (ts.isReturnStatement(node) && node.expression !== undefined) {
-      const update = objectUpdate(node.expression);
+  const updates: ObjectExpression[] = [];
+  visitSource(current.body, (node) => {
+    if (node.type === 'ReturnStatement' && node.argument !== null) {
+      const update = objectUpdate(node.argument);
       if (update !== null) updates.push(update);
-      return;
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(current.body);
+  });
   return updates;
 };
 
-const propertyName = (property: ts.ObjectLiteralElementLike): string | null => {
-  if (!('name' in property) || property.name === undefined) return null;
-  return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) ? property.name.text : null;
+const propertyName = (property: ObjectPropertyKind): string | null => {
+  if (property.type !== 'Property' || property.computed) return null;
+  if (property.key.type === 'Identifier') return property.key.name;
+  return property.key.type === 'Literal' && typeof property.key.value === 'string' ? property.key.value : null;
 };
 
 export const findEditorRenderAuthorityViolations = (filePath: string, contents: string): BoundaryViolation[] => {
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    contents,
-    ts.ScriptTarget.Latest,
-    true,
-    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  const sourceFile = parseSource(filePath, contents);
   const violations: BoundaryViolation[] = [];
   const methodAliases = new Map<string, GuardedEditorMethod>();
   const editorStoreAliases = new Set(['useEditorStore']);
-  const report = (node: ts.Node, label: string) => {
+  const report = (node: Node, label: string) => {
     violations.push({
       label,
-      line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+      line: lineAtOffset(contents, node.start),
     });
   };
-  const isEditorStoreExpression = (expression: ts.Expression): boolean => {
+  const isEditorStoreExpression = (expression: Expression): boolean => {
     const current = unwrap(expression);
-    return ts.isIdentifier(current) && editorStoreAliases.has(current.text);
+    return current.type === 'Identifier' && editorStoreAliases.has(current.name);
   };
-  const resolveGuardedMethod = (expression: ts.Expression): GuardedEditorMethod | null => {
+  const resolveGuardedMethod = (expression: Expression): GuardedEditorMethod | null => {
     const current = unwrap(expression);
-    if (ts.isIdentifier(current)) {
+    if (current.type === 'Identifier') {
       return (
-        methodAliases.get(current.text) ??
-        (current.text === 'setEditor' || current.text === 'hydrateEditorRenderAuthority' ? current.text : null)
+        methodAliases.get(current.name) ??
+        (current.name === 'setEditor' || current.name === 'hydrateEditorRenderAuthority' ? current.name : null)
       );
     }
-    if (!ts.isPropertyAccessExpression(current)) return null;
-    if (current.name.text === 'setEditor' || current.name.text === 'hydrateEditorRenderAuthority') {
-      return current.name.text;
+    if (current.type !== 'MemberExpression' || current.computed || current.property.type !== 'Identifier') return null;
+    if (current.property.name === 'setEditor' || current.property.name === 'hydrateEditorRenderAuthority') {
+      return current.property.name;
     }
-    return current.name.text === 'setState' && isEditorStoreExpression(current.expression) ? 'setState' : null;
+    return current.property.name === 'setState' && isEditorStoreExpression(current.object) ? 'setState' : null;
   };
-  const bindIdentifier = (name: ts.Identifier, method: GuardedEditorMethod | null): boolean => {
-    if (method === null || methodAliases.get(name.text) === method) return false;
-    methodAliases.set(name.text, method);
+  const bindIdentifier = (name: string, method: GuardedEditorMethod | null): boolean => {
+    if (method === null || methodAliases.get(name) === method) return false;
+    methodAliases.set(name, method);
     return true;
   };
   const collectAliases = (): void => {
     let changed = true;
     while (changed) {
       changed = false;
-      const collect = (node: ts.Node): void => {
-        if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
-          const initializer = unwrap(node.initializer);
-          if (ts.isIdentifier(node.name)) {
-            if (isEditorStoreExpression(initializer) && !editorStoreAliases.has(node.name.text)) {
-              editorStoreAliases.add(node.name.text);
+      visitSource(sourceFile, (node) => {
+        if (node.type === 'VariableDeclarator' && node.init !== null) {
+          const initializer = unwrap(node.init);
+          if (node.id.type === 'Identifier') {
+            if (isEditorStoreExpression(initializer) && !editorStoreAliases.has(node.id.name)) {
+              editorStoreAliases.add(node.id.name);
               changed = true;
             }
-            changed = bindIdentifier(node.name, resolveGuardedMethod(initializer)) || changed;
-          } else if (ts.isObjectBindingPattern(node.name)) {
+            changed = bindIdentifier(node.id.name, resolveGuardedMethod(initializer)) || changed;
+          } else if (node.id.type === 'ObjectPattern') {
             const fromEditorStore = isEditorStoreExpression(initializer);
-            for (const element of node.name.elements) {
-              if (!ts.isIdentifier(element.name)) continue;
-              const property = element.propertyName ?? element.name;
-              const propertyText =
-                ts.isIdentifier(property) || ts.isStringLiteral(property)
-                  ? property.text
-                  : property.getText(sourceFile);
+            for (const element of node.id.properties) {
+              if (element.type !== 'Property' || element.value.type !== 'Identifier') continue;
+              const propertyText = propertyName(element);
               const method =
                 propertyText === 'setEditor' || propertyText === 'hydrateEditorRenderAuthority'
                   ? propertyText
                   : propertyText === 'setState' && fromEditorStore
                     ? 'setState'
                     : null;
-              changed = bindIdentifier(element.name, method) || changed;
+              changed = bindIdentifier(element.value.name, method) || changed;
             }
           }
-        } else if (
-          ts.isBinaryExpression(node) &&
-          node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-          ts.isIdentifier(node.left)
-        ) {
-          changed = bindIdentifier(node.left, resolveGuardedMethod(node.right)) || changed;
+        } else if (node.type === 'AssignmentExpression' && node.operator === '=' && node.left.type === 'Identifier') {
+          changed = bindIdentifier(node.left.name, resolveGuardedMethod(node.right)) || changed;
         }
-        ts.forEachChild(node, collect);
-      };
-      collect(sourceFile);
+      });
     }
   };
   collectAliases();
-  const visit = (node: ts.Node): void => {
-    if (!ts.isCallExpression(node)) {
-      ts.forEachChild(node, visit);
-      return;
-    }
-    const method = resolveGuardedMethod(node.expression);
-    const update = node.arguments[0] === undefined ? null : objectUpdate(node.arguments[0]);
+  visitSource(sourceFile, (node) => {
+    if (node.type !== 'CallExpression') return;
+    const method = resolveGuardedMethod(node.callee);
+    const firstArgument = asExpression(node.arguments[0]);
+    const update = firstArgument === null ? null : objectUpdate(firstArgument);
     const isGuardedInternalSetStateCall =
       filePath.endsWith('/src/store/useEditorStore.ts') &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === 'directEditorStoreSetState';
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'directEditorStoreSetState';
     if (method === 'setEditor') {
-      const forbidden = objectUpdates(node.arguments[0] ?? ts.factory.createObjectLiteralExpression())
+      const forbidden = objectUpdates(firstArgument)
         .flatMap(({ properties }) => properties.map(propertyName))
         .filter((name) => name !== null && authorityKeys.has(name));
       if (forbidden.length > 0) report(node, `setEditor writes ${forbidden.join(',')}`);
@@ -192,9 +177,7 @@ export const findEditorRenderAuthorityViolations = (filePath: string, contents: 
         }
       }
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
+  });
   return violations;
 };
 
