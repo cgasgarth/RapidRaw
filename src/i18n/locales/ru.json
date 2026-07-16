@@ -2863,12 +2863,12 @@
         "vignette": "Виньетка",
         "whiteBalance": "Баланс белого"
       },
-      "includedAdjustments": "Включаемые настройки",
       "modeMerge": "Объединить",
       "modeReplace": "Заменить",
       "pasteMode": "Режим вставки",
       "save": "Сохранить",
       "selectAll": "Выбрать все",
+      "selectedNodes": "Включаемые настройки",
       "selectNone": "Снять выделение",
       "title": "Копирование и вставка настроек"
     },

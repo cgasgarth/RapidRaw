@@ -36,7 +36,7 @@ const selectedImage = {
 
 const exposurePayload = (state: { adjustmentSnapshot: { value: typeof INITIAL_ADJUSTMENTS } }, exposure: number) =>
   copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure }), [
-    'exposure',
+    'scene_global_color_tone',
   ]);
 
 describe('copy/paste edit transaction', () => {

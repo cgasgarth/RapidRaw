@@ -10,7 +10,8 @@ import CopyPasteSettingsModal, {
   CopyPasteSettingsDraft,
 } from '../../../src/components/modals/navigation/CopyPasteSettingsModal';
 import type { Preset } from '../../../src/components/ui/AppProperties';
-import { type CopyPasteSettings, PasteMode } from '../../../src/utils/adjustments';
+import type { CopyPasteSettings } from '../../../src/schemas/copyPasteSettingsSchemas';
+import { PasteMode } from '../../../src/utils/adjustments';
 
 let unmount: (() => Promise<void>) | null = null;
 
@@ -100,9 +101,10 @@ test('cancelled preset and copy/paste edits are discarded by the next keyed draf
   await runtime.key(runtime.selectedRadio(), 'End');
   await runtime.click(runtime.button('modals.copyPaste.save'));
   expect(settingsSave).toHaveBeenCalledTimes(1);
-  expect(settingsSave.mock.calls[0]?.[0]).toMatchObject({ mode: PasteMode.Replace });
-  expect(settingsSave.mock.calls[0]?.[0].includedAdjustments).toEqual(['scene_global_color_tone']);
-  expect(settingsSave.mock.calls[0]?.[0].knownAdjustments).not.toContain('layers');
+  expect(settingsSave.mock.calls[0]?.[0]).toEqual({
+    pasteMode: PasteMode.Replace,
+    selectedNodeIds: ['scene_global_color_tone'],
+  });
 });
 
 test('same-source close and reopen replaces each shell draft before it becomes visible', async () => {
@@ -155,8 +157,8 @@ function preset(id: string, name: string, presetType: 'style' | 'tool'): Preset 
   return { adjustments: {}, id, name, presetType };
 }
 
-function settings(mode: PasteMode): CopyPasteSettings {
-  return { includedAdjustments: ['exposure'], knownAdjustments: ['exposure'], mode };
+function settings(pasteMode: PasteMode): CopyPasteSettings {
+  return { pasteMode, selectedNodeIds: ['scene_global_color_tone'] };
 }
 
 function installRuntime() {

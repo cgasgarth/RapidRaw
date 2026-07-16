@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'react-toastify';
-
+import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import {
-  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-  getEditDocumentV2CopyableLegacyFieldsForSelection,
-} from '../../utils/editDocumentV2';
 import { EditorPersistenceEffectRunner } from '../../utils/editorPersistenceEffectRunner';
 import { registerEditorPersistenceBarrierAdapter } from '../../utils/editorPersistenceService';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+
+const DEFAULT_COPY_PASTE_SELECTED_NODE_IDS = createDefaultCopyPasteSettings().selectedNodeIds;
 
 export function useEditorPersistence(): void {
   const selectedImage = useEditorStore((state) => state.selectedImage);
@@ -24,8 +22,8 @@ export function useEditorPersistence(): void {
   const interactionActive = useEditorStore((state) => state.isSliderDragging || state.isWbPickerActive);
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
-  const includedAdjustments = useSettingsStore(
-    (state) => state.appSettings?.copyPasteSettings?.includedAdjustments ?? EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  const selectedNodeIds = useSettingsStore(
+    (state) => state.appSettings?.copyPasteSettings?.selectedNodeIds ?? DEFAULT_COPY_PASTE_SELECTED_NODE_IDS,
   );
   const runnerRef = useRef<EditorPersistenceEffectRunner | null>(null);
   const runner =
@@ -46,10 +44,8 @@ export function useEditorPersistence(): void {
   const multiSelection = useMemo(() => {
     if (!selectedImage?.path) return null;
     const paths = multiSelectedPaths.filter((path) => path !== selectedImage.path);
-    return paths.length === 0
-      ? null
-      : { includedAdjustments: getEditDocumentV2CopyableLegacyFieldsForSelection(includedAdjustments), paths };
-  }, [includedAdjustments, multiSelectedPaths, selectedImage?.path]);
+    return paths.length === 0 ? null : { paths, selectedNodeIds };
+  }, [multiSelectedPaths, selectedImage?.path, selectedNodeIds]);
 
   useEffect(() => {
     if (!selectedImage?.path || imageSession === null) return;

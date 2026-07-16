@@ -467,10 +467,6 @@ export const getEditDocumentV2NodeCapabilities = (nodeType: EditDocumentNodeType
 
 export type { EditDocumentV2CopyPayload };
 
-export const EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS = EDIT_DOCUMENT_NODE_DESCRIPTORS.filter(
-  ({ capabilities }) => capabilities.copy && capabilities.paste && capabilities.provenance === 'strip',
-).flatMap(({ legacyFields }) => [...legacyFields]);
-
 export const EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES = EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
   descriptor.capabilities.copy && descriptor.capabilities.paste && descriptor.capabilities.provenance === 'strip'
     ? [descriptor.nodeType]
@@ -478,33 +474,26 @@ export const EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES = EDIT_DOCUMENT_NODE_DESCRIPTO
 );
 
 export const getEditDocumentV2CopyableNodeTypes = (
-  includedAdjustments: readonly string[] = EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+  selectedNodeIds: readonly EditDocumentNodeTypeV2[] = EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
 ): readonly EditDocumentNodeTypeV2[] => {
-  const included = new Set(includedAdjustments);
+  const selected = new Set(selectedNodeIds);
   return EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
     descriptor.capabilities.copy &&
     descriptor.capabilities.paste &&
     descriptor.capabilities.provenance === 'strip' &&
-    (included.has(descriptor.nodeType) || descriptor.legacyFields.some((field) => included.has(field)))
+    selected.has(descriptor.nodeType)
       ? [descriptor.nodeType]
       : [],
-  );
-};
-
-export const getEditDocumentV2CopyableLegacyFieldsForSelection = (selection: readonly string[]): readonly string[] => {
-  const selected = new Set(getEditDocumentV2CopyableNodeTypes(selection));
-  return EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
-    selected.has(descriptor.nodeType) ? [...descriptor.legacyFields] : [],
   );
 };
 
 /** Build a provenance-free, descriptor-approved clipboard from render authority. */
 export const copyEditDocumentV2Nodes = (
   document: EditDocumentV2,
-  includedAdjustments?: readonly string[],
+  selectedNodeIds?: readonly EditDocumentNodeTypeV2[],
 ): EditDocumentV2CopyPayload => ({
   nodes: Object.fromEntries(
-    getEditDocumentV2CopyableNodeTypes(includedAdjustments).flatMap((nodeType) => {
+    getEditDocumentV2CopyableNodeTypes(selectedNodeIds).flatMap((nodeType) => {
       const payload = copyEditDocumentV2Node(document, nodeType);
       return payload === null ? [] : [[nodeType, payload]];
     }),
@@ -514,10 +503,10 @@ export const copyEditDocumentV2Nodes = (
 
 export const selectEditDocumentV2CopyPayload = (
   payload: EditDocumentV2CopyPayload,
-  includedAdjustments: readonly string[],
+  selectedNodeIds: readonly EditDocumentNodeTypeV2[],
   skipDefaultNodes: boolean,
 ): EditDocumentV2CopyPayload => {
-  const selected = new Set(getEditDocumentV2CopyableNodeTypes(includedAdjustments));
+  const selected = new Set(getEditDocumentV2CopyableNodeTypes(selectedNodeIds));
   return {
     nodes: Object.fromEntries(
       Object.entries(payload.nodes).flatMap(([nodeType, node]) => {

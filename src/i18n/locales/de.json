@@ -2799,12 +2799,12 @@
         "vignette": "Vignettierung",
         "whiteBalance": "Weißabgleich"
       },
-      "includedAdjustments": "Einbezogene Anpassungen",
       "modeMerge": "Zusammenführen",
       "modeReplace": "Ersetzen",
       "pasteMode": "Einfügemodus",
       "save": "Speichern",
       "selectAll": "Alle auswählen",
+      "selectedNodes": "Einbezogene Anpassungen",
       "selectNone": "Keine auswählen",
       "title": "Einstellungen kopieren & einfügen"
     },

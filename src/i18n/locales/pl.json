@@ -2933,12 +2933,12 @@
         "vignette": "Winieta",
         "whiteBalance": "Balans bieli"
       },
-      "includedAdjustments": "Uwzględnione ustawienia",
       "modeMerge": "Scal",
       "modeReplace": "Zastąp",
       "pasteMode": "Tryb wklejania",
       "save": "Zapisz",
       "selectAll": "Zaznacz wszystko",
+      "selectedNodes": "Uwzględnione ustawienia",
       "selectNone": "Odznacz wszystko",
       "title": "Kopiuj i Wklej Ustawienia"
     },

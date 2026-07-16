@@ -11,6 +11,7 @@ import {
   burstSrCandidateJobHandleSchema,
   burstSrCandidateJobResultSchema,
 } from '../../schemas/computational-merge/superResolutionCandidateRuntimeSchemas';
+import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import type {
   DenoiseBatchRequestV1,
   DenoiseOperationHandle,
@@ -41,7 +42,6 @@ import {
 } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
-import type { CopyPasteSettings } from '../../utils/adjustments';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import {
   resetHdrStateForSettingsChange,
@@ -96,6 +96,26 @@ interface ImportSettings {
   deleteAfterImport: boolean;
   filenameTemplate: string;
   organizeByDate: boolean;
+}
+
+interface CopyPasteSettingsShellProps {
+  appSettings: AppSettings | null;
+  handleSettingsChange: (settings: AppSettings) => Promise<void>;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function CopyPasteSettingsShell({ appSettings, handleSettingsChange, isOpen, onClose }: CopyPasteSettingsShellProps) {
+  return (
+    <CopyPasteSettingsModal
+      isOpen={isOpen}
+      onClose={onClose}
+      settings={appSettings?.copyPasteSettings ?? createDefaultCopyPasteSettings()}
+      onSave={(newSettings) => {
+        if (appSettings) void handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings });
+      }}
+    />
+  );
 }
 
 export interface AppModalsProps {
@@ -240,14 +260,12 @@ export default function AppModals(props: AppModalsProps) {
           setUI({ isCommandPaletteOpen: false });
         }}
       />
-      <CopyPasteSettingsModal
+      <CopyPasteSettingsShell
+        appSettings={appSettings}
+        handleSettingsChange={handleSettingsChange}
         isOpen={isCopyPasteSettingsModalOpen}
         onClose={() => {
           setUI({ isCopyPasteSettingsModalOpen: false });
-        }}
-        settings={appSettings?.copyPasteSettings as CopyPasteSettings}
-        onSave={(newSettings) => {
-          void handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings);
         }}
       />
       {hasLoadedPanoramaModal && (

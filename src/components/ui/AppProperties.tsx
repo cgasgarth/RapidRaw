@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
 import type { EditDocumentV2CopyPayload } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { CopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import type { RawDevelopmentReport } from '../../schemas/imageLoaderSchemas';
-import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
+import type { Adjustments } from '../../utils/adjustments';
 import type { ToolType } from '../panel/right/layers/Masks';
 
 export const GLOBAL_KEYS = [

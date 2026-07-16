@@ -2508,7 +2508,7 @@ export default interface Resources {
           vignette: 'Vignette';
           whiteBalance: 'White Balance';
         };
-        includedAdjustments: 'Included Adjustments';
+        selectedNodes: 'Selected edit nodes';
         modeMerge: 'Merge';
         modeReplace: 'Replace';
         pasteMode: 'Paste Mode';

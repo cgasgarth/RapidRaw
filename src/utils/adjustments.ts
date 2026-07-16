@@ -57,12 +57,6 @@ export enum PasteMode {
   Replace = 'replace',
 }
 
-export interface CopyPasteSettings {
-  mode: PasteMode;
-  includedAdjustments: Array<string>;
-  knownAdjustments: Array<string>;
-}
-
 export enum BasicAdjustment {
   Blacks = 'blacks',
   Brightness = 'brightness',

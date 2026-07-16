@@ -2797,12 +2797,12 @@
         "vignette": "Vignettatura",
         "whiteBalance": "Bilanciamento del Bianco"
       },
-      "includedAdjustments": "Regolazioni Incluse",
       "modeMerge": "Unisci",
       "modeReplace": "Sostituisci",
       "pasteMode": "Modalità Incolla",
       "save": "Salva",
       "selectAll": "Seleziona Tutto",
+      "selectedNodes": "Regolazioni Incluse",
       "selectNone": "Deseleziona Tutto",
       "title": "Copia e Incolla Impostazioni"
     },
