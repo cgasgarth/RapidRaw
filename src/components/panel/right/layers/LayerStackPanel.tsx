@@ -654,6 +654,7 @@ export function LayerStackPanel({
       debouncedSave(
         selectedImage.path,
         transactionResult.after,
+        transactionResult.afterEditDocumentV2,
         buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
       );
     }
@@ -907,6 +908,7 @@ export function LayerStackPanel({
       debouncedSave(
         selectedImage.path,
         transactionResult.after,
+        transactionResult.afterEditDocumentV2,
         buildEditTransactionPersistenceContext(transactionRequest, transactionResult),
       );
     }

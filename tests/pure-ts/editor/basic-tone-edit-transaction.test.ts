@@ -5,14 +5,13 @@ import {
   sceneGlobalColorToneParamsV2Schema,
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { BasicAdjustment, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { BasicAdjustment, ColorAdjustment } from '../../../src/utils/adjustments';
 import {
   type BasicToneCommitIdentity,
   buildBasicToneEditTransaction,
   captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, updateEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildAdjustmentMutationOperations } from '../../../src/utils/editTransaction';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
@@ -39,8 +38,10 @@ const identity = (overrides: Partial<BasicToneCommitIdentity> = {}): BasicToneCo
 
 describe('basic tone edit transaction', () => {
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), flipHorizontal: true };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', (geometry) => ({
+      ...geometry,
+      flipHorizontal: true,
+    }));
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -161,8 +162,7 @@ describe('basic tone edit transaction', () => {
       vibrance: 44,
     });
     expect(result.afterEditDocumentV2.nodes['geometry']).toBe(beforeGeometry);
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('hue');
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('vibrance');
+    expect(result.afterEditDocumentV2.extensions).toEqual({});
     const reopened = hydrateImageOpenEditDocumentV2(
       { adjustments: structuredClone(result.after), editDocumentV2: structuredClone(result.afterEditDocumentV2) },
       structuredClone(result.after),

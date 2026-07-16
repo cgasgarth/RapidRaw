@@ -1808,6 +1808,106 @@ mod tests {
     }
 
     #[test]
+    fn current_edit_autosaves_reopen_exactly_and_failed_or_older_writes_never_replace_newest() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("autosave-current.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let mut metadata = metadata_for(&source);
+
+        // Exercise the exact typed command boundary before the sidecar writer. Absent
+        // optional current fields must stay omitted when the native document is
+        // serialized, or the strict TypeScript load boundary cannot reopen it.
+        let typed_document = serde_json::from_value::<
+            crate::adjustments::edit_document_v2::EditDocumentV2,
+        >(metadata.edit_document_v2.take().unwrap())
+        .unwrap();
+        metadata.edit_document_v2 = Some(serde_json::to_value(typed_document).unwrap());
+        let typed_json = metadata.edit_document_v2.as_ref().unwrap();
+        assert!(
+            typed_json["nodes"]["scene_curve"]["params"]
+                .get("sceneCurveV1")
+                .is_none()
+        );
+        assert!(
+            typed_json["nodes"]["scene_curve"]["params"]
+                .get("outputCurveV1")
+                .is_none()
+        );
+        assert_eq!(typed_json["extensions"], serde_json::json!({}));
+
+        metadata.edit_document_v2.as_mut().unwrap()["nodes"]["scene_global_color_tone"]["params"]
+            ["exposure"] = serde_json::json!(0.4);
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+        let last_valid_bytes = fs::read(&sidecar).unwrap();
+
+        let mut legacy_extension = metadata.clone();
+        legacy_extension.edit_document_v2.as_mut().unwrap()["extensions"]["legacyAdjustments"] =
+            serde_json::json!({"exposure": 4});
+        let error = save_sidecar_metadata_atomic(&sidecar, &legacy_extension).unwrap_err();
+        assert!(error.contains("legacyAdjustments"), "{error}");
+        assert_eq!(fs::read(&sidecar).unwrap(), last_valid_bytes);
+
+        let mut malformed = metadata.clone();
+        malformed.edit_document_v2.as_mut().unwrap()["nodes"]["scene_global_color_tone"]["params"]
+            ["exposure"] = serde_json::json!(8);
+        let error = save_sidecar_metadata_atomic(&sidecar, &malformed).unwrap_err();
+        assert!(error.contains("exposure"), "{error}");
+        assert_eq!(fs::read(&sidecar).unwrap(), last_valid_bytes);
+
+        let mut unquarantined_future = metadata.clone();
+        unquarantined_future.edit_document_v2.as_mut().unwrap()["nodes"]["future_curve_v3"] = serde_json::json!({
+            "enabled": true,
+            "implementationVersion": 3,
+            "params": {},
+            "process": "scene_referred_v3",
+            "type": "future_curve_v3"
+        });
+        let error = save_sidecar_metadata_atomic(&sidecar, &unquarantined_future).unwrap_err();
+        assert!(error.contains("future_curve_v3"), "{error}");
+        let after_rejections = fs::read(&sidecar).unwrap();
+        assert_eq!(after_rejections, last_valid_bytes);
+        let last_valid: CurrentSidecarEnvelope = serde_json::from_slice(&last_valid_bytes).unwrap();
+        let unchanged: CurrentSidecarEnvelope = serde_json::from_slice(&after_rejections).unwrap();
+        assert_eq!(unchanged.edit_revision, last_valid.edit_revision);
+
+        for exposure in [0.8, 1.2, 1.6] {
+            metadata.edit_document_v2.as_mut().unwrap()["nodes"]["scene_global_color_tone"]["params"]
+                ["exposure"] = serde_json::json!(exposure);
+            save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+        }
+
+        let reopened =
+            load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref())).unwrap();
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        assert_eq!(
+            reopened.metadata.edit_document_v2,
+            metadata.edit_document_v2
+        );
+        assert_eq!(
+            reopened.metadata.edit_document_v2.unwrap()["nodes"]["scene_global_color_tone"]["params"]
+                ["exposure"],
+            serde_json::json!(1.6)
+        );
+        let persisted =
+            serde_json::from_slice::<CurrentSidecarEnvelope>(&fs::read(&sidecar).unwrap())
+                .expect("atomic sidecar must always be a complete current envelope");
+        assert!(
+            persisted.edit_document_v2["nodes"]["scene_curve"]["params"]
+                .get("sceneCurveV1")
+                .is_none()
+        );
+        assert!(
+            persisted.edit_document_v2["nodes"]["scene_curve"]["params"]
+                .get("outputCurveV1")
+                .is_none()
+        );
+        assert_eq!(
+            persisted.edit_document_v2["extensions"],
+            serde_json::json!({})
+        );
+    }
+
+    #[test]
     fn unsupported_and_malformed_sidecars_are_backed_up_then_retired() {
         let cases = [
             (

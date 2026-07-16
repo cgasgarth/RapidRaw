@@ -2285,9 +2285,11 @@ impl OutputCurveSettingsV1 {
 struct SceneCurveV2 {
     curve_mode: SceneCurveModeV2,
     curves: SceneCurveLegacyChannelsV2,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     output_curve_v1: Option<OutputCurveSettingsV1>,
     parametric_curve: SceneCurveParametricChannelsV2,
     point_curves: SceneCurveLegacyChannelsV2,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     scene_curve_v1: Option<SceneCurveSettingsV1>,
     tone_curve: SceneCurveToneCurveV2,
 }
@@ -2973,6 +2975,7 @@ struct EditDocumentProvenanceV2 {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentExtensionsV2 {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     quarantined_nodes: Option<BTreeMap<String, Value>>,
 }
 
