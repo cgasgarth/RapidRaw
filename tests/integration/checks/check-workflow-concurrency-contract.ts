@@ -9,15 +9,8 @@ function readWorkflow(name: string): Workflow {
 }
 
 const main = readWorkflow('main-long-validation.yml').concurrency;
-if (!main) throw new Error('main-long workflow is missing concurrency policy');
-if (main.group !== 'main-long-validation') {
-  throw new Error('main-long validation must use one stable serialization group');
-}
-if (main.group.includes('${{') || main.group.includes('github.run_id')) {
-  throw new Error('main-long concurrency group must not vary per workflow run');
-}
-if (main['cancel-in-progress'] !== false) {
-  throw new Error('main-long validation must retain every commit (no cancellation)');
+if (main !== undefined) {
+  throw new Error('main-long validation must not use workflow concurrency because GitHub replaces older pending runs');
 }
 
 const pr = readWorkflow('lint.yml').concurrency;
@@ -31,6 +24,4 @@ if (
 if (pr['cancel-in-progress'] !== false) {
   throw new Error('PR Fast must retain every immutable-head run without cancellation');
 }
-if (pr.group === main.group) throw new Error('PR Fast and main-long groups must remain distinct');
-
-console.log('workflow concurrency contract ok (serialized main-long, independent immutable PR heads)');
+console.log('workflow concurrency contract ok (independent main runs and immutable PR heads)');

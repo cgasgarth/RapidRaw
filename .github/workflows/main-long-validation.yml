@@ -8,10 +8,6 @@ on:
     - cron: '37 8 * * *'
   workflow_dispatch:
 
-concurrency:
-  group: main-long-validation
-  cancel-in-progress: false
-
 permissions:
   actions: read
   contents: read
