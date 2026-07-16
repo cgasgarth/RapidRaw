@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import {
   COPYABLE_ADJUSTMENT_KEYS,
+  createDefaultMaskEditNodes,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
@@ -98,6 +99,8 @@ describe('reference-match copy and batch acceptance', () => {
     const layer: MaskContainer = {
       adjustments: { ...INITIAL_MASK_ADJUSTMENTS, exposure: 0.75 },
       blendMode: 'normal' as const,
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
       id: 'reference-layer',
       invert: false,
       name: 'Reference Match',
