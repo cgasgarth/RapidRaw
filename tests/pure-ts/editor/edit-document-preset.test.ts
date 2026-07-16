@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { editDocumentV2CopyPayloadSchema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+} from '../../../src/utils/adjustments';
 import {
   buildPresetEditTransaction,
   buildPresetPreviewAdjustments,
@@ -64,7 +68,7 @@ describe('descriptor-derived edit document presets', () => {
     const style = createEditDocumentPresetPayload(source, false, 'style');
 
     expect(editDocumentV2CopyPayloadSchema.parse(style)).toEqual(style);
-    expect(style.nodes.scene_global_color_tone).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
+    expect(style.nodes['scene_global_color_tone']).toMatchObject({ enabled: false, params: { exposure: 1.25 } });
     expect(style.nodes).not.toHaveProperty('geometry');
     expect(style.nodes).not.toHaveProperty('lens_correction');
     expect(style.nodes).not.toHaveProperty('layers');
@@ -73,7 +77,7 @@ describe('descriptor-derived edit document presets', () => {
     expect(style).not.toHaveProperty('sourceArtifacts');
 
     const withGeometry = createEditDocumentPresetPayload(source, true, 'style');
-    expect(withGeometry.nodes.geometry?.params.rotation).toBe(3);
+    expect(withGeometry.nodes['geometry']?.params['rotation']).toBe(3);
     expect(withGeometry.nodes).toHaveProperty('lens_correction');
     expect(lowerEditDocumentPresetPayload(withGeometry)).toMatchObject({ exposure: 1.25, rotation: 3 });
   });
@@ -84,17 +88,17 @@ describe('descriptor-derived edit document presets', () => {
     const tool = createEditDocumentPresetPayload(source, false, 'tool');
 
     expect(Object.keys(tool.nodes)).toContain('scene_global_color_tone');
-    expect(tool.nodes.scene_global_color_tone?.enabled).toBeFalse();
+    expect(tool.nodes['scene_global_color_tone']?.enabled).toBeFalse();
   });
 
   test('promotes a partial legacy preset against destination authority without changing sibling nodes', () => {
     const destination = useEditorStore.getState().editDocumentV2;
-    const cameraInputBefore = destination.nodes.camera_input;
+    const cameraInputBefore = destination.nodes['camera_input'];
     const payload = resolveEditDocumentPresetPayload(
       { adjustments: { exposure: 0.75 }, includeCropTransform: false },
       destination,
     );
-    expect(payload?.nodes.scene_global_color_tone?.params).toMatchObject({ brightness: 0.2, exposure: 0.75 });
+    expect(payload?.nodes['scene_global_color_tone']?.params).toMatchObject({ brightness: 0.2, exposure: 0.75 });
     expect(payload?.nodes).not.toHaveProperty('camera_input');
     if (payload === null) throw new Error('Expected promoted legacy preset payload.');
 
@@ -104,7 +108,7 @@ describe('descriptor-derived edit document presets', () => {
     const result = state.applyEditTransaction(request);
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'preset' });
     expect(result.after).toMatchObject({ brightness: 0.2, exposure: 0.75 });
-    expect(result.afterEditDocumentV2.nodes.camera_input).toBe(cameraInputBefore);
+    expect(result.afterEditDocumentV2.nodes['camera_input']).toBe(cameraInputBefore);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
@@ -134,8 +138,10 @@ describe('descriptor-derived edit document presets', () => {
     const renderDocument = prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, result.afterEditDocumentV2, [
       'scene_global_color_tone',
     ]);
-    expect(renderDocument.nodes.scene_global_color_tone).toBe(result.afterEditDocumentV2.nodes.scene_global_color_tone);
-    expect(renderDocument.nodes.scene_global_color_tone?.params.exposure).toBe(
+    expect(renderDocument.nodes['scene_global_color_tone']).toBe(
+      result.afterEditDocumentV2.nodes['scene_global_color_tone'],
+    );
+    expect(renderDocument.nodes['scene_global_color_tone']?.params['exposure']).toBe(
       lowerEditDocumentPresetPayload(payload).exposure,
     );
   });
@@ -154,19 +160,37 @@ describe('descriptor-derived edit document presets', () => {
     expect(
       buildPresetPreviewAdjustments({
         adjustments: { exposure: 0.5 },
-        editDocumentV2: { nodes: { source_artifacts: document.nodes.source_artifacts }, schemaVersion: 2 } as never,
+        editDocumentV2: { nodes: { source_artifacts: document.nodes['source_artifacts'] }, schemaVersion: 2 } as never,
       }),
     ).toBeNull();
   });
 
   test('configure migrates legacy state and enforces descriptor policy for style/tool conversion', () => {
     const style = configureEditDocumentPresetPayload(
-      { adjustments: { exposure: 1, masks: [{ id: 'legacy-mask' }] }, includeCropTransform: false },
+      {
+        adjustments: {
+          exposure: 1,
+          masks: [
+            {
+              adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+              editNodes: createDefaultMaskEditNodes(),
+              editNodeSchemaVersion: 1,
+              id: 'legacy-mask',
+              invert: false,
+              name: 'Legacy mask',
+              opacity: 100,
+              subMasks: [],
+              visible: true,
+            },
+          ],
+        },
+        includeCropTransform: false,
+      },
       false,
       'style',
     );
     if (style === null) throw new Error('Expected legacy preset migration.');
-    expect(style.nodes.scene_global_color_tone?.params.exposure).toBe(1);
+    expect(style.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
     expect(style.nodes).not.toHaveProperty('layers');
     expect(style.nodes).not.toHaveProperty('source_artifacts');
     expect(style.nodes).not.toHaveProperty('geometry');
@@ -177,7 +201,7 @@ describe('descriptor-derived edit document presets', () => {
       'tool',
     );
     if (tool === null) throw new Error('Expected strict V2 preset configuration.');
-    expect(tool.nodes.scene_global_color_tone?.params.exposure).toBe(1);
+    expect(tool.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
     expect(Object.keys(tool.nodes).length).toBeLessThan(Object.keys(style.nodes).length);
   });
 
@@ -188,7 +212,7 @@ describe('descriptor-derived edit document presets', () => {
         {
           adjustments: { exposure: 1.75 },
           editDocumentV2: {
-            nodes: { source_artifacts: destination.nodes.source_artifacts },
+            nodes: { source_artifacts: destination.nodes['source_artifacts'] },
             schemaVersion: 2,
           } as never,
         },
@@ -201,7 +225,7 @@ describe('descriptor-derived edit document presets', () => {
           adjustments: {},
           editDocumentV2: {
             nodes: {
-              scene_global_color_tone: { ...destination.nodes.geometry, type: 'geometry' },
+              scene_global_color_tone: { ...destination.nodes['geometry'], type: 'geometry' },
             },
             schemaVersion: 2,
           } as never,
@@ -214,7 +238,7 @@ describe('descriptor-derived edit document presets', () => {
         {
           adjustments: { exposure: 1.75 },
           editDocumentV2: {
-            nodes: { source_artifacts: destination.nodes.source_artifacts },
+            nodes: { source_artifacts: destination.nodes['source_artifacts'] },
             schemaVersion: 2,
           } as never,
         },
@@ -243,7 +267,7 @@ describe('descriptor-derived edit document presets', () => {
             {
               adjustments: { exposure: 1.75 },
               editDocumentV2: {
-                nodes: { source_artifacts: destination.nodes.source_artifacts },
+                nodes: { source_artifacts: destination.nodes['source_artifacts'] },
                 schemaVersion: 2,
               },
               id: 'corrupt-v2',

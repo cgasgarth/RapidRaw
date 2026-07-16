@@ -7,12 +7,13 @@ import {
   parseCssRgbColor,
   shouldSubmitVisibleWgpuTransform,
   WGPU_HIDDEN_COORDINATE,
+  type WgpuTransformColors,
 } from '../../../src/utils/wgpuTransformPayload';
 
 const colors = {
-  bgPrimary: [24 / 255, 24 / 255, 24 / 255, 1] as const,
-  bgSecondary: [35 / 255, 35 / 255, 35 / 255, 1] as const,
-};
+  bgPrimary: [24 / 255, 24 / 255, 24 / 255, 1],
+  bgSecondary: [35 / 255, 35 / 255, 35 / 255, 1],
+} satisfies WgpuTransformColors;
 
 const rect = {
   left: 10,
@@ -73,8 +74,6 @@ describe('wgpu transform payload', () => {
           height: 80,
           offsetX: 4,
           offsetY: 6,
-          containerWidth: 300,
-          containerHeight: 200,
           scale: 1,
         },
       },
@@ -105,8 +104,6 @@ describe('wgpu transform payload', () => {
           height: 0,
           offsetX: 0,
           offsetY: 0,
-          containerWidth: 300,
-          containerHeight: 200,
           scale: 1,
         },
       },

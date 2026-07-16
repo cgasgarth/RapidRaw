@@ -41,4 +41,4 @@ export const groupCameraProfiles = (entries: ReadonlyArray<CameraProfileBrowserE
 export const applyCameraProfileIdentity = <T extends { cameraProfile: CameraProfileId }>(
   adjustments: T,
   cameraProfile: CameraProfileId,
-): T => ({ ...adjustments, cameraProfile });
+): Omit<T, 'cameraProfile'> & { cameraProfile: CameraProfileId } => ({ ...adjustments, cameraProfile });

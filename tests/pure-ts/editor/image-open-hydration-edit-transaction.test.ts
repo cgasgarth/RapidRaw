@@ -199,6 +199,8 @@ describe('image-open hydration edit transaction', () => {
     const imageBHistory = [
       legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 }),
     ];
+    const imageBDocument = imageBHistory[0];
+    if (imageBDocument === undefined) throw new Error('Expected image B history authority.');
     const imageBSelected = {
       ...selectedImage,
       exif: { Make: 'Camera B' },
@@ -215,7 +217,7 @@ describe('image-open hydration edit transaction', () => {
       originalSize: { height: 4000, width: 6000 },
       selectedImage: imageBSelected,
       uncroppedAdjustedPreviewUrl: 'blob:image-b-uncropped',
-      editDocumentV2: imageBHistory[0],
+      editDocumentV2: imageBDocument,
       history: imageBHistory,
     });
     const refs = {

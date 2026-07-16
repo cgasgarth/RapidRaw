@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { CameraInputCommitIdentity } from '../../../src/utils/cameraInputEditTransaction';
 import {
@@ -68,11 +67,11 @@ describe('camera input edit transaction', () => {
       },
     ]);
     expect(result.after).toMatchObject({ cameraProfile: 'camera_neutral', cameraProfileAmount: 72, exposure: 0.45 });
-    expect(result.afterEditDocumentV2.nodes.camera_input.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['camera_input']?.params).toMatchObject({
       cameraProfile: 'camera_neutral',
       cameraProfileAmount: 72,
     });
-    expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(result.beforeEditDocumentV2.nodes.scene_curve);
+    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -96,7 +95,7 @@ describe('camera input edit transaction', () => {
     );
 
     expect(result.changedKeys).toEqual(['whiteBalanceTechnical']);
-    expect(result.afterEditDocumentV2.nodes.camera_input.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['camera_input']?.params).toMatchObject({
       whiteBalanceTechnical,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
