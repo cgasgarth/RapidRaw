@@ -32,6 +32,9 @@ export function resolveRandomizedTestSeed(value: string | undefined): number {
 
 export function buildRandomizedTestArgs(seed: number, target = DEFAULT_RANDOMIZED_TEST_TARGET): string[] {
   explicitSeedSchema.parse(seed);
+  // Keep Bun's named reporter here. Its compact dot reporter has stalled after
+  // completing pass two on Linux, while the same seed and tests exit cleanly
+  // with named output; names also identify the last active test on failure.
   return ['test', '--no-orphans', '--parallel', '--bail=1', '--randomize', `--seed=${seed}`, target];
 }
 
