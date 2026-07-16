@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   type BlackWhiteMixerCommitIdentity,
@@ -67,9 +66,9 @@ describe('black-and-white mixer edit transaction', () => {
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes.black_white_mixer.params.blackWhiteMixer).toEqual(blackWhiteMixer);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    expect(result.afterEditDocumentV2.nodes['black_white_mixer']?.params).toMatchObject({ blackWhiteMixer });
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
+      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
     );
     expect(useEditorStore.getState().history).toHaveLength(2);
 
