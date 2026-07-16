@@ -9,8 +9,11 @@ use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage, RgbImage, im
 use rayon::prelude::*;
 use serde_json::Value;
 
+use crate::adjustments::edit_document_v2::{
+    SourceArtifactAiPatchV2, SourceArtifactMaskTypeV2, SourceArtifactSubMaskModeV2,
+};
 use crate::image_loader::PatchMaskInfo;
-use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
+use crate::mask_generation::{MaskDefinition, SubMask, SubMaskMode, generate_mask_bitmap};
 use crate::render::native_cache::{
     CacheBudgetCoordinator, CachePolicy, CacheStats, MemoryLruCache,
 };
@@ -30,7 +33,7 @@ pub struct PatchAssetKey {
 #[derive(Clone)]
 enum PatchMaskSource {
     Encoded(Arc<GrayImage>),
-    Procedural(Arc<Value>),
+    Procedural(Arc<MaskDefinition>),
 }
 
 #[derive(Clone)]
@@ -136,6 +139,38 @@ impl PatchAssetCache {
         drop(state);
 
         let decoded = decode_patch(key.clone(), patch).map(Arc::new);
+        let mut state = self.state.lock().unwrap();
+        state.loading_decoded.remove(key);
+        if let Ok(asset) = &decoded {
+            #[cfg(test)]
+            {
+                state.decode_count += 1;
+            }
+            self.decoded
+                .insert(key.clone(), asset.clone(), asset.bytes as u64);
+        }
+        self.ready.notify_all();
+        decoded
+    }
+
+    fn decoded_current(
+        &self,
+        key: &PatchAssetKey,
+        patch: &SourceArtifactAiPatchV2,
+    ) -> Result<Arc<DecodedPatchAsset>> {
+        let mut state = self.state.lock().unwrap();
+        loop {
+            if let Some(asset) = self.decoded.get(key) {
+                return Ok(asset);
+            }
+            if state.loading_decoded.insert(key.clone()) {
+                break;
+            }
+            state = self.ready.wait(state).unwrap();
+        }
+        drop(state);
+
+        let decoded = decode_current_patch(key.clone(), patch).map(Arc::new);
         let mut state = self.state.lock().unwrap();
         state.loading_decoded.remove(key);
         if let Ok(asset) = &decoded {
@@ -262,11 +297,24 @@ fn decode_patch(key: PatchAssetKey, patch: &Value) -> Result<DecodedPatchAsset> 
         Some(_) => PatchMaskSource::Encoded(Arc::new(
             decode_base64_image(data, "mask", "PATCH_MASK_INVALID")?.to_luma8(),
         )),
-        None => PatchMaskSource::Procedural(Arc::new(patch.clone())),
+        None => {
+            let info: PatchMaskInfo =
+                serde_json::from_value(patch.clone()).context("PATCH_MASK_DEFINITION_INVALID")?;
+            PatchMaskSource::Procedural(Arc::new(MaskDefinition {
+                id: info.id,
+                name: info.name,
+                visible: true,
+                invert: info.invert,
+                blend_mode: "normal".to_string(),
+                opacity: 100.0,
+                adjustments: Value::Null,
+                sub_masks: info.sub_masks,
+            }))
+        }
     };
     let mask_bytes = match &mask {
         PatchMaskSource::Encoded(image) => image.as_raw().capacity(),
-        PatchMaskSource::Procedural(value) => value.to_string().len(),
+        PatchMaskSource::Procedural(definition) => definition.sub_masks.len() * 128,
     };
     let bytes = color.as_raw().capacity() + mask_bytes;
     Ok(DecodedPatchAsset {
@@ -275,6 +323,102 @@ fn decode_patch(key: PatchAssetKey, patch: &Value) -> Result<DecodedPatchAsset> 
         mask,
         bytes,
     })
+}
+
+fn current_patch_key(patch: &SourceArtifactAiPatchV2) -> Result<PatchAssetKey> {
+    if patch.id.is_empty() {
+        return Err(anyhow!("PATCH_ID_MISSING"));
+    }
+    let mut hasher = DefaultHasher::new();
+    patch.patch_data.hash(&mut hasher);
+    serde_json::to_vec(&patch.sub_masks)
+        .context("PATCH_MASK_DEFINITION_INVALID")?
+        .hash(&mut hasher);
+    patch.invert.hash(&mut hasher);
+    Ok(PatchAssetKey {
+        patch_id: Arc::from(patch.id.as_str()),
+        patch_revision: hasher.finish(),
+        decode_version: DECODE_VERSION,
+    })
+}
+
+fn decode_current_patch(
+    key: PatchAssetKey,
+    patch: &SourceArtifactAiPatchV2,
+) -> Result<DecodedPatchAsset> {
+    let color = decode_base64_image(&patch.patch_data, "color", "PATCH_COLOR_INVALID")?.to_rgb8();
+    let mask = match patch
+        .patch_data
+        .get("mask")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    {
+        Some(_) => PatchMaskSource::Encoded(Arc::new(
+            decode_base64_image(&patch.patch_data, "mask", "PATCH_MASK_INVALID")?.to_luma8(),
+        )),
+        None => PatchMaskSource::Procedural(Arc::new(current_patch_mask_definition(patch))),
+    };
+    let mask_bytes = match &mask {
+        PatchMaskSource::Encoded(image) => image.as_raw().capacity(),
+        PatchMaskSource::Procedural(definition) => definition.sub_masks.len() * 128,
+    };
+    let bytes = color.as_raw().capacity() + mask_bytes;
+    Ok(DecodedPatchAsset {
+        key,
+        color: Arc::new(color),
+        mask,
+        bytes,
+    })
+}
+
+fn current_patch_mask_definition(patch: &SourceArtifactAiPatchV2) -> MaskDefinition {
+    let sub_masks = patch
+        .sub_masks
+        .iter()
+        .map(|sub_mask| SubMask {
+            id: sub_mask.id.clone(),
+            mask_type: match sub_mask.mask_type {
+                SourceArtifactMaskTypeV2::AiDepth => "ai-depth",
+                SourceArtifactMaskTypeV2::AiForeground => "ai-foreground",
+                SourceArtifactMaskTypeV2::AiObject => "ai-object",
+                SourceArtifactMaskTypeV2::AiPerson => "ai-person",
+                SourceArtifactMaskTypeV2::AiSky => "ai-sky",
+                SourceArtifactMaskTypeV2::AiSubject => "ai-subject",
+                SourceArtifactMaskTypeV2::All => "all",
+                SourceArtifactMaskTypeV2::Brush => "brush",
+                SourceArtifactMaskTypeV2::Color => "color",
+                SourceArtifactMaskTypeV2::Flow => "flow",
+                SourceArtifactMaskTypeV2::Linear => "linear",
+                SourceArtifactMaskTypeV2::Luminance => "luminance",
+                SourceArtifactMaskTypeV2::QuickEraser => "quick-eraser",
+                SourceArtifactMaskTypeV2::Radial => "radial",
+            }
+            .to_string(),
+            visible: sub_mask.visible,
+            invert: sub_mask.invert,
+            opacity: sub_mask.opacity as f32,
+            mode: match sub_mask.mode {
+                SourceArtifactSubMaskModeV2::Additive => SubMaskMode::Additive,
+                SourceArtifactSubMaskModeV2::Intersect => SubMaskMode::Intersect,
+                SourceArtifactSubMaskModeV2::Subtractive => SubMaskMode::Subtractive,
+            },
+            parameters: sub_mask
+                .parameters
+                .clone()
+                .map(|parameters| Value::Object(parameters.into_iter().collect()))
+                .unwrap_or(Value::Null),
+        })
+        .collect();
+    MaskDefinition {
+        id: patch.id.clone(),
+        name: patch.name.clone(),
+        visible: patch.visible,
+        invert: patch.invert,
+        blend_mode: "normal".to_string(),
+        opacity: 100.0,
+        adjustments: Value::Null,
+        sub_masks,
+    }
 }
 
 fn decode_base64_image(data: &Value, field: &str, code: &str) -> Result<DynamicImage> {
@@ -296,20 +440,8 @@ fn prepare_patch(
 ) -> Result<Option<PreparedPatchAsset>> {
     let mask = match &source.mask {
         PatchMaskSource::Encoded(mask) => resize_gray(mask, width, height),
-        PatchMaskSource::Procedural(patch) => {
-            let info: PatchMaskInfo = serde_json::from_value((**patch).clone())
-                .context("PATCH_MASK_DEFINITION_INVALID")?;
-            let definition = MaskDefinition {
-                id: info.id,
-                name: info.name,
-                visible: true,
-                invert: info.invert,
-                blend_mode: "normal".to_string(),
-                opacity: 100.0,
-                adjustments: Value::Null,
-                sub_masks: info.sub_masks,
-            };
-            generate_mask_bitmap(&definition, width, height, 1.0, (0.0, 0.0), None)
+        PatchMaskSource::Procedural(definition) => {
+            generate_mask_bitmap(definition, width, height, 1.0, (0.0, 0.0), None)
                 .context("PATCH_MASK_GENERATION_FAILED")?
         }
     };
@@ -411,9 +543,44 @@ pub fn composite_patches<'a>(
             prepared.push(asset);
         }
     }
+    composite_prepared_patches(base, prepared)
+}
+
+pub(crate) fn composite_current_patches<'a>(
+    base: &'a DynamicImage,
+    patches: &[SourceArtifactAiPatchV2],
+) -> Result<CompositeResult<'a>> {
+    let (width, height) = base.dimensions();
+    let mut prepared = Vec::new();
+    for patch in patches {
+        if !patch.visible || patch.is_loading {
+            continue;
+        }
+        let has_color = patch
+            .patch_data
+            .get("color")
+            .and_then(Value::as_str)
+            .is_some_and(|color| !color.is_empty());
+        if !has_color {
+            continue;
+        }
+        let key = current_patch_key(patch)?;
+        let source = cache().decoded_current(&key, patch)?;
+        if let Some(asset) = cache().prepared(source, width, height)? {
+            prepared.push(asset);
+        }
+    }
+    composite_prepared_patches(base, prepared)
+}
+
+fn composite_prepared_patches<'a>(
+    base: &'a DynamicImage,
+    prepared: Vec<Arc<PreparedPatchAsset>>,
+) -> Result<CompositeResult<'a>> {
     if prepared.is_empty() {
         return Ok(Cow::Borrowed(base));
     }
+    let (width, height) = base.dimensions();
 
     // DynamicImage's conversion preserves the existing Rgba32F output contract. Integer
     // inputs are normalized; existing float values, including out-of-range values, pass through.

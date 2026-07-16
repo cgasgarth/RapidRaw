@@ -304,6 +304,9 @@
         "denoiseDetail": 50,
         "denoiseNaturalGrain": 0,
         "denoiseShadowBias": 0,
+        "dustSpotMinRadiusPx": 2,
+        "dustSpotOverlayEnabled": false,
+        "dustSpotSensitivity": 50,
         "lumaNoiseReduction": 0,
         "sharpness": 0,
         "sharpnessThreshold": 15

@@ -55,7 +55,13 @@ pub fn parse_deblur_render_controls(adjustments: &Value) -> DeblurRenderControls
 }
 
 pub fn calculate_deblur_render_hash(base_hash: u64, adjustments: &Value) -> u64 {
-    let controls = parse_deblur_render_controls(adjustments);
+    calculate_deblur_render_hash_with_controls(base_hash, parse_deblur_render_controls(adjustments))
+}
+
+pub(crate) fn calculate_deblur_render_hash_with_controls(
+    base_hash: u64,
+    controls: DeblurRenderControls,
+) -> u64 {
     let mut hasher = DefaultHasher::new();
     DEBLUR_RENDER_REVISION_ABI.hash(&mut hasher);
     base_hash.hash(&mut hasher);
@@ -69,7 +75,13 @@ pub fn apply_deblur_stage<'a>(
     image: &'a DynamicImage,
     adjustments: &Value,
 ) -> DeblurRenderResult<'a> {
-    let controls = parse_deblur_render_controls(adjustments);
+    apply_deblur_stage_with_controls(image, parse_deblur_render_controls(adjustments))
+}
+
+pub(crate) fn apply_deblur_stage_with_controls(
+    image: &DynamicImage,
+    controls: DeblurRenderControls,
+) -> DeblurRenderResult<'_> {
     if !controls.enabled || controls.strength <= f32::EPSILON {
         return DeblurRenderResult {
             image: Cow::Borrowed(image),

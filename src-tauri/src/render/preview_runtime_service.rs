@@ -139,7 +139,6 @@ impl PreviewRuntimeService {
 mod tests {
     use super::*;
     use crate::preview_scheduler::{PreviewCompletion, PreviewSchedulingPolicy, PreviewStage};
-    use serde_json::json;
     use std::sync::Barrier;
     use std::thread;
     use tokio::sync::oneshot;
@@ -148,7 +147,9 @@ mod tests {
         let (responder, receiver) = oneshot::channel();
         (
             PreviewJob {
-                adjustments: Arc::new(json!({})),
+                edit_document: Arc::new(
+                    crate::adjustments::edit_document_v2::CompiledCurrentEditDocument::scheduler_test_stub(),
+                ),
                 expected_image_path: "preview.raw".into(),
                 is_interactive: true,
                 preview_operation_identity: Box::new(

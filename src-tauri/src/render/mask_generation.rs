@@ -2263,26 +2263,46 @@ pub fn get_cached_or_generate_mask(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn get_cached_or_generate_preview_mask(
+pub(crate) fn get_cached_or_generate_current_preview_mask(
     state: &tauri::State<AppState>,
     def: &MaskDefinition,
     width: u32,
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
-    adjustments: &serde_json::Value,
+    geometry_fingerprint: u64,
     preview_image: &DynamicImage,
 ) -> Option<GrayImage> {
-    get_cached_or_generate_mask_with_preview(
-        state,
+    let mut hasher = DefaultHasher::new();
+    let mut def_for_hash = def.clone();
+    def_for_hash.adjustments = serde_json::Value::Null;
+    serde_json::to_string(&def_for_hash)
+        .unwrap_or_default()
+        .hash(&mut hasher);
+    width.hash(&mut hasher);
+    height.hash(&mut hasher);
+    scale.to_bits().hash(&mut hasher);
+    crop_offset.0.to_bits().hash(&mut hasher);
+    crop_offset.1.to_bits().hash(&mut hasher);
+    geometry_fingerprint.hash(&mut hasher);
+    let key = hasher.finish();
+    if let Some(image) = state.render().native_caches().mask(key) {
+        return Some(image.as_ref().clone());
+    }
+    let generated = generate_mask_bitmap_in_space(
         def,
         width,
         height,
         scale,
         crop_offset,
-        adjustments,
         Some(preview_image),
-    )
+        WarpedImageSpace::Preview,
+    )?;
+    state
+        .render()
+        .native_caches()
+        .insert_mask(key, Arc::new(generated.clone()));
+    Some(generated)
 }
 
 #[allow(clippy::too_many_arguments)]
