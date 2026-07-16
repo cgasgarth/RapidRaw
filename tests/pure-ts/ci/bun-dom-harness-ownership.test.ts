@@ -7,7 +7,7 @@ import { z } from 'zod';
 const repositoryRoot = resolve(import.meta.dir, '../../..');
 const pureTestRoot = resolve(repositoryRoot, 'tests/pure-ts');
 const sharedPreload = './tests/setup/bun-dom.ts';
-const ownedGlobalBindings = new Set(['document', 'navigator', 'window']);
+const ownedGlobalBindings = new Set(['document', 'IS_REACT_ACT_ENVIRONMENT', 'localStorage', 'navigator', 'window']);
 const obsoleteHelperNames = new Set(['installDom', 'installTestDom', 'unmountRenderedRoot']);
 
 type DomHarnessViolationKind =
@@ -102,9 +102,10 @@ export function auditBunDomHarnessSource(path: string, source: string): DomHarne
     },
     ImportDeclaration(node) {
       const sourceName = node.source.value;
-      if (sourceName === 'happy-dom') report('happy-dom-import', node.start);
+      const isHappyDomImport = sourceName === 'happy-dom' || sourceName.startsWith('@happy-dom/');
+      if (isHappyDomImport) report('happy-dom-import', node.start);
       if (sourceName === 'react-dom/client') report('bespoke-react-root', node.start);
-      if (sourceName === 'happy-dom' || sourceName === '@testing-library/react' || sourceName.startsWith('react')) {
+      if (isHappyDomImport || sourceName === '@testing-library/react' || sourceName.startsWith('react')) {
         isReactOrDomTest = true;
       }
     },
@@ -146,21 +147,25 @@ describe('Bun DOM harness ownership', () => {
       [
         `import { Window } from 'happy-dom';`,
         `import { createRoot } from 'react-dom/client';`,
+        `import { GlobalRegistrator } from '@happy-dom/global-registrator';`,
         `const fixture = 'Object.assign(globalThis, { window })';`,
         `function installDom() {}`,
         `const browser = new Window();`,
         `Object.assign(globalThis, { document: browser.document });`,
         `createRoot(document.body);`,
+        `Object.defineProperty(globalThis, 'localStorage', { value: browser.localStorage });`,
       ].join('\n'),
     );
 
     expect(audit.violations.map(({ kind }) => kind)).toEqual([
       'happy-dom-import',
       'bespoke-react-root',
+      'happy-dom-import',
       'obsolete-dom-helper',
       'happy-dom-window',
       'global-dom-assignment',
       'bespoke-react-root',
+      'global-dom-assignment',
     ]);
   });
 
