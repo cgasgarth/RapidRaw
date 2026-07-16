@@ -14,7 +14,14 @@
     "../edit-document/owned-node-migrations.test.ts",
     "../edit-document/camera-detail-migrations.test.ts",
     "../edit-document/creative-curves-geometry.test.ts",
-    "../edit-document/render-preparation.test.ts"
+    "../edit-document/render-preparation.test.ts",
+    "../negative-lab/negative-lab-before-after-review-ui.test.ts",
+    "../negative-lab/negative-lab-dust-candidate-retouch-layers.test.ts",
+    "../negative-lab/negative-lab-export-handoff.test.ts",
+    "../negative-lab/negative-lab-measured-profile-library.test.ts",
+    "../negative-lab/negative-lab-preview-proof.test.ts",
+    "../negative-lab/negative-lab-roll-batch-contact-sheet.test.ts",
+    "../negative-lab/negative-lab-runtime-dry-run-adapter.test.ts"
   ],
   "exclude": ["../../../node_modules"]
 }

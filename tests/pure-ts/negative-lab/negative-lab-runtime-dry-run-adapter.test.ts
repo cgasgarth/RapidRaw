@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from 'bun:test';
 import {
   ActorKind,
   ApprovalClass,
-  negativeLabCommandEnvelopeV1Schema,
+  negativeLabSetConversionRecipeCommandV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../packages/rawengine-schema/src/index.ts';
 import { Invokes } from '../../../src/tauri/commands';
@@ -154,7 +154,7 @@ mock.module('@tauri-apps/api/core', () => ({
 
 describe('renderNegativeLabRuntimeDryRunPreview', () => {
   test('uses native rendered preview metadata for the typed dry-run artifact', async () => {
-    const command = negativeLabCommandEnvelopeV1Schema.parse({
+    const command = negativeLabSetConversionRecipeCommandV1Schema.parse({
       actor: {
         id: 'negative-lab-ui',
         kind: ActorKind.Ui,
@@ -273,7 +273,6 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         color_range_clip: 0.12,
         contrast: 1,
         conversion_model: 'negative_log_density_v1',
-        source_interpretation_hash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         exposure: 0,
         flat_log_master: { algorithm_version: 1, gain: 1, lift: 0.02 },
         green_weight: 1,
@@ -440,7 +439,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
   });
 
   test('passes through the new negative log density conversion model', async () => {
-    const command = negativeLabCommandEnvelopeV1Schema.parse({
+    const command = negativeLabSetConversionRecipeCommandV1Schema.parse({
       actor: {
         id: 'negative-lab-ui',
         kind: ActorKind.Ui,
@@ -534,6 +533,7 @@ describe('renderNegativeLabRuntimeDryRunPreview', () => {
         bounds_schema_version: 1,
         color_range_clip: 0.12,
         contrast: 1,
+        conversion_model: 'negative_log_density_v1',
         exposure: 0,
         green_weight: 1,
         luma_range_clip: 0.08,

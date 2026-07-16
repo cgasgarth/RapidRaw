@@ -7,7 +7,7 @@ import {
 import type { Adjustments } from '../adjustments';
 import { materializeMasksFromLayerStackSidecar } from './layerStackCommandBridge';
 
-type PersistedLayerStackArtifacts = {
+export type PersistedLayerStackArtifacts = {
   layerStackSidecars?: Array<LayerStackSidecarV1>;
   schemaVersion?: number;
   [key: string]: unknown;
@@ -40,15 +40,17 @@ function readLayerStackSidecarsFromMetadata(metadata: LayerStackMetadataEnvelope
 export function persistLayerStackSidecarInAdjustments(
   adjustments: Adjustments & { rawEngineArtifacts?: PersistedLayerStackArtifacts },
   layerStackSidecar: LayerStackSidecarV1,
-): Adjustments {
+): Adjustments & { rawEngineArtifacts: PersistedLayerStackArtifacts } {
   const envelope = upsertLayerStackSidecarInSidecar(
     { rawEngineArtifacts: adjustments.rawEngineArtifacts },
     layerStackSidecar,
   );
+  const rawEngineArtifacts = envelope.rawEngineArtifacts;
+  if (rawEngineArtifacts === undefined) throw new Error('Layer stack persistence produced no artifact envelope.');
 
   return {
     ...adjustments,
-    rawEngineArtifacts: envelope.rawEngineArtifacts,
+    rawEngineArtifacts,
   };
 }
 

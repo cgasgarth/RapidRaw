@@ -5,6 +5,7 @@ import {
   parseNegativeLabMeasuredProfileLibrary,
 } from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileLibrarySchemas';
 import type { NegativeLabMeasurementReport } from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileSchemas';
+import { parseNegativeLabMeasuredProfileCatalog } from '../../../src/schemas/negative-lab/negativeLabMeasuredProfileSchemas';
 import {
   buildNegativeLabMeasuredProfileContentHash,
   createEmptyNegativeLabMeasuredProfileLibrary,
@@ -16,7 +17,9 @@ import {
   removeNegativeLabMeasuredProfileLibraryEntry,
 } from '../../../src/utils/negative-lab/negativeLabMeasuredProfileLibrary';
 
-const profile = catalog.profiles[0];
+const measuredProfileCatalog = parseNegativeLabMeasuredProfileCatalog(catalog);
+const profile = measuredProfileCatalog.profiles[0];
+if (profile === undefined) throw new Error('Measured profile catalog fixture must contain a profile.');
 const report: NegativeLabMeasurementReport = {
   calibrationMethod: profile.calibrationMethod,
   doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],

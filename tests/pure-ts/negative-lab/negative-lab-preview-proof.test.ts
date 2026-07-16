@@ -124,46 +124,48 @@ describe('Negative Lab before/after preview proof', () => {
     });
 
     expect(dryRunResult.kind).toBe('dry_run');
+    if (dryRunResult.kind !== 'dry_run') throw new Error('Expected Negative Lab dry-run result.');
     const dryRun = negativeLabDryRunResultV1Schema.parse(dryRunResult.dryRun);
     const beforeAfterProof = dryRun.proof?.runtimePreview.beforeAfterPreviewProof;
     expect(beforeAfterProof).toBeDefined();
-    expect(beforeAfterProof?.sourceNegativeArtifact).toMatchObject({
+    if (beforeAfterProof === undefined) throw new Error('Expected Negative Lab before/after preview proof.');
+    expect(beforeAfterProof.sourceNegativeArtifact).toMatchObject({
       dimensions: { height: 720, width: 1080 },
       imagePath: '/roll-01/frame-001-negative.dng',
       kind: 'source_negative',
       storage: 'source_file',
     });
-    expect(beforeAfterProof?.sourceNegativeArtifact.artifactId).not.toBe(
-      beforeAfterProof?.generatedPositiveDryRunArtifact.artifactId,
+    expect(beforeAfterProof.sourceNegativeArtifact.artifactId).not.toBe(
+      beforeAfterProof.generatedPositiveDryRunArtifact.artifactId,
     );
-    expect(beforeAfterProof?.sourceNegativeArtifact.contentHash).toMatch(/^sha256:source_negative:/u);
-    expect(beforeAfterProof?.generatedPositiveDryRunArtifact).toEqual({
+    expect(beforeAfterProof.sourceNegativeArtifact.contentHash).toMatch(/^sha256:source_negative:/u);
+    expect(beforeAfterProof.generatedPositiveDryRunArtifact).toEqual({
       artifactId: 'artifact_negative_lab_generated_positive_preview',
       contentHash: 'sha256:positive_preview_pixels_001',
       dimensions: { height: 720, width: 1080 },
       kind: 'preview',
       storage: 'temp_cache',
     });
-    expect(beforeAfterProof?.baseFogSampleSummary).toMatchObject({
+    expect(beforeAfterProof.baseFogSampleSummary).toMatchObject({
       confidence: 0.88,
       sampleCount: 512,
       source: 'requested_base_fog_sample_rect',
       warningCodes: ['uneven_illumination'],
     });
-    expect(beforeAfterProof?.warningCodes).toEqual(['low_acquisition_confidence', 'uneven_illumination']);
-    expect(beforeAfterProof?.claimLevel).toBe('measured_project_profile');
-    expect(beforeAfterProof?.acceptedDryRunPlanRequirement).toEqual({
+    expect(beforeAfterProof.warningCodes).toEqual(['low_acquisition_confidence', 'uneven_illumination']);
+    expect(beforeAfterProof.claimLevel).toBe('measured_project_profile');
+    expect(beforeAfterProof.acceptedDryRunPlanRequirement).toEqual({
       acceptedDryRunPlanHash: dryRunResult.acceptedDryRunPlanHash,
       dryRunPlanId: dryRun.dryRunPlanId,
       requiredBeforeApply: true,
     });
-    expect(beforeAfterProof?.behaviorProofHash).toMatch(/^sha256:/u);
+    expect(beforeAfterProof.behaviorProofHash).toMatch(/^sha256:/u);
     expect(dryRunResult.acceptedDryRunPlanHash).toBe(negativeLabAcceptedDryRunPlanHashV1(dryRun));
-    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.rendererVersion).toBe(2);
-    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.densityRangeUnclamped).toBeGreaterThan(0);
-    expect(dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.max).toBeGreaterThan(
-      dryRun.proof?.runtimePreview.densityNormalizationMetrics.axisBounds.luma.min,
-    );
+    const densityMetrics = dryRun.proof?.runtimePreview.densityNormalizationMetrics;
+    if (densityMetrics === undefined) throw new Error('Expected Negative Lab density normalization metrics.');
+    expect(densityMetrics.rendererVersion).toBe(2);
+    expect(densityMetrics.densityRangeUnclamped).toBeGreaterThan(0);
+    expect(densityMetrics.axisBounds.luma.max).toBeGreaterThan(densityMetrics.axisBounds.luma.min);
 
     const busWithoutNativeExecutor = new NegativeLabAppServerRuntimeToolBusV1(NEGATIVE_LAB_AGENT_TOOL_MANIFEST, {
       renderPreview: () => ({
@@ -178,19 +180,19 @@ describe('Negative Lab before/after preview proof', () => {
       request: command,
       toolName: 'negativelab.preview_conversion',
     });
+    if (unboundDryRun.kind !== 'dry_run') throw new Error('Expected unbound Negative Lab dry-run result.');
     expect(() =>
       busWithoutNativeExecutor.execute({
         request: {
-          acknowledgedWarningCodes:
-            unboundDryRun.kind === 'dry_run' ? unboundDryRun.dryRun.warnings.map((warning) => warning.code) : [],
-          acceptedDryRunPlanHash: unboundDryRun.kind === 'dry_run' ? unboundDryRun.acceptedDryRunPlanHash : '',
+          acknowledgedWarningCodes: unboundDryRun.dryRun.warnings.map((warning) => warning.code),
+          acceptedDryRunPlanHash: unboundDryRun.acceptedDryRunPlanHash,
           approval: {
             approvalClass: ApprovalClass.EditApply,
             reason: 'Synthetic output must never be accepted as a native save.',
             state: 'approved',
           },
           commandId: command.commandId,
-          dryRunPlanId: unboundDryRun.kind === 'dry_run' ? unboundDryRun.dryRun.dryRunPlanId : '',
+          dryRunPlanId: unboundDryRun.dryRun.dryRunPlanId,
           expectedSessionRevision: 'graph_rev_negative_lab_preview_proof',
           sessionId: 'session_negative_lab_preview_proof',
         },
@@ -201,7 +203,7 @@ describe('Negative Lab before/after preview proof', () => {
     expect(() =>
       bus.execute({
         request: {
-          acknowledgedWarningCodes: beforeAfterProof?.warningCodes ?? [],
+          acknowledgedWarningCodes: beforeAfterProof.warningCodes,
           acceptedDryRunPlanHash: 'sha256:wrong_preview_proof',
           approval: {
             approvalClass: ApprovalClass.EditApply,
@@ -219,7 +221,7 @@ describe('Negative Lab before/after preview proof', () => {
 
     const applyResult = bus.execute({
       request: {
-        acknowledgedWarningCodes: beforeAfterProof?.warningCodes ?? [],
+        acknowledgedWarningCodes: beforeAfterProof.warningCodes,
         acceptedDryRunPlanHash: dryRunResult.acceptedDryRunPlanHash,
         approval: {
           approvalClass: ApprovalClass.EditApply,
@@ -235,6 +237,7 @@ describe('Negative Lab before/after preview proof', () => {
     });
 
     expect(applyResult.kind).toBe('apply');
+    if (applyResult.kind !== 'apply') throw new Error('Expected Negative Lab apply result.');
     const apply = negativeLabApplyResultV1Schema.parse(applyResult.apply);
     expect(apply.positiveOutputReceipts[0]).toMatchObject({
       acceptedDryRunPlanHash: dryRunResult.acceptedDryRunPlanHash,
@@ -247,8 +250,10 @@ describe('Negative Lab before/after preview proof', () => {
       sourcePath: '/roll-01/frame-001-negative.dng',
       state: 'planned',
     });
-    expect(apply.proof?.runtimePreview.beforeAfterPreviewProof.acceptedDryRunPlanRequirement).toEqual(
-      beforeAfterProof?.acceptedDryRunPlanRequirement,
+    const appliedBeforeAfterProof = apply.proof?.runtimePreview.beforeAfterPreviewProof;
+    if (appliedBeforeAfterProof === undefined) throw new Error('Expected applied Negative Lab before/after proof.');
+    expect(appliedBeforeAfterProof.acceptedDryRunPlanRequirement).toEqual(
+      beforeAfterProof.acceptedDryRunPlanRequirement,
     );
   });
 
