@@ -123,10 +123,10 @@ export async function executePerformanceBisect(options: {
     const lease = await acquireResourceLease({
       hostBudgetCapacity: await resolveValidationHostBudgetCapacity(),
       label: 'performance-bisect',
-      onQueued: options.coordination?.onQueued,
       resource: 'native-heavy',
-      root: options.coordination?.root,
-      signal: options.signal,
+      ...(options.coordination?.onQueued === undefined ? {} : { onQueued: options.coordination.onQueued }),
+      ...(options.coordination?.root === undefined ? {} : { root: options.coordination.root }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
     try {
       const status = await run(parsed.cwd, 'git', ['status', '--porcelain=v1'], options.signal);

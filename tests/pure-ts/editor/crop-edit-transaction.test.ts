@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Crop } from 'react-image-crop';
 
+import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CropStraightenSessionIdentity } from '../../../src/components/panel/editor/cropStraightenController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
@@ -68,11 +69,12 @@ describe('crop edit transaction', () => {
       noOp: false,
       source: 'geometry-tool',
     });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toEqual(
-      result.beforeEditDocumentV2.nodes.scene_global_color_tone,
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
+      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
     );
-    expect(result.afterEditDocumentV2.nodes.geometry.params.crop).toEqual(crop);
-    expect(result.afterEditDocumentV2.geometry).toEqual(result.afterEditDocumentV2.nodes.geometry.params);
+    const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
+    expect(geometry.crop).toEqual(crop);
+    expect(result.afterEditDocumentV2.geometry).toEqual(geometry);
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({

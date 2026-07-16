@@ -6,7 +6,12 @@ import {
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildRetouchHandleEditTransaction,
@@ -19,7 +24,7 @@ const geometryEpoch = 11;
 const session = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
 const imageSize = { height: 3000, width: 4000 };
 const layer = (): MaskContainer => ({
-  adjustments: {},
+  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
   blendMode: 'normal',
   editNodes: createDefaultMaskEditNodes(),
   editNodeSchemaVersion: 1,
@@ -139,8 +144,10 @@ describe('retouch handle edit transaction', () => {
     if (command === null) throw new Error('expected retouch command');
     const build = (nextState: typeof state) =>
       buildRetouchHandleEditTransaction(nextState, command, imageSize, 'retouch-handle:stale');
-    expect(() => build({ ...state, imageSession: { id: 'successor' } })).toThrow('stale_image_session');
-    expect(() => build({ ...state, selectedImage: { path: '/fixture/other.ARW' } })).toThrow('stale_source');
+    expect(() => build({ ...state, imageSession: { ...session, id: 'successor' } })).toThrow('stale_image_session');
+    expect(() => build({ ...state, selectedImage: { ...selectedImage, path: '/fixture/other.ARW' } })).toThrow(
+      'stale_source',
+    );
     expect(() => build({ ...state, sourceRevision: 'viewer-graph:retouch:2' })).toThrow('stale_source_revision');
     expect(() => build({ ...state, geometryEpoch: geometryEpoch + 1 })).toThrow('stale_geometry');
     expect(() =>
@@ -150,13 +157,11 @@ describe('retouch handle edit transaction', () => {
           ...state.adjustmentSnapshot,
           value: {
             ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({
-              ...mask,
-              retouchCloneSource:
-                mask.retouchCloneSource === undefined
-                  ? undefined
-                  : { ...mask.retouchCloneSource, scale: mask.retouchCloneSource.scale + 0.1 },
-            })),
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => {
+              const next = structuredClone(mask);
+              if (next.retouchCloneSource !== undefined) next.retouchCloneSource.scale += 0.1;
+              return next;
+            }),
           },
         },
       }),
@@ -202,7 +207,11 @@ describe('retouch handle edit transaction', () => {
           ...state.adjustmentSnapshot,
           value: {
             ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, retouchCloneSource: undefined })),
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => {
+              const next = structuredClone(mask);
+              delete next.retouchCloneSource;
+              return next;
+            }),
           },
         },
       }),
