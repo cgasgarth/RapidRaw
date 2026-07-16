@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import i18next from 'i18next';
 import { act, createElement, useState } from 'react';
@@ -7,12 +7,15 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { ColorGradingControls } from '../../../src/components/adjustments/color/ColorGradingControls';
 import en from '../../../src/i18n/locales/en.json';
+import { useEditorStore } from '../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../../src/utils/colorGradingPresets';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
+
+beforeEach(() => useEditorStore.getState().setEditor({ selectedImage: null }));
 
 afterEach(() => {
   if (renderedRoot !== null) {

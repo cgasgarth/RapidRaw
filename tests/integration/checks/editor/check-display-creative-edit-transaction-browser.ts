@@ -15,8 +15,6 @@ const persistenceSchema = z
   .object({
     adjustments: z
       .object({
-        filmLookId: z.null(),
-        filmLookStrength: z.literal(100),
         grainAmount: z.literal(28),
         grainRoughness: z.literal(50),
         grainSize: z.literal(34),
@@ -47,8 +45,6 @@ const halationPersistenceSchema = z
   .object({
     adjustments: z
       .object({
-        filmLookId: z.null(),
-        filmLookStrength: z.literal(100),
         halationAmount: z.literal(24),
         vignetteAmount: z.literal(-32),
         vignetteMidpoint: z.literal(63),
@@ -252,12 +248,6 @@ try {
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'RapidRAW' }).waitFor({ timeout: 30_000 });
-  await page.evaluate((path) => {
-    window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.setAdjustmentsForPath(path, {
-      filmLookId: 'film_look.generic.warm.v1',
-      filmLookStrength: 72,
-    });
-  }, sourcePath);
   await page.getByRole('button', { name: /Open Folder/u }).click();
   const thumbnail = page.getByRole('button', { name: /browser-harness\.ARW/u }).first();
   await thumbnail.waitFor({ timeout: 10_000 });
@@ -384,14 +374,12 @@ try {
   const halationSave = halationPersistenceSchema.parse(saveCalls.at(-2)?.args);
   const grainSave = persistenceSchema.parse(saveCalls.at(-1)?.args);
   if (
-    halationSave.adjustments.filmLookId !== null ||
-    halationSave.adjustments.filmLookStrength !== 100 ||
     halationSave.adjustments.halationAmount !== 24 ||
     halationSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision ||
     grainSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision + 1
   ) {
     throw new Error(
-      `Film effects did not persist sequential revisions with atomic Film Look invalidation: ${JSON.stringify({ grainSave, halationSave })}`,
+      `Film effects did not persist sequential current revisions: ${JSON.stringify({ grainSave, halationSave })}`,
     );
   }
 

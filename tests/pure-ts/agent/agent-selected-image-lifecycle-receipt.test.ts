@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  agentSelectedImageLifecycleReceiptV2Schema,
   canonicalizeAgentSelectedImageLifecycleValue,
   hashAgentSelectedImageLifecycleValue,
   sealAgentSelectedImageLifecyclePhase,
-  upgradeAgentSelectedImageLiveSessionReceiptV1,
 } from '../../../src/schemas/agent/agentSelectedImageLifecycleReceiptSchemas';
 
 describe('selected-image lifecycle receipt hashing', () => {
@@ -24,11 +24,12 @@ describe('selected-image lifecycle receipt hashing', () => {
     );
   });
 
-  test('marks V1 receipts as legacy evidence without upgrading weak hashes', () => {
-    expect(upgradeAgentSelectedImageLiveSessionReceiptV1({ schemaVersion: 1, finalGraphHash: 'sha256:abcd' })).toEqual({
-      legacyReceipt: { schemaVersion: 1, finalGraphHash: 'sha256:abcd' },
-      proof: 'legacy_unverified',
-      schemaVersion: 1,
-    });
+  test('rejects V1 receipts instead of upgrading unverified legacy evidence', () => {
+    expect(
+      agentSelectedImageLifecycleReceiptV2Schema.safeParse({
+        finalGraphHash: 'sha256:abcd',
+        schemaVersion: 1,
+      }).success,
+    ).toBe(false);
   });
 });

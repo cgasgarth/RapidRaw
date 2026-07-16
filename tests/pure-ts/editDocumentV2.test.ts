@@ -82,7 +82,6 @@ describe('EditDocumentV2 legacy adapter', () => {
       'tone_equalizer',
       'display_creative',
       'film_emulation',
-      'film_look',
       'detail_denoise_dehaze',
       'point_color',
       'color_balance_rgb',
@@ -153,59 +152,30 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toEqual({ filmEmulation: { mix: 1 } });
   });
 
-  test('owns strict Film Look identity and migrates old V2 authority idempotently', () => {
-    const document = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-    expect(document.nodes.film_look.params).toEqual({
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-    expect(document.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
-    expect(document.extensions.legacyAdjustments).not.toHaveProperty('filmLookStrength');
-    expect(document.migration?.mapped).toContain('film_look.filmLookId');
-    expect(document.migration?.mapped).toContain('film_look.filmLookStrength');
-    const reset = resetEditDocumentV2Node(document, 'film_look');
-    expect(reset.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
-    expect(reset.nodes.scene_global_color_tone).toEqual(document.nodes.scene_global_color_tone);
+  test('rejects retired flat Film authority and retired Film nodes', () => {
+    expect(() =>
+      legacyAdjustmentsToEditDocumentV2({
+        ...structuredClone(INITIAL_ADJUSTMENTS),
+        filmLookId: 'film_look.generic.warm_print.v1',
+        filmLookStrength: 65,
+      }),
+    ).toThrow("rejects retired pre-node Film field 'filmLookId'");
 
-    const oldV2 = structuredClone(document);
-    delete (oldV2.nodes as Partial<typeof oldV2.nodes>).film_look;
-    Object.assign(oldV2.extensions.legacyAdjustments as Record<string, unknown>, {
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-    if (oldV2.migration === undefined) throw new Error('fixture migration receipt is required');
-    oldV2.migration.mapped = oldV2.migration.mapped.filter((path) => !path.startsWith('film_look.'));
-    const reopened = editDocumentV2Schema.parse(oldV2);
-    expect(reopened.nodes.film_look.params).toEqual(document.nodes.film_look.params);
-    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
-    expect(editDocumentV2Schema.parse(reopened)).toEqual(reopened);
-
-    const corruptOldV2 = structuredClone(oldV2);
-    Object.assign(corruptOldV2.extensions.legacyAdjustments as Record<string, unknown>, {
-      filmLookId: 'unknown-look',
-      filmLookStrength: Number.NaN,
-    });
-    const quarantined = editDocumentV2Schema.parse(corruptOldV2);
-    expect(quarantined.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
-    expect(quarantined.extensions.quarantinedLegacyAdjustments).toMatchObject({ filmLookId: 'unknown-look' });
-    expect(quarantined.extensions.quarantinedLegacyAdjustments?.filmLookStrength).toBeNaN();
-    expect(quarantined.migration?.quarantined).toEqual(expect.arrayContaining(['filmLookId', 'filmLookStrength']));
-
-    const corruptFlat = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 101,
-    });
-    expect(corruptFlat.nodes.film_look.params).toEqual({
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 100,
-    });
-    expect(corruptFlat.extensions.quarantinedLegacyAdjustments).toMatchObject({ filmLookStrength: 101 });
-    expect(corruptFlat.migration?.defaulted).toContain('film_look.filmLookStrength');
+    const current = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
+    const retiredNode = {
+      ...structuredClone(current),
+      nodes: {
+        ...structuredClone(current.nodes),
+        film_look: {
+          enabled: true,
+          implementationVersion: 1,
+          params: { filmLookId: 'film_look.generic.warm_print.v1', filmLookStrength: 65 },
+          process: 'scene_referred_v2',
+          type: 'film_look',
+        },
+      },
+    };
+    expect(editDocumentV2Schema.safeParse(retiredNode).success).toBeFalse();
   });
 
   test('owns strict Color Presence state and migrates old scene-node fields idempotently', () => {
@@ -1847,26 +1817,30 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(renderDocument.nodes.scene_curve).toEqual(preparedDocument.nodes.scene_curve);
   });
 
-  test('render preparation overlays independent Film Emulation and Film Look authority', () => {
+  test('render preparation overlays only current Film Emulation authority', () => {
+    const filmEmulation = {
+      contractVersion: 1 as const,
+      enabled: true,
+      mix: 0.65,
+      nodeType: 'film_emulation' as const,
+      profileRef: {
+        contentSha256: `sha256:${'a'.repeat(64)}` as const,
+        id: 'rapidraw.reference_film.v1',
+        version: '1',
+      },
+      seedPolicy: 'source_stable_v1' as const,
+      workingSpace: 'acescg_linear_v1' as const,
+    };
     const authoritative = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
+      filmEmulation,
     });
-    const prepared = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      filmLookId: 'film_look.generic.clean_color.v1',
-      filmLookStrength: 25,
-    };
-    const renderDocument = prepareEditDocumentV2ForRender(prepared, authoritative, ['film_emulation', 'film_look']);
+    const renderDocument = prepareEditDocumentV2ForRender(structuredClone(INITIAL_ADJUSTMENTS), authoritative, [
+      'film_emulation',
+    ]);
 
     expect(renderDocument.nodes.film_emulation).toBe(authoritative.nodes.film_emulation);
-    expect(renderDocument.nodes.film_look).toBe(authoritative.nodes.film_look);
-    expect(renderDocument.nodes.film_look.params).toEqual({
-      filmLookId: 'film_look.generic.warm_print.v1',
-      filmLookStrength: 65,
-    });
-    expect(renderDocument.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
+    expect(renderDocument.nodes.film_emulation.params).toEqual({ filmEmulation });
   });
 
   test('render preparation overlays the authoritative tone-equalizer envelope', () => {

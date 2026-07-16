@@ -31,6 +31,7 @@ const selectedImage: SelectedImage = {
   thumbnailUrl: 'data:image/jpeg;base64,AAAA',
   width: 6000,
 };
+const initialEditDocumentV2 = structuredClone(useEditorStore.getState().editDocumentV2);
 
 const transcript: AgentChatTranscript = {
   id: 'agent-chat-shell-test',
@@ -90,7 +91,10 @@ afterEach(() => {
   }
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
+    editDocumentHistory: [initialEditDocumentV2],
+    editDocumentV2: initialEditDocumentV2,
     history: [INITIAL_ADJUSTMENTS],
+    historyCheckpoints: [],
     historyIndex: 0,
     selectedImage: null,
   });
@@ -274,9 +278,12 @@ async function render(element: ReturnType<typeof createElement>) {
 function seedEditor() {
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustments: INITIAL_ADJUSTMENTS,
+    editDocumentHistory: [initialEditDocumentV2],
+    editDocumentV2: initialEditDocumentV2,
     finalPreviewUrl: 'blob:agent-chat-shell-before',
     hasRenderedFirstFrame: true,
     history: [INITIAL_ADJUSTMENTS],
+    historyCheckpoints: [],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage,

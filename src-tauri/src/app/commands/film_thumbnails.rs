@@ -7,7 +7,7 @@ use tauri::Manager;
 
 use crate::AppState;
 use crate::app::commands::preset_previews::render_preset_preview_bytes;
-use crate::render::film_look_render::normalize_film_look_adjustments_for_render;
+use crate::render::film_emulation::FilmEmulationProfileRef;
 use crate::render::film_render_scheduler::{FilmRenderIdentityV1, FilmRenderQualityV1};
 use crate::render::film_thumbnail_cache::{
     FilmThumbnailCacheLookupResult, FilmThumbnailDescriptor, FilmThumbnailEntry,
@@ -16,22 +16,7 @@ use crate::render::film_thumbnail_cache::{
 
 const FILM_THUMBNAIL_RENDERER_VERSION: &str = "film-thumbnail-renderer-v1";
 const THUMBNAIL_QUALITY: &str = "profile_thumbnail_v1";
-const FILM_CONTROLLED_FIELDS: &[&str] = &[
-    "temperature",
-    "contrast",
-    "highlights",
-    "shadows",
-    "blacks",
-    "saturation",
-    "glowAmount",
-    "grainAmount",
-    "grainRoughness",
-    "grainSize",
-    "halationAmount",
-    "filmLookId",
-    "filmLookStrength",
-    "filmEmulation",
-];
+const FILM_CONTROLLED_FIELDS: &[&str] = &["filmEmulation"];
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -39,7 +24,7 @@ pub(crate) struct FilmThumbnailRequestV1 {
     request_id: String,
     selected_image_id: String,
     graph_revision: u64,
-    look_id: String,
+    profile_ref: FilmEmulationProfileRef,
     adjustments: serde_json::Value,
     width: u32,
     height: u32,
@@ -167,7 +152,7 @@ fn render_film_profile_thumbnail_blocking(
     };
     let source_fingerprint = source.artifact_source.source_fingerprint();
     let identity = build_identity(&request, source_fingerprint)?;
-    let key = thumbnail_key(&identity, &request.look_id)?;
+    let key = thumbnail_key(&identity, &request.profile_ref)?;
     let expected = FilmThumbnailLookup {
         key: key.clone(),
         width: request.width,
@@ -310,7 +295,7 @@ fn render_film_profile_thumbnail_blocking(
 fn thumbnail_lane(request: &FilmThumbnailRequestV1) -> String {
     format!(
         "thumbnail:{}:{}x{}",
-        request.look_id, request.width, request.height
+        request.profile_ref.id, request.width, request.height
     )
 }
 
@@ -339,19 +324,26 @@ pub(crate) fn handle_film_thumbnail_memory_pressure(state: tauri::State<AppState
 fn validate_request(request: &FilmThumbnailRequestV1) -> Result<(), String> {
     if request.request_id.trim().is_empty()
         || request.selected_image_id.trim().is_empty()
-        || request.look_id.trim().is_empty()
         || request.width < 32
         || request.height < 32
         || request.width > 1024
         || request.height > 1024
         || !is_identity_hash(&request.view_output_sha256)
         || !request.adjustments.is_object()
-        || request
-            .adjustments
-            .get("filmLookId")
-            .and_then(serde_json::Value::as_str)
-            != Some(request.look_id.as_str())
     {
+        return Err("film_thumbnail_invalid_request".to_string());
+    }
+    let node: crate::render::film_emulation::FilmEmulationNodeV1 = serde_json::from_value(
+        request
+            .adjustments
+            .get("filmEmulation")
+            .cloned()
+            .ok_or_else(|| "film_thumbnail_invalid_request".to_string())?,
+    )
+    .map_err(|_| "film_thumbnail_invalid_request".to_string())?;
+    node.validate()
+        .map_err(|_| "film_thumbnail_invalid_request".to_string())?;
+    if node.profile_ref != request.profile_ref {
         return Err("film_thumbnail_invalid_request".to_string());
     }
     Ok(())
@@ -367,11 +359,11 @@ fn build_identity(
             object.remove(*field);
         }
     }
-    let normalized = normalize_film_look_adjustments_for_render(&request.adjustments);
     let film_node = FILM_CONTROLLED_FIELDS
         .iter()
         .filter_map(|field| {
-            normalized
+            request
+                .adjustments
                 .get(*field)
                 .map(|value| ((*field).to_string(), value.clone()))
         })
@@ -389,7 +381,7 @@ fn build_identity(
         graph_revision: request.graph_revision,
         upstream_graph_sha256: sha256_json(&upstream)?,
         film_node_sha256: sha256_json(&film_node)?,
-        compiled_profile_sha256: sha256_json(&request.look_id)?,
+        compiled_profile_sha256: sha256_json(&request.profile_ref)?,
         execution_plan_sha256: sha256_json(&serde_json::json!({
             "quality": THUMBNAIL_QUALITY,
             "rendererVersion": FILM_THUMBNAIL_RENDERER_VERSION,
@@ -406,10 +398,13 @@ fn build_identity(
     })
 }
 
-fn thumbnail_key(identity: &FilmRenderIdentityV1, look_id: &str) -> Result<String, String> {
+fn thumbnail_key(
+    identity: &FilmRenderIdentityV1,
+    profile_ref: &FilmEmulationProfileRef,
+) -> Result<String, String> {
     sha256_json(&serde_json::json!({
         "identity": identity,
-        "lookId": look_id,
+        "profileRef": profile_ref,
         "thumbnailRendererVersion": FILM_THUMBNAIL_RENDERER_VERSION,
     }))
 }
@@ -433,15 +428,27 @@ mod tests {
     use super::*;
 
     fn request() -> FilmThumbnailRequestV1 {
+        let profile_ref = FilmEmulationProfileRef {
+            id: crate::render::film_emulation::REFERENCE_PROFILE_ID.into(),
+            version: crate::render::film_emulation::REFERENCE_PROFILE_VERSION.into(),
+            content_sha256: crate::render::film_emulation::REFERENCE_PROFILE_CONTENT_SHA256.into(),
+        };
         FilmThumbnailRequestV1 {
             request_id: "request-1".into(),
             selected_image_id: "editor-image-session:1".into(),
             graph_revision: 7,
-            look_id: "film_look.generic.warm_print.v1".into(),
+            profile_ref: profile_ref.clone(),
             adjustments: serde_json::json!({
                 "contrast": 10,
-                "filmLookId": "film_look.generic.warm_print.v1",
-                "filmLookStrength": 65,
+                "filmEmulation": {
+                    "contractVersion": 1,
+                    "enabled": true,
+                    "mix": 0.65,
+                    "nodeType": "film_emulation",
+                    "profileRef": profile_ref,
+                    "seedPolicy": "source_stable_v1",
+                    "workingSpace": "acescg_linear_v1"
+                },
                 "temperature": 8,
                 "exposure": 0.5,
                 "crop": {"x": 0, "y": 0, "width": 1, "height": 1}
@@ -473,8 +480,8 @@ mod tests {
             changed_identity.film_node_sha256
         );
         assert_ne!(
-            thumbnail_key(&first_identity, &first.look_id).unwrap(),
-            thumbnail_key(&changed_identity, &changed.look_id).unwrap()
+            thumbnail_key(&first_identity, &first.profile_ref).unwrap(),
+            thumbnail_key(&changed_identity, &changed.profile_ref).unwrap()
         );
     }
 
@@ -492,7 +499,7 @@ mod tests {
         assert_eq!(identity.film_node_sha256, upstream.film_node_sha256);
 
         let mut film = request();
-        film.adjustments["filmLookStrength"] = serde_json::json!(80);
+        film.adjustments["filmEmulation"]["mix"] = serde_json::json!(0.8);
         let film = build_identity(&film, 99).unwrap();
         assert_eq!(identity.upstream_graph_sha256, film.upstream_graph_sha256);
         assert_ne!(identity.film_node_sha256, film.film_node_sha256);
@@ -502,7 +509,7 @@ mod tests {
     fn every_renderer_authoritative_thumbnail_boundary_changes_the_full_key() {
         let base = request();
         let base_identity = build_identity(&base, 99).unwrap();
-        let base_key = thumbnail_key(&base_identity, &base.look_id).unwrap();
+        let base_key = thumbnail_key(&base_identity, &base.profile_ref).unwrap();
 
         let mut mutations: Vec<(FilmThumbnailRequestV1, u64)> = Vec::new();
         let mut selected_image = request();
@@ -515,7 +522,7 @@ mod tests {
         upstream.adjustments["exposure"] = serde_json::json!(1.25);
         mutations.push((upstream, 99));
         let mut film = request();
-        film.adjustments["filmLookStrength"] = serde_json::json!(25);
+        film.adjustments["filmEmulation"]["mix"] = serde_json::json!(0.25);
         mutations.push((film, 99));
         let mut geometry = request();
         geometry.adjustments["rotation"] = serde_json::json!(1);
@@ -531,16 +538,16 @@ mod tests {
         for (mutation, source_fingerprint) in mutations {
             let identity = build_identity(&mutation, source_fingerprint).unwrap();
             assert_ne!(
-                thumbnail_key(&identity, &mutation.look_id).unwrap(),
+                thumbnail_key(&identity, &mutation.profile_ref).unwrap(),
                 base_key
             );
         }
     }
 
     #[test]
-    fn rejects_look_identity_mismatch_before_native_rendering() {
+    fn rejects_profile_identity_mismatch_before_native_rendering() {
         let mut mismatch = request();
-        mismatch.look_id = "film_look.generic.cool_contrast.v1".into();
+        mismatch.profile_ref.content_sha256 = format!("sha256:{}", "b".repeat(64));
         assert_eq!(
             validate_request(&mismatch),
             Err("film_thumbnail_invalid_request".to_string())

@@ -1,10 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
-import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FilmStageControlDescriptorV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
 import {
@@ -12,13 +9,6 @@ import {
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
 } from '../../utils/displayCreativeEditTransaction';
-import { filmEmulationCanonicalHash } from '../../utils/film-look/filmEmulationOperation';
-import {
-  buildFilmLookPresetDraft,
-  type FilmLookBrowserItem,
-  formatFilmLookPresetName,
-  getFilmLookControlledAdjustmentKeys,
-} from '../../utils/film-look/filmLookBrowser';
 import {
   buildFilmStageOperation,
   FILM_REFERENCE_STAGE_DEFAULT_P,
@@ -27,16 +17,12 @@ import {
 import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import { buildLutClearEditTransaction } from '../../utils/lutEditTransaction';
 import FilmStageControls from '../film/FilmStageControls';
-import type { AppSettings, Preset } from '../ui/AppProperties';
+import type { AppSettings } from '../ui/AppProperties';
 import { editorChromeStatusChipClassName } from '../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 import LUTControl from './LUTControl';
-
-const FilmLookBrowser = lazy(() =>
-  import('./FilmLookBrowser.js').then((module) => ({ default: module.FilmLookBrowser })),
-);
 
 interface EffectsPanelProps {
   adjustments: Adjustments;
@@ -57,29 +43,8 @@ interface EffectsPanelProps {
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
-type PresetExportItem = { preset: Preset };
-
-const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
-const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
-const FILM_LOOK_SAVE_FAILED = 'Film look preset save failed.';
-const FILM_LOOK_SHARE_FAILED = 'Film look preset export failed.';
-const FILM_LOOK_CONTROLLED_ADJUSTMENT_KEYS = new Set<string>([
-  ...getFilmLookControlledAdjustmentKeys(),
-  CreativeAdjustment.HalationAmount,
-  Effect.GrainRoughness,
-]);
-const formatFilmLookSavedStatus = (look: FilmLookBrowserItem, strength: number) =>
-  `Saved ${formatFilmLookPresetName(look, strength)}`;
-const formatFilmLookSharedStatus = (look: FilmLookBrowserItem, strength: number) =>
-  `Exported ${formatFilmLookPresetName(look, strength)}`;
 const formatEffectSummaryValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatEffectSummaryPercent = (value: number) => `${value}%`;
-const sanitizeFilmLookPresetFileName = (look: FilmLookBrowserItem, strength: number) =>
-  `${formatFilmLookPresetName(look, strength)}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
-const createFilmLookPreset = (look: FilmLookBrowserItem, strength: number): Preset => ({
-  ...buildFilmLookPresetDraft(look, strength),
-  id: crypto.randomUUID(),
-});
 const summaryChipClassName =
   'inline-flex min-h-5 max-w-full items-center gap-1 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[10px] font-medium leading-3 text-text-secondary';
 const summaryChipLabelClassName = 'truncate text-text-tertiary';
@@ -100,31 +65,17 @@ export default function EffectsPanel({
   onFilmEmulationOperation,
 }: EffectsPanelProps) {
   const { t } = useTranslation();
-  const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
   const [filmStageP, setFilmStageP] = useState(FILM_REFERENCE_STAGE_DEFAULT_P);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const imageSessionId = useEditorStore(
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
-  const proofRevision = useEditorStore((state) => state.proofRevision);
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
-  const filmThumbnailViewOutputSha256 = useMemo(
-    () =>
-      filmEmulationCanonicalHash({
-        displayTarget: 'display_p3',
-        proofRevision,
-        viewTransform: 'rawengine_agx_v1',
-      }),
-    [proofRevision],
-  );
-  const displayCreativeCommitIdentity = useMemo<DisplayCreativeCommitIdentity | null>(
-    () =>
-      !isForMask && selectedImagePath !== null
-        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
-        : null,
-    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
-  );
+  const displayCreativeCommitIdentity: DisplayCreativeCommitIdentity | null =
+    !isForMask && selectedImagePath !== null
+      ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+      : null;
   const displayCreativeCommitIdentityRef = useRef(displayCreativeCommitIdentity);
   displayCreativeCommitIdentityRef.current = displayCreativeCommitIdentity;
 
@@ -149,7 +100,6 @@ export default function EffectsPanel({
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       [key]: nextValue,
-      ...(FILM_LOOK_CONTROLLED_ADJUSTMENT_KEYS.has(key) ? { filmLookId: null, filmLookStrength: 100 } : {}),
     }));
   };
 
@@ -164,14 +114,6 @@ export default function EffectsPanel({
       buildLutClearEditTransaction(useEditorStore.getState(), identity, crypto.randomUUID()),
     );
     displayCreativeCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
-  };
-
-  const handleFilmLookApply = async (look: FilmLookBrowserItem, strength: number) => {
-    if (onFilmEmulationOperation === undefined) {
-      setFilmLookPresetStatus('Film operation adapter unavailable; no legacy patch was applied.');
-      return;
-    }
-    await onFilmEmulationOperation({ kind: 'set_profile', profileId: look.id, mix: strength / 100 });
   };
 
   const filmStageDescriptors = getFilmStageControlDescriptors(filmStageP);
@@ -195,50 +137,7 @@ export default function EffectsPanel({
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...patch,
-      filmLookId: null,
-      filmLookStrength: 100,
     }));
-  };
-
-  const saveFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
-    try {
-      await invoke(Invokes.SaveCommunityPreset, buildFilmLookPresetDraft(look, strength));
-      setFilmLookPresetStatus(formatFilmLookSavedStatus(look, strength));
-    } catch (error) {
-      setFilmLookPresetStatus(FILM_LOOK_SAVE_FAILED);
-      console.error(FILM_LOOK_SAVE_FAILED, error);
-    }
-  };
-
-  const shareFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
-    const filePath = await saveDialog({
-      defaultPath: sanitizeFilmLookPresetFileName(look, strength),
-      filters: [{ name: FILM_LOOK_PRESET_FILE_TYPE, extensions: [FILM_LOOK_PRESET_FILE_EXTENSION] }],
-      title: t('editor.presets.dialog.exportTitle', {
-        type: t('editor.presets.types.preset'),
-      }),
-    });
-
-    if (typeof filePath !== 'string') {
-      return;
-    }
-
-    const presetsToExport: Array<PresetExportItem> = [{ preset: createFilmLookPreset(look, strength) }];
-    try {
-      await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
-      setFilmLookPresetStatus(formatFilmLookSharedStatus(look, strength));
-    } catch (error) {
-      setFilmLookPresetStatus(FILM_LOOK_SHARE_FAILED);
-      console.error(FILM_LOOK_SHARE_FAILED, error);
-    }
-  };
-
-  const handleFilmLookSave = (look: FilmLookBrowserItem, strength: number) => {
-    void saveFilmLookPreset(look, strength);
-  };
-
-  const handleFilmLookShare = (look: FilmLookBrowserItem, strength: number) => {
-    void shareFilmLookPreset(look, strength);
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
@@ -247,11 +146,11 @@ export default function EffectsPanel({
     typeof adjustments.lutName === 'string' && adjustments.lutName.length > 0 ? adjustments.lutName : null;
   const activeLutIntensity = adjustments.lutIntensity ?? 100;
   const activeEffectSummaryChips: Array<EffectSummaryChip> = [
-    ...(adjustments.filmLookId !== null
+    ...(adjustments.filmEmulation !== null
       ? [
           {
             label: t('adjustments.effects.filmLookBrowser.activeLook'),
-            value: formatEffectSummaryPercent(adjustments.filmLookStrength),
+            value: formatEffectSummaryPercent(Math.round(adjustments.filmEmulation.mix * 100)),
           },
         ]
       : []),
@@ -387,32 +286,6 @@ export default function EffectsPanel({
 
       {!isForMask && (
         <div className={density.gutter.section}>
-          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
-            <Suspense fallback={null}>
-              <FilmLookBrowser
-                activeLookId={adjustments.filmLookId}
-                activeStrength={adjustments.filmLookStrength}
-                baseAdjustments={adjustments}
-                graphRevision={adjustmentRevision}
-                onApplyLook={handleFilmLookApply}
-                onSaveLook={handleFilmLookSave}
-                onShareLook={handleFilmLookShare}
-                selectedImageId={selectedImagePath === null ? null : imageSessionId}
-                viewOutputSha256={filmThumbnailViewOutputSha256}
-              />
-            </Suspense>
-            {filmLookPresetStatus !== null && (
-              <UiText
-                aria-live="polite"
-                className="mt-1.5 rounded border border-editor-border bg-editor-panel px-2 py-1 text-[11px] leading-4 text-text-secondary"
-                data-testid="film-look-preset-status"
-                variant={TextVariants.small}
-              >
-                {filmLookPresetStatus}
-              </UiText>
-            )}
-          </div>
-
           <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
             <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
               {t('adjustments.effects.filmStages.title', { defaultValue: 'Film stages' })}

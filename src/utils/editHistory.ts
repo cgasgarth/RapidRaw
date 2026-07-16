@@ -93,8 +93,6 @@ const ADJUSTMENT_LABELS: Record<string, string> = {
   dehaze: 'Dehaze',
   exposure: 'Exposure',
   effectsEnabled: 'Effects Enabled',
-  filmLookId: 'Film Look',
-  filmLookStrength: 'Film Look Strength',
   flipHorizontal: 'Flip Horizontal',
   flipVertical: 'Flip Vertical',
   grainAmount: 'Grain Amount',

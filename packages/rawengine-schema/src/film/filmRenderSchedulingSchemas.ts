@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { filmEmulationProfileRefV1Schema } from './filmEmulationSchemas.js';
 
 export const filmRenderQualityV1Schema = z.enum([
   'interactive_drag_v1',
@@ -66,7 +67,7 @@ export const filmThumbnailRequestV1Schema = z
     requestId: z.string().trim().min(1),
     selectedImageId: z.string().trim().min(1),
     graphRevision: z.number().int().nonnegative(),
-    lookId: z.string().trim().min(1),
+    profileRef: filmEmulationProfileRefV1Schema,
     adjustments: z.record(z.string(), z.unknown()),
     width: z.number().int().min(32).max(1024),
     height: z.number().int().min(32).max(1024),

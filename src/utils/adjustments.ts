@@ -311,10 +311,8 @@ export interface Adjustments {
   flipHorizontal: boolean;
   flipVertical: boolean;
   flareAmount: number;
-  /** Canonical renderer-owned Film node; null keeps the legacy Film look path disabled. */
+  /** Canonical renderer-owned Film node. */
   filmEmulation: FilmEmulationNodeV1 | null;
-  filmLookId: string | null;
-  filmLookStrength: number;
   glowAmount: number;
   grainAmount: number;
   grainRoughness: number;
@@ -997,8 +995,6 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   flipVertical: false,
   flareAmount: 0,
   filmEmulation: null,
-  filmLookId: null,
-  filmLookStrength: 100,
   glowAmount: 0,
   grainAmount: 0,
   grainRoughness: 50,
@@ -1245,8 +1241,6 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     ...loadedPixelAdjustments,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     filmEmulation: parsedFilmEmulation.success ? parsedFilmEmulation.data : INITIAL_ADJUSTMENTS.filmEmulation,
-    filmLookId: loadedAdjustments.filmLookId ?? INITIAL_ADJUSTMENTS.filmLookId,
-    filmLookStrength: loadedAdjustments.filmLookStrength ?? INITIAL_ADJUSTMENTS.filmLookStrength,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
     halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
     hue: loadedAdjustments.hue ?? INITIAL_ADJUSTMENTS.hue,
