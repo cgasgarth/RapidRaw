@@ -92,7 +92,7 @@ try{${script}}finally{clearInterval(lifecycle)}`;
           RAWENGINE_TEST_PARENT_PID: String(process.pid),
           ...environment,
         },
-        cwd,
+        ...(cwd === undefined ? {} : { cwd }),
         stderr: 'pipe',
         stdout: 'pipe',
       },
@@ -100,7 +100,7 @@ try{${script}}finally{clearInterval(lifecycle)}`;
   );
 };
 
-const expectSuccessfulExit = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
+const expectSuccessfulExit = async (child: ReturnType<typeof directLease>): Promise<void> => {
   const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
   expect(exitCode, stderr).toBe(0);
 };
@@ -121,7 +121,7 @@ const coordinated = (root: string, label: string, script: string, cwd?: string) 
         script,
       ],
       {
-        cwd,
+        ...(cwd === undefined ? {} : { cwd }),
         env: {
           ...Bun.env,
           RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
@@ -350,7 +350,7 @@ printf '.git\n'
       GIT_CONFIG_KEY_0: 'core.fsmonitor',
       GIT_CONFIG_VALUE_0: 'true',
       GIT_CONFIG_GLOBAL: join(root, 'hostile-global-config'),
-      PATH: `${bin}:${Bun.env.PATH ?? ''}`,
+      PATH: `${bin}:${Bun.env['PATH'] ?? ''}`,
     };
     const modulePath = join(import.meta.dir, '../../../scripts/lib/ci/resource-coordinator.ts');
     const child = trackChild(

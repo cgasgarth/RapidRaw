@@ -149,16 +149,16 @@ const valueAfter = (flag: string): string | undefined => {
 
 if (import.meta.main) {
   if (process.argv.includes('--verify')) {
-    const needs = JSON.parse(process.env.NEEDS_CONTEXT ?? '{}') as Record<string, { result?: string }>;
-    const plan = JSON.parse(process.env.PLAN_JSON ?? '{}') as PrValidationPlan;
-    const jobs = parseWorkflowJobTimings(JSON.parse(process.env.JOBS_CONTEXT ?? '{}'));
+    const needs = JSON.parse(process.env['NEEDS_CONTEXT'] ?? '{}') as Record<string, { result?: string }>;
+    const plan = JSON.parse(process.env['PLAN_JSON'] ?? '{}') as PrValidationPlan;
+    const jobs = parseWorkflowJobTimings(JSON.parse(process.env['JOBS_CONTEXT'] ?? '{}'));
     const elapsedSeconds = requiredExecutionElapsedSeconds(jobs, plan.lanes);
     const failures = verifyRequiredResults(
       Object.fromEntries(Object.entries(needs).map(([job, value]) => [job, value.result ?? 'missing'])),
       plan.lanes,
       elapsedSeconds,
     );
-    const summary = process.env.GITHUB_STEP_SUMMARY;
+    const summary = process.env['GITHUB_STEP_SUMMARY'];
     if (summary) {
       const previous = await Bun.file(summary)
         .text()
@@ -178,7 +178,7 @@ if (import.meta.main) {
   const pathsFile = valueAfter('--paths-file');
   if (!pathsFile) throw new Error('--paths-file is required');
   const plan = planPrValidation((await Bun.file(pathsFile).text()).split(/\r?\n/));
-  const output = process.env.GITHUB_OUTPUT;
+  const output = process.env['GITHUB_OUTPUT'];
   if (output) {
     const lines = [
       ...Object.entries(plan.lanes).map(([lane, selected]) => `${lane}=${selected}`),
@@ -191,7 +191,7 @@ if (import.meta.main) {
         .catch(() => '')}${lines.join('\n')}\n`,
     );
   }
-  const summary = process.env.GITHUB_STEP_SUMMARY;
+  const summary = process.env['GITHUB_STEP_SUMMARY'];
   if (summary) {
     const selected = Object.entries(plan.lanes)
       .filter(([, enabled]) => enabled)
