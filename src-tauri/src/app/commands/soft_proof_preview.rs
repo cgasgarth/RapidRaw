@@ -433,11 +433,10 @@ fn render_processed_export_soft_proof_preview(
         tm_override,
         lut,
     )?;
-    let mut gpu_adjustments = render_plan.adjustments;
-    render_pipeline::suppress_legacy_global_denoise(&mut gpu_adjustments);
-    render_pipeline::suppress_legacy_global_detail(
-        &mut gpu_adjustments,
+    let (gpu_adjustments, execution_graph) = render_pipeline::bind_pre_gpu_execution(
+        &render_plan.edit_graph,
         detail_stage.owns_legacy_global_detail,
+        render_plan.lut.is_some(),
     );
     process_and_get_dynamic_image(
         &context,
@@ -458,7 +457,7 @@ fn render_processed_export_soft_proof_preview(
             lut: render_plan.lut.clone(),
             roi: None,
             edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-                &render_plan.edit_graph,
+                &execution_graph,
             )),
         },
         "export_soft_proof_preview",
