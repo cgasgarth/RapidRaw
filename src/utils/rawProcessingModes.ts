@@ -1,9 +1,15 @@
 import type { TFunction } from 'i18next';
+import {
+  type RawProcessingModeOverrideV1,
+  type RawProcessingModeV1,
+  rawProcessingModeOverrideV1Schema,
+  rawProcessingModeV1Schema,
+} from '../../packages/rawengine-schema/src/rawProcessingModeSchemas';
 
-export const RAW_PROCESSING_MODES = ['fast', 'balanced', 'maximum'] as const;
+export const RAW_PROCESSING_MODES = rawProcessingModeV1Schema.options;
 
-export type RawProcessingMode = (typeof RAW_PROCESSING_MODES)[number];
-export type RawProcessingModeOverride = RawProcessingMode | null;
+export type RawProcessingMode = RawProcessingModeV1;
+export type RawProcessingModeOverride = RawProcessingModeOverrideV1;
 
 export interface RawProcessingModeRecipe {
   applyPreprocessingToNonRaws: boolean;
@@ -54,12 +60,10 @@ export const RAW_PROCESSING_MODE_RECIPES: Record<RawProcessingMode, RawProcessin
 };
 
 export const normalizeRawProcessingMode = (mode: string | null | undefined): RawProcessingMode =>
-  RAW_PROCESSING_MODES.includes(mode as RawProcessingMode) ? (mode as RawProcessingMode) : 'balanced';
+  rawProcessingModeV1Schema.safeParse(mode).data ?? 'balanced';
 
 export const normalizeRawProcessingModeOverride = (mode: unknown): RawProcessingModeOverride =>
-  typeof mode === 'string' && RAW_PROCESSING_MODES.includes(mode as RawProcessingMode)
-    ? (mode as RawProcessingMode)
-    : null;
+  rawProcessingModeOverrideV1Schema.safeParse(mode).data ?? null;
 
 export const buildRawProcessingModePatch = (mode: RawProcessingMode): RawProcessingModeRecipe => ({
   ...RAW_PROCESSING_MODE_RECIPES[mode],

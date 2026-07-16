@@ -75,6 +75,7 @@ describe('EditDocumentV2 legacy adapter', () => {
 
     expect(document.schemaVersion).toBe(2);
     expect(editDocumentV2NodeInventory(document)).toEqual([
+      'source_decode',
       'scene_global_color_tone',
       'color_presence',
       'scene_curve',
@@ -2096,7 +2097,7 @@ describe('EditDocumentV2 legacy adapter', () => {
     expect(diagnostics.legacyNodeTypes).toEqual(['lens_correction', 'geometry']);
     expect(diagnostics.nodeDiagnostics.find(({ nodeType }) => nodeType === 'scene_curve')?.status).toBe('disabled');
     expect(diagnostics.quarantinedNodeTypes).toEqual(['future_color_v9']);
-    expect(diagnostics.renderStageFingerprints[0]?.fingerprint).toContain('scene_global_color_tone');
+    expect(diagnostics.renderStageFingerprints[0]?.fingerprint).toContain('source_decode');
   });
 
   test('reset uses descriptor defaults and preserves unrelated domains', () => {

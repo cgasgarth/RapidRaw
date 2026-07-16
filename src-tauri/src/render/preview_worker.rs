@@ -206,6 +206,12 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             plan.plan_hash
         );
     }
+    let loaded_image = crate::image_loader::resolve_loaded_image_for_adjustments(
+        loaded_image,
+        &adjustments_json,
+        &state,
+        app_handle,
+    )?;
     cancellation_checkpoint(cancellation, PreviewStage::Geometry)?;
     let adjustments_clone = adjustments_json;
 
