@@ -40,6 +40,7 @@ const seedEditor = () =>
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
+      exif: null,
       height: 4000,
       isRaw: true,
       isReady: true,
@@ -56,7 +57,7 @@ const seedEditor = () =>
 const mutationSnapshot = () => {
   const state = useEditorStore.getState();
   return JSON.stringify({
-    adjustments: state.adjustments,
+    editDocumentV2: state.editDocumentV2,
     finalPreviewUrl: state.finalPreviewUrl,
     history: state.history,
     historyIndex: state.historyIndex,
