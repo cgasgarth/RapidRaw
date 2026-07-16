@@ -5,7 +5,8 @@ import {
   type ViewerMaskOverlayGenerateCommand,
   type ViewerMaskOverlayTransition,
 } from '../../../src/components/panel/editor/viewerMaskOverlayController';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildMaskOverlayInvokePayload } from '../../../src/utils/mask/maskOverlayRequest';
 
 const context = (overrides: Partial<ViewerMaskOverlayContext> = {}): ViewerMaskOverlayContext => ({
@@ -20,6 +21,8 @@ const payload = buildMaskOverlayInvokePayload({
   jsAdjustments: INITIAL_ADJUSTMENTS,
   maskDef: {
     adjustments: {},
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: 'mask-container:1',
     invert: false,
     name: 'Mask 1',
@@ -28,16 +31,16 @@ const payload = buildMaskOverlayInvokePayload({
       {
         id: 'mask:1',
         invert: false,
-        mode: 'additive',
+        mode: SubMaskMode.Additive,
         opacity: 100,
         parameters: {},
-        type: 'brush',
+        type: Mask.Brush,
         visible: true,
       },
     ],
     visible: true,
   },
-  maskOverlaySettings: { mode: 'rubylith' },
+  maskOverlaySettings: { edgeThreshold: 0.65, mode: 'rubylith', opacity: 0.4 },
   patchesSentToBackend: new Set(),
   renderSize: { height: 200, offsetX: 0, offsetY: 0, scale: 0.5, width: 300 },
 });

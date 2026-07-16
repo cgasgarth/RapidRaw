@@ -112,12 +112,12 @@ describe('Object Prompt edit transaction', () => {
     expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
-  test('rejects stale session, source, graph, geometry, mode, tool, and mask identities', () => {
+  test('rejects invalid generations and stale session, source, graph, geometry, mode, tool, and mask identities', () => {
     const state = { ...useEditorStore.getState(), geometryEpoch, sourceRevision };
     const parameters = { pointPrompts: [], promptMode: 'foreground_point' };
-    expect(() => buildObjectPromptEditTransaction(state, identity({ active: false }), parameters, 'tx')).toThrow(
-      'object_prompt_transaction.invalid_generation',
-    );
+    expect(() =>
+      buildObjectPromptEditTransaction(state, identity({ operationGeneration: 0 }), parameters, 'tx'),
+    ).toThrow('object_prompt_transaction.invalid_generation');
     expect(() =>
       buildObjectPromptEditTransaction(state, identity({ imageSessionId: 'successor' }), parameters, 'tx'),
     ).toThrow('object_prompt_transaction.stale_image_session');

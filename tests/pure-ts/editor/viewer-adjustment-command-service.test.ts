@@ -24,7 +24,6 @@ const makeMask = (): MaskContainer => ({
     sourcePoint: { x: 0.2, y: 0.2 },
     targetPoint: { x: 0.4, y: 0.4 },
   },
-  retouchRemoveSource: undefined,
   subMasks: [
     {
       id: 'radial-1',
@@ -85,7 +84,10 @@ describe('viewer adjustment command authority', () => {
       status: 'ready',
       targetMaskId: 'radial-1',
     };
-    const state = withMask({ ...makeMask(), retouchCloneSource: undefined, retouchRemoveSource: removeSource });
+    const removeMask = makeMask();
+    delete removeMask.retouchCloneSource;
+    removeMask.retouchRemoveSource = removeSource;
+    const state = withMask(removeMask);
     const next = updateRetouchRemoveInAdjustments(
       state,
       'layer-1',
