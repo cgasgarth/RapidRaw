@@ -349,11 +349,48 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
       return { path, value };
     },
   );
+  const waitDeadlineAt = waitStartedAt + timeoutMs;
+  let abortObservedAt = options.signal?.aborted ? Date.now() : undefined;
+  const recordAbort = (): void => {
+    abortObservedAt ??= Date.now();
+  };
+  options.signal?.addEventListener('abort', recordAbort, { once: true });
+  const sleepUntilPollOrAbort = async (delayMs: number): Promise<void> => {
+    const signal = options.signal;
+    if (signal === undefined) {
+      await Bun.sleep(delayMs);
+      return;
+    }
+    if (signal.aborted) return;
+    let wakeOnAbort = (): void => {};
+    const aborted = new Promise<void>((resolve) => {
+      wakeOnAbort = () => resolve();
+      signal.addEventListener('abort', wakeOnAbort, { once: true });
+    });
+    try {
+      await Promise.race([Bun.sleep(delayMs), aborted]);
+    } finally {
+      signal.removeEventListener('abort', wakeOnAbort);
+    }
+  };
+  let lastObservedOwner: LeaseOwner | null = null;
+  const throwIfWaitTerminated = (owner: LeaseOwner | null): void => {
+    const now = Date.now();
+    if (abortObservedAt !== undefined && abortObservedAt < waitDeadlineAt) {
+      throw new Error('resource_wait_cancelled');
+    }
+    if (now >= waitDeadlineAt) {
+      throw new Error(
+        `${options.label} timed out waiting ${now - waitStartedAt}ms for ${options.resource}: ${compactOwner(owner)}`,
+      );
+    }
+    if (abortObservedAt !== undefined) throw new Error('resource_wait_cancelled');
+  };
 
   try {
     options.onQueued?.();
     while (true) {
-      if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
+      throwIfWaitTerminated(lastObservedOwner);
       try {
         const acquired = await withQueueMutex<ResourceAcquisition>(queueMutexPath, pollMs, async () => {
           const queue = await liveWaiters(queuePath);
@@ -450,6 +487,7 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
         for (const ownerPath of ownerPaths) {
           owner ??= await readOwner(ownerPath);
         }
+        lastObservedOwner = owner;
         if (
           owner?.ownerId !== undefined &&
           owner.worktree === process.cwd() &&
@@ -459,21 +497,18 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
             `${options.label} refused self-queue on ${options.resource}: effective owner ${ownerId} aliases ${owner.ownerId}`,
           );
         }
+        throwIfWaitTerminated(owner);
         const waitedMs = Date.now() - waitStartedAt;
-        if (waitedMs >= timeoutMs) {
-          throw new Error(
-            `${options.label} timed out waiting ${waitedMs}ms for ${options.resource}: ${compactOwner(owner)}`,
-          );
-        }
         if (lastDiagnosticAt === 0 || waitedMs - lastDiagnosticAt >= 15_000) {
           console.log(`${options.label} waiting for ${options.resource}: ${compactOwner(owner)}`);
           lastDiagnosticAt = waitedMs;
         }
-        await Bun.sleep(Math.min(pollMs, Math.max(1, timeoutMs - waitedMs)));
-        if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
+        await sleepUntilPollOrAbort(Math.min(pollMs, Math.max(1, timeoutMs - waitedMs)));
+        throwIfWaitTerminated(owner);
       }
     }
   } finally {
+    options.signal?.removeEventListener('abort', recordAbort);
     await withQueueMutex(queueMutexPath, pollMs, async () => {
       await rm(waiter.path, { force: true });
       if ((await liveWaiters(queuePath)).length === 0) {
