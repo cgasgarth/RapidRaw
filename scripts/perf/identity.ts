@@ -30,9 +30,9 @@ const selectedLines = (value: string, fields: readonly string[]): string =>
     .join('\n');
 
 const hardwareDetails = () => {
-  const gpuOverride = process.env.RAWENGINE_PERF_GPU_CLASS;
-  const displayOverride = process.env.RAWENGINE_PERF_DISPLAY_CLASS;
-  const storageOverride = process.env.RAWENGINE_PERF_STORAGE_CLASS;
+  const gpuOverride = process.env['RAWENGINE_PERF_GPU_CLASS'];
+  const displayOverride = process.env['RAWENGINE_PERF_DISPLAY_CLASS'];
+  const storageOverride = process.env['RAWENGINE_PERF_STORAGE_CLASS'];
   if (platform() !== 'darwin')
     return {
       display: displayOverride ?? 'unreported',
@@ -61,7 +61,7 @@ const hardwareDetails = () => {
 };
 
 const powerSource = (): string => {
-  const override = process.env.RAWENGINE_PERF_POWER_SOURCE;
+  const override = process.env['RAWENGINE_PERF_POWER_SOURCE'];
   if (override) return override;
   if (platform() !== 'darwin') return 'unreported';
   return (
@@ -111,7 +111,7 @@ export function capturePerformanceIdentity(profile = 'development'): Performance
       os: `${platform()}-${release()}`,
       powerSource: powerSource(),
       rustc: optionalCommand(['rustc', '--version'], 250),
-      thermalState: process.env.RAWENGINE_PERF_THERMAL_STATE ?? 'unreported',
+      thermalState: process.env['RAWENGINE_PERF_THERMAL_STATE'] ?? 'unreported',
     },
   };
 }

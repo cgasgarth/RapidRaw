@@ -6,6 +6,7 @@ import { DEFAULT_EDITOR_COMPARE_STATE } from '../../../src/utils/editorCompare';
 import { resolveEditorOverlayVisibility } from '../../../src/utils/editorOverlayVisibility';
 
 const image = (path: string): SelectedImage => ({
+  exif: null,
   height: 4000,
   isRaw: true,
   isReady: true,

@@ -22,7 +22,7 @@ const semanticZoom: ResolvedEditorZoom = {
 
 const fixture = (orientationSteps: number, geometryEpoch = 7) =>
   createEditorOverlayGeometry({
-    crop: { height: 1200, width: 1600, x: 200, y: 100 },
+    crop: { height: 1200, unit: 'px', width: 1600, x: 200, y: 100 },
     devicePixelRatio: 2,
     geometryEpoch,
     orientationSteps,
@@ -101,7 +101,7 @@ describe('editor overlay geometry', () => {
     const cases = [
       { crop: null, dpr: 1, orientationSteps: 0, source: { height: 6000, width: 4000 }, zoom: 1 },
       {
-        crop: { height: 1800, width: 7000, x: 400, y: 300 },
+        crop: { height: 1800, unit: 'px' as const, width: 7000, x: 400, y: 300 },
         dpr: 2,
         orientationSteps: 0,
         source: { height: 2400, width: 8000 },

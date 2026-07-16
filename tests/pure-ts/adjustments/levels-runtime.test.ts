@@ -60,7 +60,7 @@ describe('levels runtime', () => {
 
   test('is wired into the color adjustment surface', () => {
     expect(INITIAL_ADJUSTMENTS.levels.enabled).toBe(false);
-    expect(ADJUSTMENT_GROUPS.color?.some((group) => group.keys.includes(ColorAdjustment.Levels))).toBe(true);
+    expect(ADJUSTMENT_GROUPS['color']?.some((group) => group.keys.includes(ColorAdjustment.Levels))).toBe(true);
     expect(ADJUSTMENT_SECTIONS.color).toContain(ColorAdjustment.Levels);
   });
 });
