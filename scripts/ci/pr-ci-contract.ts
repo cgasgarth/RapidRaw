@@ -5,6 +5,87 @@ import { classesForPath } from '../validation/ownership';
 
 export const PR_REQUIRED_BUDGET_SECONDS = 240;
 
+export const PR_CI_GITHUB_API_RETRY = {
+  baseDelayMs: 250,
+  jitterMs: 250,
+  maxAttempts: 6,
+  maxDelayMs: 4_000,
+} as const;
+
+export interface GitHubApiRetryOptions {
+  fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
+  jitter?: () => number;
+  onDiagnostic?: (message: string) => void;
+  sleep?: (delayMs: number) => Promise<void>;
+}
+
+const compactApiDetail = (body: string): string => body.replace(/\s+/gu, ' ').trim().slice(0, 160);
+
+const isRetryableGitHubStatus = (status: number): boolean => status === 429 || (status >= 500 && status <= 599);
+
+export const fetchWorkflowJobsJson = async (
+  repository: string,
+  runId: string,
+  token: string,
+  options: GitHubApiRetryOptions = {},
+): Promise<string> => {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const jitter = options.jitter ?? Math.random;
+  const onDiagnostic = options.onDiagnostic ?? ((message: string) => console.error(message));
+  const sleep = options.sleep ?? ((delayMs: number) => Bun.sleep(delayMs));
+  const endpoint = `https://api.github.com/repos/${repository}/actions/runs/${runId}/jobs?filter=latest&per_page=100`;
+
+  for (let attempt = 1; attempt <= PR_CI_GITHUB_API_RETRY.maxAttempts; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchImpl(endpoint, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? compactApiDetail(error.message) : 'request failed';
+      if (attempt === PR_CI_GITHUB_API_RETRY.maxAttempts) {
+        throw new Error(`GitHub API jobs request failed after ${attempt} attempts: ${detail}`);
+      }
+      const delayMs = Math.min(
+        PR_CI_GITHUB_API_RETRY.maxDelayMs,
+        PR_CI_GITHUB_API_RETRY.baseDelayMs * 2 ** (attempt - 1) +
+          Math.floor(Math.max(0, Math.min(1, jitter())) * PR_CI_GITHUB_API_RETRY.jitterMs),
+      );
+      onDiagnostic(
+        `GitHub API jobs request error (${detail}); retry ${attempt}/${PR_CI_GITHUB_API_RETRY.maxAttempts - 1} in ${delayMs}ms`,
+      );
+      await sleep(delayMs);
+      continue;
+    }
+
+    const body = await response.text();
+    if (response.ok) return body;
+    const detail = compactApiDetail(body);
+    if (!isRetryableGitHubStatus(response.status)) {
+      throw new Error(`GitHub API jobs request failed HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
+    if (attempt === PR_CI_GITHUB_API_RETRY.maxAttempts) {
+      throw new Error(
+        `GitHub API jobs request failed HTTP ${response.status} after ${attempt} attempts${detail ? `: ${detail}` : ''}`,
+      );
+    }
+    const delayMs = Math.min(
+      PR_CI_GITHUB_API_RETRY.maxDelayMs,
+      PR_CI_GITHUB_API_RETRY.baseDelayMs * 2 ** (attempt - 1) +
+        Math.floor(Math.max(0, Math.min(1, jitter())) * PR_CI_GITHUB_API_RETRY.jitterMs),
+    );
+    onDiagnostic(
+      `GitHub API jobs request HTTP ${response.status}; retry ${attempt}/${PR_CI_GITHUB_API_RETRY.maxAttempts - 1} in ${delayMs}ms`,
+    );
+    await sleep(delayMs);
+  }
+  throw new Error('GitHub API jobs request exhausted retry budget');
+};
+
 export type PrFastLane = 'js' | 'frontend' | 'schema' | 'dependencies' | 'rust' | 'workflow' | 'docs';
 
 export const PR_REQUIRED_JOBS: Readonly<Record<PrFastLane, readonly string[]>> = {
@@ -149,6 +230,22 @@ const valueAfter = (flag: string): string | undefined => {
 };
 
 if (import.meta.main) {
+  if (process.argv.includes('--fetch-jobs')) {
+    const repository = process.env['GITHUB_REPOSITORY'];
+    const runId = process.env['GITHUB_RUN_ID'];
+    const token = process.env['GH_TOKEN'];
+    if (!repository || !runId || !token) {
+      console.error('GITHUB_REPOSITORY, GITHUB_RUN_ID, and GH_TOKEN are required to fetch workflow jobs');
+      process.exit(1);
+    }
+    try {
+      process.stdout.write(await fetchWorkflowJobsJson(repository, runId, token));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+    process.exit(0);
+  }
   if (process.argv.includes('--verify')) {
     const needs = JSON.parse(process.env['NEEDS_CONTEXT'] ?? '{}') as Record<string, { result?: string }>;
     const plan = JSON.parse(process.env['PLAN_JSON'] ?? '{}') as PrValidationPlan;
