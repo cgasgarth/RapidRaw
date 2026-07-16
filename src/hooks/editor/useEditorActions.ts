@@ -40,7 +40,6 @@ import {
 import {
   copyEditDocumentV2Nodes,
   EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-  legacyAdjustmentsToEditDocumentV2,
   lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   selectEditDocumentV2CopyPayload,
 } from '../../utils/editDocumentV2';
@@ -69,6 +68,7 @@ import {
 } from '../../utils/editTransaction';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
 import { buildLutLoadEditTransaction, captureLutCommitIdentity } from '../../utils/lutEditTransaction';
 import {
   buildOrientationRotateEditTransaction,
@@ -91,7 +91,7 @@ import { debounce } from '../../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   const state = useEditorStore.getState();
-  state.pushHistory(newAdj, {
+  state.pushHistory({
     adjustmentRevision: state.adjustmentRevision,
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   });
@@ -142,7 +142,7 @@ export function useEditorActions() {
   const setAdjustments = useCallback(
     (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
       const state = useEditorStore.getState();
-      const prev = state.adjustments;
+      const prev = state.adjustmentSnapshot.value;
       const proposedAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
       const newAdjustments = reconcileReferenceMatchReceiptsAfterEdit(prev, proposedAdjustments);
       const expectedGraphRevision = `history_${state.historyIndex + 1}`;
@@ -189,7 +189,7 @@ export function useEditorActions() {
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'manual-control',
-        operations: buildAdjustmentMutationOperations(prev, newAdjustments),
+        operations: buildAdjustmentMutationOperations(prev, newAdjustments, state.editDocumentV2),
         history: 'single-entry',
         persistence: 'commit',
       };
@@ -335,13 +335,13 @@ export function useEditorActions() {
 
   const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
-    const { selectedImage, adjustments, editDocumentV2 } = useEditorStore.getState();
+    const { selectedImage, adjustmentSnapshot, editDocumentV2 } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
     let sourceAdjustments: Adjustments | null = null;
     let sourceDocument = selectedImage ? editDocumentV2 : null;
 
     if (selectedImage) {
-      sourceAdjustments = adjustments;
+      sourceAdjustments = adjustmentSnapshot.value;
     } else {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
@@ -352,7 +352,7 @@ export function useEditorActions() {
           } else {
             sourceAdjustments = INITIAL_ADJUSTMENTS;
           }
-          sourceDocument = legacyAdjustmentsToEditDocumentV2(sourceAdjustments);
+          sourceDocument = hydrateImageOpenEditDocumentV2(meta, sourceAdjustments);
         } catch (err) {
           toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
@@ -466,8 +466,8 @@ export function useEditorActions() {
   const handleZoomChange = useCallback((command: EditorZoomCommand) => {
     const editor = useEditorStore.getState();
     const sourceSize = getEditorZoomSourceSize({
-      crop: editor.adjustments.crop,
-      orientationSteps: editor.adjustments.orientationSteps,
+      crop: editor.adjustmentSnapshot.value.crop,
+      orientationSteps: editor.adjustmentSnapshot.value.orientationSteps,
       originalSize: editor.originalSize,
     });
     const resolved = resolveEditorZoom({

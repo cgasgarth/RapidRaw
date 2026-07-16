@@ -37,15 +37,13 @@ describe('color calibration edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -62,7 +60,9 @@ describe('color calibration edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.colorCalibration).toEqual(INITIAL_ADJUSTMENTS.colorCalibration);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration).toEqual(
+      INITIAL_ADJUSTMENTS.colorCalibration,
+    );
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {
@@ -132,7 +132,9 @@ describe('color calibration edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.colorCalibration).toEqual(INITIAL_ADJUSTMENTS.colorCalibration);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration).toEqual(
+      INITIAL_ADJUSTMENTS.colorCalibration,
+    );
 
     expect(isCurrentColorCalibrationIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

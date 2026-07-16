@@ -78,20 +78,18 @@ describe('retouch handle edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
   test('commits one exact target revision with persistence, render geometry parity, and Undo', () => {
-    const retouchLayer = useEditorStore.getState().adjustments.masks[0]!;
+    const retouchLayer = useEditorStore.getState().adjustmentSnapshot.value.masks[0]!;
     const controller = createViewerRetouchHandlesController();
     const command = controller.place(
       context(retouchLayer),
@@ -119,13 +117,16 @@ describe('retouch handle edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.masks[0]?.retouchCloneSource?.targetPoint).toEqual({ x: 0.5, y: 0.5 });
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.retouchCloneSource?.targetPoint).toEqual({
+      x: 0.5,
+      y: 0.5,
+    });
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
   test('rejects stale source, session, graph, geometry, layer revision, mode, and duplicates', () => {
     const state = { ...useEditorStore.getState(), geometryEpoch, sourceRevision };
-    const retouchLayer = state.adjustments.masks[0]!;
+    const retouchLayer = state.adjustmentSnapshot.value.masks[0]!;
     const controller = createViewerRetouchHandlesController();
     const command = controller.place(
       context(retouchLayer),
@@ -143,57 +144,75 @@ describe('retouch handle edit transaction', () => {
     expect(() =>
       build({
         ...state,
-        adjustments: {
-          ...state.adjustments,
-          masks: state.adjustments.masks.map((mask) => ({
-            ...mask,
-            retouchCloneSource:
-              mask.retouchCloneSource === undefined
-                ? undefined
-                : { ...mask.retouchCloneSource, scale: mask.retouchCloneSource.scale + 0.1 },
-          })),
+        adjustmentSnapshot: {
+          ...state.adjustmentSnapshot,
+          value: {
+            ...state.adjustmentSnapshot.value,
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({
+              ...mask,
+              retouchCloneSource:
+                mask.retouchCloneSource === undefined
+                  ? undefined
+                  : { ...mask.retouchCloneSource, scale: mask.retouchCloneSource.scale + 0.1 },
+            })),
+          },
         },
       }),
     ).toThrow('stale_layer_revision');
     expect(() =>
       build({
         ...state,
-        adjustments: {
-          ...state.adjustments,
-          masks: state.adjustments.masks.map((mask) => ({ ...mask, opacity: 75 })),
+        adjustmentSnapshot: {
+          ...state.adjustmentSnapshot,
+          value: {
+            ...state.adjustmentSnapshot.value,
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, opacity: 75 })),
+          },
         },
       }),
     ).toThrow('stale_layer_revision');
     expect(() =>
       build({
         ...state,
-        adjustments: {
-          ...state.adjustments,
-          masks: state.adjustments.masks.map((mask) => ({
-            ...mask,
-            subMasks: [
-              {
-                ...structuredClone(mask.subMasks[0]!),
-                id: 'target:replacement',
-                parameters: { ...mask.subMasks[0]!.parameters, centerX: 100, centerY: 200 },
-              },
-              ...mask.subMasks,
-            ],
-          })),
+        adjustmentSnapshot: {
+          ...state.adjustmentSnapshot,
+          value: {
+            ...state.adjustmentSnapshot.value,
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({
+              ...mask,
+              subMasks: [
+                {
+                  ...structuredClone(mask.subMasks[0]!),
+                  id: 'target:replacement',
+                  parameters: { ...mask.subMasks[0]!.parameters, centerX: 100, centerY: 200 },
+                },
+                ...mask.subMasks,
+              ],
+            })),
+          },
         },
       }),
     ).toThrow('stale_layer_revision');
     expect(() =>
       build({
         ...state,
-        adjustments: {
-          ...state.adjustments,
-          masks: state.adjustments.masks.map((mask) => ({ ...mask, retouchCloneSource: undefined })),
+        adjustmentSnapshot: {
+          ...state.adjustmentSnapshot,
+          value: {
+            ...state.adjustmentSnapshot.value,
+            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, retouchCloneSource: undefined })),
+          },
         },
       }),
     ).toThrow();
     expect(() =>
-      build({ ...state, adjustments: { ...state.adjustments, masks: [retouchLayer, structuredClone(retouchLayer)] } }),
+      build({
+        ...state,
+        adjustmentSnapshot: {
+          ...state.adjustmentSnapshot,
+          value: { ...state.adjustmentSnapshot.value, masks: [retouchLayer, structuredClone(retouchLayer)] },
+        },
+      }),
     ).toThrow('missing_or_duplicate_layer');
   });
 });

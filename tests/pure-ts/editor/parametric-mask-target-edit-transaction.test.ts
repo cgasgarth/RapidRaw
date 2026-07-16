@@ -69,15 +69,13 @@ describe('parametric mask target edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -107,11 +105,11 @@ describe('parametric mask target edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.masks[0]?.subMasks[0]?.parameters).toEqual({
+    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toEqual({
       isInitialDraw: true,
       range: 0.2,
     });
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
   test('rejects stale session, source, graph, geometry, tool, and mask identities', () => {

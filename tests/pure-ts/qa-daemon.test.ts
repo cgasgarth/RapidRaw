@@ -364,7 +364,7 @@ describe('QA daemon lifecycle', () => {
     child.kill('SIGTERM');
     await Promise.race([
       child.exited,
-      Bun.sleep(5_000).then(() => {
+      Bun.sleep(3_000).then(() => {
         throw new Error('QA daemon did not exit within the SIGTERM cleanup deadline.');
       }),
     ]);

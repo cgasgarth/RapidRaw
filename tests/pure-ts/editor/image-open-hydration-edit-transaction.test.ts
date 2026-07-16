@@ -31,11 +31,9 @@ describe('image-open hydration edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 5,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:stale-prior-image-preview',
-      history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'prior', label: 'Prior' }],
       historyIndex: 1,
       imageSession: session,
@@ -74,14 +72,13 @@ describe('image-open hydration edit transaction', () => {
     const request = buildImageOpenHydrationEditTransaction(
       state,
       { adjustmentRevision: state.adjustmentRevision, imageSessionId: session.id, path },
-      hydrated,
+      legacyAdjustmentsToEditDocumentV2(hydrated),
       'hydrate-current',
     );
 
     state.applyEditTransaction(request);
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 6,
-      adjustments: { contrast: 14, exposure: 0.25 },
       finalPreviewUrl: null,
       historyIndex: 0,
       lastEditApplicationReceipt: {
@@ -91,7 +88,8 @@ describe('image-open hydration edit transaction', () => {
         transactionId: 'hydrate-current',
       },
     });
-    expect(useEditorStore.getState().history).toEqual([hydrated]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 14, exposure: 0.25 });
+    expect(useEditorStore.getState().history).toEqual([legacyAdjustmentsToEditDocumentV2(hydrated)]);
     expect(useEditorStore.getState().historyCheckpoints).toEqual([]);
   });
 
@@ -101,7 +99,7 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: 'editor-image-session:stale', path },
-        INITIAL_ADJUSTMENTS,
+        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
         'hydrate-stale-session',
       ),
     ).toThrow('image_open_hydration.stale_identity');
@@ -109,7 +107,7 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: session.id, path: '/fixtures/other.ARW' },
-        INITIAL_ADJUSTMENTS,
+        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
         'hydrate-stale-path',
       ),
     ).toThrow('image_open_hydration.stale_identity');
@@ -117,13 +115,13 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision - 1, imageSessionId: session.id, path },
-        INITIAL_ADJUSTMENTS,
+        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
         'hydrate-stale-revision',
       ),
     ).toThrow('image_open_hydration.stale_identity');
     const afterStale = useEditorStore.getState();
     expect(afterStale.adjustmentRevision).toBe(beforeStale.adjustmentRevision);
-    expect(afterStale.adjustments).toBe(beforeStale.adjustments);
+    expect(afterStale.adjustmentSnapshot.value).toBe(beforeStale.adjustmentSnapshot.value);
     expect(afterStale.history).toBe(beforeStale.history);
     expect(afterStale.lastEditApplicationReceipt).toBe(beforeStale.lastEditApplicationReceipt);
     expect(afterStale.finalPreviewUrl).toBe(beforeStale.finalPreviewUrl);
@@ -135,12 +133,12 @@ describe('image-open hydration edit transaction', () => {
     const request = buildImageOpenHydrationEditTransaction(
       afterStale,
       { adjustmentRevision: afterStale.adjustmentRevision, imageSessionId: session.id, path },
-      afterStale.adjustments,
+      afterStale.editDocumentV2,
       'hydrate-no-op',
     );
     afterStale.applyEditTransaction(request);
     expect(useEditorStore.getState().adjustmentRevision).toBe(beforeStale.adjustmentRevision);
-    expect(useEditorStore.getState().history).toEqual([beforeStale.adjustments]);
+    expect(useEditorStore.getState().history).toEqual([beforeStale.editDocumentV2]);
     expect(useEditorStore.getState().historyIndex).toBe(0);
     expect(useEditorStore.getState().historyCheckpoints).toEqual([]);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toBeNull();
@@ -158,7 +156,7 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         initial,
         { adjustmentRevision: initial.adjustmentRevision, imageSessionId: session.id, path },
-        cachedAdjustments,
+        legacyAdjustmentsToEditDocumentV2(cachedAdjustments),
         'hydrate-cache',
       ),
     );
@@ -169,24 +167,24 @@ describe('image-open hydration edit transaction', () => {
     expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
 
     const cached = useEditorStore.getState();
-    expect(areAdjustmentsEqual(cached.adjustments, structuredClone(cachedAdjustments))).toBeTrue();
+    expect(cached.adjustmentSnapshot.value.exposure).toBe(0.4);
     expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
     const authoritativeAdjustments = { ...cachedAdjustments, contrast: 12 };
-    expect(areAdjustmentsEqual(cached.adjustments, authoritativeAdjustments)).toBeFalse();
+    expect(areAdjustmentsEqual(cached.adjustmentSnapshot.value, authoritativeAdjustments)).toBeFalse();
     const backgroundTransaction = buildImageOpenHydrationEditTransaction(
       cached,
       { adjustmentRevision: cached.adjustmentRevision, imageSessionId: session.id, path },
-      authoritativeAdjustments,
+      legacyAdjustmentsToEditDocumentV2(authoritativeAdjustments),
       'hydrate-background-metadata',
     );
     cached.applyEditTransaction(backgroundTransaction);
     expect(useEditorStore.getState()).toMatchObject({
-      adjustments: { contrast: 12, exposure: 0.4 },
       finalPreviewUrl: null,
       historyIndex: 0,
       uncroppedAdjustedPreviewUrl: null,
     });
-    expect(useEditorStore.getState().history).toEqual([authoritativeAdjustments]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 12, exposure: 0.4 });
+    expect(useEditorStore.getState().history).toEqual([legacyAdjustmentsToEditDocumentV2(authoritativeAdjustments)]);
   });
 
   test('blocks every current-image publication when image A completes after image B opens', () => {
@@ -198,7 +196,9 @@ describe('image-open hydration edit transaction', () => {
     };
     const imageBPath = '/fixtures/newer-image-B.CR3';
     const imageBSession = createEditorImageSession({ generation: 13, path: imageBPath, source: 'cold-load' });
-    const imageBHistory = [{ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 }];
+    const imageBHistory = [
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 }),
+    ];
     const imageBSelected = {
       ...selectedImage,
       exif: { Make: 'Camera B' },
@@ -208,15 +208,15 @@ describe('image-open hydration edit transaction', () => {
       width: 6000,
     };
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 6,
       finalPreviewUrl: 'blob:image-b-preview',
-      history: imageBHistory,
       historyIndex: 0,
       imageSession: imageBSession,
       originalSize: { height: 4000, width: 6000 },
       selectedImage: imageBSelected,
       uncroppedAdjustedPreviewUrl: 'blob:image-b-uncropped',
+      editDocumentV2: imageBHistory[0],
+      history: imageBHistory,
     });
     const refs = {
       callbackCount: 0,
@@ -228,12 +228,13 @@ describe('image-open hydration edit transaction', () => {
     publishCurrentImageOpenHydration(useEditorStore.getState(), imageAIdentity, () => {
       refs.callbackCount += 1;
       useEditorStore.getState().hydrateEditorRenderAuthority({
-        adjustments: useEditorStore.getState().adjustments,
         finalPreviewUrl: null,
-        history: [structuredClone(INITIAL_ADJUSTMENTS)],
         originalSize: { height: 3000, width: 4000 },
         selectedImage: { ...selectedImage, metadata: { camera: 'A' } },
         uncroppedAdjustedPreviewUrl: null,
+        editDocumentV2: useEditorStore.getState().editDocumentV2,
+        history: [useEditorStore.getState().editDocumentV2],
+        historyIndex: 0,
       });
       refs.currentResolution = 0;
       refs.isBackendReady = true;

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { type EditDocumentV2, editDocumentV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import type { BasicToneCommandEnvelope } from '../../basicToneCommandBridge';
 import type { EditHistoryCheckpoint } from '../../editHistory';
 import { areEditDocumentsEqual } from '../../editTransaction';
@@ -15,12 +14,11 @@ export const AGENT_HISTORY_ROLLBACK_OUTPUT_SCHEMA_NAME = 'AgentHistoryRollbackRe
 const rollbackScopeSchema = z.enum(['operation', 'session_start']);
 
 export interface AgentSessionCheckpoint {
-  adjustments: Adjustments;
   activeImagePath: string;
+  editDocumentV2: EditDocumentV2;
   graphRevision: string;
-  editDocumentHistory: EditDocumentV2[];
   historyIndex: number;
-  history: Adjustments[];
+  history: EditDocumentV2[];
   historyCheckpoints: EditHistoryCheckpoint[];
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
   previewRecipeHash: string;
@@ -31,12 +29,11 @@ export interface AgentSessionCheckpoint {
 
 const agentSessionCheckpointSchema: z.ZodType<AgentSessionCheckpoint> = z
   .object({
-    adjustments: z.custom<Adjustments>((value) => typeof value === 'object' && value !== null),
     activeImagePath: z.string().trim().min(1),
+    editDocumentV2: editDocumentV2Schema,
     graphRevision: z.string().trim().min(1),
-    editDocumentHistory: z.array(editDocumentV2Schema).min(1),
     historyIndex: z.number().int().nonnegative(),
-    history: z.array(z.custom<Adjustments>((value) => typeof value === 'object' && value !== null)).min(1),
+    history: z.array(editDocumentV2Schema).min(1),
     historyCheckpoints: z.array(
       z
         .object({
@@ -97,9 +94,8 @@ export const createAgentSessionCheckpoint = (sessionId: string): AgentSessionChe
   const snapshot = buildAgentImageContextSnapshot();
 
   return {
-    adjustments: state.adjustments,
     activeImagePath: snapshot.activeImagePath,
-    editDocumentHistory: structuredClone(state.editDocumentHistory),
+    editDocumentV2: structuredClone(state.editDocumentV2),
     graphRevision: `history_${state.historyIndex}`,
     historyIndex: state.historyIndex,
     history: structuredClone(state.history),
@@ -147,11 +143,9 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
 
   const state = useEditorStore.getState();
   const history = structuredClone(checkpoint.history);
-  const editDocumentHistory = structuredClone(checkpoint.editDocumentHistory);
   if (
     checkpoint.historyIndex >= history.length ||
-    editDocumentHistory.length !== history.length ||
-    JSON.stringify(history[checkpoint.historyIndex]) !== JSON.stringify(checkpoint.adjustments)
+    !areEditDocumentsEqual(history[checkpoint.historyIndex], checkpoint.editDocumentV2)
   ) {
     throw new Error('Agent history rollback rejected inconsistent checkpoint history target.');
   }
@@ -159,7 +153,6 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
     buildHistoryRestorationEditTransaction(
       state,
       history,
-      editDocumentHistory,
       checkpoint.historyCheckpoints,
       checkpoint.historyIndex,
       `agent-history:${parsedRequest.sessionId}:${parsedRequest.scope}:${parsedRequest.requestId}`,
@@ -186,7 +179,7 @@ export const rollbackAgentSessionHistory = (request: AgentHistoryRollbackRequest
     throw new Error('Agent history rollback failed to restore basic-tone provenance.');
   }
   if (
-    !areEditDocumentHistoriesEqual(restoredState.editDocumentHistory, editDocumentHistory) ||
+    !areEditDocumentHistoriesEqual(restoredState.history, history) ||
     JSON.stringify(restoredState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints)
   ) {
     throw new Error('Agent history rollback failed to restore typed history authority.');

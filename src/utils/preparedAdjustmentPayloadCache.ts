@@ -14,12 +14,20 @@ export interface PreparedPayloadCacheMetrics {
 
 export class PreparedAdjustmentPayloadCache {
   private readonly entries = new Map<string, PreparedAdjustmentPayload>();
+  private readonly snapshotIdentities = new WeakMap<AdjustmentSnapshot, number>();
+  private nextSnapshotIdentity = 1;
   readonly metrics: PreparedPayloadCacheMetrics = { hits: 0, misses: 0, preparationMs: 0 };
 
   constructor(private readonly capacity = 8) {}
 
   prepare(snapshot: AdjustmentSnapshot, residency: PatchResidencySnapshot): PreparedAdjustmentPayload {
-    const key = `${residency.sessionId}:${snapshot.adjustmentRevision}:${residency.revision}:${BACKEND_SCHEMA_VERSION}`;
+    let snapshotIdentity = this.snapshotIdentities.get(snapshot);
+    if (snapshotIdentity === undefined) {
+      snapshotIdentity = this.nextSnapshotIdentity;
+      this.nextSnapshotIdentity += 1;
+      this.snapshotIdentities.set(snapshot, snapshotIdentity);
+    }
+    const key = `${residency.sessionId}:${String(snapshotIdentity)}:${residency.revision}:${BACKEND_SCHEMA_VERSION}`;
     const cached = this.entries.get(key);
     if (cached) {
       this.metrics.hits += 1;

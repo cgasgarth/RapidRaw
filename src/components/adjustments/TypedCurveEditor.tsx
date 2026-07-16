@@ -87,7 +87,7 @@ export default function TypedCurveEditor({ adjustments, domain }: TypedCurveEdit
     const identity = commitIdentityRef.current;
     if (identity === null) return;
     const state = useEditorStore.getState();
-    const curve = update(structuredClone(state.adjustments.sceneCurveV1 ?? DEFAULT_SCENE_CURVE));
+    const curve = update(structuredClone(state.adjustmentSnapshot.value.sceneCurveV1 ?? DEFAULT_SCENE_CURVE));
     const result = applyEditTransaction(
       buildTypedCurveEditTransaction(state, identity, { curve, domain: 'scene' }, crypto.randomUUID()),
     );
@@ -98,7 +98,7 @@ export default function TypedCurveEditor({ adjustments, domain }: TypedCurveEdit
     const identity = commitIdentityRef.current;
     if (identity === null) return;
     const state = useEditorStore.getState();
-    const curve = update(structuredClone(state.adjustments.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE));
+    const curve = update(structuredClone(state.adjustmentSnapshot.value.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE));
     const result = applyEditTransaction(
       buildTypedCurveEditTransaction(state, identity, { curve, domain: 'output' }, crypto.randomUUID()),
     );

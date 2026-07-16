@@ -63,11 +63,8 @@ const installState = (explicitSession: boolean): string => {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
     finalPreviewUrl: 'blob:brush-before-final',
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession,
@@ -80,6 +77,7 @@ const installState = (explicitSession: boolean): string => {
       url: 'blob:brush-before-navigator',
     },
     selectedImage,
+    history: [editDocumentV2],
   });
   return imageSession?.id ?? `editor-image-session:${String(imageSessionId)}`;
 };
@@ -122,7 +120,8 @@ const captureCommit = (imageSessionId: string, overrides: Partial<ViewerBrushCur
   });
   const [command] = controller.end(current);
   if (command?.kind !== 'commit') throw new Error('expected brush commit');
-  const containers = current.containerKind === 'masks' ? state.adjustments.masks : state.adjustments.aiPatches;
+  const containers =
+    current.containerKind === 'masks' ? state.adjustmentSnapshot.value.masks : state.adjustmentSnapshot.value.aiPatches;
   const subMask = containers
     .find((container) => container.id === current.containerId)
     ?.subMasks.find((candidate) => candidate.id === current.maskId);
@@ -157,8 +156,8 @@ describe('viewer brush edit transaction', () => {
     const state = useEditorStore.getState();
 
     expect(result).toMatchObject({ changedKeys: ['masks'], nextAdjustmentRevision: 1, noOp: false });
-    expect(state.adjustments.masks[0]?.subMasks[0]?.parameters.lines).toHaveLength(1);
-    expect(state.adjustments.masks[0]?.subMasks[0]?.parameters.lines?.[0]?.points).toMatchObject([
+    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines).toHaveLength(1);
+    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines?.[0]?.points).toMatchObject([
       { pressure: 0.25 },
       { pressure: 0.8 },
     ]);
@@ -173,7 +172,7 @@ describe('viewer brush edit transaction', () => {
     expect(state.navigatorPreviewArtifact).toBeNull();
 
     state.undo();
-    expect(useEditorStore.getState().adjustments.masks[0]?.subMasks[0]?.parameters.lines).toEqual([]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters.lines).toEqual([]);
   });
 
   test('treats an exact current-state replay as a no-op without history or output invalidation', () => {
@@ -215,7 +214,7 @@ describe('viewer brush edit transaction', () => {
     const aiContainerId = 'patch:brush';
     const aiSubMaskId = 'submask:flow';
     const adjustments = {
-      ...state.adjustments,
+      ...state.adjustmentSnapshot.value,
       masks: [],
       aiPatches: [
         {
@@ -242,11 +241,9 @@ describe('viewer brush edit transaction', () => {
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyIndex: 0,
+      history: [editDocumentV2],
     });
     const current = useEditorStore.getState();
     const command = captureCommit(current.imageSession!.id, {
@@ -259,7 +256,9 @@ describe('viewer brush edit transaction', () => {
     );
 
     expect(result).toMatchObject({ changedKeys: ['aiPatches'], nextAdjustmentRevision: 1, noOp: false });
-    expect(useEditorStore.getState().adjustments.aiPatches[0]?.subMasks[0]?.parameters.lines).toHaveLength(1);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.subMasks[0]?.parameters.lines).toHaveLength(
+      1,
+    );
     expect(useEditorStore.getState().history).toHaveLength(2);
   });
 

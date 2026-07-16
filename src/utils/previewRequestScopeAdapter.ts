@@ -100,7 +100,7 @@ export class PreviewRequestScopeAdapter {
     });
     const quantizedRoi = viewport.roi;
     const scope: InteractivePreviewScope = {
-      adjustmentRevision: renderSnapshot.adjustmentRevision,
+      adjustmentRevision: renderSnapshot.renderRevision,
       backend: input.settings?.useWgpuRenderer !== false && input.hasRenderedFirstFrame ? 'wgpu' : 'cpu',
       basePreviewUrl: resolveEditorPreviewSource({
         finalPreviewUrl: input.finalPreviewUrl,
@@ -110,7 +110,7 @@ export class PreviewRequestScopeAdapter {
       devicePixelRatio: dpr,
       geometryIdentity: renderSnapshot.geometryRevision,
       graphIdentity: fingerprintPreviewGraphRevision({
-        adjustmentRevision: renderSnapshot.adjustmentRevision,
+        adjustmentRevision: renderSnapshot.renderRevision,
         geometryRevision: renderSnapshot.geometryRevision,
         imageSessionId: input.imageSessionId,
         maskRevision: renderSnapshot.maskRevision,

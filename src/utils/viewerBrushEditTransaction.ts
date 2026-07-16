@@ -30,7 +30,8 @@ export const buildViewerBrushEditTransaction = (
   if (key.sourceRevision !== state.sourceRevision) rejectViewerBrush('stale_source_revision');
   if (key.geometryEpoch !== state.geometryEpoch) rejectViewerBrush('stale_geometry');
 
-  const containers = key.containerKind === 'masks' ? state.adjustments.masks : state.adjustments.aiPatches;
+  const containers =
+    key.containerKind === 'masks' ? state.adjustmentSnapshot.value.masks : state.adjustmentSnapshot.value.aiPatches;
   const matchingContainers = containers.filter((container) => container.id === key.containerId);
   const matchingSubMasks = matchingContainers.flatMap((container) =>
     container.subMasks.filter((subMask) => subMask.id === key.maskId),

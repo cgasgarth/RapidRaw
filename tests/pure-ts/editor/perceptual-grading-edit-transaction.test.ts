@@ -38,15 +38,13 @@ describe('perceptual grading edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -76,7 +74,7 @@ describe('perceptual grading edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {
@@ -161,7 +159,7 @@ describe('perceptual grading edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
 
     expect(isCurrentPerceptualGradingIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

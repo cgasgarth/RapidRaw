@@ -1044,7 +1044,7 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
       reviewedCommand ??
         buildAgentReviewedAdjustmentCommandPlan({
           commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
-          sourceAdjustments: useEditorStore.getState().adjustments,
+          sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
         }).receipt,
     ),
     sessionId,
@@ -1617,13 +1617,15 @@ export const runAgentSelectedImageApplyTransaction = (
       const current = buildSnapshot();
       if (
         state.historyIndex !== checkpoint.historyIndex + 1 ||
-        state.history.length !== checkpoint.history.length + 1 ||
-        state.editDocumentHistory.length !== checkpoint.editDocumentHistory.length + 1
+        state.history.length !== checkpoint.history.length + 1
       ) {
         throw new Error('Selected-image commit parity rejected a non-atomic history transaction.');
       }
       for (const [key, expected] of Object.entries(draft.adjustments)) {
-        if (expected !== undefined && state.adjustments[key as keyof typeof state.adjustments] !== expected) {
+        if (
+          expected !== undefined &&
+          state.adjustmentSnapshot.value[key as keyof typeof state.adjustmentSnapshot.value] !== expected
+        ) {
           throw new Error(`Selected-image commit parity rejected adjustment mismatch: ${key}.`);
         }
       }
@@ -1731,7 +1733,7 @@ export const runAgentSelectedImageApplyTransaction = (
       mutationStarted ||=
         currentState.historyIndex !== checkpoint.historyIndex ||
         currentState.history.length !== checkpoint.history.length ||
-        !areEditDocumentHistoriesEqual(currentState.editDocumentHistory, checkpoint.editDocumentHistory) ||
+        !areEditDocumentHistoriesEqual(currentState.history, checkpoint.history) ||
         JSON.stringify(currentState.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints);
       if (mutationStarted) {
         rollbackAgentSessionHistory({
@@ -1745,7 +1747,7 @@ export const runAgentSelectedImageApplyTransaction = (
         if (
           restored.historyIndex !== checkpoint.historyIndex ||
           JSON.stringify(restored.history) !== JSON.stringify(checkpoint.history) ||
-          !areEditDocumentHistoriesEqual(restored.editDocumentHistory, checkpoint.editDocumentHistory) ||
+          !areEditDocumentHistoriesEqual(restored.history, checkpoint.history) ||
           JSON.stringify(restored.historyCheckpoints) !== JSON.stringify(checkpoint.historyCheckpoints) ||
           restoredSnapshot.graphRevision !== checkpoint.graphRevision ||
           restoredSnapshot.recipeHash !== checkpoint.previewRecipeHash

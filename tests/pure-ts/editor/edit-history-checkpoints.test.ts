@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildEditHistoryItems,
   createEditHistoryCheckpoint,
@@ -52,12 +53,13 @@ describe('edit history checkpoints', () => {
     );
     const renamed = renameEditHistoryCheckpoint(checkpoints, 'checkpoint-2', 'Client proof candidate');
 
-    expect(buildEditHistoryItems(history, renamed).map((item) => item.label)).toEqual([
+    const documents = history.map(legacyAdjustmentsToEditDocumentV2);
+    expect(buildEditHistoryItems(documents, renamed).map((item) => item.label)).toEqual([
       'Initial State',
       'Exposure',
       'Client proof candidate',
     ]);
-    expect(buildEditHistoryItems(history, renamed)[2]?.isCheckpoint).toBe(true);
+    expect(buildEditHistoryItems(documents, renamed)[2]?.isCheckpoint).toBe(true);
   });
 
   test('drops checkpoint metadata for discarded redo entries', () => {
@@ -73,10 +75,11 @@ describe('edit history checkpoints', () => {
       'checkpoint-2',
       '2026-07-01T12:00:00.000Z',
     );
+    const documents = history.map(legacyAdjustmentsToEditDocumentV2);
     const pushed = pushEditHistoryEntryWithCheckpoints(
-      history,
+      documents,
       1,
-      { ...INITIAL_ADJUSTMENTS, exposure: 0.35, highlights: -20 },
+      legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, exposure: 0.35, highlights: -20 }),
       checkpoints,
     );
 
@@ -92,9 +95,9 @@ describe('edit history checkpoints', () => {
     const contrastEdit = { ...exposureEdit, contrast: 18 };
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: contrastEdit,
+      editDocumentV2: legacyAdjustmentsToEditDocumentV2(contrastEdit),
       finalPreviewUrl: 'blob:stale-history-preview',
-      history: [initial, exposureEdit, contrastEdit],
+      history: [initial, exposureEdit, contrastEdit].map(legacyAdjustmentsToEditDocumentV2),
       historyCheckpoints: [],
       historyIndex: 2,
       uncroppedAdjustedPreviewUrl: 'blob:stale-uncropped-preview',
@@ -103,7 +106,7 @@ describe('edit history checkpoints', () => {
     useEditorStore.getState().goToHistoryIndex(1);
 
     const state = useEditorStore.getState();
-    expect(state.adjustments).toEqual(exposureEdit);
+    expect(state.adjustmentSnapshot.value).toEqual(exposureEdit);
     expect(state.finalPreviewUrl).toBeNull();
     expect(state.historyIndex).toBe(1);
     expect(state.history).toHaveLength(3);

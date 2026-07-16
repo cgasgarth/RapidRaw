@@ -463,7 +463,7 @@ export const dryRunAgentToneAdjustment = async (
   if (imagePath === undefined) throw new Error('Cannot dry-run agent tone adjustment without a selected image.');
 
   const command = buildBasicToneCommandEnvelope(
-    buildRequestedBasicTone(initialState.adjustments, parsedRequest.adjustments),
+    buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
     buildBasicToneImageCommandContext({
       expectedGraphRevision: parsedRequest.expectedGraphRevision,
       imagePath,
@@ -573,16 +573,19 @@ export const applyAgentToneAdjustment = async (
     operationId: parsedRequest.operationId,
     sessionId: parsedRequest.sessionId,
   });
-  const requestedAdjustments = buildRequestedBasicTone(initialState.adjustments, parsedRequest.adjustments);
+  const requestedAdjustments = buildRequestedBasicTone(
+    initialState.adjustmentSnapshot.value,
+    parsedRequest.adjustments,
+  );
   const dryRunCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
   const applyCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, {
     acceptedDryRunPlanHash: acceptedReceipt.basicTonePlanHash,
     acceptedDryRunPlanId: acceptedReceipt.basicTonePlanId,
     dryRun: false,
   });
-  const nextAdjustments = setPatchedToneAdjustments(initialState.adjustments, parsedRequest.adjustments);
+  const nextAdjustments = setPatchedToneAdjustments(initialState.adjustmentSnapshot.value, parsedRequest.adjustments);
   const adjustedFields = getAdjustedFields(parsedRequest.adjustments).filter(
-    (key) => initialState.adjustments[key] !== nextAdjustments[key],
+    (key) => initialState.adjustmentSnapshot.value[key] !== nextAdjustments[key],
   );
   let mutation: z.infer<typeof toneColorMutationResultV1Schema> | undefined;
   if (adjustedFields.length > 0) {

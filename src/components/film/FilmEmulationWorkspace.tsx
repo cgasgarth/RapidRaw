@@ -30,7 +30,7 @@ const readFavorites = (): Set<string> => {
 
 export function FilmEmulationWorkspace() {
   const { t } = useTranslation();
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const [favorites, setFavorites] = useState(readFavorites);
   const [compare, setCompare] = useState(false);
@@ -84,7 +84,7 @@ export function FilmEmulationWorkspace() {
     const state = useEditorStore.getState();
     const source = hydrateFilmEmulationTargetState(
       { kind: 'image', variantId: 'editor' },
-      state.adjustments.filmEmulation,
+      state.adjustmentSnapshot.value.filmEmulation,
     );
     const command = {
       actor: { id: 'film-workspace', kind: 'ui' as const, sessionId: 'film-workspace' },

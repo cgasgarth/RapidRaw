@@ -53,17 +53,15 @@ const seedEditor = (adjustments = structuredClone(INITIAL_ADJUSTMENTS)): void =>
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     brushSettings: { feather: 50, size: 50, tool: ToolType.Brush },
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession,
     imageSessionId: imageSession.generation,
     lastEditApplicationReceipt: null,
     selectedImage,
+    history: [editDocumentV2],
   });
 };
 
@@ -155,12 +153,12 @@ describe('AI edit store command', () => {
     const state = useEditorStore.getState();
 
     expect(committed).toEqual({ containerId: 'first', subMaskId: 'created' });
-    expect(state.adjustments.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
+    expect(state.adjustmentSnapshot.value.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
     expect(state.activeAiPatchContainerId).toBe('first');
     expect(state.activeAiSubMaskId).toBe('created');
     expect(state.brushSettings?.tool).toBe(ToolType.Brush);
     expect(state.historyIndex).toBe(1);
-    expect(state.history[1]).toBe(state.adjustments);
+    expect(state.history[1]).toBe(state.editDocumentV2);
     expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
     expect(state.editDocumentV2.nodes.source_artifacts?.params).toEqual(state.editDocumentV2.sourceArtifacts);
     expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
@@ -192,7 +190,7 @@ describe('AI edit store command', () => {
     const state = useEditorStore.getState();
 
     expect(committed).toBeNull();
-    expect(state.adjustments).toBe(initial);
+    expect(state.adjustmentSnapshot.value).toEqual(initial);
     expect(state.activeAiPatchContainerId).toBe('survivor');
     expect(state.activeAiSubMaskId).toBe('child');
     expect(state.historyIndex).toBe(0);
@@ -227,7 +225,7 @@ describe('AI edit store command', () => {
       ),
       selection,
     }));
-    expect(useEditorStore.getState().adjustments.aiPatches[0]?.visible).toBeFalse();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.visible).toBeFalse();
     expect(useEditorStore.getState().adjustmentRevision).toBe(1);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
@@ -235,19 +233,21 @@ describe('AI edit store command', () => {
       aiPatches: aiPatches.filter((candidate) => candidate.id !== 'second'),
       selection,
     }));
-    expect(useEditorStore.getState().adjustments.aiPatches.map((candidate) => candidate.id)).toEqual(['first']);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches.map((candidate) => candidate.id)).toEqual([
+      'first',
+    ]);
     expect(useEditorStore.getState().adjustmentRevision).toBe(2);
     expect(useEditorStore.getState().history).toHaveLength(3);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.aiPatches.map((candidate) => candidate.id)).toEqual([
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches.map((candidate) => candidate.id)).toEqual([
       'first',
       'second',
     ]);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.aiPatches[0]?.visible).toBeTrue();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.visible).toBeTrue();
     expect(useEditorStore.getState().editDocumentV2.nodes.source_artifacts?.params.aiPatches).toEqual(
-      useEditorStore.getState().adjustments.aiPatches,
+      useEditorStore.getState().adjustmentSnapshot.value.aiPatches,
     );
   });
 
@@ -293,26 +293,32 @@ describe('AI edit store command', () => {
 
   test('normalizes selection synchronously for reset, navigation, and history snapshots', () => {
     const populated = { ...structuredClone(INITIAL_ADJUSTMENTS), aiPatches: [patch('first', ['child'])] };
+    seedEditor(populated);
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: populated,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: 'child',
-      history: [populated],
       historyIndex: 0,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
     });
 
-    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: structuredClone(INITIAL_ADJUSTMENTS) });
+    const neutralDocument = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: neutralDocument,
+      history: [neutralDocument],
+      historyIndex: 0,
+    });
     expect(useEditorStore.getState().activeAiPatchContainerId).toBeNull();
     expect(useEditorStore.getState().activeAiSubMaskId).toBeNull();
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: populated,
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: 'child',
-      history: [populated],
       historyIndex: 0,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
     });
-    useEditorStore.getState().resetHistory(structuredClone(INITIAL_ADJUSTMENTS));
+    useEditorStore.getState().resetHistory(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS));
     expect(useEditorStore.getState().activeAiPatchContainerId).toBeNull();
     expect(useEditorStore.getState().activeAiSubMaskId).toBeNull();
   });

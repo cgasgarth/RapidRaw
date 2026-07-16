@@ -14,14 +14,17 @@ import {
   resolveAutoEditRenderSnapshot,
   setAutoEditPreviewBypass,
 } from '../../src/utils/autoEditTransaction';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2';
 
 const path = '/fixtures/auto-edit.raw';
 const session = createEditorImageSession({ generation: 7, path, source: 'cache' });
 const committed = structuredClone(INITIAL_ADJUSTMENTS);
 const committedSnapshot = publishAdjustmentSnapshot(null, committed);
+const committedEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(committed);
 const base: AutoEditProposalBase = {
   adjustmentRevision: 0,
   adjustments: committed,
+  editDocumentV2: committedEditDocumentV2,
   graphRevision: 'history_0',
   imageSessionId: session.id,
   path,
@@ -39,18 +42,18 @@ const preview = (exposure = 0.75) =>
 
 beforeEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
-    adjustments,
     autoEditPreviewSession: null,
-    history: [adjustments],
+    editDocumentV2,
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: session,
     imageSessionId: session.generation,
     lastEditApplicationReceipt: null,
     selectedImage: null,
+    history: [editDocumentV2],
   });
 });
 
@@ -123,7 +126,7 @@ describe('Auto Edit preview transaction authority', () => {
     const state = useEditorStore.getState();
 
     expect(result).toMatchObject({ changedKeys: ['exposure'], noOp: false, source: 'auto-edit' });
-    expect(state.adjustments.exposure).toBe(0.75);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(0.75);
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
@@ -194,7 +197,7 @@ describe('Auto Edit preview transaction authority', () => {
     expect(isCurrentAutoEditProposalBase({ ...state, adjustmentRevision: 1 }, fallbackBase)).toBeFalse();
 
     const proposal = createAutoEditPreviewSession({
-      adjustments: { ...state.adjustments, exposure: 0.9 },
+      adjustments: { ...state.adjustmentSnapshot.value, exposure: 0.9 },
       base: fallbackBase,
       committedSnapshot: state.adjustmentSnapshot,
       currentAdjustmentRevision: state.adjustmentRevision,
@@ -203,7 +206,7 @@ describe('Auto Edit preview transaction authority', () => {
     });
     useEditorStore.setState({ autoEditPreviewSession: proposal });
     const previewState = useEditorStore.getState();
-    expect(previewState.adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(previewState.adjustmentSnapshot.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
     expect(previewState.history).toHaveLength(1);
     expect(previewState.adjustmentRevision).toBe(0);
     expect(previewState.finalPreviewUrl).toBe('blob:fallback-auto-edit-before');
@@ -227,6 +230,6 @@ describe('Auto Edit preview transaction authority', () => {
       },
     });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
   });
 });

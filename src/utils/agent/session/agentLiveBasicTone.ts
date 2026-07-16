@@ -373,11 +373,18 @@ export const applyBasicToneToLiveEditor = async ({
     currentState.applyBasicToneCommand(applyCommand, commitIdentity);
   } else {
     const baseTransaction = buildBasicToneCommandEditTransaction(currentState, commitIdentity, applyCommand);
-    const commandAdjustments = applyBasicToneCommandEnvelopeToAdjustments(currentState.adjustments, applyCommand);
+    const commandAdjustments = applyBasicToneCommandEnvelopeToAdjustments(
+      currentState.adjustmentSnapshot.value,
+      applyCommand,
+    );
     const nextAdjustments = { ...commandAdjustments, ...additionalAdjustmentPatch };
     const result = currentState.applyEditTransaction({
       ...baseTransaction,
-      operations: buildAdjustmentMutationOperations(currentState.adjustments, nextAdjustments),
+      operations: buildAdjustmentMutationOperations(
+        currentState.adjustmentSnapshot.value,
+        nextAdjustments,
+        currentState.editDocumentV2,
+      ),
     });
     useEditorStore
       .getState()

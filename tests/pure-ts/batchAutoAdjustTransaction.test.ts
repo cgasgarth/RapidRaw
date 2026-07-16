@@ -46,16 +46,16 @@ const applied = batchAutoAdjustPathResultV1Schema.parse({
 
 beforeEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
-    adjustments,
-    history: [adjustments],
+    editDocumentV2,
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: session,
     imageSessionId: session.generation,
     lastEditApplicationReceipt: null,
+    history: [editDocumentV2],
   });
 });
 
@@ -89,6 +89,8 @@ describe('Batch Auto Adjust transaction boundary', () => {
       acceptedAdjustments,
       captured: identity,
       current: identity,
+      currentAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      currentEditDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
       result: applied,
     });
 
@@ -104,7 +106,7 @@ describe('Batch Auto Adjust transaction boundary', () => {
     const result = useEditorStore.getState().applyEditTransaction(transaction);
     const state = useEditorStore.getState();
     expect(result.noOp).toBe(false);
-    expect(state.adjustments.exposure).toBe(0.65);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(0.65);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
     expect(state.lastEditApplicationReceipt).toMatchObject({
@@ -150,6 +152,8 @@ describe('Batch Auto Adjust transaction boundary', () => {
       acceptedAdjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.65 },
       captured: identity,
       current: acceptance,
+      currentAdjustments: capturedAdjustments,
+      currentEditDocumentV2: legacyAdjustmentsToEditDocumentV2(capturedAdjustments),
       result: applied,
     });
     expect(transaction).toMatchObject({ baseAdjustmentRevision: 4, imageSessionId: 'successor-a' });
@@ -181,20 +185,19 @@ describe('Batch Auto Adjust transaction boundary', () => {
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: successor.adjustmentRevision,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, acceptedAdjustments, acceptedEditDocument),
-      adjustments: acceptedAdjustments,
-      editDocumentHistory: [acceptedEditDocument],
       editDocumentV2: acceptedEditDocument,
-      history: [acceptedAdjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: successorSession,
       imageSessionId: successorSession.generation,
+      history: [acceptedEditDocument],
     });
     const transaction = buildSelectedBatchAutoAdjustTransaction({
       acceptedAdjustments,
       captured: identity,
       current: successor,
+      currentAdjustments: acceptedAdjustments,
+      currentEditDocumentV2: acceptedEditDocument,
       historyBaseline: historyBaseline ?? undefined,
       historyEditDocumentBaseline,
       result: applied,
@@ -205,9 +208,11 @@ describe('Batch Auto Adjust transaction boundary', () => {
     expect(result.beforeEditDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(0.55);
     expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(0.65);
     expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
-    expect(useEditorStore.getState().history.map(({ exposure }) => exposure)).toEqual([0.55, 0.65]);
+    expect(
+      useEditorStore.getState().history.map((entry) => entry.nodes.scene_global_color_tone?.params.exposure),
+    ).toEqual([0.55, 0.65]);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.55);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.55);
     expect(useEditorStore.getState().editDocumentV2.nodes.scene_curve.enabled).toBeFalse();
   });
 
@@ -230,7 +235,12 @@ describe('Batch Auto Adjust transaction boundary', () => {
 
   test('rejects a deferred legacy history snapshot after newer mixer transactions', () => {
     const deferred = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 8 };
-    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: deferred });
+    const deferredDocument = legacyAdjustmentsToEditDocumentV2(deferred);
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: deferredDocument,
+      historyIndex: 0,
+      history: [deferredDocument],
+    });
     const deferredIdentity = {
       adjustmentRevision: useEditorStore.getState().adjustmentRevision,
       imageSessionId: session.id,
@@ -245,6 +255,8 @@ describe('Batch Auto Adjust transaction boundary', () => {
         acceptedAdjustments: enabled,
         captured: enableIdentity,
         current: enableIdentity,
+        currentAdjustments: deferred,
+        currentEditDocumentV2: deferredDocument,
         result: applied,
       }) ??
         (() => {
@@ -253,10 +265,10 @@ describe('Batch Auto Adjust transaction boundary', () => {
     );
     const responseState = useEditorStore.getState();
     const response = {
-      ...responseState.adjustments,
+      ...responseState.adjustmentSnapshot.value,
       blackWhiteMixer: {
-        ...responseState.adjustments.blackWhiteMixer,
-        weights: { ...responseState.adjustments.blackWhiteMixer.weights, reds: 32 },
+        ...responseState.adjustmentSnapshot.value.blackWhiteMixer,
+        weights: { ...responseState.adjustmentSnapshot.value.blackWhiteMixer.weights, reds: 32 },
       },
     };
     responseState.applyEditTransaction({
@@ -269,10 +281,10 @@ describe('Batch Auto Adjust transaction boundary', () => {
       transactionId: 'black-white-response',
     });
 
-    useEditorStore.getState().pushHistory(deferred, deferredIdentity);
+    useEditorStore.getState().pushHistory(deferredIdentity);
     expect(useEditorStore.getState().history).toHaveLength(3);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.blackWhiteMixer).toEqual(enabled.blackWhiteMixer);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(enabled.blackWhiteMixer);
   });
 
   test('protects same-path successor hydration before accepting unchanged state or rejecting a newer edit', () => {
@@ -352,6 +364,8 @@ describe('Batch Auto Adjust transaction boundary', () => {
       acceptedAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
       captured: identity,
       current: identity,
+      currentAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+      currentEditDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
       result: { ...applied, status: 'prepared' },
     });
 

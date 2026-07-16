@@ -9,7 +9,7 @@ export interface TypedCurveCommitIdentity {
 
 export interface TypedCurveEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'rawEngineEditGraphVersion'>;
+  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'rawEngineEditGraphVersion'> };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -64,12 +64,7 @@ export const buildTypedCurveEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: [
-      { nodeType: 'scene_curve', patch: curvePatch, type: 'patch-edit-document-node' },
-      ...(state.adjustments.rawEngineEditGraphVersion === 2
-        ? []
-        : [{ patch: { rawEngineEditGraphVersion: 2 }, type: 'patch-adjustments' } as const]),
-    ],
+    operations: [{ nodeType: 'scene_curve', patch: curvePatch, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'manual-control',
     transactionId,

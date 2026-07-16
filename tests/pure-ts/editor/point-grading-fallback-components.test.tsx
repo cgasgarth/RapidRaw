@@ -59,7 +59,7 @@ test('PointColorControls toggle commits through fallback authority without the m
   if (!(enable instanceof window.HTMLButtonElement)) throw new Error('missing point color enable control');
   act(() => enable.click());
 
-  expect(useEditorStore.getState().adjustments.pointColor.enabled).toBeTrue();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBeTrue();
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:111',
@@ -87,8 +87,8 @@ test('ColorGradingControls slider commits perceptual grading through fallback au
     balance.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustments.colorGrading.balance).toBe(28);
-  expect(useEditorStore.getState().adjustments.perceptualGradingV1?.balance).toBeCloseTo(0.28);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading.balance).toBe(28);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.perceptualGradingV1?.balance).toBeCloseTo(0.28);
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:112',
@@ -102,16 +102,14 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     imageSessionId,
     lastEditApplicationReceipt: null,
     selectedImage,
+    history: [editDocumentV2],
   });
   return adjustments;
 }

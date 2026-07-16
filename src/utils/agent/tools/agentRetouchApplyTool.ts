@@ -518,7 +518,7 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     buildRetouchLayerRuntimeProvenance(parsedRequest, draftLayer, outputProof),
   );
   const result = applyLayerStackCommandBridgeOperation(
-    state.adjustments.masks,
+    state.adjustmentSnapshot.value.masks,
     { layer, type: 'create' },
     {
       graphRevision: beforeSnapshot.graphRevision,
@@ -533,7 +533,7 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     buildAgentToolEditTransaction(
       currentState,
       commitIdentity,
-      { ...state.adjustments, masks: [...result.masks] },
+      { ...state.adjustmentSnapshot.value, masks: [...result.masks] },
       `${parsedRequest.operationId}_apply`,
     ),
   );

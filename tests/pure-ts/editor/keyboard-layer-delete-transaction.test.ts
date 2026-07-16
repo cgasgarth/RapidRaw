@@ -33,10 +33,7 @@ const seedStore = () => {
     activeMaskContainerId: layer.id,
     activeMaskId: null,
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments),
-    adjustments,
     finalPreviewUrl: 'blob:layer-current',
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
@@ -61,6 +58,8 @@ const seedStore = () => {
       width: 1800,
     },
     transformedOriginalUrl: 'blob:original-before',
+    editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
+    history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
   });
 };
 
@@ -84,8 +83,8 @@ describe('keyboard layer delete EditTransaction boundary', () => {
       transactionId: 'keyboard-delete-commit',
     });
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
-    expect(committed.adjustments.masks).toEqual([]);
-    expect(readLayerStackSidecarsFromSidecar(committed.adjustments)).toMatchObject([
+    expect(committed.adjustmentSnapshot.value.masks).toEqual([]);
+    expect(readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)).toMatchObject([
       { graphRevision: expect.stringContaining('keyboard-delete-commit'), layers: [], sourceImagePath: imagePath },
     ]);
     expect(committed.adjustmentRevision).toBe(1);
@@ -102,9 +101,9 @@ describe('keyboard layer delete EditTransaction boundary', () => {
     expect(committed.transformedOriginalUrl).toBeNull();
 
     committed.undo();
-    expect(useEditorStore.getState().adjustments.masks.map((mask) => mask.id)).toEqual([layer.id]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.masks.map((mask) => mask.id)).toEqual([layer.id]);
     committed.redo();
-    expect(useEditorStore.getState().adjustments.masks).toEqual([]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toEqual([]);
   });
 
   test('a missing selected layer is an exact render no-op', () => {
@@ -139,9 +138,9 @@ describe('keyboard layer delete EditTransaction boundary', () => {
       'edit_transaction.stale_base:0:1',
     );
     const committed = useEditorStore.getState();
-    expect(committed.adjustments.masks.map((mask) => mask.id)).toEqual([layer.id]);
-    expect(readLayerStackSidecarsFromSidecar(committed.adjustments)[0]?.layers.map((item) => item.id)).toEqual([
-      layer.id,
-    ]);
+    expect(committed.adjustmentSnapshot.value.masks.map((mask) => mask.id)).toEqual([layer.id]);
+    expect(
+      readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)[0]?.layers.map((item) => item.id),
+    ).toEqual([layer.id]);
   });
 });

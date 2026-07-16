@@ -15,6 +15,7 @@ import {
   agentDetailEffectsApplyRequestSchema,
   applyAgentDetailEffects,
 } from '../../../../src/utils/agent/tools/agentDetailEffectsApplyTool.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -62,8 +63,8 @@ const detailEffectsResultSchema = z
   })
   .passthrough();
 
+const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-detail-effects-before',
   hasRenderedFirstFrame: true,
@@ -73,7 +74,8 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  editDocumentV2,
+  history: [editDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '640', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -179,20 +181,20 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustments.deblurEnabled !== true ||
-  state.adjustments.deblurSigmaPx !== 0.9 ||
-  state.adjustments.deblurStrength !== 24 ||
-  state.adjustments.sharpness !== 18 ||
-  state.adjustments.lumaNoiseReduction !== 16 ||
-  state.adjustments.colorNoiseReduction !== 12 ||
-  state.adjustments.localContrastRadiusPx !== 32 ||
-  state.adjustments.dustSpotOverlayEnabled !== true ||
-  state.adjustments.dustSpotSensitivity !== 62 ||
-  state.adjustments.grainAmount !== 18 ||
-  state.adjustments.vignetteAmount !== -14 ||
-  state.adjustments.glowAmount !== 6 ||
-  state.adjustments.halationAmount !== 5 ||
-  state.adjustments.flareAmount !== 4
+  state.adjustmentSnapshot.value.deblurEnabled !== true ||
+  state.adjustmentSnapshot.value.deblurSigmaPx !== 0.9 ||
+  state.adjustmentSnapshot.value.deblurStrength !== 24 ||
+  state.adjustmentSnapshot.value.sharpness !== 18 ||
+  state.adjustmentSnapshot.value.lumaNoiseReduction !== 16 ||
+  state.adjustmentSnapshot.value.colorNoiseReduction !== 12 ||
+  state.adjustmentSnapshot.value.localContrastRadiusPx !== 32 ||
+  state.adjustmentSnapshot.value.dustSpotOverlayEnabled !== true ||
+  state.adjustmentSnapshot.value.dustSpotSensitivity !== 62 ||
+  state.adjustmentSnapshot.value.grainAmount !== 18 ||
+  state.adjustmentSnapshot.value.vignetteAmount !== -14 ||
+  state.adjustmentSnapshot.value.glowAmount !== 6 ||
+  state.adjustmentSnapshot.value.halationAmount !== 5 ||
+  state.adjustmentSnapshot.value.flareAmount !== 4
 ) {
   throw new Error('agent.detail_effects.apply did not mutate representative detail/effects adjustments.');
 }

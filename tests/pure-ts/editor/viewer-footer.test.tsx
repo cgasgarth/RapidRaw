@@ -62,11 +62,13 @@ afterEach(() => {
     rendered = null;
   }
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     compare: { dividerPosition: 0.5, isOriginalHeld: false, labelsVisible: true, mode: 'off', orientation: 'vertical' },
     previewQualityStatus: null,
     selectedImage: null,
     zoomMode: { kind: 'fit' },
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
+    historyIndex: 0,
   });
   useLibraryStore.setState({ imageList: [], multiSelectedPaths: [] });
 });

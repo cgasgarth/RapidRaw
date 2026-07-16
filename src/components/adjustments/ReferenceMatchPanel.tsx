@@ -53,6 +53,7 @@ export default function ReferenceMatchPanel() {
   const { t } = useTranslation();
   const {
     adjustmentSnapshot,
+    adjustmentRevision,
     adjustments,
     dispatchCompare,
     finalPreviewUrl,
@@ -66,7 +67,8 @@ export default function ReferenceMatchPanel() {
   } = useEditorStore(
     useShallow((state) => ({
       adjustmentSnapshot: state.adjustmentSnapshot,
-      adjustments: state.adjustments,
+      adjustmentRevision: state.adjustmentRevision,
+      adjustments: state.adjustmentSnapshot.value,
       dispatchCompare: state.dispatchCompare,
       finalPreviewUrl: state.finalPreviewUrl,
       histogram: state.histogram,
@@ -132,7 +134,7 @@ export default function ReferenceMatchPanel() {
 
   useEffect(() => {
     setProposal(null);
-  }, [adjustmentSnapshot.adjustmentRevision, selectedImage?.path]);
+  }, [adjustmentRevision, selectedImage?.path]);
 
   useEffect(() => {
     if (!proposal || !selectedImage) {
@@ -142,14 +144,14 @@ export default function ReferenceMatchPanel() {
     setEditor({
       referenceMatchPreview: {
         adjustments: applyReferenceMatchProposal({ adjustments, enabledGroups, impact, proposal }),
-        baseAdjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+        baseAdjustmentRevision: adjustmentRevision,
         enabledGroups: [...enabledGroups].sort(),
         impact,
         proposalFingerprint: proposal.proposalFingerprint,
         targetPath: selectedImage.path,
       },
     });
-  }, [adjustmentSnapshot.adjustmentRevision, adjustments, enabledGroups, impact, proposal, selectedImage, setEditor]);
+  }, [adjustmentRevision, adjustments, enabledGroups, impact, proposal, selectedImage, setEditor]);
 
   useEffect(
     () => () => {
@@ -165,16 +167,14 @@ export default function ReferenceMatchPanel() {
     const sourceRevision = sourceIdentity.sourceRevision;
     const captured = {
       availability: 'available',
-      adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+      adjustmentRevision,
       cameraProfile: adjustments.cameraProfile,
       geometryFingerprint: fingerprintReferenceMatchValue(
         `${selectedImage.path}:geometry:${String(adjustmentSnapshot.geometryRevision)}`,
       ),
       geometryRevision: adjustmentSnapshot.geometryRevision,
-      graphFingerprint: fingerprintReferenceMatchValue(
-        `${selectedImage.path}:graph:${String(adjustmentSnapshot.adjustmentRevision)}`,
-      ),
-      id: `${selectedImage.path}:${String(adjustmentSnapshot.adjustmentRevision)}:${String(proofRevision)}`,
+      graphFingerprint: fingerprintReferenceMatchValue(`${selectedImage.path}:graph:${String(adjustmentRevision)}`),
+      id: `${selectedImage.path}:${String(adjustmentRevision)}:${String(proofRevision)}`,
       label: describeReferenceMatchSource(selectedImage.path).label,
       path: selectedImage.path,
       proofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),

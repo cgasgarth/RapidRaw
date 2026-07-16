@@ -32,7 +32,7 @@ export const useCameraInputEditCommit = (enabled = true) => {
       const currentIdentity = identityRef.current;
       if (currentIdentity === null) return null;
       const state = useEditorStore.getState();
-      const patch = typeof update === 'function' ? update(state.adjustments) : update;
+      const patch = typeof update === 'function' ? update(state.adjustmentSnapshot.value) : update;
       const result = applyEditTransaction(
         buildCameraInputEditTransaction(state, currentIdentity, patch, crypto.randomUUID()),
       );

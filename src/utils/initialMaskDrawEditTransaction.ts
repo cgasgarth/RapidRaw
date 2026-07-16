@@ -5,7 +5,7 @@ import type { EditTransactionRequest } from './editTransaction';
 
 export interface InitialMaskDrawEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly geometryEpoch: number;
   readonly imageSession: { readonly id: string } | null;
   readonly selectedImage: { readonly path: string } | null;
@@ -60,8 +60,8 @@ export const buildInitialMaskDrawEditTransaction = (
     );
   }
 
-  const masks = updateSubMask(state.adjustments.masks, identity.maskId, identity.tool, parameters);
-  const aiPatches = updateSubMask(state.adjustments.aiPatches, identity.maskId, identity.tool, parameters);
+  const masks = updateSubMask(state.adjustmentSnapshot.value.masks, identity.maskId, identity.tool, parameters);
+  const aiPatches = updateSubMask(state.adjustmentSnapshot.value.aiPatches, identity.maskId, identity.tool, parameters);
   if (!masks.found && !aiPatches.found) throw new Error(`initial_mask_transaction.missing_mask:${identity.maskId}`);
 
   return {
@@ -70,8 +70,14 @@ export const buildInitialMaskDrawEditTransaction = (
     imageSessionId: identity.imageSessionId,
     operations: [
       {
-        adjustments: { ...state.adjustments, aiPatches: aiPatches.containers, masks: masks.containers },
-        type: 'replace-adjustments',
+        nodeType: 'layers',
+        patch: { masks: masks.containers },
+        type: 'patch-edit-document-node',
+      },
+      {
+        nodeType: 'source_artifacts',
+        patch: { aiPatches: aiPatches.containers },
+        type: 'patch-edit-document-node',
       },
     ],
     persistence: 'commit',

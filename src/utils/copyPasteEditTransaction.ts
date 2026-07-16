@@ -10,7 +10,7 @@ import type {
 
 export interface CopyPasteEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -19,10 +19,8 @@ export interface CopyPasteEditTransactionState {
 
 export interface CopyPasteCompensationTarget {
   adjustmentRevision: number;
-  adjustments: Adjustments;
-  editDocumentHistory: EditDocumentV2[];
   editDocumentV2: EditDocumentV2;
-  history: Adjustments[];
+  history: EditDocumentV2[];
   historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
   imageSessionId: string;
@@ -61,8 +59,7 @@ export const buildCopyPasteEditTransaction = (
 
 export const captureCopyPasteCompensationTarget = (
   state: CopyPasteEditTransactionState & {
-    editDocumentHistory: EditDocumentV2[];
-    history: Adjustments[];
+    history: EditDocumentV2[];
     historyCheckpoints: EditHistoryCheckpoint[];
     historyIndex: number;
   },
@@ -73,8 +70,6 @@ export const captureCopyPasteCompensationTarget = (
   }
   return {
     adjustmentRevision: state.adjustmentRevision,
-    adjustments: structuredClone(state.adjustments),
-    editDocumentHistory: structuredClone(state.editDocumentHistory),
     editDocumentV2: structuredClone(state.editDocumentV2),
     history: structuredClone(state.history),
     historyCheckpoints: structuredClone(state.historyCheckpoints),
@@ -134,7 +129,6 @@ export const buildCopyPastePersistenceCompensation = (
     baseAdjustmentRevision: state.adjustmentRevision,
     compensationHistory: {
       checkpoints: structuredClone(target.historyCheckpoints),
-      editDocumentEntries: structuredClone(target.editDocumentHistory),
       entries: structuredClone(target.history),
       historyIndex: target.historyIndex,
     },
@@ -142,9 +136,8 @@ export const buildCopyPastePersistenceCompensation = (
     imageSessionId: target.imageSessionId,
     operations: [
       {
-        adjustments: structuredClone(target.adjustments),
         editDocumentV2: structuredClone(target.editDocumentV2),
-        type: 'replace-edit-authority',
+        type: 'replace-edit-document',
       },
     ],
     persistence: 'native-committed',

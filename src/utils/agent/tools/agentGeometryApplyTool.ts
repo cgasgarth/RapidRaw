@@ -273,7 +273,7 @@ export const applyAgentGeometry = async (
   const commitIdentity = captureAgentToolCommitIdentity(state);
   if (commitIdentity === null) throw new Error('Agent geometry apply requires a selected image session.');
 
-  const beforeAdjustments = state.adjustments;
+  const beforeAdjustments = state.adjustmentSnapshot.value;
   const undoGraphRevision = `history_${state.historyIndex}`;
   const operations = buildGeometryPatchOperations(beforeAdjustments, parsedRequest.geometry);
   const typedMutation = await dispatchTypedGeometryEditGraphApply(

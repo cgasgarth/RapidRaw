@@ -1,6 +1,7 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import type { Adjustments } from './adjustments';
-import type { EditTransactionRequest } from './editTransaction';
+import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 import {
   applyReferenceMatchProposal,
   createReferenceMatchAdjustmentLayer,
@@ -13,7 +14,8 @@ import {
 
 export interface ReferenceMatchEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   imageSession?: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -96,26 +98,23 @@ export const buildReferenceMatchGlobalEditTransaction = ({
   transactionId: string;
 }): ReferenceMatchTransactionCommit | null => {
   assertReferenceMatchIdentity(state, identity, proposal);
-  const applied = applyReferenceMatchProposal({ adjustments: state.adjustments, enabledGroups, impact, proposal });
+  const applied = applyReferenceMatchProposal({
+    adjustments: state.adjustmentSnapshot.value,
+    enabledGroups,
+    impact,
+    proposal,
+  });
   const appliedDiffs = createReferenceMatchAppliedDiffs({
-    adjustments: state.adjustments,
+    adjustments: state.adjustmentSnapshot.value,
     enabledGroups,
     impact,
     proposal,
   });
   if (appliedDiffs.length === 0) return null;
-  const appliesWhiteBalance = appliedDiffs.some(
-    (diff) => diff.key === 'whiteBalanceKelvin' || diff.key === 'whiteBalanceDuv',
-  );
-  const scalarPatch = Object.fromEntries(
-    appliedDiffs
-      .filter((diff) => diff.key !== 'whiteBalanceKelvin' && diff.key !== 'whiteBalanceDuv')
-      .map((diff) => [diff.key, diff.after]),
-  );
   const receipt = matchLookApplicationReceiptV1Schema.parse({
     appliedDiffs,
     appliedAt,
-    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(state.adjustments)),
+    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(state.adjustmentSnapshot.value)),
     destination: 'global-adjustments',
     effectiveReferences: proposal.effectiveReferences,
     enabledGroups: sortedGroups(enabledGroups),
@@ -134,16 +133,11 @@ export const buildReferenceMatchGlobalEditTransaction = ({
       baseAdjustmentRevision: identity.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: identity.imageSessionId,
-      operations: [
-        {
-          patch: {
-            ...scalarPatch,
-            ...(appliesWhiteBalance ? { whiteBalanceTechnical: structuredClone(applied.whiteBalanceTechnical) } : {}),
-            referenceMatchApplicationReceipt: receipt,
-          },
-          type: 'patch-adjustments',
-        },
-      ],
+      operations: buildAdjustmentMutationOperations(
+        state.adjustmentSnapshot.value,
+        { ...applied, referenceMatchApplicationReceipt: receipt },
+        state.editDocumentV2,
+      ),
       persistence: 'commit',
       source: 'reference-match',
       transactionId,
@@ -174,7 +168,7 @@ export const buildReferenceMatchLayerEditTransaction = ({
 }): ReferenceMatchTransactionCommit | null => {
   assertReferenceMatchIdentity(state, identity, proposal);
   const appliedDiffs = createReferenceMatchAppliedDiffs({
-    adjustments: state.adjustments,
+    adjustments: state.adjustmentSnapshot.value,
     enabledGroups,
     impact,
     proposal,
@@ -190,7 +184,7 @@ export const buildReferenceMatchLayerEditTransaction = ({
   const receipt = matchLookApplicationReceiptV1Schema.parse({
     appliedDiffs,
     appliedAt,
-    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(state.adjustments)),
+    baseGraphFingerprint: fingerprintReferenceMatchValue(JSON.stringify(state.adjustmentSnapshot.value)),
     destination: 'adjustment-layer',
     effectiveReferences: proposal.effectiveReferences,
     enabledGroups: sortedGroups(enabledGroups),
@@ -221,7 +215,7 @@ export const buildReferenceMatchLayerEditTransaction = ({
       operations: [
         {
           nodeType: 'layers',
-          patch: { masks: [layer, ...state.adjustments.masks] },
+          patch: { masks: [layer, ...state.adjustmentSnapshot.value.masks] },
           type: 'patch-edit-document-node',
         },
       ],

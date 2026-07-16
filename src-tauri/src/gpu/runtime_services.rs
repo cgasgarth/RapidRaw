@@ -48,7 +48,7 @@ impl GpuRuntimeServices {
         self.context.coordinator_snapshot()
     }
 
-    #[cfg(any(test, target_os = "macos", feature = "validation-harness"))]
+    #[cfg(any(target_os = "macos", feature = "validation-harness"))]
     pub(crate) fn install_coordinator(
         &self,
         coordinator: Arc<DisplayTargetCoordinator>,

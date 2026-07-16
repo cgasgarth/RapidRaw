@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import type { EditHistoryCheckpoint } from '../../editHistory';
 import { buildHistoryRestorationEditTransaction } from '../../historyNavigationEditTransaction';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
@@ -25,10 +24,9 @@ export interface AgentAtomicApplyResult {
   appliedGraphRevision: string;
   approvalId: string;
   rollbackTarget: {
-    adjustments: Adjustments;
-    editDocumentHistory: EditDocumentV2[];
+    editDocumentV2: EditDocumentV2;
     graphRevision: string;
-    history: Adjustments[];
+    history: EditDocumentV2[];
     historyCheckpoints: EditHistoryCheckpoint[];
     historyIndex: number;
     previewUrl: string | null;
@@ -78,8 +76,7 @@ export const applyApprovedAgentPlanAtomically = async (plan: AgentApprovedPlan):
   });
 
   const rollbackTarget = {
-    adjustments: state.adjustments,
-    editDocumentHistory: structuredClone(state.editDocumentHistory),
+    editDocumentV2: structuredClone(state.editDocumentV2),
     graphRevision: currentGraphRevision,
     history: structuredClone(state.history),
     historyCheckpoints: structuredClone(state.historyCheckpoints),
@@ -106,7 +103,6 @@ export const rollbackApprovedAgentPlan = (rollbackTarget: AgentAtomicApplyResult
     buildHistoryRestorationEditTransaction(
       state,
       rollbackTarget.history,
-      rollbackTarget.editDocumentHistory,
       rollbackTarget.historyCheckpoints,
       rollbackTarget.historyIndex,
       `agent-approval-rollback:${rollbackTarget.graphRevision}:${String(state.adjustmentRevision)}`,

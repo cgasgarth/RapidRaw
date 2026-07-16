@@ -30,7 +30,7 @@ export const scheduleSubMaskInteractionEnd = (
 
 export interface SubMaskInteractionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'aiPatches' | 'masks'>;
+  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'aiPatches' | 'masks'> };
   imageSession: { id: string } | null;
   imageSessionId: number;
   lastEditApplicationReceipt: EditApplicationReceipt | null;
@@ -108,9 +108,12 @@ export const buildSubMaskInteractionEditTransaction = (
   if (!isCurrentInteraction(state, identity)) throw new Error('sub_mask_interaction.stale_identity');
   if (subMaskId === null) throw new Error('sub_mask_interaction.missing_id');
   if (subMaskId !== identity.subMaskId) throw new Error('sub_mask_interaction.stale_target');
-  const masks = identity.containerKind === 'masks' ? updateContainers(state.adjustments.masks, identity, patch) : null;
+  const masks =
+    identity.containerKind === 'masks' ? updateContainers(state.adjustmentSnapshot.value.masks, identity, patch) : null;
   const aiPatches =
-    identity.containerKind === 'aiPatches' ? updateContainers(state.adjustments.aiPatches, identity, patch) : null;
+    identity.containerKind === 'aiPatches'
+      ? updateContainers(state.adjustmentSnapshot.value.aiPatches, identity, patch)
+      : null;
 
   return {
     baseAdjustmentRevision: state.adjustmentRevision,

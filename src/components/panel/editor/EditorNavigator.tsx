@@ -87,7 +87,7 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   const { t } = useTranslation();
   const editor = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
+      adjustmentProjection: state.adjustmentSnapshot.value,
       baseRenderSize: state.baseRenderSize,
       compare: state.compare,
       originalSize: state.originalSize,
@@ -146,11 +146,11 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   const sourceSize = useMemo(
     () =>
       getEditorZoomSourceSize({
-        crop: editor.adjustments.crop,
-        orientationSteps: editor.adjustments.orientationSteps,
+        crop: editor.adjustmentProjection.crop,
+        orientationSteps: editor.adjustmentProjection.orientationSteps,
         originalSize: editor.originalSize,
       }),
-    [editor.adjustments.crop, editor.adjustments.orientationSteps, editor.originalSize],
+    [editor.adjustmentProjection.crop, editor.adjustmentProjection.orientationSteps, editor.originalSize],
   );
   const snapshot: ViewportSnapshot = useMemo(() => {
     const scale = editor.baseRenderSize.width / Math.max(sourceSize.width, 1);

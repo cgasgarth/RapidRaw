@@ -23,7 +23,7 @@ const source = (path: string, imageSessionId: number, proofRevision = 1, exposur
   adjustments.exposure = exposure;
   const adjustmentSnapshot = publishAdjustmentSnapshot(null, adjustments);
   return {
-    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+    adjustmentRevision: adjustmentSnapshot.renderRevision,
     adjustmentSnapshot,
     autoEditPreviewSession: null,
     baseRenderSize: {

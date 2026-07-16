@@ -94,8 +94,7 @@ export function EditorSnapshotsSection() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const items = useMemo(() => buildEditHistoryItems(history, checkpoints), [checkpoints, history]);
   const snapshots = items.filter(
-    (item): item is EditHistoryItem & { checkpoint: NonNullable<EditHistoryItem['checkpoint']> } =>
-      item.checkpoint !== null,
+    (item): item is typeof item & { checkpoint: NonNullable<typeof item.checkpoint> } => item.checkpoint !== null,
   );
   const activeItem = items[historyIndex] ?? null;
   const activeSnapshot = snapshots.find((item) => item.historyIndex === historyIndex) ?? null;
