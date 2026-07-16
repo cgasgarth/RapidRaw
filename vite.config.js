@@ -16,20 +16,16 @@ const hmrPort =
     : parseTcpPort(process.env.RAWENGINE_DEV_SERVER_HMR_PORT, 'RAWENGINE_DEV_SERVER_HMR_PORT');
 
 // https://vitejs.dev/config/
-export default defineConfig(async ({ command }) => ({
+export default defineConfig(async () => ({
+  ...(process.env.RAWENGINE_VITE_CACHE_DIR === undefined ? {} : { cacheDir: process.env.RAWENGINE_VITE_CACHE_DIR }),
   plugins: [
     createViteProductBundleGuardPlugin(),
+    browserTauriHarnessPrebootPlugin(),
     startupPrebootOrderingPlugin(),
-    browserTauriHarnessDevPlugin(command),
+    browserTauriHarnessEntryPlugin(),
     tailwindcss(),
     react(),
   ],
-  define: {
-    __RAWENGINE_BROWSER_TAURI_HARNESS__: JSON.stringify(
-      command === 'serve' || process.env.VITE_RAWENGINE_BROWSER_TAURI_HARNESS === '1',
-    ),
-  },
-
   clearScreen: false,
   server: {
     port: devServerPort,
@@ -73,24 +69,65 @@ function startupPrebootOrderingPlugin() {
   };
 }
 
-function browserTauriHarnessDevPlugin(command) {
+function browserTauriHarnessEntryPlugin() {
   return {
-    name: 'rapidraw-browser-tauri-harness-dev',
+    name: 'rapidraw-browser-tauri-harness-entry',
     apply: 'serve',
-    transformIndexHtml(html) {
-      if (command !== 'serve') return html;
-
-      const harnessScript = [
-        '    <script type="module">',
-        '      import { installBrowserTauriHarness } from "/src/validation/browserTauriHarness.mts";',
-        '      installBrowserTauriHarness();',
-        '    </script>',
+    transform(source, id) {
+      if (!id.endsWith('/src/main.ts')) return;
+      return [
+        'import { installBrowserTauriHarness } from "/src/validation/browserTauriHarness.mts";',
+        'installBrowserTauriHarness();',
+        source,
       ].join('\n');
+    },
+  };
+}
 
-      return html.replace(
-        '    <script type="module" src="/src/main.ts"></script>',
-        [harnessScript, '    <script type="module" src="/src/main.ts"></script>'].join('\n'),
-      );
+function browserTauriHarnessPrebootPlugin() {
+  return {
+    name: 'rapidraw-browser-tauri-harness-preboot',
+    apply: 'serve',
+    enforce: 'pre',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        const marker = '<script data-rawengine-startup-preboot>';
+        if (!html.includes(marker)) return html;
+        const bootstrap = `<script data-rawengine-browser-tauri-bootstrap>
+      (() => {
+        if (window.__TAURI_INTERNALS__ !== undefined) return;
+        const trace = {
+          criticalPathOrderValid: true,
+          firstPaintBudgetMet: true,
+          firstPaintBudgetMs: 750,
+          processId: 12345,
+          traceId: "startup:browser-harness",
+          phases: [],
+        };
+        const queuedCalls = [];
+        window.isTauri = true;
+        window.__TAURI_INTERNALS__ = {
+          __rawengineBrowserBootstrap: true,
+          __rawengineQueuedCalls: queuedCalls,
+          convertFileSrc: (path) => path,
+          invoke: (command, args, options) => {
+            const startedAtMs = performance.now();
+            queuedCalls.push({ args, command, endedAtMs: performance.now(), options, startedAtMs });
+            if (command === "frontend_ready") return Promise.resolve(null);
+            if (command === "get_startup_trace") return Promise.resolve(trace);
+            if (command === "record_frontend_startup_phase") {
+              return Promise.resolve({ ...trace, phases: [{ ...args, elapsedMs: 0 }] });
+            }
+            return Promise.reject(new Error("browser_tauri_harness_not_ready:" + command));
+          },
+          transformCallback: () => 0,
+          unregisterCallback: () => {},
+        };
+      })();
+    </script>`;
+        return html.replace(marker, `${bootstrap}\n    ${marker}`);
+      },
     },
   };
 }
