@@ -62,11 +62,8 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
     finalPreviewUrl: 'blob:fallback-actions-before',
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
@@ -84,6 +81,7 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
       thumbnailUrl: '',
       width: 4500,
     },
+    history: [editDocumentV2],
   });
   let actions: ReturnType<typeof useEditorActions> | null = null;
   const Harness = () => {
@@ -105,8 +103,8 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
       source: 'auto-edit',
     },
   });
-  expect(useEditorStore.getState().adjustments.exposure).toBe(0.35);
-  expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.35);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
 
   useEditorStore.setState({ finalPreviewUrl: 'blob:fallback-reset-action-before' });
   await act(async () => actions?.handleResetAdjustments([sourcePath]));
@@ -120,8 +118,8 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
       source: 'reset',
     },
   });
-  expect(useEditorStore.getState().adjustments.exposure).toBe(0);
-  expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
   expect(invoke).toHaveBeenCalledTimes(2);
 });
 

@@ -15,6 +15,7 @@ import {
   agentGeometryApplyRequestSchema,
   applyAgentGeometry,
 } from '../../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -50,8 +51,8 @@ const geometryResultSchema = z
   })
   .passthrough();
 
+const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-geometry-before',
   hasRenderedFirstFrame: true,
@@ -61,7 +62,8 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  editDocumentV2,
+  history: [editDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '640', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -134,10 +136,10 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustments.crop?.x !== 8 ||
-  state.adjustments.rotation !== 1.25 ||
-  !state.adjustments.flipHorizontal ||
-  state.adjustments.transformScale !== 1.08
+  state.adjustmentSnapshot.value.crop?.x !== 8 ||
+  state.adjustmentSnapshot.value.rotation !== 1.25 ||
+  !state.adjustmentSnapshot.value.flipHorizontal ||
+  state.adjustmentSnapshot.value.transformScale !== 1.08
 ) {
   throw new Error('agent.geometry.apply did not mutate crop/geometry adjustments.');
 }

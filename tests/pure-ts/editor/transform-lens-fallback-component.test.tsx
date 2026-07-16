@@ -65,16 +65,14 @@ test('TransformLens commits a manual lens control through the canonical fallback
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     imageSessionId: 73,
     lastEditApplicationReceipt: null,
     selectedImage,
+    history: [editDocumentV2],
   });
   const setAdjustments = mock(() => undefined);
   const container = document.createElement('div');
@@ -99,7 +97,7 @@ test('TransformLens commits a manual lens control through the canonical fallback
     vignetteSwitch.click();
   });
 
-  expect(useEditorStore.getState().adjustments.lensVignetteEnabled).toBeFalse();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.lensVignetteEnabled).toBeFalse();
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:73',
     source: 'manual-control',

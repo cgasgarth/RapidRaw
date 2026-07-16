@@ -4,7 +4,7 @@ import type { EditTransactionRequest } from './editTransaction';
 
 export interface StraightenEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
   imageSession: { id: string } | null;
   operationGeneration: number;
   selectedImage: { height: number; path: string; width: number } | null;
@@ -45,7 +45,7 @@ export const buildStraightenEditTransaction = (
     );
   }
 
-  const previous = state.adjustments;
+  const previous = state.adjustmentSnapshot.value;
   const rotation = (previous.rotation || 0) + correctionDegrees;
   const selectedImage = state.selectedImage;
   const crop =

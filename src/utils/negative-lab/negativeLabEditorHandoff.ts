@@ -33,18 +33,18 @@ function appendAcceptedDustHealLayers(layers: Array<MaskContainer> | undefined):
   if (layers === undefined || layers.length === 0) return;
 
   const state = useEditorStore.getState();
-  const existingLayerIds = new Set(state.adjustments.masks.map((layer) => layer.id));
+  const existingLayerIds = new Set(state.adjustmentSnapshot.value.masks.map((layer) => layer.id));
   const newLayers = layers.filter((layer) => !existingLayerIds.has(layer.id));
   if (newLayers.length === 0) return;
   const adjustments = {
-    ...state.adjustments,
-    masks: [...state.adjustments.masks, ...newLayers],
+    ...state.adjustmentSnapshot.value,
+    masks: [...state.adjustmentSnapshot.value.masks, ...newLayers],
   };
   state.applyEditTransaction({
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-    operations: buildAdjustmentMutationOperations(state.adjustments, adjustments),
+    operations: buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, adjustments, state.editDocumentV2),
     persistence: 'commit',
     source: 'layer-command',
     transactionId: `negative-lab-dust-handoff:${newLayers.map(({ id }) => id).join(',')}`,

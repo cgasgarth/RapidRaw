@@ -2,7 +2,7 @@ import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDoc
 import type { BatchAutoAdjustPathResultV1 } from '../schemas/batchAutoAdjustSchemas';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
-import type { EditTransactionRequest } from './editTransaction';
+import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 
 export interface BatchAutoAdjustSelectionIdentity {
   adjustmentRevision: number;
@@ -109,6 +109,8 @@ interface SelectedBatchAutoAdjustInput {
   acceptedAdjustments: Adjustments;
   captured: BatchAutoAdjustSelectionIdentity;
   current: BatchAutoAdjustSelectionIdentity | null;
+  currentAdjustments: Adjustments;
+  currentEditDocumentV2: EditDocumentV2;
   historyBaseline?: Adjustments;
   historyEditDocumentBaseline?: EditDocumentV2;
   result: BatchAutoAdjustPathResultV1;
@@ -118,6 +120,8 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
   acceptedAdjustments,
   captured,
   current,
+  currentAdjustments,
+  currentEditDocumentV2,
   historyBaseline,
   historyEditDocumentBaseline,
   result,
@@ -138,13 +142,12 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
     baseAdjustmentRevision: current.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: current.imageSessionId,
-    operations: [{ adjustments: acceptedAdjustments, type: 'replace-adjustments' }],
+    operations: buildAdjustmentMutationOperations(currentAdjustments, acceptedAdjustments, currentEditDocumentV2),
     persistence: 'native-committed',
     ...(historyBaseline === undefined || historyEditDocumentBaseline === undefined
       ? {}
       : {
-          nativeCommittedEditDocumentHistoryBaseline: historyEditDocumentBaseline,
-          nativeCommittedHistoryBaseline: historyBaseline,
+          nativeCommittedHistoryBaseline: historyEditDocumentBaseline,
         }),
     source: 'auto-edit',
     transactionId: result.receipt.transactionId,

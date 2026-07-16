@@ -53,15 +53,13 @@ describe('context Auto Adjust edit transaction', () => {
     );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustments,
       editDocumentV2,
-      editDocumentHistory: [editDocumentV2],
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -87,7 +85,7 @@ describe('context Auto Adjust edit transaction', () => {
     });
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 1, historyIndex: 1 });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({ contrast: 0, exposure: 0 });
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 0, exposure: 0 });
   });
 
   test('rejects stale source, session, revision, and superseded request generations', () => {
@@ -130,20 +128,20 @@ describe('context Auto Adjust edit transaction', () => {
     if (base === null) throw new Error('Expected context Auto Adjust base');
     const currentPatch = contextAutoAdjustPatchSchema.parse({
       ...patch,
-      blacks: state.adjustments.blacks,
-      brightness: state.adjustments.brightness,
-      clarity: state.adjustments.clarity,
-      contrast: state.adjustments.contrast,
-      dehaze: state.adjustments.dehaze,
-      exposure: state.adjustments.exposure,
-      highlights: state.adjustments.highlights,
-      shadows: state.adjustments.shadows,
-      vibrance: state.adjustments.vibrance,
-      vignetteAmount: state.adjustments.vignetteAmount,
-      whiteBalanceMigration: state.adjustments.whiteBalanceMigration,
-      whiteBalanceTechnical: state.adjustments.whiteBalanceTechnical,
-      whites: state.adjustments.whites,
-      centré: state.adjustments.centré,
+      blacks: state.adjustmentSnapshot.value.blacks,
+      brightness: state.adjustmentSnapshot.value.brightness,
+      clarity: state.adjustmentSnapshot.value.clarity,
+      contrast: state.adjustmentSnapshot.value.contrast,
+      dehaze: state.adjustmentSnapshot.value.dehaze,
+      exposure: state.adjustmentSnapshot.value.exposure,
+      highlights: state.adjustmentSnapshot.value.highlights,
+      shadows: state.adjustmentSnapshot.value.shadows,
+      vibrance: state.adjustmentSnapshot.value.vibrance,
+      vignetteAmount: state.adjustmentSnapshot.value.vignetteAmount,
+      whiteBalanceMigration: state.adjustmentSnapshot.value.whiteBalanceMigration,
+      whiteBalanceTechnical: state.adjustmentSnapshot.value.whiteBalanceTechnical,
+      whites: state.adjustmentSnapshot.value.whites,
+      centré: state.adjustmentSnapshot.value.centré,
     });
     const result = state.applyEditTransaction(
       buildContextAutoAdjustEditTransaction(state, base, currentPatch, 'context-auto-no-op'),
@@ -193,7 +191,7 @@ describe('context Auto Adjust edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
     expect(() =>
       buildContextAutoAdjustEditTransaction({ ...state, imageSessionId: 123 }, base, patch, 'stale-reopened-a'),
     ).toThrow('context_auto_adjust_transaction.stale_session');

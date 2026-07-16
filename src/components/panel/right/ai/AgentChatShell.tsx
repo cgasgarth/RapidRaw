@@ -86,9 +86,8 @@ const createAgentRollbackSnapshot = () => {
   const context = buildAgentImageContextSnapshot();
 
   return {
-    adjustments: state.adjustments,
     activeImagePath: context.activeImagePath,
-    editDocumentHistory: structuredClone(state.editDocumentHistory),
+    editDocumentV2: structuredClone(state.editDocumentV2),
     finalPreviewUrl: state.finalPreviewUrl,
     graphRevision: context.graphRevision,
     history: structuredClone(state.history),
@@ -216,7 +215,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const rollbackValidationKey = useEditorStore((state) =>
     JSON.stringify({
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
       finalPreviewUrl: state.finalPreviewUrl,
       historyIndex: state.historyIndex,
       selectedImagePath: state.selectedImage?.path ?? null,
@@ -468,7 +467,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         requestId: `${requestId}-lifecycle`,
         reviewedCommand: buildAgentReviewedAdjustmentCommandPlan({
           commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
-          sourceAdjustments: useEditorStore.getState().adjustments,
+          sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
         }).receipt,
         sessionId: dryRunReceipt.sessionId,
       });
@@ -553,9 +552,8 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
 
     const rollbackRequestId = `agent-live-rollback-${Date.now()}`;
     const checkpoint = {
-      adjustments: rollbackSnapshot.adjustments,
       activeImagePath: rollbackSnapshot.activeImagePath,
-      editDocumentHistory: rollbackSnapshot.editDocumentHistory,
+      editDocumentV2: rollbackSnapshot.editDocumentV2,
       graphRevision: rollbackSnapshot.graphRevision,
       history: rollbackSnapshot.history,
       historyCheckpoints: rollbackSnapshot.historyCheckpoints,

@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerRetouchCommand } from '../components/panel/editor/viewerRetouchHandlesController';
 import { Mask } from '../components/panel/right/layers/Masks';
 import type { Adjustments, MaskContainer, RetouchCloneSource } from './adjustments';
@@ -6,7 +7,8 @@ import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction'
 
 export interface RetouchHandleEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
   readonly imageSession?: { id: string } | null;
@@ -123,13 +125,13 @@ export const buildRetouchHandleEditTransaction = (
   imageSize: { readonly height: number; readonly width: number },
   transactionId: string,
 ): EditTransactionRequest => {
-  const matches = state.adjustments.masks.filter((layer) => layer.id === command.key.layerId);
+  const matches = state.adjustmentSnapshot.value.masks.filter((layer) => layer.id === command.key.layerId);
   const matchedLayer = matches[0];
   if (matches.length !== 1 || matchedLayer === undefined) return rejectRetouchHandle('missing_or_duplicate_layer');
   assertCurrent(state, command, matchedLayer, imageSize);
   const adjustments: Adjustments = {
-    ...state.adjustments,
-    masks: state.adjustments.masks.map((layer) =>
+    ...state.adjustmentSnapshot.value,
+    masks: state.adjustmentSnapshot.value.masks.map((layer) =>
       layer.id === command.key.layerId ? updateLayer(layer, command, imageSize) : layer,
     ),
   };

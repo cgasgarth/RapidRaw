@@ -22,7 +22,6 @@ import {
   INITIAL_ADJUSTMENTS,
   type MaskContainer,
 } from '../utils/adjustments';
-import { areAdjustmentsEqual } from '../utils/adjustmentsSnapshot';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
@@ -36,7 +35,11 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import { type EditDocumentV2CopyPayload, legacyAdjustmentsToEditDocumentV2 } from '../utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  type EditDocumentV2CopyPayload,
+  editDocumentV2ToLegacyAdjustments,
+} from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
@@ -93,10 +96,8 @@ export interface CopiedSectionAdjustments {
 }
 
 interface PresetApplication {
-  before: Adjustments;
-  beforeEditDocumentV2: EditDocumentV2;
-  expected: Adjustments;
-  expectedEditDocumentV2: EditDocumentV2;
+  before: EditDocumentV2;
+  expected: EditDocumentV2;
   id: string;
   imagePath: string | null;
   name: string;
@@ -178,8 +179,7 @@ interface ReferenceMatchPreview {
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
-  adjustments: Adjustments;
-  /** Versioned render authority; flat adjustments are the compatibility projection. */
+  /** The sole mutable and persisted editor render authority. */
   editDocumentV2: EditDocumentV2;
   /** Monotonic revision used to reject stale preview/commit proposals. */
   adjustmentRevision: number;
@@ -195,8 +195,7 @@ interface EditorState {
   basicToneSliderInteraction: BasicToneSliderInteraction | null;
 
   // History State
-  history: Adjustments[];
-  editDocumentHistory: EditDocumentV2[];
+  history: EditDocumentV2[];
   historyCheckpoints: EditHistoryCheckpoint[];
   historyIndex: number;
 
@@ -280,7 +279,7 @@ interface EditorState {
   publishPreviewViewportTransform: (transform: PreviewViewportTransformSnapshot) => void;
   setEditor: (updater: EditorStateUpdater) => void;
   hydrateEditorRenderAuthority: (updater: EditorRenderAuthorityHydrationUpdater) => void;
-  publishWhiteBalancePickerPreview: (adjustments: Adjustments) => void;
+  publishWhiteBalancePickerPreview: (editDocumentV2: EditDocumentV2) => void;
   applyEditTransaction: (request: EditTransactionRequest) => EditTransactionResult;
   beginBasicToneSliderInteraction: (
     identity: BasicToneCommitIdentity,
@@ -302,41 +301,30 @@ interface EditorState {
     command: BasicToneCommandEnvelope,
     identity: BasicToneCommitIdentity,
   ) => EditTransactionResult;
-  pushHistory: (newAdjustments: Adjustments, expected: { adjustmentRevision: number; imageSessionId: string }) => void;
+  pushHistory: (expected: { adjustmentRevision: number; imageSessionId: string }) => void;
   renameHistoryCheckpoint: (checkpointId: string, label: string) => void;
   undo: () => void;
   redo: () => void;
-  resetHistory: (initialState: Adjustments) => void;
+  resetHistory: (initialState: EditDocumentV2) => void;
   goToHistoryIndex: (index: number) => void;
 }
 
 const editorRenderAuthorityKeys = [
-  'adjustments',
   'adjustmentRevision',
   'adjustmentSnapshot',
-  'editDocumentHistory',
   'editDocumentV2',
   'history',
   'historyCheckpoints',
   'historyIndex',
 ] as const;
+const removedEditorRenderAuthorityKeys = ['adjustments', 'editDocumentHistory'] as const;
 
 type EditorRenderAuthorityKey = (typeof editorRenderAuthorityKeys)[number];
 export type EditorStateUpdate = Omit<Partial<EditorState>, EditorRenderAuthorityKey>;
 type EditorStateUpdater = EditorStateUpdate | ((state: EditorState) => EditorStateUpdate);
 export type EditorRenderAuthorityHydration = EditorStateUpdate &
-  Pick<EditorState, 'adjustments'> &
-  Partial<
-    Pick<
-      EditorState,
-      | 'adjustmentRevision'
-      | 'editDocumentHistory'
-      | 'editDocumentV2'
-      | 'history'
-      | 'historyCheckpoints'
-      | 'historyIndex'
-    >
-  >;
+  Pick<EditorState, 'editDocumentV2'> &
+  Partial<Pick<EditorState, 'adjustmentRevision' | 'history' | 'historyCheckpoints' | 'historyIndex'>>;
 type EditorRenderAuthorityHydrationUpdater =
   | EditorRenderAuthorityHydration
   | ((state: EditorState) => EditorRenderAuthorityHydration);
@@ -386,14 +374,9 @@ const historyNavigationPreviewInvalidation = {
   uncroppedAdjustedPreviewUrl: null,
 } satisfies Partial<EditorState>;
 
-const publishAdjustmentState = (
-  state: EditorState,
-  adjustments: Adjustments,
-  editDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments),
-) => ({
-  adjustments,
+const publishEditDocumentState = (state: EditorState, editDocumentV2: EditDocumentV2) => ({
   editDocumentV2,
-  adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments, editDocumentV2),
+  adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, editDocumentV2),
   autoEditPreviewSession: null,
 });
 
@@ -433,9 +416,8 @@ const assertApprovedBasicToneCommand = (command: BasicToneCommandEnvelope, state
   }
 };
 
-const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
-const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(initialAdjustments);
-const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialAdjustments, initialEditDocumentV2);
+const initialEditDocumentV2 = createDefaultEditDocumentV2();
+const initialAdjustmentSnapshot = publishAdjustmentSnapshot(null, initialEditDocumentV2);
 
 const viewportRevisionKeys: Array<keyof EditorState> = [
   'baseRenderSize',
@@ -453,12 +435,14 @@ const applyEditorStateUpdate = (
 ): void => {
   set((state) => {
     const rawUpdate = typeof updater === 'function' ? updater(state) : updater;
-    const forbiddenKey = allowRenderAuthority ? undefined : editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+    const forbiddenKey =
+      removedEditorRenderAuthorityKeys.find((key) => key in rawUpdate) ??
+      (allowRenderAuthority ? undefined : editorRenderAuthorityKeys.find((key) => key in rawUpdate));
     if (forbiddenKey !== undefined) {
       throw new Error(`editor.setEditor.render_authority_forbidden:${forbiddenKey}`);
     }
-    if (allowRenderAuthority && !('adjustments' in rawUpdate)) {
-      throw new Error('editor.hydration.adjustments_required');
+    if (allowRenderAuthority && !('editDocumentV2' in rawUpdate)) {
+      throw new Error('editor.hydration.edit_document_required');
     }
     const update: Partial<EditorState> = { ...rawUpdate };
 
@@ -467,51 +451,34 @@ const applyEditorStateUpdate = (
       (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
         ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
         ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
-        'adjustments' in update ||
+        'editDocumentV2' in update ||
         ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
     ) {
       update.basicToneSliderInteraction = null;
       update.isSliderDragging = false;
     }
 
-    if ('adjustments' in update && update.adjustments !== undefined) {
+    if ('editDocumentV2' in update && update.editDocumentV2 !== undefined) {
       if (!('adjustmentRevision' in update)) {
         update.adjustmentRevision = allowRenderAuthority ? state.adjustmentRevision : state.adjustmentRevision + 1;
       }
       update.referenceMatchPreview = null;
       update.autoEditPreviewSession = null;
-      update.editDocumentV2 = update.editDocumentV2 ?? legacyAdjustmentsToEditDocumentV2(update.adjustments);
       if (allowRenderAuthority) {
         const history = update.history ?? state.history;
         const historyIndex = update.historyIndex ?? state.historyIndex;
         if (!Number.isInteger(historyIndex) || historyIndex < 0 || historyIndex >= history.length) {
           throw new Error('editor.hydration.invalid_history_index');
         }
-        const editDocumentHistory =
-          update.editDocumentHistory?.map((entry) => structuredClone(entry)) ??
-          history.map((entry, index) =>
-            index === historyIndex
-              ? structuredClone(update.editDocumentV2 as EditDocumentV2)
-              : legacyAdjustmentsToEditDocumentV2(entry),
-          );
-        if (
-          editDocumentHistory.length !== history.length ||
-          !areEditDocumentsEqual(editDocumentHistory[historyIndex], update.editDocumentV2)
-        ) {
-          throw new Error('editor.hydration.inconsistent_edit_document_history');
+        if (!areEditDocumentsEqual(history[historyIndex], update.editDocumentV2)) {
+          throw new Error('editor.hydration.inconsistent_history');
         }
-        update.editDocumentHistory = editDocumentHistory;
       }
-      update.adjustmentSnapshot = publishAdjustmentSnapshot(
-        state.adjustmentSnapshot,
-        update.adjustments,
-        update.editDocumentV2,
-      );
-      update.adjustments = update.adjustmentSnapshot.value as Adjustments;
+      update.adjustmentSnapshot = publishAdjustmentSnapshot(state.adjustmentSnapshot, update.editDocumentV2);
       update.lastEditApplicationReceipt = null;
       Object.assign(
         update,
-        resolveAiSelectionState(state, update.adjustments, {
+        resolveAiSelectionState(state, update.adjustmentSnapshot.value, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -522,7 +489,7 @@ const applyEditorStateUpdate = (
     } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
       Object.assign(
         update,
-        resolveAiSelectionState(state, state.adjustments, {
+        resolveAiSelectionState(state, state.adjustmentSnapshot.value, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -613,7 +580,6 @@ const applyEditorStateUpdate = (
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   selectedImage: null,
-  adjustments: initialAdjustments,
   editDocumentV2: initialEditDocumentV2,
   adjustmentRevision: 0,
   adjustmentSnapshot: initialAdjustmentSnapshot,
@@ -625,8 +591,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   proofRevision: 1,
   lastBasicToneCommand: null,
   basicToneSliderInteraction: null,
-  history: [initialAdjustments],
-  editDocumentHistory: [initialEditDocumentV2],
+  history: [initialEditDocumentV2],
   historyCheckpoints: [],
   historyIndex: 0,
 
@@ -723,26 +688,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setEditor: (updater) => applyEditorStateUpdate(set, updater, false),
   hydrateEditorRenderAuthority: (updater) => applyEditorStateUpdate(set, updater, true),
 
-  publishWhiteBalancePickerPreview: (adjustments) =>
+  publishWhiteBalancePickerPreview: (editDocumentV2) =>
     set((state) => ({
       ...historyNavigationPreviewInvalidation,
-      ...publishAdjustmentState(state, adjustments),
+      ...publishEditDocumentState(state, editDocumentV2),
     })),
 
   applyEditorTeardownTransaction: (request) => {
     let result: EditorTeardownTransactionResult | null = null;
     set((state) => {
       if (!isEditorTeardownIdentityCurrent(state, request)) throw new Error('editor_teardown.stale_identity');
-      const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-      const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-      const adjustmentsChanged = !areAdjustmentsEqual(state.adjustments, adjustments);
+      const editDocumentV2 = structuredClone(initialEditDocumentV2);
+      const adjustmentsChanged = !areEditDocumentsEqual(state.editDocumentV2, editDocumentV2);
       const adjustmentRevision = state.adjustmentRevision + (adjustmentsChanged ? 1 : 0);
       const imageSessionId = state.imageSessionId + 1;
       state.patchResidency.reset(imageSessionId);
       result = { adjustmentRevision, adjustmentsChanged, transactionId: request.transactionId };
       return {
         ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, adjustments, editDocumentV2),
+        ...publishEditDocumentState(state, editDocumentV2),
         activeAiPatchContainerId: null,
         activeAiSubMaskId: null,
         activeMaskContainerId: null,
@@ -754,8 +718,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gamutWarningOverlay: null,
         hasRenderedFirstFrame: false,
         histogram: null,
-        history: [structuredClone(adjustments)],
-        editDocumentHistory: [structuredClone(editDocumentV2)],
+        history: [structuredClone(editDocumentV2)],
         historyCheckpoints: [],
         historyIndex: 0,
         imageSession: null,
@@ -787,24 +750,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.preview_requires_proposal');
       }
       const nativeHistoryBaseline = request.nativeCommittedHistoryBaseline;
-      const nativeEditDocumentHistoryBaseline = request.nativeCommittedEditDocumentHistoryBaseline;
       const historyTargetIndex = request.history === 'navigation' ? request.historyTargetIndex : undefined;
       const compensationHistory =
         request.history === 'compensation' && request.compensationHistory !== undefined
           ? {
               checkpoints: structuredClone([...request.compensationHistory.checkpoints]),
-              editDocumentEntries: structuredClone([...request.compensationHistory.editDocumentEntries]),
               entries: structuredClone([...request.compensationHistory.entries]),
               historyIndex: request.compensationHistory.historyIndex,
             }
           : undefined;
-      const currentEditDocumentHistory = state.history.map((entry, index) => {
-        const existing = state.editDocumentHistory[index];
-        if (index === state.historyIndex && !areEditDocumentsEqual(existing, state.editDocumentV2)) {
-          return state.editDocumentV2;
-        }
-        return existing ?? legacyAdjustmentsToEditDocumentV2(entry);
-      });
+      const currentHistory = state.history.map((entry, index) =>
+        index === state.historyIndex && !areEditDocumentsEqual(entry, state.editDocumentV2)
+          ? state.editDocumentV2
+          : entry,
+      );
       if (request.history === 'navigation') {
         if (
           historyTargetIndex === undefined ||
@@ -823,7 +782,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           !Number.isInteger(compensationHistory.historyIndex) ||
           compensationHistory.historyIndex < 0 ||
           compensationHistory.historyIndex >= compensationHistory.entries.length ||
-          compensationHistory.editDocumentEntries.length !== compensationHistory.entries.length ||
           compensationHistory.checkpoints.some(
             (checkpoint) =>
               !Number.isInteger(checkpoint.historyIndex) ||
@@ -837,46 +795,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error('edit_transaction.compensation_history_requires_compensation');
       }
       if (
-        (nativeHistoryBaseline !== undefined || nativeEditDocumentHistoryBaseline !== undefined) &&
-        (nativeHistoryBaseline === undefined ||
-          nativeEditDocumentHistoryBaseline === undefined ||
-          request.persistence !== 'native-committed' ||
-          request.history !== 'single-entry')
+        nativeHistoryBaseline !== undefined &&
+        (request.persistence !== 'native-committed' || request.history !== 'single-entry')
       ) {
         throw new Error('edit_transaction.native_history_baseline_requires_native_single_entry');
       }
       const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
       const nextResult = reduceEditTransaction(
-        nativeHistoryBaseline ?? state.adjustments,
+        nativeHistoryBaseline ?? state.editDocumentV2,
         state.adjustmentRevision,
         request,
         currentImageSessionId,
-        nativeHistoryBaseline === undefined ? state.editDocumentV2 : nativeEditDocumentHistoryBaseline,
       );
       const reconcilesHydratedNativeCommit =
-        nativeHistoryBaseline !== undefined && !areAdjustmentsEqual(state.adjustments, nativeHistoryBaseline);
-      if (reconcilesHydratedNativeCommit && !areAdjustmentsEqual(state.adjustments, nextResult.after)) {
+        nativeHistoryBaseline !== undefined && !areEditDocumentsEqual(state.editDocumentV2, nativeHistoryBaseline);
+      if (
+        reconcilesHydratedNativeCommit &&
+        !areEditDocumentsEqual(state.editDocumentV2, nextResult.afterEditDocumentV2)
+      ) {
         throw new Error('edit_transaction.native_history_baseline_mismatch');
       }
       if (
         historyTargetIndex !== undefined &&
-        !areAdjustmentsEqual(state.history[historyTargetIndex] ?? state.adjustments, nextResult.after)
+        !areEditDocumentsEqual(state.history[historyTargetIndex], nextResult.afterEditDocumentV2)
       ) {
         throw new Error('edit_transaction.history_target_mismatch');
       }
       if (
         compensationHistory !== undefined &&
-        !areAdjustmentsEqual(
-          compensationHistory.entries[compensationHistory.historyIndex] ?? state.adjustments,
-          nextResult.after,
-        )
-      ) {
-        throw new Error('edit_transaction.compensation_history_target_mismatch');
-      }
-      if (
-        compensationHistory !== undefined &&
         !areEditDocumentsEqual(
-          compensationHistory.editDocumentEntries[compensationHistory.historyIndex],
+          compensationHistory.entries[compensationHistory.historyIndex],
           nextResult.afterEditDocumentV2,
         )
       ) {
@@ -886,7 +834,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const coalescedReceipt =
         request.history === 'coalesced-interaction' &&
         state.historyIndex === state.history.length - 1 &&
-        state.history[state.historyIndex] === state.adjustments &&
+        state.history[state.historyIndex] === state.editDocumentV2 &&
         activeInteractionReceipt?.transactionId === request.transactionId &&
         activeInteractionReceipt.imageSessionId === request.imageSessionId &&
         activeInteractionReceipt.source === request.source
@@ -906,8 +854,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (request.history === 'reset') {
           return {
             ...historyNavigationPreviewInvalidation,
-            history: [structuredClone(nextResult.after)],
-            editDocumentHistory: [structuredClone(nextResult.afterEditDocumentV2)],
+            history: [structuredClone(nextResult.afterEditDocumentV2)],
             historyCheckpoints: [],
             historyIndex: 0,
           };
@@ -916,7 +863,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
-          ? { history: state.history, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
+          ? { history: currentHistory, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
           : compensationHistory !== undefined
             ? {
                 history: structuredClone(compensationHistory.entries),
@@ -924,54 +871,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 historyIndex: compensationHistory.historyIndex,
               }
             : request.history === 'reset'
-              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
+              ? { history: [nextResult.afterEditDocumentV2], checkpoints: [], historyIndex: 0 }
               : coalescedReceipt
                 ? {
-                    history: state.history.map((entry, index) =>
-                      index === state.historyIndex ? nextResult.after : entry,
+                    history: currentHistory.map((entry, index) =>
+                      index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
                     ),
                     checkpoints: state.historyCheckpoints,
                     historyIndex: state.historyIndex,
                   }
                 : pushEditHistoryEntryWithCheckpoints(
                     reconcilesHydratedNativeCommit
-                      ? state.history.map((entry, index) =>
-                          index === state.historyIndex ? nativeHistoryBaseline : entry,
+                      ? currentHistory.map((entry, index) =>
+                          index === state.historyIndex && nativeHistoryBaseline !== undefined
+                            ? nativeHistoryBaseline
+                            : entry,
                         )
-                      : state.history,
+                      : currentHistory,
                     state.historyIndex,
-                    nextResult.after,
+                    nextResult.afterEditDocumentV2,
                     state.historyCheckpoints,
                   );
-      const nextEditDocumentHistory =
-        request.history === 'none' || request.history === 'navigation'
-          ? currentEditDocumentHistory
-          : request.history === 'compensation'
-            ? structuredClone(compensationHistory?.editDocumentEntries ?? [])
-            : request.history === 'reset'
-              ? [nextResult.afterEditDocumentV2]
-              : coalescedReceipt
-                ? currentEditDocumentHistory.map((entry, index) =>
-                    index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
-                  )
-                : [
-                    ...(reconcilesHydratedNativeCommit && nativeEditDocumentHistoryBaseline !== undefined
-                      ? currentEditDocumentHistory.map((entry, index) =>
-                          index === state.historyIndex ? nativeEditDocumentHistoryBaseline : entry,
-                        )
-                      : currentEditDocumentHistory
-                    ).slice(0, state.historyIndex + 1),
-                    nextResult.afterEditDocumentV2,
-                  ].slice(-nextHistory.history.length);
       return {
         ...historyNavigationPreviewInvalidation,
-        ...publishAdjustmentState(state, nextResult.after, nextResult.afterEditDocumentV2),
+        ...publishEditDocumentState(state, nextResult.afterEditDocumentV2),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
         basicToneSliderInteraction: null,
         isSliderDragging: false,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
-        editDocumentHistory: nextEditDocumentHistory,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
         ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
@@ -1005,7 +933,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           latestValue: value,
           previewSnapshot: publishAdjustmentSnapshot(
             interaction.previewSnapshot ?? state.adjustmentSnapshot,
-            result.after,
             result.afterEditDocumentV2,
           ),
         },
@@ -1041,7 +968,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   applyAiEditCommand: (command) => {
     const state = get();
     const result = command({
-      aiPatches: state.adjustments.aiPatches,
+      aiPatches: state.adjustmentSnapshot.value.aiPatches,
       selection: {
         containerId: state.activeAiPatchContainerId,
         subMaskId: state.activeAiSubMaskId,
@@ -1098,28 +1025,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return result;
   },
 
-  pushHistory: (newAdj, expected) => {
+  pushHistory: (expected) => {
     set((state) => {
       const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
       if (
         state.adjustmentRevision !== expected.adjustmentRevision ||
-        currentImageSessionId !== expected.imageSessionId ||
-        !areAdjustmentsEqual(state.adjustments, newAdj)
+        currentImageSessionId !== expected.imageSessionId
       ) {
         return {};
       }
       const nextHistory = pushEditHistoryEntryWithCheckpoints(
         state.history,
         state.historyIndex,
-        newAdj,
+        state.editDocumentV2,
         state.historyCheckpoints,
       );
       return {
         history: nextHistory.history,
-        editDocumentHistory: [
-          ...state.editDocumentHistory.slice(0, state.historyIndex + 1),
-          state.editDocumentV2,
-        ].slice(-nextHistory.history.length),
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: nextHistory.historyIndex,
       };
@@ -1134,51 +1056,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   undo: () => {
     const state = get();
-    const nextState = undoEditHistory(state);
-    if (nextState.historyIndex === state.historyIndex) return;
+    const historyIndex = Math.max(0, state.historyIndex - 1);
+    if (historyIndex === state.historyIndex) return;
     state.applyEditTransaction(
       buildHistoryNavigationEditTransaction(
         state,
-        nextState.historyIndex,
-        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+        historyIndex,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(historyIndex)}`,
       ),
     );
   },
 
   redo: () => {
     const state = get();
-    const nextState = redoEditHistory(state);
-    if (nextState.historyIndex === state.historyIndex) return;
+    const historyIndex = Math.min(state.history.length - 1, state.historyIndex + 1);
+    if (historyIndex === state.historyIndex) return;
     state.applyEditTransaction(
       buildHistoryNavigationEditTransaction(
         state,
-        nextState.historyIndex,
-        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+        historyIndex,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(historyIndex)}`,
       ),
     );
   },
 
   resetHistory: (initialState) => {
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initialState);
     set((state) => ({
       history: [initialState],
-      editDocumentHistory: [editDocumentV2],
       historyCheckpoints: [],
       historyIndex: 0,
-      ...publishAdjustmentState(state, initialState, editDocumentV2),
-      ...resolveAiSelectionState(state, initialState),
+      ...publishEditDocumentState(state, initialState),
+      ...resolveAiSelectionState(state, editDocumentV2ToLegacyAdjustments(initialState)),
     }));
   },
 
   goToHistoryIndex: (index) => {
     const state = get();
-    const nextState = goToEditHistoryIndex(state, index);
-    if (nextState.historyIndex === state.historyIndex) return;
+    if (!Number.isInteger(index) || index < 0 || index >= state.history.length || index === state.historyIndex) return;
     state.applyEditTransaction(
       buildHistoryNavigationEditTransaction(
         state,
-        nextState.historyIndex,
-        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(nextState.historyIndex)}`,
+        index,
+        `history:${state.imageSession?.id ?? String(state.imageSessionId)}:${String(state.adjustmentRevision)}:${String(index)}`,
       ),
     );
   },
@@ -1188,7 +1107,9 @@ const directEditorStoreSetState = useEditorStore.setState;
 useEditorStore.setState = (updater, replace) => {
   if (replace === true) throw new Error('editor.setState.replace_forbidden');
   const rawUpdate = typeof updater === 'function' ? updater(useEditorStore.getState()) : updater;
-  const forbiddenKey = editorRenderAuthorityKeys.find((key) => key in rawUpdate);
+  const forbiddenKey =
+    removedEditorRenderAuthorityKeys.find((key) => key in rawUpdate) ??
+    editorRenderAuthorityKeys.find((key) => key in rawUpdate);
   if (forbiddenKey !== undefined) {
     throw new Error(`editor.setState.render_authority_forbidden:${forbiddenKey}`);
   }

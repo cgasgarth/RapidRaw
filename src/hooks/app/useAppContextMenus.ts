@@ -572,7 +572,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 path: editor.selectedImage.path,
               }
             : null;
-        const capturedAdjustments = capturedSelection === null ? null : structuredClone(editor.adjustments);
+        const capturedAdjustments =
+          capturedSelection === null ? null : structuredClone(editor.adjustmentSnapshot.value);
         const capturedEditDocumentV2 = capturedSelection === null ? null : structuredClone(editor.editDocumentV2);
         let successorBaseline: BatchAutoAdjustSuccessorBaseline | null = null;
         const stopTrackingSuccessor =
@@ -590,7 +591,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   return;
                 }
                 successorBaseline = {
-                  adjustments: structuredClone(state.adjustments),
+                  adjustments: structuredClone(state.adjustmentSnapshot.value),
                   identity: {
                     adjustmentRevision: state.adjustmentRevision,
                     imageSessionId: session.id,
@@ -685,7 +686,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     captured: capturedSelection,
                     capturedAdjustments,
                     current: latestSelection,
-                    currentAdjustments: latest.selectedImage ? latest.adjustments : null,
+                    currentAdjustments: latest.selectedImage ? latest.adjustmentSnapshot.value : null,
                   });
                   const acceptanceIdentity =
                     reconciledHistoryBaseline === null
@@ -693,7 +694,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                           captured: capturedSelection,
                           capturedAdjustments,
                           current: latestSelection,
-                          currentAdjustments: latest.selectedImage ? latest.adjustments : null,
+                          currentAdjustments: latest.selectedImage ? latest.adjustmentSnapshot.value : null,
                           currentSource: latest.imageSession?.source ?? null,
                           successorBaseline,
                         })
@@ -703,6 +704,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       acceptedAdjustments,
                       captured: capturedSelection,
                       current: acceptanceIdentity,
+                      currentAdjustments: latest.adjustmentSnapshot.value,
+                      currentEditDocumentV2: latest.editDocumentV2,
                       ...(reconciledHistoryBaseline === null ? {} : { historyBaseline: reconciledHistoryBaseline }),
                       ...(reconciledHistoryBaseline === null || capturedEditDocumentV2 === null
                         ? {}
@@ -748,7 +751,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   captured: capturedSelection,
                   capturedAdjustments,
                   current: currentSelection,
-                  currentAdjustments: current.selectedImage ? current.adjustments : null,
+                  currentAdjustments: current.selectedImage ? current.adjustmentSnapshot.value : null,
                 })
               ) {
                 debouncedSave(capturedSelection.path, capturedAdjustments);

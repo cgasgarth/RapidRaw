@@ -412,7 +412,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const imageSession = useEditorStore((state) => state.imageSession);
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const appliedPreset = useEditorStore((state) => state.presetApplication);
   const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
@@ -521,9 +521,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     () =>
       appliedPreset !== null &&
       appliedPreset.imagePath === (selectedImage?.path ?? null) &&
-      (!areAdjustmentsEqual(adjustments, appliedPreset.expected) ||
-        !areEditDocumentsEqual(editDocumentV2, appliedPreset.expectedEditDocumentV2)),
-    [adjustments, appliedPreset, editDocumentV2, selectedImage?.path],
+      !areEditDocumentsEqual(editDocumentV2, appliedPreset.expected),
+    [appliedPreset, editDocumentV2, selectedImage?.path],
   );
   const previewedPreset = previewedPresetId ? (allPresetMap.get(previewedPresetId) ?? null) : null;
   const hasUserPresets = rootPresets.length > 0 || folders.some((entry) => entry.folder.children.length > 0);
@@ -589,10 +588,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setSelectedPresetId(preset.id);
         if (result.noOp) return;
         setAppliedPreset({
-          before: result.before,
-          beforeEditDocumentV2: result.beforeEditDocumentV2,
-          expected: result.after,
-          expectedEditDocumentV2: result.afterEditDocumentV2,
+          before: result.beforeEditDocumentV2,
+          expected: result.afterEditDocumentV2,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,
@@ -620,10 +617,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(null);
         if (result.noOp) return;
         setAppliedPreset({
-          before: result.before,
-          beforeEditDocumentV2: result.beforeEditDocumentV2,
-          expected: result.after,
-          expectedEditDocumentV2: result.afterEditDocumentV2,
+          before: result.beforeEditDocumentV2,
+          expected: result.afterEditDocumentV2,
           id: preset.id,
           imagePath: selectedImage?.path ?? null,
           name: preset.name,
@@ -645,9 +640,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
       operations: [
         {
-          adjustments: structuredClone(appliedPreset.before),
-          editDocumentV2: structuredClone(appliedPreset.beforeEditDocumentV2),
-          type: 'replace-edit-authority',
+          editDocumentV2: structuredClone(appliedPreset.before),
+          type: 'replace-edit-document',
         },
       ],
       persistence: 'commit',

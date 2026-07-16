@@ -9,7 +9,7 @@ export interface PointColorCommitIdentity {
 
 export interface PointColorEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'pointColor'>;
+  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'pointColor'> };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -53,7 +53,9 @@ export const buildPointColorEditTransaction = (
     operations: [
       {
         nodeType: 'point_color',
-        patch: { pointColor: { ...structuredClone(state.adjustments.pointColor), ...structuredClone(patch) } },
+        patch: {
+          pointColor: { ...structuredClone(state.adjustmentSnapshot.value.pointColor), ...structuredClone(patch) },
+        },
         type: 'patch-edit-document-node',
       },
     ],

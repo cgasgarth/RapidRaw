@@ -70,7 +70,7 @@ export default function ViewerFooter({
   );
   const editor = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
+      adjustmentProjection: state.adjustmentSnapshot.value,
       compare: state.compare,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       exportSoftProofTransform: state.exportSoftProofTransform,
@@ -109,7 +109,7 @@ export default function ViewerFooter({
     () =>
       getEditorChromeStatusStripChips(
         getEditorChromeStatusChips({
-          adjustments: editor.adjustments,
+          adjustments: editor.adjustmentProjection,
           gamutWarningOverlay: editor.gamutWarningOverlay,
           previewScopeStatus: editor.previewScopeStatus,
           proofContext: {

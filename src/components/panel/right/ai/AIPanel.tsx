@@ -375,7 +375,7 @@ export function AIPanel() {
   const nativeCapabilities = useNativeCapabilityStore((state) => state.manifest);
   const activePatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
-  const adjustments = useEditorStore((s) => s.adjustments);
+  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const isAIConnectorConnected = useEditorStore((s) => s.isAIConnectorConnected);
   const isGeneratingAi = useEditorStore((s) => s.isGeneratingAi);
@@ -488,7 +488,7 @@ export function AIPanel() {
     (requested: AiEditSelection, expandSelection = false) => {
       let selection: AiEditSelection = { containerId: null, subMaskId: null };
       setEditor((state) => {
-        selection = resolveAiEditSelection(state.adjustments.aiPatches, requested);
+        selection = resolveAiEditSelection(state.adjustmentSnapshot.value.aiPatches, requested);
         return {
           activeAiPatchContainerId: selection.containerId,
           activeAiSubMaskId: selection.subMaskId,

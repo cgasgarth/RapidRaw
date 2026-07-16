@@ -22,7 +22,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const source = (path: string, imageSessionId: number): PreviewRequestScopeInput => {
   const adjustmentSnapshot = publishAdjustmentSnapshot(null, structuredClone(INITIAL_ADJUSTMENTS));
   return {
-    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+    adjustmentRevision: adjustmentSnapshot.renderRevision,
     adjustmentSnapshot,
     autoEditPreviewSession: null,
     baseRenderSize: {

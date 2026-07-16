@@ -96,7 +96,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     waveformHeight,
   } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
       activeWaveformChannel: state.activeWaveformChannel,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       exportSoftProofTransform: state.exportSoftProofTransform,

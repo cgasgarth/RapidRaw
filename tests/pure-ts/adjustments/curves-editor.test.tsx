@@ -15,7 +15,7 @@ import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -420,7 +420,7 @@ function CurveHarness({
   dragStates: boolean[];
   initialAdjustments: Adjustments;
 }) {
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   return createElement(
     'div',
     null,
@@ -428,9 +428,16 @@ function CurveHarness({
       adjustments,
       histogram: null,
       setAdjustments: (updater) => {
-        const next = updater(useEditorStore.getState().adjustments);
+        const next = bindTypedCurveGraphVersion(
+          updater(useEditorStore.getState().adjustmentSnapshot.value),
+        ) as Adjustments;
         changes.push(next);
-        useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: next });
+        const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(next);
+        useEditorStore.getState().hydrateEditorRenderAuthority({
+          editDocumentV2,
+          history: [editDocumentV2],
+          historyIndex: 0,
+        });
       },
       theme: Theme.Dark,
       onDragStateChange: (dragging) => dragStates.push(dragging),
@@ -440,18 +447,16 @@ function CurveHarness({
       {
         'data-testid': 'parent-curve-update',
         onClick: () => {
-          const previous = useEditorStore.getState().adjustments;
+          const previous = useEditorStore.getState().adjustmentSnapshot.value;
+          const next = {
+            ...previous,
+            curves: { ...previous.curves, luma: [{ x: 0, y: 37 }, ...previous.curves.luma.slice(1)] },
+          };
+          const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(next);
           useEditorStore.getState().hydrateEditorRenderAuthority({
-            adjustments: {
-              ...previous,
-              curves: {
-                ...previous.curves,
-                luma: [
-                  { x: 0, y: 37 },
-                  { x: 255, y: 255 },
-                ],
-              },
-            },
+            editDocumentV2,
+            history: [editDocumentV2],
+            historyIndex: 0,
           });
         },
         type: 'button',
@@ -478,10 +483,7 @@ async function renderCurveEditor(
   const imageSession = createEditorImageSession({ generation: 29, path: sourcePath, source: 'cache' });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession,
@@ -498,6 +500,7 @@ async function renderCurveEditor(
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
 
   await act(async () => {
@@ -519,7 +522,7 @@ async function renderCurveEditor(
   return { container, root };
 }
 
-const currentAdjustments = () => useEditorStore.getState().adjustments;
+const currentAdjustments = () => useEditorStore.getState().adjustmentSnapshot.value;
 
 async function click(button: HTMLButtonElement) {
   await act(async () => {
@@ -537,7 +540,6 @@ function getButton(container: Element, title: string): HTMLButtonElement {
 }
 
 function installDom() {
-  if (globalThis.document) return;
   const window = new Window({ url: 'http://localhost/' });
   Object.assign(globalThis, {
     document: window.document,

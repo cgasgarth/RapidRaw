@@ -19,7 +19,7 @@ export interface BasicToneSliderInteraction {
 }
 
 export interface BasicToneSliderInteractionState extends BasicToneEditTransactionState {
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
 }
 
@@ -31,12 +31,12 @@ export const beginBasicToneSliderInteraction = (
 ): BasicToneSliderInteraction => {
   assertBasicToneCommitIdentity(state, identity);
   return {
-    baseAdjustments: structuredClone(state.adjustments),
+    baseAdjustments: structuredClone(state.adjustmentSnapshot.value),
     baseEditDocumentV2: structuredClone(state.editDocumentV2),
     identity,
     interactionId,
     key,
-    latestValue: state.adjustments[key],
+    latestValue: state.adjustmentSnapshot.value[key],
     previewSnapshot: null,
   };
 };
@@ -75,11 +75,10 @@ export const buildBasicToneSliderInteractionRequest = (
 
 export const reduceBasicToneSliderInteractionPreview = (interaction: BasicToneSliderInteraction, value: number) =>
   reduceEditTransaction(
-    interaction.baseAdjustments,
+    interaction.baseEditDocumentV2,
     interaction.identity.adjustmentRevision,
     buildBasicToneSliderInteractionRequest(interaction, value, 'preview'),
     interaction.identity.imageSessionId,
-    interaction.baseEditDocumentV2,
   );
 
 export const resolveBasicToneSliderRenderSnapshot = (

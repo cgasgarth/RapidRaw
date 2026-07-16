@@ -44,7 +44,7 @@ import {
   getEditDocumentNodeTypesForEditorSection,
   sceneGlobalColorToneParamsV2Schema,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from './adjustments';
 
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const PROVENANCE_FIELDS = new Set(['referenceMatchApplicationReceipt']);
@@ -113,6 +113,47 @@ const nodeTypeForField = (key: string): EditDocumentNodeTypeV2 | null => {
     candidate.legacyFields.some((field) => field === key),
   );
   return descriptor?.nodeType ?? null;
+};
+
+/** Build the editor's current document authority directly from node descriptors. */
+export const createDefaultEditDocumentV2 = (): EditDocumentV2 => {
+  const nodes = Object.fromEntries(
+    EDIT_DOCUMENT_NODE_DESCRIPTORS.map((descriptor) => [
+      descriptor.nodeType,
+      {
+        enabled: true,
+        implementationVersion: descriptor.implementationVersion,
+        params: structuredClone(descriptor.defaultParams),
+        process: descriptor.process,
+        type: descriptor.nodeType,
+      },
+    ]),
+  );
+  const legacyAdjustments = Object.fromEntries(
+    Object.entries(INITIAL_ADJUSTMENTS).filter(
+      ([key]) => key !== 'effectsEnabled' && !PROVENANCE_FIELDS.has(key) && nodeTypeForField(key) === null,
+    ),
+  );
+  const nodeParams = (nodeType: EditDocumentNodeTypeV2): Record<string, unknown> => {
+    const node = nodes[nodeType];
+    if (node === undefined) throw new Error(`edit_document.default_node_missing:${nodeType}`);
+    return node.params;
+  };
+  return editDocumentV2Schema.parse({
+    extensions: { legacyAdjustments },
+    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
+    geometry: nodeParams('geometry'),
+    graphProcess: 'scene_referred_v2',
+    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
+    layers: nodeParams('layers'),
+    nodes,
+    provenance: { referenceMatchApplicationReceipt: null },
+    schemaVersion: 2,
+    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
+    sourceDecode: nodeParams('source_decode'),
+    // biome-ignore lint/complexity/useLiteralKeys: descriptor-built nodes use an index signature.
+    sourceArtifacts: nodeParams('source_artifacts'),
+  });
 };
 
 const readEffectsEnabled = (adjustments: Readonly<Record<string, unknown>>): boolean => {
@@ -308,12 +349,15 @@ export const editDocumentV2ToLegacyAdjustments = (document: EditDocumentV2): Adj
   // biome-ignore lint/complexity/useLiteralKeys: extensions intentionally quarantines future keys.
   const legacy = parsed.extensions['legacyAdjustments'];
   const nodeValues = Object.values(parsed.nodes).flatMap((node) => Object.entries(node.params));
-  return Object.fromEntries([
+  const projection = Object.fromEntries([
     ...Object.entries(legacy && typeof legacy === 'object' ? legacy : {}),
     ...nodeValues,
     ['effectsEnabled', parsed.nodes['display_creative']?.enabled ?? true],
     ['referenceMatchApplicationReceipt', parsed.provenance.referenceMatchApplicationReceipt],
   ]) as Adjustments;
+  return projection.sceneCurveV1 !== undefined || projection.outputCurveV1 !== undefined
+    ? { ...projection, rawEngineEditGraphVersion: 2 }
+    : projection;
 };
 
 export const editDocumentV2NodeInventory = (document: EditDocumentV2): readonly EditDocumentNodeTypeV2[] =>

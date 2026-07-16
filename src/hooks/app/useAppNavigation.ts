@@ -306,7 +306,7 @@ export function useAppNavigation({
           buildImageOpenHydrationEditTransaction(
             cacheState,
             { adjustmentRevision: cacheState.adjustmentRevision, imageSessionId: session.id, path },
-            cachedReadyEntry.adjustments,
+            cachedReadyEntry.editDocumentV2,
             `cache-open:${session.id}`,
           ),
         );
@@ -363,16 +363,15 @@ export function useAppNavigation({
                   : hydrateImageOpenEditDocumentV2(loadedMetadata, authoritativeAdjustments);
               if (
                 authoritativeAdjustments !== null &&
-                (!areAdjustmentsEqual(current.adjustments, authoritativeAdjustments) ||
+                (!areAdjustmentsEqual(current.adjustmentSnapshot.value, authoritativeAdjustments) ||
                   JSON.stringify(current.editDocumentV2) !== JSON.stringify(authoritativeEditDocument))
               ) {
                 current.applyEditTransaction(
                   buildImageOpenHydrationEditTransaction(
                     current,
                     backgroundHydrationIdentity,
-                    authoritativeAdjustments,
+                    authoritativeEditDocument ?? current.editDocumentV2,
                     `cache-meta:${session.id}:${openResult.metadataFingerprint}`,
-                    authoritativeEditDocument ?? undefined,
                   ),
                 );
               }
@@ -389,8 +388,12 @@ export function useAppNavigation({
                   width: result.width,
                 },
               });
-              const currentAdjustments = useEditorStore.getState().adjustments;
-              globalImageCache.set(path, { ...cachedReadyEntry, adjustments: currentAdjustments });
+              const currentAdjustments = useEditorStore.getState().adjustmentSnapshot.value;
+              globalImageCache.set(path, {
+                ...cachedReadyEntry,
+                adjustments: currentAdjustments,
+                editDocumentV2: current.editDocumentV2,
+              });
               consumePendingNegativeConversionDustHealLayers(path);
               consumePendingNegativeConversionSavedPositiveHandoff(path);
             });

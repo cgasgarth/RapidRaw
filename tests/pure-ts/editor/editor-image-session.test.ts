@@ -6,6 +6,7 @@ import {
   useEditorStore,
 } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildImageCacheEntry } from '../../../src/utils/ImageLRUCache';
 import { resolvePreviewViewportRoi } from '../../../src/utils/previewCoordinator';
 
@@ -95,7 +96,8 @@ describe('editor image session ownership', () => {
   test('cache snapshot is built only for a coherent ready current image', () => {
     const session = createEditorImageSession({ generation: 2, path: '/raw/A.ARW', source: 'cold-load' });
     const snapshot = {
-      adjustments: INITIAL_ADJUSTMENTS,
+      adjustmentSnapshot: { value: INITIAL_ADJUSTMENTS },
+      editDocumentV2: createDefaultEditDocumentV2(),
       finalPreviewUrl: 'blob:preview-a',
       hasRenderedFirstFrame: false,
       histogram: null,

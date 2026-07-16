@@ -146,7 +146,7 @@ export default function CropPanel() {
 function CropEditSession() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
-  const adjustments = useEditorStore((s) => s.adjustments);
+  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const activeOverlay = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);

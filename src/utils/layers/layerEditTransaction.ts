@@ -1,9 +1,11 @@
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from '../adjustments';
-import type { EditTransactionRequest } from '../editTransaction';
+import { buildAdjustmentMutationOperations, type EditTransactionRequest } from '../editTransaction';
 
 export interface LayerEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   imageSessionId: number;
   imageSession?: { id: string } | null;
 }
@@ -13,26 +15,24 @@ export const buildLayerEditTransactionRequest = (
   nextAdjustments: Adjustments,
   transactionId: string,
 ): EditTransactionRequest => {
-  const compatibilityPatch = Object.fromEntries(
-    [...new Set([...Object.keys(state.adjustments), ...Object.keys(nextAdjustments)])]
-      .filter((key) => key !== 'masks')
-      .filter((key) => {
-        const before = state.adjustments[key as keyof Adjustments];
-        const after = nextAdjustments[key as keyof Adjustments];
-        return !Object.is(before, after) && JSON.stringify(before) !== JSON.stringify(after);
-      })
-      .map((key) => [key, nextAdjustments[key as keyof Adjustments]]),
-  ) as Partial<Adjustments>;
-  const operations: EditTransactionRequest['operations'] = [
-    ...(Object.keys(compatibilityPatch).length === 0
-      ? []
-      : [{ type: 'patch-adjustments' as const, patch: compatibilityPatch }]),
-    {
-      type: 'patch-edit-document-node' as const,
-      nodeType: 'layers' as const,
-      patch: { masks: structuredClone(nextAdjustments.masks) },
-    },
-  ];
+  const compatibilityChanged = [
+    ...new Set([...Object.keys(state.adjustmentSnapshot.value), ...Object.keys(nextAdjustments)]),
+  ]
+    .filter((key) => key !== 'masks')
+    .some((key) => {
+      const before = state.adjustmentSnapshot.value[key as keyof Adjustments];
+      const after = nextAdjustments[key as keyof Adjustments];
+      return !Object.is(before, after) && JSON.stringify(before) !== JSON.stringify(after);
+    });
+  const operations: EditTransactionRequest['operations'] = compatibilityChanged
+    ? buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, nextAdjustments, state.editDocumentV2)
+    : [
+        {
+          nodeType: 'layers',
+          patch: { masks: structuredClone(nextAdjustments.masks) },
+          type: 'patch-edit-document-node',
+        },
+      ];
   return {
     transactionId,
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,

@@ -22,15 +22,13 @@ const seedStore = () => {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     imageSessionId: 9,
     lastEditApplicationReceipt: null,
+    history: [editDocumentV2],
   });
 };
 
@@ -55,9 +53,9 @@ describe('current Film workspace transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.filmEmulation).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.filmEmulation).toBeNull();
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.filmEmulation).toEqual(node(0.72));
+    expect(useEditorStore.getState().adjustmentSnapshot.value.filmEmulation).toEqual(node(0.72));
   });
 
   test('coalesces mix changes into one history entry and removing the node is exact', () => {
@@ -74,14 +72,14 @@ describe('current Film workspace transaction', () => {
         ),
       );
     }
-    expect(useEditorStore.getState().adjustments.filmEmulation?.mix).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.filmEmulation?.mix).toBe(0.4);
     expect(useEditorStore.getState().history).toHaveLength(3);
 
     const current = useEditorStore.getState();
     current.applyEditTransaction(
       buildFilmWorkspaceEditTransactionRequest(current, { filmEmulation: null }, 'remove-film'),
     );
-    expect(useEditorStore.getState().adjustments.filmEmulation).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.filmEmulation).toBeNull();
     expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: null });
   });
 });

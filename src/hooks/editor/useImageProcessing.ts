@@ -32,7 +32,7 @@ const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function useImageProcessing() {
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const committedAdjustments = useEditorStore((state) => state.adjustments);
+  const committedAdjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
   const autoEditPreviewSession = useEditorStore((state) => state.autoEditPreviewSession);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
@@ -58,7 +58,7 @@ export function useImageProcessing() {
     path: selectedImage?.path ?? null,
   });
   const referenceMatchAdjustments = resolveReferenceMatchRenderAdjustments({
-    adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+    adjustmentRevision: committedAdjustmentRevision,
     committed: committedAdjustments,
     preview: referenceMatchPreview,
     targetPath: selectedImage?.path ?? null,
@@ -296,7 +296,7 @@ export function useImageProcessing() {
       const operationClass: PreviewOperationClass =
         activeRightPanel === Panel.Crop
           ? 'geometry'
-          : activeRightPanel === Panel.Masks || editor.adjustments.masks.length > 0
+          : activeRightPanel === Panel.Masks || editor.adjustmentSnapshot.value.masks.length > 0
             ? 'mask'
             : 'standard';
       return previewQualityController.decide({
@@ -440,7 +440,7 @@ export function useImageProcessing() {
     [
       activeWaveformChannel,
       adjustments,
-      adjustmentSnapshot.adjustmentRevision,
+      committedAdjustmentRevision,
       adjustmentSnapshot.geometryRevision,
       appSettings?.enableLivePreviews,
       calculatedRoiFingerprint,

@@ -265,7 +265,7 @@ export default function Controls() {
   } = useEditorStore(
     useShallow((state) => ({
       adjustmentRevision: state.adjustmentRevision,
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
       editDocumentV2: state.editDocumentV2,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,

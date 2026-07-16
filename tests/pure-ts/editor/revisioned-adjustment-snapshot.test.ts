@@ -8,14 +8,13 @@ import { PreparedAdjustmentPayloadCache } from '../../../src/utils/preparedAdjus
 
 const adjustments = () => structuredClone(INITIAL_ADJUSTMENTS);
 
-test('published adjustment snapshots are immutable and preserve prior revisions', () => {
+test('published adjustment snapshots are immutable and preserve prior values', () => {
   const firstValue = adjustments();
   const first = publishAdjustmentSnapshot(null, firstValue);
   const second = publishAdjustmentSnapshot(first, { ...firstValue, exposure: firstValue.exposure + 1 });
   const geometry = publishAdjustmentSnapshot(second, { ...second.value, aspectRatio: 4 / 3 });
 
   expect(first.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
-  expect(second.adjustmentRevision).toBe(first.adjustmentRevision + 1);
   expect(second.geometryRevision).toBe(first.geometryRevision);
   expect(geometry.geometryRevision).toBe(second.geometryRevision + 1);
   expect(Object.isFrozen(first.value)).toBe(true);

@@ -268,11 +268,11 @@ export const applyAgentLensProfile = async (
   if (commitIdentity === null) throw new Error('Agent lens/profile apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const nextAdjustments = applyLensProfilePatchToAdjustments(state.adjustments, parsedRequest.lensProfile);
+  const nextAdjustments = applyLensProfilePatchToAdjustments(state.adjustmentSnapshot.value, parsedRequest.lensProfile);
   const adjustedFields = LENS_PROFILE_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.lensProfile[key] !== undefined &&
-      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const typedMutation =
     adjustedFields.length === 0
@@ -300,7 +300,7 @@ export const applyAgentLensProfile = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustments,
+      before: state.adjustmentSnapshot.value,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

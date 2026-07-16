@@ -413,7 +413,7 @@ export const applyAgentColor = async (
   if (commitIdentity === null) throw new Error('Agent color apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustments, parsedRequest.color);
+  const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustmentSnapshot.value, parsedRequest.color);
   const { applyCommands, mutations: typedMutations } = await dispatchSelectiveColorPayloads({
     bridge,
     expectedGraphRevision: undoGraphRevision,
@@ -424,7 +424,7 @@ export const applyAgentColor = async (
   });
   const typedAdjustments = applyCommands.reduce(
     (adjustments, applyCommand) => applySelectiveColorCommandEnvelopeToAdjustments(adjustments, applyCommand),
-    state.adjustments,
+    state.adjustmentSnapshot.value,
   );
   const nextAdjustments = applyColorPatchToAdjustments(typedAdjustments, parsedRequest.color, {
     includeSelectiveColor: false,
@@ -438,7 +438,7 @@ export const applyAgentColor = async (
   const adjustedFields = COLOR_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.color[key] !== undefined &&
-      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const previewAfter =
     adjustedFields.length === 0
@@ -459,7 +459,7 @@ export const applyAgentColor = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustments,
+      before: state.adjustmentSnapshot.value,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     previewAfter: {

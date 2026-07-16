@@ -16,7 +16,7 @@ import { globalImageCache } from '../../utils/ImageLRUCache';
 
 export function useEditorPersistence(): void {
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const imageSession = useEditorStore((state) => state.imageSession);

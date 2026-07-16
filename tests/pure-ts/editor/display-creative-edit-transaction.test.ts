@@ -39,15 +39,13 @@ describe('display creative edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -84,9 +82,9 @@ describe('display creative edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.vignetteAmount).toBe(0);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.vignetteAmount).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
   });
 
   test('commits a zero LUT intensity without falling back to the display default', () => {
@@ -101,7 +99,7 @@ describe('display creative edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.lutIntensity).toBe(100);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.lutIntensity).toBe(100);
   });
 
   test('owns display controls, exact no-ops, and rejects stale identity', () => {

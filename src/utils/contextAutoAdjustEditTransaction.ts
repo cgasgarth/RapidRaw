@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import { type AutoEditProposalBase, buildAutoEditTransactionRequest } from './autoEditTransaction';
 import { mergeAutoEditAdjustments } from './autoEditWorkflow';
@@ -35,7 +36,8 @@ export interface ContextAutoAdjustBase extends AutoEditProposalBase {
 
 export interface ContextAutoAdjustEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   historyIndex: number;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -51,7 +53,8 @@ export const captureContextAutoAdjustBase = (
   state.selectedImage?.isReady === true
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        adjustments: structuredClone(state.adjustments),
+        adjustments: structuredClone(state.adjustmentSnapshot.value),
+        editDocumentV2: structuredClone(state.editDocumentV2),
         graphRevision: `history_${String(state.historyIndex)}`,
         imageSessionId: currentImageSessionId(state),
         inputSemantics:

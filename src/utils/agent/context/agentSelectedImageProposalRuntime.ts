@@ -383,7 +383,7 @@ export const createAgentSelectedImageProposalRuntime = ({
       }
 
       acquiredAfter = await attachmentManager.acquire({
-        adjustments: proposedAdjustments(useEditorStore.getState().adjustments, command.edit.patch),
+        adjustments: proposedAdjustments(useEditorStore.getState().adjustmentSnapshot.value, command.edit.patch),
         deadlineAt: commandDeadline,
         outputIdentity: {
           graphRevision: command.dryRunPlan.predictedGraphRevision,

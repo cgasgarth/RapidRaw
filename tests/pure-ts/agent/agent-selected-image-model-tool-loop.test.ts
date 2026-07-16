@@ -30,7 +30,6 @@ const mediumJpeg = async (): Promise<Uint8Array> => {
 
 const seedEditor = () =>
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:model-loop-before',
     histogram: {
       [ActiveChannel.Blue]: { color: '#00f', data: bins },
@@ -38,7 +37,6 @@ const seedEditor = () =>
       [ActiveChannel.Luma]: { color: '#fff', data: bins },
       [ActiveChannel.Red]: { color: '#f00', data: bins },
     },
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -51,6 +49,8 @@ const seedEditor = () =>
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 
 const mutationSnapshot = () => {

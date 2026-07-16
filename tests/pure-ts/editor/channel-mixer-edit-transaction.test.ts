@@ -37,15 +37,13 @@ describe('channel mixer edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -75,8 +73,8 @@ describe('channel mixer edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
   test('rejects stale source, session, and revision identities', () => {
@@ -121,9 +119,9 @@ describe('channel mixer edit transaction', () => {
       );
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.channelMixer).toEqual(enabled);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(enabled);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
   });
 
   test('commits through fallback authority and rejects stale A to B to A identities', () => {
@@ -173,7 +171,7 @@ describe('channel mixer edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
 
     expect(isCurrentChannelMixerIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

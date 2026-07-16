@@ -47,7 +47,7 @@ export const ColorAdvancedControls = ({
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
-  const authoritativeLevels = useEditorStore((state) => state.adjustments.levels);
+  const authoritativeLevels = useEditorStore((state) => state.adjustmentSnapshot.value.levels);
   const commitIdentity = useMemo<ColorCalibrationCommitIdentity | null>(
     () =>
       selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,

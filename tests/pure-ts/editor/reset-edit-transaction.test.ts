@@ -48,16 +48,13 @@ describe('Reset edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 4,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      editDocumentHistory: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
-      history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
       historyCheckpoints: [],
       historyIndex: 1,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
     });
   });
 
@@ -83,7 +80,7 @@ describe('Reset edit transaction', () => {
       transactionId: 'reset-native',
     });
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 5, historyIndex: 0 });
-    expect(useEditorStore.getState().history).toEqual([result.after]);
+    expect(useEditorStore.getState().history).toEqual([result.afterEditDocumentV2]);
   });
 
   test('rejects stale source, session, revision, and mismatched native receipts', () => {
@@ -143,10 +140,9 @@ describe('Reset edit transaction', () => {
     );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
       editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
-      history: [structuredClone(INITIAL_ADJUSTMENTS)],
       historyIndex: 0,
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)],
     });
     const state = useEditorStore.getState();
     const identity = captureResetEditCommitIdentity(state, sourcePath);

@@ -86,7 +86,12 @@ export const runQuickEraseBoxOperation = async (
   { command, isCurrent, isLatestOperation }: AiMaskBoxAsyncRequest,
   getToken: () => Promise<string | null>,
 ): Promise<void> => {
-  const { selectedImage, adjustments, patchResidency, setEditor } = useEditorStore.getState();
+  const {
+    selectedImage,
+    adjustmentSnapshot: { value: adjustments },
+    patchResidency,
+    setEditor,
+  } = useEditorStore.getState();
   if (!isCurrent() || !selectedImage?.path || command.key.containerFamily !== 'aiPatches') return;
   const subMaskToUpdate = findCommandSubMask(adjustments, command);
   if (subMaskToUpdate === null) return;
@@ -141,7 +146,8 @@ export const runQuickEraseBoxOperation = async (
       },
       generativePatchDataJsonSchema,
     );
-    if (!isCurrent() || findCommandSubMask(useEditorStore.getState().adjustments, command) === null) return;
+    if (!isCurrent() || findCommandSubMask(useEditorStore.getState().adjustmentSnapshot.value, command) === null)
+      return;
     const newPatchData = parseAiPatchDataJson(newPatchDataJson);
     patchResidency.remove(patchId);
     useEditorStore.getState().applyAiEditCommand(({ aiPatches }) => {
@@ -176,7 +182,12 @@ export const runAiSubjectBoxOperation = async (
   { command, commitParameters, isCurrent, isLatestOperation }: AiMaskBoxAsyncRequest,
   aiProvider: AiProviderIdType,
 ): Promise<void> => {
-  const { selectedImage, adjustments, patchResidency, setEditor } = useEditorStore.getState();
+  const {
+    selectedImage,
+    adjustmentSnapshot: { value: adjustments },
+    patchResidency,
+    setEditor,
+  } = useEditorStore.getState();
   if (!isCurrent() || !selectedImage?.path || findCommandSubMask(adjustments, command) === null) return;
   setEditor({ isGeneratingAiMask: true });
 

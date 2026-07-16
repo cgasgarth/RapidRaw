@@ -315,7 +315,7 @@ export const applyAgentCurveLevels = async (
   if (commitIdentity === null) throw new Error('Agent curve/levels apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const operations = buildCurveLevelsPatchOperations(state.adjustments, parsedRequest.curveLevels);
+  const operations = buildCurveLevelsPatchOperations(state.adjustmentSnapshot.value, parsedRequest.curveLevels);
   const typedMutation = await dispatchTypedCurveLevelsEditGraphApply(
     {
       expectedGraphRevision: undoGraphRevision,
@@ -325,7 +325,7 @@ export const applyAgentCurveLevels = async (
     },
     bridge,
   );
-  const nextAdjustments = applyCurveLevelsPatchToAdjustments(state.adjustments, parsedRequest.curveLevels);
+  const nextAdjustments = applyCurveLevelsPatchToAdjustments(state.adjustmentSnapshot.value, parsedRequest.curveLevels);
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
     buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
@@ -335,7 +335,7 @@ export const applyAgentCurveLevels = async (
   const adjustedFields = CURVE_LEVELS_KEYS.filter(
     (key) =>
       parsedRequest.curveLevels[key] !== undefined &&
-      JSON.stringify(state.adjustments[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
@@ -346,7 +346,7 @@ export const applyAgentCurveLevels = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustments,
+      before: state.adjustmentSnapshot.value,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

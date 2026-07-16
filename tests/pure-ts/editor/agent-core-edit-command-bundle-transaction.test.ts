@@ -52,11 +52,8 @@ describe('agent core command bundle transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:bundle-current',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -75,6 +72,7 @@ describe('agent core command bundle transaction', () => {
         width: 4000,
       },
       uncroppedAdjustedPreviewUrl: 'blob:bundle-uncropped',
+      history: [editDocumentV2],
     });
   });
 
@@ -107,9 +105,9 @@ describe('agent core command bundle transaction', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.contrast).toBe(14);
-    expect(after.adjustments.exposure).toBe(0);
-    expect(after.adjustments.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
+    expect(after.adjustmentSnapshot.value.contrast).toBe(14);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(0);
+    expect(after.adjustmentSnapshot.value.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-bundle-edit');
   });
@@ -118,7 +116,7 @@ describe('agent core command bundle transaction', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentToolCommitIdentity(state);
     if (identity === null) throw new Error('Expected bundle identity.');
-    const next = { ...state.adjustments, exposure: 0.3 };
+    const next = { ...state.adjustmentSnapshot.value, exposure: 0.3 };
     expect(() =>
       buildAgentToolEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
@@ -155,15 +153,17 @@ describe('agent core command bundle transaction', () => {
         transactionId: 'fallback-core-bundle_apply',
       },
     });
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 0,
       imageSessionId: 81,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
     });
     const fallbackState = useEditorStore.getState();
     const identity = captureAgentToolCommitIdentity(fallbackState);

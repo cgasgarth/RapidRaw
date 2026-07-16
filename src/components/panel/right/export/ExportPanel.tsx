@@ -409,7 +409,7 @@ export default function ExportPanel({
     setEditor,
   } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustments,
+      adjustments: state.adjustmentSnapshot.value,
       exportSoftProofTransform: state.exportSoftProofTransform,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       gamutWarningOverlay: state.gamutWarningOverlay,

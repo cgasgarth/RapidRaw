@@ -50,16 +50,15 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   installDom();
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, initial),
-    adjustments: initial,
     finalPreviewUrl: null,
     histogram: histogram(180, 200, 170, 120),
-    history: [initial],
     historyIndex: 0,
     lastReferenceMatchApplicationReceipt: null,
     proofRevision: 3,
     referenceMatchReferences: [],
     selectedImage: image('/photos/reference.ARW'),
+    editDocumentV2: publishAdjustmentSnapshot(null, initial).editDocumentV2,
+    history: [publishAdjustmentSnapshot(null, initial).editDocumentV2],
   });
   const container = document.createElement('div');
   document.body.append(container);
@@ -160,9 +159,9 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     'Creative 100%',
   );
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal);
-  expect(useEditorStore.getState().adjustments).toEqual(initial);
+  expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(initial);
   expect(useEditorStore.getState().referenceMatchPreview).toMatchObject({
-    baseAdjustmentRevision: useEditorStore.getState().adjustmentSnapshot.adjustmentRevision,
+    baseAdjustmentRevision: useEditorStore.getState().adjustmentRevision,
     impact: 100,
     targetPath: '/photos/target.ARW',
   });
@@ -206,7 +205,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     historyEntriesAdded: 1,
     impact: 100,
   });
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt,
   );
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -217,22 +216,22 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt?.baseGraphFingerprint).not.toBe(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt?.resultingGraphFingerprint,
   );
-  expect(useEditorStore.getState().adjustments.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
-  expect(useEditorStore.getState().adjustments.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
   expect(useEditorStore.getState().referenceMatchPreview).toBeNull();
-  const appliedReceipt = useEditorStore.getState().adjustments.referenceMatchApplicationReceipt;
+  const appliedReceipt = useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt;
   await act(async () => {
     useEditorStore.getState().undo();
     await flushPromises();
   });
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
   await act(async () => {
     useEditorStore.getState().redo();
     await flushPromises();
   });
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
 
-  const globalExposure = useEditorStore.getState().adjustments.exposure;
+  const globalExposure = useEditorStore.getState().adjustmentSnapshot.value.exposure;
   const historyBeforeLayer = useEditorStore.getState().historyIndex;
   await click(container, '[data-testid="reference-match-normalize"]');
   expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-apply-layer"]')?.disabled).toBe(
@@ -241,8 +240,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   await click(container, '[data-testid="reference-match-apply-layer"]');
   const layerState = useEditorStore.getState();
   expect(layerState.historyIndex).toBe(historyBeforeLayer + 1);
-  expect(layerState.adjustments.exposure).toBe(globalExposure);
-  expect(layerState.adjustments.masks[0]).toMatchObject({
+  expect(layerState.adjustmentSnapshot.value.exposure).toBe(globalExposure);
+  expect(layerState.adjustmentSnapshot.value.masks[0]).toMatchObject({
     name: 'Reference Normalize',
     opacity: 100,
     referenceMatchApplicationReceipt: {
@@ -254,8 +253,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
       impact: 100,
     },
   });
-  expect(layerState.adjustments.masks[0]?.adjustments.exposure).not.toBe(0);
-  expect(layerState.activeMaskContainerId).toBe(layerState.adjustments.masks[0]?.id);
+  expect(layerState.adjustmentSnapshot.value.masks[0]?.adjustments.exposure).not.toBe(0);
+  expect(layerState.activeMaskContainerId).toBe(layerState.adjustmentSnapshot.value.masks[0]?.id);
   expect(layerState.lastEditApplicationReceipt).toMatchObject({
     persistence: 'commit',
     source: 'reference-match',

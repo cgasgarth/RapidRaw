@@ -60,7 +60,6 @@ const previewVariant = (source: Uint8Array, marker: number): Uint8Array => {
 
 const seedEditor = () => {
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-selected-image-proposal-before',
     histogram: {
       [ActiveChannel.Blue]: { color: '#4D96FF', data: bins },
@@ -68,7 +67,6 @@ const seedEditor = () => {
       [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
       [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
     },
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -81,6 +79,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 };
 

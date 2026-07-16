@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerParametricMaskTargetKey } from '../components/panel/editor/viewerParametricMaskTargetInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
 import type { Adjustments } from './adjustments';
@@ -6,7 +7,8 @@ import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction'
 
 export interface ParametricMaskTargetEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
   readonly imageSession?: { id: string } | null;
@@ -45,9 +47,12 @@ export const buildParametricMaskTargetEditTransaction = (
       return { ...subMask, parameters: { ...parameters } };
     });
   const adjustments: Adjustments = {
-    ...state.adjustments,
-    aiPatches: state.adjustments.aiPatches.map((patch) => ({ ...patch, subMasks: updateSubMasks(patch.subMasks) })),
-    masks: state.adjustments.masks.map((mask) => ({ ...mask, subMasks: updateSubMasks(mask.subMasks) })),
+    ...state.adjustmentSnapshot.value,
+    aiPatches: state.adjustmentSnapshot.value.aiPatches.map((patch) => ({
+      ...patch,
+      subMasks: updateSubMasks(patch.subMasks),
+    })),
+    masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, subMasks: updateSubMasks(mask.subMasks) })),
   };
   if (!matched) rejectParametricMaskTarget('missing_mask');
   return buildLayerEditTransactionRequest(state, adjustments, transactionId);

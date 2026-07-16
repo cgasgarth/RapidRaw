@@ -10,7 +10,6 @@ import {
   lowerEditDocumentPresetPayload,
   parsePresetLibrary,
 } from '../../utils/editDocumentPreset';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import { debounce } from '../../utils/timing';
 
 export enum PresetListType {
@@ -56,10 +55,7 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray;
 }
 
-export function usePresets(
-  currentAdjustments: Adjustments,
-  currentEditDocumentV2: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(currentAdjustments),
-) {
+export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV2: EditDocumentV2) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

@@ -408,7 +408,12 @@ const pushMaskHistory = (masks: ReadonlyArray<MaskContainer>, operationId: strin
   const identity = captureAgentToolCommitIdentity(state);
   if (identity === null) throw new Error('Agent layer/mask apply requires a selected image session.');
   state.applyEditTransaction(
-    buildAgentToolEditTransaction(state, identity, { ...state.adjustments, masks: [...masks] }, `${operationId}_apply`),
+    buildAgentToolEditTransaction(
+      state,
+      identity,
+      { ...state.adjustmentSnapshot.value, masks: [...masks] },
+      `${operationId}_apply`,
+    ),
   );
   return { historyIndex: useEditorStore.getState().historyIndex };
 };
@@ -517,7 +522,7 @@ export const applyAgentLayerCreate = (request: AgentLayerCreateRequest): AgentLa
   const rollbackTarget = buildRollbackTarget(undoGraphRevision, state);
 
   const result = applyLayerStackCommandBridgeOperation(
-    state.adjustments.masks,
+    state.adjustmentSnapshot.value.masks,
     { layer, type: 'create' },
     {
       graphRevision: beforeSnapshot.graphRevision,
@@ -657,7 +662,7 @@ export const applyAgentBrushMaskCreateOrUpdate = (
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent mask create/update requires a selected image.');
-  const targetLayer = state.adjustments.masks.find((mask) => mask.id === parsedRequest.layerId);
+  const targetLayer = state.adjustmentSnapshot.value.masks.find((mask) => mask.id === parsedRequest.layerId);
   if (targetLayer === undefined)
     throw new Error(`Agent mask create/update could not find layer ${parsedRequest.layerId}.`);
 
@@ -741,7 +746,7 @@ export const applyAgentBrushMaskCreateOrUpdate = (
     visible: true,
   };
 
-  const nextMasks = state.adjustments.masks.map((mask) =>
+  const nextMasks = state.adjustmentSnapshot.value.masks.map((mask) =>
     mask.id === parsedRequest.layerId
       ? {
           ...mask,
@@ -805,7 +810,7 @@ export const applyAgentLayerScopedAdjustments = (
   const state = useEditorStore.getState();
   const selectedImage = state.selectedImage;
   if (selectedImage === null) throw new Error('Agent layer scoped adjustment requires a selected image.');
-  const targetLayer = state.adjustments.masks.find((mask) => mask.id === parsedRequest.layerId);
+  const targetLayer = state.adjustmentSnapshot.value.masks.find((mask) => mask.id === parsedRequest.layerId);
   if (targetLayer === undefined)
     throw new Error(`Agent layer scoped adjustment could not find layer ${parsedRequest.layerId}.`);
 
@@ -858,7 +863,7 @@ export const applyAgentLayerScopedAdjustments = (
   });
   const rollbackTarget = buildRollbackTarget(beforeSnapshot.graphRevision, state);
   const result = applyLayerStackCommandBridgeOperation(
-    state.adjustments.masks,
+    state.adjustmentSnapshot.value.masks,
     {
       layerId: parsedRequest.layerId,
       toneColor: parsedRequest.adjustments,
@@ -982,7 +987,7 @@ export const applyAgentObjectSelection = (
   };
 
   const result = applyLayerStackCommandBridgeOperation(
-    state.adjustments.masks,
+    state.adjustmentSnapshot.value.masks,
     { layer, type: 'create' },
     {
       graphRevision: beforeSnapshot.graphRevision,

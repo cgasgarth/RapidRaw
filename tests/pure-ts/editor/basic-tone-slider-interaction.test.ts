@@ -33,11 +33,8 @@ describe('basic tone slider interaction authority', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       basicToneSliderInteraction: null,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -45,12 +42,13 @@ describe('basic tone slider interaction authority', () => {
       isSliderDragging: false,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
   test('many previews change only the ephemeral render snapshot, then commit one undoable revision', () => {
     const store = useEditorStore.getState();
-    const canonicalAdjustments = store.adjustments;
+    const canonicalAdjustments = store.adjustmentSnapshot.value;
     const canonicalSnapshot = store.adjustmentSnapshot;
     const canonicalHistory = store.history;
 
@@ -58,7 +56,7 @@ describe('basic tone slider interaction authority', () => {
     for (const value of [0.1, 0.25, 0.4, 0.65]) {
       useEditorStore.getState().updateBasicToneSliderInteraction('drag-exposure', value);
       const previewState = useEditorStore.getState();
-      expect(previewState.adjustments).toBe(canonicalAdjustments);
+      expect(previewState.adjustmentSnapshot.value).toBe(canonicalAdjustments);
       expect(previewState.adjustmentSnapshot).toBe(canonicalSnapshot);
       expect(previewState.adjustmentRevision).toBe(0);
       expect(previewState.history).toBe(canonicalHistory);
@@ -70,7 +68,6 @@ describe('basic tone slider interaction authority', () => {
     expect(result).toMatchObject({ changedKeys: ['exposure'], nextAdjustmentRevision: 1, noOp: false });
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 1,
-      adjustments: { exposure: 0.65 },
       basicToneSliderInteraction: null,
       historyIndex: 1,
       isSliderDragging: false,
@@ -79,12 +76,13 @@ describe('basic tone slider interaction authority', () => {
         transactionId: 'drag-exposure',
       },
     });
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.65);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.65);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.65);
   });
 
   test('cancel and exact no-op drop preview authority without a late commit', async () => {
@@ -97,12 +95,12 @@ describe('basic tone slider interaction authority', () => {
 
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 0,
-      adjustments: { contrast: 0 },
       basicToneSliderInteraction: null,
       historyIndex: 0,
       isSliderDragging: false,
       lastEditApplicationReceipt: null,
     });
+    expect(useEditorStore.getState().adjustmentSnapshot.value.contrast).toBe(0);
     expect(useEditorStore.getState().history).toHaveLength(1);
 
     useEditorStore.getState().beginBasicToneSliderInteraction(identity(), BasicAdjustment.Exposure, 'no-op-exposure');
@@ -124,21 +122,26 @@ describe('basic tone slider interaction authority', () => {
     useEditorStore.setState({ selectedImage: { ...selectedImage, path: '/fixture/replacement.ARW' } });
     useEditorStore.getState().updateBasicToneSliderInteraction('stale-highlights', -40);
     expect(useEditorStore.getState().basicToneSliderInteraction).toBeNull();
-    expect(useEditorStore.getState().adjustments.highlights).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.highlights).toBe(0);
 
     useEditorStore.setState({ selectedImage });
     useEditorStore.getState().beginBasicToneSliderInteraction(identity(), BasicAdjustment.Shadows, 'stale-revision');
-    useEditorStore
-      .getState()
-      .hydrateEditorRenderAuthority({ adjustments: useEditorStore.getState().adjustments, adjustmentRevision: 1 });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustmentRevision: 1,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
+    });
     expect(useEditorStore.getState().commitBasicToneSliderInteraction('stale-revision')).toBeNull();
-    expect(useEditorStore.getState().adjustments.shadows).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.shadows).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 0,
       imageSession: null,
       imageSessionId: 91,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
     });
     const fallbackIdentity = identity('editor-image-session:91');
     useEditorStore
@@ -147,7 +150,7 @@ describe('basic tone slider interaction authority', () => {
     useEditorStore.getState().updateBasicToneSliderInteraction('fallback-whites', 20);
     useEditorStore.setState({ imageSessionId: 92 });
     expect(useEditorStore.getState().commitBasicToneSliderInteraction('fallback-whites')).toBeNull();
-    expect(useEditorStore.getState().adjustments.whites).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.whites).toBe(0);
   });
 
   test('rapid independent sliders retain separate transaction and history boundaries', () => {
@@ -176,10 +179,10 @@ describe('basic tone slider interaction authority', () => {
 
     expect(useEditorStore.getState()).toMatchObject({
       adjustmentRevision: 2,
-      adjustments: { blacks: -15, exposure: 0.4 },
       historyIndex: 2,
       lastEditApplicationReceipt: { transactionId: 'rapid-blacks' },
     });
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ blacks: -15, exposure: 0.4 });
     expect(useEditorStore.getState().history).toHaveLength(3);
   });
 });

@@ -41,7 +41,7 @@ export interface ResetEditCommitIdentity {
 
 export interface ResetEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { isReady: boolean; path: string } | null;
@@ -101,7 +101,7 @@ export const buildResetEditTransaction = (
       ? (resultVisibility as Readonly<Record<string, unknown>>)['effects']
       : undefined;
   if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && legacyEffectsEnabled === undefined) {
-    normalized.effectsEnabled = state.adjustments.effectsEnabled;
+    normalized.effectsEnabled = state.adjustmentSnapshot.value.effectsEnabled;
   }
   const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : null;
   const resetAdjustments: Adjustments = {
@@ -116,9 +116,8 @@ export const buildResetEditTransaction = (
     imageSessionId: identity.imageSessionId,
     operations: [
       {
-        adjustments: resetAdjustments,
         editDocumentV2: legacyAdjustmentsToEditDocumentV2(resetAdjustments),
-        type: 'replace-edit-authority',
+        type: 'replace-edit-document',
       },
     ],
     persistence: 'native-committed',

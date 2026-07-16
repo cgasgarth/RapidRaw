@@ -55,12 +55,9 @@ describe('agent geometry EditTransaction bridge', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:agent-geometry-current',
       hasRenderedFirstFrame: true,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -79,6 +76,7 @@ describe('agent geometry EditTransaction bridge', () => {
         width: 4000,
       },
       uncroppedAdjustedPreviewUrl: 'blob:agent-geometry-uncropped',
+      history: [editDocumentV2],
     });
   });
 
@@ -110,8 +108,8 @@ describe('agent geometry EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.contrast).toBe(14);
-    expect(after.adjustments.rotation).toBe(0);
+    expect(after.adjustmentSnapshot.value.contrast).toBe(14);
+    expect(after.adjustmentSnapshot.value.rotation).toBe(0);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-geometry-edit');
   });
 
@@ -119,7 +117,7 @@ describe('agent geometry EditTransaction bridge', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentToolCommitIdentity(state);
     if (identity === null) throw new Error('Expected seeded agent-tool identity.');
-    const nextAdjustments = { ...state.adjustments, rotation: 2 };
+    const nextAdjustments = { ...state.adjustmentSnapshot.value, rotation: 2 };
     expect(() =>
       buildAgentToolEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
