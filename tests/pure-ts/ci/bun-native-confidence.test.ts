@@ -22,19 +22,28 @@ async function temporaryDirectory(prefix: string): Promise<string> {
   return directory;
 }
 
-async function captured(command: string[], options: { cwd: string; env?: Record<string, string> }) {
+async function captured(command: string[], options: { cwd: string; env?: Record<string, string>; timeoutMs?: number }) {
   const child = Bun.spawn(command, {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
     stderr: 'pipe',
     stdout: 'pipe',
   });
+  let timedOut = false;
+  const timeout =
+    options.timeoutMs === undefined
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true;
+          child.kill('SIGTERM');
+        }, options.timeoutMs);
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ]);
-  return { exitCode, output: `${stdout}\n${stderr}` };
+  if (timeout !== undefined) clearTimeout(timeout);
+  return { exitCode, output: `${stdout}\n${stderr}`, timedOut };
 }
 
 describe('Bun native confidence gates', () => {
@@ -71,6 +80,35 @@ describe('Bun native confidence gates', () => {
     if (result.exitCode === 0) throw new Error(`Expected Bun coverage threshold failure:\n${result.output}`);
     expect(result.output).toContain('All files');
     expect(result.output).toContain('50.00');
+  });
+
+  test('shared DOM preload closes isolated windows and their pending timers under native coverage', async () => {
+    const directory = await temporaryDirectory('rapidraw-bun-dom-teardown-');
+    const fixture =
+      'import { expect, test } from "bun:test";\ntest("owns a DOM window", () => { expect(document.body).toBeDefined(); window.setTimeout(() => {}, 60_000); });\n';
+    await Promise.all([
+      Bun.write(join(directory, 'first.test.ts'), fixture),
+      Bun.write(join(directory, 'second.test.ts'), fixture),
+    ]);
+    const setup = resolve('tests/setup/bun-dom.ts');
+    const result = await captured(
+      [
+        'bun',
+        'test',
+        '--preload',
+        setup,
+        '--no-orphans',
+        '--only-failures',
+        '--parallel',
+        '--coverage',
+        './first.test.ts',
+        './second.test.ts',
+      ],
+      { cwd: directory, timeoutMs: 5_000 },
+    );
+    expect(result.timedOut, result.output).toBeFalse();
+    expect(result.exitCode, result.output).toBe(0);
+    expect(result.output).toContain('2 pass');
   });
 
   test('prints the seed and exact reproduction command before a randomized failure', async () => {
