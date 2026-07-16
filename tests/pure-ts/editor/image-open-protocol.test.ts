@@ -23,7 +23,16 @@ const invoke = mock(async (command: string, args: unknown) => {
   if (command === 'schedule_image_prefetch') {
     return {
       duplicatePrefetchDrops: 0,
+      embeddedPreviewAttempted: 1,
+      embeddedPreviewCacheHits: 0,
+      embeddedPreviewElapsedMillis: 12,
+      embeddedPreviewEncodedBytes: 2048,
+      embeddedPreviewPublished: 1,
+      embeddedPreviewRejected: 0,
+      embeddedPreviewStaleSuppressed: 0,
       foregroundOpens: 1,
+      lastEmbeddedCandidateHeight: 800,
+      lastEmbeddedCandidateWidth: 1200,
       metadataReads: 1,
       peakPrefetchInFlight: 2,
       prefetchCancelled: 0,
@@ -31,6 +40,7 @@ const invoke = mock(async (command: string, args: unknown) => {
       prefetchPromotions: 1,
       prefetchRequested: 3,
       prefetchStarted: 2,
+      stalePrefetchDrops: 0,
       stalePhaseDrops: 0,
     };
   }
@@ -101,10 +111,39 @@ describe('revisioned image-open protocol', () => {
     const report = await scheduleImagePrefetchWithSchema({
       candidates: ['/next.raw', '/next-2.raw', '/previous.raw'],
       collectionGeneration: 5,
+      currentPath: '/current.raw',
       memoryPressure: false,
+      sessionId: { imageSession: 4, selectionGeneration: 4 },
       workloadBusy: false,
     });
     expect(report.peakPrefetchInFlight).toBe(2);
     expect(calls.map(({ command }) => command)).toEqual(['schedule_image_prefetch']);
+    expect(calls[0]?.args).toEqual({
+      request: {
+        candidates: ['/next.raw', '/next-2.raw', '/previous.raw'],
+        collectionGeneration: 5,
+        currentPath: '/current.raw',
+        memoryPressure: false,
+        sessionId: { imageSession: 4, selectionGeneration: 4 },
+        workloadBusy: false,
+      },
+    });
+  });
+
+  test('malformed and obsolete prefetch projections fail before native dispatch', () => {
+    calls.length = 0;
+    const schedule = scheduleImagePrefetchWithSchema as (request: unknown) => Promise<unknown>;
+    expect(() =>
+      schedule({
+        candidates: ['/next.raw'],
+        collectionGeneration: 5,
+        currentPath: '/current.raw',
+        legacyImageSession: 4,
+        memoryPressure: false,
+        sessionId: { imageSession: 4, selectionGeneration: 4 },
+        workloadBusy: false,
+      }),
+    ).toThrow('Unrecognized key');
+    expect(calls).toHaveLength(0);
   });
 });

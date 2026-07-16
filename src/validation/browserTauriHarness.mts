@@ -6,6 +6,7 @@ import { type AppSettings, LibraryViewMode, Theme, ThumbnailSize } from '../comp
 import { Invokes } from '../tauri/commands.ts';
 import { INITIAL_ADJUSTMENTS } from '../utils/adjustments.ts';
 import { createDefaultEditDocumentV2 } from '../utils/editDocumentV2.ts';
+import { scheduleImagePrefetchRequestSchema } from '../utils/imageOpenInvokes.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
 import { createBrowserHarnessReleaseGate } from './browserHarnessReleaseGate.ts';
@@ -880,9 +881,19 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         }));
     }
     case commandNames.scheduleImagePrefetch:
+      scheduleImagePrefetchRequestSchema.parse(args?.['request']);
       return Promise.resolve({
         duplicatePrefetchDrops: 0,
+        embeddedPreviewAttempted: 0,
+        embeddedPreviewCacheHits: 0,
+        embeddedPreviewElapsedMillis: 0,
+        embeddedPreviewEncodedBytes: 0,
+        embeddedPreviewPublished: 0,
+        embeddedPreviewRejected: 0,
+        embeddedPreviewStaleSuppressed: 0,
         foregroundOpens: 0,
+        lastEmbeddedCandidateHeight: 0,
+        lastEmbeddedCandidateWidth: 0,
         metadataReads: 0,
         peakPrefetchInFlight: 0,
         prefetchCancelled: 0,
@@ -890,6 +901,7 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         prefetchPromotions: 0,
         prefetchRequested: 0,
         prefetchStarted: 0,
+        stalePrefetchDrops: 0,
         stalePhaseDrops: 0,
       });
     case commandNames.applyAdjustments:
