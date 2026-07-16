@@ -61,37 +61,6 @@ const launchBrowser = (headed: boolean): Promise<Browser> =>
 const isExpectedOfflineHarnessMessage = (message: string): boolean =>
   message.includes('Clerk: Failed to load Clerk ') || message.includes('Clerk has been loaded with development keys');
 
-async function installHarnessHtmlRoute(
-  context: Awaited<ReturnType<Browser['newContext']>>,
-  baseUrl: string,
-): Promise<void> {
-  await context.route(`${baseUrl}/`, async (route) => {
-    const response = await fetch(route.request().url());
-    let body = await response.text();
-    if (!body.includes('installBrowserTauriHarness')) {
-      const main = /<script type="module" src="\/src\/main\.tsx[^>]*><\/script>/u;
-      const match = body.match(main)?.[0];
-      if (match === undefined) throw new Error('QA harness could not locate the Vite application entrypoint.');
-      const harness = [
-        '<script type="module">',
-        'import { installBrowserTauriHarness } from "/src/validation/browserTauriHarness.mts";',
-        'installBrowserTauriHarness();',
-        '</script>',
-      ].join('\n');
-      body = body.replace(match, `${harness}\n${match}`);
-    }
-    await route.fulfill({
-      status: response.status,
-      body,
-      headers: {
-        'cache-control': 'no-cache',
-        'content-length': String(Buffer.byteLength(body)),
-        'content-type': response.headers.get('content-type') ?? 'text/html; charset=utf-8',
-      },
-    });
-  });
-}
-
 export interface BrowserJobResult {
   browserVersion: string;
   results: QaScenarioResult[];
@@ -270,7 +239,6 @@ export function createBrowserLifecycleAdapter(
         const scenarioDeadline = setTimeout(() => void context.close(), scenario.timeoutMs);
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
         let tracingStopped = false;
-        await installHarnessHtmlRoute(context, session.baseUrl);
         const abort = () => void context.close();
         signal.addEventListener('abort', abort, { once: true });
         const page = await context.newPage();
