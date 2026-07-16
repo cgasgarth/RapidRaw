@@ -138,7 +138,7 @@ test('export cancellation ends in the terminal status render without an observer
   expect(resolveExportCancellationPending({ isExporting: false, requested: true })).toBe(false);
 });
 
-function preset(id: string, fileFormat = 'jpeg'): ExportPreset {
+function preset(id: string, fileFormat: FileFormats = FileFormats.Jpeg): ExportPreset {
   return {
     blackPointCompensation: false,
     colorProfile: ExportColorProfile.Srgb,

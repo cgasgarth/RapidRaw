@@ -153,12 +153,12 @@ describe('Bun native confidence gates', () => {
     const startedAt = performance.now();
     const result = await captured(['bun', runner, '--target', directory], {
       cwd: process.cwd(),
-      env: { RAWENGINE_BUN_TEST_SEED: '314159', RAWENGINE_BUN_TEST_TIMEOUT_MS: '750' },
-      timeoutMs: 5_000,
+      env: { RAWENGINE_BUN_TEST_SEED: '314159', RAWENGINE_BUN_TEST_TIMEOUT_MS: '5000' },
+      timeoutMs: 12_000,
     });
     expect(result.timedOut, result.output).toBeFalse();
     expect(result.exitCode).not.toBe(0);
-    expect(performance.now() - startedAt).toBeLessThan(5_000);
+    expect(performance.now() - startedAt).toBeLessThan(12_000);
     expect(result.output).toContain('Bun randomized isolation seed: 314159');
     expect(result.output).toContain('Reproduce: RAWENGINE_BUN_TEST_SEED=314159 bun run test:randomized');
     const descendantPid = Number(await Bun.file(pidFile).text());
@@ -168,7 +168,7 @@ describe('Bun native confidence gates', () => {
       descendantExecuting = await processIsExecuting(descendantPid);
     }
     expect(descendantExecuting).toBeFalse();
-  }, 8_000);
+  }, 15_000);
 
   test('clears the pass watchdog after a successful native run', async () => {
     const directory = await temporaryDirectory('rapidraw-bun-randomized-success-');

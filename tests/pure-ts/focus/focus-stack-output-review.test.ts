@@ -11,10 +11,18 @@ import {
 import { buildFocusStackSourcePreflight } from '../../../src/utils/focusStackSourcePreflight';
 
 test('focus stack artifact output review carries apply-capable receipt metadata', () => {
+  const haloReview = sampleFocusStackArtifactV1.haloReview;
+  const previewArtifact = sampleFocusStackArtifactV1.previewArtifacts[0];
+  if (haloReview === undefined) throw new Error('Expected focus-stack halo review fixture.');
+  if (previewArtifact === undefined) throw new Error('Expected focus-stack preview fixture.');
+  const previewContentHash = previewArtifact.contentHash;
+  if (previewContentHash === undefined) throw new Error('Expected focus-stack preview content hash.');
+  const outputContentHash = sampleFocusStackArtifactV1.outputArtifact.contentHash;
+  if (outputContentHash === undefined) throw new Error('Expected focus-stack output content hash.');
   const review = buildFocusStackOutputReviewFromArtifact({
     ...sampleFocusStackArtifactV1,
     haloReview: {
-      ...sampleFocusStackArtifactV1.haloReview,
+      ...haloReview,
       editableHandoffStatus: 'ready',
       reviewStatus: 'apply_ready',
     },
@@ -24,17 +32,20 @@ test('focus stack artifact output review carries apply-capable receipt metadata'
       artifactId:
         sampleFocusStackArtifactV1.retouchLayerArtifact?.artifactId ?? 'artifact_focus_stack_macro_0001_retouch_layer',
       availability: 'available',
-      maskRegions:
-        sampleFocusStackArtifactV1.haloReview?.transitionRiskRegions
-          .filter((region) => region.risk !== 'stable')
-          .map((region) => ({
-            cellCount: region.cellCount,
-            regionId: region.regionId,
-            risk: region.risk === 'retouch_recommended' ? 'retouch_recommended' : region.risk,
-            sourceIndex: region.sourceIndex,
-          })) ?? [],
-      outputContentHash: sampleFocusStackArtifactV1.outputArtifact.contentHash,
-      previewContentHash: sampleFocusStackArtifactV1.previewArtifacts[0]?.contentHash ?? 'sha256:sample-focus-preview',
+      maskRegions: haloReview.transitionRiskRegions.flatMap((region) =>
+        region.risk === 'stable'
+          ? []
+          : [
+              {
+                cellCount: region.cellCount,
+                regionId: region.regionId,
+                risk: region.risk,
+                sourceIndex: region.sourceIndex,
+              },
+            ],
+      ),
+      outputContentHash,
+      previewContentHash,
       reasonCodes: ['halo_risk', 'low_confidence', 'retouch_layer_required'],
       sourceCandidates: sampleFocusStackArtifactV1.sourceImageRefs
         .map((source) => ({
@@ -47,7 +58,7 @@ test('focus stack artifact output review carries apply-capable receipt metadata'
               ?.graphRevision ?? `focus_stack_source_${source.sourceIndex}`,
           path: source.imagePath,
           regionIds:
-            sampleFocusStackArtifactV1.haloReview?.transitionRiskRegions
+            haloReview.transitionRiskRegions
               .filter((region) => region.sourceIndex === source.sourceIndex && region.risk !== 'stable')
               .map((region) => region.regionId) ?? [],
           sourceIndex: source.sourceIndex,
@@ -60,7 +71,7 @@ test('focus stack artifact output review carries apply-capable receipt metadata'
 
   expect(review.applyReceipt.status).toBe('apply_ready');
   expect(review.applyReceipt.sourceCount).toBe(sampleFocusStackArtifactV1.sourceImageRefs.length);
-  expect(review.applyReceipt.alignment.mode).toBe(sampleFocusStackArtifactV1.resolvedAlignmentMode);
+  expect(review.applyReceipt.alignment.mode).toBe('homography');
   expect(review.applyReceipt.alignment.status).toBe('applied');
   expect(review.applyReceipt.alignment.confidence).toBe(0.92);
   expect(review.applyReceipt.outputPreviewDimensions).toEqual({ height: 1600, width: 2400 });
@@ -75,6 +86,8 @@ test('focus stack artifact output review carries apply-capable receipt metadata'
   expect(review.retouchSeed?.availability).toBe('available');
   expect(review.retouchSeed?.staleState).toBe('current');
   expect(review.retouchSeed?.maskRegions).toHaveLength(2);
+  const reviewRetouchSeed = review.retouchSeed;
+  if (reviewRetouchSeed === undefined) throw new Error('Expected focus-stack review retouch seed.');
 
   const receipt = buildFocusStackDerivedOutputReceipt({
     acceptedDryRunPlanHash: sampleFocusStackArtifactV1.dryRun.acceptedDryRunPlanHash,
@@ -86,9 +99,13 @@ test('focus stack artifact output review carries apply-capable receipt metadata'
   expect(receipt.openInEditorAction.state).toBe('available');
   expect(receipt.openInEditorAction.path).toBe(review.artifactPath);
   expect(receipt.provenanceSidecar?.warnings).toContain('retouch_layer_required');
-  expect(receipt.focusStack?.retouchSeed.acceptedDryRunPlanId).toBe(review.retouchSeed?.acceptedDryRunPlanId);
-  expect(receipt.provenanceSidecar?.focusStack?.retouchSeed.previewContentHash).toBe(
-    review.retouchSeed?.previewContentHash,
+  if (receipt.focusStack?.retouchSeed === undefined) throw new Error('Expected focus-stack receipt retouch seed.');
+  if (receipt.provenanceSidecar?.focusStack?.retouchSeed === undefined) {
+    throw new Error('Expected focus-stack provenance retouch seed.');
+  }
+  expect(receipt.focusStack.retouchSeed.acceptedDryRunPlanId).toBe(reviewRetouchSeed.acceptedDryRunPlanId);
+  expect(receipt.provenanceSidecar.focusStack.retouchSeed.previewContentHash).toBe(
+    reviewRetouchSeed.previewContentHash,
   );
 });
 

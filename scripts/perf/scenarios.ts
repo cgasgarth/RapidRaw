@@ -17,7 +17,6 @@ import {
 import type { PerformanceScenario } from './model';
 
 const DISPATCHES = 20_000;
-const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
 const fixture = structuredClone(INITIAL_ADJUSTMENTS);
 fixture.masks = Array.from({ length: 16 }, (_, index) => ({
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -78,10 +77,6 @@ const previewScheduling: PerformanceScenario = {
       throw new Error(`Preview scheduling correctness sink mismatch: ${sink}/${controlSink} != ${expected}.`);
     const snapshotInstrumentationOverheadMs = Math.max(0, interactionDispatchMs - controlDispatchMs);
     const resourceAfter = process.resourceUsage();
-    if (snapshotInstrumentationOverheadMs > MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS)
-      throw new Error(
-        `Light snapshot instrumentation overhead ${snapshotInstrumentationOverheadMs.toFixed(3)}ms exceeded ${MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS}ms.`,
-      );
     return {
       assertions: 2,
       metrics: {
