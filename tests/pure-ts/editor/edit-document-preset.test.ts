@@ -181,10 +181,10 @@ describe('current RapidRaw preset envelope', () => {
   });
 
   test('mixed current and obsolete native values retain current presets and quarantine obsolete entries', () => {
-    const current = envelope(
-      createEditDocumentPresetPayload(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), false, 'style'),
-      { id: 'current', name: 'Current' },
-    );
+    const current = envelope(createEditDocumentPresetPayload(createDefaultEditDocumentV2(), false, 'style'), {
+      id: 'current',
+      name: 'Current',
+    });
     const obsolete = { preset: { adjustments: { exposure: 0.75 }, id: 'obsolete', name: 'Alaska Proof Look' } };
 
     const parsed = parsePresetLibrary([{ preset: current }, obsolete]);

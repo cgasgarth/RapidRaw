@@ -1,4 +1,5 @@
 import {
+  currentRenderEditDocumentV2Schema,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeParamsV2,
@@ -123,6 +124,17 @@ export const setEditDocumentV2NodeEnabled = (
     nodes: { ...document.nodes, [nodeType]: { ...node, enabled } },
   };
   return next;
+};
+
+/** Seal current typed authority before crossing the native persistence boundary. */
+export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
+  const quarantinedNodes = document.extensions['quarantinedNodes'];
+  const current = currentRenderEditDocumentV2Schema.parse({
+    ...document,
+    extensions: quarantinedNodes === undefined ? {} : { quarantinedNodes },
+  });
+  const jsonSafe: unknown = JSON.parse(JSON.stringify(current));
+  return currentRenderEditDocumentV2Schema.parse(jsonSafe);
 };
 
 /** Publish source-owned AI artifacts atomically in the node and explicit domain. */

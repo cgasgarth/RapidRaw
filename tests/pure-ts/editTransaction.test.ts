@@ -48,6 +48,10 @@ const resetEditorState = () => {
     history: [editDocumentV2],
     historyCheckpoints: [],
     historyIndex: 0,
+    imageSession: null,
+    imageSessionId: 1,
+    lastEditApplicationReceipt: null,
+    selectedImage: null,
   });
 };
 

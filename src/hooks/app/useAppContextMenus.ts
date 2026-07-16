@@ -82,7 +82,6 @@ import {
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
-import { editDocumentV2ToLegacyAdjustments } from '../../utils/editDocumentV2';
 import { buildEditorPersistenceRequest } from '../../utils/editorPersistenceEffectRunner';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
@@ -610,7 +609,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               matchingSave ??
               (await invokeWithSchema(
                 Invokes.SaveMetadataAndUpdateThumbnail,
-                {
+                buildEditorPersistenceRequest({
                   editDocumentV2: capturedEditDocumentV2,
                   path: capturedSelection.path,
                   transaction: null,

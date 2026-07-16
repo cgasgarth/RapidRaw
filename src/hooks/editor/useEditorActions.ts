@@ -40,6 +40,7 @@ import {
   setEditDocumentV2NodeEnabled,
 } from '../../utils/editDocumentV2';
 import {
+  buildEditorPersistenceRequest,
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
 } from '../../utils/editorPersistenceEffectRunner';
@@ -90,14 +91,15 @@ export const debouncedSetHistory = debounce((_newAdjustments: Adjustments) => {
 
 export const debouncedSave = debounce(
   (path: string, documentToSave: EditDocumentV2, transaction?: EditTransactionPersistenceContext) => {
+    const request = buildEditorPersistenceRequest({
+      editDocumentV2: documentToSave,
+      path,
+      ...(transaction === undefined ? {} : { transaction }),
+    });
     void trackEditorPersistence(
       path,
       documentToSave,
-      invokeWithSchema(
-        Invokes.SaveMetadataAndUpdateThumbnail,
-        { path, editDocumentV2: documentToSave, transaction },
-        editorPersistenceReceiptSchema,
-      ),
+      invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
     ).catch((err: unknown) => {
       console.error('Auto-save failed:', err);
       toast.error(`Failed to save changes: ${formatUnknownError(err)}`);

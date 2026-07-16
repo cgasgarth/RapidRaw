@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  currentRenderEditDocumentV2Schema,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   type EditDocumentV2CopyPayload,
@@ -7,7 +8,7 @@ import {
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
 import { areEditDocumentsEqual } from './adjustmentsSnapshot';
-import { copyEditDocumentV2Nodes } from './editDocumentV2';
+import { copyEditDocumentV2Nodes, prepareEditDocumentV2ForPersistence } from './editDocumentV2';
 import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
 import { invokeWithSchema } from './tauriSchemaInvoke';

@@ -177,31 +177,8 @@ export interface BuildColorStackPreviewExportParityReceiptOptions {
 export function buildColorStackPreviewExportParityReceipt(
   options: BuildColorStackPreviewExportParityReceiptOptions,
 ): ColorStackPreviewExportParityReceiptV1 {
-  const blackWhiteMixer = editDocumentBlackWhiteMixerV2Schema.parse(
-    options.editDocumentV2.nodes['black_white_mixer']?.params,
-  ).blackWhiteMixer;
-  const cameraProfile = editDocumentCameraInputV2Schema.parse(
-    options.editDocumentV2.nodes['camera_input']?.params,
-  ).cameraProfile;
-  const channelMixer = editDocumentChannelMixerV2Schema.parse(
-    options.editDocumentV2.nodes['channel_mixer']?.params,
-  ).channelMixer;
-  const colorBalanceRgb = editDocumentColorBalanceRgbV2Schema.parse(
-    options.editDocumentV2.nodes['color_balance_rgb']?.params,
-  ).colorBalanceRgb;
-  const colorGrading = editDocumentPerceptualGradingV2Schema.parse(
-    options.editDocumentV2.nodes['perceptual_grading']?.params,
-  ).colorGrading;
-  const selectiveColor = editDocumentSelectiveColorMixerV2Schema.parse(
-    options.editDocumentV2.nodes['selective_color_mixer']?.params,
-  );
-  const { hsl, selectiveColorRangeControls } = selectiveColor;
-  const skinToneUniformity = editDocumentSkinToneUniformityV2Schema.parse(
-    options.editDocumentV2.nodes['skin_tone_uniformity']?.params,
-  ).skinToneUniformity;
-  const toneCurve = editDocumentSceneCurveV2Schema.parse(options.editDocumentV2.nodes['scene_curve']?.params).toneCurve;
   const selectiveColorRanges = SELECTIVE_COLOR_RANGE_KEYS.filter((rangeKey) => {
-    const controls = selectiveColorRangeControls[rangeKey];
+    const controls = options.adjustments.selectiveColorRangeControls[rangeKey];
     const defaults = DEFAULT_SELECTIVE_COLOR_RANGE_CONTROLS[rangeKey];
     return (
       controls.centerHueDegrees !== defaults.centerHueDegrees ||
@@ -211,16 +188,16 @@ export function buildColorStackPreviewExportParityReceipt(
   });
   const activeColorStackHash = hashString(
     stableJson({
-      blackWhiteMixer,
-      cameraProfile,
-      channelMixer,
-      colorBalanceRgb,
-      colorGrading,
+      blackWhiteMixer: options.adjustments.blackWhiteMixer,
+      cameraProfile: options.adjustments.cameraProfile,
+      channelMixer: options.adjustments.channelMixer,
+      colorBalanceRgb: options.adjustments.colorBalanceRgb,
+      colorGrading: options.adjustments.colorGrading,
       colorStylePresetId: options.colorStylePresetId ?? null,
-      hsl,
-      selectiveColorRangeControls,
-      skinToneUniformity,
-      toneCurve,
+      hsl: options.adjustments.hsl,
+      selectiveColorRangeControls: options.adjustments.selectiveColorRangeControls,
+      skinToneUniformity: options.adjustments.skinToneUniformity,
+      toneCurve: options.adjustments.toneCurve,
     }),
   );
   const previewColorProfile = options.exportSoftProofTransform?.effectiveColorProfile ?? null;
@@ -264,15 +241,15 @@ export function buildColorStackPreviewExportParityReceipt(
     activeColorStackHash,
     colorStylePresetId: options.colorStylePresetId ?? null,
     components: {
-      blackWhiteMixerEnabled: blackWhiteMixer.enabled,
-      cameraProfile,
-      channelMixerEnabled: channelMixer.enabled,
-      colorBalanceRgbEnabled: colorBalanceRgb.enabled,
-      colorGradingEnabled: hasActiveColorGrading(colorGrading),
+      blackWhiteMixerEnabled: options.adjustments.blackWhiteMixer.enabled,
+      cameraProfile: options.adjustments.cameraProfile,
+      channelMixerEnabled: options.adjustments.channelMixer.enabled,
+      colorBalanceRgbEnabled: options.adjustments.colorBalanceRgb.enabled,
+      colorGradingEnabled: hasActiveColorGrading(options.adjustments.colorGrading),
       selectiveColorRangeCount: selectiveColorRanges.length,
       selectiveColorRanges,
-      skinToneUniformityEnabled: skinToneUniformity.enabled,
-      toneCurve,
+      skinToneUniformityEnabled: options.adjustments.skinToneUniformity.enabled,
+      toneCurve: options.adjustments.toneCurve,
     },
     colorManagement: {
       cmm: options.exportOutput.cmm ?? null,

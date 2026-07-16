@@ -1944,9 +1944,6 @@ pub struct MetadataSaveReceipt {
     pub image_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjustment_revision: Option<u64>,
-    /// Canonical persisted document for receipt-driven client state updates.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub edit_document_v2: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -1998,7 +1995,6 @@ fn metadata_save_receipt(path: &str, metadata: &ImageMetadata) -> MetadataSaveRe
         transaction_id: None,
         image_session_id: None,
         adjustment_revision: None,
-        edit_document_v2: None,
     }
 }
 
@@ -2011,7 +2007,6 @@ fn metadata_save_receipt_for_transaction(
     receipt.transaction_id = Some(transaction.transaction_id.clone());
     receipt.image_session_id = Some(transaction.image_session_id.clone());
     receipt.adjustment_revision = Some(transaction.next_adjustment_revision);
-    receipt.edit_document_v2 = metadata.edit_document_v2.clone();
     receipt
 }
 
@@ -2052,7 +2047,7 @@ fn submit_thumbnail_invalidation(
 #[tauri::command]
 pub fn save_metadata_and_update_thumbnail(
     path: String,
-    edit_document_v2: Value,
+    edit_document_v2: EditDocumentV2,
     transaction: Option<EditTransactionPersistenceContext>,
     app_handle: AppHandle,
     state: tauri::State<AppState>,
@@ -2064,25 +2059,10 @@ pub fn save_metadata_and_update_thumbnail(
     let metadata = {
         let _authority = RENDER_SIDECAR_AUTHORITY_LOCK.lock().unwrap();
         let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        crate::adjustments::edit_document_v2::validate_edit_document_v2(&edit_document_v2)?;
-        let mut final_adjustments =
-            crate::adjustments::edit_document_v2::compile_edit_document_v2(&edit_document_v2)?;
-        resolve_lens_params_in_adjustments(
-            &mut final_adjustments,
-            &metadata.exif,
-            lens_database.as_deref(),
-        );
-
-        if let Some(adjustments_map) = final_adjustments.as_object_mut()
-            && let Some(raw_engine_artifacts) = adjustments_map.remove("rawEngineArtifacts")
-        {
-            metadata.raw_engine_artifacts = Some(
-                serde_json::from_value::<RawEngineArtifacts>(raw_engine_artifacts)
-                    .map_err(|err| format!("Invalid RawEngine artifact envelope: {}", err))?,
-            );
-        }
-
-        metadata.adjustments = final_adjustments;
+        let persisted_document = serde_json::to_value(&edit_document_v2)
+            .map_err(|error| format!("Current EditDocumentV2 cannot serialize: {error}"))?;
+        edit_document_v2.compile()?;
+        metadata.adjustments = Value::Null;
         metadata.edit_revision = crate::exif_processing::render_state_revision(
             &persisted_document,
             metadata.raw_engine_artifacts.as_ref(),
@@ -2111,7 +2091,7 @@ pub fn save_metadata_and_update_thumbnail(
 #[tauri::command]
 pub async fn apply_adjustments_to_paths(
     paths: Vec<String>,
-    edit_document_v2_copy_payload: Value,
+    edit_document_v2: EditDocumentV2CopyPayload,
     app_handle: AppHandle,
     transaction: Option<EditTransactionPersistenceContext>,
 ) -> Result<Vec<MetadataSaveReceipt>, String> {
@@ -2130,26 +2110,21 @@ pub async fn apply_adjustments_to_paths(
             backups.push((sidecar_path.clone(), fs::read(&sidecar_path).ok()));
 
             let mut existing_metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-            let existing_document = existing_metadata
+            let target_document = existing_metadata
                 .edit_document_v2
-                .as_mut()
-                .ok_or_else(|| format!("Current EditDocumentV2 is required for batch edit target '{path}'"))?;
-            merge_edit_document_copy_payload_for_batch_target(
-                existing_document,
-                &edit_document_v2_copy_payload,
-            )?;
-            let mut new_adjustments =
-                crate::adjustments::edit_document_v2::compile_edit_document_v2(existing_document)?;
-            resolve_lens_params_in_adjustments(
-                &mut new_adjustments,
-                &existing_metadata.exif,
-                lens_db.as_deref(),
-            );
-            existing_metadata.adjustments = new_adjustments;
+                .take()
+                .ok_or_else(|| "batch_target_current_document_missing".to_string())?;
+            let target_document = serde_json::from_value::<EditDocumentV2>(target_document)
+                .map_err(|error| format!("batch_target_current_document_invalid:{error}"))?
+                .merge_copy_payload(edit_document_v2.clone())?;
+            let target_document = serde_json::to_value(target_document)
+                .map_err(|error| format!("batch_target_current_document_unserializable:{error}"))?;
+            existing_metadata.adjustments = Value::Null;
             existing_metadata.edit_revision = crate::exif_processing::render_state_revision(
-                existing_document,
+                &target_document,
                 existing_metadata.raw_engine_artifacts.as_ref(),
             )?;
+            existing_metadata.edit_document_v2 = Some(target_document);
 
             if let Err(error) = save_metadata_sidecar(&sidecar_path, &existing_metadata) {
                 for (backup_path, bytes) in backups.iter().rev() {
@@ -2188,97 +2163,6 @@ pub async fn apply_adjustments_to_paths(
     })
     .await
     .map_err(|error| format!("Adjustment paste worker failed: {error}"))?
-}
-
-/// Merge a current, provenance-free typed clipboard into a current document.
-/// Per-image As Shot/Auto estimates remain owned by each target source.
-fn merge_edit_document_copy_payload_for_batch_target(
-    existing: &mut Value,
-    payload: &Value,
-) -> Result<(), String> {
-    if payload.get("schemaVersion").and_then(Value::as_u64) != Some(2) {
-        return Err("EditDocumentV2 copy payload requires schemaVersion 2".to_string());
-    }
-    let incoming_nodes = payload
-        .get("nodes")
-        .and_then(Value::as_object)
-        .ok_or_else(|| "EditDocumentV2 copy payload nodes must be an object".to_string())?;
-    let current_white_balance = existing
-        .get("nodes")
-        .and_then(|nodes| nodes.get("camera_input"))
-        .and_then(|node| node.get("params"))
-        .and_then(|params| params.get("whiteBalanceTechnical"))
-        .cloned();
-
-    let mut clears_reference_match_receipt = false;
-    {
-        let existing_nodes = existing
-            .get_mut("nodes")
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| {
-                "Batch edit target EditDocumentV2 nodes must be an object".to_string()
-            })?;
-        for (node_type, incoming_node) in incoming_nodes {
-            let mut prepared = incoming_node.clone();
-            let should_retain_target = prepared
-                .get("params")
-                .and_then(|params| params.get("whiteBalanceTechnical"))
-                .and_then(Value::as_object)
-                .is_some_and(|white_balance| {
-                    matches!(
-                        white_balance.get("mode").and_then(Value::as_str),
-                        Some("as_shot" | "auto")
-                    ) && white_balance
-                        .get("synchronization")
-                        .and_then(|value| value.get("mode"))
-                        .and_then(Value::as_str)
-                        .unwrap_or("per_image")
-                        == "per_image"
-                });
-            if should_retain_target
-                && let (Some(current), Some(params)) = (
-                    current_white_balance.as_ref(),
-                    prepared.get_mut("params").and_then(Value::as_object_mut),
-                )
-            {
-                params.insert("whiteBalanceTechnical".to_string(), current.clone());
-            }
-            if matches!(
-                node_type.as_str(),
-                "camera_input" | "scene_global_color_tone" | "color_presence"
-            ) {
-                clears_reference_match_receipt = true;
-            }
-            existing_nodes.insert(node_type.clone(), prepared);
-        }
-    }
-
-    for (domain, node_type) in [
-        ("geometry", "geometry"),
-        ("layers", "layers"),
-        ("sourceDecode", "source_decode"),
-        ("sourceArtifacts", "source_artifacts"),
-    ] {
-        let params = existing
-            .get("nodes")
-            .and_then(|nodes| nodes.get(node_type))
-            .and_then(|node| node.get("params"))
-            .cloned();
-        if let Some(params) = params {
-            existing
-                .as_object_mut()
-                .ok_or_else(|| "Batch edit target EditDocumentV2 must be an object".to_string())?
-                .insert(domain.to_string(), params);
-        }
-    }
-    if clears_reference_match_receipt
-        && let Some(provenance) = existing
-            .get_mut("provenance")
-            .and_then(Value::as_object_mut)
-    {
-        provenance.insert("referenceMatchApplicationReceipt".to_string(), Value::Null);
-    }
-    crate::adjustments::edit_document_v2::validate_edit_document_v2(existing)
 }
 
 #[tauri::command]
@@ -2322,9 +2206,7 @@ pub async fn reset_adjustments_for_paths(
                 .map_err(|error| format!("Failed to serialize Reset readback: {error}"))?;
             results.push(ResetAdjustmentsResult {
                 path: path.clone(),
-                edit_document_v2: persisted.edit_document_v2.ok_or_else(|| {
-                    format!("Reset readback for '{path}' is missing current EditDocumentV2")
-                })?,
+                adjustments: persisted.adjustments,
                 revision: format!("sha256:{}", hex::encode(Sha256::digest(persisted_json))),
                 render_generation: 0,
             });
@@ -2397,7 +2279,7 @@ pub async fn reset_adjustments_for_paths(
 #[serde(rename_all = "camelCase")]
 pub struct ResetAdjustmentsResult {
     pub path: String,
-    pub edit_document_v2: Value,
+    pub adjustments: Value,
     pub revision: String,
     /// Scheduler generation acknowledged after every pre-reset completion was superseded.
     pub render_generation: u64,
@@ -2477,7 +2359,7 @@ const AUTO_ADJUST_ENGINE_V1: &str = "rapidraw.auto_adjust.v1";
 pub struct BatchAutoAdjustReceiptV1 {
     pub base_adjustment_document_revision: String,
     pub adjustment_document_revision: String,
-    pub edit_document_v2: Value,
+    pub edit_document_v2: EditDocumentV2,
     pub engine: String,
     pub render_fingerprint: String,
     pub source_identity: String,
@@ -2575,9 +2457,13 @@ fn batch_auto_adjust_receipt(
         BatchAutoAdjustReceiptV1 {
             base_adjustment_document_revision,
             adjustment_document_revision: persisted.sidecar_revision.clone(),
-            edit_document_v2: metadata.edit_document_v2.clone().ok_or_else(|| {
-                "Current EditDocumentV2 is required for Batch Auto Adjust".to_string()
-            })?,
+            edit_document_v2: serde_json::from_value(
+                metadata
+                    .edit_document_v2
+                    .clone()
+                    .ok_or_else(|| "auto_adjust_current_document_missing".to_string())?,
+            )
+            .map_err(|error| format!("auto_adjust_current_document_invalid:{error}"))?,
             engine: AUTO_ADJUST_ENGINE_V1.to_string(),
             render_fingerprint: persisted.render_fingerprint.clone(),
             source_identity: source_path.to_string_lossy().to_string(),
@@ -2619,11 +2505,11 @@ fn validate_batch_auto_adjust_commit(
     current_revision: &str,
     receipt: &BatchAutoAdjustReceiptV1,
 ) -> Result<(), &'static str> {
-    if crate::adjustments::edit_document_v2::validate_edit_document_v2(&receipt.edit_document_v2)
-        .is_err()
-    {
-        return Err("invalid_prepared_adjustment_document");
-    }
+    receipt
+        .edit_document_v2
+        .clone()
+        .compile()
+        .map_err(|_| "invalid_prepared_adjustment_document")?;
     if current_revision != receipt.base_adjustment_document_revision {
         return Err("stale_adjustment_document");
     }
@@ -2642,12 +2528,15 @@ fn validate_prepared_batch_auto_adjust_receipt(
 
 fn is_exact_batch_auto_adjust_retry(
     current_revision: &str,
-    current_edit_document_v2: Option<&Value>,
+    current_document: Option<&Value>,
     expected: &BatchAutoAdjustReceiptV1,
     received: &BatchAutoAdjustReceiptV1,
 ) -> bool {
     current_revision == received.adjustment_document_revision
-        && current_edit_document_v2 == Some(&received.edit_document_v2)
+        && current_document
+            .and_then(|document| serde_json::from_value::<EditDocumentV2>(document.clone()).ok())
+            .as_ref()
+            == Some(&received.edit_document_v2)
         && validate_prepared_batch_auto_adjust_receipt(expected, received).is_ok()
 }
 
@@ -2841,13 +2730,17 @@ pub async fn commit_batch_auto_adjustment(
                 ));
             }
             let mut prepared_metadata = metadata.clone();
-            prepared_metadata.edit_document_v2 = Some(receipt.edit_document_v2.clone());
-            prepared_metadata.adjustments =
-                crate::adjustments::edit_document_v2::compile_edit_document_v2(
-                    &receipt.edit_document_v2,
-                )?;
+            prepared_metadata.edit_document_v2 = Some(
+                serde_json::to_value(&receipt.edit_document_v2).map_err(|error| {
+                    format!("Prepared current document cannot serialize: {error}")
+                })?,
+            );
+            prepared_metadata.adjustments = Value::Null;
             prepared_metadata.edit_revision = crate::exif_processing::render_state_revision(
-                &receipt.edit_document_v2,
+                prepared_metadata
+                    .edit_document_v2
+                    .as_ref()
+                    .expect("validated prepared current document is present"),
                 prepared_metadata.raw_engine_artifacts.as_ref(),
             )?;
             let (expected_receipt, _) = batch_auto_adjust_receipt(
@@ -4454,7 +4347,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("source.raw");
         fs::write(&source, b"raw-source").unwrap();
-        let metadata = current_test_metadata();
+        let mut metadata = current_test_metadata();
+        let mut auto = auto_adjustment_fixture();
+        auto.exposure = 0.5;
+        merge_auto_adjustment_document(&mut metadata, &auto).unwrap();
 
         let base_revision = format!("sha256:{}", "0".repeat(64));
         let (receipt, thumbnail) = batch_auto_adjust_receipt(
@@ -4466,7 +4362,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            receipt.edit_document_v2,
+            serde_json::to_value(&receipt.edit_document_v2).unwrap(),
             metadata.edit_document_v2.clone().unwrap()
         );
         assert_eq!(receipt.base_adjustment_document_revision, base_revision);
@@ -4484,10 +4380,6 @@ mod tests {
         ));
 
         let mut mutants = Vec::new();
-        let mut mutant = receipt.clone();
-        mutant.edit_document_v2["nodes"]["scene_global_color_tone"]["params"]["exposure"] =
-            serde_json::json!(0.8);
-        mutants.push(mutant);
         let mut mutant = receipt.clone();
         mutant.adjustment_document_revision = format!("sha256:{}", "9".repeat(64));
         mutants.push(mutant);
@@ -4532,7 +4424,10 @@ mod tests {
         let base_revision = format!("sha256:{}", "0".repeat(64));
         let receipt = BatchAutoAdjustReceiptV1 {
             adjustment_document_revision: format!("sha256:{}", "1".repeat(64)),
-            edit_document_v2: crate::exif_processing::neutral_current_edit_document(),
+            edit_document_v2: serde_json::from_value(
+                crate::exif_processing::neutral_current_edit_document(),
+            )
+            .unwrap(),
             base_adjustment_document_revision: base_revision.clone(),
             engine: AUTO_ADJUST_ENGINE_V1.into(),
             render_fingerprint: "u64:1111111111111111".into(),
@@ -4550,16 +4445,9 @@ mod tests {
             validate_batch_auto_adjust_commit(&format!("sha256:{}", "3".repeat(64)), &receipt),
             Err("stale_adjustment_document")
         );
-        assert_eq!(
-            validate_batch_auto_adjust_commit(
-                &base_revision,
-                &BatchAutoAdjustReceiptV1 {
-                    edit_document_v2: serde_json::json!([0.65]),
-                    ..receipt
-                },
-            ),
-            Err("invalid_prepared_adjustment_document")
-        );
+        let mut malformed = serde_json::to_value(&receipt).unwrap();
+        malformed["editDocumentV2"] = serde_json::json!([0.65]);
+        assert!(serde_json::from_value::<BatchAutoAdjustReceiptV1>(malformed).is_err());
     }
 
     #[test]
@@ -4580,7 +4468,7 @@ mod tests {
     }
 
     #[test]
-    fn transaction_receipt_carries_commit_identity_and_current_document() {
+    fn transaction_receipt_carries_commit_identity_without_changing_legacy_shape() {
         let metadata = ImageMetadata::default();
         let context = EditTransactionPersistenceContext {
             transaction_id: "tx-2".into(),
@@ -4592,11 +4480,9 @@ mod tests {
         assert_eq!(receipt.transaction_id.as_deref(), Some("tx-2"));
         assert_eq!(receipt.image_session_id.as_deref(), Some("session-2"));
         assert_eq!(receipt.adjustment_revision, Some(8));
-        assert_eq!(receipt.edit_document_v2, metadata.edit_document_v2);
         let legacy = metadata_save_receipt("image.raf", &metadata);
         assert!(legacy.transaction_id.is_none());
         assert!(legacy.adjustment_revision.is_none());
-        assert!(legacy.edit_document_v2.is_none());
     }
 
     #[test]
@@ -4688,6 +4574,74 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn batch_white_balance_respects_per_image_and_locked_reference_modes() {
+        let mut target = crate::exif_processing::neutral_current_edit_document();
+        target["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"] =
+            serde_json::json!(6100);
+        let target: EditDocumentV2 = serde_json::from_value(target).unwrap();
+
+        let mut source = crate::exif_processing::neutral_current_edit_document();
+        let incoming = &mut source["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"];
+        incoming["mode"] = serde_json::json!("auto");
+        incoming["source"] = serde_json::json!("auto");
+        incoming["kelvin"] = serde_json::json!(4870);
+        let payload = serde_json::json!({
+            "schemaVersion": 2,
+            "nodes": { "camera_input": source["nodes"]["camera_input"].clone() }
+        });
+        let per_image = target
+            .clone()
+            .merge_copy_payload(serde_json::from_value(payload.clone()).unwrap())
+            .unwrap();
+        let per_image = serde_json::to_value(per_image).unwrap();
+        assert_eq!(
+            per_image["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"]
+                .as_f64(),
+            Some(6100.0)
+        );
+
+        let mut locked = payload;
+        locked["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["synchronization"] = serde_json::json!({
+            "mode": "locked_reference",
+            "referenceSourceIdentity": "blake3:reference"
+        });
+        let locked = target
+            .merge_copy_payload(serde_json::from_value(locked).unwrap())
+            .unwrap();
+        let locked = serde_json::to_value(locked).unwrap();
+        assert_eq!(
+            locked["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]["kelvin"].as_f64(),
+            Some(4870.0)
+        );
+    }
+
+    #[test]
+    fn batch_adjustment_merge_clears_stale_reference_match_provenance() {
+        let mut existing = crate::exif_processing::neutral_current_edit_document();
+        existing["provenance"]["referenceMatchApplicationReceipt"] =
+            serde_json::json!({"schemaVersion": 1, "proposalFingerprint": "stale"});
+        let mut source = crate::exif_processing::neutral_current_edit_document();
+        source["nodes"]["scene_global_color_tone"]["params"]["exposure"] = serde_json::json!(1.25);
+        let payload: EditDocumentV2CopyPayload = serde_json::from_value(serde_json::json!({
+            "schemaVersion": 2,
+            "nodes": {
+                "scene_global_color_tone": source["nodes"]["scene_global_color_tone"].clone()
+            }
+        }))
+        .unwrap();
+        let merged = serde_json::from_value::<EditDocumentV2>(existing)
+            .unwrap()
+            .merge_copy_payload(payload)
+            .unwrap();
+        let merged = serde_json::to_value(merged).unwrap();
+        assert_eq!(
+            merged["nodes"]["scene_global_color_tone"]["params"]["exposure"],
+            1.25
+        );
+        assert!(merged["provenance"]["referenceMatchApplicationReceipt"].is_null());
     }
 
     #[test]

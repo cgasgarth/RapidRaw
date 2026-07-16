@@ -1025,7 +1025,7 @@ export default function ExportPanel({
     const { newlySentPatchIds, payload } = prepareEditDocumentPayloadForBackend(editDocumentV2, residency.residentIds);
     const compareRequests = buildSoftProofProfileCompareRequests({
       blackPointCompensation,
-      editDocumentV2: preparedEditDocumentV2,
+      editDocumentV2: payload,
       renderingIntent,
       targetResolution: EXPORT_SOFT_PROOF_PROFILE_COMPARE_TARGET_RESOLUTION,
     });

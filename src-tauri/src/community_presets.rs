@@ -15,8 +15,7 @@ const MAX_COMMUNITY_PRESETS: usize = 512;
 pub struct CommunityPreset {
     pub name: String,
     pub creator: String,
-    #[serde(rename = "editDocumentV2")]
-    pub edit_document_v2: Value,
+    pub adjustments: Value,
     #[serde(rename = "includeMasks")]
     pub include_masks: Option<bool>,
     #[serde(rename = "includeCropTransform")]
@@ -37,10 +36,7 @@ pub(crate) fn parse_community_preset_manifest(
     let mut names = HashSet::with_capacity(presets.len());
     for preset in &presets {
         let name = preset.name.trim();
-        if name.is_empty()
-            || preset.creator.trim().is_empty()
-            || !preset.edit_document_v2.is_object()
-        {
+        if name.is_empty() || preset.creator.trim().is_empty() || !preset.adjustments.is_object() {
             return Err("community_presets.preset_invalid".to_string());
         }
         if !names.insert(name.to_string()) {
@@ -58,7 +54,7 @@ mod tests {
         serde_json::json!({
             "name": name,
             "creator": "RapidRAW",
-            "editDocumentV2": { "nodes": {}, "schemaVersion": 2 }
+            "adjustments": {}
         })
     }
 
@@ -91,6 +87,6 @@ mod tests {
         let presets = parse_community_preset_manifest(&bytes).unwrap();
         assert_eq!(presets.len(), 1);
         assert_eq!(presets[0].name, "Alaska");
-        assert!(presets[0].edit_document_v2.is_object());
+        assert!(presets[0].adjustments.is_object());
     }
 }

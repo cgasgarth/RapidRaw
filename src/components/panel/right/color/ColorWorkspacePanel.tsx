@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Palette, RotateCcw } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -26,20 +26,78 @@ import InspectorPanelFrame, {
 
 const PANEL_ACTION_ICON_SIZE = 15;
 
-export const selectColorPanelAdjustmentView = (document: EditDocumentV2): ColorPanelAdjustmentView => ({
-  ...selectEditDocumentNode(document, 'black_white_mixer').params,
-  ...selectEditDocumentNode(document, 'camera_input').params,
-  ...selectEditDocumentNode(document, 'channel_mixer').params,
-  ...selectEditDocumentNode(document, 'color_balance_rgb').params,
-  ...selectEditDocumentNode(document, 'color_calibration').params,
-  ...selectEditDocumentNode(document, 'color_presence').params,
-  ...selectEditDocumentNode(document, 'luma_levels').params,
-  ...selectEditDocumentNode(document, 'perceptual_grading').params,
-  ...selectEditDocumentNode(document, 'point_color').params,
-  ...selectEditDocumentNode(document, 'scene_curve').params,
-  ...selectEditDocumentNode(document, 'selective_color_mixer').params,
-  ...selectEditDocumentNode(document, 'skin_tone_uniformity').params,
+const selectColorPanelAdjustmentSources = (document: EditDocumentV2) => ({
+  blackWhiteMixer: selectEditDocumentNode(document, 'black_white_mixer').params,
+  cameraInput: selectEditDocumentNode(document, 'camera_input').params,
+  channelMixer: selectEditDocumentNode(document, 'channel_mixer').params,
+  colorBalanceRgb: selectEditDocumentNode(document, 'color_balance_rgb').params,
+  colorCalibration: selectEditDocumentNode(document, 'color_calibration').params,
+  colorPresence: selectEditDocumentNode(document, 'color_presence').params,
+  lumaLevels: selectEditDocumentNode(document, 'luma_levels').params,
+  perceptualGrading: selectEditDocumentNode(document, 'perceptual_grading').params,
+  pointColor: selectEditDocumentNode(document, 'point_color').params,
+  sceneCurve: selectEditDocumentNode(document, 'scene_curve').params,
+  selectiveColorMixer: selectEditDocumentNode(document, 'selective_color_mixer').params,
+  skinToneUniformity: selectEditDocumentNode(document, 'skin_tone_uniformity').params,
 });
+
+type ColorPanelAdjustmentSources = ReturnType<typeof selectColorPanelAdjustmentSources>;
+
+const mergeColorPanelAdjustmentSources = (sources: ColorPanelAdjustmentSources): ColorPanelAdjustmentView => ({
+  ...sources.blackWhiteMixer,
+  ...sources.cameraInput,
+  ...sources.channelMixer,
+  ...sources.colorBalanceRgb,
+  ...sources.colorCalibration,
+  ...sources.colorPresence,
+  ...sources.lumaLevels,
+  ...sources.perceptualGrading,
+  ...sources.pointColor,
+  ...sources.sceneCurve,
+  ...sources.selectiveColorMixer,
+  ...sources.skinToneUniformity,
+});
+
+const equalColorPanelAdjustmentSources = (
+  left: ColorPanelAdjustmentSources,
+  right: ColorPanelAdjustmentSources,
+): boolean =>
+  left.blackWhiteMixer === right.blackWhiteMixer &&
+  left.cameraInput === right.cameraInput &&
+  left.channelMixer === right.channelMixer &&
+  left.colorBalanceRgb === right.colorBalanceRgb &&
+  left.colorCalibration === right.colorCalibration &&
+  left.colorPresence === right.colorPresence &&
+  left.lumaLevels === right.lumaLevels &&
+  left.perceptualGrading === right.perceptualGrading &&
+  left.pointColor === right.pointColor &&
+  left.sceneCurve === right.sceneCurve &&
+  left.selectiveColorMixer === right.selectiveColorMixer &&
+  left.skinToneUniformity === right.skinToneUniformity;
+
+export const selectColorPanelAdjustmentView = (document: EditDocumentV2): ColorPanelAdjustmentView =>
+  mergeColorPanelAdjustmentSources(selectColorPanelAdjustmentSources(document));
+
+/** Cache the merged view by node identity so unrelated document edits do not publish a new panel snapshot. */
+export const createColorPanelAdjustmentViewSelector = () => {
+  let previousSources: ColorPanelAdjustmentSources | undefined;
+  let previousView: ColorPanelAdjustmentView | undefined;
+
+  return (state: { editDocumentV2: EditDocumentV2 }): ColorPanelAdjustmentView => {
+    const sources = selectColorPanelAdjustmentSources(state.editDocumentV2);
+    if (previousSources && previousView && equalColorPanelAdjustmentSources(previousSources, sources)) {
+      return previousView;
+    }
+    previousSources = sources;
+    previousView = mergeColorPanelAdjustmentSources(sources);
+    return previousView;
+  };
+};
+
+export const useColorPanelAdjustmentView = (): ColorPanelAdjustmentView => {
+  const selector = useMemo(createColorPanelAdjustmentViewSelector, []);
+  return useEditorStore(selector);
+};
 
 const changed = (left: unknown, right: unknown): boolean => JSON.stringify(left) !== JSON.stringify(right);
 
@@ -94,9 +152,9 @@ export default function ColorWorkspacePanel() {
     defaultValue: 'Reset Color settings',
     section: colorLabel,
   });
-  const { adjustments, isColorEnabled, isWbPickerActive, selectedImage, setEditor } = useEditorStore(
+  const adjustments = useColorPanelAdjustmentView();
+  const { isColorEnabled, isWbPickerActive, selectedImage, setEditor } = useEditorStore(
     useShallow((state) => ({
-      adjustments: selectColorPanelAdjustmentView(state.editDocumentV2),
       isColorEnabled: getEditDocumentNodeTypesForEditorSection('color').every(
         (nodeType) => state.editDocumentV2.nodes[nodeType]?.enabled !== false,
       ),

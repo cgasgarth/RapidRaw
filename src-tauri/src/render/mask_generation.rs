@@ -2178,12 +2178,12 @@ pub fn generate_mask_overlay(
     scale: f32,
     crop_offset: (f32, f32),
     overlay_settings: Option<MaskOverlaySettings>,
-    edit_document_v2: serde_json::Value,
+    mut js_adjustments: Option<serde_json::Value>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let mut js_adjustments =
-        crate::adjustments::edit_document_v2::compile_edit_document_v2(&edit_document_v2)?;
-    crate::adjustment_utils::hydrate_adjustments(&state, &mut js_adjustments);
+    if let Some(ref mut adj) = js_adjustments {
+        crate::adjustment_utils::hydrate_adjustments(&state, adj);
+    }
 
     if let Some(sub_masks) = mask_def.get_mut("subMasks").and_then(|v| v.as_array_mut()) {
         state
@@ -2197,11 +2197,9 @@ pub fn generate_mask_overlay(
 
     let scaled_crop_offset = (crop_offset.0 * scale, crop_offset.1 * scale);
 
-    let warped_image = resolve_warped_image_for_masks(
-        &state,
-        &js_adjustments,
-        std::slice::from_ref(&parsed_mask_def),
-    );
+    let warped_image = js_adjustments.as_ref().and_then(|adj| {
+        resolve_warped_image_for_masks(&state, adj, std::slice::from_ref(&parsed_mask_def))
+    });
 
     if let Some(gray_mask) = generate_mask_bitmap(
         &parsed_mask_def,

@@ -10,7 +10,6 @@ import {
   colorStackPreviewExportParityReceiptV1Schema,
 } from '../../../../src/utils/colorStackPreviewExportParityReceipt.ts';
 import { renderColorStackPreviewExportParityProof } from '../../../../src/utils/colorStackPreviewExportParityRuntime.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 
 const exportOutput: ExportReceiptOutput = {
   bitDepth: 16,
@@ -72,8 +71,6 @@ const adjustedColorStack = {
   toneCurve: 'soft_contrast',
 };
 
-const currentEditDocument = legacyAdjustmentsToEditDocumentV2(adjustedColorStack);
-
 const runtimeProof = renderColorStackPreviewExportParityProof({
   adjustments: adjustedColorStack,
   colorStylePresetId: 'color_style.cinematic.warm_shadow_rolloff.v1',
@@ -110,7 +107,7 @@ for (const requiredStage of [
 
 const matchedReceipt = colorStackPreviewExportParityReceiptV1Schema.parse(
   buildColorStackPreviewExportParityReceipt({
-    editDocumentV2: currentEditDocument,
+    adjustments: adjustedColorStack,
     colorStylePresetId: 'color_style.cinematic.warm_shadow_rolloff.v1',
     exportOutput,
     exportSoftProofTransform: {
@@ -174,7 +171,7 @@ if (matchedReceipt.diagnostics.failureDomain !== 'none' || matchedReceipt.diagno
 
 const warningReceipt = colorStackPreviewExportParityReceiptV1Schema.parse(
   buildColorStackPreviewExportParityReceipt({
-    editDocumentV2: currentEditDocument,
+    adjustments: adjustedColorStack,
     colorStylePresetId: 'color_style.cinematic.warm_shadow_rolloff.v1',
     exportOutput,
     exportSoftProofTransform: {
@@ -206,7 +203,7 @@ if (warningReceipt.activeColorStackHash !== matchedReceipt.activeColorStackHash)
 }
 
 const inactiveProofReceipt = buildColorStackPreviewExportParityReceipt({
-  editDocumentV2: currentEditDocument,
+  adjustments: adjustedColorStack,
   exportOutput,
   exportSoftProofTransform: null,
   isExportSoftProofEnabled: false,

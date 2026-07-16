@@ -1510,7 +1510,21 @@ const editDocumentV2ObjectSchema = z
 
 export const editDocumentV2Schema = editDocumentV2ObjectSchema;
 
-export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
+/** Strict current render/persistence boundary; only future-node quarantine may cross it. */
+export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
+  const extensionKeys = Object.keys(document.extensions);
+  if (extensionKeys.some((key) => key !== 'quarantinedNodes')) {
+    context.addIssue({ code: 'custom', message: 'Current render documents may only carry quarantinedNodes.' });
+  }
+  const quarantinedNodes = document.extensions['quarantinedNodes'];
+  if (
+    quarantinedNodes !== undefined &&
+    (quarantinedNodes === null || Array.isArray(quarantinedNodes) || typeof quarantinedNodes !== 'object')
+  ) {
+    context.addIssue({ code: 'custom', message: 'quarantinedNodes must be an object when present.' });
+  }
+});
+
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2CopyPayload = z.infer<typeof editDocumentV2CopyPayloadSchema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
