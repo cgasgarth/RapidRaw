@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { ToolType } from '../../../src/components/panel/right/layers/Masks';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildAgentReviewedAdjustmentCommandPlan } from '../../../src/utils/agent/agentReviewedAdjustmentCommands';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import {
   type AgentSelectedImageLiveSessionDraft,
@@ -101,12 +102,19 @@ const addReadyCurrentProposal = (draft: AgentSelectedImageLiveSessionDraft): Age
   return draft;
 };
 
+const buildReviewedCommand = () =>
+  buildAgentReviewedAdjustmentCommandPlan({
+    commandId: 'highlight_recovery',
+    sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+  }).receipt;
+
 const startApprovedSession = async (requestId: string) => {
   const draft = await startAgentSelectedImageLiveSessionDryRun({
     adjustments: { exposure: 0.18, highlights: -10, shadows: 12 },
     operationId: `${requestId}-operation`,
     prompt: 'Brighten the selected RAW and preserve highlight detail.',
     requestId,
+    reviewedCommand: buildReviewedCommand(),
     sessionId: 'agent-stale-apply-guards',
   });
   return approveAgentSelectedImageLiveSession(addReadyCurrentProposal(draft));
@@ -186,6 +194,7 @@ describe('agent stale apply guards', () => {
       operationId: 'issue-4878-missing-approval-operation',
       prompt: 'Brighten the selected RAW and preserve highlight detail.',
       requestId: 'issue-4878-missing-approval',
+      reviewedCommand: buildReviewedCommand(),
       sessionId: 'agent-stale-apply-guards',
     });
     const historyIndexBeforeApply = useEditorStore.getState().historyIndex;
@@ -207,6 +216,7 @@ describe('agent stale apply guards', () => {
       operationId: 'issue-5953-no-legacy-lineage-operation',
       prompt: 'Do not fabricate proposal proof.',
       requestId: 'issue-5953-no-legacy-lineage',
+      reviewedCommand: buildReviewedCommand(),
       sessionId: 'agent-stale-apply-guards',
     });
 
