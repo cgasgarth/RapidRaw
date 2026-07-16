@@ -28,6 +28,7 @@ const receipt = {
     changedPixelRatio: 0.42,
     previewExportMeanAbsDelta: 0.001,
     postFilmPreViewHashEqual: true as const,
+    saveReopenFilmNodeHashEqual: true as const,
     sourceHashUnchanged: true as const,
   },
   limitationCodes: ['display_transform_unverified'],
@@ -47,4 +48,13 @@ if (
   }).success
 )
   throw new Error('Out-of-tolerance preview/export parity was accepted.');
+if (
+  filmRuntimeProofReceiptV1Schema.safeParse({
+    ...receipt,
+    previewExportMetrics: { ...receipt.previewExportMetrics, saveReopenFilmNodeHashEqual: false },
+  }).success
+)
+  throw new Error('A changed save/reopen Film node was accepted.');
+if (filmRuntimeProofReceiptV1Schema.safeParse({ ...receipt, limitationCodes: [] }).success)
+  throw new Error('An unavailable ColorSync profile without its limitation was accepted.');
 console.log('film runtime proof receipt ok (identity, parity, limitation guards)');

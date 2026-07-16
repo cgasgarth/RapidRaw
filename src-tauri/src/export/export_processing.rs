@@ -1072,6 +1072,83 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
     tm_override: Option<u32>,
     mask_bitmaps: &[GrayImage],
 ) -> Result<DynamicImage, String> {
+    process_image_for_export_pipeline_with_optional_film_tap(
+        path,
+        transformed_image,
+        js_adjustments,
+        context,
+        state,
+        is_raw,
+        source_revision,
+        debug_tag,
+        tm_override,
+        mask_bitmaps,
+        false,
+    )
+    .map(|(image, _)| image)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(feature = "validation-harness"), allow(dead_code))]
+pub(crate) fn process_image_for_export_pipeline_with_film_tap(
+    path: &str,
+    transformed_image: &DynamicImage,
+    js_adjustments: &Value,
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    is_raw: bool,
+    source_revision: u64,
+    debug_tag: &str,
+    tm_override: Option<u32>,
+    mask_bitmaps: &[GrayImage],
+) -> Result<(DynamicImage, crate::gpu_processing::GpuPostFilmTapReceiptV1), String> {
+    let (image, receipt) = process_image_for_export_pipeline_with_optional_film_tap(
+        path,
+        transformed_image,
+        js_adjustments,
+        context,
+        state,
+        is_raw,
+        source_revision,
+        debug_tag,
+        tm_override,
+        mask_bitmaps,
+        true,
+    )?;
+    receipt
+        .map(|receipt| (image, receipt))
+        .ok_or_else(|| "film_runtime_proof_missing_production_gpu_tap".to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_image_for_export_pipeline_with_optional_film_tap(
+    path: &str,
+    transformed_image: &DynamicImage,
+    js_adjustments: &Value,
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    is_raw: bool,
+    source_revision: u64,
+    debug_tag: &str,
+    tm_override: Option<u32>,
+    mask_bitmaps: &[GrayImage],
+    capture_film_tap: bool,
+) -> Result<
+    (
+        DynamicImage,
+        Option<crate::gpu_processing::GpuPostFilmTapReceiptV1>,
+    ),
+    String,
+> {
+    let film_profile_content_sha256 = capture_film_tap
+        .then(|| {
+            js_adjustments
+                .pointer("/filmEmulation/profileRef/contentSha256")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| "film_runtime_proof_profile_identity_missing".to_string())
+        })
+        .transpose()?;
     let render_inputs =
         prepare_export_render_inputs(path, js_adjustments, state, is_raw, tm_override, 0)?;
 
@@ -1093,27 +1170,45 @@ pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
         detail_stage.owns_legacy_global_detail,
     );
 
-    process_and_get_unclamped_dynamic_image(
-        context,
-        state,
+    let identity = crate::gpu_processing::PreGpuImageIdentity::for_stage(
         retouched_image.as_ref(),
-        crate::gpu_processing::PreGpuImageIdentity::for_stage(
-            retouched_image.as_ref(),
-            source_revision,
-            detail_stage.render_hash,
-            render_inputs.pre_gpu_revision,
+        source_revision,
+        detail_stage.render_hash,
+        render_inputs.pre_gpu_revision,
+    );
+    let request = RenderRequest {
+        adjustments: gpu_adjustments,
+        mask_bitmaps,
+        lut: render_inputs.lut,
+        roi: None,
+        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+            render_inputs.edit_graph,
         ),
-        RenderRequest {
-            adjustments: gpu_adjustments,
-            mask_bitmaps,
-            lut: render_inputs.lut,
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                render_inputs.edit_graph,
-            ),
-        },
-        debug_tag,
-    )
+    };
+    if capture_film_tap {
+        crate::gpu_processing::process_and_get_unclamped_dynamic_image_with_film_tap(
+            context,
+            state,
+            retouched_image.as_ref(),
+            identity,
+            request,
+            debug_tag,
+            film_profile_content_sha256
+                .as_deref()
+                .ok_or_else(|| "film_runtime_proof_profile_identity_missing".to_string())?,
+        )
+        .map(|(image, receipt)| (image, Some(receipt)))
+    } else {
+        process_and_get_unclamped_dynamic_image(
+            context,
+            state,
+            retouched_image.as_ref(),
+            identity,
+            request,
+            debug_tag,
+        )
+        .map(|image| (image, None))
+    }
 }
 
 fn set_timestamps_from_exif(src: &Path, dst: &Path) {

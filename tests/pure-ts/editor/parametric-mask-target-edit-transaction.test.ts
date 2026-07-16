@@ -3,7 +3,7 @@ import type { ViewerParametricMaskTargetKey } from '../../../src/components/pane
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildParametricMaskTargetEditTransaction } from '../../../src/utils/parametricMaskTargetEditTransaction';
 
@@ -47,6 +47,8 @@ describe('parametric mask target edit transaction', () => {
         {
           adjustments: {},
           blendMode: 'normal' as const,
+          editNodes: createDefaultMaskEditNodes(),
+          editNodeSchemaVersion: 1 as const,
           id: 'layer:1',
           invert: false,
           name: 'Color layer',

@@ -8,7 +8,7 @@ import {
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildViewerBrushEditTransaction } from '../../../src/utils/viewerBrushEditTransaction';
 
@@ -41,6 +41,8 @@ const installState = (explicitSession: boolean): string => {
       {
         adjustments: {},
         blendMode: 'normal' as const,
+        editNodes: createDefaultMaskEditNodes(),
+        editNodeSchemaVersion: 1 as const,
         id: containerId,
         invert: false,
         name: 'Brush layer',

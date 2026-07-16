@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter';
 import { acquireQaDaemon, type QaDaemonLease, requestQaDaemon, shutdownQaDaemonLease } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
@@ -21,6 +21,8 @@ const MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS = 5;
 const fixture = structuredClone(INITIAL_ADJUSTMENTS);
 fixture.masks = Array.from({ length: 16 }, (_, index) => ({
   adjustments: {},
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: `perf-mask-${index}`,
   invert: false,
   name: `Performance mask ${index}`,

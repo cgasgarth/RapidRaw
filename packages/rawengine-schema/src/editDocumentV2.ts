@@ -1212,17 +1212,11 @@ export const editDocumentMaskNodesV2Schema = z
     'Mask edit nodes must contain every supported node type.',
   );
 
-const defaultEditDocumentMaskNodesV2 = () =>
-  editDocumentMaskNodesV2Schema.parse(
-    Object.fromEntries(editDocumentMaskNodeTypeV2Schema.options.map((nodeType) => [nodeType, { enabled: true }])),
-  );
-
-const editDocumentLayerV2ObjectSchema = z
+export const editDocumentLayerV2Schema = z
   .object({
     adjustments: z.record(z.string(), editDocumentJsonValueSchema),
     blendMode: editDocumentLayerBlendModeV2Schema.optional(),
     editNodes: editDocumentMaskNodesV2Schema,
-    editNodeQuarantine: z.record(z.string(), editDocumentJsonValueSchema).optional(),
     editNodeSchemaVersion: z.literal(1),
     id: z.string().trim().min(1),
     invert: z.boolean(),
@@ -1238,47 +1232,18 @@ const editDocumentLayerV2ObjectSchema = z
   })
   .strict()
   .superRefine((layer, context) => {
+    if (Object.hasOwn(layer.adjustments, 'sectionVisibility')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Layer adjustments must not contain legacy sectionVisibility.',
+        path: ['adjustments', 'sectionVisibility'],
+      });
+    }
     const subMaskIds = layer.subMasks.map(({ id }) => id);
     if (new Set(subMaskIds).size !== subMaskIds.length) {
       context.addIssue({ code: 'custom', message: 'Layer sub-mask IDs must be unique.', path: ['subMasks'] });
     }
   });
-
-export const editDocumentLayerV2Schema = z.preprocess((value) => {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
-  const layer = value as Readonly<Record<string, unknown>>;
-  const adjustments =
-    layer['adjustments'] !== null && typeof layer['adjustments'] === 'object' && !Array.isArray(layer['adjustments'])
-      ? (layer['adjustments'] as Readonly<Record<string, unknown>>)
-      : {};
-  const legacyVisibility =
-    adjustments['sectionVisibility'] !== null &&
-    typeof adjustments['sectionVisibility'] === 'object' &&
-    !Array.isArray(adjustments['sectionVisibility'])
-      ? (adjustments['sectionVisibility'] as Readonly<Record<string, unknown>>)
-      : null;
-  const { sectionVisibility: _legacyVisibility, ...pixelAdjustments } = adjustments;
-  const parsedNodes = editDocumentMaskNodesV2Schema.safeParse(layer['editNodes']);
-  const migratedNodes = parsedNodes.success
-    ? parsedNodes.data
-    : editDocumentMaskNodesV2Schema.parse(
-        Object.fromEntries(
-          editDocumentMaskNodeTypeV2Schema.options.map((nodeType) => [
-            nodeType,
-            { enabled: typeof legacyVisibility?.[nodeType] === 'boolean' ? legacyVisibility[nodeType] : true },
-          ]),
-        ),
-      );
-  return {
-    ...layer,
-    adjustments: pixelAdjustments,
-    editNodes: migratedNodes,
-    ...(layer['editNodes'] !== undefined && !parsedNodes.success
-      ? { editNodeQuarantine: { invalidEditNodes: layer['editNodes'] } }
-      : {}),
-    editNodeSchemaVersion: 1,
-  };
-}, editDocumentLayerV2ObjectSchema);
 
 export const editDocumentLayersV2Schema = z
   .object({ masks: z.array(editDocumentLayerV2Schema) })
@@ -1713,24 +1678,6 @@ export const editDocumentV2Schema = z.preprocess((value) => {
         },
         nodes: { ...nodes, scene_global_color_tone: { ...legacySceneNode, params: nextSceneParams } },
       };
-    }
-  }
-  const currentNodes = isEditDocumentRecord(document['nodes']) ? document['nodes'] : nodes;
-  const layersNode = currentNodes['layers'];
-  if (isEditDocumentRecord(layersNode)) {
-    const rawLayers = document['layers'];
-    const rawNodeParams = layersNode['params'];
-    if (sameJsonValue(rawLayers, rawNodeParams)) {
-      const parsedLayers = editDocumentLayersV2Schema.safeParse(rawLayers);
-      if (parsedLayers.success) {
-        // Legacy V2 documents duplicated the same pre-envelope layer domain in
-        // the graph node. Normalize both copies together for deterministic reopen.
-        document = {
-          ...document,
-          layers: parsedLayers.data,
-          nodes: { ...currentNodes, layers: { ...layersNode, params: parsedLayers.data } },
-        };
-      }
     }
   }
   document = normalizeLegacyNodeOwnership(document, {

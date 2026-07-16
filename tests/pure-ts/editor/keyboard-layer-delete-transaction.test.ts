@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { readLayerStackSidecarsFromSidecar } from '../../../packages/rawengine-schema/src';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments';
 import { buildKeyboardLayerDeleteTransaction } from '../../../src/utils/layers/keyboardLayerDeleteTransaction';
 import { buildLayerStackSidecarFromMasks } from '../../../src/utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInAdjustments } from '../../../src/utils/layers/layerStackSidecarAdjustments';
@@ -12,6 +17,8 @@ const imagePath = '/fixtures/keyboard-layer-delete.ARW';
 const layer: MaskContainer = {
   adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
   blendMode: 'normal',
+  editNodes: createDefaultMaskEditNodes(),
+  editNodeSchemaVersion: 1,
   id: 'keyboard-delete-layer',
   invert: false,
   name: 'Keyboard delete layer',
